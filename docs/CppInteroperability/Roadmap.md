@@ -21,13 +21,15 @@
 
 “Reverse” interoperability (using Swift APIs from C++) is another extremely important part of the interoperability story, however, reverse interoperability has largely different goals and constraints, which necessarily mean a different design and roadmap. Alex Lorenz will be putting together a roadmap for reverse interoperability which outlines these goals and will shed light onto the differences between the two halves of the projects. In the future this roadmap will need to be updated to explain how these two halves fit together and present the “bi-directional” interoperability story that is C++ and Swift interoperability as a whole. 
 
-**C and Objective-C interoperability:** C++ interoperability will have to build off of the previous art of C and Objective-C interoperability, not only to preserve existing Swift codebases and provide a incremental story, but also to reduce unnecessary cognitivie burdon on developers. Starting with the name, C++ inherits much of C, which means C++ interoperability has a great starting place to build off of. C is a simple language without many high level constructs, so importing C APIs is, relatively, simple. On the other hand, Objective-C adds some high level constructs, such as reference types and a generics model. However, unlike C++, Objective-C has strong idioms; there are only so many patterns for doing some specific thing. So, while C and Objective-C interoperability is a good starting place, the model for importing these languages cannot be taken wholesale for C++ interoperability. 
+**C and Objective-C interoperability:** C++ interoperability will have to build off of the previous art of C and Objective-C interoperability, not only to preserve existing Swift codebases and provide a incremental story, but also to reduce unnecessary cognitive burden on developers. Starting with the name, C++ inherits much of C, which means C++ interoperability has a great starting place to build off of. C is a simple language without many high level constructs, so importing C APIs is, relatively, simple. On the other hand, Objective-C adds some high level constructs, such as reference types and a generics model. However, unlike C++, Objective-C has strong idioms; there are only so many patterns for doing some specific thing. So, while C and Objective-C interoperability is a good starting place, the model for importing these languages cannot be taken wholesale for C++ interoperability. 
 
 ## Goals
 
 Safety is a top priority for the Swift programming language. Therefore, the Swift compiler should not import APIs that will likely be less safe in Swift than they are in C++ and interop should strive to make imported APIs *safer* in Swift than they are in C++ by providing safe API interfaces for common, unsafe C++ API patterns (such as iterators). This means that, while some common C++ APIs will be exposed through a safer interface in Swift, most C++ APIs will be imported with the same level of unsafety as they have in C++. 
 
-In a similar vein, the Swift programming language strives to be fast. C++ interoperability should follow suite, making it a goal not to have hidden performance traps. C++ APIs should have similar performance in Swift as C++ and should be called directly when possible.
+The Swift language was built with good diagnostics in mind. To fit with the rest of the language, C++ interoperability should strive to have good diagnostics, especially when an API cannot be imported. The compiler should produce a clear error any time an API that could not be imported is used, and should strive to guide the programmer towards an API interface that can be imported (for example, by suggesting annotations). 
+
+In a similar vein, the Swift programming language strives to be fast. C++ interoperability should follow suit, making it a goal not to have hidden performance traps. C++ APIs should have similar performance in Swift as C++ and should be called directly when possible.
 
 C++ is an un-opinionated language. There is little to no consensus on anything from naming, to generic programming, value categories, or error handling (to name a few things). This lack of opinion is in sharp contrast to Swift where there is generally one, specific way to do things. Even in the C++ Standard Library there is a rather un-standard set of API models. The un-opinionated nature of C++ means there are few, if any guarantees about a given C++ API, because the same functionality may be implemented using many different language features or programming paradigms. When consuming an arbitrary C++ API, you must be prepared for *anything*. Types with reference semantics (referred to as “reference types” in this document) are one example of this. Taking the reference type from our examples section:
 
@@ -99,11 +101,22 @@ doSomething(start)
 fixLifetime(v)
 ```
 
-Here, because Swift inserts a copy before the call to begin, v projects a dangling reference. This is an example of how subtly different lifetime models make using C++ types from Swift hard, if their semantics aren’t understood by the compiler. 
+To understand the problem with this code, the following snippet highlights where an implicit copy is created and destroyed:
+
+```
+var v = vector(1)
+let copy = copy(v) 
+let start = copy.begin()
+destroy(copy)
+doSomething(start) 
+fixLifetime(v)
+```
+
+Here, because Swift inserts a copy before the call to `begin`, `v` projects a dangling reference. This is an example of how subtly different lifetime models make using C++ types from Swift hard, if their semantics aren’t understood by the compiler. 
 
 To make these APIs safe and usable, Swift cannot import unsafe projections of types that own memory, because they don’t fit the Swift model. Instead, the Swift compiler can try to infer what, semantically, the API is trying to do, or the library author can provide this information via annotations. In this case, the Swift compiler can infer that begin returns an iterator, which Swift can represent through the existing, safe Swift iterator interface. In the future, Swift may gain the necessary ownership features to import and use projections of types that own memory in a safe way, but today, this is not possible, and importing these projections would result in a *less safe* API in Swift than in C++ (violating the first goal above). Other than methods which project owned memory, owned types, their instances, methods on owned types, and other APIs that use owned types are generally considered to be safe and usable.
 
-Note: in the example above, “start” is a pointer type. The use of this pointer in the “begin” API is unsafe, but the type of start itself is not unsafe. In other words, safety restrictions need not be applied to pointer types themselves but rather their unsafe uses.
+Note: in the example above, “start” is a pointer type. Using this pointer returned by the “begin” method is unsafe, but the type of start itself is not unsafe. In other words, safety restrictions need not be applied to pointer types themselves but rather their unsafe uses.
 
 Editorial note: the following three paragraphs have a lot of overlap with the above section and should be folded together somehow. 
 
@@ -130,7 +143,7 @@ C++ provides a couple of tools for writing generic APIs: templates, concepts, vi
 
 ## Evolution process
 
-Several specific API patterns are outlined above. These specific API patterns will each need a detailed, self-contained, evolution proposal which can take context from and be framed by this roadmap. Once each of these specific API patterns is accepted by the Swift community (through the evolution process) the design will be ratified and that part of Swift and C++ interoperability will no longer be considered experimental.
+Several specific API patterns are outlined above. These specific API patterns will each need a detailed, self-contained, evolution proposal which can take context from and be framed by this roadmap. Once each of these specific API patterns is accepted by the Swift community (through the evolution process) the design will be ratified.
 
 As discussed many time before, the C++ language is huge and scattered (refrase). This roadmap allows specific, focused, and self contained evolution proposals to be created for individual pieces of the language and specific programming patterns by providing goals that lend themself to this kind of incremental design and evolution (by not importing everything and requiring specific mappings for specific API patterns) and by framing interop in a larger context that these individual evolution proposals can fit into.
 
@@ -243,7 +256,7 @@ Trivial types are a subset of owned types. They can be copied by copying the bit
 
 *Pointer Types*
 
-Pointer types are trivial types that hold pointers or references to some un-owned storage (storage that is not destroyed when the object is destroyed). Pointer types are not a subset of trivial types or owned types. Examples of pointer types include `std::string_view` and `std::span` and raw pointer types such as `int *` or `void *`.
+Pointer types are trivial types that hold pointers or references to some un-owned storage (storage that is not destroyed when the object is destroyed). Pointer types are *not* a subset of trivial types or owned types. Examples of pointer types include `std::string_view` and `std::span` and raw pointer types such as `int *` or `void *`.
 
 *Projections*
 
@@ -264,4 +277,4 @@ Iterators are also projections:
   char *end() { return storage + size; } // Projects internal storage
 ```
 
-Because `string` is an owned type, the Swift compiler cannot represent a projection of its storage, so the `begin`, `end`, and `c_str` APIs are not imported.
+Because `string` is an owned type, the Swift compiler cannot represent a projection of its storage, so the `begin`, `end`, and `c_str` APIs are not imported. A projection is only valid as long as the storage it points to is valid. Projections of reference types are usually safe because reference types have storage with long, stable lifetimes, but projections of owned types are more dangerous because the storage associated with a specific copy usually has a much shorter lifetime (therefore most of these projections of owned storage cannot yet be imported).
