@@ -99,7 +99,7 @@
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:
 // CHECK-NEXT: /// Naive exception class that should be thrown
-// CHECK-NEXT: class NaiveException {
+// CHECK-NEXT: class NaiveException : public swift::Error {
 // CHECK-NEXT: public:
 // CHECK-NEXT: inline NaiveException(const char * _Nonnull msg) noexcept : msg_(msg) { }
 // CHECK-NEXT: inline NaiveException(NaiveException&& other) noexcept : msg_(other.msg_) { other.msg_ = nullptr; }

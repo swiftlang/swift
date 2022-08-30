@@ -32,6 +32,10 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
+
+extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
+
 inline void *_Nonnull opaqueAlloc(size_t size, size_t align) noexcept {
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
@@ -170,6 +174,29 @@ template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
   if constexpr (isOpaqueLayout<T>)
     return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
   return reinterpret_cast<void *>(&value);
+}
+
+namespace swift {
+class Error {
+public:
+  Error() {}
+  ~Error() {
+    if (opaqueValue)
+      swift_errorRelease(opaqueValue);
+  }
+  void* _Nonnull getPointerToOpaquePointer() { return opaqueValue; }
+  Error(Error &&other) : opaqueValue(other.opaqueValue) {
+    other.opaqueValue = nullptr;
+  }
+  Error(const Error &other) {
+    if (other.opaqueValue)
+      swift_errorRetain(other.opaqueValue);
+    opaqueValue = other.opaqueValue;
+  }
+
+private:
+  void * _Nonnull opaqueValue = nullptr;
+};
 }
 
 } // namespace _impl
