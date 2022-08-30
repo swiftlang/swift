@@ -19,13 +19,13 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
-#include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/VersionTuple.h"
 #include <system_error>
@@ -52,6 +52,7 @@ class NominalTypeDecl;
 class SourceFile;
 class TypeDecl;
 class CompilerInstance;
+enum class ModuleDependenciesKind : int8_t;
 
 enum class KnownProtocolKind : uint8_t;
 
