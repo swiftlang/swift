@@ -126,7 +126,8 @@ public:
   /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
                       const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
-                      Type resultTy, bool isDefinition);
+                      Type resultTy, bool isDefinition,
+                      ArrayRef<AdditionalParam> additionalParams);
 
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
