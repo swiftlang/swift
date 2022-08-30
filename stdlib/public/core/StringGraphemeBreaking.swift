@@ -426,6 +426,9 @@ internal struct _GraphemeBreakingState {
   // as trivial as comparing two grapheme properties.
   var isInIndicSequence = false
 
+  // The last grapheme break property we just viewed.
+  var lastProperty: Unicode._GraphemeBreakProperty? = nil
+
   // When walking forward in a string, we need to not break on emoji flag
   // sequences. Emoji flag sequences are composed of 2 regional indicators, so
   // when we see our first (.regionalIndicator, .regionalIndicator) decision,
@@ -532,7 +535,7 @@ extension _StringGuts {
       return true
     }
 
-    let x = Unicode._GraphemeBreakProperty(from: scalar1)
+    let x = state.lastProperty ?? Unicode._GraphemeBreakProperty(from: scalar1)
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
     // This variable and the defer statement help toggle the isInEmojiSequence
@@ -547,6 +550,8 @@ extension _StringGuts {
     defer {
       state.isInEmojiSequence = enterEmojiSequence
       state.isInIndicSequence = enterIndicSequence
+
+      state.lastProperty = y
     }
 
     switch (x, y) {
