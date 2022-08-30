@@ -13,8 +13,6 @@
 #include <cassert>
 #include "generics.h"
 
-extern "C" void puts(const char *);
-
 int main() {
   using namespace Generics;
 
