@@ -18,9 +18,7 @@ extern "C" void puts(const char *);
 int main() {
   using namespace Generics;
 
-  auto x = _impl::_impl_GenericPair<int, int>::returnNewValue([] (void *p) {
-    // nada.
-  });
+  auto x = makeGenericPair<int, int>(11, 42);
   puts("no\n");
 // CHECK: no
   return 0;

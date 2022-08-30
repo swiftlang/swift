@@ -86,6 +86,11 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 
 void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
                                             const NominalTypeDecl *typeDecl) {
+  if (typeDecl->isGeneric()) {
+    auto genericSignature =
+        typeDecl->getGenericSignature().getCanonicalSignature();
+    ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+  }
   os << "class ";
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << ";\n";
@@ -513,10 +518,19 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
 
 void ClangValueTypePrinter::printValueTypeReturnType(
     const NominalTypeDecl *type, OutputLanguageMode outputLang,
-    const ModuleDecl *moduleContext) {
+    TypeUseKind typeUse, const ModuleDecl *moduleContext) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
+  // FIXME: make a type use.
   if (outputLang == OutputLanguageMode::Cxx) {
-    printCxxTypeName(os, type, moduleContext);
+    if (typeUse == TypeUseKind::CxxTypeName)
+      printCxxTypeName(os, type, moduleContext);
+    else {
+      assert(typeUse == TypeUseKind::CxxImplTypeName);
+      ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
+          type->getModuleContext(), moduleContext);
+      os << cxx_synthesis::getCxxImplNamespaceName() << "::";
+      printCxxImplClassName(os, type);
+    }
   } else {
     os << "struct ";
     printCStubTypeName(type);
@@ -525,13 +539,11 @@ void ClangValueTypePrinter::printValueTypeReturnType(
 
 void ClangValueTypePrinter::printValueTypeIndirectReturnScaffold(
     const NominalTypeDecl *type, const ModuleDecl *moduleContext,
+    llvm::function_ref<void()> typePrinter,
     llvm::function_ref<void(StringRef)> bodyPrinter) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   os << "  return ";
-  ClangSyntaxPrinter(os).printModuleNamespaceQualifiersIfNeeded(
-      type->getModuleContext(), moduleContext);
-  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
-  printCxxImplClassName(os, type);
+  typePrinter();
   os << "::returnNewValue([&](void * _Nonnull result) {\n    ";
   bodyPrinter("result");
   os << ";\n";

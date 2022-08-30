@@ -57,9 +57,19 @@ public:
                                   llvm::function_ref<void()> cxxParamPrinter,
                                   bool isInOut, bool isSelf);
 
+  enum class TypeUseKind {
+    // The name of the C++ class that corresponds to the Swift value type (with
+    // any qualifiers).
+    CxxTypeName,
+    // The name of the C++ _impl class that corresponds to the Swift value type
+    // (with any qualifiers).
+    CxxImplTypeName
+  };
+
   /// Print the return type that refers to a Swift struct type in C/C++.
   void printValueTypeReturnType(const NominalTypeDecl *typeDecl,
                                 OutputLanguageMode outputLang,
+                                TypeUseKind typeUse,
                                 const ModuleDecl *moduleContext);
 
   /// Print the supporting code  that's required to indirectly return a C++
@@ -67,6 +77,7 @@ public:
   /// from the C function that represents the native Swift function.
   void printValueTypeIndirectReturnScaffold(
       const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext,
+      llvm::function_ref<void()> typePrinter,
       llvm::function_ref<void(StringRef)> bodyPrinter);
 
   /// Print the supporting code  that's required to directly return a C++ class

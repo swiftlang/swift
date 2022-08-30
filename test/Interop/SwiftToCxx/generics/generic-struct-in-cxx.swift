@@ -14,6 +14,10 @@ public struct GenericPair<T, T2> {
     let y: T2
 }
 
+public func makeGenericPair<T, T1>(_ x: T, _ y: T1) -> GenericPair<T, T1> {
+    return GenericPair<T, T1>(x: x, y: y);
+}
+
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class _impl_GenericPair;
@@ -43,4 +47,16 @@ public struct GenericPair<T, T2> {
 // CHECK-NEXT:   auto result = GenericPair<T_0_0, T_0_1>::_make();
 // CHECK-NEXT:   callable(result._getOpaquePointer());
 // CHECK-NEXT:   return result;
+// CHECK-NEXT: }
+
+// CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: class GenericPair;
+// CHECK-EMPTY:
+// CHECK-NEXT: template<class T, class T1>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T> && swift::isUsableInGenericContext<T1>
+// CHECK-NEXT: inline GenericPair<T, T1> makeGenericPair(const T & x, const T1 & y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:   return _impl::_impl_GenericPair<T, T1>::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T>(), swift::getTypeMetadata<T1>());
+// CHECK-NEXT:   });
 // CHECK-NEXT: }
