@@ -538,6 +538,8 @@ extension _StringGuts {
     let x = state.lastProperty ?? Unicode._GraphemeBreakProperty(from: scalar1)
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
+    state.lastProperty = y
+
     // This variable and the defer statement help toggle the isInEmojiSequence
     // state variable to false after every decision of 'shouldBreak'. If we
     // happen to see a rhs .extend or .zwj, then it's a signal that we should
@@ -550,8 +552,6 @@ extension _StringGuts {
     defer {
       state.isInEmojiSequence = enterEmojiSequence
       state.isInIndicSequence = enterIndicSequence
-
-      state.lastProperty = y
     }
 
     switch (x, y) {
@@ -682,7 +682,9 @@ extension _StringGuts {
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    let y = Unicode._GraphemeBreakProperty(from: scalar2)
+    let y = state.lastProperty ?? Unicode._GraphemeBreakProperty(from: scalar2)
+
+    state.lastProperty = x
 
     switch (x, y) {
 
