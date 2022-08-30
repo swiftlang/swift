@@ -34,6 +34,18 @@ int main() {
     auto x = makeConcretePair(100000, 0x1fee7);
     takeGenericPair(x);
     // CHECK-NEXT: GenericPair<UInt32, UInt32>(x: 100000, y: 130791)
+    takeConcretePair(x);
+    // CHECK-NEXT: CONCRETE pair of UInt32: 100000 130791 ;
+    auto xprime = passThroughConcretePair(x, 918);
+    takeConcretePair(x);
+    takeConcretePair(xprime);
+    takeGenericPair(xprime);
+    // CHECK-NEXT: CONCRETE pair of UInt32: 100000 130791 ;
+    // CHECK-NEXT: CONCRETE pair of UInt32: 100000 918 ;
+    // CHECK-NEXT: GenericPair<UInt32, UInt32>(x: 100000, y: 918)
+    inoutConcretePair(77, x);
+    takeConcretePair(x);
+    // CHECK-NEXT: CONCRETE pair of UInt32: 77 130791 ;
   }
   return 0;
 }

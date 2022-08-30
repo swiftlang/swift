@@ -29,7 +29,7 @@ using namespace swift;
 
 /// Print out the C type name of a struct/enum declaration.
 static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type,
-                           ArrayRef<Type> genericArgs = {}) {
+                           ArrayRef<Type> genericArgs) {
   ClangSyntaxPrinter printer(os);
   printer.printModuleNameCPrefix(*type->getParentModule());
   // FIXME: add nested type qualifiers to fully disambiguate the name.
@@ -85,7 +85,7 @@ static void
 printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
                              IRABIDetailsProvider::SizeAndAlignment layout) {
   os << "struct ";
-  printCTypeName(os, typeDecl);
+  printCTypeName(os, typeDecl, /*genericArgs=*/{});
   os << " {\n";
   os << "  _Alignas(" << layout.alignment << ") ";
   os << "char _storage[" << layout.size << "];\n";
@@ -450,7 +450,7 @@ printCStructStubForDirectPassing(raw_ostream &os, StringRef stubName, Type type,
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
-    bool isIndirect, const NominalTypeDecl *type,
+    bool isIndirect, const NominalTypeDecl *type, ArrayRef<Type> genericArgs,
     const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
     llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf) {
   // A Swift value type is passed to its underlying Swift function
@@ -458,7 +458,7 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
   if (!isIndirect && !isInOut) {
     os << cxx_synthesis::getCxxImplNamespaceName() << "::"
        << "swift_interop_passDirect_";
-    printCTypeName(os, type);
+    printCTypeName(os, type, genericArgs);
     os << '(';
   }
   if (isSelf) {

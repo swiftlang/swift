@@ -46,7 +46,7 @@ public:
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
   void printParameterCxxToCUseScaffold(
-      bool isIndirect, const NominalTypeDecl *type,
+      bool isIndirect, const NominalTypeDecl *type, ArrayRef<Type> genericArgs,
       const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
       llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf);
 

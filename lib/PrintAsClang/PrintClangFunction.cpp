@@ -190,14 +190,14 @@ public:
   ClangRepresentation visitEnumType(EnumType *ET,
                                     Optional<OptionalTypeKind> optionalKind,
                                     bool isInOutParam) {
-    return visitValueType(ET, ET->getNominalOrBoundGenericNominal(), ET,
+    return visitValueType(ET, ET->getNominalOrBoundGenericNominal(),
                           optionalKind, isInOutParam);
   }
 
   ClangRepresentation visitStructType(StructType *ST,
                                       Optional<OptionalTypeKind> optionalKind,
                                       bool isInOutParam) {
-    return visitValueType(ST, ST->getNominalOrBoundGenericNominal(), ST,
+    return visitValueType(ST, ST->getNominalOrBoundGenericNominal(),
                           optionalKind, isInOutParam);
   }
 
@@ -218,12 +218,11 @@ public:
     return result;
   }
 
-  ClangRepresentation
-  visitValueType(TypeBase *type, const NominalTypeDecl *decl, NominalType *NT,
-                 Optional<OptionalTypeKind> optionalKind, bool isInOutParam,
-                 ArrayRef<Type> genericArgs = {}) {
-    if (NT)
-      assert(isa<StructType>(NT) || isa<EnumType>(NT));
+  ClangRepresentation visitValueType(TypeBase *type,
+                                     const NominalTypeDecl *decl,
+                                     Optional<OptionalTypeKind> optionalKind,
+                                     bool isInOutParam,
+                                     ArrayRef<Type> genericArgs = {}) {
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
 
     // Handle known type names.
@@ -234,8 +233,8 @@ public:
                                                // exposed.
     // FIXME: Handle optional structures.
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
-      if (languageMode != OutputLanguageMode::Cxx && !genericArgs.empty()) {
-        // FIXME: what about concrete generic type.
+      if (languageMode != OutputLanguageMode::Cxx && !genericArgs.empty() &&
+          type->hasTypeParameter()) {
         if (!isInOutParam)
           os << "const ";
         os << "void * _Nonnull";
@@ -243,7 +242,7 @@ public:
       }
       if (languageMode != OutputLanguageMode::Cxx &&
           (decl->isResilient() ||
-           (NT && interopContext.getIrABIDetails().shouldPassIndirectly(NT)))) {
+           (interopContext.getIrABIDetails().shouldPassIndirectly(type)))) {
         if (modifiersDelegate.prefixIndirectlyPassedParamTypeInC)
           (*modifiersDelegate.prefixIndirectlyPassedParamTypeInC)(os);
         // FIXME: it would be nice to print out the C struct type here.
@@ -321,8 +320,8 @@ public:
                               bool isInOutParam) {
     if (printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
       return ClangRepresentation::representable;
-    return visitValueType(BGT, BGT->getDecl(), nullptr, optionalKind,
-                          isInOutParam, BGT->getGenericArgs());
+    return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
+                          BGT->getGenericArgs());
   }
 
   ClangRepresentation
@@ -597,11 +596,15 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
 
     if (auto *decl = type->getNominalOrBoundGenericNominal()) {
       if ((isa<StructDecl>(decl) || isa<EnumDecl>(decl))) {
+        ArrayRef<Type> genericArgs;
+        // FIXME: Do we need to account for any sugar?
+        if (const auto *bgt = type->getAs<BoundGenericType>())
+          genericArgs = bgt->getGenericArgs();
         ClangValueTypePrinter(os, cPrologueOS, typeMapping, interopContext)
             .printParameterCxxToCUseScaffold(
                 isIndirect || decl->isResilient() || isGenericType(type) ||
                     interopContext.getIrABIDetails().shouldPassIndirectly(type),
-                decl, moduleContext,
+                decl, genericArgs, moduleContext,
                 [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
                 namePrinter, isInOut,
                 /*isSelf=*/paramRole &&

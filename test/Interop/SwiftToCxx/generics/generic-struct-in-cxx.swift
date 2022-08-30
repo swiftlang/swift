@@ -30,15 +30,30 @@ public func takeGenericPair<T, T1>(_ x: GenericPair<T, T1>) {
     print(x)
 }
 
+public func takeConcretePair(_ x: GenericPair<UInt32, UInt32>) {
+    print("CONCRETE pair of UInt32: ", x.x, x.y, ";")
+}
+
 public func passThroughGenericPair<T1, T>(_ x: GenericPair<T1, T>, _ y: T)  -> GenericPair<T1, T> {
     return GenericPair<T1, T>(x: x.x, y: y)
+}
+
+public typealias ConcreteUint32Pair = GenericPair<UInt32, UInt32>
+
+public func passThroughConcretePair(_ x: ConcreteUint32Pair, y: UInt32) -> ConcreteUint32Pair {
+    return ConcreteUint32Pair(x: x.x, y: y)
 }
 
 public func inoutGenericPair<T1, T>(_ x: inout GenericPair<T1, T>, _ y: T1) {
     x.x = y
 }
 
-// CHECK: SWIFT_EXTERN void $s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // inoutGenericPair(_:_:)
+public func inoutConcretePair(_ x: UInt32, _ y: inout GenericPair<UInt32, UInt32>) {
+    y.x = x
+}
+
+// CHECK: SWIFT_EXTERN void $s8Generics17inoutConcretePairyys6UInt32V_AA07GenericD0VyA2DGztF(uint32_t x, char * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inoutConcretePair(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // inoutGenericPair(_:_:)
 // CHECK-NEXT: // Stub struct to be used to pass/return values to/from Swift functions.
 // CHECK-NEXT: struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V {
 // CHECK-NEXT:   uint64_t _1;
@@ -56,7 +71,9 @@ public func inoutGenericPair<T1, T>(_ x: inout GenericPair<T1, T>, _ y: T1) {
 // CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_EXTERN struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V $s8Generics16makeConcretePairyAA07GenericD0Vys6UInt32VAFGAF_AFtF(uint32_t x, uint32_t y) SWIFT_NOEXCEPT SWIFT_CALL; // makeConcretePair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // makeGenericPair(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V $s8Generics23passThroughConcretePair_1yAA07GenericE0Vys6UInt32VAGGAH_AGtF(struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V x, uint32_t y) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughConcretePair(_:y:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // passThroughGenericPair(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void $s8Generics16takeConcretePairyyAA07GenericD0Vys6UInt32VAFGF(struct swift_interop_stub_Generics_GenericPair_s6UInt32V_s6UInt32V x) SWIFT_NOEXCEPT SWIFT_CALL; // takeConcretePair(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(const void * _Nonnull x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)
 
 // CHECK: template<class T_0_0, class T_0_1>
@@ -95,7 +112,11 @@ public func inoutGenericPair<T1, T>(_ x: inout GenericPair<T1, T>, _ y: T1) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class GenericPair;
 // CHECK-EMPTY:
-// CHECK-NEXT: template<class T1, class T>
+// CHECK-NEXT: inline void inoutConcretePair(uint32_t x, GenericPair<uint32_t, uint32_t>& y) noexcept {
+// CHECK-NEXT:   return _impl::$s8Generics17inoutConcretePairyys6UInt32V_AA07GenericD0VyA2DGztF(x, _impl::_impl_GenericPair<uint32_t, uint32_t>::getOpaquePointer(y));
+// CHECK-NEXT: }
+
+// CHECK: template<class T1, class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T1> && swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline void inoutGenericPair(GenericPair<T1, T>& x, const T1 & y) noexcept {
 // CHECK-NEXT:   return _impl::$s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(_impl::_impl_GenericPair<T1, T>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T1>(), swift::getTypeMetadata<T>());
@@ -109,12 +130,22 @@ public func inoutGenericPair<T1, T>(_ x: inout GenericPair<T1, T>, _ y: T1) {
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
+// CHECK: inline GenericPair<uint32_t, uint32_t> passThroughConcretePair(const GenericPair<uint32_t, uint32_t>& x, uint32_t y) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:  return _impl::_impl_GenericPair<uint32_t, uint32_t>::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     _impl::swift_interop_returnDirect_Generics_GenericPair_s6UInt32V_s6UInt32V(result, _impl::$s8Generics23passThroughConcretePair_1yAA07GenericE0Vys6UInt32VAGGAH_AGtF(_impl::swift_interop_passDirect_Generics_GenericPair_s6UInt32V_s6UInt32V(_impl::_impl_GenericPair<uint32_t, uint32_t>::getOpaquePointer(x)), y));
+// CHECK-NEXT:   });
+// CHECK-NEXT: }
+
 // CHECK: template<class T1, class T>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T1> && swift::isUsableInGenericContext<T>
 // CHECK-NEXT: inline GenericPair<T1, T> passThroughGenericPair(const GenericPair<T1, T>& x, const T & y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T1, T>::returnNewValue([&](void * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(result, _impl::_impl_GenericPair<T1, T>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T1>(), swift::getTypeMetadata<T>());
 // CHECK-NEXT:   });
+// CHECK-NEXT: }
+
+// CHECK: inline void takeConcretePair(const GenericPair<uint32_t, uint32_t>& x) noexcept {
+// CHECK-NEXT:  return _impl::$s8Generics16takeConcretePairyyAA07GenericD0Vys6UInt32VAFGF(_impl::swift_interop_passDirect_Generics_GenericPair_s6UInt32V_s6UInt32V(_impl::_impl_GenericPair<uint32_t, uint32_t>::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 // CHECK: template<class T, class T1>
