@@ -717,7 +717,8 @@ static StringRef getConstructorName(const AbstractFunctionDecl *FD) {
 
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
-    StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
+    StringRef swiftSymbolName, Type resultTy, bool isDefinition,
+    ArrayRef<AdditionalParam> additionalParams) {
   bool isConstructor = isa<ConstructorDecl>(FD);
   os << "  ";
 
@@ -744,15 +745,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  SmallVector<AdditionalParam, 2> additionalParams;
-  if (!isConstructor)
-    additionalParams.push_back(AdditionalParam{
-        AdditionalParam::Role::Self,
-        typeDeclContext->getDeclaredType(),
-        /*isIndirect=*/isMutating,
-    });
   printCxxThunkBody(swiftSymbolName, FD->getModuleContext(), resultTy,
-                    FD->getParameters(), additionalParams, FD->hasThrows());
+                    FD->getParameters(), additionalParams, FD->hasThrows(),
+                    FD->getInterfaceType()->castTo<AnyFunctionType>());
   os << "  }\n";
 }
 

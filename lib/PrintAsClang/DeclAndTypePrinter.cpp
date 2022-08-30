@@ -753,9 +753,9 @@ private:
             typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
             /*isDefinition=*/false);
       } else {
-        declPrinter.printCxxMethod(typeDeclContext, AFD,
-                                   funcABI->getSymbolName(), resultTy,
-                                   /*isDefinition=*/false);
+        declPrinter.printCxxMethod(
+            typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
+            /*isDefinition=*/false, funcABI->additionalParams);
       }
 
       DeclAndTypeClangFunctionPrinter defPrinter(
@@ -769,9 +769,9 @@ private:
             typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
             /*isDefinition=*/true);
       } else {
-        defPrinter.printCxxMethod(typeDeclContext, AFD,
-                                  funcABI->getSymbolName(), resultTy,
-                                  /*isDefinition=*/true);
+        defPrinter.printCxxMethod(
+            typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
+            /*isDefinition=*/true, funcABI->additionalParams);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1068,6 +1068,9 @@ private:
 
     bool useMangledSymbolName() const { return !isCDecl; }
 
+    SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
+        additionalParams;
+
   private:
     bool isCDecl;
     StringRef symbolName;
@@ -1078,7 +1081,8 @@ private:
       AbstractFunctionDecl *FD, Type resultTy,
       llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> ABIparams,
       llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-          &params) {
+          &params,
+      Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
     for (auto param : ABIparams) {
       if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
                             ABIParameterRole::GenericRequirementRole)
@@ -1090,7 +1094,9 @@ private:
                IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-             resultTy->getASTContext().getOpaquePointerType(),
+             selfTypeDeclContext
+                 ? (*selfTypeDeclContext)->getDeclaredType()
+                 : resultTy->getASTContext().getOpaquePointerType(),
              /*isIndirect=*/
              isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
       else if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
@@ -1135,23 +1141,29 @@ private:
         owningPrinter.interopContext, owningPrinter);
     auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
                          .getFunctionABIAdditionalParams(FD);
-    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-        additionalParams;
-    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
-      additionalParams.push_back(
+    // FIXME: Ideally direct 'self' would come from IR provider too.
+    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD) &&
+        llvm::find_if(
+            ABIparams,
+            [](const IRABIDetailsProvider::ABIAdditionalParam &Param) {
+              return Param.role == IRABIDetailsProvider::ABIAdditionalParam::
+                                       ABIParameterRole::Self;
+            }) == ABIparams.end()) {
+      funcABI.additionalParams.push_back(
           {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
            (*selfTypeDeclContext)->getDeclaredType(),
            /*isIndirect=*/
            isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
-    // FIXME: Fix the method 'self' parameter.
-    if (!selfTypeDeclContext && !ABIparams.empty())
-      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+    if (!ABIparams.empty())
+      convertABIAdditionalParams(FD, resultTy, ABIparams,
+                                 funcABI.additionalParams,
+                                 /*selfContext=*/selfTypeDeclContext);
 
     auto representation = funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto,
-        additionalParams);
+        funcABI.additionalParams);
     if (representation.isUnsupported()) {
       // FIXME: Emit remark about unemitted declaration.
       return None;
@@ -1195,12 +1207,6 @@ private:
     DeclAndTypeClangFunctionPrinter funcPrinter(
         os, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
-    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-        additionalParams;
-    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
-                         .getFunctionABIAdditionalParams(FD);
-    if (!ABIparams.empty())
-      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
     DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
     modifiers.isInline = true;
     auto result = funcPrinter.printFunctionSignature(
@@ -1215,9 +1221,10 @@ private:
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(
-        funcABI.getSymbolName(), FD->getModuleContext(), resultTy,
-        FD->getParameters(), additionalParams, funcTy->isThrowing(), funcTy);
+    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(),
+                                  FD->getModuleContext(), resultTy,
+                                  FD->getParameters(), funcABI.additionalParams,
+                                  funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 
