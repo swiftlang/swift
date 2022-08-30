@@ -2241,6 +2241,34 @@ getImportTypeKindForParam(const clang::ParmVarDecl *param) {
   return importKind;
 }
 
+static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
+                                   const clang::ParmVarDecl *param,
+                                   const Identifier &name,
+                                   const swift::Type &swiftParamTy,
+                                   const bool isInOut,
+                                   const bool isParamTypeImplicitlyUnwrapped) {
+  // Figure out the name for this parameter.
+  Identifier bodyName = impl->importFullName(param, impl->CurrentVersion)
+                            .getDeclName()
+                            .getBaseIdentifier();
+
+  // It doesn't actually matter which DeclContext we use, so just use the
+  // imported header unit.
+  auto paramInfo = impl->createDeclWithClangNode<ParamDecl>(
+      param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
+      impl->importSourceLoc(param->getLocation()), bodyName,
+      impl->ImportedHeaderUnit);
+  // Foreign references are already references so they don't need to be passed
+  // as inout.
+  paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()
+                              ? ParamSpecifier::InOut
+                              : ParamSpecifier::Default);
+  paramInfo->setInterfaceType(swiftParamTy);
+  impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+
+  return paramInfo;
+}
+
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
@@ -2344,29 +2372,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy = importedType.getType();
     }
 
-    // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, CurrentVersion)
-                              .getDeclName()
-                              .getBaseIdentifier();
-
     // Retrieve the argument name.
     Identifier name;
     if (index < argNames.size())
       name = argNames[index];
 
-    // It doesn't actually matter which DeclContext we use, so just use the
-    // imported header unit.
-    auto paramInfo = createDeclWithClangNode<ParamDecl>(
-        param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
-        importSourceLoc(param->getLocation()), bodyName,
-        ImportedHeaderUnit);
-    // Foreign references are already references so they don't need to be passed
-    // as inout.
-    paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()
-                                ? ParamSpecifier::InOut
-                                : ParamSpecifier::Default);
-    paramInfo->setInterfaceType(swiftParamTy);
-    recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+    auto paramInfo = getParameterInfo(this, param, name, swiftParamTy, isInOut,
+                                      isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -3013,11 +3025,6 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       llvm_unreachable("async info computed incorrectly?");
     }
 
-    // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, CurrentVersion)
-                              .getDeclName()
-                              .getBaseIdentifier();
-
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;
     if (nameIndex < argNames.size()) {
@@ -3025,16 +3032,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
     ++nameIndex;
 
-    // Set up the parameter info.
-    auto paramInfo
-      = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           SourceLoc(), SourceLoc(), name,
-                                           importSourceLoc(param->getLocation()),
-                                           bodyName,
-                                           ImportedHeaderUnit);
-    paramInfo->setSpecifier(ParamSpecifier::Default);
-    paramInfo->setInterfaceType(swiftParamTy);
-    recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
+    // Set up the parameter info
+    auto paramInfo = getParameterInfo(this, param, name, swiftParamTy,
+                                      /*isInOut=*/false, paramIsIUO);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||
