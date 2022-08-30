@@ -5528,6 +5528,9 @@ public:
 
   /// Apply the given result builder to the closure expression.
   ///
+  /// \note builderType must be a contexutal type - callers should
+  /// open the builder type or map it into context as appropriate.
+  ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
   Optional<TypeMatchResult>
