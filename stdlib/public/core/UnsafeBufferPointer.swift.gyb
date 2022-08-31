@@ -769,15 +769,15 @@ extension Unsafe${Mutable}BufferPointer {
     from source: S
   ) -> (unwritten: S.Iterator, index: Index) where S.Element == Element {
     var iterator = source.makeIterator()
-    guard var pointer = baseAddress else { return (iterator, startIndex) }
-    for index in indices {
-      guard let element = iterator.next() else {
-        return (iterator, index)
-      }
-      pointer.pointee = element
-      pointer += 1
+    guard !self.isEmpty else { return (iterator, startIndex) }
+    _internalInvariant(_position != nil)
+    var index = startIndex
+    while index < endIndex {
+      guard let element = iterator.next() else { break }
+      _position._unsafelyUnwrappedUnchecked[index] = element
+      formIndex(after: &index)
     }
-    return (iterator, endIndex)
+    return (iterator, index)
   }
 
   /// Updates the buffer's initialized memory with every element of the source.
