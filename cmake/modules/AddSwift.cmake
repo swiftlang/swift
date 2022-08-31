@@ -608,6 +608,11 @@ function(add_swift_host_library name)
 
   translate_flags(ASHL "${options}")
 
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_SWIFT_PARSER AND ASHL_SHARED)
+    set(ASHL_HAS_SWIFT_MODULES ON)
+  endif()
+
   if(NOT ASHL_SHARED AND NOT ASHL_STATIC AND NOT ASHL_OBJECT)
     message(FATAL_ERROR "One of SHARED/STATIC/OBJECT must be specified")
   endif()
@@ -832,6 +837,11 @@ function(add_swift_host_tool executable)
   if(SWIFT_PARALLEL_LINK_JOBS)
     set_target_properties(${executable} PROPERTIES
       JOB_POOL_LINK swift_link_job_pool)
+  endif()
+
+  # Once the new Swift parser is linked in, every host tool has Swift modules.
+  if (SWIFT_SWIFT_PARSER)
+    set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
   if (ASHT_HAS_SWIFT_MODULES)
