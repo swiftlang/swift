@@ -330,3 +330,15 @@ func test_implicit_conversion_clash_with_partial_application_check() {
     }
   }
 }
+
+// rdar://99352676
+func test_init_validation() {
+  class Foo {
+    static let bar = 100.0
+
+    func getBar() -> CGFloat? {
+      return Self.bar
+      // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
+    }
+  }
+}

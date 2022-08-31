@@ -8861,6 +8861,10 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!anchor)
     return nullptr;
 
+  // Avoid checking implicit conversions injected by the compiler.
+  if (locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return nullptr;
+
   auto getType = [&cs](Expr *expr) -> Type {
     return cs.simplifyType(cs.getType(expr))->getRValueType();
   };
