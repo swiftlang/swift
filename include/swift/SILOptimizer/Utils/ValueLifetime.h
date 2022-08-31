@@ -138,6 +138,20 @@ public:
     propagateLiveness();
   }
 
+  ValueLifetimeAnalysis(SILArgument *def, ArrayRef<Operand *> useRange)
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use->getUser());
+    propagateLiveness();
+  }
+
+  ValueLifetimeAnalysis(SILInstruction *def, ArrayRef<Operand *> useRange)
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use->getUser());
+    propagateLiveness();
+  }
+
   /// Compute the LifetimeBoundary--the last users and boundary edges. This
   /// always succeeds.
   ///

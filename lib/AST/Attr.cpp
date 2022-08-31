@@ -1046,6 +1046,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
 
+  case DAK_Expose:
+    Printer.printAttrName("@_expose");
+    Printer << "(Cxx";
+    if (!cast<ExposeAttr>(this)->Name.empty())
+      Printer << ", \"" << cast<ExposeAttr>(this)->Name << "\"";
+    Printer << ")";
+    break;
+
   case DAK_ObjC: {
     Printer.printAttrName("@objc");
     llvm::SmallString<32> scratch;
@@ -1440,6 +1448,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_unavailableFromAsync";
   case DAK_BackDeploy:
     return "_backDeploy";
+  case DAK_Expose:
+    return "_expose";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2284,4 +2294,24 @@ DeclAttributes::getEffectiveSendableAttr() const {
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
+}
+
+bool swift::hasAttribute(
+    const LangOptions &langOpts, llvm::StringRef attributeName) {
+  DeclAttrKind kind = DeclAttribute::getAttrKindFromString(attributeName);
+  if (kind == DAK_Count)
+    return false;
+
+  if (DeclAttribute::isUserInaccessible(kind))
+    return false;
+  if (DeclAttribute::isDeclModifier(kind))
+    return false;
+  if (DeclAttribute::shouldBeRejectedByParser(kind))
+    return false;
+  if (DeclAttribute::isSilOnly(kind))
+    return false;
+  if (DeclAttribute::isConcurrencyOnly(kind))
+    return false;
+
+  return true;
 }

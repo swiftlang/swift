@@ -84,73 +84,73 @@ func testArchetypeDispatch<T: P>(t: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
 func testExistentialDispatch(p: P) {
-// CHECK: bb0([[P:%[0-9]+]] : $*P):
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]], P) Self
-// CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]], P) Self, #P.f : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]], P) Self
-// CHECK:   apply [[P_F_METHOD]]<@opened([[N]], P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[P_RESULT]] : $*P
-// CHECK:   dealloc_stack [[P_RESULT]] : $*P
+// CHECK: bb0([[P:%[0-9]+]] : $*any P):
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
+// CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
+// CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.f : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
+// CHECK:   apply [[P_F_METHOD]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   destroy_addr [[P_RESULT]] : $*any P
+// CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p.f()
 
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]], P) Self
-// CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], P) Self
-// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
-// CHECK:   [[P_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], P) Self, #P.p!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   [[P_RESULT_ADDR2:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]], P) Self
-// CHECK:   apply [[P_P_GETTER]]<@opened([[N]], P) Self>([[P_RESULT_ADDR2]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
-// CHECK:   destroy_addr [[P_RESULT]] : $*P
-// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
-// CHECK:   dealloc_stack [[P_RESULT]] : $*P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
+// CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
+// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], any P) Self
+// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   [[P_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.p!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_RESULT_ADDR2:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
+// CHECK:   apply [[P_P_GETTER]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR2]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   destroy_addr [[P_RESULT]] : $*any P
+// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p.p
 
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]], P) Self
-// CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
-// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], P) Self
-// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
-// CHECK:   [[P_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], P) Self, #P.subscript!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]], P) Self
-// CHECK:   apply [[P_SUBSCRIPT_GETTER]]<@opened([[N]], P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
-// CHECK:   destroy_addr [[P_RESULT]] : $*P
-// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], P) Self
-// CHECK:   dealloc_stack [[P_RESULT]] : $*P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
+// CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
+// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], any P) Self
+// CHECK:   copy_addr [[PCOPY_ADDR]] to [initialization] [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   [[P_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.subscript!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
+// CHECK:   apply [[P_SUBSCRIPT_GETTER]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   destroy_addr [[P_RESULT]] : $*any P
+// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p[]
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self28testExistentialDispatchClass{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed CP) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self28testExistentialDispatchClass{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed any CP) -> ()
 func testExistentialDispatchClass(cp: CP) {
-// CHECK: bb0([[CP:%[0-9]+]] : @guaranteed $CP):
-// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]], CP) Self
-// CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]], CP) Self, #CP.f : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]], CP) Self>([[CP_ADDR]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]], CP) Self : $@opened([[N]], CP) Self, $CP
+// CHECK: bb0([[CP:%[0-9]+]] : @guaranteed $any CP):
+// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:".*"]], any CP) Self
+// CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]], any CP) Self, #CP.f : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]], any CP) Self>([[CP_ADDR]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]], any CP) Self : $@opened([[N]], any CP) Self, $any CP
 // CHECK:   destroy_value [[RESULT_EXISTENTIAL]]
   _ = cp.f()
 
-// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]], CP) Self
-// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], CP) Self
-// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], CP) Self
-// CHECK: [[CP_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], CP) Self, #CP.p!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_P_GETTER]]<@opened([[N]], CP) Self>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]], CP) Self
-// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]], CP) Self
-// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]], CP) Self : $@opened([[N]], CP) Self, $CP
-// CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $CP
+// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:".*"]], any CP) Self
+// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], any CP) Self
+// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], any CP) Self
+// CHECK: [[CP_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any CP) Self, #CP.p!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_P_GETTER]]<@opened([[N]], any CP) Self>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]], any CP) Self
+// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]], any CP) Self
+// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]], any CP) Self : $@opened([[N]], any CP) Self, $any CP
+// CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $any CP
   _ = cp.p
 
-// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]], CP) Self
-// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], CP) Self
-// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], CP) Self
-// CHECK: [[CP_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], CP) Self, #CP.subscript!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_SUBSCRIPT_GETTER]]<@opened([[N]], CP) Self>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]], CP) Self
-// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]], CP) Self
-// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]], CP) Self : $@opened([[N]], CP) Self, $CP
-// CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $CP
+// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:".*"]], any CP) Self
+// CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], any CP) Self
+// CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], any CP) Self
+// CHECK: [[CP_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any CP) Self, #CP.subscript!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[APPLY_RESULT:%[0-9]+]] = apply [[CP_SUBSCRIPT_GETTER]]<@opened([[N]], any CP) Self>([[CP_BORROWED]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: end_borrow [[CP_BORROWED]] : $@opened([[N]], any CP) Self
+// CHECK: destroy_value [[CP_ADDR_1]] : $@opened([[N]], any CP) Self
+// CHECK: [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[APPLY_RESULT]] : $@opened([[N]], any CP) Self : $@opened([[N]], any CP) Self, $any CP
+// CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $any CP
   _ = cp[]
 }
 
@@ -348,7 +348,7 @@ class FactoryFactory {
 
     // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick FactoryFactory.Type to $@thick @dynamic_self FactoryFactory.Type
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, [[DYNAMIC_SELF]] : $@thick @dynamic_self FactoryFactory.Type
-    // CHECK: [[ANY:%.*]] = init_existential_metatype [[METATYPE]] : $@thick @dynamic_self FactoryFactory.Type.Type, $@thick Any.Type
+    // CHECK: [[ANY:%.*]] = init_existential_metatype [[METATYPE]] : $@thick @dynamic_self FactoryFactory.Type.Type, $@thick any Any.Type
     let _: Any.Type = type(of: self)
 
     while true {}

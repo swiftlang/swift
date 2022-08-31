@@ -7,6 +7,7 @@ import SwiftUI
 @MainActor
 class ContentState: ObservableObject { }
 
+@available(SwiftStdlib 5.3, *)
 struct SomeView: View {
   @StateObject private var contentState = ContentState()
 

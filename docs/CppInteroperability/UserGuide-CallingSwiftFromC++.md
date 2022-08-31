@@ -595,7 +595,7 @@ enum value will abort the program.
 A resilient Swift enumeration value could represent a case that's unknown to the client.
 Swift forces the client to check if the value is `@uknown default` when switching over
 the enumeration to account for that. C++ follows a similar principle,
-by exposing an `unknown_default` case that can then be matched in a switch.
+by exposing an `unknownDefault` case that can then be matched in a switch.
 
 For example, given the following resilient enumeration:
 
@@ -620,14 +620,14 @@ void test(const DateFormatStyle &style) {
   case DateFormatStyle::full:
     ...
     break;
-  case DateFormatStyle::unknown_default: // just like Swift's @unknown default
+  case DateFormatStyle::unknownDefault: // just like Swift's @unknown default
     // Some case value added in a future version of enum.
     break;
   }
 }
 ```
 
-The `unknown_default` case value is not a constructible case and you will get a compiler error if you try to construct it in C++.
+The `unknownDefault` case value is not a constructible case and you will get a compiler error if you try to construct it in C++.
 
 ## Using Swift Class Types
 
@@ -1320,6 +1320,16 @@ You can convert an `std::string` into a `swift::String` using an explicit constr
 ```c++
 void setSwiftString(swift::String &other, const std::string &str) {
   other = swift::String(str);
+}
+```
+
+In Objective-C++ mode, you can also convert a `swift::String` to an `NSString *` value using
+a cast or by assigning to an `NSString *` value directly:
+
+```c++
+void useObjCString(const swift::String &swStr) {
+  // This cast will bridge the Swift String to an Objective-C NSString value.
+  NSString *nsStr = swStr;
 }
 ```
 

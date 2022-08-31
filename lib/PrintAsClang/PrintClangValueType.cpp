@@ -80,9 +80,43 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   os << "};\n\n";
 }
 
+void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
+                                            const NominalTypeDecl *typeDecl) {
+  os << "class ";
+  ClangSyntaxPrinter(os).printBaseName(typeDecl);
+  os << ";\n";
+}
+
+static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
+                                         ClangSyntaxPrinter &printer,
+                                         raw_ostream &cPrologueOS) {
+  if (typeDecl == typeDecl->getASTContext().getStringDecl()) {
+    // Perform String -> NSString conversion using
+    // _bridgeToObjectiveCImpl.
+    // FIXME: This is an extension, we should
+    // just expose the method to C once extensions are
+    // supported.
+    cPrologueOS << "SWIFT_EXTERN void *_Nonnull "
+                   "$sSS23_bridgeToObjectiveCImplyXlyF(swift_interop_stub_"
+                   "Swift_String) SWIFT_NOEXCEPT SWIFT_CALL;\n";
+    printer.printObjCBlock([](raw_ostream &os) {
+      os << "  ";
+      ClangSyntaxPrinter(os).printInlineForThunk();
+      os << "operator NSString * _Nonnull () const noexcept {\n";
+      os << "    return (__bridge_transfer NSString "
+            "*)(_impl::$sSS23_bridgeToObjectiveCImplyXlyF(_impl::swift_interop_"
+            "passDirect_Swift_String(_getOpaquePointer())));\n";
+      os << "  }\n";
+    });
+  }
+}
+
 void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl,
     llvm::function_ref<void(void)> bodyPrinter) {
+  // FIXME: Add support for generic structs.
+  if (typeDecl->isGeneric())
+    return;
   llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
   if (!typeDecl->isResilient()) {
 
@@ -124,7 +158,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
                              os << typeDecl->getName().str() << '\n';
                              os << "extern \"C\" {\n";
                              for (const auto &pair : elementTagMapping) {
-                               os << "extern int "
+                               os << "extern unsigned "
                                   << pair.second.globalVariableName << ";\n";
                              }
                              os << "}\n";
@@ -183,6 +217,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << " &&) = default;\n";
 
   bodyPrinter();
+  if (typeDecl->isStdlibDecl())
+    addCppExtensionsToStdlibType(typeDecl, printer, cPrologueOS);
 
   os << "private:\n";
 
@@ -234,8 +270,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
           "metadata._0);\n";
     os << "    return _getOpaquePointer();\n";
     os << "  }\n";
-    // FIXME: (tongjie) return type should be unsigned
-    os << "  inline int _getEnumTag() const {\n";
+    os << "  inline unsigned _getEnumTag() const {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
@@ -254,7 +289,36 @@ void ClangValueTypePrinter::printValueTypeDecl(
   os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
-  os << "};\n\n";
+  os << "};\n";
+  // Print the definition of enum static struct data memebers
+  if (isa<EnumDecl>(typeDecl)) {
+    auto tagMapping = interopContext.getIrABIDetails().getEnumTagMapping(
+        cast<EnumDecl>(typeDecl));
+    for (const auto &pair : tagMapping) {
+      os << "decltype(";
+      printer.printBaseName(typeDecl);
+      os << "::";
+      printer.printIdentifier(pair.first->getNameStr());
+      os << ") ";
+      printer.printBaseName(typeDecl);
+      os << "::";
+      printer.printIdentifier(pair.first->getNameStr());
+      os << ";\n";
+    }
+    if (isOpaqueLayout) {
+      os << "decltype(";
+      printer.printBaseName(typeDecl);
+      // TODO: allow custom name for this special case
+      os << "::";
+      printer.printIdentifier("unknownDefault");
+      os << ") ";
+      printer.printBaseName(typeDecl);
+      os << "::";
+      printer.printIdentifier("unknownDefault");
+      os << ";\n";
+    }
+  }
+  os << '\n';
 
   const auto *moduleContext = typeDecl->getModuleContext();
   // Print out the "hidden" _impl class.

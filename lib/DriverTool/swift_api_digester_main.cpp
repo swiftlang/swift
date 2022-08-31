@@ -558,6 +558,11 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
   if (Ctx.getOpts().SkipRemoveDeprecatedCheck &&
       D->isDeprecated())
     return;
+  // Don't complain about removing importation of SwiftOnoneSupport.
+  if (D->getKind() == SDKNodeKind::DeclImport &&
+      D->getName() == "SwiftOnoneSupport") {
+    return;
+  }
   D->emitDiag(SourceLoc(), diag::removed_decl, false);
 }
 
@@ -690,6 +695,21 @@ public:
             // Ignore protocol requirement additions if the protocol has been added
             // to the allowlist.
             ShouldComplain = false;
+          }
+          if (ShouldComplain) {
+            // Providing a default implementation via a protocol extension for
+            // a protocol requirement is both ABI and API safe.
+            if (auto *PD = dyn_cast<SDKNodeDecl>(D->getParent())) {
+              for (auto *SIB: PD->getChildren()) {
+                if (auto *SIBD = dyn_cast<SDKNodeDecl>(SIB)) {
+                  if (SIBD->isFromExtension() &&
+                      SIBD->getPrintedName() == D->getPrintedName()) {
+                    ShouldComplain = false;
+                    break;
+                  }
+                }
+              }
+            }
           }
           if (ShouldComplain)
             D->emitDiag(D->getLoc(), diag::protocol_req_added);
@@ -1807,19 +1827,22 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
-static std::unique_ptr<DiagnosticConsumer>
+static std::vector<std::unique_ptr<DiagnosticConsumer>>
 createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError, bool DisableFailOnError,
                    bool CompilerStyleDiags, StringRef SerializedDiagPath) {
+  std::vector<std::unique_ptr<DiagnosticConsumer>> results;
   if (!SerializedDiagPath.empty()) {
     FailOnError = !DisableFailOnError;
-    return serialized_diagnostics::createConsumer(SerializedDiagPath);
+    results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
+    results.emplace_back(serialized_diagnostics::createConsumer(SerializedDiagPath));
   } else if (CompilerStyleDiags) {
     FailOnError = !DisableFailOnError;
-    return std::make_unique<PrintingDiagnosticConsumer>();
+    results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
   } else {
     FailOnError = false;
-    return std::make_unique<ModuleDifferDiagsConsumer>(true, OS);
+    results.emplace_back(std::make_unique<ModuleDifferDiagsConsumer>(true, OS));
   }
+  return results;
 }
 
 static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {

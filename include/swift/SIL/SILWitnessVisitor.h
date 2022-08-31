@@ -57,6 +57,9 @@ public:
     auto requirements = protocol->getRequirementSignature().getRequirements();
     for (const auto &reqt : requirements) {
       switch (reqt.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
+
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:

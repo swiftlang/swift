@@ -110,10 +110,10 @@ class D4 : C4, P1 { // expected-note 3 {{through reference here}}
   }
 }
 
-// SR-12236
+// https://github.com/apple/swift/issues/54662
 // N.B. This used to compile in 5.1.
-protocol SR12236 { }
-class SR12236_A { // expected-note {{through reference here}}
-    typealias Nest = SR12236 // expected-error {{circular reference}} expected-note {{through reference here}}
+protocol P_54662 { }
+class C_54662 { // expected-note {{through reference here}}
+    typealias Nest = P_54662 // expected-error {{circular reference}} expected-note {{through reference here}}
 }
-extension SR12236_A: SR12236_A.Nest { }
+extension C_54662: C_54662.Nest { }

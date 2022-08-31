@@ -2612,6 +2612,7 @@ namespace {
       if (clangModule && requiresCPlusPlus(clangModule)) {
         if (auto structDecl = dyn_cast_or_null<NominalTypeDecl>(result)) {
           conformToCxxIteratorIfNeeded(Impl, structDecl, decl);
+          conformToCxxSequenceIfNeeded(Impl, structDecl, decl);
         }
       }
 
@@ -6597,8 +6598,8 @@ void SwiftDeclConverter::importObjCProtocols(
     SmallVectorImpl<InheritedEntry> &inheritedTypes) {
   SmallVector<ProtocolDecl *, 4> protocols;
   llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    nominal->getImplicitProtocols(protocols);
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    classDecl->getImplicitProtocols(protocols);
     knownProtocols.insert(protocols.begin(), protocols.end());
   }
 

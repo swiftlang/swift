@@ -1,4 +1,4 @@
-#  Getting started with C++ Interoperability
+# Getting started with C++ Interoperability
 
 This document is designed to get you started with bidirectional API-level interoperability between Swift and C++.
 
@@ -32,10 +32,10 @@ module Cxx {
 - In your xcode project, follow the steps [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code) in your project directory
 
 Add the C++ module to the include path and enable C++ interop:
-- Navigate to your project directory 
+- Navigate to your project directory
 - In `Project` navigate to `Build Settings` -> `Swift Compiler`
 - Under `Custom Flags` -> `Other Swift Flags` add`-enable-experimental-cxx-interop`
-- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/Cxx`). Repeat this step in `Other Swift Flags` 
+- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/Cxx`). Repeat this step in `Other Swift Flags`
 
 ```
 //Add to Other Swift Flags and Import Paths respectively
@@ -64,9 +64,8 @@ struct ContentView: View {
 #ifndef Cxx_hpp
 #define Cxx_hpp
 
-int cxxFunction(int n) {
-    return n;
-}
+int cxxFunction(int n);
+
 #endif
 ```
 
@@ -74,8 +73,10 @@ int cxxFunction(int n) {
 //In Cxx.cpp
 
 #include "Cxx.hpp"
-int cxxFunction(int n);
 
+int cxxFunction(int n) {
+    return n;
+}
 
 ```
 
@@ -134,7 +135,7 @@ let package = Package(
 import Cxx
 
 public struct CxxInterop {
-    
+
     public func callCxxFunction(n: Int32) -> Int32 {
         return cxxFunction(n: n)
     }
@@ -152,7 +153,7 @@ After creating your project follow the steps [Creating a Module to contain your 
 - In`add_library` invoke `cxx-support` with the path to the C++ implementation file
 - Add the `target_include_directories` with `cxx-support` and path to the C++ Module `${CMAKE_SOURCE_DIR}/Sources/Cxx`
 - Add the `add_executable` to the specific files/directory you would like to generate source, with`SHELL:-enable-experimental-cxx-interop`.
-- In the example below we will be following the file structure used in [Creating a Swift Package](#Creating-a-Swift-Package) 
+- In the example below we will be following the file structure used in [Creating a Swift Package](#Creating-a-Swift-Package)
 
 ```
 //In CMakeLists.txt
@@ -199,7 +200,7 @@ CxxInterop.main()
 
 - In your project's directory, run `cmake` to generate the systems build files
 
-- To generate an Xcode project run `cmake -GXcode` 
+- To generate an Xcode project run `cmake -GXcode`
 - To generate with Ninja run `cmake -GNinja`
 
 - For more information on `cmake` see the  'GettingStarted' documentation: (https://github.com/apple/swift/blob/main/docs/HowToGuides/GettingStarted.md)

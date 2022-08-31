@@ -519,6 +519,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   (void)kind;
 
   DeclID clangNodeOwnerID;
+  ModuleID parentModuleID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
@@ -538,7 +539,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, isDistributed, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, SemanticsIDs);
+      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   if (funcTyID == 0) {
     MF->fatal("SILFunction typeID is 0");
@@ -661,9 +662,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
-    fn->setIsWeakImported(isWeakImported
-                              ? IsWeakImported_t::IsAlwaysWeakImported
-                              : IsWeakImported_t::IsNotWeakImported);
+    fn->setIsAlwaysWeakImported(isWeakImported);
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
 
@@ -705,11 +704,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setWasDeserializedCanonical();
 
   fn->setBare(IsBare);
-  const SILDebugScope *DS = fn->getDebugScope();
-  if (!DS) {
-    DS = new (SILMod) SILDebugScope(loc, fn);
+  if (!fn->getDebugScope()) {
+    const SILDebugScope *DS = new (SILMod) SILDebugScope(loc, fn);
     fn->setDebugScope(DS);
   }
+
+  // If we don't already have a DeclContext to use to find a parent module,
+  // attempt to deserialize a parent module reference directly.
+  if (!fn->getDeclContext() && parentModuleID)
+    fn->setParentModule(MF->getModule(parentModuleID));
 
   // Read and instantiate the specialize attributes.
   bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
@@ -943,6 +946,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
       bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
       fArg->setNoImplicitCopy(isNoImplicitCopy);
+      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 17) & 0x3);
+      fArg->setLifetimeAnnotation(lifetime);
       Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
@@ -3014,6 +3019,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   // TODO: If this results in any noticeable performance problems, Cache the
   // linkage to avoid re-reading it from the bitcode each time?
   DeclID clangOwnerID;
+  ModuleID parentModuleID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
@@ -3033,7 +3039,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, isDistributed, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangOwnerID, SemanticsIDs);
+      genericSigID, clangOwnerID, parentModuleID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

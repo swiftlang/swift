@@ -20,24 +20,24 @@ struct S: P {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21existential_metatypes0A8MetatypeyyAA1P_pF
-// CHECK: bb0([[X:%.*]] : $*P):
+// CHECK: bb0([[X:%.*]] : $*any P):
 func existentialMetatype(_ x: P) {
-  // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick P.Type, [[X]]
+  // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick any P.Type, [[X]]
   let type1 = type(of: x)
-  // CHECK: [[INSTANCE1:%.*]] = alloc_stack [lexical] $P
+  // CHECK: [[INSTANCE1:%.*]] = alloc_stack [lexical] $any P
   // CHECK: [[OPEN_TYPE1:%.*]] = open_existential_metatype [[TYPE1]]
   // CHECK: [[INIT:%.*]] = witness_method {{.*}} #P.init!allocator
-  // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*P
+  // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*any P
   // CHECK: apply [[INIT]]<{{.*}}>([[INSTANCE1_VALUE]], [[OPEN_TYPE1]])
   let instance1 = type1.init()
 
   // CHECK: [[S:%.*]] = metatype $@thick S.Type
-  // CHECK: [[TYPE2:%.*]] = init_existential_metatype [[S]] : $@thick S.Type, $@thick P.Type
+  // CHECK: [[TYPE2:%.*]] = init_existential_metatype [[S]] : $@thick S.Type, $@thick any P.Type
   let type2: P.Type = S.self
-  // CHECK: [[INSTANCE2:%.*]] = alloc_stack [lexical] $P
+  // CHECK: [[INSTANCE2:%.*]] = alloc_stack [lexical] $any P
   // CHECK: [[OPEN_TYPE2:%.*]] = open_existential_metatype [[TYPE2]]
   // CHECK: [[STATIC_METHOD:%.*]] = witness_method {{.*}} #P.staticMethod
-  // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*P
+  // CHECK: [[INSTANCE2_VALUE:%.*]] = init_existential_addr [[INSTANCE2]] : $*any P
   // CHECK: apply [[STATIC_METHOD]]<{{.*}}>([[INSTANCE2_VALUE]], [[OPEN_TYPE2]])
   let instance2 = type2.staticMethod()
 }
@@ -64,9 +64,8 @@ func existentialMetatypeUpcast2(_ x: (P & Q).Type) -> P.Type {
 // rdar://32288618
 // CHECK-LABEL: sil hidden [ossa] @$s21existential_metatypes0A19MetatypeVarPropertyAA5ValueVyF : $@convention(thin) () -> Value
 func existentialMetatypeVarProperty() -> Value {
-  // CHECK:      [[BOX:%.*]] = alloc_box ${ var @thick P.Type }
-  // CHECK:      [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
-  // CHECK:      [[ADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var @thick P.Type }, 0
+  // CHECK:      [[BOX:%.*]] = alloc_box ${ var @thick any P.Type }
+  // CHECK:      [[ADDR:%.*]] = project_box [[BOX]] : ${ var @thick any P.Type }, 0
   // CHECK:      [[T0:%.*]] = metatype $@thick S.Type
   // CHECK:      [[T1:%.*]] = init_existential_metatype [[T0]]
   // CHECK:      store [[T1]] to [trivial] [[ADDR]] :
@@ -82,8 +81,8 @@ func existentialMetatypeVarProperty() -> Value {
 var _type: P.Type { get {return S.self } set {} }
 func getterResultStaticStorageAccess() {
   // CHECK:      [[GET_TYPE:%.*]] = function_ref @$s21existential_metatypes5_typeAA1P_pXpvg
-  // CHECK-NEXT: [[TYPE:%.*]] = apply [[GET_TYPE]]() : $@convention(thin) () -> @thick P.Type
-  // CHECK-NEXT: [[OPEN:%.*]] = open_existential_metatype [[TYPE]] : $@thick P.Type to $@thick ([[ARCHETYPE:@opened\(.*, P\) Self]]).Type
+  // CHECK-NEXT: [[TYPE:%.*]] = apply [[GET_TYPE]]() : $@convention(thin) () -> @thick any P.Type
+  // CHECK-NEXT: [[OPEN:%.*]] = open_existential_metatype [[TYPE]] : $@thick any P.Type to $@thick ([[ARCHETYPE:@opened\(.*, any P\) Self]]).Type
   // CHECK-NEXT: [[GET_VALUE:%.*]] = witness_method $[[ARCHETYPE]], #P.value!getter
   // CHECK-NEXT: [[VALUE:%.*]] = apply [[GET_VALUE]]<[[ARCHETYPE]]>([[OPEN]])
   // CHECK-NEXT: // function_ref

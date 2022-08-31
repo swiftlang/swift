@@ -12,13 +12,18 @@ import Swift
 import SwiftShims
 
 class List {
-  var x: Int
+  var x: Int64
   let next: List
 }
 
 struct S {
   var l: List
-  var y: Int
+  var y: Int64
+}
+
+struct TwoInts {
+  var a: Int64
+  var b: Int64
 }
 
 struct Ptr {
@@ -26,106 +31,104 @@ struct Ptr {
 }
 
 // CHECK-LABEL: Accesses for readIdentifiedArg
-// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int
-// CHECK-NEXT:     Path: ""
+// CHECK-NEXT:     no Storage paths
 // CHECK-NEXT: End accesses for readIdentifiedArg
-sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int) -> Int {
-bb0(%0 : $*Int):
-  %res = load [trivial] %0 : $*Int
-  return %res : $Int
+sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int64) -> Int64 {
+bb0(%0 : $*Int64):
+  %res = load [trivial] %0 : $*Int64
+  return %res : $Int64
 }
 
 // CHECK-LABEL: Accesses for writeIdentifiedArg
-// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int
+// CHECK-NEXT: Value: %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int
+// CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Int64
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Int
-// CHECK-NEXT:     Path: ""
+// CHECK-NEXT:     no Storage paths
 // CHECK-NEXT: End accesses for writeIdentifiedArg
-sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
+sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
   %2 = integer_literal $Builtin.Int64, 42
-  %3 = struct $Int (%2 : $Builtin.Int64)
-  store %3 to [trivial] %0 : $*Int
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  store %3 to [trivial] %0 : $*Int64
   %5 = tuple ()
   return %5 : $()
 }
 
-// CHECK-LABEL: Accesses for $writeToHead
-// CHECK-NEXT: Value:   %7 = begin_access [modify] [dynamic] %6 : $*Int
-// CHECK-NEXT:   Scope:   %7 = begin_access [modify] [dynamic] %6 : $*Int
+// CHECK-LABEL: Accesses for writeToHead
+// CHECK-NEXT: Value:   %7 = begin_access [modify] [dynamic] %6 : $*Int64
+// CHECK-NEXT:   Scope:   %7 = begin_access [modify] [dynamic] %6 : $*Int64
 // CHECK-NEXT:   Base: class -   %6 = ref_element_addr %5 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $S
 // CHECK-NEXT:     Path: "s0.c0"
-// CHECK-NEXT: End accesses for $writeToHead
-sil [ossa] @$writeToHead : $@convention(thin) (@guaranteed S) -> () {
+// CHECK-NEXT: End accesses for writeToHead
+sil [ossa] @writeToHead : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
   debug_value %0 : $S, let, name "s", argno 1
   %2 = struct_extract %0 : $S, #S.l
   %3 = integer_literal $Builtin.Int64, 10
-  %4 = struct $Int (%3 : $Builtin.Int64)
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
   %5 = begin_borrow [lexical] %2 : $List
   %6 = ref_element_addr %5 : $List, #List.x
-  %7 = begin_access [modify] [dynamic] %6 : $*Int
-  store %4 to [trivial] %7 : $*Int
-  end_access %7 : $*Int
+  %7 = begin_access [modify] [dynamic] %6 : $*Int64
+  store %4 to [trivial] %7 : $*Int64
+  end_access %7 : $*Int64
   end_borrow %5 : $List
   %11 = tuple ()
   return %11 : $()
 }
 
 // CHECK-LABEL: Accesses for storeToArgs
-// CHECK-NEXT: Value:   %6 = begin_access [modify] [dynamic] %5 : $*Int
-// CHECK-NEXT:   Scope:   %6 = begin_access [modify] [dynamic] %5 : $*Int
+// CHECK-NEXT: Value:   %6 = begin_access [modify] [dynamic] %5 : $*Int64
+// CHECK-NEXT:   Scope:   %6 = begin_access [modify] [dynamic] %5 : $*Int64
 // CHECK-NEXT:   Base: class -   %5 = ref_element_addr %0 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $List
 // CHECK-NEXT:     Path: "c0"
-// CHECK-NEXT: Value:   %14 = begin_access [modify] [dynamic] %13 : $*Int
-// CHECK-NEXT:   Scope:   %14 = begin_access [modify] [dynamic] %13 : $*Int
+// CHECK-NEXT: Value:   %14 = begin_access [modify] [dynamic] %13 : $*Int64
+// CHECK-NEXT:   Scope:   %14 = begin_access [modify] [dynamic] %13 : $*Int64
 // CHECK-NEXT:   Base: class -   %13 = ref_element_addr %1 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %1 = argument of bb0 : $List
 // CHECK-NEXT:     Path: "c0"
 // CHECK-NEXT: End accesses for storeToArgs
 sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
-bb0(%1 : @guaranteed $List, %2 : @guaranteed $List):
+bb0(%0 : @guaranteed $List, %1 : @guaranteed $List):
   cond_br undef, bb1, bb2
 
 bb1:
-  %8 = integer_literal $Builtin.Int64, 10
-  %9 = struct $Int (%8 : $Builtin.Int64)
-  %10 = ref_element_addr %1 : $List, #List.x
-  %11 = begin_access [modify] [dynamic] %10 : $*Int
-  store %9 to [trivial] %11 : $*Int
-  end_access %11 : $*Int
-  %14 = tuple ()
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = ref_element_addr %0 : $List, #List.x
+  %6 = begin_access [modify] [dynamic] %5 : $*Int64
+  store %4 to [trivial] %6 : $*Int64
+  end_access %6 : $*Int64
+  %9 = tuple ()
   br bb3
 
 bb2:
-  %16 = integer_literal $Builtin.Int64, 20
-  %17 = struct $Int (%16 : $Builtin.Int64)
-  %18 = ref_element_addr %2 : $List, #List.x
-  %19 = begin_access [modify] [dynamic] %18 : $*Int
-  store %17 to [trivial] %19 : $*Int
-  end_access %19 : $*Int
-  %22 = tuple ()
+  %11 = integer_literal $Builtin.Int64, 20
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  %13 = ref_element_addr %1 : $List, #List.x
+  %14 = begin_access [modify] [dynamic] %13 : $*Int64
+  store %12 to [trivial] %14 : $*Int64
+  end_access %14 : $*Int64
+  %17 = tuple ()
   br bb3
 
 bb3:
-  %24 = tuple ()
-  return %24 : $()
+  %19 = tuple ()
+  return %19 : $()
 }
 
 // CHECK-LABEL: Accesses for storeMaybeLocalPhi
-// CHECK-NEXT: Value:   %10 = begin_access [modify] [dynamic] %9 : $*Int
-// CHECK-NEXT:   Scope:   %10 = begin_access [modify] [dynamic] %9 : $*Int
+// CHECK-NEXT: Value:   %10 = begin_access [modify] [dynamic] %9 : $*Int64
+// CHECK-NEXT:   Scope:   %10 = begin_access [modify] [dynamic] %9 : $*Int64
 // CHECK-NEXT:   Base: class -   %9 = ref_element_addr %6 : $List, #List.x
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage:   %4 = alloc_ref $List
@@ -134,28 +137,29 @@ bb3:
 // CHECK-NEXT:     Path: "c0"
 // CHECK-NEXT: End accesses for storeMaybeLocalPhi
 sil @storeMaybeLocalPhi : $@convention(thin) (@guaranteed List) -> () {
-bb0(%1 : $List):
+bb0(%0 : $List):
   cond_br undef, bb1, bb2
 
 bb1:
-  strong_retain %1 : $List
-  br bb3(%1 : $List)
+  strong_retain %0 : $List
+  br bb3(%0 : $List)
 
 bb2:
-  %10 = alloc_ref $List
-  br bb3(%10 : $List)
+  %4 = alloc_ref $List
+  br bb3(%4 : $List)
 
-bb3(%12 : $List):
-  %14 = integer_literal $Builtin.Int64, 20
-  %15 = struct $Int (%14 : $Builtin.Int64)
-  %16 = ref_element_addr %12 : $List, #List.x
-  %17 = begin_access [modify] [dynamic] %16 : $*Int
-  store %15 to %17 : $*Int
-  end_access %17 : $*Int
-  %20 = tuple ()
-  strong_release %12 : $List
-  %22 = tuple ()
-  return %22 : $()
+
+bb3(%6 : $List):
+  %7 = integer_literal $Builtin.Int64, 20
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  %9 = ref_element_addr %6 : $List, #List.x
+  %10 = begin_access [modify] [dynamic] %9 : $*Int64
+  store %8 to %10 : $*Int64
+  end_access %10 : $*Int64
+  %13 = tuple ()
+  strong_release %6 : $List
+  %15 = tuple ()
+  return %15 : $()
 }
 
 
@@ -164,8 +168,7 @@ bb3(%12 : $List):
 // CHECK-NEXT:   Scope: base
 // CHECK-NEXT:   Base: argument - %0 = argument of bb0 : $*Ptr
 // CHECK-NEXT:   Path: "s0"
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : $*Ptr
-// CHECK-NEXT:     Path: "s0"
+// CHECK-NEXT:     no Storage paths
 // CHECK-NEXT: End accesses for testStructPhiCommon
 sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
 bb0(%0 : $*Ptr):
@@ -180,13 +183,13 @@ bb2:
   %5 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
   br bb3(%5 : $Builtin.RawPointer)
 
-bb3(%6 : $Builtin.RawPointer) :
+bb3(%6 : $Builtin.RawPointer):
   %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
   %8 = integer_literal $Builtin.Int64, 2
   %9 = struct $Int64 (%8 : $Builtin.Int64)
   store %9 to [trivial] %7 : $*Int64
-  %22 = tuple ()
-  return %22 : $()
+  %11 = tuple ()
+  return %11 : $()
 }
 
 // CHECK-LABEL: Accesses for testStructPhiDivergent
@@ -194,50 +197,49 @@ bb3(%6 : $Builtin.RawPointer) :
 // CHECK-NEXT:   Scope: base
 // CHECK-NEXT:   Base: pointer - %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64 // user: %13
-// CHECK-NEXT:     Path: ""
+// CHECK-NEXT:     no Storage paths
 // CHECK-NEXT: End accesses for testStructPhiDivergent
 sil [ossa] @testStructPhiDivergent : $@convention(thin) (@inout Ptr) -> () {
 bb0(%0 : $*Ptr):
-  %ptr = alloc_stack $Ptr
+  %1 = alloc_stack $Ptr
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = struct_element_addr %ptr : $*Ptr, #Ptr.p
-  %3 = address_to_pointer %2 : $*Int64 to $Builtin.RawPointer
-  br bb3(%3 : $Builtin.RawPointer)
+  %3 = struct_element_addr %1 : $*Ptr, #Ptr.p
+  %4 = address_to_pointer %3 : $*Int64 to $Builtin.RawPointer
+  br bb3(%4 : $Builtin.RawPointer)
 
 bb2:
-  %4 = struct_element_addr %0 : $*Ptr, #Ptr.p
-  %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
-  br bb3(%5 : $Builtin.RawPointer)
+  %6 = struct_element_addr %0 : $*Ptr, #Ptr.p
+  %7 = address_to_pointer %6 : $*Int64 to $Builtin.RawPointer
+  br bb3(%7 : $Builtin.RawPointer)
 
-bb3(%6 : $Builtin.RawPointer) :
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int64
-  %8 = integer_literal $Builtin.Int64, 2
-  %9 = struct $Int64 (%8 : $Builtin.Int64)
-  store %9 to [trivial] %7 : $*Int64
-  dealloc_stack %ptr : $*Ptr
-  %22 = tuple ()
-  return %22 : $()
+
+bb3(%9 : $Builtin.RawPointer):
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*Int64
+  %11 = integer_literal $Builtin.Int64, 2
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to [trivial] %10 : $*Int64
+  dealloc_stack %1 : $*Ptr
+  %15 = tuple ()
+  return %15 : $()
 }
 
-
 // CHECK-LABEL: Accesses for readIdentifiedBoxArg
-// CHECK-NEXT: Value:   %2 = begin_access [read] [dynamic] %1 : $*Int
-// CHECK-NEXT:   Scope:   %2 = begin_access [read] [dynamic] %1 : $*Int
-// CHECK-NEXT:   Base: box -   %1 = project_box %0 : ${ var Int }, 0
+// CHECK-NEXT: Value:   %2 = begin_access [read] [dynamic] %1 : $*Int64
+// CHECK-NEXT:   Scope:   %2 = begin_access [read] [dynamic] %1 : $*Int64
+// CHECK-NEXT:   Base: box -   %1 = project_box %0 : ${ var Int64 }, 0
 // CHECK-NEXT:   Path: ""
-// CHECK-NEXT:     Storage: %0 = argument of bb0 : ${ var Int }
+// CHECK-NEXT:     Storage: %0 = argument of bb0 : ${ var Int64 }
 // CHECK-NEXT:     Path: "c0"
 // CHECK-NEXT: End accesses for readIdentifiedBoxArg
-sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
-bb0(%0 : @guaranteed ${ var Int }):
-  %1 = project_box %0 : ${ var Int }, 0
-  %5 = begin_access [read] [dynamic] %1 : $*Int
-  %6 = load [trivial] %5 : $*Int
-  end_access %5 : $*Int
-  return %6 : $Int
+sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : @guaranteed ${ var Int64 }):
+  %1 = project_box %0 : ${ var Int64 }, 0
+  %5 = begin_access [read] [dynamic] %1 : $*Int64
+  %6 = load [trivial] %5 : $*Int64
+  end_access %5 : $*Int64
+  return %6 : $Int64
 }
 
 
@@ -246,6 +248,7 @@ class A {
 }
 class B : A {
   var prop1: Int64
+  var prop2: Int64
 }
 
 // CHECK-LABEL: Accesses for testNonUniquePropertyIndex
@@ -274,6 +277,18 @@ bb0(%0 : $Int64):
   return %99 : $()
 }
 
+struct MySwiftArrayBodyStorage {
+  @_hasStorage var count : Int64
+}
+
+struct MyArrayBody {
+  @_hasStorage var _storage : MySwiftArrayBodyStorage
+}
+
+class MyContiguousArrayStorageBase {
+  @_hasStorage var countAndCapacity : MyArrayBody
+}
+
 struct _MyBridgeStorage {
   @_hasStorage var rawValue : Builtin.BridgeObject
 }
@@ -288,21 +303,21 @@ struct MyArray<T> {
 }
 
 // CHECK-LABEL: Accesses for testRefTailAndStruct0
-// CHECK-NEXT: Value:   %8 = struct_element_addr %7 : $*Int, #Int._value // user: %9
+// CHECK-NEXT: Value:   %8 = struct_element_addr %7 : $*Int64, #Int64._value // user: %9
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: class -   %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+// CHECK-NEXT:   Base: class -   %5 = ref_element_addr [immutable] %4 : $MyContiguousArrayStorageBase, #MyContiguousArrayStorageBase.countAndCapacity
 // CHECK-NEXT:   Path: "s0.s0.s0"
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
 // CHECK-NEXT:     Path: "s0.s0.s0.c0.s0.s0.s0"
 // CHECK-NEXT: Value:   %11 = struct_element_addr %10 : $*String, #String._guts
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Base: tail -   %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
 // CHECK-NEXT:   Path: "s0"
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
 // CHECK-NEXT:     Path: "s0.s0.s0.ct.s0"
-// CHECK-NEXT: Value:   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT: Value:   %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
 // CHECK-NEXT:   Scope: base
-// CHECK-NEXT:   Base: tail -   %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+// CHECK-NEXT:   Base: tail -   %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
 // CHECK-NEXT:   Path: ""
 // CHECK-NEXT:     Storage: %0 = argument of bb0 : $MyArray<String>
 // CHECK-NEXT:     Path: "s0.s0.s0.ct"
@@ -312,16 +327,175 @@ bb0(%0 : $MyArray<String>):
   %1 = struct_extract %0 : $MyArray<String>, #MyArray._buffer
   %2 = struct_extract %1 : $_MyArrayBuffer<String>, #_MyArrayBuffer._storage
   %3 = struct_extract %2 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
-  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
-  %5 = ref_element_addr [immutable] %4 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
-  %6 = struct_element_addr %5 : $*_ArrayBody, #_ArrayBody._storage
-  %7 = struct_element_addr %6 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
-  %8 = struct_element_addr %7 : $*Int, #Int._value
+  %4 = unchecked_ref_cast %3 : $Builtin.BridgeObject to $MyContiguousArrayStorageBase
+  %5 = ref_element_addr [immutable] %4 : $MyContiguousArrayStorageBase, #MyContiguousArrayStorageBase.countAndCapacity
+  %6 = struct_element_addr %5 : $*MyArrayBody, #MyArrayBody._storage
+  %7 = struct_element_addr %6 : $*MySwiftArrayBodyStorage, #MySwiftArrayBodyStorage.count
+  %8 = struct_element_addr %7 : $*Int64, #Int64._value
   %9 = load %8 : $*Builtin.Int64
-  %10 = ref_tail_addr [immutable] %4 : $__ContiguousArrayStorageBase, $String
+  %10 = ref_tail_addr [immutable] %4 : $MyContiguousArrayStorageBase, $String
   %11 = struct_element_addr %10 : $*String, #String._guts
   %12 = load %11 : $*_StringGuts
   %13 = load %10 : $*String
   %14 = tuple ()
   return %14 : $()
+}
+
+sil_global @global1 : $Int64
+sil_global @global2 : $Int64
+
+sil @coro : $@yield_once @convention(thin) () -> @yields @inout Int64
+
+sil @_isDistinct : $@convention(thin) <T1, T2> (@inout T1, @inout T2) -> ()
+sil @_isNotDistinct : $@convention(thin) <T1, T2> (@inout T1, @inout T2) -> ()
+
+// CHECK-LABEL: Accesses for testAccessBaseAliasing
+// CHECK-NEXT: End accesses for testAccessBaseAliasing
+sil @testAccessBaseAliasing : $@convention(thin) (@inout Int64, @inout_aliasable Int64, @inout_aliasable Int64, Builtin.RawPointer, Builtin.RawPointer, @guaranteed B, @guaranteed B, @guaranteed { var Int64, var Int64 }, @guaranteed { var Int64, var Int64 }) -> () {
+bb0(%inoutArg : $*Int64, %aliasableArg1 : $*Int64, %aliasableArg2 : $*Int64, %3 : $Builtin.RawPointer, %4 : $Builtin.RawPointer, %5 : $B, %6 : $B, %7 : ${ var Int64, var Int64 }, %8 : ${ var Int64, var Int64 }):
+  %pointer1 = pointer_to_address %3 : $Builtin.RawPointer to $*Int64
+  %pointer2 = pointer_to_address %4 : $Builtin.RawPointer to $*Int64
+
+  %stack1 = alloc_stack $Int64
+  %stack2 = alloc_stack $Int64
+
+  %20 = alloc_ref $B
+  %21 = alloc_ref $B
+  %prop1OfClassArg1 = ref_element_addr %5 : $B, #B.prop1
+  %prop1OfClassArg2 = ref_element_addr %6 : $B, #B.prop1
+  %prop2OfClassArg2 = ref_element_addr %6 : $B, #B.prop2
+  %prop1OfLocalClass1 = ref_element_addr %20 : $B, #B.prop1
+  %prop1OfLocalClass2 = ref_element_addr %21 : $B, #B.prop1
+  %prop2OfLocalClass2 = ref_element_addr %21 : $B, #B.prop2
+  %tailOfClassArg1 = ref_tail_addr %5 : $B, $Int64
+  %tailOfClassArg2 = ref_tail_addr %6 : $B, $Int64
+  %tailOfLocalClass1 = ref_tail_addr %20 : $B, $Int64
+  %tailOfLocalClass2 = ref_tail_addr %21 : $B, $Int64
+
+  %30 = alloc_box ${ var Int64, var Int64 }
+  %31 = alloc_box ${ var Int64, var Int64 }
+  %field0OfBoxArg1 = project_box %7 : ${ var Int64, var Int64 }, 0
+  %field0OfBoxArg2 = project_box %8 : ${ var Int64, var Int64 }, 0
+  %field1OfBoxArg2 = project_box %8 : ${ var Int64, var Int64 }, 1
+  %field0OfLocalBox1 = project_box %30 : ${ var Int64, var Int64 }, 0
+  %field0OfLocalBox2 = project_box %31 : ${ var Int64, var Int64 }, 0
+  %field1OfLocalBox2 = project_box %31 : ${ var Int64, var Int64 }, 1
+
+  %global1 = global_addr @global1 : $*Int64
+  %global2 = global_addr @global2 : $*Int64
+
+  %50 = function_ref @coro : $@yield_once @convention(thin) () -> @yields @inout Int64
+  (%yield1, %52) = begin_apply %50() : $@yield_once @convention(thin) () -> @yields @inout Int64
+  end_apply %52
+  (%yield2, %55) = begin_apply %50() : $@yield_once @convention(thin) () -> @yields @inout Int64
+  end_apply %55
+
+  %isDistinct = function_ref @_isDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Function arguments
+  %101 = apply %isDistinct<Int64, Int64>(%inoutArg, %aliasableArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %102 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %aliasableArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Pointers
+  %103 = apply %isNotDistinct<Int64, Int64>(%pointer1, %pointer2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Stack allocations
+  %104 = apply %isNotDistinct<Int64, Int64>(%stack1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %105 = apply %isDistinct<Int64, Int64>(%stack1, %stack2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Classes
+  %121 = apply %isNotDistinct<Int64, Int64>(%prop1OfClassArg1, %prop1OfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %122 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %prop2OfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %123 = apply %isNotDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop1OfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %124 = apply %isDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop1OfLocalClass2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %125 = apply %isDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop2OfLocalClass2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %126 = apply %isDistinct<Int64, Int64>(%prop1OfLocalClass1, %prop1OfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Tail elements
+  %127 = apply %isNotDistinct<Int64, Int64>(%tailOfClassArg1, %tailOfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %128 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %tailOfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %129 = apply %isDistinct<Int64, Int64>(%tailOfLocalClass1, %tailOfLocalClass2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %130 = apply %isNotDistinct<Int64, Int64>(%tailOfLocalClass1, %tailOfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Boxes
+  %131 = apply %isNotDistinct<Int64, Int64>(%field0OfBoxArg1, %field0OfBoxArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %132 = apply %isDistinct<Int64, Int64>(%field0OfBoxArg1, %field1OfBoxArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %133 = apply %isNotDistinct<Int64, Int64>(%field0OfLocalBox1, %field0OfLocalBox1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %134 = apply %isDistinct<Int64, Int64>(%field0OfLocalBox1, %field0OfLocalBox2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %135 = apply %isDistinct<Int64, Int64>(%field0OfLocalBox1, %field1OfLocalBox2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %136 = apply %isDistinct<Int64, Int64>(%field0OfLocalBox1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Globals
+  %140 = apply %isNotDistinct<Int64, Int64>(%global1, %global1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %141 = apply %isDistinct<Int64, Int64>(%global1, %global2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Yields
+  %145 = apply %isNotDistinct<Int64, Int64>(%yield1, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %146 = apply %isNotDistinct<Int64, Int64>(%yield1, %yield2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Function arguments vs others
+  %150 = apply %isNotDistinct<Int64, Int64>(%inoutArg, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %151 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %152 = apply %isDistinct<Int64, Int64>(%inoutArg, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %153 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %154 = apply %isDistinct<Int64, Int64>(%inoutArg, %prop1OfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %155 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %prop1OfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %156 = apply %isDistinct<Int64, Int64>(%inoutArg, %prop1OfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %157 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %prop1OfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %158 = apply %isDistinct<Int64, Int64>(%inoutArg, %tailOfClassArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %159 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %tailOfLocalClass1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %160 = apply %isDistinct<Int64, Int64>(%inoutArg, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %161 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %162 = apply %isDistinct<Int64, Int64>(%inoutArg, %field0OfLocalBox1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %163 = apply %isDistinct<Int64, Int64>(%aliasableArg1, %field0OfLocalBox1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %164 = apply %isNotDistinct<Int64, Int64>(%inoutArg, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %165 = apply %isNotDistinct<Int64, Int64>(%aliasableArg1, %yield2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Classes vs others
+  %170 = apply %isNotDistinct<Int64, Int64>(%prop1OfClassArg1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %171 = apply %isNotDistinct<Int64, Int64>(%prop1OfLocalClass1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %172 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %173 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %tailOfClassArg2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %174 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %175 = apply %isDistinct<Int64, Int64>(%prop1OfClassArg1, %global1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %176 = apply %isNotDistinct<Int64, Int64>(%prop1OfClassArg1, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Tail elements vs others
+  %180 = apply %isNotDistinct<Int64, Int64>(%tailOfClassArg1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %181 = apply %isNotDistinct<Int64, Int64>(%tailOfLocalClass1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %182 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %183 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %field0OfBoxArg1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %184 = apply %isDistinct<Int64, Int64>(%tailOfClassArg1, %global1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %185 = apply %isNotDistinct<Int64, Int64>(%tailOfClassArg1, %yield1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // Yields vs others
+  %190 = apply %isNotDistinct<Int64, Int64>(%yield1, %pointer1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %191 = apply %isNotDistinct<Int64, Int64>(%yield1, %stack1) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  dealloc_stack %stack2 : $*Int64
+  dealloc_stack %stack1 : $*Int64
+  %200 = tuple ()
+  return %200 : $()
+}
+
+// CHECK-LABEL: Accesses for testAccessPathAliasing
+// CHECK-NEXT: End accesses for testAccessPathAliasing
+sil @testAccessPathAliasing : $@convention(thin) (@inout TwoInts) -> () {
+bb0(%twoInts: $*TwoInts):
+  %a = struct_element_addr %twoInts : $*TwoInts, #TwoInts.a
+  %b = struct_element_addr %twoInts : $*TwoInts, #TwoInts.b
+
+  %isDistinct = function_ref @_isDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  %10 = apply %isNotDistinct<TwoInts, TwoInts>(%twoInts, %twoInts) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %11 = apply %isNotDistinct<TwoInts, Int64>(%twoInts, %a) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %12 = apply %isNotDistinct<Int64, TwoInts>(%b, %twoInts) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %13 = apply %isDistinct<Int64, Int64>(%a, %b) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+
+  // More complex paths are tested in the unit test for `SmallProjectionPath.mayOverlap`.
+
+  %200 = tuple ()
+  return %200 : $()
 }

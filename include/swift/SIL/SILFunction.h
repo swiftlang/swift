@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/SwiftObjectHeader.h"
@@ -63,11 +64,6 @@ enum IsExactSelfClass_t {
 enum IsDistributed_t {
   IsNotDistributed,
   IsDistributed,
-};
-enum IsWeakImported_t {
-  IsNotWeakImported,
-  IsWeakImportedByModule,
-  IsAlwaysWeakImported,
 };
 
 enum class PerformanceConstraints : uint8_t {
@@ -222,6 +218,10 @@ private:
   /// The AST decl context of the function.
   DeclContext *DeclCtxt = nullptr;
 
+  /// The module that defines this function. This member should only be set as
+  /// a fallback when a \c DeclCtxt is unavailable.
+  ModuleDecl *ParentModule = nullptr;
+
   /// The profiler for instrumentation based profiling, or null if profiling is
   /// disabled.
   SILProfiler *Profiler = nullptr;
@@ -322,8 +322,9 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Whether cross-module references to this function should use weak linking.
-  unsigned IsWeakImported : 2;
+  /// Whether cross-module references to this function should always use weak
+  /// linking.
+  unsigned IsAlwaysWeakImported : 1;
 
   /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
@@ -801,19 +802,11 @@ public:
 
   /// Returns whether this function's symbol must always be weakly referenced
   /// across module boundaries.
-  bool isAlwaysWeakImported() const {
-    return IsWeakImported == IsWeakImported_t::IsAlwaysWeakImported;
-  }
+  bool isAlwaysWeakImported() const { return IsAlwaysWeakImported; }
 
-  /// Returns whether this function's symbol was referenced by a module that
-  /// imports the defining module \c @_weakLinked.
-  bool isWeakImportedByModule() const {
-    return IsWeakImported == IsWeakImported_t::IsWeakImportedByModule;
-  }
+  void setIsAlwaysWeakImported(bool value) { IsAlwaysWeakImported = value; }
 
-  void setIsWeakImported(IsWeakImported_t value) { IsWeakImported = value; }
-
-  bool isWeakImported() const;
+  bool isWeakImported(ModuleDecl *module) const;
 
   /// Returns whether this function implementation can be dynamically replaced.
   IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
@@ -958,6 +951,18 @@ public:
   void setDebugScope(const SILDebugScope *DS) {
     DebugScope = DS;
     DeclCtxt = (DS ? DebugScope->Loc.getAsDeclContext() : nullptr);
+  }
+
+  /// Returns the module that defines this function.
+  ModuleDecl *getParentModule() const {
+    return DeclCtxt ? DeclCtxt->getParentModule() : ParentModule;
+  }
+
+  /// Sets \c ParentModule as fallback if \c DeclCtxt is not available to
+  /// provide the parent module.
+  void setParentModule(ModuleDecl *module) {
+    assert(!DeclCtxt && "already have a DeclCtxt");
+    ParentModule = module;
   }
 
   /// Initialize the debug scope for debug info on SIL level
@@ -1340,6 +1345,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//
+
+  /// A value's lifetime, determined by looking at annotations on its decl and
+  /// the default lifetime for the type.
+  Lifetime getLifetime(VarDecl *decl, SILType ty) {
+    return ty.getLifetime(*this).getLifetimeForAnnotatedValue(
+        decl->getLifetimeAnnotation());
+  }
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.

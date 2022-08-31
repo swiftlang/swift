@@ -232,7 +232,7 @@ SYNTAX_TOKENS = [
                serialization_code=92),
     Punctuator('RightSquareBracket', 'r_square', text=']',
                serialization_code=93),
-    Punctuator('LeftAngle', 'l_angle', text='<', requires_leading_space=True, 
+    Punctuator('LeftAngle', 'l_angle', text='<', requires_leading_space=True,
                requires_trailing_space=True, serialization_code=94),
     Punctuator('RightAngle', 'r_angle', text='>', requires_leading_space=True,
                requires_trailing_space=True, serialization_code=95),
@@ -253,7 +253,7 @@ SYNTAX_TOKENS = [
     Punctuator('Pound', 'pound', text='#', serialization_code=81),
 
     Punctuator('PrefixAmpersand', 'amp_prefix', text='&',
-               requires_leading_space=True, requires_trailing_space=True, 
+               requires_leading_space=True, requires_trailing_space=True,
                serialization_code=96),
     Punctuator('Arrow', 'arrow', text='->', requires_leading_space=True,
                requires_trailing_space=True, serialization_code=78),

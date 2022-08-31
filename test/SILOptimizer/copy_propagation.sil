@@ -616,10 +616,6 @@ bb2:
 
 // Original Overlapping (unnecessarilly extends pruned liveness):
 //
-// TODO: this copy could be avoided but is probably an unusual case,
-// and sinking the destroy outside the access scope might help to
-// optimize the access itself.
-//
 //     %def
 //     begin_access // access scope unrelated to def
 //     use %def     // pruned liveness ends here
@@ -627,13 +623,14 @@ bb2:
 //     end_access
 //
 // CHECK-LABEL: sil [ossa] @testOriginalOverlapInLiveBlock : $@convention(thin) () -> () {
-// CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK:   begin_access
-// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
-// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
-// CHECK:   end_access
-// CHECK:   destroy_value [[DEF]] : $AnyObject
-// CHECK: br bb1
+// CHECK:         [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
+// CHECK:         begin_access
+// CHECK-OPT:     store [[DEF]] to [init] %{{.*}} : $*AnyObject
+// CHECK-ONONE:   [[COPY:%[^,]+]] = copy_value [[DEF]]
+// CHECK-ONONE:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK-ONONE:   destroy_value [[DEF]]
+// CHECK:         end_access
+// CHECK:         br bb1
 // CHECK-LABEL: } // end sil function 'testOriginalOverlapInLiveBlock'
 sil [ossa] @testOriginalOverlapInLiveBlock : $@convention(thin) () -> () {
 bb0:
@@ -900,4 +897,45 @@ exit:
     destroy_value %instance : $X
     %retval = tuple ()
     return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         begin_access
+// CHECK-NOT:     copy_value
+// CHECK:         store [[COPY]] to [init] {{%[^,]+}}
+// CHECK-LABEL: } // end sil function 'dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block'
+sil [ossa] @dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C, var
+  %borrow = begin_borrow %instance : $C
+  %copy = copy_value %borrow : $C
+  end_borrow %borrow : $C
+  destroy_value %instance : $C
+  %access = begin_access [static] [modify] %addr : $*C
+  store %copy to [init] %addr : $*C
+  end_access %access : $*C
+  destroy_addr %addr : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_extend_beyond_nonoverlapping_endaccess_after_destroyvalue_in_consuming_block : $@convention(thin) () -> () {
+// CHECK:         begin_access
+// CHECK:         destroy_value
+// CHECK:         end_access
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dont_extend_beyond_nonoverlapping_endaccess_after_destroyvalue_in_consuming_block'
+sil [ossa] @dont_extend_beyond_nonoverlapping_endaccess_after_destroyvalue_in_consuming_block : $@convention(thin) () -> () {
+  %instance = apply undef() : $@convention(thin) () -> @owned C
+  %addr = alloc_stack [lexical] $C, var
+  %access = begin_access [static] [modify] %addr : $*C
+  apply undef(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance : $C
+  end_access %access : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple()
+  return %retval : $()
 }

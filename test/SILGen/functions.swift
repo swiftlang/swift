@@ -103,14 +103,11 @@ func calls(_ i:Int, j:Int, k:Int) {
   var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[ILIFETIME:%[^,]+]] = begin_borrow [lexical] [[IBOX]]
-  // CHECK: [[IADDR:%.*]] = project_box [[ILIFETIME]]
+  // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
   // CHECK: [[JBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[JLIFETIME:%[^,]+]] = begin_borrow [lexical] [[JBOX]]
-  // CHECK: [[JADDR:%.*]] = project_box [[JLIFETIME]]
+  // CHECK: [[JADDR:%.*]] = project_box [[JBOX]]
   // CHECK: [[KBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[KLIFETIME:%[^,]+]] = begin_borrow [lexical] [[KBOX]]
-  // CHECK: [[KADDR:%.*]] = project_box [[KLIFETIME]]
+  // CHECK: [[KADDR:%.*]] = project_box [[KBOX]]
 
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
@@ -232,15 +229,15 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Curry the projected concrete value in an existential (or its Type)
   // -- onto protocol type methods dispatched using protocol_method.
 
-  // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var SomeProtocol }
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var any SomeProtocol }
   // CHECK: [[PLIFETIME:%[^,]+]] = begin_borrow [lexical] [[PBOX]]
   // CHECK: [[PADDR:%.*]] = project_box [[PLIFETIME]]
   var p : SomeProtocol = ConformsToSomeProtocol()
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PADDR]]
-  // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
+  // CHECK: [[TEMP:%.*]] = alloc_stack $any SomeProtocol
   // CHECK: copy_addr [[READ]] to [initialization] [[TEMP]]
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened\(.*, SomeProtocol\) Self]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*any SomeProtocol to $*[[OPENED:@opened\(.*, any SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method :
@@ -249,7 +246,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened\(.*, SomeProtocol\) Self]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*any SomeProtocol to $*[[OPENED:@opened\(.*, any SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method :

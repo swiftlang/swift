@@ -229,7 +229,7 @@ public protocol P : class {
 // CHECK-LABEL: sil @dont_hoist_metatype
 // CHECK-NOT: metatype
 // CHECK-NOT: witness_method
-// CHECK: bb1({{%.*}} : $P)
+// CHECK: bb1({{%.*}} : $any P)
 // CHECK-NOT: metatype
 // CHECK-NOT: witness_method
 // CHECK: open_existential_ref

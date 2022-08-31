@@ -33,10 +33,10 @@ func read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
   // SEMANTIC ARC TODO: This is incorrect. We need to do the project_box on the copy.
-  // CHECK:   [[PROJECT:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[PROJECT:%.*]] = project_box [[XBOX]]
   // CHECK:   store [[X]] to [trivial] [[PROJECT]]
+  // CHECK:   [[XLIFETIME:%[0-9]+]] = begin_borrow [[XBOX]]
 
   func cap() -> Int {
     return x
@@ -66,14 +66,13 @@ func write_to_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
-  // CHECK:   [[XBOX_PB:%[0-9]+]] = project_box [[XLIFETIME]]
+  // CHECK:   [[XBOX_PB:%[0-9]+]] = project_box [[XBOX]]
   // CHECK:   store [[X]] to [trivial] [[XBOX_PB]]
   // CHECK:   [[X2BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[X2LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[X2BOX]]
-  // CHECK:   [[X2BOX_PB:%.*]] = project_box [[X2LIFETIME]]
+  // CHECK:   [[X2BOX_PB:%.*]] = project_box [[X2BOX]]
   // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[XBOX_PB]] : $*Int
   // CHECK:   copy_addr [[ACCESS]] to [initialization] [[X2BOX_PB]]
+  // CHECK:   [[X2LIFETIME:%[0-9]+]] = begin_borrow [[X2BOX]]
   // CHECK:   mark_function_escape [[X2BOX_PB]]
   var x2 = x
 
@@ -122,15 +121,14 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
   // CHECK: bb0([[ARG:%.*]] : $Int):
   var x = x
   // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
-  // CHECK:   [[XBOX_PB:%[0-9]+]] = project_box [[XLIFETIME]]
+  // CHECK:   [[XBOX_PB:%[0-9]+]] = project_box [[XBOX]]
   // CHECK:   store [[ARG]] to [trivial] [[XBOX_PB]]
 
   func aleph() -> Int { return x }
 
   func beth() -> () -> Int { return aleph }
   // CHECK: [[BETH_REF:%.*]] = function_ref @[[BETH_NAME:\$s8closures18capture_local_funcySiycycSiF4bethL_SiycyF]] : $@convention(thin) (@guaranteed { var Int }) -> @owned @callee_guaranteed () -> Int
-  // CHECK: [[XBOX_COPY:%.*]] = copy_value [[XLIFETIME]]
+  // CHECK: [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
   // SEMANTIC ARC TODO: This is incorrect. This should be a project_box from XBOX_COPY.
   // CHECK: mark_function_escape [[XBOX_PB]]
   // CHECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [callee_guaranteed] [[BETH_REF]]([[XBOX_COPY]])
@@ -160,8 +158,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
-  // CHECK: [[PB:%[0-9]+]] = project_box [[XLIFETIME]]
+  // CHECK: [[PB:%[0-9]+]] = project_box [[XBOX]]
 
   return ({ x })()
   // -- func expression
@@ -183,8 +180,7 @@ func small_closure_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
-  // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
+  // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
   return { x }()
   // -- func expression
@@ -206,12 +202,11 @@ func small_closure_capture(_ x: Int) -> Int {
 func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XBOX]]
 
   return { x + $0 }
   // -- func expression
   // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:\$s8closures35small_closure_capture_with_argument.*]] : $@convention(thin) (Int, @guaranteed { var Int }) -> Int
-  // CHECK: [[XBOX_COPY:%.*]] = copy_value [[XLIFETIME]]
+  // CHECK: [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
   // CHECK: [[ANON_CLOSURE_APP:%[0-9]+]] = partial_apply [callee_guaranteed] [[ANON]]([[XBOX_COPY]])
   // -- return
   // CHECK: destroy_value [[XBOX]]
@@ -244,8 +239,7 @@ func uncaptured_locals(_ x: Int) -> (Int, Int) {
   // -- locals without captures are stack-allocated
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
   // CHECK:   [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%[0-9]+]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK:   [[PB:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[PB:%.*]] = project_box [[XADDR]]
   // CHECK:   store [[XARG]] to [trivial] [[PB]]
 
   var y = zero

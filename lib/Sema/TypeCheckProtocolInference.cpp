@@ -317,6 +317,9 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
             for (auto &reqt : witnessContext->getGenericSignatureOfContext()
                                             .getRequirements()) {
               switch (reqt.getKind()) {
+              case RequirementKind::SameCount:
+                llvm_unreachable("Same-count requirement not supported here");
+
               case RequirementKind::Conformance:
               case RequirementKind::Superclass:
               case RequirementKind::Layout:
@@ -1067,6 +1070,9 @@ static void sanitizeProtocolRequirements(
 
   for (const auto &req : requirements) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass: {
@@ -1732,6 +1738,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       class1 = reqt.getSecondType();
       break;
 
+    case RequirementKind::SameCount:
     case RequirementKind::SameType:
     case RequirementKind::Layout:
       break;
@@ -1764,6 +1771,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       class2 = reqt.getSecondType();
       break;
 
+    case RequirementKind::SameCount:
     case RequirementKind::SameType:
     case RequirementKind::Layout:
       break;

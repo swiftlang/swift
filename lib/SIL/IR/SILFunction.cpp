@@ -182,7 +182,7 @@ void SILFunction::init(
   this->InlineStrategy = inlineStrategy;
   this->Linkage = unsigned(Linkage);
   this->HasCReferences = false;
-  this->IsWeakImported = false;
+  this->IsAlwaysWeakImported = false;
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
@@ -260,7 +260,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->perfConstraints = perfConstraints;
   newSnapshot->GlobalInitFlag = GlobalInitFlag;
   newSnapshot->HasCReferences = HasCReferences;
-  newSnapshot->IsWeakImported = IsWeakImported;
+  newSnapshot->IsAlwaysWeakImported = IsAlwaysWeakImported;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
@@ -452,9 +452,10 @@ bool SILFunction::isTypeABIAccessible(SILType type) const {
   return getModule().isTypeABIAccessible(type, TypeExpansionContext(*this));
 }
 
-bool SILFunction::isWeakImported() const {
-  if (isWeakImportedByModule())
-    return true;
+bool SILFunction::isWeakImported(ModuleDecl *module) const {
+  if (auto *parent = getParentModule())
+    if (module->isImportedAsWeakLinked(parent))
+      return true;
 
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)

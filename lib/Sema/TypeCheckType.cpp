@@ -126,6 +126,7 @@ Type TypeResolution::resolveDependentMemberType(
   // FIXME(ModQual): Reject qualified names immediately; they cannot be
   // dependent member types.
   Identifier refIdentifier = ref->getNameRef().getBaseIdentifier();
+  ASTContext &ctx = DC->getASTContext();
 
   switch (stage) {
   case TypeResolutionStage::Structural:
@@ -146,8 +147,6 @@ Type TypeResolution::resolveDependentMemberType(
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
-    ASTContext &ctx = DC->getASTContext();
-
     // Resolve the base to a potential archetype.
     // Perform typo correction.
     TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
@@ -187,6 +186,25 @@ Type TypeResolution::resolveDependentMemberType(
   }
 
   auto *concrete = ref->getBoundDecl();
+
+  if (auto concreteBase = genericSig->getConcreteType(baseTy)) {
+    bool hasUnboundOpener = !!getUnboundTypeOpener();
+    switch (TypeChecker::isUnsupportedMemberTypeAccess(concreteBase, concrete,
+                                                       hasUnboundOpener)) {
+    case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
+      ctx.Diags.diagnose(ref->getNameLoc(),
+                         diag::typealias_outside_of_protocol,
+                         ref->getNameRef(), concreteBase);
+      break;
+    case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
+      ctx.Diags.diagnose(ref->getNameLoc(),
+                         diag::assoc_type_outside_of_protocol,
+                         ref->getNameRef(), concreteBase);
+      break;
+    default:
+      break;
+    };
+  }
 
   // If the nested type has been resolved to an associated type, use it.
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(concrete)) {
@@ -286,6 +304,37 @@ static Type getIdentityOpaqueTypeArchetypeType(
   return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
+/// Adjust the underlying type of a typealias within the given context to
+/// account for @preconcurrency.
+static Type adjustTypeAliasTypeInContext(
+    Type type, TypeAliasDecl *aliasDecl, DeclContext *fromDC,
+    TypeResolutionOptions options) {
+  // If we are in a @preconcurrency declaration, don't adjust the types of
+  // type aliases.
+  if (options.contains(TypeResolutionFlags::Preconcurrency))
+    return type;
+
+  // If the type alias itself isn't marked with @preconcurrency, don't
+  // adjust the type.
+  if (!aliasDecl->preconcurrency())
+    return type;
+
+  // Only adjust the type within a strict concurrency context, so we don't
+  // change the types as seen by code that hasn't adopted concurrency.
+  if (contextRequiresStrictConcurrencyChecking(
+          fromDC,
+          [](const AbstractClosureExpr *closure) {
+            return closure->getType();
+          },
+          [](const ClosureExpr *closure) {
+            return closure->isIsolatedByPreconcurrency();
+          }))
+    return type;
+
+  return type->stripConcurrency(
+      /*recurse=*/true, /*dropGlobalActor=*/true);
+}
+
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
                                           DeclContext *foundDC,
                                           bool isSpecialized) const {
@@ -306,6 +355,13 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
     return genericParam->getDeclaredInterfaceType();
   }
+
+  /// Call this function before returning the underlying type of a typealias,
+  /// to adjust its type for concurrency.
+  auto adjustAliasType = [&](Type type) -> Type {
+    return adjustTypeAliasTypeInContext(
+        type, cast<TypeAliasDecl>(typeDecl), fromDC, options);
+  };
 
   if (!isSpecialized) {
     // If we are referring to a type within its own context, and we have either
@@ -342,9 +398,9 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
               if (ugAliasDecl == aliasDecl) {
                 if (getStage() == TypeResolutionStage::Structural &&
                     aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-                  return aliasDecl->getStructuralType();
+                  return adjustAliasType(aliasDecl->getStructuralType());
                 }
-                return aliasDecl->getDeclaredInterfaceType();
+                return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
               }
 
               extendedType = unboundGeneric->getParent();
@@ -356,9 +412,9 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
             if (aliasType->getDecl() == aliasDecl) {
               if (getStage() == TypeResolutionStage::Structural &&
                   aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-                return aliasDecl->getStructuralType();
+                return adjustAliasType(aliasDecl->getStructuralType());
               }
-              return aliasDecl->getDeclaredInterfaceType();
+              return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
             }
             extendedType = aliasType->getParent();
             continue;
@@ -381,9 +437,9 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       // Otherwise, return the appropriate type.
       if (getStage() == TypeResolutionStage::Structural &&
           aliasDecl->getUnderlyingTypeRepr() != nullptr) {
-        return aliasDecl->getStructuralType();
+        return adjustAliasType(aliasDecl->getStructuralType());
       }
-      return aliasDecl->getDeclaredInterfaceType();
+      return adjustAliasType(aliasDecl->getDeclaredInterfaceType());
     }
 
     // When a nominal type used outside its context, return the unbound
@@ -1591,6 +1647,13 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
                                         AssociatedTypeDecl *inferredAssocType) {
     bool hasUnboundOpener = !!resolution.getUnboundTypeOpener();
 
+    // Type aliases might require adjustment due to @preconcurrency.
+    if (auto aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+      memberType = adjustTypeAliasTypeInContext(
+          memberType, aliasDecl, resolution.getDeclContext(),
+          resolution.getOptions());
+    }
+
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
       if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
                                                      hasUnboundOpener)
@@ -1611,12 +1674,12 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfExistential:
       diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
-                     comp->getNameRef());
+                     comp->getNameRef(), parentTy);
       return ErrorType::get(ctx);
 
     case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfExistential:
       diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
-                     comp->getNameRef());
+                     comp->getNameRef(), parentTy);
       return ErrorType::get(ctx);
     }
 
@@ -2462,6 +2525,9 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       attrs.has(TAK_objc_metatype)) {
     if (auto SF = getDeclContext()->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
+        if (auto existential = dyn_cast<ExistentialTypeRepr>(repr))
+          repr = existential->getConstraint();
+
         TypeRepr *base;
         if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
           base = metatypeRepr->getBase();
@@ -2793,6 +2859,18 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   // context, and then set isNoEscape if @escaping is not present.
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
+
+  // In SIL mode only, build one-element tuples.
+  if (attrs.has(TAK_tuple)) {
+    SmallVector<TupleTypeElt, 1> elements;
+    if (auto *parenTy = dyn_cast<ParenType>(ty.getPointer()))
+      ty = parenTy->getUnderlyingType();
+
+    elements.emplace_back(ty);
+    ty = TupleType::get(elements, getASTContext());
+
+    attrs.clearAttribute(TAK_tuple);
+  }
 
   // Type aliases inside protocols are not yet resolved in the structural
   // stage of type resolution
@@ -3952,13 +4030,19 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       if (patternTy->hasError())
         complained = true;
 
+      // Find the first type sequence parameter and use that as the count type.
+      SmallVector<Type, 1> rootTypeSequenceParams;
+      patternTy->getTypeSequenceParameters(rootTypeSequenceParams);
+
       // If there's no reference to a variadic generic parameter, complain
       // - the pack won't actually expand to anything meaningful.
-      if (!patternTy->hasTypeSequence())
+      if (rootTypeSequenceParams.empty()) {
         diagnose(repr->getLoc(), diag::expansion_not_variadic, patternTy)
           .highlight(repr->getParens());
+        return ErrorType::get(getASTContext());
+      }
 
-      return PackExpansionType::get(patternTy);
+      return PackExpansionType::get(patternTy, rootTypeSequenceParams[0]);
     } else {
       // Variadic tuples are not permitted.
       //
@@ -4014,6 +4098,9 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   if (foundDupLabel) {
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
+
+  if (elements.size() == 1 && !elements[0].hasName())
+    return ParenType::get(getASTContext(), elements[0].getType());
 
   return TupleType::get(elements, getASTContext());
 }
@@ -4493,6 +4580,7 @@ public:
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
+
       // If this is a type alias to a constraint type, the type
       // alias name must be prefixed with 'any' to be used as an
       // existential type.
@@ -4618,7 +4706,8 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
-  if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
+  if (typeKind == CustomAttrTypeKind::PropertyWrapper ||
+      typeKind == CustomAttrTypeKind::TypeWrapper) {
     unboundTyOpener = [](auto unboundTy) {
       // FIXME: Don't let unbound generic types
       // escape type resolution. For now, just

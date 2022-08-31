@@ -22,6 +22,7 @@
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include <tuple>
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -159,6 +160,15 @@ bool SILType::isNoReturnFunction(SILModule &M,
     return funcTy->isNoReturnFunction(M, context);
 
   return false;
+}
+
+Lifetime SILType::getLifetime(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  const auto &lowering = F.getTypeLowering(contextType);
+  auto properties = lowering.getRecursiveProperties();
+  if (properties.isTrivial())
+    return Lifetime::None;
+  return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
 }
 
 std::string SILType::getMangledName() const {
@@ -932,3 +942,66 @@ bool SILType::isMoveOnly() const {
       return true;
   return isMoveOnlyWrapped();
 }
+
+#ifndef NDEBUG
+bool SILType::visitAggregateLeaves(
+    Lowering::TypeConverter &TC, TypeExpansionContext context,
+    std::function<bool(SILType, SILType, VarDecl *)> isLeaf,
+    std::function<bool(SILType, SILType, VarDecl *)> visit) const {
+
+  llvm::SmallSet<std::tuple<SILType::ValueType, SILType::ValueType, VarDecl *>,
+                 16>
+      visited;
+  llvm::SmallVector<
+      std::tuple<SILType::ValueType, SILType::ValueType, VarDecl *>, 16>
+      worklist;
+  auto insertIntoWorklist = [&visited, &worklist](SILType parent, SILType type,
+                                                  VarDecl *decl) -> bool {
+    if (!visited.insert({parent.value, type.value, decl}).second) {
+      return false;
+    }
+    worklist.push_back({parent.value, type.value, decl});
+    return true;
+  };
+  auto popFromWorklist =
+      [&worklist]() -> std::tuple<SILType, SILType, VarDecl *> {
+    SILType::ValueType parentOpaqueType;
+    SILType::ValueType opaqueType;
+    VarDecl *decl;
+    std::tie(parentOpaqueType, opaqueType, decl) = worklist.pop_back_val();
+    return {parentOpaqueType, opaqueType, decl};
+  };
+  insertIntoWorklist(SILType(), *this, nullptr);
+  while (!worklist.empty()) {
+    SILType parent;
+    SILType ty;
+    VarDecl *decl;
+    std::tie(parent, ty, decl) = popFromWorklist();
+    if (ty.isAggregate() && !isLeaf(parent, ty, decl)) {
+      if (auto tupleTy = ty.getAs<TupleType>()) {
+        for (unsigned index = 0, num = tupleTy->getNumElements(); index < num;
+             ++index) {
+          insertIntoWorklist(ty, ty.getTupleElementType(index), nullptr);
+        }
+      } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+        for (auto *field : decl->getStoredProperties()) {
+          insertIntoWorklist(ty, ty.getFieldType(field, TC, context), field);
+        }
+      } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
+        for (auto *field : decl->getStoredProperties()) {
+          insertIntoWorklist(ty, ty.getFieldType(field, TC, context), field);
+        }
+      } else {
+        llvm_unreachable("unknown aggregate kind!");
+      }
+      continue;
+    }
+
+    // This type is a leaf.  Visit it.
+    auto success = visit(parent, ty, decl);
+    if (!success)
+      return false;
+  }
+  return true;
+}
+#endif

@@ -129,12 +129,13 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
   assert(lowering.getLoweredType().getObjectType() == v->getType());
   if (lowering.isTrivial() || v->getOwnershipKind() == OwnershipKind::None) {
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
-    return ManagedValue::forUnmanaged(v);
+    return ManagedValue::forTrivialAddressRValue(addr);
   }
   assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
          "cannot retain an unloadable type");
   auto *sbi = B.createStoreBorrow(loc, v, addr);
-  return emitManagedBorrowedRValueWithCleanup(sbi->getSrc(), sbi, lowering);
+  Cleanups.pushCleanup<EndBorrowCleanup>(sbi);
+  return ManagedValue(sbi, CleanupHandle::invalid());
 }
 
 ManagedValue SILGenFunction::emitManagedBeginBorrow(SILLocation loc,
@@ -243,6 +244,18 @@ ManagedValue SILGenFunction::emitFormalEvaluationManagedBeginBorrow(
                                                               lowering);
 }
 
+ManagedValue SILGenFunction::emitFormalEvaluationManagedStoreBorrow(
+    SILLocation loc, SILValue v, SILValue addr) {
+  auto &lowering = getTypeLowering(v->getType());
+  if (lowering.isTrivial() || v->getOwnershipKind() == OwnershipKind::None) {
+    lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
+    return ManagedValue::forTrivialAddressRValue(addr);
+  }
+  auto *sbi = B.createStoreBorrow(loc, v, addr);
+  return emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc, v, sbi,
+                                                              lowering);
+}
+
 ManagedValue
 SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
     SILLocation loc, SILValue original, SILValue borrowed) {
@@ -259,10 +272,6 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
          original->getType().getObjectType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(borrowed);
-
-  if (!borrowed->getType().isObject()) {
-    return ManagedValue(borrowed, CleanupHandle::invalid());
-  }
 
   assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &cleanup = Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
@@ -329,10 +338,7 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
       original->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forUnmanaged(borrowed);
 
-  if (borrowed->getType().isObject()) {
-    Cleanups.pushCleanup<EndBorrowCleanup>(borrowed);
-  }
-
+  Cleanups.pushCleanup<EndBorrowCleanup>(borrowed);
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
@@ -409,7 +415,9 @@ namespace {
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(),
                                                     std::move(lv)));
     }
-    
+
+    RValue visitLazyInitializerExpr(LazyInitializerExpr *E, SGFContext C);
+
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
     
     RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C) {
@@ -445,6 +453,9 @@ namespace {
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
                                              SGFContext C);
+    RValue visitABISafeConversionExpr(ABISafeConversionExpr *E, SGFContext C) {
+      llvm_unreachable("cannot appear in rvalue");
+    }
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
@@ -700,6 +711,15 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
   }
 
   return SGF.emitConvertedRValue(subExpr, conversion, C);
+}
+
+RValue RValueEmitter::visitLazyInitializerExpr(LazyInitializerExpr *E,
+                                               SGFContext C) {
+  // We need to emit a profiler count increment specifically for the lazy
+  // initialization, as we don't want to record an increment for every call to
+  // the getter.
+  SGF.emitProfilerIncrement(E);
+  return visit(E->getSubExpr(), C);
 }
 
 RValue RValueEmitter::visitApplyExpr(ApplyExpr *E, SGFContext C) {
@@ -3170,12 +3190,12 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
 static void
 getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
-                              SILLocation loc,
-                              GenericEnvironment *genericEnv,
-                              ResilienceExpansion expansion,
-                              ArrayRef<KeyPathPatternComponent::Index> indexes,
-                              SILFunction *&equals,
-                              SILFunction *&hash) {
+                                SILLocation loc,
+                                GenericEnvironment *genericEnv,
+                                ResilienceExpansion expansion,
+                                ArrayRef<KeyPathPatternComponent::Index> indexes,
+                                SILFunction *&equals,
+                                SILFunction *&hash) {
   if (indexes.empty()) {
     equals = nullptr;
     hash = nullptr;
@@ -3212,14 +3232,21 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   for (auto &index : indexes)
     indexTypes.push_back(index.FormalType);
 
-  SmallVector<TupleTypeElt, 2> indexElts;
-  for (auto &elt : indexes) {
-    indexElts.push_back(GenericEnvironment::mapTypeIntoContext(genericEnv,
-                                                               elt.FormalType));
+  CanType indexTupleTy;
+  if (indexes.size() == 1) {
+    indexTupleTy = GenericEnvironment::mapTypeIntoContext(
+        genericEnv, indexes[0].FormalType)->getCanonicalType();
+  } else {
+    SmallVector<TupleTypeElt, 2> indexElts;
+    for (auto &elt : indexes) {
+      indexElts.push_back(GenericEnvironment::mapTypeIntoContext(
+          genericEnv, elt.FormalType));
+    }
+
+    indexTupleTy = TupleType::get(indexElts, SGM.getASTContext())
+                          ->getCanonicalType();
   }
 
-  auto indexTupleTy = TupleType::get(indexElts, SGM.getASTContext())
-                        ->getCanonicalType();
   RValue indexValue(indexTupleTy);
 
   auto indexLoweredTy =

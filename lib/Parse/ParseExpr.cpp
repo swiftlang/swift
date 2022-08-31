@@ -72,9 +72,15 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
 ///   expr-is:
 ///     'is' type
 ParserResult<Expr> Parser::parseExprIs() {
-  SourceLoc isLoc = consumeToken(tok::kw_is);
+  SourceLoc isLoc;
+  {
+    SyntaxParsingContext IsExprCtx(SyntaxContext, SyntaxKind::UnresolvedIsExpr);
+    isLoc = consumeToken(tok::kw_is);
+  }
 
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_is);
+  SyntaxContext->createNodeInPlace(SyntaxKind::TypeExpr);
+
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
@@ -89,19 +95,25 @@ ParserResult<Expr> Parser::parseExprIs() {
 ///     'as?' type
 ///     'as!' type
 ParserResult<Expr> Parser::parseExprAs() {
-  // Parse the 'as'.
-  SourceLoc asLoc = consumeToken(tok::kw_as);
-
-  // Parse the postfix '?'.
+  SourceLoc asLoc;
   SourceLoc questionLoc;
   SourceLoc exclaimLoc;
-  if (Tok.is(tok::question_postfix)) {
-    questionLoc = consumeToken(tok::question_postfix);
-  } else if (Tok.is(tok::exclaim_postfix)) {
-    exclaimLoc = consumeToken(tok::exclaim_postfix);
+
+  {
+    SyntaxParsingContext AsExprCtx(SyntaxContext, SyntaxKind::UnresolvedAsExpr);
+    // Parse the 'as'.
+    asLoc = consumeToken(tok::kw_as);
+
+    // Parse the postfix '?'.
+    if (Tok.is(tok::question_postfix)) {
+      questionLoc = consumeToken(tok::question_postfix);
+    } else if (Tok.is(tok::exclaim_postfix)) {
+      exclaimLoc = consumeToken(tok::exclaim_postfix);
+    }
   }
 
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
+  SyntaxContext->createNodeInPlace(SyntaxKind::TypeExpr);
 
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
@@ -182,7 +194,6 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   ParserStatus SequenceStatus;
-  bool PendingTernary = false;
 
   while (true) {
     if (isForConditionalDirective && Tok.isAtStartOfLine())
@@ -204,12 +215,6 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       return nullptr;
     }
     SequencedExprs.push_back(Primary.get());
-
-    // We know we can make a syntax node for ternary expression.
-    if (PendingTernary) {
-      SyntaxContext->createNodeInPlace(SyntaxKind::TernaryExpr);
-      PendingTernary = false;
-    }
 
     if (SequenceStatus.isError() && !SequenceStatus.hasCodeCompletion())
       break;
@@ -245,6 +250,8 @@ parse_operator:
     }
     
     case tok::question_infix: {
+      SyntaxParsingContext TernaryCtx(SyntaxContext,
+                                      SyntaxKind::UnresolvedTernaryExpr);
       // Save the '?'.
       SourceLoc questionLoc = consumeToken();
       
@@ -280,10 +287,6 @@ parse_operator:
                                colonLoc);
       SequencedExprs.push_back(unresolvedIf);
       Message = diag::expected_expr_after_if_colon;
-
-      // Wait for the next expression to make a syntax node for ternary
-      // expression.
-      PendingTernary = true;
       break;
     }
         
@@ -304,7 +307,6 @@ parse_operator:
     }
         
     case tok::kw_is: {
-      SyntaxParsingContext IsContext(SyntaxContext, SyntaxKind::IsExpr);
       // Parse a type after the 'is' token instead of an expression.
       ParserResult<Expr> is = parseExprIs();
       if (is.isNull() || is.hasCodeCompletion())
@@ -322,7 +324,6 @@ parse_operator:
     }
         
     case tok::kw_as: {
-      SyntaxParsingContext AsContext(SyntaxContext, SyntaxKind::AsExpr);
       ParserResult<Expr> as = parseExprAs();
       if (as.isNull() || as.hasCodeCompletion())
         return as;
@@ -1008,6 +1009,17 @@ StringRef Parser::copyAndStripUnderscores(StringRef orig) {
   return StringRef(start, p - start);
 }
 
+StringRef Parser::stripUnderscoresIfNeeded(StringRef text,
+                                           SmallVectorImpl<char> &buffer) {
+  if (text.contains('_')) {
+    buffer.clear();
+    llvm::copy_if(text, std::back_inserter(buffer),
+                  [](char ch) { return ch != '_'; });
+    return StringRef(buffer.data(), buffer.size());
+  }
+  return text;
+}
+
 /// Disambiguate the parse after '{' token that is in a place that might be
 /// the start of a trailing closure, or start the variable accessor block.
 ///
@@ -1247,7 +1259,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         //   }
         // In this case, we want to consume the trailing closure because
         // otherwise it will get parsed as a get-set clause on a variable
-        // declared by `baseExpr.<complete>` which is complete garbage.
+        // declared by `baseExpr.<complete>` which is clearly wrong.
         bool hasBindOptional = false;
         parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
                                periodHasKeyPathBehavior, hasBindOptional);
@@ -1702,11 +1714,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
-                /*GarbageNodes=*/None,
+                /*UnexpectedNodes=*/None,
                 /*Identifier=*/SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
             ParsedSyntaxRecorder::makeUnresolvedPatternExpr(
-                /*GarbageNodes=*/None,
+                /*UnexpectedNodes=*/None,
                 /*Pattern=*/std::move(PatternNode), *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }

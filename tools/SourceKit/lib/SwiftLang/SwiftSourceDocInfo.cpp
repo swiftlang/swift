@@ -948,6 +948,22 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.TypeName = copyAndClearString(Allocator, Buffer);
 
+  // ParameterizedProtocolType should always be wrapped in ExistentialType and
+  // cannot be mangled on its own.
+  // But ParameterizedProtocolType can currently occur in 'typealias'
+  // declarations. rdar://99176683
+  // To avoid crashing in USR generation, return an error for now.
+  if (auto Ty = DInfo.VD->getInterfaceType()) {
+    while (auto MetaTy = Ty->getAs<MetatypeType>()) {
+      Ty = MetaTy->getInstanceType();
+    }
+    if (Ty && Ty->getCanonicalType()->is<ParameterizedProtocolType>()) {
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "Cannot mangle USR for ParameterizedProtocolType without 'any'.");
+    }
+  }
+
   SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
   Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
 
@@ -1620,6 +1636,10 @@ static void computeDiagnostics(
       auto &DiagConsumer = AstUnit->getEditorDiagConsumer();
       auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
       Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<DiagnosticsResult>::cancelled());
     }
   };
 

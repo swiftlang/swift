@@ -41,7 +41,7 @@ func testIsolatedParamCalls(a: isolated A, b: A) {
   globalFunc(b)
 
   globalFuncIsolated(a)
-  globalFuncIsolated(b) // expected-error{{call to actor-isolated global function 'globalFuncIsolated' in a synchronous nonisolated context}}
+  globalFuncIsolated(b) // expected-error{{call to actor-isolated global function 'globalFuncIsolated' in a synchronous actor-isolated context}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -63,6 +63,7 @@ typealias MyFn = (isolated: Int) -> Void // expected-error {{function types cann
 typealias MyFnFixed = (_: isolated MyActor) -> Void
 
 func standalone(_: isolated MyActor) {}
+
 func check() {
   let _: MyFnFixed = standalone
   let _: MyFnFixed = { (_: isolated MyActor) in () }
@@ -148,6 +149,14 @@ func testExistentialIsolated(a: isolated P2, b: P2) async {
 // "isolated" parameters of closures make the closure itself isolated.
 extension TestActor {
   func isolatedMethod() { }
+  // expected-note@-1{{calls to instance method 'isolatedMethod()' from outside of its actor context are implicitly asynchronous}}
+
+  func isolatedToParameter(_ other: isolated TestActor) {
+    isolatedMethod()
+    // expected-error@-1{{actor-isolated instance method 'isolatedMethod()' can not be referenced on a non-isolated actor instance}}
+
+    other.isolatedMethod()
+  }
 }
 
 @available(SwiftStdlib 5.1, *)

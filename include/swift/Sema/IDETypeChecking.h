@@ -304,6 +304,8 @@ namespace swift {
     BuildArray,
     BuildLimitedAvailability,
     BuildFinalResult,
+    BuildPartialBlockFirst,
+    BuildPartialBlockAccumulated,
   };
 
   /// Try to infer the component type of a result builder from the type

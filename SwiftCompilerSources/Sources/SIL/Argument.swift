@@ -16,7 +16,7 @@ import SILBridging
 /// A basic block argument.
 ///
 /// Maps to both, SILPhiArgument and SILFunctionArgument.
-public class Argument : Value, Equatable {
+public class Argument : Value, Hashable {
   public var definingInstruction: Instruction? { nil }
   public var definingBlock: BasicBlock { block }
 
@@ -32,6 +32,10 @@ public class Argument : Value, Equatable {
   
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
   }
 }
 

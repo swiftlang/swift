@@ -174,8 +174,7 @@ func stringToPointer(_ s: String) {
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box ${ var Int }
-  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INT]]
-  // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
+  // CHECK: [[PB:%.*]] = project_box [[INT]]
   takesMutablePointer(&int)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]

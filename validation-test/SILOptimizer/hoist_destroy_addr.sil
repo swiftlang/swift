@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
 // RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
+// REQUIRES: rdar98890125
 // REQUIRES: long_test
 // REQUIRES: objc_interop
 // SIL includes assumption of 64-bit wordsize

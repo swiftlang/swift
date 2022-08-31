@@ -636,8 +636,6 @@ void BindingSet::determineLiteralCoverage() {
   if (Literals.empty())
     return;
 
-  SmallVector<PotentialBinding, 4> adjustedBindings;
-
   bool allowsNil = canBeNil();
 
   for (auto &entry : Literals) {
@@ -648,7 +646,6 @@ void BindingSet::determineLiteralCoverage() {
 
     for (auto binding = Bindings.begin(); binding != Bindings.end();
          ++binding) {
-
       bool isCovered = false;
       Type adjustedTy;
 
@@ -745,7 +742,8 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
                          -numNonDefaultableBindings);
 }
 
-Optional<BindingSet> ConstraintSystem::determineBestBindings() {
+Optional<BindingSet> ConstraintSystem::determineBestBindings(
+    llvm::function_ref<void(const BindingSet &)> onCandidate) {
   // Look for potential type variable bindings.
   Optional<BindingSet> bestBindings;
   llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
@@ -807,9 +805,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
     if (!bindings || !isViable)
       continue;
 
-    if (isDebugMode()) {
-      bindings.dump(typeVar, llvm::errs(), solverState->getCurrentIndent());
-    }
+    onCandidate(bindings);
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
@@ -1655,21 +1651,15 @@ static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
 #undef ENTRY
 }
 
-void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-                      unsigned indent) const {
-  out.indent(indent);
-  out << "(";
-  if (typeVar)
-    out << "$T" << typeVar->getImpl().getID();
-  dump(out, 1);
-  out << ")\n";
-}
-
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
   out.indent(indent);
+  out << "(";
+  if (auto typeVar = getTypeVariable())
+    out << "$T" << typeVar->getImpl().getID() << " ";
+  
   std::vector<std::string> attributes;
   if (isDirectHole())
     attributes.push_back("hole");
@@ -1710,7 +1700,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
     case LiteralBindingKind::Float:
     case LiteralBindingKind::None:
-        out << getLiteralBindingKind(literalKind).str();
+      out << getLiteralBindingKind(literalKind).str();
       break;
     }
     if (attributes.empty()) {
@@ -1755,8 +1745,20 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
 
   out << "[with possible bindings: ";
   interleave(Bindings, printBinding, [&]() { out << "; "; });
-  if (Bindings.empty())
+  if (!Literals.empty()) {
+    std::vector<std::string> defaultLiterals;
+    for (const auto &literal : Literals) {
+      if (literal.second.viableAsBinding()) {
+        auto defaultWithType = "(default type of literal) " +
+                               literal.second.getDefaultType().getString(PO);
+        defaultLiterals.push_back(defaultWithType);
+      }
+    }
+    interleave(defaultLiterals, out, ", ");
+  }
+  if (Bindings.empty() && Literals.empty()) {
     out << "<empty>";
+  }
   out << "]";
 
   if (!Defaults.empty()) {
@@ -1769,6 +1771,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
     out << "] ";
   }
+  out << ")\n";
 }
 
 // Given a possibly-Optional type, return the direct superclass of the

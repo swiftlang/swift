@@ -1089,32 +1089,33 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
 
       // Create a new instance by the arguments and save it in the map.
       auto newGlobalCache = std::make_unique<GlobalModuleDependenciesCache>();
-      subInstanceMap->insert(
-          {entry.arguments,
-           std::make_tuple(std::make_unique<CompilerInstance>(),
-                           std::move(newGlobalCache),
-                           std::make_unique<ModuleDependenciesCache>(*newGlobalCache))});
+      auto newInstance = std::make_unique<CompilerInstance>();
 
-      pInstance = std::get<0>((*subInstanceMap)[entry.arguments]).get();
-      auto globalCache = std::get<1>((*subInstanceMap)[entry.arguments]).get();
-      pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
       SmallVector<const char *, 4> args;
       llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
       CompilerInvocation subInvoke = invoke;
-      pInstance->addDiagnosticConsumer(&FDC);
+      newInstance->addDiagnosticConsumer(&FDC);
       if (subInvoke.parseArgs(args, diags)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
       std::string InstanceSetupError;
-      if (pInstance->setup(subInvoke, InstanceSetupError)) {
+      if (newInstance->setup(subInvoke, InstanceSetupError)) {
         invocationInstance.getDiags().diagnose(
             SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
         return true;
       }
-      globalCache->configureForTriple(pInstance->getInvocation()
-                                                .getLangOptions().Target.str());
+      newGlobalCache->configureForTriple(
+          newInstance->getInvocation().getLangOptions().Target.str());
+      auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
+          *newGlobalCache);
+      pInstance = newInstance.get();
+      pCache = newLocalCache.get();
+      subInstanceMap->insert(
+          {entry.arguments,
+           std::make_tuple(std::move(newInstance), std::move(newGlobalCache),
+                           std::move(newLocalCache))});
     }
     assert(pInstance);
     assert(pCache);

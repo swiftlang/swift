@@ -217,8 +217,29 @@ void swift::runSILLoweringPasses(SILModule &Module) {
 }
 
 /// Registered briged pass run functions.
-static llvm::StringMap<BridgedFunctionPassRunFn> bridgedPassRunFunctions;
+static llvm::StringMap<BridgedModulePassRunFn> bridgedModulePassRunFunctions;
+static llvm::StringMap<BridgedFunctionPassRunFn> bridgedFunctionPassRunFunctions;
 static bool passesRegistered = false;
+
+/// Runs a bridged module pass.
+///
+/// \p runFunction is a cache for the run function, so that it has to be looked
+/// up only once in bridgedPassRunFunctions.
+static void runBridgedModulePass(BridgedModulePassRunFn &runFunction,
+                                 SILPassManager *passManager,
+                                 StringRef passName) {
+  if (!runFunction) {
+    runFunction = bridgedModulePassRunFunctions[passName];
+    if (!runFunction) {
+      if (passesRegistered) {
+        llvm::errs() << "Swift pass " << passName << " is not registered\n";
+        abort();
+      }
+      return;
+    }
+  }
+  runFunction({passManager->getSwiftPassInvocation()});
+}
 
 /// Runs a bridged function pass.
 ///
@@ -228,7 +249,7 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
                                    SILPassManager *passManager,
                                    SILFunction *f, StringRef passName) {
   if (!runFunction) {
-    runFunction = bridgedPassRunFunctions[passName];
+    runFunction = bridgedFunctionPassRunFunctions[passName];
     if (!runFunction) {
       if (passesRegistered) {
         llvm::errs() << "Swift pass " << passName << " is not registered\n";
@@ -245,9 +266,15 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
 }
 
 // Called from initializeSwiftModules().
+void SILPassManager_registerModulePass(llvm::StringRef name,
+                                       BridgedModulePassRunFn runFn) {
+  bridgedModulePassRunFunctions[name] = runFn;
+  passesRegistered = true;
+}
+
 void SILPassManager_registerFunctionPass(llvm::StringRef name,
                                          BridgedFunctionPassRunFn runFn) {
-  bridgedPassRunFunctions[name] = runFn;
+  bridgedFunctionPassRunFunctions[name] = runFn;
   passesRegistered = true;
 }
 
@@ -262,6 +289,16 @@ BridgedFunctionPassRunFn ID##Pass::runFunction = nullptr;                  \
 
 #define PASS(ID, TAG, DESCRIPTION)
 #define SWIFT_INSTRUCTION_PASS(INST, TAG)
+
+#define SWIFT_MODULE_PASS(ID, TAG, DESCRIPTION) \
+class ID##Pass : public SILModuleTransform {                               \
+  static BridgedModulePassRunFn runFunction;                               \
+  void run() override {                                                    \
+    runBridgedModulePass(runFunction, PM, TAG);                            \
+  }                                                                        \
+};                                                                         \
+BridgedModulePassRunFn ID##Pass::runFunction = nullptr;                    \
+SILTransform *swift::create##ID() { return new ID##Pass(); }               \
 
 #define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION) \
 SWIFT_FUNCTION_PASS_COMMON(ID, TAG)                                        \

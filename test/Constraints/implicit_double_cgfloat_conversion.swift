@@ -285,3 +285,48 @@ func test_conversion_inside_tuple_elements() -> (a: CGFloat, b: (c: Int, d: CGFl
   let x: Double = 0.0
   return (a: x, b: (c: 42, d: x)) // Ok
 }
+
+do {
+  struct Data {
+    var prop: CGFloat
+  }
+
+  func single(get: () -> Double) {}
+  func multiple(get1: () -> Double,
+                get2: () -> CGFloat = { Double(1) },
+                get3: () -> Double) {}
+
+  func test(data: Data) {
+    single { data.prop } // Ok
+    single { return data.prop } // Ok
+
+    single {
+      _ = 42
+      if true {
+        return data.prop // Ok
+      }
+      return data.prop // Ok
+    }
+
+    multiple {
+      data.prop // Ok
+    } get3: {
+      return data.prop // Ok
+    }
+  }
+}
+
+// rdar://99282938
+func test_implicit_conversion_clash_with_partial_application_check() {
+  class C {
+    var duration: CGFloat { 0.3 }
+
+    var use: Double {
+      duration // Ok
+    }
+
+    func transitionDuration() -> TimeInterval {
+      duration // Ok
+    }
+  }
+}

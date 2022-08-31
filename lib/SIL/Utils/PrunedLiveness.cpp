@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/PrunedLiveness.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -19,29 +20,36 @@ using namespace swift;
 
 /// Mark blocks live during a reverse CFG traversal from one specific block
 /// containing a user.
-void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB) {
-  // If we are visiting this block, then it is not already LiveOut. Mark it
+void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB,
+                                               unsigned startBitNo,
+                                               unsigned endBitNo) {
+  // If, we are visiting this block, then it is not already LiveOut. Mark it
   // LiveWithin to indicate a liveness boundary within the block.
-  markBlockLive(userBB, LiveWithin);
+  markBlockLive(userBB, startBitNo, endBitNo, LiveWithin);
 
-  SmallVector<SILBasicBlock *, 8> predBBWorklist({userBB});
-  while (!predBBWorklist.empty()) {
-    SILBasicBlock *bb = predBBWorklist.pop_back_val();
+  SmallVector<IsLive, 8> predLivenessInfo;
+  BasicBlockWorklist worklist(userBB->getFunction());
+  worklist.push(userBB);
 
+  while (auto *block = worklist.pop()) {
     // The popped `bb` is live; now mark all its predecessors LiveOut.
     //
     // Traversal terminates at any previously visited block, including the
     // blocks initialized as definition blocks.
-    for (auto *predBB : bb->getPredecessorBlocks()) {
-      switch (getBlockLiveness(predBB)) {
-      case Dead:
-        predBBWorklist.push_back(predBB);
-        LLVM_FALLTHROUGH;
-      case LiveWithin:
-        markBlockLive(predBB, LiveOut);
-        break;
-      case LiveOut:
-        break;
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      SWIFT_DEFER { predLivenessInfo.clear(); };
+      getBlockLiveness(predBlock, startBitNo, endBitNo, predLivenessInfo);
+      for (unsigned i : indices(predLivenessInfo)) {
+        switch (predLivenessInfo[i]) {
+        case Dead:
+          worklist.pushIfNotVisited(predBlock);
+          LLVM_FALLTHROUGH;
+        case LiveWithin:
+          markBlockLive(predBlock, startBitNo, endBitNo, LiveOut);
+          break;
+        case LiveOut:
+          break;
+        }
       }
     }
   }
@@ -52,23 +60,29 @@ void PrunedLiveBlocks::computeUseBlockLiveness(SILBasicBlock *userBB) {
 /// Return the updated liveness of the \p use block (LiveOut or LiveWithin).
 ///
 /// Terminators are not live out of the block.
-PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(SILInstruction *user) {
+void PrunedLiveBlocks::updateForUse(
+    SILInstruction *user, unsigned startBitNo, unsigned endBitNo,
+    SmallVectorImpl<IsLive> &resultingLivenessInfo) {
   SWIFT_ASSERT_ONLY(seenUse = true);
 
   auto *bb = user->getParent();
-  switch (getBlockLiveness(bb)) {
-  case LiveOut:
-    return LiveOut;
-  case LiveWithin:
-    return LiveWithin;
-  case Dead: {
-    // This use block has not yet been marked live. Mark it and its predecessor
-    // blocks live.
-    computeUseBlockLiveness(bb);
-    return getBlockLiveness(bb);
+  getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
+
+  for (auto isLive : resultingLivenessInfo) {
+    switch (isLive) {
+    case LiveOut:
+    case LiveWithin:
+      continue;
+    case Dead: {
+      // This use block has not yet been marked live. Mark it and its
+      // predecessor blocks live.
+      computeUseBlockLiveness(bb, startBitNo, endBitNo);
+      resultingLivenessInfo.clear();
+      return getBlockLiveness(bb, startBitNo, endBitNo, resultingLivenessInfo);
+    }
+    }
+    llvm_unreachable("covered switch");
   }
-  }
-  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -76,7 +90,7 @@ PrunedLiveBlocks::IsLive PrunedLiveBlocks::updateForUse(SILInstruction *user) {
 //===----------------------------------------------------------------------===//
 
 void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
-  auto useBlockLive = liveBlocks.updateForUse(user);
+  auto useBlockLive = liveBlocks.updateForUse(user, 0);
   // Record all uses of blocks on the liveness boundary. For blocks marked
   // LiveWithin, the boundary is considered to be the last use in the block.
   //

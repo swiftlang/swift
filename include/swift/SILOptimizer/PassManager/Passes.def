@@ -43,6 +43,17 @@
 #define IRGEN_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
+/// SWIFT_MODULE_PASS(Id, Tag, Description)
+///   This macro follows the same conventions as PASS(Id, Tag, Description),
+///   but is used for module passes which are implemented in Swift.
+///
+///   No further code is need on the C++ side. On the swift swift a module
+///   pass with the same name must be registered with 'registerPass()'.
+///
+#ifndef SWIFT_MODULE_PASS
+#define SWIFT_MODULE_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
+#endif
+
 /// SWIFT_FUNCTION_PASS(Id, Tag, Description)
 ///   This macro follows the same conventions as PASS(Id, Tag, Description),
 ///   but is used for function passes which are implemented in Swift.
@@ -388,6 +399,8 @@ SWIFT_FUNCTION_PASS(RunUnitTests, "run-unit-tests",
      "Runs the compiler internal unit tests")
 SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
+SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
+     "Dump the results of FunctionUses")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
@@ -410,8 +423,6 @@ PASS(StringOptimization, "string-optimization",
      "Optimization for String operations")
 PASS(SwiftArrayPropertyOpt, "array-property-opt",
      "Loop Specialization for Array Properties")
-PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
-     "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
 PASS(OwnershipDumper, "ownership-dumper",
@@ -437,8 +448,8 @@ PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS(AssemblyVisionRemarkGenerator, "assembly-vision-remark-generator",
      "Emit assembly vision remarks that provide source level guidance of where runtime calls ended up")
-PASS(MoveOnlyChecker, "sil-move-only-checker",
-     "Pass that enforces move only invariants on raw SIL")
+PASS(MoveOnlyObjectChecker, "sil-move-only-object-checker",
+     "Pass that enforces move only invariants on raw SIL for objects")
 PASS(MoveKillsCopyableValuesChecker, "sil-move-kills-copyable-values-checker",
      "Pass that checks that any copyable (non-move only) value that is passed "
      "to _move do not have any uses later than the _move")
@@ -470,6 +481,7 @@ SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongRetainInst, "simplify-strong_retain")
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongReleaseInst, "simplify-strong_release")
 
 #undef IRGEN_PASS
+#undef SWIFT_MODULE_PASS
 #undef SWIFT_FUNCTION_PASS
 #undef SWIFT_FUNCTION_PASS_WITH_LEGACY
 #undef SWIFT_INSTRUCTION_PASS

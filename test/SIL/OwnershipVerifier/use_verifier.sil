@@ -127,7 +127,8 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 sil [ossa] @store_borrow_result : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
-  store_borrow %0 to %1 : $*Builtin.NativeObject
+  %sb = store_borrow %0 to %1 : $*Builtin.NativeObject
+  end_borrow %sb : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -307,18 +308,6 @@ bb0:
   %0 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
   %1 = function_ref @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
   apply %1(%0, %0, %0) : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-sil [ossa] @unsafeGuaranteedTest : $@convention(thin) (@owned Ref) -> () {
-bb0(%0 : @owned $Ref):
-  %1 = builtin "unsafeGuaranteed"(%0 : $Ref) : $(Ref, Builtin.Int8)
-  %2 = begin_borrow %1 : $(Ref, Builtin.Int8)
-  %3 = tuple_extract %2 : $(Ref, Builtin.Int8), 1
-  end_borrow %2 : $(Ref, Builtin.Int8)
-  builtin "unsafeGuaranteedEnd"(%3 : $Builtin.Int8) : $()
-  destroy_value %1 : $(Ref, Builtin.Int8)
   %9999 = tuple()
   return %9999 : $()
 }

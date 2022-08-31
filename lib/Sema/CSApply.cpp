@@ -919,6 +919,24 @@ namespace {
 
       auto &context = cs.getASTContext();
 
+      // For an RValue function type, use a standard function conversion.
+      if (openedType->is<AnyFunctionType>()) {
+        expr = new (context) FunctionConversionExpr(
+            expr, getNewType(adjustedOpenedType));
+        cs.cacheType(expr);
+        return expr;
+      }
+
+      // For any kind of LValue, use an ABISafeConversion.
+      if (openedType->hasLValueType()) {
+        assert(adjustedOpenedType->hasLValueType() && "lvalueness mismatch?");
+
+        expr = new (context) ABISafeConversionExpr(
+                                expr, getNewType(adjustedOpenedType));
+        cs.cacheType(expr);
+        return expr;
+      }
+
       // If we have an optional type, wrap it up in a monadic '?' and recurse.
       if (Type objectType = openedType->getOptionalObjectType()) {
         Type adjustedRefType = getNewType(adjustedOpenedType);
@@ -931,14 +949,6 @@ namespace {
         expr = new (context) InjectIntoOptionalExpr(expr, adjustedRefType);
         cs.cacheType(expr);
         expr = new (context) OptionalEvaluationExpr(expr, adjustedRefType);
-        cs.cacheType(expr);
-        return expr;
-      }
-
-      // For a function type, perform a function conversion.
-      if (openedType->is<AnyFunctionType>()) {
-        expr = new (context) FunctionConversionExpr(
-            expr, getNewType(adjustedOpenedType));
         cs.cacheType(expr);
         return expr;
       }
@@ -1669,10 +1679,17 @@ namespace {
           adjustedRefTy = adjustedRefTy->replaceCovariantResultType(
               containerTy, 1);
         }
-        cs.setType(memberRefExpr, refTy->castTo<FunctionType>()->getResult());
+
+        // \returns result of the given function type
+        auto resultType = [](Type fnTy) -> Type {
+          return fnTy->castTo<FunctionType>()->getResult();
+        };
+
+        cs.setType(memberRefExpr, resultType(refTy));
 
         Expr *result = memberRefExpr;
-        result = adjustTypeForDeclReference(result, refTy, adjustedRefTy);
+        result = adjustTypeForDeclReference(result, resultType(refTy),
+                                                    resultType(adjustedRefTy));
         closeExistentials(result, locator);
 
         // If the property is of dynamic 'Self' type, wrap an implicit
@@ -6792,7 +6809,25 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::DoubleToCGFloat: {
       auto conversionKind = knownRestriction->second;
 
-      auto *argExpr = locator.trySimplifyToExpr();
+      auto shouldUseCoercedExpr = [&]() {
+        // If conversion wraps the whole body of a single-expression closure,
+        // let's use the passed-in expression since the closure itself doesn't
+        // get updated until coercion is done.
+        if (locator.endsWith<LocatorPathElt::ClosureBody>())
+          return true;
+
+        // Contextual type locator always uses the original version of
+        // expression (before any coercions have been applied) because
+        // otherwise it wouldn't be possible to find the overload choice.
+        if (locator.endsWith<LocatorPathElt::ContextualType>())
+          return true;
+
+        // In all other cases use the expression associated with locator.
+        return false;
+      };
+
+      auto *argExpr =
+          shouldUseCoercedExpr() ? expr : locator.trySimplifyToExpr();
       assert(argExpr);
 
       // Source requires implicit conversion to match destination
@@ -6858,11 +6893,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // below is just an approximate check since the above would be expensive to
   // verify and still relies on the type checker ensuing `fromType` is
   // compatible with any opaque archetypes.
-  if (toType->hasOpaqueArchetype() &&
+  if (toType->getCanonicalType()->hasOpaqueArchetype() &&
       cs.getConstraintLocator(locator)->isForContextualType()) {
     // Find the opaque type declaration. We need its generic signature.
     OpaqueTypeDecl *opaqueDecl = nullptr;
-    bool found = toType.findIf([&](Type type) {
+    bool found = toType->getCanonicalType().findIf([&](Type type) {
       if (auto opaqueType = type->getAs<OpaqueTypeArchetypeType>()) {
         opaqueDecl = opaqueType->getDecl();
         return true;
@@ -8570,7 +8605,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   // Convert the initializer to the type of the pattern.
   auto &cs = solution.getConstraintSystem();
   auto locator = cs.getConstraintLocator(
-      initializer, LocatorPathElt::ContextualType(CTP_Initialization));
+      target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
   initializer = solution.coerceToType(initializer, initType, locator);
   if (!initializer)
     return None;
@@ -9081,17 +9116,35 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
+      ConstraintLocator *locator = nullptr;
+
+      auto contextualTypePurpose = target.getExprContextualTypePurpose();
+      // Bodies of single-expression closures use a special locator
+      // for contextual type conversion to make sure that result is
+      // convertible to `Void` when `return` is not used explicitly.
+      if (contextualTypePurpose == CTP_ClosureResult) {
+        auto *closure = cast<ClosureExpr>(target.getDeclContext());
+        auto *returnStmt =
+            castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
+
+        locator = cs.getConstraintLocator(
+            closure, LocatorPathElt::ClosureBody(
+                         /*hasReturn=*/!returnStmt->isImplicit()));
+      } else {
+        locator = cs.getConstraintLocator(
+            expr, LocatorPathElt::ContextualType(contextualTypePurpose));
+      }
+
+      assert(locator);
+
       resultExpr = Rewriter.coerceToType(
-          resultExpr, solution.simplifyType(convertType),
-          cs.getConstraintLocator(resultExpr,
-                                  LocatorPathElt::ContextualType(
-                                      target.getExprContextualTypePurpose())));
+          resultExpr, solution.simplifyType(convertType), locator);
     } else if (cs.getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
           resultExpr, cs.getType(resultExpr)->getRValueType(),
-          cs.getConstraintLocator(resultExpr,
+          cs.getConstraintLocator(expr,
                                   LocatorPathElt::ContextualType(
                                       target.getExprContextualTypePurpose())));
     }

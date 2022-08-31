@@ -255,7 +255,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
                                                 llvm::AttributeList &attrs,
                                                 const TypeInfo &ti,
                                                 unsigned argIndex) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(IGM.getLLVMContext());
   // Value parameter pointers can't alias or be captured.
   b.addAttribute(llvm::Attribute::NoAlias);
   b.addAttribute(llvm::Attribute::NoCapture);
@@ -269,7 +269,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
                                         llvm::AttributeList &attrs,
                                         const TypeInfo &ti, unsigned argIndex,
                                         bool aliasable) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(IGM.getLLVMContext());
   // Thanks to exclusivity checking, it is not possible to alias inouts except
   // those that are inout_aliasable.
   if (!aliasable && paramSILType.getASTType()->getAnyPointerElementType()) {
@@ -318,7 +318,7 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
                                         unsigned paramIndex, bool allowSRet,
                                         llvm::Type *storageType) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(IGM.getLLVMContext());
   b.addAttribute(llvm::Attribute::NoAlias);
   b.addAttribute(llvm::Attribute::NoCapture);
   if (allowSRet) {
@@ -330,21 +330,21 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
 
 void IRGenModule::addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                                  unsigned argIndex) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   b.addAttribute(llvm::Attribute::SwiftAsync);
   attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   b.addAttribute(llvm::Attribute::SwiftSelf);
   attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
                                           unsigned argIndex) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(getLLVMContext());
   // Don't add the swifterror attribute on ABIs that don't pass it in a register.
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
@@ -365,7 +365,7 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                                        llvm::AttributeList &attrs,
                                        unsigned argIndex, Alignment align,
                                        llvm::Type *storageType) {
-  llvm::AttrBuilder b;
+  llvm::AttrBuilder b(IGM.getLLVMContext());
   b.addByValAttr(storageType);
   b.addAttribute(llvm::Attribute::getWithAlignment(
       IGM.getLLVMContext(), llvm::Align(align.getValue())));
@@ -936,8 +936,8 @@ namespace {
       case clang::Type::Pipe:
         llvm_unreachable("OpenCL type in ABI lowering?");
 
-      case clang::Type::ExtInt:
-        llvm_unreachable("ExtInt type in ABI lowering?");
+      case clang::Type::BitInt:
+        llvm_unreachable("BitInt type in ABI lowering?");
 
       case clang::Type::ConstantMatrix: {
         llvm_unreachable("ConstantMatrix type in ABI lowering?");
@@ -2730,8 +2730,11 @@ public:
     auto signedResumeFn = currentResumeFn;
     // Sign the task resume function with the C function pointer schema.
     if (auto schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers) {
-      // TODO: use the Clang type for TaskContinuationFunction*
+      // Use the Clang type for TaskContinuationFunction*
       // to make this work with type diversity.
+      if (schema.hasOtherDiscrimination())
+        schema =
+            IGF.IGM.getOptions().PointerAuth.ClangTypeTaskContinuationFunction;
       auto authInfo =
           PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
       signedResumeFn = emitPointerAuthSign(IGF, signedResumeFn, authInfo);
@@ -2933,7 +2936,7 @@ llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
   if (auto func = dyn_cast<llvm::Function>(fn.getRawPointer())) {
     for (unsigned argIndex = 0; argIndex < func->arg_size(); ++argIndex) {
       if (func->hasParamAttribute(argIndex, llvm::Attribute::StructRet)) {
-        llvm::AttrBuilder builder;
+        llvm::AttrBuilder builder(func->getContext());
         builder.addStructRetAttr(nullptr);
         attrs = attrs.addParamAttributes(func->getContext(), argIndex, builder);
       }
@@ -4926,7 +4929,7 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
   auto castBlockPtr = IGF.Builder.CreateBitCast(blockPtr, blockPtrTy);
 
   // Extract the invocation pointer for blocks.
-  auto blockStructTy = blockPtrTy->getElementType();
+  auto blockStructTy = blockPtrTy->getPointerElementType();
   llvm::Value *invokeFnPtrPtr =
     IGF.Builder.CreateStructGEP(blockStructTy, castBlockPtr, 3);
   Address invokeFnPtrAddr(invokeFnPtrPtr, IGF.IGM.getPointerAlignment());

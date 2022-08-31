@@ -57,15 +57,15 @@ sil @GetRawPointer : $@convention(thin) () -> Builtin.RawPointer
 sil @GetOptionalModel : $@convention(method) (@in ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model>
 
 // CHECK-LABEL: sil hidden @BuggyFunction : $@convention(thin) () -> @owned Model {
-// CHECK: [[ALLOC:%.*]] = alloc_stack $ReadonlyExternalFramework, let, name "ExternalFramework"
-// CHECK-NEXT: [[INITE:%.*]] = init_existential_addr [[ALLOC]] : $*ReadonlyExternalFramework, $ExternalFramework
-// CHECK: [[TALLOC1:%.*]] = alloc_stack $ReadonlyExternalFramework
-// CHECK-NEXT: copy_addr [[ALLOC]] to [initialization] [[TALLOC1]] : $*ReadonlyExternalFramework
-// CHECK-NEXT: apply {{%.*}}([[TALLOC1]], {{%.*}}) : $@convention(method) (@in ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model>
-// CHECK: [[TALLOC2:%.*]] = alloc_stack $ReadonlyExternalFramework
-// CHECK-NEXT: copy_addr [[ALLOC]] to [initialization] [[TALLOC2]] : $*ReadonlyExternalFramework
+// CHECK: [[ALLOC:%.*]] = alloc_stack $any ReadonlyExternalFramework, let, name "ExternalFramework"
+// CHECK-NEXT: [[INITE:%.*]] = init_existential_addr [[ALLOC]] : $*any ReadonlyExternalFramework, $ExternalFramework
+// CHECK: [[TALLOC1:%.*]] = alloc_stack $any ReadonlyExternalFramework
+// CHECK-NEXT: copy_addr [[ALLOC]] to [initialization] [[TALLOC1]] : $*any ReadonlyExternalFramework
+// CHECK-NEXT: apply {{%.*}}([[TALLOC1]], {{%.*}}) : $@convention(method) (@in any ReadonlyExternalFramework, @thin ModelDataService.Type) -> @owned Optional<Model>
+// CHECK: [[TALLOC2:%.*]] = alloc_stack $any ReadonlyExternalFramework
+// CHECK-NEXT: copy_addr [[ALLOC]] to [initialization] [[TALLOC2]] : $*any ReadonlyExternalFramework
 // CHECK-NEXT: destroy_addr [[ALLOC]]
-// CHECK: [[OEADDR:%.*]] = open_existential_addr immutable_access [[TALLOC2]] : $*ReadonlyExternalFramework
+// CHECK: [[OEADDR:%.*]] = open_existential_addr immutable_access [[TALLOC2]] : $*any ReadonlyExternalFramework
 sil hidden @BuggyFunction : $@convention(thin) () -> @owned Model {
 bb0:
   %0 = alloc_stack $ReadonlyExternalFramework, let, name "ExternalFramework" // users: %1, %166, %72, %163, %71, %168, %10

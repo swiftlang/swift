@@ -934,9 +934,8 @@ namespace {
           assert(!param.isInOut());
           elts.emplace_back(param.getParameterType());
         }
-        auto outputSubstType = cast<TupleType>(
-          TupleType::get(elts, SGF.getASTContext())
-            ->getCanonicalType());
+        auto outputSubstType = CanTupleType(
+          TupleType::get(elts, SGF.getASTContext()));
 
         // Translate the input tuple value into the output tuple value. Note
         // that the output abstraction pattern is a tuple, and we explode tuples
@@ -4438,6 +4437,7 @@ void SILGenFunction::emitProtocolWitness(
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
+      assert(enterIsolation->getActorInstanceParameter() == 0 && "Not self?");
       auto actorSelfVal = origParams.back();
 
       if (actorSelfVal.getType().isAddress()) {

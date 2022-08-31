@@ -15,8 +15,8 @@ func setChildren(p: Parent, c: Child) {
   p.children = [c]
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s19objc_bridging_array11setChildren1p1cyAA6Parent_p_AA5ChildCtF : $@convention(thin) (@guaranteed Parent, @guaranteed Child) -> () {
-// CHECK: [[OPENED:%.*]] = open_existential_ref %0 : $Parent to $[[OPENED_TYPE:@opened\(.*, Parent\) Self]]
+// CHECK-LABEL: sil hidden [ossa] @$s19objc_bridging_array11setChildren1p1cyAA6Parent_p_AA5ChildCtF : $@convention(thin) (@guaranteed any Parent, @guaranteed Child) -> () {
+// CHECK: [[OPENED:%.*]] = open_existential_ref %0 : $any Parent to $[[OPENED_TYPE:@opened\(.*, any Parent\) Self]]
 // CHECK: [[COPIED:%.*]] = copy_value [[OPENED]] : $[[OPENED_TYPE]]
 // CHECK: [[LENGTH:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK: [[FN:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)

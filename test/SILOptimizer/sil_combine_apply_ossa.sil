@@ -218,7 +218,7 @@ bb4:
 
 sil [ossa] @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
 
-// CHECK-LABEL: sil [ossa] @sil_combine_dead_partial_apply_try_apply : $@convention(thin) (@in S1) -> ((), @error Error) {
+// CHECK-LABEL: sil [ossa] @sil_combine_dead_partial_apply_try_apply : $@convention(thin) (@in S1) -> ((), @error any Error) {
 // CHECK: bb0([[ARG:%.*]] : $*S1):
 // CHECK: bb1:
 // CHECK-NEXT: [[ORIGINAL_ALLOC_STACK:%.*]] = alloc_stack $S1
@@ -342,7 +342,7 @@ bb0(%0 : $*T, %1 : $*T):
   return %r : $()
 }
 
-// CHECK-LABEL: sil [ossa] @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in_guaranteed SwiftP) -> () {
+// CHECK-LABEL: sil [ossa] @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in_guaranteed any SwiftP) -> () {
 // CHECK: bb0({{.*}}):
 // CHECK:   [[EX:%.*]] = open_existential_addr
 // CHECK:   [[METHOD:%.*]] = witness_method
@@ -410,7 +410,7 @@ bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type, %2 : $*MutatingProto)
   copy_addr %2 to [initialization] %alloc2 : $*MutatingProto
   %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self
   %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self).Type : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
-  // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self>({{%.*}}) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
+  // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", any MutatingProto) Self>({{%.*}}) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
   %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F", MutatingProto) Self>(%oeaddr) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   copy_addr [take] %alloc2 to [initialization] %0 : $*MutatingProto
   dealloc_stack %alloc2 : $*MutatingProto
@@ -486,8 +486,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[PA:%.*]] = partial_apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[CVT1:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
-// CHECK:  [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
-// CHECK:  try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+// CHECK:  [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error any Error
+// CHECK:  try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error any Error, normal bb1, error bb2
 // CHECK-LABEL: } // end sil function 'testCombineClosureConvert'
 sil [ossa] @testCombineClosureConvert : $(Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
@@ -544,7 +544,7 @@ sil [ossa] @guaranteed_closure_throws : $@convention(thin) (@guaranteed C, Built
 // CHECK: bb1({{.*}}):
 // CHECK-NOT:   destroy_value
 // CHECK:   br bb3
-// CHECK: bb2([[ERROR:%.*]] : @owned $Error):
+// CHECK: bb2([[ERROR:%.*]] : @owned $any Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT:   br bb3
 // CHECK: bb3:
@@ -792,8 +792,8 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-LABEL: sil [ossa] @convert_function_simplification_caller : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK:   apply [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error
-// CHECK:   apply [nothrow] [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> @error Error
+// CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error any Error
+// CHECK:   apply [nothrow] [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> @error any Error
 // CHECK: } // end sil function 'convert_function_simplification_caller'
 sil [ossa] @convert_function_simplification_caller : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -1091,10 +1091,10 @@ bb2:
 
 
 // CHECK-LABEL: sil [ossa] @test_existential_partial_apply_apply
-// CHECK: bb0(%0 : $*FakeProtocol):
+// CHECK: bb0(%0 : $*any FakeProtocol):
 // CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access
 // CHECK-NEXT: [[FN:%.*]] = witness_method
-// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", FakeProtocol) Self>([[OPEN]])
+// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0", any FakeProtocol) Self>([[OPEN]])
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil [ossa] @test_existential_partial_apply_apply : $@convention(thin) (@in_guaranteed FakeProtocol) -> () {

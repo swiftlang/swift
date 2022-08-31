@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "debug-info"
-
 #include "IRGenDebugInfo.h"
 #include "GenOpaque.h"
 #include "GenStruct.h"
@@ -64,6 +62,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
+
+#define DEBUG_TYPE "debug-info"
 
 using namespace swift;
 using namespace irgen;

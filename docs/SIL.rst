@@ -4363,11 +4363,22 @@ bind_memory
 Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
 capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
 
-Produces a opaque token representing the previous memory state. For
-memory binding semantics, this state includes the type that the memory
-was previously bound to. The token cannot, however, be used to
-retrieve a metatype. It's value is only meaningful to the Swift
-runtime for typed pointer verification.
+Produces a opaque token representing the previous memory state for
+memory binding semantics. This abstract state includes the type that
+the memory was previously bound to along with the size of the affected
+memory region, which can be derived from ``%1``. The token cannot, for
+example, be used to retrieve a metatype. It only serves a purpose when
+used by ``rebind_memory``, which has no static type information. The
+token dynamically passes type information from the first bind_memory
+into a chain of rebind_memory operations.
+
+Example::
+
+  %_      = bind_memory %0   : $Builtin.RawPointer, %numT : $Builtin.Word to $T // holds type 'T'
+  %token0 = bind_memory %0   : $Builtin.RawPointer, %numU : $Builtin.Word to $U // holds type 'U'
+  %token1 = rebind_memory %0 : $Builtin.RawPointer, %token0 : $Builtin.Word  // holds type 'T'
+  %token2 = rebind_memory %0 : $Builtin.RawPointer, %token1 : $Builtin.Word  // holds type 'U'
+
 
 rebind_memory
 `````````````
@@ -4386,8 +4397,8 @@ This instruction's semantics are identical to ``bind_memory``, except
 that the types to which memory will be bound, and the extent of the
 memory region is unknown at compile time. Instead, the bound-types are
 represented by a token that was produced by a prior memory binding
-operation. ``%in_token`` must be the result of bind_memory or
-rebind_memory.
+operation. ``%in_token`` must be the result of ``bind_memory`` or
+``rebind_memory``.
 
 begin_access
 ````````````
@@ -4861,36 +4872,6 @@ swift closures to Objective C. A mandatory SIL pass will lower this instruction
 into a ``copy_block`` and a ``is_escaping``/``cond_fail``/``destroy_value`` at
 the end of the lifetime of the objective c closure parameter to check whether
 the sentinel closure was escaped.
-
-builtin "unsafeGuaranteed"
-``````````````````````````
-
-::
-
-  sil-instruction := 'builtin' '"unsafeGuaranteed"' '<' sil-type '>' '(' sil-operand')' ':' sil-type
-
-  %1 = builtin "unsafeGuaranteed"<T>(%0 : $T) : ($T, Builtin.Int1)
-  // $T must be of AnyObject type.
-
-Asserts that there exists another reference of the value ``%0`` for the scope
-delineated by the call of this builtin up to the first call of a ``builtin
-"unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
-returned value. If no such instruction can be found nothing can be assumed. This
-assertion holds for uses of the first tuple element of the returned value
-``%1.0`` within this scope. The returned reference value equals the input
-``%0``.
-
-builtin "unsafeGuaranteedEnd"
-`````````````````````````````
-
-::
-
-  sil-instruction := 'builtin' '"unsafeGuaranteedEnd"' '(' sil-operand')'
-
-  %1 = builtin "unsafeGuaranteedEnd"(%0 : $Builtin.Int1)
-  // $T must be of AnyObject type.
-
-Ends the scope for the ``builtin "unsafeGuaranteed"`` instruction.
 
 Literals
 ~~~~~~~~

@@ -38,20 +38,6 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:   static inline FirstSmallStruct init(swift::Int x);
 // CHECK-NEXT: private:
 
-// CHECK:      inline uint32_t FirstSmallStruct::getX() const {
-// CHECK-NEXT: return _impl::$s4Init16FirstSmallStructV1xs6UInt32Vvg(_impl::swift_interop_passDirect_Init_FirstSmallStruct(_getOpaquePointer()));
-// CHECK-NEXT: }
-// CHECK-NEXT: inline FirstSmallStruct FirstSmallStruct::init() {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_FirstSmallStruct(result, _impl::$s4Init16FirstSmallStructVACycfC());
-// CHECK-NEXT: });
-// CHECK-NEXT: }
-// CHECK-NEXT: inline FirstSmallStruct FirstSmallStruct::init(swift::Int x) {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_FirstSmallStruct(result, _impl::$s4Init16FirstSmallStructVyACSicfC(x));
-// CHECK-NEXT: });
-// CHECK-NEXT: }
-
 public struct LargeStruct {
     public let x1, x2, x3, x4, x5, x6: Int
 
@@ -80,17 +66,6 @@ public struct LargeStruct {
 // CHECK-NEXT:  static inline LargeStruct init(swift::Int x, const FirstSmallStruct& y);
 // CHECK-NEXT: private:
 
-// CHECK:      inline LargeStruct LargeStruct::init() {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:   _impl::$s4Init11LargeStructVACycfC(result);
-// CHECK-NEXT: });
-// CHECK-NEXT: }
-// CHECK-NEXT: inline LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& y) {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:   _impl::$s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(result, x, _impl::swift_interop_passDirect_Init_FirstSmallStruct(_impl::_impl_FirstSmallStruct::getOpaquePointer(y)));
-// CHECK-NEXT: });
-// CHECK-NEXT: }
-
 private class RefCountedClass {
     let x: Int
 
@@ -117,6 +92,32 @@ public struct StructWithRefCountStoredProp {
 
 // CHECK:      static inline StructWithRefCountStoredProp init();
 // CHECK-NEXT: static inline StructWithRefCountStoredProp init(swift::Int x);
+
+
+// CHECK:      inline uint32_t FirstSmallStruct::getX() const {
+// CHECK-NEXT: return _impl::$s4Init16FirstSmallStructV1xs6UInt32Vvg(_impl::swift_interop_passDirect_Init_FirstSmallStruct(_getOpaquePointer()));
+// CHECK-NEXT: }
+// CHECK-NEXT: inline FirstSmallStruct FirstSmallStruct::init() {
+// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_FirstSmallStruct(result, _impl::$s4Init16FirstSmallStructVACycfC());
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+// CHECK-NEXT: inline FirstSmallStruct FirstSmallStruct::init(swift::Int x) {
+// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_FirstSmallStruct(result, _impl::$s4Init16FirstSmallStructVyACSicfC(x));
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+
+// CHECK:      inline LargeStruct LargeStruct::init() {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   _impl::$s4Init11LargeStructVACycfC(result);
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+// CHECK-NEXT: inline LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& y) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   _impl::$s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(result, x, _impl::swift_interop_passDirect_Init_FirstSmallStruct(_impl::_impl_FirstSmallStruct::getOpaquePointer(y)));
+// CHECK-NEXT: });
+// CHECK-NEXT: }
 
 // CHECK:      inline StructWithRefCountStoredProp StructWithRefCountStoredProp::init() {
 // CHECK-NEXT: return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) {

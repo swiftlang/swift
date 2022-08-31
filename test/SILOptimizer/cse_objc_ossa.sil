@@ -91,7 +91,7 @@ bb0(%0 : @owned $Bar):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @_TF4test9trytowalkFPS_8Walkable_T_ :
-// CHECK:           bb0(%0 : @owned $Walkable):
+// CHECK:           bb0(%0 : @owned $any Walkable):
 // CHECK-NEXT:      {{%.*}} = open_existential_ref
 // CHECK-NEXT:      {{%.*}} = objc_method
 // CHECK-NEXT:      {{%.*}} = apply
@@ -247,9 +247,9 @@ class B {}
 
 // CHECK-LABEL: sil [ossa] @nocse_existential_metatype_addr :
 // CHECK: store
-// CHECK: existential_metatype $@thick Any.Type
+// CHECK: existential_metatype $@thick any Any.Type
 // CHECK: store
-// CHECK: existential_metatype $@thick Any.Type
+// CHECK: existential_metatype $@thick any Any.Type
 // CHECK-LABEL: } // end sil function 'nocse_existential_metatype_addr'
 sil [ossa] @nocse_existential_metatype_addr : $@convention(thin) (@owned B, @owned B) -> (@thick Any.Type, @thick Any.Type) {
 bb0(%0 : @owned $B, %1 : @owned $B):

@@ -715,13 +715,29 @@ class FunctionArgApplyInfo {
   FunctionType *FnType;
   const ValueDecl *Callee;
 
-public:
   FunctionArgApplyInfo(ArgumentList *argList, Expr *argExpr, unsigned argIdx,
                        Type argType, unsigned paramIdx, Type fnInterfaceType,
                        FunctionType *fnType, const ValueDecl *callee)
       : ArgList(argList), ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType),
         ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType), FnType(fnType),
         Callee(callee) {}
+
+public:
+  static Optional<FunctionArgApplyInfo>
+  get(ArgumentList *argList, Expr *argExpr, unsigned argIdx, Type argType,
+      unsigned paramIdx, Type fnInterfaceType, FunctionType *fnType,
+      const ValueDecl *callee) {
+    assert(fnType);
+
+    if (argIdx >= argList->size())
+      return None;
+
+    if (paramIdx >= fnType->getNumParams())
+      return None;
+
+    return FunctionArgApplyInfo(argList, argExpr, argIdx, argType, paramIdx,
+                                fnInterfaceType, fnType, callee);
+  }
 
   /// \returns The list of the arguments used for this application.
   ArgumentList *getArgList() const { return ArgList; }
@@ -4748,7 +4764,8 @@ public:
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   ConstraintLocator *memberLocator = nullptr,
-                                  bool wantInterfaceType = false);
+                                  bool wantInterfaceType = false,
+                                  bool adjustForPreconcurrency = true);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -4770,6 +4787,7 @@ public:
       llvm::function_ref<Type(VarDecl *)> getType,
       ConstraintLocator *memberLocator = nullptr,
       bool wantInterfaceType = false,
+      bool adjustForPreconcurrency = true,
       llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType =
         [](const AbstractClosureExpr *) {
           return Type();
@@ -5528,6 +5546,9 @@ public:
 
   /// Apply the given result builder to the closure expression.
   ///
+  /// \note builderType must be a contexutal type - callers should
+  /// open the builder type or map it into context as appropriate.
+  ///
   /// \returns \c None when the result builder cannot be applied at all,
   /// otherwise the result of applying the result builder.
   Optional<TypeMatchResult>
@@ -5541,7 +5562,10 @@ public:
       Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
       ConstraintKind matchKind, ConstraintLocatorBuilder locator);
 
-  Optional<BindingSet> determineBestBindings();
+  /// Determine whether given type variable with its set of bindings is viable
+  /// to be attempted on the next step of the solver.
+  Optional<BindingSet> determineBestBindings(
+      llvm::function_ref<void(const BindingSet &)> onCandidate);
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.

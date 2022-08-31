@@ -43,9 +43,10 @@ public:
   DependencyScanningTool tool;
 
   ClangModuleDependenciesCacheImpl()
-      : importHackFileCache(),
-        service(ScanningMode::MinimizedSourcePreprocessing, ScanningOutputFormat::Full),
-        tool(service) { }
+      : importHackFileCache(), service(ScanningMode::DependencyDirectivesScan,
+                                       ScanningOutputFormat::Full,
+                                       clang::CASOptions(), nullptr, nullptr),
+        tool(service) {}
   ~ClangModuleDependenciesCacheImpl();
 
   /// Retrieve the name of the file used for the "import hack" that is
@@ -209,9 +210,13 @@ void ClangImporter::recordModuleDependencies(
     // We pass the entire argument list via -Xcc, so the invocation should
     // use extra clang options alone.
     swiftArgs.push_back("-only-use-extra-clang-opts");
-    auto addClangArg = [&](StringRef arg) {
+    auto addClangArg = [&](Twine arg) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(arg.str());
+    };
+    auto addClangFrontendArg = [&](Twine arg) {
+      addClangArg("-Xclang");
+      addClangArg(arg);
     };
 
     // Add all args inherited from creating the importer.
@@ -246,24 +251,23 @@ void ClangImporter::recordModuleDependencies(
       }
     }
 
-    // Add all args the non-path arguments required to be passed in, according
-    // to the Clang scanner
-    for (const auto &clangArg :
-         clangModuleDep.getAdditionalArgsWithoutModulePaths()) {
-      swiftArgs.push_back("-Xcc");
-      swiftArgs.push_back("-Xclang");
-      swiftArgs.push_back("-Xcc");
-      swiftArgs.push_back(clangArg);
-    }
+    // Add the equivalent of the old `getAdditionalArgsWithoutModulePaths`.
+    // TODO: Should we be passing all cc1 args (ie.
+    // `getCanonicalCommandLineWithoutModulePaths`)?
+    addClangFrontendArg("-fno-implicit-modules");
+    addClangFrontendArg("-emit-module");
+    addClangFrontendArg(Twine("-fmodule-name=") + clangModuleDep.ID.ModuleName);
+    if (clangModuleDep.IsSystem)
+      addClangFrontendArg("-fsystem-module");
+    if (clangModuleDep.BuildInvocation.getLangOpts()->NeededByPCHOrCompilationUsesPCH)
+      addClangFrontendArg("-fmodule-related-to-pch");
 
     // If the scanner is invoked with '-clang-target', ensure this is the target
     // used to build this PCM.
     if (Impl.SwiftContext.LangOpts.ClangTarget.hasValue()) {
       llvm::Triple triple = Impl.SwiftContext.LangOpts.ClangTarget.getValue();
-      swiftArgs.push_back("-Xcc");
-      swiftArgs.push_back("-target");
-      swiftArgs.push_back("-Xcc");
-      swiftArgs.push_back(triple.str());
+      addClangArg("-target");
+      addClangArg(triple.str());
     }
 
     // Swift frontend action: -emit-pcm

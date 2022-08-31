@@ -1049,7 +1049,7 @@ bb0(%0 : $*Airplane):
 }
 
 // CHECK-LABEL: _TF2p28trytoflyFPS_7Flyable_T_
-// CHECK:           bb0(%0 : $*Flyable):
+// CHECK:           bb0(%0 : $*any Flyable):
 // CHECK-NEXT:      open_existential_addr
 // CHECK-NEXT:      witness_method
 // CHECK-NEXT:      apply
@@ -1090,12 +1090,12 @@ sil_witness_table hidden Airplane: Flyable module p2 {
 protocol Pingable { func ping() }
 
 // CHECK-LABEL: CSE_Existential_Simple
-// CHECK: open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable)
-// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self, #Pingable.ping : {{.*}}, %2
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%2)
+// CHECK: open_existential_addr immutable_access %0 : $*any Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable)
+// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self, #Pingable.ping : {{.*}}, %2
+// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
 // CHECK: open_existential_addr immutable_access 
 // CHECK: witness_method
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%2)
+// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
 // CHECK: return
 sil hidden @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
@@ -1119,7 +1119,7 @@ bb0(%0 : $*Pingable, %1 : $Int):
   %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self // users: %5, %6
   %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4)
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
   %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   %7 = integer_literal $Builtin.Int64, 3          // user: %9
   %8 = integer_literal $Builtin.Int64, 3          // user: %9
@@ -1130,7 +1130,7 @@ bb1:                                              // Preds: bb0
   %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self // users: %12, %13
   %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %13
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4)
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
   %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   br bb2                                          // id: %14
 
@@ -1138,7 +1138,7 @@ bb2:                                              // Preds: bb0 bb1
   %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self // users: %16, %17
   %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %17
 
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4)
+  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
   %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable                    // id: %18
   %19 = tuple ()                                  // user: %20
@@ -1169,14 +1169,14 @@ protocol Proto : class {
 // Check that all open_existential_ref instructions are CSEd
 // Any reference to the $@opened("1B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self should be replaced by
 // references to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self.
-// CHECK-LABEL: sil @cse_open_existential : $@convention(thin) (@guaranteed Proto, Bool) -> ()
+// CHECK-LABEL: sil @cse_open_existential : $@convention(thin) (@guaranteed any Proto, Bool) -> ()
 // CHECK: bb0
-// CHECK: %[[OPENED_EXISTENTIAL:[0-9]+]] = open_existential_ref %{{[0-9]+}} : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self
-// CHECK: %[[WM1:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis
+// CHECK: %[[OPENED_EXISTENTIAL:[0-9]+]] = open_existential_ref %{{[0-9]+}} : $any Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", any Proto) Self
+// CHECK: %[[WM1:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", any Proto) Self, #Proto.doThis
 // CHECK: apply %[[WM1]]{{.*}}(%[[OPENED_EXISTENTIAL]])
 // CHECK: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: %[[WM2:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThat
+// CHECK-NEXT: %[[WM2:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", any Proto) Self, #Proto.doThat
 // CHECK-NEXT: apply %[[WM2]]{{.*}}(%[[OPENED_EXISTENTIAL]])
 // CHECK-NOT: 1B6851A6-4796-11E6-B7DF-B8E856428C60
 // CHECK: br bb
@@ -1294,9 +1294,9 @@ protocol SomeP {}
 public enum SpecialEnum : SomeP {}
 
 // CHECK-LABEL: sil @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
-// CHECK:   [[EMT:%.*]] = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick Any.Type
+// CHECK:   [[EMT:%.*]] = init_existential_metatype %0 : $@thick SpecialEnum.Type, $@thick any Any.Type
 // CHECK-NOT: init_existential_metatype
-// CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick Any.Type, [[EMT]] : $@thick Any.Type) : $Builtin.Int1
+// CHECK:   builtin "is_same_metatype"([[EMT]] : $@thick any Any.Type, [[EMT]] : $@thick any Any.Type) : $Builtin.Int1
 // CHECK-LABEL: }  // end sil function 'testCSEInitExistentialMetatype'
 sil @testCSEInitExistentialMetatype : $@convention(thin) (@thick SpecialEnum.Type) -> Bool {
 bb0(%0 : $@thick SpecialEnum.Type):

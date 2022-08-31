@@ -168,6 +168,9 @@ bool swift::rewriting::diagnoseRequirementErrors(
         break;
 
       switch (requirement.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
+
       case RequirementKind::SameType:
         ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
                            requirement.getFirstType(),

@@ -3199,10 +3199,7 @@ public:
     if (!changed)
       return ty;
 
-    // The cast should succeed, because if we end up with a one-element
-    // tuple type here, it must have a label.
-    return cast<TupleType>(
-        CanType(TupleType::get(loweredElts, ty->getASTContext())));
+    return CanTupleType(TupleType::get(loweredElts, ty->getASTContext()));
   }
 
   CanType visitAnyFunctionType(CanAnyFunctionType ty) {

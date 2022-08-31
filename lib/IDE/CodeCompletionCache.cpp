@@ -484,6 +484,12 @@ static std::string getName(StringRef cacheDirectory,
       << (K.AddInitsInToplevel ? "-inits" : "")
       << (K.AddCallWithNoDefaultArgs ? "-nodefaults" : "")
       << (K.Annotated ? "-annotated" : "");
+  if (K.SpiGroups.size() > 0) {
+    OSS << "-spi";
+    for (auto SpiGroup : K.SpiGroups) {
+      OSS << "-" << SpiGroup;
+    }
+  }
 
   // name[-access-path-components]
   for (StringRef component : K.AccessPath)
@@ -548,9 +554,16 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
     return None;
 
   // Make up a key for readCachedModule.
-  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},
-                             false,          false,           false,
-                             false,          false,           false};
+  CodeCompletionCache::Key K{/*ModuleFilename=*/filename.str(),
+                             /*ModuleName=*/"<module-name>",
+                             /*AccessPath=*/{},
+                             /*ResultsHaveLeadingDot=*/false,
+                             /*ForTestableLookup=*/false,
+                             /*ForPrivateImportLookup=*/false,
+                             /*SpiGroups=*/{},
+                             /*AddInitsInToplevel=*/false,
+                             /*AddCallWithNoDefaultArgs=*/false,
+                             /*Annotated=*/false};
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();

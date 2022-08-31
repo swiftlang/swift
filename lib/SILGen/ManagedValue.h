@@ -320,6 +320,8 @@ public:
   /// exact same level of cleanup it had before.
   ManagedValue materialize(SILGenFunction &SGF, SILLocation loc) const;
 
+  ManagedValue formallyMaterialize(SILGenFunction &SGF, SILLocation loc) const;
+
   /// Disable the cleanup for this value.
   void forwardCleanup(SILGenFunction &SGF) const;
   

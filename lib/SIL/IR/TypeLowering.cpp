@@ -232,6 +232,21 @@ namespace {
       return props;
     }
 
+    RecursiveProperties applyLifetimeAnnotation(LifetimeAnnotation annotation,
+                                                RecursiveProperties props) {
+      switch (annotation) {
+      case LifetimeAnnotation::None:
+        break;
+      case LifetimeAnnotation::Lexical:
+        props.setLexical(IsLexical);
+        break;
+      case LifetimeAnnotation::EagerMove:
+        props.setLexical(IsNotLexical);
+        break;
+      }
+      return props;
+    }
+
     RecursiveProperties
     getTrivialRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
@@ -267,8 +282,6 @@ namespace {
     IMPL(BuiltinBridgeObject, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
-    IMPL(Class, Reference)
-    IMPL(BoundGenericClass, Reference)
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
 
@@ -288,7 +301,9 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
                                                IsAddressOnly, IsNotResilient,
-                                               isSensitive});
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
     }
 
     RetTy visitBuiltinDefaultActorStorageType(
@@ -297,7 +312,9 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
                                                IsAddressOnly, IsNotResilient,
-                                               isSensitive});
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
     }
 
     RetTy visitAnyFunctionType(CanAnyFunctionType type,
@@ -479,7 +496,9 @@ namespace {
                                                IsFixedABI, \
                                                IsAddressOnly, \
                                                IsNotResilient, \
-                                               isSensitive}); \
+                                               isSensitive, \
+                                               DoesNotHaveRawPointer, \
+                                               IsLexical}); \
     }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
@@ -502,7 +521,9 @@ namespace {
                                                IsFixedABI, \
                                                IsAddressOnly, \
                                                IsNotResilient, \
-                                               isSensitive}); \
+                                               isSensitive, \
+                                               DoesNotHaveRawPointer, \
+                                               IsLexical}); \
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType, \
@@ -579,7 +600,9 @@ namespace {
                                                  IsFixedABI,
                                                  IsAddressOnly,
                                                  IsNotResilient,
-                                                 isSensitive});
+                                                 isSensitive,
+                                                 DoesNotHaveRawPointer,
+                                                 IsLexical});
       // Class-constrained and boxed existentials are refcounted.
       case ExistentialRepresentation::Class:
       case ExistentialRepresentation::Boxed:
@@ -606,6 +629,20 @@ namespace {
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
       return visitExistentialType(type, origType, isSensitive);
+    }
+
+    // Classes depend on their attributes.
+    RetTy visitClassType(CanClassType type, AbstractionPattern origType,
+                         IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().visitAnyClassType(type, origType, type->getDecl(),
+                                        isSensitive);
+    }
+
+    RetTy visitBoundGenericClassType(CanBoundGenericClassType type,
+                                     AbstractionPattern origType,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().visitAnyClassType(type, origType, type->getDecl(),
+                                        isSensitive);
     }
 
     // Enums depend on their enumerators.
@@ -671,7 +708,9 @@ namespace {
                                                IsFixedABI,
                                                IsAddressOnly,
                                                IsNotResilient,
-                                               isSensitive});
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
     }
 
     RetTy visitSILBoxType(CanSILBoxType type,
@@ -721,6 +760,14 @@ namespace {
 
     RecursiveProperties handle(CanType type, RecursiveProperties properties) {
       return properties;
+    }
+
+    RecursiveProperties
+    visitAnyClassType(CanType type, AbstractionPattern origType, ClassDecl *D,
+                      IsTypeExpansionSensitive_t isSensitive) {
+      // Consult the type lowering.
+      auto &lowering = TC.getTypeLowering(origType, type, Expansion);
+      return handleClassificationFromLowering(type, lowering, isSensitive);
     }
 
     RecursiveProperties visitAnyEnumType(CanType type,
@@ -1743,7 +1790,8 @@ namespace {
                                   IsTypeExpansionSensitive_t isSensitive)
       : AddressOnlyTypeLowering(type,
                                 {IsNotTrivial, IsFixedABI,
-                                 IsAddressOnly, IsNotResilient, isSensitive},
+                                 IsAddressOnly, IsNotResilient, isSensitive,
+                                 DoesNotHaveRawPointer, IsLexical},
                                 forExpansion) {}
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -2019,6 +2067,18 @@ namespace {
       return false;
     }
 
+    TypeLowering *visitAnyClassType(CanType classType,
+                                    AbstractionPattern origType, ClassDecl *C,
+                                    IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties properties =
+          getReferenceRecursiveProperties(isSensitive);
+
+      if (C->getLifetimeAnnotation() == LifetimeAnnotation::EagerMove)
+        properties.setLexical(IsNotLexical);
+
+      return handleReference(classType, properties);
+    }
+
     TypeLowering *visitAnyStructType(CanType structType,
                                      AbstractionPattern origType,
                                      StructDecl *D,
@@ -2061,7 +2121,13 @@ namespace {
         
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));
+        properties =
+            applyLifetimeAnnotation(field->getLifetimeAnnotation(), properties);
       }
+
+      // Type-level annotations override inferred behavior.
+      properties =
+          applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
@@ -2119,7 +2185,13 @@ namespace {
                                  ->getReducedType(D->getGenericSignature()));
         properties.addSubobject(classifyType(origEltType, substEltType,
                                              TC, Expansion));
+        properties =
+            applyLifetimeAnnotation(elt->getLifetimeAnnotation(), properties);
       }
+
+      // Type-level annotations override inferred behavior.
+      properties =
+          applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
@@ -2348,8 +2420,104 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     removeNullEntry(key.getKeyForMinimalExpansion());
 #endif
   }
+
+#ifndef NDEBUG
+  verifyLowering(*lowering, origType, origSubstType, forExpansion);
+#endif
+
   return *lowering;
 }
+
+#ifndef NDEBUG
+void TypeConverter::verifyLowering(const TypeLowering &lowering,
+                                   AbstractionPattern origType,
+                                   Type origSubstType,
+                                   TypeExpansionContext forExpansion) {
+  // Non-trivial lowerings should always be lexical unless all non-trivial
+  // fields are eager move.
+  if (!lowering.isTrivial() && !lowering.isLexical()) {
+    auto getLifetimeAnnotation = [](SILType ty) -> LifetimeAnnotation {
+      NominalTypeDecl *nominal;
+      if (!(nominal = ty.getASTType().getAnyNominal()))
+        return LifetimeAnnotation::None;
+      return nominal->getLifetimeAnnotation();
+    };
+    auto loweredType = lowering.getLoweredType();
+    bool hasNoNontrivialLexicalLeaf = loweredType.visitAggregateLeaves(
+        *this, forExpansion,
+        /*isLeaf=*/
+        [&](auto parent, auto ty, auto *fieldDecl) -> bool {
+          // The field's type is an aggregate.  Treat it as a leaf if it
+          // has a lifetime annotation.
+
+          // If we don't have a field decl, it's either a field of a tuple
+          // or the top-level type.  Either way, there's no var decl on
+          // which to look for an attribute.
+          //
+          // It's a leaf if the type has a lifetime annotation.
+          if (!fieldDecl)
+            return getLifetimeAnnotation(ty).isSome();
+
+          // It's a field of a struct or an enum.  It's a leaf if the type
+          // or the var decl has a lifetime annotation.
+          return fieldDecl->getLifetimeAnnotation().isSome() ||
+                 getLifetimeAnnotation(ty);
+        },
+        /*visit=*/
+        [&](auto parent, auto ty, auto *fieldDecl) -> bool {
+          // Look at each leaf: if it is non-trivial, verify that it is
+          // attributed @_eagerMove.
+
+          // If the leaf is the whole type, verify that it is annotated
+          // @_eagerMove.
+          if (ty == loweredType)
+            return getLifetimeAnnotation(ty) == LifetimeAnnotation::EagerMove;
+
+          // Get ty's lowering.
+          CanGenericSignature sig;
+          if (fieldDecl) {
+            AbstractionPattern origFieldTy = getAbstractionPattern(fieldDecl);
+            CanType substFieldTy;
+            if (fieldDecl->hasClangNode()) {
+              substFieldTy = origFieldTy.getType();
+            } else {
+              substFieldTy = parent.getASTType()
+                                 ->getTypeOfMember(&M, fieldDecl)
+                                 ->getCanonicalType();
+            }
+            sig = getAbstractionPattern(fieldDecl).getGenericSignatureOrNull();
+          } else {
+            sig = CanGenericSignature();
+          }
+          auto &tyLowering = getTypeLowering(ty, forExpansion, sig);
+
+          // Leaves which are trivial aren't of interest.
+          if (tyLowering.isTrivial())
+            return true;
+
+          // We're visiting a non-trival leaf of a type whose lowering is
+          // not lexical.  The leaf must be annotated @_eagerMove.
+          // Otherwise, the whole type would be lexical.
+
+          if (!fieldDecl) {
+            // The field is non-trivial and the whole type is non-lexical.
+            // If there's no field decl which might be annotated
+            // @_eagerMove, we have a problem.
+            return false;
+          }
+
+          // The field is non-trivial and the whole type is non-lexical.
+          // That's fine as long as the field or its type is annotated
+          // @_eagerMove.
+          return fieldDecl->getLifetimeAnnotation() ==
+                     LifetimeAnnotation::EagerMove ||
+                 getLifetimeAnnotation(ty) == LifetimeAnnotation::EagerMove;
+        });
+    assert(hasNoNontrivialLexicalLeaf &&
+           "Found non-trivial lexical leaf in non-trivial non-lexical type?!");
+  }
+}
+#endif
 
 CanType
 TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,

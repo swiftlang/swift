@@ -1002,7 +1002,7 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (isAlwaysWeakImported())
     return true;
 
-  if (fromModule->isImportedAsWeakLinked(this))
+  if (fromModule->isImportedAsWeakLinked(this->getModuleContext()))
     return true;
 
   auto availability = getAvailabilityForLinkage();
@@ -4044,6 +4044,9 @@ findGenericParameterReferences(CanGenericSignature genericSig,
     auto opaqueSig = opaque->getDecl()->getOpaqueInterfaceGenericSignature();
     for (const auto &req : opaqueSig.getRequirements()) {
       switch (req.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
+
       case RequirementKind::Conformance:
       case RequirementKind::Layout:
         continue;
@@ -6730,7 +6733,8 @@ bool VarDecl::hasStorageOrWrapsStorage() const {
 }
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
-  if (getDeclContext()->isTypeContext() || isImplicit())
+  if (getDeclContext()->isTypeContext() ||
+      (isImplicit() && !isa<ParamDecl>(this)))
     return;
 
   if (getAttrs().hasAttribute<LazyAttr>()) {
@@ -9232,7 +9236,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       auto actor = selfDecl->getType()->getReferenceStorageReferent()
           ->getAnyActor();
       assert(actor && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actor)
+      // FIXME: This could be a parameter... or a capture... hmmm.
+      return ActorIsolation::forActorInstanceSelf(actor)
         .withPreconcurrency(isolation.preconcurrency());
     }
     }

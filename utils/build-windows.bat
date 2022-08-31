@@ -28,8 +28,8 @@ setlocal enableextensions enabledelayedexpansion
 
 PATH=%PATH%;%PYTHON_HOME%
 
-set icu_version_major=64
-set icu_version_minor=2
+set icu_version_major=69
+set icu_version_minor=1
 set icu_version=%icu_version_major%_%icu_version_minor%
 set icu_version_dashed=%icu_version_major%-%icu_version_minor%
 
@@ -68,9 +68,10 @@ set RunTest=1
 if "%1"=="-notest" set RunTest=0
 
 call :clone_repositories %exitOnError%
-call :download_icu %exitOnError%
+:: TODO: Disabled until we need Foundation in this build script.
+:: call :download_icu %exitOnError%
 :: TODO: Disabled until we need LLBuild/SwiftPM in this build script.
-:: call :download_sqlite3
+:: call :download_sqlite3 %exitOnError%
 
 call :build_llvm %exitOnError%
 path %PATH%;%install_directory%\bin
@@ -82,10 +83,10 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
-path %PATH%;C:\Program Files\Git\usr\bin
+path %PATH%;%SystemDrive%\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
+path %install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
 
 if %RunTest%==1 (
   call :test_swift %exitOnError%
@@ -104,7 +105,7 @@ setlocal enableextensions enabledelayedexpansion
 if defined REPO_SCHEME SET "scheme_arg=--scheme %REPO_SCHEME%"
 
 git -C "%source_root%\swift" config --local core.autocrlf input
-git -C "%source_root%\swift" config --local core.symlink true
+git -C "%source_root%\swift" config --local core.symlinks true
 git -C "%source_root%\swift" checkout-index --force --all
 
 :: Always skip Swift, since it is checked out by Jenkins
@@ -134,15 +135,14 @@ endlocal
 
 
 :download_icu
-:: Downloads ICU, which will be used as a dependency for the Swift Standard
-:: Library and Foundation.
+:: Downloads ICU, which will be used as a dependency for Foundation.
 setlocal enableextensions enabledelayedexpansion
 
-set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
+set file_name=icu4c-%icu_version%-Win64-MSVC2019.zip
 curl -L -O "https://github.com/unicode-org/icu/releases/download/release-%icu_version_dashed%/%file_name%" %exitOnError%
 :: unzip warns about the paths in the zip using slashes, which raises the
 :: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
-"C:\Program Files\Git\usr\bin\unzip.exe" -o %file_name% -d "%source_root%\icu-%icu_version%"
+"%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o %file_name% -d "%source_root%\icu-%icu_version%"
 exit /b 0
 
 goto :eof
@@ -154,9 +154,9 @@ endlocal
 :: Swift Package Manager.
 setlocal enableextensions enabledelayedexpansion
 
-set file_name=sqlite-amalgamation-3270200.zip
-curl -L -O "https://www.sqlite.org/2019/%file_name%" %exitOnError%
-"C:\Program Files\Git\usr\bin\unzip.exe" -o %file_name% %exitOnError%
+set file_name=sqlite-amalgamation-3360000.zip
+curl -L -O "https://www.sqlite.org/2021/%file_name%" %exitOnError%
+"%SystemDrive%\Program Files\Git\usr\bin\unzip.exe" -o %file_name% %exitOnError%
 
 goto :eof
 endlocal

@@ -433,16 +433,17 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
-static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
-                                                SILLocation loc,
-                                                ValueDecl *decl = nullptr,
-                                                bool isNoImplicitCopy = false) {
+static ManagedValue createInputFunctionArgument(
+    SILGenBuilder &B, SILType type, SILLocation loc, ValueDecl *decl = nullptr,
+    bool isNoImplicitCopy = false,
+    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None) {
   auto &SGF = B.getSILGenFunction();
   SILFunction &F = B.getFunction();
   assert((F.isBare() || decl) &&
          "Function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   arg->setNoImplicitCopy(isNoImplicitCopy);
+  arg->setLifetimeAnnotation(lifetimeAnnotation);
   switch (arg->getArgumentConvention()) {
   case SILArgumentConvention::Indirect_In_Guaranteed:
   case SILArgumentConvention::Direct_Guaranteed:
@@ -476,11 +477,11 @@ static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
   llvm_unreachable("bad parameter convention");
 }
 
-ManagedValue SILGenBuilder::createInputFunctionArgument(SILType type,
-                                                        ValueDecl *decl,
-                                                        bool isNoImplicitCopy) {
+ManagedValue SILGenBuilder::createInputFunctionArgument(
+    SILType type, ValueDecl *decl, bool isNoImplicitCopy,
+    LifetimeAnnotation lifetimeAnnotation) {
   return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl,
-                                       isNoImplicitCopy);
+                                       isNoImplicitCopy, lifetimeAnnotation);
 }
 
 ManagedValue
@@ -721,21 +722,23 @@ createValueMetatype(SILLocation loc, SILType metatype,
   return ManagedValue::forUnmanaged(v);
 }
 
-void SILGenBuilder::createStoreBorrow(SILLocation loc, ManagedValue value,
-                                      SILValue address) {
+ManagedValue SILGenBuilder::createStoreBorrow(SILLocation loc,
+                                              ManagedValue value,
+                                              SILValue address) {
   assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
-  createStoreBorrow(loc, value.getValue(), address);
+  auto *sbi = createStoreBorrow(loc, value.getValue(), address);
+  return ManagedValue(sbi, CleanupHandle::invalid());
 }
 
-void SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
-                                               ManagedValue value,
-                                               SILValue address) {
+ManagedValue SILGenBuilder::createStoreBorrowOrTrivial(SILLocation loc,
+                                                       ManagedValue value,
+                                                       SILValue address) {
   if (value.getOwnershipKind() == OwnershipKind::None) {
     createStore(loc, value, address, StoreOwnershipQualifier::Trivial);
-    return;
+    return ManagedValue(address, CleanupHandle::invalid());
   }
 
-  createStoreBorrow(loc, value, address);
+  return createStoreBorrow(loc, value, address);
 }
 
 ManagedValue SILGenBuilder::createBridgeObjectToRef(SILLocation loc,

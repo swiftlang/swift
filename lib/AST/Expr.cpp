@@ -320,12 +320,12 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
                  ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
 
   NO_REFERENCE(Error);
-  NO_REFERENCE(NilLiteral);
-  NO_REFERENCE(IntegerLiteral);
-  NO_REFERENCE(FloatLiteral);
-  NO_REFERENCE(BooleanLiteral);
-  NO_REFERENCE(StringLiteral);
-  NO_REFERENCE(InterpolatedStringLiteral);
+  SIMPLE_REFERENCE(NilLiteral, getInitializer);
+  SIMPLE_REFERENCE(IntegerLiteral, getInitializer);
+  SIMPLE_REFERENCE(FloatLiteral, getInitializer);
+  SIMPLE_REFERENCE(BooleanLiteral, getInitializer);
+  SIMPLE_REFERENCE(StringLiteral, getInitializer);
+  SIMPLE_REFERENCE(InterpolatedStringLiteral, getInitializer);
   NO_REFERENCE(RegexLiteral);
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
@@ -371,8 +371,8 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
 
   NO_REFERENCE(Tuple);
-  NO_REFERENCE(Array);
-  NO_REFERENCE(Dictionary);
+  SIMPLE_REFERENCE(Array, getInitializer);
+  SIMPLE_REFERENCE(Dictionary, getInitializer);
 
   case ExprKind::Subscript: {
     auto subscript = cast<SubscriptExpr>(this);
@@ -414,6 +414,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(DestructureTuple);
   NO_REFERENCE(UnresolvedTypeConversion);
+  PASS_THROUGH_REFERENCE(ABISafeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantReturnConversion, getSubExpr);
@@ -741,6 +742,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Load:
+  case ExprKind::ABISafeConversion:
   case ExprKind::DestructureTuple:
   case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
@@ -914,6 +916,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Load:
   case ExprKind::DestructureTuple:
   case ExprKind::UnresolvedTypeConversion:
+  case ExprKind::ABISafeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:
@@ -971,6 +974,38 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
+
+StringRef LiteralExpr::getLiteralKindDescription() const {
+  switch (getKind()) {
+  case ExprKind::IntegerLiteral:
+    return "integer";
+  case ExprKind::FloatLiteral:
+    return "floating-point";
+  case ExprKind::BooleanLiteral:
+    return "boolean";
+  case ExprKind::StringLiteral:
+    return "string";
+  case ExprKind::InterpolatedStringLiteral:
+    return "string";
+  case ExprKind::RegexLiteral:
+    return "regular expression";
+  case ExprKind::MagicIdentifierLiteral:
+    return MagicIdentifierLiteralExpr::getKindString(
+        cast<MagicIdentifierLiteralExpr>(this)->getKind());
+  case ExprKind::NilLiteral:
+    return "nil";
+  case ExprKind::ObjectLiteral:
+    return "object";
+  // Define an unreachable case for all non-literal expressions.
+  // This way, if a new literal is added in the future, the compiler
+  // will warn that a case is missing from this switch.
+  #define LITERAL_EXPR(Id, Parent)
+  #define EXPR(Id, Parent) case ExprKind::Id:
+  #include "swift/AST/ExprNodes.def"
+    llvm_unreachable("Not a literal expression");
+  }
+  llvm_unreachable("Unhandled literal");
+}
 
 IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
   llvm::SmallString<8> Scratch;

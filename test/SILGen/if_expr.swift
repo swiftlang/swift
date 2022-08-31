@@ -31,12 +31,12 @@ func consumeAddressOnly(_: AddressOnly) {}
 
 // CHECK: sil hidden [ossa] @$s7if_expr19addr_only_ternary_1{{[_0-9a-zA-Z]*}}F
 func addr_only_ternary_1(x: Bool) -> AddressOnly {
-  // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
-  // CHECK: [[a:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "a"
+  // CHECK: bb0([[RET:%.*]] : $*any AddressOnly, {{.*}}):
+  // CHECK: [[a:%[0-9]+]] = alloc_box ${ var any AddressOnly }, var, name "a"
   // CHECK: [[a_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[a]]
   // CHECK: [[PBa:%.*]] = project_box [[a_LIFETIME]]
   var a : AddressOnly = A()
-  // CHECK: [[b:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "b"
+  // CHECK: [[b:%[0-9]+]] = alloc_box ${ var any AddressOnly }, var, name "b"
   // CHECK: [[b_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[b]]
   // CHECK: [[PBb:%.*]] = project_box [[b_LIFETIME]]
   var b : AddressOnly = B()

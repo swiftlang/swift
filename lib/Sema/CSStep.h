@@ -466,11 +466,29 @@ private:
     // to preliminary modify constraint system or log anything.
     if (IsSingle)
       return;
-
-    if (CS.isDebugMode())
-      getDebugLogger() << "(solving component #" << Index << '\n';
-
+    
+    if (CS.isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "(solving component #" << Index << '\n';
+    }
+    
     ComponentScope = std::make_unique<Scope>(*this);
+    
+    if (CS.isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "Type variables in scope = "
+          << "[";
+      auto typeVars = CS.getTypeVariables();
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+      interleave(typeVars, [&](TypeVariableType *typeVar) {
+                   Type(typeVar).print(log, PO);
+                 },
+                 [&] {
+                   log << ", ";
+                 });
+      log << "]" << '\n';
+    }
 
     // If this component has orphaned constraint attached,
     // let's return it to the graph.
@@ -527,6 +545,13 @@ public:
         auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
+
+          if (CS.isDebugMode()) {
+            auto &log = llvm::errs();
+            auto &CG = CS.getConstraintGraph();
+            CG.dumpActiveScopeChanges(log, CS.solverState->getCurrentIndent());
+          }
+          
           return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }

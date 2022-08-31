@@ -30,20 +30,22 @@ let _ = SimpleStruct.encode(to:)
 // struct.
 let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
-// rdar://problem/59655704 
-struct SR_12248_1: Codable { // expected-error {{type 'SR_12248_1' does not conform to protocol 'Encodable'}} expected-error {{type 'SR_12248_1' does not conform to protocol 'Decodable'}}
+// rdar://problem/59655704
+// https://github.com/apple/swift/issues/54675
+
+struct S1_54675: Codable { // expected-error {{type 'S1_54675' does not conform to protocol 'Encodable'}} expected-error {{type 'S1_54675' does not conform to protocol 'Decodable'}}
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
   // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'Int' does not conform to 'Encodable'}}
 }
 
-struct SR_12248_2: Decodable { // expected-error {{type 'SR_12248_2' does not conform to protocol 'Decodable'}}
+struct S2_54675: Decodable { // expected-error {{type 'S2_54675' does not conform to protocol 'Decodable'}}
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
 }
 
-struct SR_12248_3: Encodable { // expected-error {{type 'SR_12248_3' does not conform to protocol 'Encodable'}}
+struct S3_54675: Encodable { // expected-error {{type 'S3_54675' does not conform to protocol 'Encodable'}}
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
 }

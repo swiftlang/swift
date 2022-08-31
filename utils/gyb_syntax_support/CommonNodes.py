@@ -59,11 +59,11 @@ COMMON_NODES = [
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Statements', kind='CodeBlockItemList',
                    collection_element_name='Statement', is_indented=True),
-             Child('RightBrace', kind='RightBraceToken', 
+             Child('RightBrace', kind='RightBraceToken',
                    requires_leading_newline=True),
          ]),
 
-    Node('GarbageNodes', kind='SyntaxCollection', element='Syntax',
+    Node('UnexpectedNodes', kind='SyntaxCollection', element='Syntax',
          description='''
          A collection of syntax nodes that occurred in the source code but
          could not be used to form a valid syntax tree.

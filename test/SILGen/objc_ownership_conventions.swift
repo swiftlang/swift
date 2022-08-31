@@ -134,18 +134,18 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
   // CHECK-NEXT: [[NS_G_BORROW:%.*]] = begin_borrow [[NS_G_COPY]]
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.classProp!getter.foreign : (NSObject) -> () -> AnyObject.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.classProp!getter.foreign : (NSObject) -> () -> (any AnyObject.Type)?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype any AnyObject.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype any AnyObject.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
-  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype AnyObject.Type):
+  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype any AnyObject.Type):
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $Optional<@thick AnyObject.Type>, #Optional.some!enumelt, [[THICK]]
-  // CHECK:   bb{{.*}}(%{{.*}} : $Optional<@thick AnyObject.Type>):
+  // CHECK:      [[T0:%.*]] = enum $Optional<@thick any AnyObject.Type>, #Optional.some!enumelt, [[THICK]]
+  // CHECK:   bb{{.*}}(%{{.*}} : $Optional<@thick any AnyObject.Type>):
   // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
-  // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick AnyObject.Type):
+  // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick any AnyObject.Type):
   // CHECK-NOT:      destroy_value [[G]] : $Gizmo
-  // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
+  // CHECK-NEXT: return [[RES]] : $@thick any AnyObject.Type
   return g.classProp
 }
 
@@ -155,20 +155,20 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK-NEXT: [[NS_G_BORROW:%.*]] = begin_borrow [[NS_G_COPY]]
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.qualifiedClassProp!getter.foreign : (NSObject) -> () -> NSAnsing.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.qualifiedClassProp!getter.foreign : (NSObject) -> () -> (any NSAnsing.Type)?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype any NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype any NSAnsing.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
-  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype NSAnsing.Type):
+  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype any NSAnsing.Type):
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
-  // CHECK:      [[T0:%.*]] = enum $Optional<@thick NSAnsing.Type>, #Optional.some!enumelt, [[THICK]]
-  // CHECK:   bb{{.*}}(%{{.*}} : $Optional<@thick NSAnsing.Type>):
+  // CHECK:      [[T0:%.*]] = enum $Optional<@thick any NSAnsing.Type>, #Optional.some!enumelt, [[THICK]]
+  // CHECK:   bb{{.*}}(%{{.*}} : $Optional<@thick any NSAnsing.Type>):
   // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
-  // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick NSAnsing.Type):
+  // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick any NSAnsing.Type):
   // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
   // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK-NOT:      destroy_value [[G]] : $Gizmo
-  // CHECK-NEXT: return [[RES_ANY]] : $@thick AnyObject.Type
+  // CHECK-NEXT: return [[RES_ANY]] : $@thick any AnyObject.Type
   return g.qualifiedClassProp
 }
 

@@ -128,7 +128,7 @@ struct S5: P14 { // expected-error {{type 'S5' does not conform to protocol 'P14
   // expected-note@-1 {{cannot infer 'A' = 'any P11' because 'any P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{24-24=some }}
 }
 
-// SR-12759
+// https://github.com/apple/swift/issues/55204
 
 // Note: the conformance to collection should succeed
 struct CountSteps1<T> : Collection {

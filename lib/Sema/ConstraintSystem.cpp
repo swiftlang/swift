@@ -444,15 +444,6 @@ ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
       break;
     }
 
-    // If the conversion is associated with a contextual type e.g.
-    // `_: Double = CGFloat(1)` then drop `ContextualType` so that
-    // it's easy to find when the underlying expression has been
-    // rewritten.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      anchor = ASTNode();
-      path.clear();
-    }
-
     // If conversion is for a tuple element, let's drop `TupleType`
     // components from the path since they carry information for
     // diagnostics that `ExprRewriter` won't be able to re-construct
@@ -1259,7 +1250,8 @@ ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
-    ConstraintLocator *memberLocator, bool wantInterfaceType) {
+    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    bool adjustForPreconcurrency) {
   return ConstraintSystem::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
@@ -1272,22 +1264,25 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType, GetClosureType{*this},
+      memberLocator, wantInterfaceType, adjustForPreconcurrency,
+      GetClosureType{*this},
       ClosureIsolatedByPreconcurrency{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    ConstraintLocator *memberLocator,
+    bool wantInterfaceType, bool adjustForPreconcurrency,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
     llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
-  // Adjust the type for concurrency.
-  requestedType = adjustVarTypeForConcurrency(
-      requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
+  // Adjust the type for concurrency if requested.
+  if (adjustForPreconcurrency)
+    requestedType = adjustVarTypeForConcurrency(
+        requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1773,6 +1768,8 @@ void ConstraintSystem::openGenericRequirement(
 
   auto kind = req.getKind();
   switch (kind) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
   case RequirementKind::Conformance: {
     auto protoDecl = req.getProtocolDecl();
     // Determine whether this is the protocol 'Self' constraint we should
@@ -2309,9 +2306,14 @@ ConstraintSystem::getTypeOfMemberReference(
       FunctionType::ExtInfo info;
       refType = FunctionType::get(indices, elementTy, info);
     } else {
+      // Delay the adjustment for preconcurrency until after we've formed
+      // the function type for this kind of reference. Otherwise we will lose
+      // track of the adjustment in the formed function's return type.
+
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            locator,
-                                           /*wantInterfaceType=*/true);
+                                           /*wantInterfaceType=*/true,
+                                           /*adjustForPreconcurrency=*/false);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -2432,6 +2434,16 @@ ConstraintSystem::getTypeOfMemberReference(
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements);
+  } else if (auto var = dyn_cast<VarDecl>(value)) {
+    // Adjust the function's result type, since that's the Var's actual type.
+    auto origFnType = origOpenedType->castTo<AnyFunctionType>();
+
+    auto resultTy = adjustVarTypeForConcurrency(
+          origFnType->getResult(), var, useDC, GetClosureType{*this},
+          ClosureIsolatedByPreconcurrency{*this});
+
+    openedType = FunctionType::get(
+                  origFnType->getParams(), resultTy, origFnType->getExtInfo());
   }
 
   // Compute the type of the reference.
@@ -2758,6 +2770,13 @@ static std::pair<bool, unsigned>
 isInvalidPartialApplication(ConstraintSystem &cs,
                             const AbstractFunctionDecl *member,
                             ConstraintLocator *locator) {
+  // If this is a compiler synthesized implicit conversion, let's skip
+  // the check because the base of `UDE` is not the base of the injected
+  // initializer.
+  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
+      locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return {false, 0};
+
   auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
   if (UDE == nullptr)
     return {false,0};
@@ -4046,7 +4065,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch ||
-                     fix->getKind() == FixKind::GenericArgumentsMismatch;
+                     fix->getKind() == FixKind::GenericArgumentsMismatch ||
+                     fix->getKind() == FixKind::InsertCall;
             });
       });
 
@@ -4522,7 +4542,9 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
 
     auto argParamMatch = argMatching->second.parameterBindings[i];
     auto param = applyFnType->getParams()[argParamMatch.front()];
-    auto paramFnType = param.getPlainType()->castTo<FunctionType>();
+    auto paramFnType = param.getPlainType()->getAs<FunctionType>();
+    if (!paramFnType)
+      continue;
 
     if (cs.typeVarOccursInType(resultTypeVar, paramFnType->getResult()))
       closureArguments.push_back(closure);
@@ -5682,9 +5704,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(argList, argExpr, argIdx,
-                              simplifyType(getType(argExpr)), paramIdx,
-                              fnInterfaceType, fnType, callee);
+  return FunctionArgApplyInfo::get(argList, argExpr, argIdx,
+                                   simplifyType(getType(argExpr)), paramIdx,
+                                   fnInterfaceType, fnType, callee);
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
@@ -6566,6 +6588,9 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::Superclass: {
       if (req.getFirstType()->getRootGenericParam()->getDepth() > 0 &&
           req.getSecondType().walk(isDependentOnSelfWalker)) {
@@ -6947,15 +6972,10 @@ bool TypeVarBindingProducer::requiresOptionalAdjustment(
     // produce an optional of that type as a potential binding. We
     // overwrite the binding in place because the non-optional type
     // will fail to type-check against the nil-literal conformance.
-    bool conformsToExprByNilLiteral = false;
-    if (auto *nominalBindingDecl = type->getAnyNominal()) {
-      SmallVector<ProtocolConformance *, 2> conformances;
-      conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-          CS.getASTContext().getProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral),
-          conformances);
-    }
-    return !conformsToExprByNilLiteral;
+    auto *proto = CS.getASTContext().getProtocol(
+         KnownProtocolKind::ExpressibleByNilLiteral);
+
+    return !proto->getParentModule()->lookupConformance(type, proto);
   } else if (binding.isDefaultableBinding() && binding.BindingType->isAny()) {
     return true;
   }

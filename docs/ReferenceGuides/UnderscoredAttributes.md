@@ -23,6 +23,10 @@ the Swift ABI. This attribute is intended for the SIMD types in the standard
 library which use it to increase the alignment of their internal storage to at
 least 16 bytes.
 
+## `@_alwaysEmitConformanceMetadata`
+
+Forces conformances of the attributed protocol to always have their Type Metadata get emitted into the binary and prevents it from being optimized away or stripped by the linker.
+
 ## `@_alwaysEmitIntoClient`
 
 Forces the body of a function to be emitted into client code.
@@ -39,6 +43,14 @@ Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
 function which did not have one previously does not break ABI.
 
+## `@_assemblyVision`
+
+Forces emission of assembly vision remarks for a function or method, showing
+where various runtime calls and performance impacting hazards are in the code
+at source level after optimization.
+
+Adding this attribute to a type leads to remarks being emitted for all methods.
+
 ## `@_backDeploy(before: ...)`
 
 Causes the body of a function to be emitted into the module interface to be
@@ -52,14 +64,6 @@ client is called instead.
 
 For more details, see the [pitch thread](https://forums.swift.org/t/pitch-function-back-deployment/55769/)
 in the forums.
-
-## `@_assemblyVision`
-
-Forces emission of assembly vision remarks for a function or method, showing
-where various runtime calls and performance impacting hazards are in the code
-at source level after optimization.
-
-Adding this attribute to a type leads to remarks being emitted for all methods.
 
 ## `@_borrowed`
 
@@ -126,6 +130,23 @@ library), instead of at an arbitrary point in time.
 
 For more details, see the forum post on
 [dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
+
+## `@_eagerMove`
+
+When applied to a value, indicates that the value's lifetime is _not_ lexical,
+that releases of the value may be hoisted without respect to deinit barriers.
+
+When applied to a type, indicates that all values which are _statically_
+instances of that type are themselves `@_eagerMove` as above, unless overridden
+with `@_lexical`.
+
+Aggregates all of whose fields are `@_eagerMove` or trivial are inferred to be
+`@_eagerMove`.
+
+Note that a value of an `@_eagerMove` type that is passed to a generic API (to a
+parameter not annotated `@_eagerMove` will, in that generic function's context,
+not be statically an instance of the `@_eagerMove` type.  As a result it will
+have a lexical lifetime in that function.
 
 ## `@_effects(effectname)`
 
@@ -337,6 +358,22 @@ func g() {
 }
 ```
 
+## `@_expose(<language>)`
+
+Indicates that a particular declaration should be included
+in the emitted specified foreign language binding.
+
+When applied to a nominal type declaration, all of the
+public declarations inside this type become exposed as well.
+
+### `_expose(Cxx[, <"cxxName">])`
+
+Indicates that a particular declaration should be included
+in the generated C++ binding header.
+
+The optional "cxxName" string will be used as the name of
+the generated C++ declaration.
+
 ## `@_fixed_layout`
 
 Same as `@frozen` but also works for classes.
@@ -469,18 +506,47 @@ initializers from its superclass. This implies that all designated initializers
 overridden. This attribute is often printed alongside
 `@_hasMissingDesignatedInitializers` in this case.
 
+## `@_lexical`
+
+When applied to a value, indicates that the value's lifetime is lexical, that
+releases of the value may not be hoisted over deinit barriers.  
+
+This is the default behavior, unless the value's type is annotated
+`@_eagerMove`, in which case this attribute overrides that type-level
+annotation.
+
+When applied to a type, indicates that all values which are instances of that
+type are themselves `@_lexical` as above.
+
+This is the default behavior, unless the type annotated is an aggregate that
+consists entirely of `@_eagerMove` or trivial values, in which case the
+attribute overrides the inferred type-level annotation.
+
 ## `@_marker`
 
 Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
-For more details, see [SE-0302](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
 [marker traits](https://doc.rust-lang.org/std/marker/index.html),
 including one called `Send`,
 which inspired the design of `Sendable`.
+
+## `@_noAllocation`, `@_noLocks`
+
+These attributes are performance annotations. If a function is annotated with
+such an attribute, the compiler issues a diagnostic message if the function
+calls a runtime function which allocates memory or locks, respectively.
+The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
+also locks.
+
+## `@_noImplicitCopy`
+
+Marks a var decl as a variable that must be copied explicitly using the builtin
+function Builtin.copy.
 
 ## `@_nonEphemeral`
 
@@ -755,6 +821,14 @@ Clients can access SPI by marking the import as `@_spi(spiName) import Module`.
 This design makes it easy to find out which clients are using certain SPIs by
 doing a textual search.
 
+## `@_spi_available(platform, version)`
+
+Like `@available`, this attribute indicates a decl is available only as an SPI.
+This implies several behavioral changes comparing to regular `@available`:
+1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
+3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
+
 ## `@_staticInitializeObjCMetadata`
 
 Indicates that a static initializer should be emitted to register the
@@ -789,6 +863,25 @@ A type eraser has the following restrictions:
 This feature was designed to be used for compiler-driven type erasure for
 dynamic replacement of functions with an opaque return type.
 
+## `@_unavailableFromAsync`
+
+Marks a synchronous API as being unavailable from asynchronous contexts. Direct
+usage of annotated API from asynchronous contexts will result in a warning from
+the compiler.
+
+## `@_unsafeMainActor`, `@_unsafeSendable`
+
+Marks a parameter's (function) type as `@MainActor` (`@Sendable`) in Swift 6 and
+within Swift 5 code that has adopted concurrency, but non-`@MainActor`
+(non-`@Sendable`) everywhere else.
+
+See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
+for more details.
+
+## `@_unsafeInheritExecutor`
+
+This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
+
 ## `@_weakLinked`
 
 Allows a declaration to be weakly-referenced, i.e., any references emitted by
@@ -803,48 +896,6 @@ If the availability of a library symbol is newer than the deployment target of
 the client, the symbol will be weakly linked, but checking for `@available` and
 `#(un)available` ensures that a symbol is not accessed when it is unavailable.
 
-## `@_unsafeMainActor`, `@_unsafeSendable`
-
-Marks a parameter's (function) type as `@MainActor` (`@Sendable`) in Swift 6 and
-within Swift 5 code that has adopted concurrency, but non-`@MainActor`
-(non-`@Sendable`) everywhere else.
-
-See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
-for more details.
-
-## `@_noImplicitCopy`
-
-Marks a var decl as a variable that must be copied explicitly using the builtin
-function Builtin.copy.
-
-## `@_noAllocation`, `@_noLocks`
-
-These attributes are performance annotations. If a function is annotated with
-such an attribute, the compiler issues a diagnostic message if the function
-calls a runtime function which allocates memory or locks, respectively.
-The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
-also locks.
-
-## `@_unavailableFromAsync`
-
-Marks a synchronous API as being unavailable from asynchronous contexts. Direct
-usage of annotated API from asynchronous contexts will result in a warning from
-the compiler.
-
-## `@_unsafeInheritExecutor`
-
-This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
-
-
-## `@_spi_available(platform, version)`
-
-Like `@available`, this attribute indicates a decl is available only as an SPI.
-This implies several behavioral changes comparing to regular `@available`:
-1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
-2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
-3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
-
-
 ## `_local`
 
 A distributed actor can be marked as "known to be local" which allows avoiding 
@@ -852,8 +903,3 @@ the distributed actor isolation checks. This is used for things like `whenLocal`
 where the actor passed to the closure is known-to-be-local, and similarly a 
 `self` of obtained from an _isolated_ function inside a distributed actor is 
 also guaranteed to be local by construction.
-
-
-## `@_alwaysEmitConformanceMetadata`
-
-Forces conformances of the attributed protocol to always have their Type Metadata get emitted into the binary and prevents it from being optimized away or stripped by the linker.

@@ -23,6 +23,7 @@ namespace clang {
 }
 
 namespace swift {
+class Decl;
 class ModuleDecl;
 class SwiftToClangInteropContext;
 
@@ -40,7 +41,8 @@ void printModuleContentsAsObjC(raw_ostream &os,
 void printModuleContentsAsCxx(raw_ostream &os,
                               llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                               ModuleDecl &M,
-                              SwiftToClangInteropContext &interopContext);
+                              SwiftToClangInteropContext &interopContext,
+                              bool requiresExposedAttribute);
 
 } // end namespace swift
 

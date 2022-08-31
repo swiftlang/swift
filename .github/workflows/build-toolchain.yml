@@ -191,7 +191,7 @@ jobs:
   build-toolchain:
     env:
       TOOLCHAIN_CHANNEL: DEVELOPMENT
-      DEVELOPER_DIR: /Applications/Xcode_13.0.app/Contents/Developer/
+      DEVELOPER_DIR: /Applications/Xcode_13.2.1.app/Contents/Developer/
     needs: [build-matrix]
     if: ${{ always() }}
     strategy:

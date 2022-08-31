@@ -34,30 +34,30 @@ public func printFoo(_ x: Foo) {
 
 // CHECK:         // Tags for resilient enum Foo
 // CHECK-NEXT:    extern "C" {
-// CHECK-NEXT:    extern int $s5Enums3FooO1ayACSdcACmFWC;
-// NEW_CASE-NEXT: extern int $s5Enums3FooO1byACSicACmFWC;
+// CHECK-NEXT:    extern unsigned $s5Enums3FooO1ayACSdcACmFWC;
+// NEW_CASE-NEXT: extern unsigned $s5Enums3FooO1byACSicACmFWC;
 // CHECK-NEXT:    }
 // CHECK-EMPTY:
 // CHECK-NEXT:    } // namespace _impl
 // CHECK-EMPTY:
 // CHECK-NEXT:    class Foo final {
 // CHECK-NEXT:    public:
+// CHECK:         enum class cases {
+// CHECK-NEXT:      a,
+// NEW_CASE-NEXT:   b,
+// CHECK-NEXT:      unknownDefault
+// CHECK-NEXT:    }
+// CHECK:         static struct {  // impl struct for case unknownDefault
+// CHECK-NEXT:      constexpr operator cases() const {
+// CHECK-NEXT:        return cases::unknownDefault;
+// CHECK-NEXT:      }
+// CHECK-NEXT:    } unknownDefault;
+// CHECK-NEXT:    inline bool isUnknownDefault() const {
+// CHECK-NEXT:      return *this == Foo::unknownDefault;
+// CHECK-NEXT:    }
 // CHECK:         inline operator cases() const {
 // CHECK-NEXT:      auto tag = _getEnumTag();
 // CHECK-NEXT:      if (tag == _impl::$s5Enums3FooO1ayACSdcACmFWC) return cases::a;
 // NEW_CASE-NEXT:   if (tag == _impl::$s5Enums3FooO1byACSicACmFWC) return cases::b;
-// CHECK-NEXT:      abort();
+// CHECK-NEXT:      return cases::unknownDefault;
 // CHECK-NEXT:    }
-// CHECK-NEXT:    inline bool inResilientUnknownCase() const {
-// CHECK-NEXT:      auto tag = _getEnumTag();
-// CHECK-NEXT:      return
-// OLD_CASE-NEXT:     tag != _impl::$s5Enums3FooO1ayACSdcACmFWC;
-// NEW_CASE-NEXT:     tag != _impl::$s5Enums3FooO1ayACSdcACmFWC &&
-// NEW_CASE-NEXT:     tag != _impl::$s5Enums3FooO1byACSicACmFWC;
-// CHECK-NEXT:    }
-// CHECK-NEXT:    inline bool isA() const {
-// CHECK-NEXT:      return _getEnumTag() == _impl::$s5Enums3FooO1ayACSdcACmFWC;
-// CHECK-NEXT:    }
-// NEW_CASE:      inline bool isB() const {
-// NEW_CASE-NEXT:   return _getEnumTag() == _impl::$s5Enums3FooO1byACSicACmFWC;
-// NEW_CASE-NEXT: }

@@ -3976,16 +3976,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   if (!parentExpr)
     return false;
 
-  auto parentType = getType(parentExpr);
-
-  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
-    return false;
-
-  if (isa<TupleExpr>(parentExpr)) {
+  // This could happen if collection is a dictionary literal i.e.
+  // ["a": .test] - the element is a tuple - ("a", .test).
+  if (isExpr<TupleExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
-    if (!parentExpr)
-      return false;
-  }
+
+  if (!isExpr<CollectionExpr>(parentExpr))
+    return false;
 
   if (auto *defaultableVar =
           getRawType(parentExpr)->getAs<TypeVariableType>()) {
@@ -4297,7 +4294,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
   }
 
-  if (BaseType->is<AnyMetatypeType>() && !Member->isStatic()) {
+  bool isStaticOrTypeMember = Member->isStatic() || isa<TypeDecl>(Member);
+  if (BaseType->is<AnyMetatypeType>() && !isStaticOrTypeMember) {
     auto instanceTy = BaseType;
 
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
@@ -4405,10 +4403,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // static members doesn't make a whole lot of sense
         if (isa<TypeAliasDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::typealias_outside_of_protocol, Name));
+              emitDiagnostic(diag::typealias_outside_of_protocol, Name, instanceTy));
         } else if (isa<AssociatedTypeDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name));
+              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name, instanceTy));
         } else if (isa<ConstructorDecl>(Member)) {
           Diag.emplace(
               emitDiagnostic(diag::construct_protocol_by_name, instanceTy));

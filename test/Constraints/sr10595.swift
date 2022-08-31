@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
+// https://github.com/apple/swift/issues/52995
+
 protocol Nested {
     associatedtype U // expected-note {{protocol requires nested type 'U'; do you want to add it?}}
 }

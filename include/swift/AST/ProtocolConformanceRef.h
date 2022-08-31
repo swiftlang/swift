@@ -33,6 +33,7 @@ namespace swift {
 
 class BuiltinProtocolConformance;
 class ConcreteDeclRef;
+class PackConformance;
 class ProtocolConformance;
 enum class EffectKind : uint8_t;
 
@@ -50,7 +51,9 @@ enum class EffectKind : uint8_t;
 /// ProtocolConformanceRef allows the efficient recovery of the protocol
 /// even when the conformance is abstract.
 class ProtocolConformanceRef {
-  using UnionType = llvm::PointerUnion<ProtocolDecl*, ProtocolConformance*>;
+  using UnionType = llvm::PointerUnion<ProtocolDecl *,
+                                       ProtocolConformance *,
+                                       PackConformance *>;
   UnionType Union;
 
   explicit ProtocolConformanceRef(UnionType value) : Union(value) {}
@@ -64,6 +67,12 @@ public:
 
   /// Create a concrete protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolConformance *conf) : Union(conf) {
+    assert(conf != nullptr &&
+           "cannot construct ProtocolConformanceRef with null");
+  }
+
+  /// Create a pack protocol conformance reference.
+  explicit ProtocolConformanceRef(PackConformance *conf) : Union(conf) {
     assert(conf != nullptr &&
            "cannot construct ProtocolConformanceRef with null");
   }
@@ -96,6 +105,13 @@ public:
   }
   ProtocolConformance *getConcrete() const {
     return Union.get<ProtocolConformance*>();
+  }
+
+  bool isPack() const {
+    return !isInvalid() && Union.is<PackConformance*>();
+  }
+  PackConformance *getPack() const {
+    return Union.get<PackConformance*>();
   }
 
   bool isAbstract() const {

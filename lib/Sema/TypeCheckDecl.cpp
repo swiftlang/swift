@@ -1826,6 +1826,8 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
+  if (typeAlias->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
 
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
@@ -2091,8 +2093,11 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
             : ErrorType::get(ctx));
   }
 
-  const auto options =
+  auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
+  if (decl->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
+
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
@@ -2193,6 +2198,13 @@ static Type validateParameterType(ParamDecl *decl) {
     options = TypeResolutionOptions(TypeResolverContext::EnumElementDecl);
   }
 
+  // Set the "preconcurrency" flag if this is a parameter of a preconcurrency
+  // declaration.
+  if (auto decl = dc->getAsDecl()) {
+    if (decl->preconcurrency())
+      options |= TypeResolutionFlags::Preconcurrency;
+  }
+
   // If the element is a variadic parameter, resolve the parameter type as if
   // it were in non-parameter position, since we want functions to be
   // @escaping in this case.
@@ -2215,10 +2227,14 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (decl->isVariadic()) {
+    // Find the first type sequence parameter and use that as the count type.
+    SmallVector<Type, 2> rootTypeSequenceParams;
+    Ty->getTypeSequenceParameters(rootTypeSequenceParams);
+
     // Handle the monovariadic/polyvariadic interface type split.
-    if (Ty->hasTypeSequence()) {
+    if (!rootTypeSequenceParams.empty()) {
       // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty);
+      Ty = PackExpansionType::get(Ty, rootTypeSequenceParams[0]);
     } else {
       // Monovariadic types (T...) for <T> resolve to [T].
       Ty = VariadicSequenceType::get(Ty);

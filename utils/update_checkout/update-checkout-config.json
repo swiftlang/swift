@@ -88,13 +88,14 @@
         "wasm": {
             "aliases": ["wasm", "swiftwasm"],
             "repos": {
-                "llvm-project": "stable/20211026",
+                "llvm-project": "stable/20220421",
+                "swift-llvm-bindings": "stable/20220421",
                 "swift": "swiftwasm",
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "1.0.1",
+                "swift-argument-parser": "1.0.3",
                 "swift-atomics": "1.0.2",
                 "swift-collections": "1.0.1",
                 "swift-crypto": "1.1.5",
@@ -110,7 +111,7 @@
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
                 "icu": "release-65-1",
-                "yams": "4.0.2",
+                "yams": "5.0.1",
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
@@ -128,10 +129,10 @@
             }
         },
         "main": {
-            "aliases": ["swift/main", "main", "stable/20211026"],
+            "aliases": ["swift/main", "main", "stable/20220421"],
             "repos": {
-                "llvm-project": "stable/20211026",
-                "swift-llvm-bindings": "stable/20211026",
+                "llvm-project": "stable/20220421",
+                "swift-llvm-bindings": "stable/20220421",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -170,7 +171,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/20220421"],
+            "aliases": ["rebranch"],
             "repos": {
                 "llvm-project": "stable/20220421",
                 "swift-llvm-bindings": "stable/20220421",

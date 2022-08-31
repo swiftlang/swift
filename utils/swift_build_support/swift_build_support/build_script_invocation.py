@@ -548,6 +548,10 @@ class BuildScriptInvocation(object):
         builder = ProductPipelineListBuilder(self.args)
 
         builder.begin_pipeline()
+
+        builder.add_product(products.EarlySwiftSyntax,
+                            is_enabled=self.args.build_early_swiftsyntax)
+
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
@@ -636,7 +640,7 @@ class BuildScriptInvocation(object):
         builder.add_product(products.SwiftDocC,
                             is_enabled=self.args.build_swiftdocc)
         builder.add_product(products.SwiftDocCRender,
-                            is_enabled=self.args.install_swiftdocc)                  
+                            is_enabled=self.args.install_swiftdocc)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
@@ -692,7 +696,7 @@ class BuildScriptInvocation(object):
             if is_impl:
                 self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
             else:
-                assert(index != last_impl_index)
+                assert index != last_impl_index
                 if index > last_impl_index:
                     non_darwin_cross_compile_hostnames = [
                         target for target in self.args.cross_compile_hosts if not

@@ -292,12 +292,12 @@ func localFunctionWithDefaultArg() {
 // CHECK-LABEL: sil private [ossa] @$s17default_arguments27localFunctionWithDefaultArgyyF3barL_yySiSgFfA_
 // CHECK-SAME: $@convention(thin) () -> Optional<Int>
 
-// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 func throwingDefault(closure: () throws -> Bool  = {  return true }) throws {
   try _ = closure()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 func throwingAutoclosureDefault(closure: @autoclosure () throws -> Bool  = true ) throws {
   try _ = closure()
 }
@@ -312,12 +312,12 @@ func autoclosureDefaultArg(closure: @autoclosure () -> Bool  = true ) {
   _ = closure()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 func throwingDefaultEscaping(closure: @escaping () throws -> Bool  = {  return true }) throws {
   try _ = closure()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 func throwingAutoclosureDefaultEscaping(closure: @escaping @autoclosure () throws -> Bool  = true ) throws {
   try _ = closure()
 }
@@ -332,18 +332,18 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
   _ = closure()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @{{.*}}callThem{{.*}} : $@convention(thin) () -> @error Error
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}callThem{{.*}} : $@convention(thin) () -> @error any Error
 
-// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
+// CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments15throwingDefault7closureySbyKXE_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
 // CHECK:  try_apply [[R]]([[E]])
 
-// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
+// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
+// CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
 // CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:   [[F:%.*]] = function_ref @$s17default_arguments0A3Arg7closureySbyXE_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
@@ -358,14 +358,14 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 // CHECK:  [[R:%.*]] = function_ref @$s17default_arguments21autoclosureDefaultArg7closureySbyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
 // CHECK:  apply [[R]]([[E]])
 
-// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error Error)) -> @error Erro
+// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
+// CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
 // CHECK:  try_apply [[R]]([[E]])
 
-// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
+// CHECK:  [[F:%.*]] = function_ref @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
+// CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error any Error)
+// CHECK:  [[R:%.*]] = function_ref @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error any Error)) -> @error any Error
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments0A8Escaping7closureySbyc_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool

@@ -877,9 +877,9 @@ def compile_module_from_interface :
   HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
   ModeOpt;
 
-def ignore_interface_provided_options :
-  Flag<["-"], "ignore-interface-provided-options">,
-  HelpText<"Ignore all module flags specified in the swiftinterface being built">;
+def explicit_interface_module_build :
+  Flag<["-"], "explicit-interface-module-build">,
+  HelpText<"Use the specified command-line to build the module from interface, instead of flags specified in the interface">;
 
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
@@ -899,6 +899,11 @@ def module_interface_preserve_types_as_written :
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
   HelpText<"Enable experimental support for SPI imports">;
+
+def disable_print_missing_imports_in_module_interface :
+  Flag<["-"], "disable-print-missing-imports-in-module-interface">,
+  HelpText<"Disable adding to the module interface imports used from API and "
+           "missing from the sources">;
 
 // [FIXME: Clang-type-plumbing] Make this a SIL-only option once we start
 // unconditionally emitting non-canonical Clang types in swiftinterfaces.

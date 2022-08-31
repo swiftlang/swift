@@ -1691,6 +1691,10 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     if (isAccessStorageIdentityCast(svi))
       return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0],
                                        AccessStorageCast::Identity);
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(svi))
+      return asImpl().visitStorageCast(
+          svi, &sbi->getAllOperands()[CopyLikeInstruction::Dest],
+          AccessStorageCast::Identity);
   }
   switch (sourceAddr->getKind()) {
   default:

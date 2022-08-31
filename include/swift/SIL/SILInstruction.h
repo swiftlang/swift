@@ -5048,7 +5048,14 @@ public:
 /// to hold %1 values.
 ///
 /// %token is an opaque word representing the previously bound types of this
-/// memory region, before binding it to a contiguous region of type $T.
+/// memory region, before binding it to a contiguous region of type $T. This
+/// token has no purpose unless it is consumed be a rebind_memory instruction.
+///
+/// Semantics: changes the type information assocated with a memory region. This
+/// affects all memory operations that alias with the given region of memory,
+/// regardless of their type or address provenance. For optimizations that query
+/// side effects, this is equivalent to writing and immediately reading an
+/// unknown value to memory at `%0` of `%1` bytes.
 class BindMemoryInst final : public InstructionBaseWithTrailingOperands<
                                  SILInstructionKind::BindMemoryInst,
                                  BindMemoryInst, SingleValueInstruction> {
@@ -5096,6 +5103,9 @@ public:
 ///
 /// %out_token represents the previously bound types of this memory region,
 /// before binding it to %in_token.
+///
+/// This has the same semantics as bind_memory except that the size of memory
+/// affected must be derived from `%in_token`.
 class RebindMemoryInst final : public SingleValueInstruction {
   FixedOperandList<2> Operands;
 

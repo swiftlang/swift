@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-13183: Make sure we don't incorrectly split the constraint system without
+// https://github.com/apple/swift/issues/55623
+// Make sure we don't incorrectly split the constraint system without
 // considering that a result builder type var may connect the inside of a
 // closure body with the enclosing expression.
 

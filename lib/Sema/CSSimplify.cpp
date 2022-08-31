@@ -3814,6 +3814,13 @@ ConstraintSystem::matchTypesBindTypeVar(
       // let's ignore this mismatch and mark affected type variable as a hole
       // because something else has to be fixed already for this to happen.
       if (type->is<DependentMemberType>() && !type->hasTypeVariable()) {
+        // Since the binding couldn't be performed, the type variable is a
+        // hole regardless whether it would be bound later to some other
+        // type or not. If this is not reflected in constraint system
+        // it would let the solver to form a _valid_ solution as if the
+        // constraint between the type variable and the unresolved dependent
+        // member type never existed.
+        increaseScore(SK_Hole);
         recordPotentialHole(typeVar);
         return getTypeMatchSuccess();
       }
@@ -3972,6 +3979,9 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
   switch (req.getRequirementKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::SameType: {
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
   }
@@ -8086,16 +8096,12 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
     }
 
     if (auto *protocol = candidateDC->getSelfProtocolDecl()) {
-      SmallVector<ProtocolConformance *, 4> conformances;
-      if (!NTD->lookupConformance(protocol, conformances))
+      auto conformance = DC->getParentModule()->lookupConformance(
+          baseTy, protocol);
+      if (!conformance.isConcrete())
         return false;
 
-      // This is opportunistic, there should be a way to narrow the
-      // list down to a particular declaration member comes from.
-      return llvm::any_of(
-          conformances, [](const ProtocolConformance *conformance) {
-            return !conformance->getConditionalRequirements().empty();
-          });
+      return !conformance.getConcrete()->getConditionalRequirements().empty();
     }
 
     return false;
@@ -12889,7 +12895,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       }
     }
     auto matchingType =
-        TupleType::get(newTupleTypes, getASTContext())->castTo<TupleType>();
+        TupleType::get(newTupleTypes, getASTContext());
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
@@ -13432,6 +13438,9 @@ void ConstraintSystem::addConstraint(Requirement req,
   bool conformsToAnyObject = false;
   Optional<ConstraintKind> kind;
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance:
     kind = ConstraintKind::ConformsTo;
     break;

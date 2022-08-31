@@ -111,21 +111,21 @@ func testClassInGenericFunc<T>(t: T) {
 }
 
 
-// <https://bugs.swift.org/browse/SR-5056> Required convenience init inhibits inheritance
-
-class SR5056A {
+// https://github.com/apple/swift/issues/47632
+// Required convenience 'init' inhibits inheritance
+do {
+  class A {
     required init(a: Int) {}
-}
+  }
 
-class SR5056B : SR5056A {
+  class B : A {
     required convenience init(b: Int) {
         self.init(a: b)
     }
-}
+  }
 
-class SR5056C : SR5056B {}
+  class C : B {}
 
-func useSR5056C() {
-  _ = SR5056C(a: 0)
-  _ = SR5056C(b: 0)
+  _ = C(a: 0)
+  _ = C(b: 0)
 }

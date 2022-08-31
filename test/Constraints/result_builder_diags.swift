@@ -232,7 +232,8 @@ func test_56221372() -> some P {
   })
 }
 
-struct SR11440 {
+// https://github.com/apple/swift/issues/53841
+struct S_53841 {
   typealias ReturnsTuple<T> = () -> (T, T)
   subscript<T, U>(@TupleBuilder x: ReturnsTuple<T>) -> (ReturnsTuple<U>) -> Void { //expected-note {{in call to 'subscript(_:)'}}
     return { _ in }
@@ -261,8 +262,9 @@ struct SR11440 {
 
 func acceptInt(_: Int, _: () -> Void) { }
 
-// SR-11350 crash due to improper recontextualization.
-func erroneousSR11350(x: Int) {
+// https://github.com/apple/swift/issues/53751
+// Crash due to improper recontextualization.
+func erroneous_53751(x: Int) {
   tuplify(true) { b in
     17
     x + 25
