@@ -124,10 +124,13 @@ bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
   }
 
   auto *dc = fn->getDeclContext();
+  if (!dc)
+    return false;
 
   // Must be part of a nominal type.
   auto *nominal = dc->getSelfNominalTypeDecl();
-  assert(nominal && "init/deinit not part of a nominal?");
+  if (!nominal)
+    return false;
 
   // If it's part of an actor type, then its deinit and some of its inits use
   // flow-isolation.
