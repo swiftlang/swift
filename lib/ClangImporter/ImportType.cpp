@@ -2230,6 +2230,17 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
+static ImportTypeKind
+getImportTypeKindForParam(const clang::ParmVarDecl *param) {
+  ImportTypeKind importKind = ImportTypeKind::Parameter;
+  if (param->hasAttr<clang::CFReturnsRetainedAttr>())
+    importKind = ImportTypeKind::CFRetainedOutParameter;
+  else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
+    importKind = ImportTypeKind::CFUnretainedOutParameter;
+
+  return importKind;
+}
+
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
@@ -2254,11 +2265,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Check nullability of the parameter.
     OptionalTypeKind OptionalityOfParam = getParamOptionality(param, knownNonNull);
 
-    ImportTypeKind importKind = ImportTypeKind::Parameter;
-    if (param->hasAttr<clang::CFReturnsRetainedAttr>())
-      importKind = ImportTypeKind::CFRetainedOutParameter;
-    else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
-      importKind = ImportTypeKind::CFUnretainedOutParameter;
+    ImportTypeKind importKind = getImportTypeKindForParam(param);
 
     // Import the parameter type into Swift.
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
@@ -2904,7 +2911,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     // Special case for NSDictionary's subscript.
-    ImportTypeKind importKind = ImportTypeKind::Parameter;
+    ImportTypeKind importKind = getImportTypeKindForParam(param);
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
     Type swiftParamTy;
     bool paramIsIUO = false;
@@ -2934,11 +2941,6 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
       paramIsIUO = optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
     } else if (!swiftParamTy) {
-      if (param->hasAttr<clang::CFReturnsRetainedAttr>())
-        importKind = ImportTypeKind::CFRetainedOutParameter;
-      else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
-        importKind = ImportTypeKind::CFUnretainedOutParameter;
-
       // Figure out if this is a completion handler parameter whose error
       // parameter is used to indicate throwing.
       Optional<unsigned> completionHandlerErrorParamIndex;
