@@ -409,7 +409,9 @@ ThrowingInitTestSuite.test("InitFailure_Struct") {
 
 // Specific regression tests:
 
-// <https://bugs.swift.org/browse/SR-1714> - try? self.init(...)` in init? causes overrelease
+// https://github.com/apple/swift/issues/44323
+// 'try? self.init(...)' in 'init?' causes overrelease
+
 class ThrowAndFailRoot {
   let x = LifetimeTracked(0)
 }
@@ -437,6 +439,7 @@ ThrowingInitTestSuite.test("ThrowsAndFailableTest") {
   if let x = ThrowAndFailDerived(b: false) { preconditionFailure() }
 }
 
-// <https://bugs.swift.org/browse/SR-3132> - Invalid pointer dequeued from free list. Runtime crash on some weird code
+// https://github.com/apple/swift/issues/45720
+// Invalid pointer dequeued from free list: run-time crash on some weird code
 
 runAllTests()

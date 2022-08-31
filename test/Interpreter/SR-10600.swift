@@ -2,6 +2,8 @@
 
 // REQUIRES: executable_test
 
+// https://github.com/apple/swift/issues/53000
+
 public class BaseView { }
 public class GenericView<T>: BaseView { }
 public class FinalView: GenericView<ContentForTheView> { }

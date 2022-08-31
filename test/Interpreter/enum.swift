@@ -554,7 +554,8 @@ presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: (), u: "foo")
 
-// SR-5148
+// https://github.com/apple/swift/issues/47724
+
 enum Payload {
     case email
 }

@@ -24,8 +24,8 @@ extension P {
   }
 }
 
-// SR-4363
-// Test several paths through swift_getObjectType() 
+// https://github.com/apple/swift/issues/46942
+// Test several paths through 'swift_getObjectType()'.
 
 // instance of a Swift class that conforms to P
 class O: NSObject, P { }

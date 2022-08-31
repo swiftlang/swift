@@ -458,8 +458,9 @@ SubclassExistentialsTestSuite.test("Failing dynamic downcast to subclass existen
   }
 }
 
-// This test triggers SR-815 (rdar://problem/25318716) on macOS 10.9 and iOS 7.
-// Disable it for now when testing on those versions.
+// This test triggers https://github.com/apple/swift/issues/43427
+// (rdar://problem/25318716) on macOS 10.9 and iOS 7. Disable it for now when
+// testing on those versions.
 if #available(macOS 10.10, iOS 8, *) {
   runAllTests()
 } else {
