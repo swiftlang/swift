@@ -2593,9 +2593,9 @@ only values" that are guaranteed to never be copied. This is enforced by:
 * Having SILGen emit copies as it normally does.
 
 * Use OSSA canonicalization to eliminate copies that aren't needed semantically
-  due to consuming uses of the value. This is implemented by the pass guaranteed
-  pass "MoveOnlyChecker". Emit errors on any of the consuming uses that we found
-  in said pass.
+  due to consuming uses of the value. This is implemented by the guaranteed
+  passes "MoveOnlyObjectChecker" and "MoveOnlyAddressChecker". We will emit
+  errors on any of the consuming uses that we found in said pass.
 
 Assuming that no errors are emitted, we can then conclude before we reach
 canonical SIL that the value was never copied and thus is a "move only value"
@@ -2667,7 +2667,7 @@ rather than a viral type level annotation that would constrain the type system.
 As mentioned above trivial move only wrapped types are actually
 non-trivial. This is because in SIL ownership is tied directly to
 non-trivialness so unless we did that we could not track ownership
-accurately. This is loss of triviality is not an issue for most of the pipeline
+accurately. This loss of triviality is not an issue for most of the pipeline
 since we eliminate all move only wrapper types for trivial types during the
 guaranteed optimizations after we have run various ownership checkers but before
 we have run diagnostics for trivial types (e.x.: DiagnosticConstantPropagation).
