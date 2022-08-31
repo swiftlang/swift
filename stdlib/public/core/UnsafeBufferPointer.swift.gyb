@@ -818,26 +818,27 @@ extension Unsafe${Mutable}BufferPointer {
       return startIndex.advanced(by: count)
     }
 
-    guard var position = baseAddress else {
+    if self.isEmpty {
       _precondition(
         source.isEmpty,
         "buffer cannot contain every element from source."
       )
       return startIndex
     }
+    _internalInvariant(_position != nil)
     var iterator = source.makeIterator()
-    for index in indices {
-      guard let value = iterator.next() else {
-        return index
+    var index = startIndex
+    while let value = iterator.next() {
+      guard index < endIndex else {
+        _preconditionFailure(
+          "buffer cannot contain every element from source."
+        )
+        break
       }
-      position.pointee = value
-      position = position.advanced(by: 1)
+      _position._unsafelyUnwrappedUnchecked[index] = value
+      formIndex(after: &index)
     }
-    _precondition(
-      iterator.next() == nil,
-      "buffer cannot contain every element from source."
-    )
-    return endIndex
+    return index
   }
 
   /// Moves every element of an initialized source buffer into the
