@@ -420,8 +420,8 @@ beginLexicalLifetimeAfterStore(AllocStackInst *asi, SILInstruction *inst) {
     if (isGuaranteedLexicalValue(sbi->getSrc())) {
       return {{stored, SILValue(), SILValue()}, /*isStorageValid*/ true};
     }
-    auto *borrow = SILBuilderWithScope(sbi).createBeginBorrow(
-        loc, stored, /*isLexical*/ true);
+    auto *borrow = SILBuilderWithScope(sbi->getNextInstruction())
+                       .createBeginBorrow(loc, stored, /*isLexical*/ true);
     return {{stored, borrow, SILValue()}, /*isStorageValid*/ true};
   }
   BeginBorrowInst *bbi = nullptr;
@@ -794,6 +794,11 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       if (!sbi) {
         continue;
       }
+      if (sbi->getDest() != asi) {
+        continue;
+      }
+      assert(!deinitializationPoints[blockPromotingWithin]);
+      deinitializationPoints[blockPromotingWithin] = inst;
       if (!runningVals.hasValue()) {
         continue;
       }
@@ -802,8 +807,6 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       }
       // Mark storage as invalid and mark end_borrow as a deinit point.
       runningVals->isStorageValid = false;
-      assert(!deinitializationPoints[blockPromotingWithin]);
-      deinitializationPoints[blockPromotingWithin] = inst;
       if (!canEndLexicalLifetime(runningVals->value)) {
         continue;
       }
