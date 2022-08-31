@@ -2241,6 +2241,85 @@ getImportTypeKindForParam(const clang::ParmVarDecl *param) {
   return importKind;
 }
 
+Optional<swift::Type> ClangImporter::Implementation::importParameterType(
+    const clang::ParmVarDecl *param, OptionalTypeKind OptionalityOfParam,
+    bool allowNSUIntegerAsInt, ArrayRef<GenericTypeParamDecl *> genericParams,
+    llvm::function_ref<void(Diagnostic &&)> paramAddDiag, bool &isInOut,
+    bool &isParamTypeImplicitlyUnwrapped) {
+  auto paramTy = param->getType();
+
+  ImportTypeKind importKind = getImportTypeKindForParam(param);
+
+  // Import the parameter type into Swift.
+  auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
+  Type swiftParamTy;
+
+  // Sometimes we import unavailable typedefs as enums. If that's the case,
+  // use the enum, not the typedef here.
+  if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
+    if (isUnavailableInSwift(typedefType->getDecl())) {
+      if (auto clangEnum =
+              findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+        // If this fails, it means that we need a stronger predicate for
+        // determining the relationship between an enum and typedef.
+        assert(clangEnum.getValue()
+                   ->getIntegerType()
+                   ->getCanonicalTypeInternal() ==
+               typedefType->getCanonicalTypeInternal());
+        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
+          swiftParamTy = cast<NominalTypeDecl>(swiftEnum)->getDeclaredType();
+        }
+      }
+    }
+  } else if (isa<clang::PointerType>(paramTy) &&
+             isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
+    auto pointeeType = paramTy->getPointeeType();
+    auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
+    PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
+                                      ? PTK_UnsafePointer
+                                      : PTK_UnsafeMutablePointer;
+    auto genericType = findGenericTypeInGenericDecls(
+        *this, templateParamType, genericParams, attrs, paramAddDiag);
+    swiftParamTy = genericType->wrapInPointer(pointerKind);
+    if (!swiftParamTy)
+      return None;
+  } else if (isa<clang::ReferenceType>(paramTy) &&
+             isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
+    auto templateParamType =
+        cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
+    swiftParamTy = findGenericTypeInGenericDecls(
+        *this, templateParamType, genericParams, attrs, paramAddDiag);
+    if (!paramTy->getPointeeType().isConstQualified())
+      isInOut = true;
+  } else if (auto *templateParamType =
+                 dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
+    swiftParamTy = findGenericTypeInGenericDecls(
+        *this, templateParamType, genericParams, attrs, paramAddDiag);
+  } else if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
+    // We don't support reference type to a dependent type, just bail.
+    if (refType->getPointeeType()->isDependentType()) {
+      return None;
+    }
+
+    paramTy = refType->getPointeeType();
+    if (!paramTy.isConstQualified())
+      isInOut = true;
+  }
+
+  if (!swiftParamTy) {
+    auto importedType =
+        importType(paramTy, importKind, paramAddDiag, allowNSUIntegerAsInt,
+                   Bridgeability::Full, attrs, OptionalityOfParam);
+    if (!importedType)
+      return None;
+
+    isParamTypeImplicitlyUnwrapped = importedType.isImplicitlyUnwrapped();
+    swiftParamTy = importedType.getType();
+  }
+
+  return swiftParamTy;
+}
+
 static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
                                    const clang::ParmVarDecl *param,
                                    const Identifier &name,
@@ -2293,86 +2372,21 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Check nullability of the parameter.
     OptionalTypeKind OptionalityOfParam = getParamOptionality(param, knownNonNull);
 
-    ImportTypeKind importKind = getImportTypeKindForParam(param);
-
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
     bool isInOut = false;
     bool isParamTypeImplicitlyUnwrapped = false;
 
-    // Import the parameter type into Swift.
-    auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
-    Type swiftParamTy;
-
-    // Sometimes we import unavailable typedefs as enums. If that's the case,
-    // use the enum, not the typedef here.
-    if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
-      if (isUnavailableInSwift(typedefType->getDecl())) {
-        if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
-          // If this fails, it means that we need a stronger predicate for
-          // determining the relationship between an enum and typedef.
-          assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
-                 typedefType->getCanonicalTypeInternal());
-          if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-            swiftParamTy = cast<NominalTypeDecl>(swiftEnum)->getDeclaredType();
-          }
-        }
-      }
-    } else if (isa<clang::PointerType>(paramTy) &&
-        isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
-      auto pointeeType = paramTy->getPointeeType();
-      auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
-      PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
-                                        ? PTK_UnsafePointer
-                                        : PTK_UnsafeMutablePointer;
-      auto genericType =
-          findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
-                                        attrs, paramAddDiag);
-      swiftParamTy = genericType->wrapInPointer(pointerKind);
-      if (!swiftParamTy)
-        return nullptr;
-    } else if (isa<clang::ReferenceType>(paramTy) &&
-               isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
-      auto templateParamType =
-          cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
-      swiftParamTy =
-          findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
-                                        attrs, paramAddDiag);
-      if (!paramTy->getPointeeType().isConstQualified())
-        isInOut = true;
-    } else if (auto *templateParamType =
-                   dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
-      swiftParamTy =
-          findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
-                                        attrs, paramAddDiag);
-    } else if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
-      // We don't support reference type to a dependent type, just bail.
-      if (refType->getPointeeType()->isDependentType()) {
-        addImportDiagnostic(
-            param, Diagnostic(diag::parameter_type_not_imported, param),
-            param->getSourceRange().getBegin());
-        return nullptr;
-      }
-
-      paramTy = refType->getPointeeType();
-      if (!paramTy.isConstQualified())
-        isInOut = true;
+    auto swiftParamTyOpt = importParameterType(
+        param, OptionalityOfParam, importKind, allowNSUIntegerAsInt,
+        genericParams, paramAddDiag, isInOut, isParamTypeImplicitlyUnwrapped);
+    if (!swiftParamTyOpt) {
+      addImportDiagnostic(param,
+                          Diagnostic(diag::parameter_type_not_imported, param),
+                          param->getSourceRange().getBegin());
+      return nullptr;
     }
-
-    if (!swiftParamTy) {
-      auto importedType = importType(paramTy, importKind, paramAddDiag,
-                                     allowNSUIntegerAsInt, Bridgeability::Full,
-                                     attrs, OptionalityOfParam);
-      if (!importedType) {
-        addImportDiagnostic(
-            param, Diagnostic(diag::parameter_type_not_imported, param),
-            param->getSourceRange().getBegin());
-        return nullptr;
-      }
-
-      isParamTypeImplicitlyUnwrapped = importedType.isImplicitlyUnwrapped();
-      swiftParamTy = importedType.getType();
-    }
+    auto swiftParamTy = *swiftParamTyOpt;
 
     // Retrieve the argument name.
     Identifier name;

@@ -1364,6 +1364,32 @@ public:
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
       ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
 
+  /// Import a parameter type
+  ///
+  /// \param param The underlaying parameter declaraction.
+  /// \param optionalityOfParam The kind of optionality for the parameter
+  ///        being imported.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be import as Int
+  ///        in certain contexts. If false, it will always be import as UInt.
+  /// \param genericParams For C++ functions, an array of the generic type
+  ///        parameters of the function. For the rest of cases, an empty array
+  ///        can be provided.
+  /// \param addImportDiagnosticFn A function that can be called to add import
+  ///        diagnostics to the declaration being imported. This can be any
+  ///        lambda or callable object, but it's designed to be compatible
+  ///        with \c ImportDiagnosticAdder .
+  /// \param[out] isInOut On return, true if the parameter is inout. False,
+  ///             otherwise.
+  /// \param[out] isParamTypeImplicitlyUnwrapped On return, true if the
+  ///             parameter is implicitly unwrapped. False, otherwise.
+  ///
+  /// \returns The imported parameter type on success, or None on failure.
+  Optional<swift::Type> importParameterType(
+      const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
+      bool allowNSUIntegerAsInt, ArrayRef<GenericTypeParamDecl *> genericParams,
+      llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
+      bool &isInOut, bool &isParamTypeImplicitlyUnwrapped);
+
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
 
