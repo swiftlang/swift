@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -396,4 +396,45 @@ llvm::Value *irgen::emitIntegerLiteralToFP(IRGenFunction &IGF,
   default:
     llvm_unreachable("not a floating-point type");
   }
+}
+
+llvm::Value *irgen::emitIntLiteralBitWidth(
+  IRGenFunction &IGF,
+  Explosion &in
+) {
+  auto data = in.claimNext();
+  auto flags = in.claimNext();
+  (void)data; // [[maybe_unused]]
+  return IGF.Builder.CreateLShr(
+    flags,
+    IGF.IGM.getSize(Size(IntegerLiteralFlags::BitWidthShift))
+  );
+}
+
+llvm::Value *irgen::emitIntLiteralIsNegative(
+  IRGenFunction &IGF,
+  Explosion &in
+) {
+  auto data = in.claimNext();
+  auto flags = in.claimNext();
+  (void)data; // [[maybe_unused]]
+  static_assert(
+    IntegerLiteralFlags::IsNegativeFlag == 1,
+    "hardcoded in this truncation"
+  );
+  return IGF.Builder.CreateTrunc(flags, IGF.IGM.Int1Ty);
+}
+
+llvm::Value *irgen::emitIntLiteralWordAtIndex(
+  IRGenFunction &IGF,
+  Explosion &in
+) {
+  auto data = in.claimNext();
+  auto flags = in.claimNext();
+  auto index = in.claimNext();
+  (void)flags; // [[maybe_unused]]
+  return IGF.Builder.CreateLoad(
+    IGF.Builder.CreateInBoundsGEP(IGF.IGM.SizeTy, data, index),
+    IGF.IGM.getPointerAlignment()
+  );
 }

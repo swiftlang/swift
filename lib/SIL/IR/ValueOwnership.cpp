@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -497,6 +497,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, SToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, SToUCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, UToUCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, IntToFPWithOverflow)
+CONSTANT_OWNERSHIP_BUILTIN(None, BitWidth)
+CONSTANT_OWNERSHIP_BUILTIN(None, IsNegative)
+CONSTANT_OWNERSHIP_BUILTIN(None, WordAtIndex)
 
 // This is surprising, Builtin.unreachable returns a "Never" value which is
 // trivially typed.

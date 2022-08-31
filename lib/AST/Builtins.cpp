@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1821,6 +1821,33 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   return getBuiltinFunction(Id, { InTy }, OutTy);
 }
 
+static ValueDecl *getBitWidthOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy), _word);
+}
+
+static ValueDecl *getIsNegativeOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy), _int(1));
+}
+
+static ValueDecl *getWordAtIndexOperation(
+  ASTContext &ctx,
+  Identifier id,
+  Type valueTy
+) {
+  if (!valueTy->getAs<BuiltinIntegerLiteralType>()) return nullptr;
+  return getBuiltinFunction(ctx, id, _thin, _parameters(valueTy, _word), _word);
+}
+
 static ValueDecl *getUnreachableOperation(ASTContext &Context,
                                           Identifier Id) {
   auto NeverTy = Context.getNeverType();
@@ -2810,6 +2837,18 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
     return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::BitWidth:
+    if (Types.size() != 1) return nullptr;
+    return getBitWidthOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::IsNegative:
+    if (Types.size() != 1) return nullptr;
+    return getIsNegativeOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::WordAtIndex:
+    if (Types.size() != 1) return nullptr;
+    return getWordAtIndexOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);

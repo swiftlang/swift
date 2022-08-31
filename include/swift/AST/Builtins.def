@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -695,6 +695,18 @@ BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
+
+/// Builtin.bitWidth_IntLiteral has type
+/// (_ value: Builtin.IntLiteral) -> Builtin.Word
+BUILTIN_MISC_OPERATION(BitWidth, "bitWidth", "n", Special)
+
+/// Builtin.isNegative_IntLiteral has type
+/// (_ value: Builtin.IntLiteral) -> Builtin.Int1
+BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
+
+/// Builtin.wordAtIndex_IntLiteral has type
+/// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
+BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
 
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
