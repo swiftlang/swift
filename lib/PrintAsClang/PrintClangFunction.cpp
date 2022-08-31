@@ -328,24 +328,20 @@ public:
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             Optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
-    // FIXME: handle optionalKind.
-    if (typeUseKind == FunctionSignatureTypeUse::ReturnType ||
-        typeUseKind == FunctionSignatureTypeUse::TypeReference) {
-      // generic is always returned indirectly in C signature.
-      assert(languageMode == OutputLanguageMode::Cxx);
-      os << genericTpt->getName();
-      return ClangRepresentation::representable;
-    }
-    if (!isInOutParam)
+    bool isParam = typeUseKind == FunctionSignatureTypeUse::ParamType;
+    if (isParam && !isInOutParam)
       os << "const ";
-    if (languageMode == OutputLanguageMode::Cxx) {
-      // Pass a reference to a template type.
-      os << genericTpt->getName();
-      os << " &";
+    // FIXME: handle optionalKind.
+    if (languageMode != OutputLanguageMode::Cxx) {
+      assert(typeUseKind == FunctionSignatureTypeUse::ParamType);
+      // Pass an opaque param in C mode.
+      os << "void * _Nonnull";
       return ClangRepresentation::representable;
     }
-    // Pass an opaque param in C mode.
-    os << "void * _Nonnull";
+    ClangSyntaxPrinter(os).printGenericTypeParamTypeName(genericTpt);
+    // Pass a reference to the template type.
+    if (isParam)
+      os << '&';
     return ClangRepresentation::representable;
   }
 
@@ -385,31 +381,13 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
     FunctionSignatureModifiers modifiers) {
   if (FD->isGeneric()) {
-    auto Signature = FD->getGenericSignature();
+    auto Signature = FD->getGenericSignature().getCanonicalSignature();
     auto Requirements = Signature.getRequirements();
     // FIXME: Support generic requirements.
     if (!Requirements.empty())
       return ClangRepresentation::unsupported;
-    if (kind == FunctionSignatureKind::CxxInlineThunk) {
-      os << "template<";
-      llvm::interleaveComma(FD->getGenericParams()->getParams(), os,
-                            [&](const GenericTypeParamDecl *genericParam) {
-                              os << "class ";
-                              ClangSyntaxPrinter(os).printBaseName(
-                                  genericParam);
-                            });
-      os << ">\n";
-      os << "requires ";
-      llvm::interleave(
-          FD->getGenericParams()->getParams(), os,
-          [&](const GenericTypeParamDecl *genericParam) {
-            os << "swift::isUsableInGenericContext<";
-            ClangSyntaxPrinter(os).printBaseName(genericParam);
-            os << ">";
-          },
-          " && ");
-      os << "\n";
-    }
+    if (kind == FunctionSignatureKind::CxxInlineThunk)
+      ClangSyntaxPrinter(os).printGenericSignature(Signature);
   }
   auto emittedModule = FD->getModuleContext();
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
@@ -672,14 +650,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           assert(!genericRequirement.Protocol);
           if (auto *gtpt = genericRequirement.TypeParameter
                                ->getAs<GenericTypeParamType>()) {
-            assert(funcType);
-            auto *gft = dyn_cast<GenericFunctionType>(funcType);
-            if (gtpt->getDepth() == 0) {
-              os << "swift::getTypeMetadata<"
-                 << gft->getGenericParams()[gtpt->getIndex()]->getName()
-                 << ">()";
-              return;
-            }
+            os << "swift::getTypeMetadata<";
+            ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
+            os << ">()";
+            return;
           }
           os << "ERROR";
           return;
@@ -706,20 +680,25 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   // indirectly by a pointer.
   if (!isKnownCxxType(resultTy, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
-    if (resultTy->is<GenericTypeParamType>()) {
+    if (const auto *gtpt = resultTy->getAs<GenericTypeParamType>()) {
       std::string returnAddress;
       llvm::raw_string_ostream ros(returnAddress);
       ros << "reinterpret_cast<void *>(&returnValue)";
-      StringRef resultTyName = "T"; // FIXME
+      std::string resultTyName;
+      {
+        llvm::raw_string_ostream os(resultTyName);
+        ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
+      }
 
       os << "  if constexpr (std::is_base_of<::swift::"
-         << cxx_synthesis::getCxxImplNamespaceName()
-         << "::RefCountedClass, T>::value) {\n";
+         << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
+         << resultTyName << ">::value) {\n";
       os << "  void *returnValue;\n  ";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
       os << ";\n";
       os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-         << "::implClassFor<T>::type::makeRetained(returnValue);\n";
+         << "::implClassFor<" << resultTyName
+         << ">::type::makeRetained(returnValue);\n";
       os << "  } else if constexpr (::swift::"
          << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
          << resultTyName << ">) {\n";
@@ -729,7 +708,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
       os << ";\n  });\n";
       os << "  } else {\n";
-      os << "  T returnValue;\n";
+      os << "  " << resultTyName << " returnValue;\n";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
       os << ";\n  return returnValue;\n";
       os << "  }\n";
