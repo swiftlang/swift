@@ -749,7 +749,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(repeating:)")
-  @_silgen_name("_swift_se0370_UnsageMutableBufferPointer_assign_repeating")
+  @_silgen_name("_swift_se0370_UnsafeMutableBufferPointer_assign_repeating")
   public func assign(repeating repeatedValue: Element) {
     update(repeating: repeatedValue)
   }
