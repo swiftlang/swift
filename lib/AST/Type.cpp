@@ -4886,11 +4886,15 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     break;
   }
 
+  // Add any outer generic parameters from the local context.
   while (n > 0) {
     auto *gp = params[--n];
-    auto substTy = (genericEnv
-                    ? genericEnv->mapTypeIntoContext(gp)
-                    : gp);
+    Type substTy = gp;
+    if (baseTy && baseTy->is<ErrorType>())
+      substTy = ErrorType::get(baseTy->getASTContext());
+    else if (genericEnv)
+      substTy = genericEnv->mapTypeIntoContext(gp);
+
     auto result = substitutions.insert(
       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
        substTy});
