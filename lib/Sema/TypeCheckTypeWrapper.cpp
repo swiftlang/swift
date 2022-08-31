@@ -195,7 +195,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
       /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
-                        VarDecl::Introducer::Var, AccessLevel::Private);
+                        VarDecl::Introducer::Var, AccessLevel::Internal);
 }
 
 VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
