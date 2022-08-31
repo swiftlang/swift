@@ -270,11 +270,23 @@ void ClangValueTypePrinter::printValueTypeDecl(
           "metadata._0);\n";
     os << "    return _getOpaquePointer();\n";
     os << "  }\n";
+    os << "  inline void _destructiveInjectEnumTag(unsigned tag) {\n";
+    printEnumVWTableVariable();
+    os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, "
+          "metadata._0);\n";
+    os << "  }\n";
     os << "  inline unsigned _getEnumTag() const {\n";
     printEnumVWTableVariable();
     os << "    return enumVWTable->getEnumTag(_getOpaquePointer(), "
           "metadata._0);\n";
     os << "  }\n";
+
+    for (const auto &pair : interopContext.getIrABIDetails().getEnumTagMapping(
+             cast<EnumDecl>(typeDecl))) {
+      os << "  using _impl_" << pair.first->getNameStr() << " = decltype(";
+      ClangSyntaxPrinter(os).printIdentifier(pair.first->getNameStr());
+      os << ");\n";
+    }
   }
   // Print out the storage for the value type.
   os << "  ";
@@ -290,34 +302,6 @@ void ClangValueTypePrinter::printValueTypeDecl(
   printCxxImplClassName(os, typeDecl);
   os << ";\n";
   os << "};\n";
-  // Print the definition of enum static struct data memebers
-  if (isa<EnumDecl>(typeDecl)) {
-    auto tagMapping = interopContext.getIrABIDetails().getEnumTagMapping(
-        cast<EnumDecl>(typeDecl));
-    for (const auto &pair : tagMapping) {
-      os << "decltype(";
-      printer.printBaseName(typeDecl);
-      os << "::";
-      printer.printIdentifier(pair.first->getNameStr());
-      os << ") ";
-      printer.printBaseName(typeDecl);
-      os << "::";
-      printer.printIdentifier(pair.first->getNameStr());
-      os << ";\n";
-    }
-    if (isOpaqueLayout) {
-      os << "decltype(";
-      printer.printBaseName(typeDecl);
-      // TODO: allow custom name for this special case
-      os << "::";
-      printer.printIdentifier("unknownDefault");
-      os << ") ";
-      printer.printBaseName(typeDecl);
-      os << "::";
-      printer.printIdentifier("unknownDefault");
-      os << ";\n";
-    }
-  }
   os << '\n';
 
   const auto *moduleContext = typeDecl->getModuleContext();

@@ -19,6 +19,8 @@
 using namespace swift;
 using namespace cxx_synthesis;
 
+StringRef cxx_synthesis::getCxxSwiftNamespaceName() { return "swift"; }
+
 StringRef cxx_synthesis::getCxxImplNamespaceName() { return "_impl"; }
 
 StringRef cxx_synthesis::getCxxOpaqueStorageClassName() {

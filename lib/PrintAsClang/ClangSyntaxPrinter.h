@@ -25,6 +25,9 @@ class NominalTypeDecl;
 
 namespace cxx_synthesis {
 
+/// Return the name of the namespace for things exported from Swift stdlib
+StringRef getCxxSwiftNamespaceName();
+
 /// Return the name of the implementation namespace that is used to hide
 /// declarations from the namespace that corresponds to the imported Swift
 /// module in C++.
