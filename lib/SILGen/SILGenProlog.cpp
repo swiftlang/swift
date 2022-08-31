@@ -823,7 +823,7 @@ void SILGenFunction::emitPrologGlobalActorHop(SILLocation loc,
 }
 
 SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
-  CanType actorType = CanType(globalActor);
+  CanType actorType = globalActor->getCanonicalType();
   NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
   VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
   assert(sharedInstanceDecl && "no shared actor field in global actor");
