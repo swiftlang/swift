@@ -209,9 +209,6 @@ jobs:
           # Installer script is here: https://github.com/actions/virtual-environments/blob/1cbea058249db750691ec74f1b3ba9a7b1605d26/images/linux/scripts/installers/swift.sh
           rm -f /usr/local/bin/swiftc /usr/local/bin/swift
           rm -rf /usr/share/swift/
-      - name: (Workaround) Use Xcode 13.0 on arm64 macOS
-        run: |
-          echo "DEVELOPER_DIR=/Applications/Xcode_13.0.app/Contents/Developer/" >> $GITHUB_ENV
 
       - name: Free disk space
         if: ${{ matrix.free_disk_space }}
