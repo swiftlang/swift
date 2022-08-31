@@ -9,6 +9,7 @@
 swift_compiler_sources(Optimizer
   BasicBlockRange.swift
   BasicBlockWorklist.swift
+  FunctionUses.swift
   InstructionRange.swift
   Set.swift
   Stack.swift)

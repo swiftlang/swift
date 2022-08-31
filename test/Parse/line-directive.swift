@@ -67,3 +67,13 @@ enum E {
 // CHECK: sr8772.swift:400:2: error: expected member name following '.'
 // CHECK: sr8772.swift:400:3: error: consecutive statements on a line must be separated by ';'
 // CHECK: sr8772.swift:400:3: error: expected expression
+
+// https://github.com/apple/swift/issues/55049
+class I55049 {
+#sourceLocation(file: "issue-55049.swift", line: 1_000)
+    let bar = 12
+#sourceLocation(file: "issue-55049.swift", line: 2_000)
+}
+
+#line 1_000 "issue-55049.swift"
+class I55049_1 {}

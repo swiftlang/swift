@@ -25,24 +25,22 @@ let rangeDumper = FunctionPass(name: "dump-ranges", {
   var outs = Stack<Instruction>(context)
   defer { outs.deinitialize() }
 
-  for block in function.blocks {
-    for inst in block.instructions {
-      if let sli = inst as? StringLiteralInst {
-        switch sli.string {
-          case "begin":
-            precondition(begin == nil, "more than one begin instruction")
-            begin = sli
-          case "end":
-            ends.append(sli)
-          case "interior":
-            interiors.append(sli)
-          case "inside":
-            ins.append(sli)
-          case "outside":
-            outs.append(sli)
-          default:
-            break
-        }
+  for inst in function.instructions {
+    if let sli = inst as? StringLiteralInst {
+      switch sli.string {
+        case "begin":
+          precondition(begin == nil, "more than one begin instruction")
+          begin = sli
+        case "end":
+          ends.append(sli)
+        case "interior":
+          interiors.append(sli)
+        case "inside":
+          ins.append(sli)
+        case "outside":
+          outs.append(sli)
+        default:
+          break
       }
     }
   }

@@ -90,6 +90,9 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
                                       llvm::json::OStream &OS) {
   StringRef Kind;
   switch (Req.getKind()) {
+    case RequirementKind::SameCount:
+      Kind = "sameLength";
+      break;
     case RequirementKind::Conformance:
       Kind = "conformance";
       break;

@@ -72,9 +72,15 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
 ///   expr-is:
 ///     'is' type
 ParserResult<Expr> Parser::parseExprIs() {
-  SourceLoc isLoc = consumeToken(tok::kw_is);
+  SourceLoc isLoc;
+  {
+    SyntaxParsingContext IsExprCtx(SyntaxContext, SyntaxKind::UnresolvedIsExpr);
+    isLoc = consumeToken(tok::kw_is);
+  }
 
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_is);
+  SyntaxContext->createNodeInPlace(SyntaxKind::TypeExpr);
+
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
@@ -89,19 +95,25 @@ ParserResult<Expr> Parser::parseExprIs() {
 ///     'as?' type
 ///     'as!' type
 ParserResult<Expr> Parser::parseExprAs() {
-  // Parse the 'as'.
-  SourceLoc asLoc = consumeToken(tok::kw_as);
-
-  // Parse the postfix '?'.
+  SourceLoc asLoc;
   SourceLoc questionLoc;
   SourceLoc exclaimLoc;
-  if (Tok.is(tok::question_postfix)) {
-    questionLoc = consumeToken(tok::question_postfix);
-  } else if (Tok.is(tok::exclaim_postfix)) {
-    exclaimLoc = consumeToken(tok::exclaim_postfix);
+
+  {
+    SyntaxParsingContext AsExprCtx(SyntaxContext, SyntaxKind::UnresolvedAsExpr);
+    // Parse the 'as'.
+    asLoc = consumeToken(tok::kw_as);
+
+    // Parse the postfix '?'.
+    if (Tok.is(tok::question_postfix)) {
+      questionLoc = consumeToken(tok::question_postfix);
+    } else if (Tok.is(tok::exclaim_postfix)) {
+      exclaimLoc = consumeToken(tok::exclaim_postfix);
+    }
   }
 
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
+  SyntaxContext->createNodeInPlace(SyntaxKind::TypeExpr);
 
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
@@ -295,7 +307,6 @@ parse_operator:
     }
         
     case tok::kw_is: {
-      SyntaxParsingContext IsContext(SyntaxContext, SyntaxKind::IsExpr);
       // Parse a type after the 'is' token instead of an expression.
       ParserResult<Expr> is = parseExprIs();
       if (is.isNull() || is.hasCodeCompletion())
@@ -313,7 +324,6 @@ parse_operator:
     }
         
     case tok::kw_as: {
-      SyntaxParsingContext AsContext(SyntaxContext, SyntaxKind::AsExpr);
       ParserResult<Expr> as = parseExprAs();
       if (as.isNull() || as.hasCodeCompletion())
         return as;
@@ -997,6 +1007,17 @@ StringRef Parser::copyAndStripUnderscores(StringRef orig) {
   }
   
   return StringRef(start, p - start);
+}
+
+StringRef Parser::stripUnderscoresIfNeeded(StringRef text,
+                                           SmallVectorImpl<char> &buffer) {
+  if (text.contains('_')) {
+    buffer.clear();
+    llvm::copy_if(text, std::back_inserter(buffer),
+                  [](char ch) { return ch != '_'; });
+    return StringRef(buffer.data(), buffer.size());
+  }
+  return text;
 }
 
 /// Disambiguate the parse after '{' token that is in a place that might be

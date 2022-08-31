@@ -52,14 +52,14 @@ func baz2() -> Int {
   return x
 }
 
-// SR-11016
+// https://github.com/apple/swift/issues/53406
 
-protocol SR_11016_P {
+protocol P_53406 {
   func bar() throws
 }
 
-class SR_11016_C {
-  var foo: SR_11016_P?
+class C_53406 {
+  var foo: P_53406?
 
   func someMethod() throws {
     foo?.bar() // expected-error {{call can throw but is not marked with 'try'}}

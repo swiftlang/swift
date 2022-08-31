@@ -206,5 +206,23 @@ int main() {
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 4294902062)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
+  {
+    auto x = createTestSmallStruct(42);
+    int passThru = x.genericMethodPassThrough((int)555);
+    assert(passThru == 555);
+    auto xprime = x.genericMethodPassThrough(x);
+    genericPrintFunction(xprime);
+    x.genericMethodMutTake((uint32_t)16);
+    genericPrintFunction(xprime);
+    genericPrintFunction(x);
+    x.genericMethodMutTake(xprime);
+    genericPrintFunction(xprime);
+    genericPrintFunction(x);
+  }
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 42)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 42)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 58)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 42)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 57)
   return 0;
 }

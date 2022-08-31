@@ -47,6 +47,7 @@ private:
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
   AccessLevel minRequiredAccess;
+  bool requiresExposedAttribute;
   OutputLanguageMode outputLang;
 
   /// The name 'CFTypeRef'.
@@ -62,11 +63,14 @@ public:
                      DelayedMemberSet &delayed,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
-                     AccessLevel access, OutputLanguageMode outputLang)
+                     AccessLevel access, bool requiresExposedAttribute,
+                     OutputLanguageMode outputLang)
       : M(mod), os(out), prologueOS(prologueOS),
         outOfLineDefinitionsOS(outOfLineDefinitionsOS), delayedMembers(delayed),
         typeMapping(typeMapping), interopContext(interopContext),
-        minRequiredAccess(access), outputLang(outputLang) {}
+        minRequiredAccess(access),
+        requiresExposedAttribute(requiresExposedAttribute),
+        outputLang(outputLang) {}
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.

@@ -399,6 +399,15 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
 
+  llvm::SmallDenseSet<ImportedModule> MissingImportedModules;
+
+  void addMissingImportedModule(ImportedModule module) const {
+     const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
+  }
+
+  void getMissingImportedModules(
+         SmallVectorImpl<ImportedModule> &imports) const override;
+
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 

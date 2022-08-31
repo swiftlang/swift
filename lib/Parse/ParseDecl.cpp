@@ -2376,6 +2376,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_CDecl:
+  case DAK_Expose:
   case DAK_SILGenName: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -2383,20 +2384,37 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    if (Tok.isNot(tok::string_literal)) {
-      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
-      return false;
+    bool ParseSymbolName = true;
+    if (DK == DAK_Expose) {
+      if (Tok.isNot(tok::identifier) || Tok.getText() != "Cxx") {
+        diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName,
+                 "Cxx");
+        if (Tok.isNot(tok::identifier))
+          return false;
+        DiscardAttribute = true;
+      }
+      consumeToken(tok::identifier);
+      ParseSymbolName = consumeIf(tok::comma);
     }
 
-    Optional<StringRef> AsmName = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
+    Optional<StringRef> AsmName;
+    if (ParseSymbolName) {
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+        return false;
+      }
 
-    consumeToken(tok::string_literal);
+      AsmName =
+          getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
 
-    if (AsmName.hasValue())
+      consumeToken(tok::string_literal);
+
+      if (AsmName.hasValue())
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      else
+        DiscardAttribute = true;
+    } else
       AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    else
-      DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
@@ -2419,6 +2437,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       else if (DK == DAK_CDecl)
         Attributes.add(new (Context) CDeclAttr(AsmName.getValue(), AtLoc,
                                                AttrRange, /*Implicit=*/false));
+      else if (DK == DAK_Expose)
+        Attributes.add(new (Context) ExposeAttr(
+            AsmName ? AsmName.getValue() : StringRef(""), AtLoc, AttrRange,
+            /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
     }
@@ -3797,6 +3819,15 @@ ParserStatus Parser::parseTypeAttribute(TypeAttributes &Attributes,
 
     Attributes.setOpaqueReturnTypeOf(mangling, index);
     break;
+  }
+
+  case TAK_tuple: {
+    if (!isInSILMode()) {
+      diagnose(AtLoc, diag::only_allowed_in_sil, "tuple");
+      return makeParserSuccess();
+    }
+
+    Attributes.IsTuple = true;
   }
   }
 
@@ -5778,7 +5809,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
         diagnose(Tok, diag::expected_line_directive_number);
         return makeParserError();
       }
-      if (Tok.getText().getAsInteger(0, StartLine)) {
+      SmallString<16> buffer;
+      auto text = stripUnderscoresIfNeeded(Tok.getText(), buffer);
+      if (text.getAsInteger(0, StartLine)) {
         diagnose(Tok, diag::expected_line_directive_number);
         return makeParserError();
       }
@@ -5809,7 +5842,9 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       diagnose(Tok, diag::expected_line_directive_number);
       return makeParserError();
     }
-    if (Tok.getText().getAsInteger(0, StartLine)) {
+    SmallString<16> buffer;
+    auto text = stripUnderscoresIfNeeded(Tok.getText(), buffer);
+    if (text.getAsInteger(0, StartLine)) {
       diagnose(Tok, diag::expected_line_directive_number);
       return makeParserError();
     }

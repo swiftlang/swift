@@ -21,32 +21,48 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 
 #include <set>
 #include <sstream>
 #include <string>
 
+using namespace swift;
+
 namespace {
 /// A helper class to collect all nominal type declarations that conform to
 /// specific protocols provided as input.
-class NominalTypeConformanceCollector : public swift::ASTWalker {
+class NominalTypeConformanceCollector : public ASTWalker {
   const std::unordered_set<std::string> &Protocols;
-  std::vector<swift::NominalTypeDecl *> &ConformanceTypeDecls;
+  std::vector<NominalTypeDecl *> &ConformanceTypeDecls;
 
 public:
   NominalTypeConformanceCollector(
       const std::unordered_set<std::string> &Protocols,
-      std::vector<swift::NominalTypeDecl *> &ConformanceDecls)
+      std::vector<NominalTypeDecl *> &ConformanceDecls)
       : Protocols(Protocols), ConformanceTypeDecls(ConformanceDecls) {}
 
-  bool walkToDeclPre(swift::Decl *D) override {
-    if (auto *NTD = llvm::dyn_cast<swift::NominalTypeDecl>(D))
-      for (auto &Protocol : NTD->getAllProtocols())
-        if (Protocols.count(Protocol->getName().str().str()) != 0)
-          ConformanceTypeDecls.push_back(NTD);
+  bool walkToDeclPre(Decl *D) override {
+    if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
+      if (!isa<ProtocolDecl>(NTD))
+        for (auto &Protocol : NTD->getAllProtocols())
+          if (Protocols.count(Protocol->getName().str().str()) != 0)
+            ConformanceTypeDecls.push_back(NTD);
     return true;
   }
 };
+
+std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
+  std::string TypeNameOutput;
+  llvm::raw_string_ostream OutputStream(TypeNameOutput);
+  swift::PrintOptions Options;
+  Options.FullyQualifiedTypes = true;
+  Options.PreferTypeRepr = true;
+  Type.print(OutputStream, Options);
+  OutputStream.flush();
+  return TypeNameOutput;
+}
 
 } // namespace
 
@@ -103,27 +119,11 @@ extractPropertyInitializationValue(VarDecl *propertyDecl) {
   if (binding) {
     auto originalInit = binding->getOriginalInit(0);
     if (originalInit) {
-      // Integer Literals
-      if (auto integerExpr =
-              dyn_cast_or_null<IntegerLiteralExpr>(originalInit)) {
-        std::string LiteralOutput;
-        llvm::raw_string_ostream OutputStream(LiteralOutput);
-        integerExpr->printConstExprValue(&OutputStream, nullptr);
-        OutputStream.flush();
+      std::string LiteralOutput;
+      llvm::raw_string_ostream OutputStream(LiteralOutput);
+      originalInit->printConstExprValue(&OutputStream, nullptr);
+      if (!LiteralOutput.empty())
         return std::make_shared<RawLiteralValue>(LiteralOutput);
-        // Float Literals
-      } else if (auto floatExpr =
-                     dyn_cast_or_null<FloatLiteralExpr>(originalInit)) {
-        std::string LiteralOutput;
-        llvm::raw_string_ostream OutputStream(LiteralOutput);
-        floatExpr->printConstExprValue(&OutputStream, nullptr);
-        OutputStream.flush();
-        return std::make_shared<RawLiteralValue>(LiteralOutput);
-        // String Literals
-      } else if (auto stringExpr =
-                     dyn_cast_or_null<StringLiteralExpr>(originalInit)) {
-        return std::make_shared<RawLiteralValue>(stringExpr->getValue().str());
-      }
     }
   }
 
@@ -187,7 +187,7 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   return Result;
 }
 
-static std::string toString(const CompileTimeValue *Value) {
+std::string toString(const CompileTimeValue *Value) {
   switch (Value->getKind()) {
     case CompileTimeValue::RawLiteral:
       return cast<RawLiteralValue>(Value)->getValue();
@@ -209,7 +209,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
     for (const auto &TypeInfo : ConstValueInfos) {
       JSON.object([&] {
         const auto *TypeDecl = TypeInfo.TypeDecl;
-        JSON.attribute("typeName", TypeDecl->getName().str().str());
+        JSON.attribute("typeName", toFullyQualifiedTypeNameString(TypeDecl->getDeclaredInterfaceType()));
         JSON.attribute(
             "kind",
             TypeDecl->getDescriptiveKindName(TypeDecl->getDescriptiveKind())
@@ -219,7 +219,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
             JSON.object([&] {
               const auto *PropertyDecl = PropertyInfo.VarDecl;
               JSON.attribute("label", PropertyDecl->getName().str().str());
-              JSON.attribute("type", PropertyDecl->getType().getString());
+              JSON.attribute("type", toFullyQualifiedTypeNameString(PropertyDecl->getType()));
               JSON.attribute("isStatic",
                              PropertyDecl->isStatic() ? "true" : "false");
               JSON.attribute("isComputed",

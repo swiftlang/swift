@@ -128,7 +128,7 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
 }
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
-                                         unsigned paramSize, ASTContext &ctx) {
+                                         ASTContext &ctx) {
   // First and foremost, if this is a constant don't bother.
   if (var->isLet())
     return;
@@ -188,6 +188,49 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
+static void maybeAddTypeWrapperDefaultArg(ParamDecl *arg, VarDecl *var,
+                                          ASTContext &ctx) {
+  assert(var->isAccessedViaTypeWrapper() || var->hasAttachedPropertyWrapper());
+
+  if (!(var->getParentPattern() && var->getParentPattern()->getSingleVar()))
+    return;
+
+  auto *PBD = var->getParentPatternBinding();
+
+  Expr *initExpr = nullptr;
+
+  if (var->hasAttachedPropertyWrapper()) {
+    auto initInfo = var->getPropertyWrapperInitializerInfo();
+
+    if (initInfo.hasInitFromWrappedValue()) {
+      initExpr =
+          initInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue();
+    }
+  } else {
+    initExpr = PBD->getInit(/*index=*/0);
+  }
+
+  if (!initExpr)
+    return;
+
+  // Type wrapper variables are never initialized directly,
+  // initialization expression (if any) becomes an default
+  // argument of the initializer synthesized by the type wrapper.
+  {
+    // Since type wrapper is applied to backing property, that's
+    // the the initializer it subsumes.
+    if (var->hasAttachedPropertyWrapper()) {
+      auto *backingVar = var->getPropertyWrapperBackingProperty();
+      PBD = backingVar->getParentPatternBinding();
+    }
+
+    PBD->setInitializerSubsumed(/*index=*/0);
+  }
+
+  arg->setDefaultExpr(initExpr, PBD->isInitializerChecked(/*index=*/0));
+  arg->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+}
+
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
@@ -202,7 +245,78 @@ enum class ImplicitConstructorKind {
   /// the instance variables from a parameter of the same type and
   /// name.
   Memberwise,
+  /// The constructor of a type wrapped type which is going to
+  /// initialize underlying storage for all applicable properties.
+  TypeWrapper,
 };
+
+static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
+                                                SourceLoc paramLoc,
+                                                VarDecl *var) {
+  auto &ctx = var->getASTContext();
+  auto varInterfaceType = var->getValueInterfaceType();
+  bool isAutoClosure = false;
+
+  if (var->getAttrs().hasAttribute<LazyAttr>()) {
+    // If var is a lazy property, its value is provided for the underlying
+    // storage.  We thus take an optional of the property's type.  We only
+    // need to do this because the implicit initializer is added before all
+    // the properties are type checked.  Perhaps init() synth should be
+    // moved later.
+    varInterfaceType = OptionalType::get(varInterfaceType);
+  } else if (Type backingPropertyType =
+                 var->getPropertyWrapperBackingPropertyType()) {
+    // For a property that has a wrapper, writing the initializer
+    // with an '=' implies that the memberwise initializer should also
+    // accept a value of the original property type. Otherwise, the
+    // memberwise initializer will be in terms of the backing storage
+    // type.
+    if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
+      varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
+      isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
+    } else {
+      varInterfaceType = backingPropertyType;
+    }
+  }
+
+  Type resultBuilderType = var->getResultBuilderType();
+  if (resultBuilderType) {
+    // If the variable's type is structurally a function type, use that
+    // type. Otherwise, form a non-escaping function type for the function
+    // parameter.
+    bool isStructuralFunctionType =
+        varInterfaceType->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
+    if (!isStructuralFunctionType) {
+      auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+      varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
+    }
+  }
+
+  // Create the parameter.
+  auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
+                                  paramLoc, var->getName(), DC);
+  arg->setSpecifier(ParamSpecifier::Default);
+  arg->setInterfaceType(varInterfaceType);
+  arg->setImplicit();
+  arg->setAutoClosure(isAutoClosure);
+
+  // Don't allow the parameter to accept temporary pointer conversions.
+  arg->setNonEphemeralIfPossible();
+
+  // Attach a result builder attribute if needed.
+  if (resultBuilderType) {
+    auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
+    auto attr =
+        CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+    arg->getAttrs().add(attr);
+  }
+
+  maybeAddMemberwiseDefaultArg(arg, var, ctx);
+
+  return arg;
+}
 
 /// Create an implicit struct or class constructor.
 ///
@@ -235,70 +349,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      auto varInterfaceType = var->getValueInterfaceType();
-      bool isAutoClosure = false;
-
-      if (var->getAttrs().hasAttribute<LazyAttr>()) {
-        // If var is a lazy property, its value is provided for the underlying
-        // storage.  We thus take an optional of the property's type.  We only
-        // need to do this because the implicit initializer is added before all
-        // the properties are type checked.  Perhaps init() synth should be
-        // moved later.
-        varInterfaceType = OptionalType::get(varInterfaceType);
-      } else if (Type backingPropertyType =
-                     var->getPropertyWrapperBackingPropertyType()) {
-        // For a property that has a wrapper, writing the initializer
-        // with an '=' implies that the memberwise initializer should also
-        // accept a value of the original property type. Otherwise, the
-        // memberwise initializer will be in terms of the backing storage
-        // type.
-        if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
-          varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-
-          auto initInfo = var->getPropertyWrapperInitializerInfo();
-          isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
-        } else {
-          varInterfaceType = backingPropertyType;
-        }
-      }
-
-      Type resultBuilderType= var->getResultBuilderType();
-      if (resultBuilderType) {
-        // If the variable's type is structurally a function type, use that
-        // type. Otherwise, form a non-escaping function type for the function
-        // parameter.
-        bool isStructuralFunctionType =
-            varInterfaceType->lookThroughAllOptionalTypes()
-              ->is<AnyFunctionType>();
-        if (!isStructuralFunctionType) {
-          auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-          varInterfaceType = FunctionType::get({ }, varInterfaceType, extInfo);
-        }
-      }
-
-      // Create the parameter.
-      auto *arg = new (ctx)
-          ParamDecl(SourceLoc(), Loc,
-                    var->getName(), Loc, var->getName(), decl);
-      arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(varInterfaceType);
-      arg->setImplicit();
-      arg->setAutoClosure(isAutoClosure);
-
-      // Don't allow the parameter to accept temporary pointer conversions.
-      arg->setNonEphemeralIfPossible();
-
-      // Attach a result builder attribute if needed.
-      if (resultBuilderType) {
-        auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
-        auto attr = CustomAttr::create(
-            ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-        arg->getAttrs().add(attr);
-      }
-
-      maybeAddMemberwiseDefaultArg(arg, var, params.size(), ctx);
-      
-      params.push_back(arg);
+      params.push_back(createMemberwiseInitParameter(decl, Loc, var));
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
     auto classDecl = dyn_cast<ClassDecl>(decl);
@@ -317,6 +368,84 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(systemTy);
       arg->setImplicit();
+
+      params.push_back(arg);
+    }
+  } else if (ICK == ImplicitConstructorKind::TypeWrapper) {
+    // Access to the initializer should match that of its parent type.
+    accessLevel = decl->getEffectiveAccess();
+
+    for (auto *member : decl->getMembers()) {
+      auto *var = dyn_cast<VarDecl>(member);
+      if (!var)
+        continue;
+
+      if (!var->isAccessedViaTypeWrapper()) {
+        // $_storage itself.
+        if (var->getName() == ctx.Id_TypeWrapperProperty)
+          continue;
+
+        // Computed properties are not included.
+        if (!var->hasStorage())
+          continue;
+
+        // If this is a memberwise initializeable property include
+        // it into the type wrapper initializer otherwise the instance
+        // of type wrapped type wouldn't be completely initialized.
+        if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+          params.push_back(createMemberwiseInitParameter(decl, Loc, var));
+
+        continue;
+      }
+
+      Identifier argName = var->getName();
+      Identifier paramName = argName;
+
+      auto paramInterfaceType = var->getValueInterfaceType();
+      DeclAttributes attrs;
+
+      // If this is a backing storage of a property wrapped property
+      // let's use wrapped property as a parameter and synthesize
+      // appropriate property wrapper initialization upon assignment.
+      if (auto *wrappedVar = var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::Backing)) {
+        // If there is `init(wrappedValue:)` or default value for a wrapped
+        // property we should use wrapped type, otherwise let's proceed with
+        // wrapper type.
+        if (wrappedVar->isPropertyMemberwiseInitializedWithWrappedType()) {
+          var = wrappedVar;
+          // If parameter have to get wrapped type, let's re-map both argument
+          // and parameter name to match wrapped property and let property
+          // wrapper attributes generate wrapped value and projection variables.
+          argName = wrappedVar->getName();
+          paramName = argName;
+
+          paramInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+          // The parameter needs to have all of the property wrapper
+          // attributes to generate projection and wrapper variables.
+          for (auto *attr : wrappedVar->getAttachedPropertyWrappers())
+            attrs.add(attr);
+        } else {
+          // If parameter has to have wrapper type then argument type should
+          // match that of a wrapped property but parameter name stays the same
+          // since it represents the type of backing storage and could be passed
+          // to `$Storage` constructor directly.
+          argName = wrappedVar->getName();
+        }
+      }
+
+      if (!paramInterfaceType || paramInterfaceType->hasError())
+        continue;
+
+      auto *arg =
+          new (ctx) ParamDecl(SourceLoc(), Loc, argName, Loc, paramName, decl);
+
+      arg->getAttrs().add(attrs);
+      arg->setSpecifier(ParamSpecifier::Default);
+      arg->setInterfaceType(paramInterfaceType);
+      arg->setImplicit();
+
+      maybeAddTypeWrapperDefaultArg(arg, var, ctx);
 
       params.push_back(arg);
     }
@@ -1113,6 +1242,10 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return false;
 
+  // Don't attempt if the decl has a type wrapper.
+  if (decl->hasTypeWrapper())
+    return false;
+
   return true;
 }
 
@@ -1122,6 +1255,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     return;
 
   if (!shouldAttemptInitializerSynthesis(decl)) {
+    // If declaration is type wrapped, synthesize a
+    // special initializer that would instantiate storage.
+    if (decl->hasTypeWrapper())
+      (void)decl->getTypeWrapperInitializer();
+
     decl->setAddedImplicitInitializers();
     return;
   }
@@ -1440,4 +1578,25 @@ void swift::addNonIsolatedToSynthesized(
 
   ASTContext &ctx = nominal->getASTContext();
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
+}
+
+ConstructorDecl *
+SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
+                                           NominalTypeDecl *wrappedType) const {
+  if (!wrappedType->hasTypeWrapper())
+    return nullptr;
+
+  // Create the implicit memberwise constructor.
+  auto &ctx = wrappedType->getASTContext();
+  auto ctor = createImplicitConstructor(
+      wrappedType, ImplicitConstructorKind::TypeWrapper, ctx);
+  wrappedType->addMember(ctor);
+
+  auto *body = evaluateOrDefault(
+      evaluator, SynthesizeTypeWrapperInitializerBody{ctor}, nullptr);
+  if (!body)
+    return nullptr;
+
+  ctor->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
+  return ctor;
 }

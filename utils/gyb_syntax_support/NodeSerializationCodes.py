@@ -272,6 +272,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'InfixOperatorExpr': 268,
     'MoveExpr': 269,
     'UnresolvedTernaryExpr': 270,
+    'UnresolvedIsExpr': 271,
+    'UnresolvedAsExpr': 272,
 }
 
 

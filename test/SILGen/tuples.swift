@@ -28,8 +28,7 @@ func testShuffleOpaque() {
   // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
   // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[Y:%.*]] = alloc_box ${ var Int }
-  // CHECK: [[Y_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
-  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y_LIFETIME]]
+  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y]]
   // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
 
   // CHECK:      [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
@@ -73,8 +72,7 @@ func testShuffleTuple() {
   // CHECK: [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
   // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
   // CHECK: [[Y:%.*]] = alloc_box ${ var Int }
-  // CHECK: [[Y_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[Y]]
-  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y_LIFETIME]]
+  // CHECK-NEXT: [[PBY:%.*]] = project_box [[Y]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples8make_intSiyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()

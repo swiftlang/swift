@@ -23,6 +23,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
@@ -690,6 +691,16 @@ namespace {
         OS << attr->getReplacedFunctionName();
         OS << "\")";
       }
+      switch (VD->getLifetimeAnnotation()) {
+      case LifetimeAnnotation::EagerMove:
+        OS << " _eagerMove";
+        break;
+      case LifetimeAnnotation::Lexical:
+        OS << " _lexical";
+        break;
+      case LifetimeAnnotation::None:
+        break;
+      }
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name,
@@ -957,6 +968,17 @@ namespace {
 
       if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
         OS << " nonEphemeral";
+
+      switch (P->getLifetimeAnnotation()) {
+      case LifetimeAnnotation::EagerMove:
+        OS << " _eagerMove";
+        break;
+      case LifetimeAnnotation::Lexical:
+        OS << " _lexical";
+        break;
+      case LifetimeAnnotation::None:
+        break;
+      }
 
       if (P->getAttrs().hasAttribute<NoImplicitCopyAttr>())
         OS << " noImplicitCopy";
@@ -2276,6 +2298,11 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitABISafeConversionExpr(ABISafeConversionExpr *E) {
+    printCommon(E, "abi_safe_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
     printCommon(E, "metatype_conversion_expr") << '\n';
     printRec(E->getSubExpr());
@@ -3238,6 +3265,11 @@ static void dumpProtocolConformanceRec(
     unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
+static void dumpPackConformanceRec(
+    const PackConformance *conformance, llvm::raw_ostream &out,
+    unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
+
 static void dumpProtocolConformanceRefRec(
     const ProtocolConformanceRef conformance, llvm::raw_ostream &out,
     unsigned indent,
@@ -3246,7 +3278,11 @@ static void dumpProtocolConformanceRefRec(
     out.indent(indent) << "(invalid_conformance)";
   } else if (conformance.isConcrete()) {
     dumpProtocolConformanceRec(conformance.getConcrete(), out, indent, visited);
+  } else if (conformance.isPack()) {
+    dumpPackConformanceRec(conformance.getPack(), out, indent, visited);
   } else {
+    assert(conformance.isAbstract());
+
     out.indent(indent) << "(abstract_conformance protocol="
                        << conformance.getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
@@ -3383,6 +3419,27 @@ static void dumpProtocolConformanceRec(
   PrintWithColorRAII(out, ParenthesisColor) << ')';
 }
 
+static void dumpPackConformanceRec(
+    const PackConformance *conformance, llvm::raw_ostream &out,
+    unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
+  out.indent(indent);
+  PrintWithColorRAII(out, ParenthesisColor) << '(';
+  out << "pack_conformance type=" << Type(conformance->getType())
+      << " protocol=" << conformance->getProtocol()->getName();
+
+  auto conformances = conformance->getPatternConformances();
+  if (!conformances.empty()) {
+    out << "\n";
+
+    for (auto conformanceRef : conformances) {
+      dumpProtocolConformanceRefRec(conformanceRef, out, indent, visited);
+    }
+  }
+
+  PrintWithColorRAII(out, ParenthesisColor) << ')';
+}
+
 static void dumpSubstitutionMapRec(
     SubstitutionMap map, llvm::raw_ostream &out,
     SubstitutionMap::DumpStyle style, unsigned indent,
@@ -3466,7 +3523,6 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
 void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
   dumpProtocolConformanceRefRec(*this, out, 0, visited);
-
 }
 
 void ProtocolConformance::dump() const {
@@ -3478,6 +3534,11 @@ void ProtocolConformance::dump() const {
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
   dumpProtocolConformanceRec(this, out, indent, visited);
+}
+
+void PackConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpPackConformanceRec(this, out, indent, visited);
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
@@ -3665,6 +3726,7 @@ namespace {
     void visitPackExpansionType(PackExpansionType *T, StringRef label) {
       printCommon(label, "pack_expansion_type");
       printField("pattern", T->getPatternType());
+      printField("count", T->getCountType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -4165,4 +4227,72 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
     }
     os << "\n";
   }
+}
+
+void RequirementRepr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void GenericParamList::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void LayoutConstraint::dump() const {
+  if (!*this) {
+    llvm::errs() << "(null)\n";
+    return;
+  }
+  getPointer()->print(llvm::errs());
+}
+
+void GenericSignature::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void Requirement::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
+void Requirement::dump(raw_ostream &out) const {
+  switch (getKind()) {
+  case RequirementKind::SameCount:
+    out << "same_count: ";
+    break;
+  case RequirementKind::Conformance:
+    out << "conforms_to: ";
+    break;
+  case RequirementKind::Layout:
+    out << "layout: ";
+    break;
+  case RequirementKind::Superclass:
+    out << "superclass: ";
+    break;
+  case RequirementKind::SameType:
+    out << "same_type: ";
+    break;
+  }
+
+  PrintOptions opts;
+  opts.ProtocolQualifiedDependentMemberTypes = true;
+
+  getFirstType().print(out, opts);
+  out << " ";
+
+  if (getKind() != RequirementKind::Layout && getSecondType())
+    getSecondType().print(out, opts);
+  else if (getLayoutConstraint())
+    out << getLayoutConstraint();
+}
+
+void SILParameterInfo::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void SILResultInfo::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
 }

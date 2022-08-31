@@ -426,7 +426,7 @@ private:
       // Printing struct, is, and get functions for each case
       DeclAndTypeClangFunctionPrinter clangFuncPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
-          owningPrinter.interopContext);
+          owningPrinter.interopContext, owningPrinter);
 
       auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
         os << "  inline bool is";
@@ -745,22 +745,23 @@ private:
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
-      DeclAndTypeClangFunctionPrinter declPrinter(os, owningPrinter.prologueOS,
-                                                  owningPrinter.typeMapping,
-                                                  owningPrinter.interopContext);
+      DeclAndTypeClangFunctionPrinter declPrinter(
+          os, owningPrinter.prologueOS, owningPrinter.typeMapping,
+          owningPrinter.interopContext, owningPrinter);
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         declPrinter.printCxxPropertyAccessorMethod(
             typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
             /*isDefinition=*/false);
       } else {
-        declPrinter.printCxxMethod(typeDeclContext, AFD,
-                                   funcABI->getSymbolName(), resultTy,
-                                   /*isDefinition=*/false);
+        declPrinter.printCxxMethod(
+            typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
+            /*isDefinition=*/false, funcABI->additionalParams);
       }
 
       DeclAndTypeClangFunctionPrinter defPrinter(
           owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
-          owningPrinter.typeMapping, owningPrinter.interopContext);
+          owningPrinter.typeMapping, owningPrinter.interopContext,
+          owningPrinter);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
 
@@ -768,9 +769,9 @@ private:
             typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
             /*isDefinition=*/true);
       } else {
-        defPrinter.printCxxMethod(typeDeclContext, AFD,
-                                  funcABI->getSymbolName(), resultTy,
-                                  /*isDefinition=*/true);
+        defPrinter.printCxxMethod(
+            typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
+            /*isDefinition=*/true, funcABI->additionalParams);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1067,6 +1068,9 @@ private:
 
     bool useMangledSymbolName() const { return !isCDecl; }
 
+    SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
+        additionalParams;
+
   private:
     bool isCDecl;
     StringRef symbolName;
@@ -1077,7 +1081,8 @@ private:
       AbstractFunctionDecl *FD, Type resultTy,
       llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> ABIparams,
       llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-          &params) {
+          &params,
+      Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
     for (auto param : ABIparams) {
       if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
                             ABIParameterRole::GenericRequirementRole)
@@ -1089,7 +1094,9 @@ private:
                IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-             resultTy->getASTContext().getOpaquePointerType(),
+             selfTypeDeclContext
+                 ? (*selfTypeDeclContext)->getDeclaredType()
+                 : resultTy->getASTContext().getOpaquePointerType(),
              /*isIndirect=*/
              isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
       else if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
@@ -1131,26 +1138,32 @@ private:
 
     DeclAndTypeClangFunctionPrinter funcPrinter(
         cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
-        owningPrinter.interopContext);
+        owningPrinter.interopContext, owningPrinter);
     auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
                          .getFunctionABIAdditionalParams(FD);
-    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-        additionalParams;
-    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD)) {
-      additionalParams.push_back(
+    // FIXME: Ideally direct 'self' would come from IR provider too.
+    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD) &&
+        llvm::find_if(
+            ABIparams,
+            [](const IRABIDetailsProvider::ABIAdditionalParam &Param) {
+              return Param.role == IRABIDetailsProvider::ABIAdditionalParam::
+                                       ABIParameterRole::Self;
+            }) == ABIparams.end()) {
+      funcABI.additionalParams.push_back(
           {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
            (*selfTypeDeclContext)->getDeclaredType(),
            /*isIndirect=*/
            isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
-    // FIXME: Fix the method 'self' parameter.
-    if (!selfTypeDeclContext && !ABIparams.empty())
-      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+    if (!ABIparams.empty())
+      convertABIAdditionalParams(FD, resultTy, ABIparams,
+                                 funcABI.additionalParams,
+                                 /*selfContext=*/selfTypeDeclContext);
 
     auto representation = funcPrinter.printFunctionSignature(
         FD, funcABI.getSymbolName(), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto,
-        additionalParams);
+        funcABI.additionalParams);
     if (representation.isUnsupported()) {
       // FIXME: Emit remark about unemitted declaration.
       return None;
@@ -1191,30 +1204,27 @@ private:
     auto resultTy =
         getForeignResultType(FD, funcTy, asyncConvention, errorConvention);
 
-    DeclAndTypeClangFunctionPrinter funcPrinter(os, owningPrinter.prologueOS,
-                                                owningPrinter.typeMapping,
-                                                owningPrinter.interopContext);
-    llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-        additionalParams;
-    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
-                         .getFunctionABIAdditionalParams(FD);
-    if (!ABIparams.empty())
-      convertABIAdditionalParams(FD, resultTy, ABIparams, additionalParams);
+    DeclAndTypeClangFunctionPrinter funcPrinter(
+        os, owningPrinter.prologueOS, owningPrinter.typeMapping,
+        owningPrinter.interopContext, owningPrinter);
     DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
     modifiers.isInline = true;
-    funcPrinter.printFunctionSignature(
-        FD, FD->getName().getBaseIdentifier().get(), resultTy,
+    auto result = funcPrinter.printFunctionSignature(
+        FD, cxx_translation::getNameForCxx(FD), resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk,
         {}, modifiers);
+    assert(
+        !result.isUnsupported()); // The C signature should be unsupported too.
     // FIXME: Support throwing exceptions for Swift errors.
     if (!funcTy->isThrowing())
       os << " noexcept";
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(
-        funcABI.getSymbolName(), FD->getModuleContext(), resultTy,
-        FD->getParameters(), additionalParams, funcTy->isThrowing(), funcTy);
+    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(),
+                                  FD->getModuleContext(), resultTy,
+                                  FD->getParameters(), funcABI.additionalParams,
+                                  funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 
@@ -1740,6 +1750,9 @@ public:
 
     // Print imported bridgeable decls as their unbridged type.
     if (nominal->hasClangNode())
+      return nullptr;
+
+    if (isa<ProtocolDecl>(nominal))
       return nullptr;
 
     auto &ctx = nominal->getASTContext();
@@ -2390,8 +2403,21 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
   return false;
 }
 
+static bool hasExposeAttr(const ValueDecl *VD) {
+  if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
+    if (VD == VD->getASTContext().getStringDecl())
+      return true;
+    return false;
+  }
+  if (VD->getAttrs().hasAttribute<ExposeAttr>())
+    return true;
+  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
+    return hasExposeAttr(NMT);
+  return false;
+}
+
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return !VD->isInvalid() &&
+  return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
               ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess)
               : isVisibleToObjC(VD, minRequiredAccess)) &&

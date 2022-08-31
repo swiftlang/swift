@@ -373,6 +373,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_spi_imports);
   Opts.DebugPrintInvalidSyntax |=
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
+  Opts.PrintMissingImports =
+    !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
 
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
@@ -797,6 +799,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
 
+  Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
+  
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   std::string TargetArgScratch;
@@ -1450,7 +1454,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       // for the specified locale code.
       llvm::SmallString<128> localizationPath(A->getValue());
       llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
-      llvm::sys::path::replace_extension(localizationPath, ".yaml");
+      llvm::sys::path::replace_extension(localizationPath, ".strings");
       if (!llvm::sys::fs::exists(localizationPath)) {
         Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
                        Opts.LocalizationCode, localizationPath);

@@ -215,6 +215,9 @@ namespace swift {
 
     /// Emit a remark after loading a module.
     bool EnableModuleLoadingRemarks = false;
+    
+    /// Emit a remark on early exit in explicit interface build
+    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
     ///
     /// Support for alternate usage modes

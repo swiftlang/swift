@@ -2469,8 +2469,10 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
 
   // Sign the task resume function with the C function pointer schema.
   if (auto schema = IGM.getOptions().PointerAuth.FunctionPointers) {
-    // TODO: use the Clang type for TaskContinuationFunction*
+    // Use the Clang type for TaskContinuationFunction*
     // to make this work with type diversity.
+    if (schema.hasOtherDiscrimination())
+      schema = IGM.getOptions().PointerAuth.ClangTypeTaskContinuationFunction;
     auto authInfo = PointerAuthInfo::emit(suspendIGF, schema, nullptr,
                                           PointerAuthEntity());
     resumeFunction = emitPointerAuthSign(suspendIGF, resumeFunction, authInfo);

@@ -95,8 +95,9 @@ bool swift::decodeRegexCaptureTypes(ASTContext &ctx,
       break;
     case RegexCaptureStructureCode::EndTuple: {
       auto children = scopes.pop_back_val();
+      assert(children.size() > 1);
       auto type = TupleType::get(children, ctx);
-      scopes.back().push_back(type);
+      scopes.back().push_back(Type(type));
       break;
     }
     case RegexCaptureStructureCode::CaseCount:

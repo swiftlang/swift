@@ -424,7 +424,8 @@ func testSubscript1(_ s2 : SubscriptTest2) {
   let v: (Int?, [Int]?) = (nil [17]) // expected-error {{cannot subscript a nil literal value}}
 }
 
-// sr-114 & rdar://22007370
+// rdar://22007370
+// https://github.com/apple/swift/issues/42736
 
 class Foo {
     subscript(key: String) -> String { // expected-note {{'subscript(_:)' previously declared here}}
@@ -447,17 +448,19 @@ protocol r23952125 {
   var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
 }
 
-// SR-2575
-struct SR2575 {
-  subscript() -> Int { // expected-note {{declared here}}
-    return 1
+// https://github.com/apple/swift/issues/45180
+do {
+  struct S {
+    subscript() -> Int { // expected-note {{declared here}}
+      return 1
+    }
   }
+
+  S().subscript()
+  // expected-error@-1 {{value of type 'S' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{6-7=}} {{7-16=}} {{16-17=[}} {{17-18=]}}
 }
 
-SR2575().subscript()
-// expected-error@-1 {{value of type 'SR2575' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}
-
-// SR-7890
+// https://github.com/apple/swift/issues/50425
 
 struct InOutSubscripts {
   subscript(x1: inout Int) -> Int { return 0 }

@@ -267,6 +267,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   for (auto &reqt : signature.getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
+      case RequirementKind::SameCount:
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::Layout:
@@ -871,7 +872,7 @@ bool IRGenModule::isResilientConformance(
   // across module boundaries.
   if (conformanceModule == getSwiftModule() &&
       conformanceModule->getName().str() ==
-        conformance->getProtocol()->getAlternateModuleName())
+      conformance->getProtocol()->getAlternateModuleName())
     return false;
 
   // If the protocol and the conformance are in the same module and the
@@ -920,6 +921,12 @@ static bool hasDependentTypeWitness(
   return false;
 }
 
+static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
+    return normal->isSynthesizedNonUnique();
+  return false;
+}
+
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
@@ -940,8 +947,9 @@ static bool isDependentConformance(
   if (!visited.insert(conformance).second)
     return false;
 
-  // If the conformance is resilient, this is always true.
-  if (IGM.isResilientConformance(conformance))
+  // If the conformance is resilient or synthesized, this is always true.
+  if (IGM.isResilientConformance(conformance)
+      || isSynthesizedNonUnique(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -975,7 +983,7 @@ static bool isDependentConformance(
   // Check if there are any conditional conformances. Other forms of conditional
   // requirements don't exist in the witness table.
   return SILWitnessTable::enumerateWitnessTableConditionalConformances(
-      conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
+    conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
 
 /// Is there anything about the given conformance that requires witness
@@ -984,12 +992,6 @@ bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(*this, conformance, visited);
-}
-
-static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
-    return normal->isSynthesizedNonUnique();
-  return false;
 }
 
 static llvm::Value *

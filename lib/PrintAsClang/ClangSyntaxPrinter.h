@@ -70,6 +70,10 @@ public:
   void
   printExternC(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
 
+  /// Print an #ifdef __OBJC__ block.
+  void
+  printObjCBlock(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+
   /// Print the `swift::_impl::` namespace qualifier.
   void printSwiftImplQualifier() const;
 
@@ -79,6 +83,8 @@ public:
     After,
     ContextSensitive,
   };
+
+  void printInlineForThunk() const;
 
   void printNullability(
       Optional<OptionalTypeKind> kind,

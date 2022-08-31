@@ -35,6 +35,7 @@ class ParamDecl;
 class ParameterList;
 class PrimitiveTypeMapping;
 class SwiftToClangInteropContext;
+class DeclAndTypePrinter;
 
 struct ClangRepresentation {
   enum Kind { representable, unsupported };
@@ -61,9 +62,10 @@ class DeclAndTypeClangFunctionPrinter {
 public:
   DeclAndTypeClangFunctionPrinter(raw_ostream &os, raw_ostream &cPrologueOS,
                                   PrimitiveTypeMapping &typeMapping,
-                                  SwiftToClangInteropContext &interopContext)
+                                  SwiftToClangInteropContext &interopContext,
+                                  DeclAndTypePrinter &declPrinter)
       : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
-        interopContext(interopContext) {}
+        interopContext(interopContext), declPrinter(declPrinter) {}
 
   /// What kind of function signature should be emitted for the given Swift
   /// function.
@@ -124,7 +126,8 @@ public:
   /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
                       const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
-                      Type resultTy, bool isDefinition);
+                      Type resultTy, bool isDefinition,
+                      ArrayRef<AdditionalParam> additionalParams);
 
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
@@ -150,6 +153,7 @@ private:
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
+  DeclAndTypePrinter &declPrinter;
 };
 
 } // end namespace swift

@@ -2226,6 +2226,23 @@ public:
   }
 };
 
+/// Defines the `@_expose` attribute, used to expose declarations in the
+/// header used by C/C++ to interoperate with Swift.
+class ExposeAttr : public DeclAttribute {
+public:
+  ExposeAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_Expose, AtLoc, Range, Implicit), Name(Name) {}
+
+  ExposeAttr(StringRef Name, bool Implicit)
+      : ExposeAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The exposed declaration name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Expose;
+  }
+};
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
@@ -2503,6 +2520,9 @@ public:
     unsigned index;
   };
   Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
+
+  // Force construction of a one-element tuple type.
+  bool IsTuple = false;
 
   TypeAttributes() {}
 

@@ -320,12 +320,12 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
                  ->GetSubExpr()->getReferencedDecl(stopAtParenExpr)
 
   NO_REFERENCE(Error);
-  NO_REFERENCE(NilLiteral);
-  NO_REFERENCE(IntegerLiteral);
-  NO_REFERENCE(FloatLiteral);
-  NO_REFERENCE(BooleanLiteral);
-  NO_REFERENCE(StringLiteral);
-  NO_REFERENCE(InterpolatedStringLiteral);
+  SIMPLE_REFERENCE(NilLiteral, getInitializer);
+  SIMPLE_REFERENCE(IntegerLiteral, getInitializer);
+  SIMPLE_REFERENCE(FloatLiteral, getInitializer);
+  SIMPLE_REFERENCE(BooleanLiteral, getInitializer);
+  SIMPLE_REFERENCE(StringLiteral, getInitializer);
+  SIMPLE_REFERENCE(InterpolatedStringLiteral, getInitializer);
   NO_REFERENCE(RegexLiteral);
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
@@ -371,8 +371,8 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(OptionalTry, getSubExpr);
 
   NO_REFERENCE(Tuple);
-  NO_REFERENCE(Array);
-  NO_REFERENCE(Dictionary);
+  SIMPLE_REFERENCE(Array, getInitializer);
+  SIMPLE_REFERENCE(Dictionary, getInitializer);
 
   case ExprKind::Subscript: {
     auto subscript = cast<SubscriptExpr>(this);
@@ -414,6 +414,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(DestructureTuple);
   NO_REFERENCE(UnresolvedTypeConversion);
+  PASS_THROUGH_REFERENCE(ABISafeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantReturnConversion, getSubExpr);
@@ -741,6 +742,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Load:
+  case ExprKind::ABISafeConversion:
   case ExprKind::DestructureTuple:
   case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
@@ -914,6 +916,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Load:
   case ExprKind::DestructureTuple:
   case ExprKind::UnresolvedTypeConversion:
+  case ExprKind::ABISafeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:

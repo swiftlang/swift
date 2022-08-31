@@ -65,8 +65,7 @@ func existentialMetatypeUpcast2(_ x: (P & Q).Type) -> P.Type {
 // CHECK-LABEL: sil hidden [ossa] @$s21existential_metatypes0A19MetatypeVarPropertyAA5ValueVyF : $@convention(thin) () -> Value
 func existentialMetatypeVarProperty() -> Value {
   // CHECK:      [[BOX:%.*]] = alloc_box ${ var @thick any P.Type }
-  // CHECK:      [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
-  // CHECK:      [[ADDR:%.*]] = project_box [[BOX_LIFETIME]] : ${ var @thick any P.Type }, 0
+  // CHECK:      [[ADDR:%.*]] = project_box [[BOX]] : ${ var @thick any P.Type }, 0
   // CHECK:      [[T0:%.*]] = metatype $@thick S.Type
   // CHECK:      [[T1:%.*]] = init_existential_metatype [[T0]]
   // CHECK:      store [[T1]] to [trivial] [[ADDR]] :

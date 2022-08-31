@@ -491,11 +491,13 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
 
 static std::string
 getModuleContentsCxxString(ModuleDecl &M,
-                           SwiftToClangInteropContext &interopContext) {
+                           SwiftToClangInteropContext &interopContext,
+                           bool requiresExposedAttribute) {
   SmallPtrSet<ImportModuleTy, 8> imports;
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsCxx(moduleContents, imports, M, interopContext);
+  printModuleContentsAsCxx(moduleContents, imports, M, interopContext,
+                           requiresExposedAttribute);
   return moduleContents.str();
 }
 
@@ -518,8 +520,11 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
-    if (ExposePublicDeclsInClangHeader) {
-      os << getModuleContentsCxxString(*M, interopContext);
+    if (ExposePublicDeclsInClangHeader ||
+        M->DeclContext::getASTContext().LangOpts.EnableCXXInterop) {
+      os << getModuleContentsCxxString(
+          *M, interopContext,
+          /*requiresExposedAttribute=*/!ExposePublicDeclsInClangHeader);
     }
   });
   writeEpilogue(os);

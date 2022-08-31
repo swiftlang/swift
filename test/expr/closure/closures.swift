@@ -751,3 +751,15 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
     if s == "1" { return () } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
     return s.isEmpty
 }.filter { $0 }
+
+// https://github.com/apple/swift/issues/60781
+func f60781<T>(_ x: T) -> T { x }
+func f60781<T>(_ x: T, _ y: T) -> T { x }
+
+func test60781() -> Int {
+  f60781({ 1 }) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> Int')}}
+}
+
+func test60781_MultiArg() -> Int {
+  f60781({ 1 }, { 1 }) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> Int')}}
+}

@@ -352,9 +352,9 @@ class PresetParser(object):
     def _interpolate_preset_vars(self, preset, vars):
         interpolated_options = []
         for (name, value) in preset.options:
-            # If the option is a key-value pair, e.g. 
+            # If the option is a key-value pair, e.g.
             # install-destdir=%(install_dir)s
-            # interpolate the value. If it is a raw option, e.g. 
+            # interpolate the value. If it is a raw option, e.g.
             # %(some_flag)s
             # is a raw option without a value, expand the name.
             if value:

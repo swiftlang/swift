@@ -1570,6 +1570,11 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   FORWARD(getImportedModules, (modules, filter));
 }
 
+void ModuleDecl::getMissingImportedModules(
+    SmallVectorImpl<ImportedModule> &imports) const {
+  FORWARD(getMissingImportedModules, (imports));
+}
+
 void
 SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
@@ -1602,6 +1607,12 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
   }
+}
+
+void SourceFile::getMissingImportedModules(
+    SmallVectorImpl<ImportedModule> &modules) const {
+  for (auto module : MissingImportedModules)
+    modules.push_back(module);
 }
 
 void SourceFile::dumpSeparatelyImportedOverlays() const {
@@ -2534,6 +2545,21 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   // Now check this file's enclosing module in case there are re-exports.
   if (imports.isImportedBy(module, getParentModule()))
     return RestrictedImportKind::None;
+
+  if (importKind == RestrictedImportKind::Implicit &&
+      (module->getLibraryLevel() == LibraryLevel::API ||
+       getParentModule()->getLibraryLevel() != LibraryLevel::API)) {
+    // Hack to fix swiftinterfaces in case of missing imports.
+    // We can get rid of this logic when we don't leak the use of non-locally
+    // imported things in API.
+    ImportPath::Element pathElement = {module->getName(), SourceLoc()};
+    auto pathArray = getASTContext().AllocateCopy(
+                       llvm::makeArrayRef(pathElement));
+    auto missingImport = ImportedModule(
+                           ImportPath::Access(pathArray),
+                           const_cast<ModuleDecl *>(module));
+    addMissingImportedModule(missingImport);
+  }
 
   return importKind;
 }

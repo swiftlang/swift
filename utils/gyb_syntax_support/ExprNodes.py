@@ -351,16 +351,46 @@ EXPR_NODES = [
                    is_optional=True),
          ]),
 
-    # is TypeName
+    # 'is'
+    # "is" type casting ooperator without operands.
+    # NOTE: This appears only in SequenceExpr.
+    Node('UnresolvedIsExpr', kind='Expr',
+         children=[
+             Child("IsTok", kind='IsToken'),
+         ]),
+
+    # expression is TypeName
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
     Node('IsExpr', kind='Expr',
          children=[
+             Child("Expression", kind="Expr"),
              Child("IsTok", kind='IsToken'),
              Child("TypeName", kind='Type')
          ]),
 
-    # as TypeName
+    # 'as' ('?'|'!')
+    # "as" type casting ooperator without operands.
+    # NOTE: This appears only in SequenceExpr.
+    Node('UnresolvedAsExpr', kind='Expr',
+         children=[
+             Child("AsTok", kind='AsToken'),
+             Child("QuestionOrExclamationMark", kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'PostfixQuestionMarkToken',
+                       'ExclamationMarkToken',
+                   ]),
+         ]),
+
+    # expression as TypeName
+    # NOTE: This won't come directly out of the parser. Rather, it is the
+    # result of "folding" a SequenceExpr based on knowing the precedence
+    # relationships amongst the different infix operators.
     Node('AsExpr', kind='Expr',
          children=[
+             Child("Expression", kind="Expr"),
              Child("AsTok", kind='AsToken'),
              Child("QuestionOrExclamationMark", kind='Token',
                    is_optional=True,
@@ -416,7 +446,7 @@ EXPR_NODES = [
 
     Node('ClosureSignature', kind='Syntax',
          children=[
-             Child('Attributes', kind='AttributeList', 
+             Child('Attributes', kind='AttributeList',
                    collection_element_name='Attribute', is_optional=True),
              Child('Capture', kind='ClosureCaptureSignature',
                    is_optional=True),
@@ -538,7 +568,7 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('Delimiter', kind='RawStringDelimiterToken', 
+             Child('Delimiter', kind='RawStringDelimiterToken',
                    is_optional=True),
              Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
@@ -551,7 +581,7 @@ EXPR_NODES = [
     # e.g. "abc \(foo()) def"
     Node('StringLiteralExpr', kind='Expr',
          children=[
-             Child('OpenDelimiter', kind='RawStringDelimiterToken', 
+             Child('OpenDelimiter', kind='RawStringDelimiterToken',
                    is_optional=True),
              Child('OpenQuote', kind='Token',
                    token_choices=[
@@ -565,7 +595,7 @@ EXPR_NODES = [
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
-             Child('CloseDelimiter', kind='RawStringDelimiterToken', 
+             Child('CloseDelimiter', kind='RawStringDelimiterToken',
                    is_optional=True),
          ]),
 

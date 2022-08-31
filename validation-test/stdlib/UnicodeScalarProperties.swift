@@ -4,6 +4,11 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: objc_interop
 
+// This test requires access to Unicode data files in the source tree, so
+// it doesn't currently support testing on a remote device. (rdar://98993795)
+// UNSUPPORTED: remote_run
+// UNSUPPORTED: device_run
+
 @_spi(_Unicode)
 import Swift
 

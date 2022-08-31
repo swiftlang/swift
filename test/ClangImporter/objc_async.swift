@@ -311,6 +311,7 @@ class BazFrame: NotIsolatedPictureFrame {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrameIso: PictureFrame { // expected-error {{global actor 'SomeGlobalActor'-isolated class 'BazFrameIso' has different actor isolation from main actor-isolated superclass 'PictureFrame'}}
 }
@@ -387,6 +388,7 @@ extension SomeWrapper: Sendable where T: Sendable {}
 
 
 // rdar://96830159
+@available(SwiftStdlib 5.5, *)
 @MainActor class SendableCompletionHandler {
   var isolatedThing: [String] = []
   // expected-note@-1 {{property declared here}}

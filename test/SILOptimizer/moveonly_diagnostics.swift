@@ -225,7 +225,7 @@ public func classAssignToVar1(_ x: Klass) { // expected-error {{'x' has guarante
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 // TODO: We shouldn't see a consuming use on x3.
@@ -234,7 +234,7 @@ public func classAssignToVar1Arg(_ x: Klass, _ x2: Klass) { // expected-error {{
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 // NOTE: print(x3) shouldn't be marked! This is most likely due to some form of
@@ -245,7 +245,7 @@ public func classAssignToVar1OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expe
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func classAssignToVar2(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -273,7 +273,7 @@ public func classAssignToVar3(_ x: Klass) { // expected-error {{'x' has guarante
     let x2 = x // expected-note {{consuming use}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 // NOTE: print(x3) is a bug.
@@ -281,14 +281,14 @@ public func classAssignToVar3Arg(_ x: Klass, _ x2: Klass) { // expected-error {{
                                                             // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 // This is a bug around print(x3)
 public func classAssignToVar3OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func classAssignToVar4(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -319,7 +319,7 @@ public func classAssignToVar5(_ x: Klass) {  // expected-error {{'x' has guarant
     // appropriately though.
     classUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func classAssignToVar5Arg(_ x: Klass, _ x2: Klass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -329,7 +329,7 @@ public func classAssignToVar5Arg(_ x: Klass, _ x2: Klass) { // expected-error {{
     // appropriately though.
     classUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func classAssignToVar5OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expected-error {{'x2' consumed more than once}}
@@ -339,7 +339,7 @@ public func classAssignToVar5OwnedArg(_ x: Klass, _ x2: __owned Klass) { // expe
     // appropriately though.
     classUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func classAccessAccessField(_ x: Klass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -576,7 +576,7 @@ public func finalClassAssignToVar1(_ x: FinalKlass) { // expected-error {{'x' ha
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar1Arg(_ x: FinalKlass, _ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -584,7 +584,7 @@ public func finalClassAssignToVar1Arg(_ x: FinalKlass, _ x2: FinalKlass) { // ex
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar1OwnedArg(_ x: FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
@@ -592,7 +592,7 @@ public func finalClassAssignToVar1OwnedArg(_ x: FinalKlass, _ x2: __owned FinalK
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar2(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -619,20 +619,20 @@ public func finalClassAssignToVar3(_ x: FinalKlass) { // expected-error {{'x' ha
     let x2 = x // expected-note {{consuming use}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar3Arg(_ x: FinalKlass, _ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                                            // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar3OwnedArg(_ x: FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar4(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -663,7 +663,7 @@ public func finalClassAssignToVar5(_ x: FinalKlass) { // expected-error {{'x' ha
     // appropriately though.
     finalClassUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar5Arg(_ x: FinalKlass, _ x2: FinalKlass) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -673,7 +673,7 @@ public func finalClassAssignToVar5Arg(_ x: FinalKlass, _ x2: FinalKlass) { // ex
     // appropriately though.
     finalClassUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAssignToVar5OwnedArg(_ x: FinalKlass, _ x2: __owned FinalKlass) { // expected-error {{'x2' consumed more than once}}
@@ -683,7 +683,7 @@ public func finalClassAssignToVar5OwnedArg(_ x: FinalKlass, _ x2: __owned FinalK
     // appropriately though.
     finalClassUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func finalClassAccessField(_ x: FinalKlass) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1734,7 +1734,7 @@ public func enumAssignToVar1(_ x: EnumTy) { // expected-error {{'x' has guarante
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar1Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -1742,7 +1742,7 @@ public func enumAssignToVar1Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar1OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
@@ -1750,7 +1750,7 @@ public func enumAssignToVar1OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // exp
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar2(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1777,20 +1777,20 @@ public func enumAssignToVar3(_ x: EnumTy) { // expected-error {{'x' has guarante
     let x2 = x // expected-note {{consuming use}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar3Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
                                                              // expected-error @-1 {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2 // expected-note {{consuming use}}
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar3OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
     var x3 = x2
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar4(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}
@@ -1821,7 +1821,7 @@ public func enumAssignToVar5(_ x: EnumTy) { // expected-error {{'x' has guarante
     // appropriately though.
     enumUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar5Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {{'x2' has guaranteed ownership but was consumed}}
@@ -1831,7 +1831,7 @@ public func enumAssignToVar5Arg(_ x: EnumTy, _ x2: EnumTy) { // expected-error {
     // appropriately though.
     enumUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumAssignToVar5OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // expected-error {{'x2' consumed more than once}}
@@ -1841,7 +1841,7 @@ public func enumAssignToVar5OwnedArg(_ x: EnumTy, _ x2: __owned EnumTy) { // exp
     // appropriately though.
     enumUseMoveOnlyWithoutEscaping(x2)
     x3 = x // expected-note {{consuming use}}
-    print(x3) // expected-note {{consuming use}}
+    print(x3)
 }
 
 public func enumPatternMatchIfLet1(_ x: EnumTy) { // expected-error {{'x' has guaranteed ownership but was consumed}}

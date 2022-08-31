@@ -30,166 +30,188 @@
 //===----------------------------------------------------------------------===//
 import SIL
 
-/// "AccessBase describes the base address of a memory access (e.g. of a `load` or `store``).
-/// The access address is either the base address directly or an address
-/// projection of it.
+/// AccessBase describes the base address of a memory access (e.g. of a `load` or `store``).
+/// The "base address" is defined as the address which is obtained from the access address by
+/// looking through all address projections.
+/// This means that the base address is either the same as the access address or:
+/// the access address is a chain of address projections of the base address.
 /// The following snippets show examples of memory accesses and their respective bases.
 ///
 /// ```
-/// %base1 = ref_element_addr %ref, #Obj.field
-/// %base2 = alloc_stack $S
-/// %base3 = global_addr @gaddr
+/// %base1 = ref_element_addr %ref, #Obj.field // A `class` base
+/// %base2 = alloc_stack $S                    // A `stack` base
+/// %base3 = global_addr @gaddr                // A `global` base
 /// %addr1 = struct_element_addr %base1
 /// %access1 = store %v1 to [trivial] %addr1   // accessed address is offset from base
 /// %access2 = store %v2 to [trivial] %base2   // accessed address is base itself
 /// ```
 ///
 /// The base address is never inside an access scope.
-struct AccessBase : CustomStringConvertible {
+enum AccessBase : CustomStringConvertible, Hashable {
 
-  public enum Kind {
-    case box
-    case stack
-    case global
-    case `class`
-    case tail
-    case argument
-    case yield
-    case pointer
+  /// The address of a boxed variable, i.e. a field of an `alloc_box`.
+  case box(ProjectBoxInst)
+  
+  /// The address of a stack-allocated value, i.e. an `alloc_stack`
+  case stack(AllocStackInst)
+  
+  /// The address of a global variable.
+  case global(GlobalVariable)
+  
+  /// The address of a stored property of a class instance.
+  case `class`(RefElementAddrInst)
+  
+  /// The base address of the tail allocated elements of a class instance.
+  case tail(RefTailAddrInst)
 
-    var isObject: Bool { self == .class || self == .tail }
-  }
+  /// An indirect function argument, like `@inout`.
+  case argument(FunctionArgument)
+  
+  /// An indirect result of a `begin_apply`.
+  case yield(BeginApplyInst)
 
-  let baseAddress: Value
-  let kind: Kind
+  /// An address which is derived from a `Builtin.RawPointer`.
+  case pointer(PointerToAddressInst)
 
   init?(baseAddress: Value) {
     switch baseAddress {
-    case is RefElementAddrInst   : kind = .class
-    case is RefTailAddrInst      : kind = .tail
-    case is ProjectBoxInst       : kind = .box
-    case is AllocStackInst       : kind = .stack
-    case is FunctionArgument     : kind = .argument
-    case is GlobalAddrInst       : kind = .global
-    default:
-      if baseAddress.definingInstruction is BeginApplyInst &&
-         baseAddress.type.isAddress {
-        kind = .yield
+    case let rea as RefElementAddrInst   : self = .class(rea)
+    case let rta as RefTailAddrInst      : self = .tail(rta)
+    case let pbi as ProjectBoxInst       : self = .box(pbi)
+    case let asi as AllocStackInst       : self = .stack(asi)
+    case let arg as FunctionArgument     : self = .argument(arg)
+    case let ga as GlobalAddrInst        : self = .global(ga.global)
+    case let mvr as MultipleValueInstructionResult:
+      if let ba = mvr.instruction as? BeginApplyInst, baseAddress.type.isAddress {
+        self = .yield(ba)
       } else {
         return nil
       }
-    }
-
-    self.baseAddress = baseAddress
-  }
-
-  init(baseAddress: Value, kind: Kind) {
-    self.baseAddress = baseAddress
-    self.kind = kind
-  }
-
-  var description: String {
-    "\(kind) - \(baseAddress)"
-  }
-
-  /// Returns `true` if this is an access to a class instance
-  var isObjectAccess: Bool {
-    return kind == .class || kind == .tail
-  }
-
-  /// Returns a value of reference type if this is a reference projection (class, box, tail)
-  var reference: Value? {
-    switch baseAddress {
-    case let rea as RefElementAddrInst:
-      return rea.operand
-    case let pb as ProjectBoxInst:
-      return pb.operand
-    case let rta as RefTailAddrInst:
-      return rta.operand
     default:
       return nil
     }
   }
 
-  /// Returns `true` if the baseAddress is of an immutable property/global variable
+  var description: String {
+    switch self {
+      case .box(let pbi):      return "box - \(pbi)"
+      case .stack(let asi):    return "stack - \(asi)"
+      case .global(let gl):    return "global - @\(gl.name)"
+      case .class(let rea):    return "class  - \(rea)"
+      case .tail(let rta):     return "tail - \(rta.operand)"
+      case .argument(let arg): return "argument - \(arg)"
+      case .yield(let ba):     return "yield - \(ba)"
+      case .pointer(let p):    return "pointer - \(p)"
+    }
+  }
+
+  /// True, if this is an access to a class instance.
+  var isObjectAccess: Bool {
+    switch self {
+      case .class, .tail:
+        return true
+      case .box, .stack, .global, .argument, .yield, .pointer:
+        return false
+    }
+  }
+
+  /// The reference value if this is an access to a referenced objecct (class, box, tail).
+  var reference: Value? {
+    switch self {
+      case .box(let pbi):      return pbi.operand
+      case .class(let rea):    return rea.operand
+      case .tail(let rta):     return rta.operand
+      case .stack, .global, .argument, .yield, .pointer:
+        return nil
+    }
+  }
+  /// True, if the baseAddress is of an immutable property or global variable
   var isLet: Bool {
-    switch baseAddress {
-    case let rea as RefElementAddrInst:
-      return rea.fieldIsLet
-    case let ga as GlobalAddrInst:
-      return ga.global.isLet
-    default:
-      return false
+    switch self {
+      case .class(let rea):    return rea.fieldIsLet
+      case .global(let g):     return g.isLet
+      case .box, .stack, .tail, .argument, .yield, .pointer:
+        return false
     }
   }
 
-  /// Returns `true` if the address is immediately produced by a stack or box allocation
+  /// True, if the address is immediately produced by an allocation in its function.
   var isLocal: Bool {
-    switch kind {
-    case .box:
-      // The operand of the projection can be an argument, in which
-      // case it wouldn't be local
-      return (baseAddress as! ProjectBoxInst).operand is AllocBoxInst
-    case .class:
-      let op = (baseAddress as! RefElementAddrInst).operand
-      return op is AllocRefInst || op is AllocRefDynamicInst
-    case .stack:
-      return true
-    default:
-      return false
+    switch self {
+      case .box(let pbi):      return pbi.operand is AllocBoxInst
+      case .class(let rea):    return rea.operand is AllocRefInstBase
+      case .tail(let rta):     return rta.operand is AllocRefInstBase
+      case .stack:             return true
+      case .global, .argument, .yield, .pointer:
+        return false
     }
   }
 
-  /// Returns `true` if we can reliably compare this `AccessBase`
-  /// with another `AccessBase` for equality.
-  /// When comparing two uniquely identified access bases and they are not equal,
-  /// it follows that the accessed memory addresses do not alias.
-  /// This is e.g. not the case for class references: two different references
-  /// may still point to the same object.
-  var isUniquelyIdentified: Bool {
-    switch kind {
-    case .box:
-      // The operand `%op` in `%baseAddress = project_box %op` can
-      // be `alloc_box` or an argument. Only if it's a fresh allocation it is
-      // uniquelyIdentified, otherwise it is aliasable, as all the other references.
-      return (baseAddress as! ProjectBoxInst).operand is AllocBoxInst
-    case .stack, .global:
-      return true
-    case .argument:
-      // An argument address that is non-aliasable
-      return (baseAddress as! FunctionArgument).isExclusiveIndirectParameter
-    case .class:
-      let op = (baseAddress as! RefElementAddrInst).operand
-      return op is AllocRefInst || op is AllocRefDynamicInst
-    case .tail, .yield, .pointer:
-      // References (.class and .tail) may alias, and so do pointers and
-      // yield results
-      return false
+  /// True, if the kind of storage of the access is known (e.g. a class property, or global variable).
+  var hasKnownStorageKind: Bool {
+    switch self {
+      case .box, .class, .tail, .stack, .global:
+        return true
+      case .argument, .yield, .pointer:
+        return false
     }
   }
 
-  /// Returns `true` if the two access bases do not alias
+  /// Returns `true` if the two access bases do not alias.
   func isDistinct(from other: AccessBase) -> Bool {
-    switch (baseAddress, other.baseAddress) {
-    case is (AllocStackInst, AllocStackInst):
-      return baseAddress != other.baseAddress
-    case let (this as ProjectBoxInst, that as ProjectBoxInst)
-        where this.operand is AllocBoxInst && that.operand is AllocBoxInst:
-      return this.operand != that.operand
-    case let (this as GlobalAddrInst, that as GlobalAddrInst):
-      return this.global != that.global
-    case let (this as FunctionArgument, that as FunctionArgument):
-      return (this.isExclusiveIndirectParameter || that.isExclusiveIndirectParameter) && this != that
-    case let (this as RefElementAddrInst, that as RefElementAddrInst):
-      return (this.fieldIndex != that.fieldIndex)
+  
+    func isDifferentAllocation(_ lhs: Value, _ rhs: Value) -> Bool {
+      switch (lhs, rhs) {
+      case (is Allocation, is Allocation):
+        return lhs != rhs
+      case (is Allocation, is FunctionArgument),
+           (is FunctionArgument, is Allocation):
+        // A local allocation cannot alias with something passed to the function.
+        return true
+      default:
+        return false
+      }
+    }
+
+    func argIsDistinct(_ arg: FunctionArgument, from other: AccessBase) -> Bool {
+      if arg.isExclusiveIndirectParameter {
+        // Exclusive indirect arguments cannot alias with an address for which we know that it
+        // is not derived from that argument (which might be the case for `pointer` and `yield`).
+        return other.hasKnownStorageKind
+      }
+      // Non-exclusive argument still cannot alias with anything allocated locally in the function.
+      return other.isLocal
+    }
+
+    switch (self, other) {
+    
+    // First handle all pairs of the same kind (except `yield` and `pointer`).
+    case (.box(let pb), .box(let otherPb)):
+      return pb.fieldIndex != otherPb.fieldIndex ||
+             isDifferentAllocation(pb.operand, otherPb.operand)
+    case (.stack(let asi), .stack(let otherAsi)):
+      return asi != otherAsi
+    case (.global(let global), .global(let otherGlobal)):
+      return global != otherGlobal
+    case (.class(let rea), .class(let otherRea)):
+      return rea.fieldIndex != otherRea.fieldIndex ||
+             isDifferentAllocation(rea.operand, otherRea.operand)
+    case (.tail(let rta), .tail(let otherRta)):
+      return isDifferentAllocation(rta.operand, otherRta.operand)
+    case (.argument(let arg), .argument(let otherArg)):
+      return (arg.isExclusiveIndirectParameter || otherArg.isExclusiveIndirectParameter) && arg != otherArg
+      
+    // Handle arguments vs non-arguments
+    case (.argument(let arg), _):
+      return argIsDistinct(arg, from: other)
+    case (_, .argument(let otherArg)):
+      return argIsDistinct(otherArg, from: self)
+
     default:
-      let selfIsUniquelyIdentified = isUniquelyIdentified
-      let otherIsUniquelyIdentified = other.isUniquelyIdentified
-      if selfIsUniquelyIdentified && otherIsUniquelyIdentified && kind != other.kind { return true }
-      // property: `isUniquelyIdentified` XOR `isObject`
-      if selfIsUniquelyIdentified && other.kind.isObject { return true }
-      if kind.isObject && otherIsUniquelyIdentified { return true }
-      return false
+      // As we already handled pairs of the same kind, here we handle pairs with different kinds.
+      // Different storage kinds cannot alias, regardless where the storage comes from.
+      // E.g. a class property address cannot alias with a global variable address.
+      return hasKnownStorageKind && other.hasKnownStorageKind
     }
   }
 }
@@ -207,11 +229,18 @@ struct AccessPath : CustomStringConvertible {
   }
 
   func isDistinct(from other: AccessPath) -> Bool {
-    return
-      base.isDistinct(from: other.base) ||                            // The base is distinct, in which case we are done. OR
-      (base.baseAddress == other.base.baseAddress &&                  // (The base is the exact same AND
-      !(projectionPath.matches(pattern: other.projectionPath)         //  the projection paths do not overlap)
-        || (other.projectionPath.matches(pattern: projectionPath))))
+    if base.isDistinct(from: other.base) {
+      // We can already derived from the bases that there is no alias.
+      // No need to look at the projection paths.
+      return true
+    }
+    if base == other.base ||
+       (base.hasKnownStorageKind && other.base.hasKnownStorageKind) {
+      if !projectionPath.mayOverlap(with: other.projectionPath) {
+        return true
+      }
+    }
+    return false
   }
 }
 
@@ -240,45 +269,22 @@ private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
   }
 }
 
-enum AddressOrPointerArgument {
-  case address(Value)
-  case pointer(FunctionArgument)
-}
-
-extension AddressOrPointerArgument : Equatable {
-  static func ==(lhs: AddressOrPointerArgument, rhs: AddressOrPointerArgument) -> Bool {
-    switch (lhs, rhs) {
-    case let (.address(left), .address(right)):
-      return left == right
-    case let (.pointer(left), .pointer(right)):
-      return left == right
-    default:
-      return false
-    }
-  }
-}
-
 /// Given a `%addr = pointer_to_address %ptr_operand` instruction tries to identify
-/// the address the pointer operand `ptr_operand` originates from, if any exists.
+/// where the pointer operand `ptr_operand` originates from.
 /// This is useful to identify patterns like
 /// ```
 /// %orig_addr = global_addr @...
 /// %ptr = address_to_pointer %orig_addr
 /// %addr = pointer_to_address %ptr
 /// ```
-/// which might arise when `[global_init]` functions for global addressors are inlined.
-///
-/// Alternatively, if the pointer originates from a ``FunctionArgument``, the argument is returned.
-///
-/// This underlying use-def traversal might cross phi arguments to identify the originating address
-/// to handle diamond-shaped control-flow with common originating
-/// address which might arise due to transformations ([example] (https://github.com/apple/swift/blob/8f9c5339542b17af9033f51ad7a0b95a043cad1b/test/SILOptimizer/access_storage_analysis_ossa.sil#L669-L705)) .
 struct PointerIdentification {
   private var walker = PointerIdentificationUseDefWalker()
 
-  mutating func getOriginatingAddressOrArgument(_ atp: PointerToAddressInst) -> AddressOrPointerArgument? {
-    walker.start(atp.type)
-    if walker.walkUp(value: atp.operand, path: SmallProjectionPath()) == .abortWalk {
+  mutating func getOriginatingAddress(of pointerToAddr: PointerToAddressInst) -> Value? {
+    defer { walker.clear() }
+
+    walker.start(pointerToAddr.type)
+    if walker.walkUp(value: pointerToAddr.operand, path: SmallProjectionPath()) == .abortWalk {
       return nil
     }
     return walker.result
@@ -286,37 +292,31 @@ struct PointerIdentification {
 
   private struct PointerIdentificationUseDefWalker : ValueUseDefWalker {
     private var addrType: Type!
-    private(set) var result: AddressOrPointerArgument?
+    private(set) var result: Value?
+    var walkUpCache = WalkerCache<Path>()
 
     mutating func start(_ addrType: Type) {
       self.addrType = addrType
+      assert(result == nil)
+    }
+
+    mutating func clear() {
       result = nil
       walkUpCache.clear()
     }
 
     mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
-      switch value {
-      case let arg as FunctionArgument:
-        if let res = result, res != self.result {
-          self.result = nil
-          return .abortWalk
-        }
-        self.result = .pointer(arg)
-        return .continueWalk
-      case let atp as AddressToPointerInst:
-        if case let .address(result) = result, atp.operand != result {
-          self.result = nil
+      if let atp = value as? AddressToPointerInst {
+        if let res = result, atp.operand != res {
           return .abortWalk
         }
 
-        if addrType == atp.operand.type, path.isEmpty {
-          self.result = .address(atp.operand)
-          return .continueWalk
-        }
-      default:
-        break
+        if addrType != atp.operand.type { return .abortWalk }
+        if !path.isEmpty { return .abortWalk }
+
+        self.result = atp.operand
+        return .continueWalk
       }
-      self.result = nil
       return .abortWalk
     }
 
@@ -327,12 +327,9 @@ struct PointerIdentification {
            is FunctionArgument, is AddressToPointerInst:
         return walkUpDefault(value: value, path: path)
       default:
-        self.result = nil
         return .abortWalk
       }
     }
-
-    var walkUpCache = WalkerCache<Path>()
   }
 }
 
@@ -438,17 +435,13 @@ struct AccessPathWalker {
     }
 
     mutating func rootDef(address: Value, path: Path) -> WalkResult {
+      assert(result == nil, "rootDef should only called once")
       // Try identifying the address a pointer originates from
       if let p2ai = address as? PointerToAddressInst {
-        if let addrOrArg = pointerId.getOriginatingAddressOrArgument(p2ai) {
-          switch addrOrArg {
-          case let .address(newAddress):
-            return walkUp(address: newAddress, path: path)
-          case let .pointer(arg):
-            self.result = AccessPath(base: AccessBase(baseAddress: arg, kind: .pointer), projectionPath: path.projectionPath)
-          }
+        if let originatingAddr = pointerId.getOriginatingAddress(of: p2ai) {
+          return walkUp(address: originatingAddr, path: path)
         } else {
-          self.result = AccessPath(base: AccessBase(baseAddress: p2ai, kind: .pointer), projectionPath: path.projectionPath)
+          self.result = AccessPath(base: .pointer(p2ai), projectionPath: path.projectionPath)
           return .continueWalk
         }
       }
@@ -481,29 +474,30 @@ struct AccessPathWalker {
   }
 }
 
-/// A ValueUseDef walker that identifies which values a reference might
+/// A ValueUseDef walker that identifies which values a reference of an access path might
 /// originate from.
 protocol AccessStoragePathWalker : ValueUseDefWalker where Path == SmallProjectionPath {
   mutating func visit(access: AccessStoragePath)
 }
 
 extension AccessStoragePathWalker {
-  // Main entry point
-  /// Given an `ap: AccessPath` where the base address is a projection
-  /// from a reference type, returns the set of reference definitions
-  /// that the address of the access may originate from.
-  mutating func getAccessStorage(for accessPath: AccessPath) {
+  /// The main entry point.
+  /// Given an `accessPath` where the access base is a reference (class, tail, box), call
+  /// the `visit` function for all storage roots with a the corresponding path.
+  /// Returns true on success.
+  /// Returns false if not all storage roots could be identified or if `accessPath` has not a "reference" base.
+  mutating func visitAccessStorageRoots(of accessPath: AccessPath) -> Bool {
     walkUpCache.clear()
     let path = accessPath.projectionPath
-    switch accessPath.base.baseAddress {
-    case let rea as RefElementAddrInst:
-      _ = walkUp(value: rea.operand, path: path.push(.classField, index: rea.fieldIndex))
-    case let pb as ProjectBoxInst:
-      _ = walkUp(value: pb.operand, path: path.push(.classField, index: pb.fieldIndex))
-    case let rta as RefTailAddrInst:
-      _ = walkUp(value: rta.operand, path: path.push(.tailElements, index: 0))
-    default:
-      visit(access: AccessStoragePath(storage: accessPath.base.baseAddress, path: accessPath.projectionPath))
+    switch accessPath.base {
+      case .box(let pbi):
+        return walkUp(value: pbi.operand, path: path.push(.classField, index: pbi.fieldIndex)) != .abortWalk
+      case .class(let rea):
+        return walkUp(value: rea.operand, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
+      case .tail(let rta):
+        return walkUp(value: rta.operand, path: path.push(.tailElements, index: 0)) != .abortWalk
+      case .stack, .global, .argument, .yield, .pointer:
+        return false
     }
   }
 

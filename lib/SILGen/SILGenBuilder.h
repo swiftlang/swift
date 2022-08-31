@@ -226,8 +226,9 @@ public:
 
   /// Create a SILArgument for an input parameter. Asserts if used to create a
   /// function argument for an out parameter.
-  ManagedValue createInputFunctionArgument(SILType type, ValueDecl *decl,
-                                           bool isNoImplicitCopy = false);
+  ManagedValue createInputFunctionArgument(
+      SILType type, ValueDecl *decl, bool isNoImplicitCopy = false,
+      LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out

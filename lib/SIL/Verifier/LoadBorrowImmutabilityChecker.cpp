@@ -94,6 +94,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::ExistentialMetatypeInst:

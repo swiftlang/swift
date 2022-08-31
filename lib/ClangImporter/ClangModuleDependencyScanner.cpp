@@ -43,9 +43,9 @@ public:
   DependencyScanningTool tool;
 
   ClangModuleDependenciesCacheImpl()
-      : importHackFileCache(),
-        service(ScanningMode::DependencyDirectivesScan,
-                ScanningOutputFormat::Full, clang::CASOptions(), nullptr),
+      : importHackFileCache(), service(ScanningMode::DependencyDirectivesScan,
+                                       ScanningOutputFormat::Full,
+                                       clang::CASOptions(), nullptr, nullptr),
         tool(service) {}
   ~ClangModuleDependenciesCacheImpl();
 

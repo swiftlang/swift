@@ -229,8 +229,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   auto optionSetType = dyn_cast_or_null<ProtocolDecl>(Ctx.getOptionSetDecl());
   if (!optionSetType)
     return;
-  SmallVector<ProtocolConformance *, 4> conformances;
-  if (!(optionSetType && NTD->lookupConformance(optionSetType, conformances)))
+  if (!module->lookupConformance(ResultType, optionSetType))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
@@ -2114,7 +2113,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   TypeChecker::computeCaptures(AFD);
   if (!AFD->getDeclContext()->isLocalContext()) {
     checkFunctionActorIsolation(AFD);
-    checkFunctionAsyncUsage(AFD);
     TypeChecker::checkFunctionEffects(AFD);
   }
 

@@ -122,6 +122,11 @@ EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
 /// Enables opaque type erasure without also enabling implict dynamic
 EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
 
+/// Whether to enable experimental @typeWrapper feature which allows to
+/// declare a type that controls access to all stored properties of the
+/// wrapped type.
+EXPERIMENTAL_FEATURE(TypeWrappers)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE

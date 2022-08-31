@@ -106,6 +106,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Integrate
     single-source/IterateData
     single-source/Join
+    single-source/KeyPathPerformanceTests
     single-source/LazyFilter
     single-source/LinkedList
     single-source/LuhnAlgoEager

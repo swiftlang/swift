@@ -1,4 +1,4 @@
-//===--- swift-def-to-yaml-converter.cpp ----------------------------------===//
+//===--- swift-def-to-strings-converter.cpp -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Create a YAML file from the diagnostic messages text in `.def` files.
+// Create a .strings file from the diagnostic messages text in `.def` files.
 //
 //===----------------------------------------------------------------------===//
 
@@ -49,7 +49,8 @@ enum LocalDiagID : uint32_t {
 
 namespace options {
 
-static llvm::cl::OptionCategory Category("swift-def-to-yaml-converter Options");
+static llvm::cl::OptionCategory
+    Category("swift-def-to-strings-converter Options");
 
 static llvm::cl::opt<std::string>
     OutputDirectory("output-directory",
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
 
   llvm::cl::HideUnrelatedOptions(options::Category);
   llvm::cl::ParseCommandLineOptions(argc, argv,
-                                    "Swift `.def` to YAML Converter\n");
+                                    "Swift `.def` to `.strings` Converter\n");
 
   llvm::SmallString<128> LocalizedFilePath;
   if (options::OutputFilename.empty()) {
@@ -76,7 +77,7 @@ int main(int argc, char *argv[]) {
     std::string defaultLocaleCode = "en";
     LocalizedFilePath = options::OutputDirectory;
     llvm::sys::path::append(LocalizedFilePath, defaultLocaleCode);
-    llvm::sys::path::replace_extension(LocalizedFilePath, ".yaml");
+    llvm::sys::path::replace_extension(LocalizedFilePath, ".strings");
   } else {
     LocalizedFilePath = options::OutputFilename;
   }
@@ -96,7 +97,7 @@ int main(int argc, char *argv[]) {
   llvm::ArrayRef<const char *> messages(diagnosticMessages,
                                         LocalDiagID::NumDiags);
 
-  swift::diag::DefToYAMLConverter converter(ids, messages);
+  swift::diag::DefToStringsConverter converter(ids, messages);
   converter.convert(OS);
 
   return EXIT_SUCCESS;

@@ -78,7 +78,7 @@ class SwiftSyntax(product.Product):
             self.run_swiftsyntax_build_script(target=host_target,
                                               command='verify-source-code')
 
-        self.run_swiftsyntax_build_script(target=host_target, 
+        self.run_swiftsyntax_build_script(target=host_target,
                                           command='build')
 
     def should_test(self, host_target):
@@ -91,9 +91,9 @@ class SwiftSyntax(product.Product):
         self.run_swiftsyntax_build_script(target=host_target,
                                           command='test',
                                           additional_params=[
-                                              '--filecheck-exec', 
-                                              os.path.join(llvm_build_dir, 
-                                                           'bin', 
+                                              '--filecheck-exec',
+                                              os.path.join(llvm_build_dir,
+                                                           'bin',
                                                            'FileCheck')
                                           ])
 
@@ -101,8 +101,8 @@ class SwiftSyntax(product.Product):
         return self.args.install_swiftsyntax
 
     def install(self, target_name):
-        # SwiftSyntax doesn't produce any products thate should be installed 
-        # into the toolchein. All tools using it link against SwiftSyntax 
+        # SwiftSyntax doesn't produce any products thate should be installed
+        # into the toolchein. All tools using it link against SwiftSyntax
         # statically.
         pass
 

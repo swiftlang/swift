@@ -58,6 +58,7 @@ TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
 TYPE_ATTR(_typeSequence)
 TYPE_ATTR(_local)
+TYPE_ATTR(tuple)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -662,7 +663,12 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   116)
 
-// 117 was 'spawn' and is now unused
+SIMPLE_DECL_ATTR(_eagerMove, EagerMove,
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIStableToRemove |
+  OnParam | OnVar | OnNominalType,
+  117)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc | OnAccessor | OnVar |
@@ -670,7 +676,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
-// 119 is unused
+SIMPLE_DECL_ATTR(_lexical, Lexical,
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIStableToRemove |
+  OnParam | OnVar | OnNominalType,
+  119)
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   OnFunc | UserInaccessible | NotSerialized | OnNominalType |
@@ -745,6 +756,17 @@ SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
 SIMPLE_DECL_ATTR(_alwaysEmitConformanceMetadata, AlwaysEmitConformanceMetadata,
   OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   132)
+
+DECL_ATTR(_expose, Expose,
+  OnFunc | OnNominalType | OnVar | OnConstructor |
+  LongAttribute | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  133)
+
+SIMPLE_DECL_ATTR(typeWrapper, TypeWrapper,
+  OnStruct | OnClass | OnEnum |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  134)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

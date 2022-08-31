@@ -29,6 +29,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
@@ -2713,6 +2714,15 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
+
+  LifetimeAnnotation getLifetimeAnnotation() const {
+    auto &attrs = getAttrs();
+    if (attrs.hasAttribute<EagerMoveAttr>())
+      return LifetimeAnnotation::EagerMove;
+    if (attrs.hasAttribute<LexicalAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::None;
+  }
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -3743,6 +3753,21 @@ public:
   bool isGlobalActor() const {
     return getGlobalActorInstance() != nullptr;
   }
+
+  /// Returns true if this type has a type wrapper custom attribute.
+  bool hasTypeWrapper() const { return bool(getTypeWrapper()); }
+
+  /// Return a type wrapper (if any) associated with this type.
+  NominalTypeDecl *getTypeWrapper() const;
+
+  /// If this declaration has a type wrapper return a property that
+  /// is used for all type wrapper related operations (mainly for
+  /// applicable property access routing).
+  VarDecl *getTypeWrapperProperty() const;
+
+  /// Get an initializer that could be used to instantiate a
+  /// type wrapped type.
+  ConstructorDecl *getTypeWrapperInitializer() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5539,7 +5564,18 @@ public:
   /// Return true if this property either has storage or has an attached property
   /// wrapper that has storage.
   bool hasStorageOrWrapsStorage() const;
-  
+
+  /// Whether this property belongs to a type wrapped type and has
+  /// all access to it routed through a type wrapper.
+  bool isAccessedViaTypeWrapper() const;
+
+  /// For type wrapped properties (see \c isAccessedViaTypeWrapper)
+  /// all access is routed through a type wrapper.
+  ///
+  /// \returns an underlying type wrapper property which is a
+  /// storage endpoint for all access to this property.
+  VarDecl *getUnderlyingTypeWrapperStorage() const;
+
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support

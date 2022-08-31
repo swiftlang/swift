@@ -3509,9 +3509,9 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     ? overrideDeclType
     : entity.getDefaultDeclarationType(*this);
   
-  auto &entry = GlobalVars[entity];
-  if (entry) {
-    auto existing = cast<llvm::GlobalValue>(entry);
+  auto existingGlobal = GlobalVars[entity];
+  if (existingGlobal) {
+    auto existing = cast<llvm::GlobalValue>(existingGlobal);
 
     // If we're looking to define something, we may need to replace a
     // forward declaration.
@@ -3531,12 +3531,12 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
       // Fall out to the case below, clearing the name so that
       // createVariable doesn't detect a collision.
-      entry->setName("");
+      existingGlobal->setName("");
 
     // Otherwise, we have a previous declaration or definition which
     // we need to ensure has the right type.
     } else {
-      return getElementBitCast(entry, defaultType);
+      return getElementBitCast(existingGlobal, defaultType);
     }
   }
 
@@ -3580,11 +3580,17 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     lazyInitializer->Create(var);
   }
 
+  if (lazyInitializer) {
+    // Protect against self-references that might've been created during
+    // the lazy emission.
+    existingGlobal = GlobalVars[entity];
+  }
+
   // If we have an existing entry, destroy it, replacing it with the
-  // new variable.
-  if (entry) {
-    auto existing = cast<llvm::GlobalValue>(entry);
-    auto castVar = llvm::ConstantExpr::getBitCast(var, entry->getType());
+  // new variable.  We only really have to do 
+  if (existingGlobal) {
+    auto existing = cast<llvm::GlobalValue>(existingGlobal);
+    auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
     existing->replaceAllUsesWith(castVar);
     existing->eraseFromParent();
   }
@@ -3607,7 +3613,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   }
 
   // Cache and return.
-  entry = var;
+  GlobalVars[entity] = var;
   return var;
 }
 

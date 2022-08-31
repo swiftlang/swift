@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 import SIL
+import OptimizerBridging
 
 struct FunctionPass {
 
@@ -47,3 +48,19 @@ struct InstructionPass<InstType: Instruction> {
   }
 }
 
+struct ModulePass {
+
+  let name: String
+  let runFunction: (ModulePassContext) -> ()
+
+  public init(name: String,
+              _ runFunction: @escaping (ModulePassContext) -> ()) {
+    self.name = name
+    self.runFunction = runFunction
+  }
+
+  func run(_ bridgedCtxt: BridgedPassContext) {
+    let context = ModulePassContext(_bridged: bridgedCtxt)
+    runFunction(context)
+  }
+}

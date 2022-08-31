@@ -515,18 +515,6 @@ class GlobalModuleDependenciesCache {
   /// The triples used by scanners using this cache, in the order in which they were used
   std::vector<std::string> AllTriples;
 
-  /// Additional information needed for Clang dependency scanning.
-  ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
-
-  /// Function that will delete \c clangImpl properly.
-  void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *) = nullptr;
-
-  /// Free up the storage associated with the Clang implementation.
-  void destroyClangImpl() {
-    if (this->clangImplDeleter)
-      this->clangImplDeleter(this->clangImpl);
-  }
-
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
   llvm::StringMap<ModuleDependenciesVector> &
@@ -539,8 +527,7 @@ public:
   GlobalModuleDependenciesCache(const GlobalModuleDependenciesCache &) = delete;
   GlobalModuleDependenciesCache &
   operator=(const GlobalModuleDependenciesCache &) = delete;
-
-  virtual ~GlobalModuleDependenciesCache() { destroyClangImpl(); }
+  virtual ~GlobalModuleDependenciesCache() {}
 
   void configureForTriple(std::string triple);
 
@@ -552,19 +539,6 @@ private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
   friend class ModuleDependenciesCache;
-
-  /// Set the Clang-specific implementation data.
-  virtual void
-  setClangImpl(ClangModuleDependenciesCacheImpl *clangImpl,
-               void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *)) {
-    destroyClangImpl();
-
-    this->clangImpl = clangImpl;
-    this->clangImplDeleter = clangImplDeleter;
-  }
-
-  /// Retrieve the Clang-specific implementation data;
-  ClangModuleDependenciesCacheImpl *getClangImpl() const { return clangImpl; }
 
   /// Whether we have cached dependency information for the given module.
   bool hasDependencies(StringRef moduleName,
@@ -628,9 +602,24 @@ class ModuleDependenciesCache {
 private:
   GlobalModuleDependenciesCache &globalCache;
 
-  /// References to data in `globalCache` for dependencies accimulated during
+  /// References to data in `globalCache` for Swift dependencies and
+  /// `clangModuleDependencies` for Clang dependencies accimulated during
   /// the current scanning action.
   ModuleDependenciesKindRefMap ModuleDependenciesMap;
+
+  /// Discovered Clang modules are only cached locally.
+  llvm::StringMap<ModuleDependenciesVector> clangModuleDependencies;
+
+  /// Function that will delete \c clangImpl properly.
+  void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *) = nullptr;
+  /// Additional information needed for Clang dependency scanning.
+  ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
+
+  /// Free up the storage associated with the Clang implementation.
+  void destroyClangImpl() {
+    if (this->clangImplDeleter)
+      this->clangImplDeleter(this->clangImpl);
+  }
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -654,19 +643,22 @@ public:
   ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
-  virtual ~ModuleDependenciesCache() {}
+  virtual ~ModuleDependenciesCache() { destroyClangImpl(); }
 
 public:
   /// Set the Clang-specific implementation data.
   void
   setClangImpl(ClangModuleDependenciesCacheImpl *clangImpl,
                void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *)) {
-    globalCache.setClangImpl(clangImpl, clangImplDeleter);
+    destroyClangImpl();
+
+    this->clangImpl = clangImpl;
+    this->clangImplDeleter = clangImplDeleter;
   }
 
   /// Retrieve the Clang-specific implementation data;
   ClangModuleDependenciesCacheImpl *getClangImpl() const {
-    return globalCache.getClangImpl();
+    return clangImpl;
   }
 
   /// Whether we have cached dependency information for the given module.

@@ -1346,6 +1346,13 @@ public:
   // Miscellaneous
   //===--------------------------------------------------------------------===//
 
+  /// A value's lifetime, determined by looking at annotations on its decl and
+  /// the default lifetime for the type.
+  Lifetime getLifetime(VarDecl *decl, SILType ty) {
+    return ty.getLifetime(*this).getLifetimeForAnnotatedValue(
+        decl->getLifetimeAnnotation());
+  }
+
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
   void verify(bool SingleFunction = true) const;

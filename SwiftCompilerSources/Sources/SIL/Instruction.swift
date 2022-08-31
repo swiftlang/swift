@@ -104,6 +104,9 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return SILInstruction_mayRelease(bridged)
   }
 
+  public func visitReferencedFunctions(_ cl: (Function) -> ()) {
+  }
+
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
@@ -139,6 +142,10 @@ public class SingleValueInstruction : Instruction, Value {
 
   fileprivate final override var resultCount: Int { 1 }
   fileprivate final override func getResult(index: Int) -> Value { self }
+
+  public static func ==(lhs: SingleValueInstruction, rhs: SingleValueInstruction) -> Bool {
+    lhs === rhs
+  }
 }
 
 public final class MultipleValueInstructionResult : Value {
@@ -340,7 +347,10 @@ final public
 class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class IndexAddrInst : SingleValueInstruction {}
+class IndexAddrInst : SingleValueInstruction {
+  public var base: Value { operands[0].value }
+  public var index: Value { operands[1].value }
+}
 
 final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
@@ -384,10 +394,23 @@ public class GlobalAccessInst : SingleValueInstruction {
   }
 }
 
-final public class FunctionRefInst : GlobalAccessInst {
+public class FunctionRefBaseInst : SingleValueInstruction {
   public var referencedFunction: Function {
-    FunctionRefInst_getReferencedFunction(bridged).function
+    FunctionRefBaseInst_getReferencedFunction(bridged).function
   }
+
+  public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
+    cl(referencedFunction)
+  }
+}
+
+final public class FunctionRefInst : FunctionRefBaseInst {
+}
+
+final public class DynamicFunctionRefInst : FunctionRefBaseInst {
+}
+
+final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 }
 
 final public class GlobalAddrInst : GlobalAccessInst {}
@@ -453,6 +476,24 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class KeyPathInst : SingleValueInstruction {
+  public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
+    var results = KeyPathFunctionResults()
+    for componentIdx in 0..<KeyPathInst_getNumComponents(bridged) {
+      KeyPathInst_getReferencedFunctions(bridged, componentIdx, &results)
+      let numFuncs = results.numFunctions
+      withUnsafePointer(to: &results) {
+        $0.withMemoryRebound(to: BridgedFunction.self, capacity: numFuncs) {
+          let functions = UnsafeBufferPointer(start: $0, count: numFuncs)
+          for idx in 0..<numFuncs {
+            cl(functions[idx].function)
+          }
+        }
+      }
+    }
+  }
+}
 
 final public
 class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
@@ -530,7 +571,7 @@ extension BeginAccessInst : ScopedInstruction {
   public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndAccessInst?>>, EndAccessInst>
 
   public var endInstructions: EndInstructions {
-    uses.lazy.compactMap({ $0.value.definingInstruction as? EndAccessInst })
+    uses.lazy.compactMap({ $0.instruction as? EndAccessInst })
   }
 }
 
@@ -647,21 +688,26 @@ public class TermInst : Instruction {
   final public var successors: SuccessorArray {
     SuccessorArray(succArray: TermInst_getSuccessors(bridged))
   }
+  
+  public var isFunctionExiting: Bool { false }
 }
 
 final public class UnreachableInst : TermInst {
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class ThrowInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class YieldInst : TermInst {
 }
 
 final public class UnwindInst : TermInst {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class TryApplyInst : TermInst, FullApplySite {

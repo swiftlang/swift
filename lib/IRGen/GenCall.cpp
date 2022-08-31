@@ -2730,8 +2730,11 @@ public:
     auto signedResumeFn = currentResumeFn;
     // Sign the task resume function with the C function pointer schema.
     if (auto schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers) {
-      // TODO: use the Clang type for TaskContinuationFunction*
+      // Use the Clang type for TaskContinuationFunction*
       // to make this work with type diversity.
+      if (schema.hasOtherDiscrimination())
+        schema =
+            IGF.IGM.getOptions().PointerAuth.ClangTypeTaskContinuationFunction;
       auto authInfo =
           PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
       signedResumeFn = emitPointerAuthSign(IGF, signedResumeFn, authInfo);

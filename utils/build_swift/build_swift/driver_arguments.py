@@ -352,7 +352,7 @@ def create_argument_parser():
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
 
-    option('--swift-disable-dead-stripping', toggle_true, 
+    option('--swift-disable-dead-stripping', toggle_true,
            help="Turn off Darwin-specific dead stripping for Swift host tools")
 
     option('--build-subdir', store,
@@ -580,6 +580,11 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--infer-cross-compile-hosts-on-darwin', toggle_true,
+           help="When building on Darwin, automatically populate cross-compile-hosts "
+                "based on the architecture build-script is running on. "
+                "Has precedence over cross-compile-hosts")
+
     option('--cross-compile-deps-path', store_path,
            help='The path to a directory that contains prebuilt cross-compiled '
                 'library dependencies of the corelibs and other Swift repos, '
@@ -650,6 +655,9 @@ def create_argument_parser():
 
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
+
+    option(['--early-swiftsyntax'], toggle_true('build_early_swiftsyntax'),
+           help='build early SwiftSyntax')
 
     option(['--skstresstester'], toggle_true('build_skstresstester'),
            help='build the SourceKit stress tester')

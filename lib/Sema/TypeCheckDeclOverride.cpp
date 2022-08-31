@@ -1513,6 +1513,7 @@ namespace  {
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
+    UNINTERESTING_ATTR(Expose)
     UNINTERESTING_ATTR(Final)
     UNINTERESTING_ATTR(MoveOnly)
     UNINTERESTING_ATTR(FixedLayout)
@@ -1583,6 +1584,7 @@ namespace  {
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
+    UNINTERESTING_ATTR(TypeWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(ResultBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
@@ -1614,6 +1616,9 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeInheritExecutor)
     UNINTERESTING_ATTR(CompilerInitialized)
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
+
+    UNINTERESTING_ATTR(EagerMove)
+    UNINTERESTING_ATTR(Lexical)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

@@ -1283,7 +1283,7 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
     ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
 
   auto name = req->createNameRef();
-  auto *nominal = Adoptee->getAnyNominal();
+  auto *nominal = DC->getSelfNominalTypeDecl();
 
   NLOptions subOptions = (NL_ProtocolMembers | NL_IncludeAttributeImplements);
 
@@ -1338,7 +1338,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   }
 
   if (doQualifiedLookup) {
-    auto *nominal = Adoptee->getAnyNominal();
+    auto *nominal = DC->getSelfNominalTypeDecl();
     nominal->synthesizeSemanticMembersIfNeeded(reqName.getFullName());
 
     // Unqualified lookup would have already found candidates from protocol
@@ -1551,7 +1551,7 @@ AccessScope WitnessChecker::getRequiredAccessScope() {
 
   bool witnessesMustBeUsableFromInline = false;
   if (Adoptee) {
-    const NominalTypeDecl *adoptingNominal = Adoptee->getAnyNominal();
+    const NominalTypeDecl *adoptingNominal = DC->getSelfNominalTypeDecl();
 
     // Compute the intersection of the conforming type's access scope
     // and the protocol's access scope.
@@ -2012,7 +2012,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
   // Dig out some of the fields from the conformance.
   Type T = conformance->getType();
-  auto canT = T->getCanonicalType();
   DeclContext *DC = conformance->getDeclContext();
   auto Proto = conformance->getProtocol();
   auto ProtoType = Proto->getDeclaredInterfaceType();
@@ -2030,7 +2029,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   }
 
   // If the protocol requires a class, non-classes are a non-starter.
-  if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
+  if (Proto->requiresClass() && !DC->getSelfClassDecl()) {
     C.Diags.diagnose(ComplainLoc,
                      diag::non_class_cannot_conform_to_class_protocol, T,
                      ProtoType);
@@ -2060,7 +2059,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
   if (Proto->isObjC()) {
     // Foreign classes cannot conform to objc protocols.
-    if (auto clazz = canT->getClassOrBoundGenericClass()) {
+    if (auto clazz = DC->getSelfClassDecl()) {
       Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
       diagKind;
       switch (clazz->getForeignClassKind()) {
@@ -2114,7 +2113,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   // Not every protocol/type is compatible with conditional conformances.
   auto conditionalReqs = conformance->getConditionalRequirementsIfAvailable();
   if (conditionalReqs && !conditionalReqs->empty()) {
-    auto nestedType = canT;
+    auto nestedType = DC->getSelfNominalTypeDecl()->getDeclaredInterfaceType();
     // Obj-C generics cannot be looked up at runtime, so we don't support
     // conditional conformances involving them. Check the full stack of nested
     // types for any obj-c ones.
@@ -2129,7 +2128,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
         }
       }
 
-      nestedType = nestedType.getNominalParent();
+      nestedType = nestedType->getNominalParent();
     }
 
     // If the protocol to which we are conditionally conforming is not a marker
@@ -3212,7 +3211,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
   if (!ctx.LangOpts.EnableObjCInterop && type->hasError())
     return false;
 
-  auto classDecl = Adoptee->getClassOrBoundGenericClass();
+  auto classDecl = DC->getSelfClassDecl();
   if (!classDecl) return false;
 
   if (!classDecl->isTypeErasedGenericClass()) return false;
@@ -3784,7 +3783,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   for (auto &Missing : LocalMissing) {
     auto requirement = Missing.requirement;
     auto matches = Missing.matches;
-    auto nominal = Adoptee->getAnyNominal();
+    auto nominal = DC->getSelfNominalTypeDecl();
 
     diagnoseOrDefer(requirement, true,
       [requirement, matches, nominal](NormalProtocolConformance *conformance) {
@@ -4014,7 +4013,7 @@ getAdopteeSelfSameTypeConstraint(ClassDecl *selfClass, ValueDecl *witness) {
 
 void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
                                                    ValueDecl *witness) {
-  auto *classDecl = Adoptee->getClassOrBoundGenericClass();
+  auto *classDecl = DC->getSelfClassDecl();
 
   // If we have an initializer requirement and the conforming type
   // is a non-final class, the witness must be 'required'.
@@ -4161,7 +4160,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
-  auto *nominal = Adoptee->getAnyNominal();
+  auto *nominal = DC->getSelfNominalTypeDecl();
 
   // Resolve all associated types before trying to resolve this witness.
   resolveTypeWitnesses();
@@ -4435,7 +4434,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       break;
     }
 
-    if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
+    if (auto *classDecl = DC->getSelfClassDecl()) {
       if (!classDecl->isSemanticallyFinal()) {
         checkNonFinalClassWitness(requirement, witness);
       }
@@ -4519,7 +4518,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  auto *nominal = Adoptee->getAnyNominal();
+  auto *nominal = DC->getSelfNominalTypeDecl();
   if (DerivedConformance::derivesProtocolConformance(DC, nominal, Proto))
     derivingTypeDecl = nominal;
 
@@ -4694,7 +4693,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
 
-  DC->lookupQualified(Adoptee->getAnyNominal(),
+  DC->lookupQualified(DC->getSelfNominalTypeDecl(),
                       assocType->createNameRef(),
                       subOptions, candidates);
 
@@ -4734,7 +4733,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       if (typeAliasDecl->getUnderlyingType()->isNever()) {
         if (typeAliasDecl->getParentModule()->getName().is("SwiftUI")) {
           if (typeAliasDecl->getDeclContext()->getSelfNominalTypeDecl() ==
-              Adoptee->getAnyNominal()) {
+              DC->getSelfNominalTypeDecl()) {
             const auto reqs =
                 typeAliasDecl->getGenericSignature().requirementsNotSatisfiedBy(
                     DC->getGenericSignatureOfContext());
@@ -4896,6 +4895,9 @@ hasInvariantSelfRequirement(const ProtocolDecl *proto,
 
   for (auto req : reqSig) {
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::SameType:
       if (req.getSecondType()->isTypeParameter()) {
         if (req.getFirstType()->isEqual(selfTy))
@@ -4927,6 +4929,9 @@ static void diagnoseInvariantSelfRequirement(
   unsigned kind = 0;
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::SameType:
   if (req.getSecondType()->isTypeParameter()) {
       // eg, 'Self == Self.A.B'
@@ -4974,7 +4979,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   // an error, we can handle it as part of the above checkGenericArguments()
   // call by passing in a superclass-bound archetype for the 'self' type
   // instead of the concrete class type itself.
-  if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
+  if (auto *classDecl = DC->getSelfClassDecl()) {
     if (!classDecl->isSemanticallyFinal()) {
       if (auto req = hasInvariantSelfRequirement(proto, reqSig)) {
         diagnoseInvariantSelfRequirement(Loc, Adoptee, proto, *req, diags);
@@ -5393,7 +5398,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Note that we check the module name to smooth over the difference
   // between an imported Objective-C module and its overlay.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-    auto nominal = Adoptee->getAnyNominal();
+    auto nominal = DC->getSelfNominalTypeDecl();
     if (!getASTContext().isTypeBridgedInExternalModule(nominal)) {
       auto clangLoader = getASTContext().getClangModuleLoader();
       if (nominal->getParentModule() != DC->getParentModule() &&
@@ -6762,7 +6767,9 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
 
   auto dc = witness->getDeclContext();
   auto nominal = dc->getSelfNominalTypeDecl();
+
   if (!nominal) return result;
+  if (isa<ProtocolDecl>(nominal)) return result;
 
   DeclName name = witness->getName();
   Optional<AccessorKind> accessorKind;

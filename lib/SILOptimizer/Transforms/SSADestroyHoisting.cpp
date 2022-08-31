@@ -966,17 +966,20 @@ void SSADestroyHoisting::run() {
                              remainingDestroyAddrs, deleter);
   }
   // Arguments enclose everything.
-  for (auto *arg : getFunction()->getArguments()) {
+  for (auto *uncastArg : getFunction()->getArguments()) {
+    auto *arg = cast<SILFunctionArgument>(uncastArg);
     if (arg->getType().isAddress()) {
-      auto convention = cast<SILFunctionArgument>(arg)->getArgumentConvention();
+      auto convention = arg->getArgumentConvention();
       // This is equivalent to writing
       //
       //     convention == SILArgumentConvention::Indirect_Inout
       //
       // but communicates the rationale: in order to ignore deinit barriers, the
       // address must be exclusively accessed and be a modification.
-      bool ignoreDeinitBarriers = convention.isInoutConvention() &&
-                                  convention.isExclusiveIndirectParameter();
+      bool ignoredByConvention = convention.isInoutConvention() &&
+                                 convention.isExclusiveIndirectParameter();
+      auto lifetime = arg->getLifetime();
+      bool ignoreDeinitBarriers = ignoredByConvention || lifetime.isEagerMove();
       changed |= hoistDestroys(arg, ignoreDeinitBarriers, remainingDestroyAddrs,
                                deleter);
     }

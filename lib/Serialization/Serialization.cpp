@@ -1,4 +1,4 @@
-//===--- Serialization.cpp - Read and write Swift modules -----------------===//
+  //===--- Serialization.cpp - Read and write Swift modules -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -1337,6 +1337,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
     return GenericRequirementKind::KIND;
 
   switch (kind) {
+  CASE(SameCount)
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)
@@ -2860,6 +2861,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       UnavailableFromAsyncDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           theAttr->Message);
+      return;
+    }
+
+    case DAK_Expose: {
+      auto *theAttr = cast<ExposeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ExposeDeclAttrLayout::Code];
+      ExposeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       theAttr->isImplicit(), theAttr->Name);
       return;
     }
     }

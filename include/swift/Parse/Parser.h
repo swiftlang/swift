@@ -695,7 +695,7 @@ public:
                      tok::pound_else, tok::pound_elseif,
                      tok::code_complete) &&
            !isStartOfStmt() &&
-           !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
+           !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/true)) {
       skipSingle();
     }
   }
@@ -1653,6 +1653,8 @@ public:
   ParserResult<Expr> parseExprRegexLiteral();
 
   StringRef copyAndStripUnderscores(StringRef text);
+  StringRef stripUnderscoresIfNeeded(StringRef text,
+                                     SmallVectorImpl<char> &buffer);
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    Token EntireTok,

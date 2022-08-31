@@ -245,6 +245,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitExposeAttr(ExposeAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -291,6 +292,7 @@ public:
 
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
+  void visitTypeWrapperAttr(TypeWrapperAttr *attr);
   void visitResultBuilderAttr(ResultBuilderAttr *attr);
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
@@ -317,6 +319,9 @@ public:
   void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
+
+  void visitEagerMoveAttr(EagerMoveAttr *attr);
+  void visitLexicalAttr(LexicalAttr *attr);
 
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
@@ -1840,6 +1845,37 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cdecl_empty_name);
 }
 
+void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
+  const auto *VD = cast<ValueDecl>(D);
+  // Expose cannot be mixed with '@objc'/'@_cdecl' declarations.
+  if (VD->isObjC())
+    diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@objc");
+  if (VD->getAttrs().hasAttribute<CDeclAttr>())
+    diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@_cdecl");
+
+  // Nested exposed declarations are expected to be inside
+  // of other exposed declarations.
+  bool hasExpose = true;
+  const ValueDecl *decl = VD;
+  while (const NominalTypeDecl *NMT =
+             dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    decl = NMT;
+    hasExpose = NMT->getAttrs().hasAttribute<ExposeAttr>();
+  }
+  if (!hasExpose) {
+    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl,
+             decl->getName());
+  }
+
+  // Verify that the name mentioned in the expose
+  // attribute matches the supported name pattern.
+  if (!attr->Name.empty()) {
+    if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
+      diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
+               attr->Name);
+  }
+}
+
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
                                           UnsafeNoObjCTaggedPointerAttr *attr) {
   // Only class protocols can have the attribute.
@@ -1923,6 +1959,13 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 }
 
 void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::MoveOnly)) {
+    auto error =
+        diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
   if (isa<NominalTypeDecl>(D))
     return;
 
@@ -2490,6 +2533,9 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
     }
 
     switch (specializedReq.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),
@@ -2732,6 +2778,10 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const ValueDecl *replacement,
                                SmallVectorImpl<ValueDecl *> &results) {
   auto *declCtxt = replacement->getDeclContext();
+
+  // Hop up to the FileUnit if we're in top-level code
+  if (auto *toplevel = dyn_cast<TopLevelCodeDecl>(declCtxt))
+    declCtxt = toplevel->getDeclContext();
 
   // Look at the accessors' storage's context.
   if (auto *accessor = dyn_cast<AccessorDecl>(replacement)) {
@@ -3299,14 +3349,22 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     // Check that the decl we're decorating is a member of a type that actually
     // conforms to the specified protocol.
     NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
-    SmallVector<ProtocolConformance *, 2> conformances;
-    if (!NTD->lookupConformance(PD, conformances)) {
-      diagnose(attr->getLocation(),
-               diag::implements_attr_protocol_not_conformed_to,
-               NTD->getName(), PD->getName())
-        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    if (auto *OtherPD = dyn_cast<ProtocolDecl>(NTD)) {
+      if (!OtherPD->inheritsFrom(PD)) {
+        diagnose(attr->getLocation(),
+                 diag::implements_attr_protocol_not_conformed_to,
+                 NTD->getName(), PD->getName())
+          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+      }
+    } else {
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (!NTD->lookupConformance(PD, conformances)) {
+        diagnose(attr->getLocation(),
+                 diag::implements_attr_protocol_not_conformed_to,
+                 NTD->getName(), PD->getName())
+          .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+      }
     }
-
   } else {
     diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
       .highlight(attr->getProtocolTypeRepr()->getSourceRange());
@@ -3410,6 +3468,18 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         attr->setInvalid();
         return;
       }
+    }
+
+    return;
+  }
+
+  if (nominal->getAttrs().hasAttribute<TypeWrapperAttr>()) {
+    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D))) {
+      diagnose(attr->getLocation(),
+               diag::type_wrapper_attribute_not_allowed_here,
+               nominal->getName());
+      attr->setInvalid();
+      return;
     }
 
     return;
@@ -3529,6 +3599,177 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 
   // Force checking of the property wrapper type.
   (void)nominal->getPropertyWrapperTypeInfo();
+}
+
+void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::TypeWrappers)) {
+    diagnose(attr->getLocation(), diag::type_wrappers_are_experimental);
+    attr->setInvalid();
+    return;
+  }
+
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  auto &ctx = D->getASTContext();
+
+  auto isLessAccessibleThanType = [&](ValueDecl *decl) {
+    return decl->getFormalAccess() <
+           std::min(nominal->getFormalAccess(), AccessLevel::Public);
+  };
+
+  enum class UnviabilityReason { Failable, InvalidType, Inaccessible };
+
+  auto findMembersOrDiagnose = [&](DeclName memberName,
+                                   SmallVectorImpl<ValueDecl *> &results,
+                                   Diag<DeclName> notFoundDiagnostic) -> bool {
+    nominal->lookupQualified(nominal, DeclNameRef(memberName),
+                             NL_QualifiedDefault, results);
+
+    if (results.empty()) {
+      diagnose(nominal->getLoc(), notFoundDiagnostic, nominal->getName());
+      attr->setInvalid();
+      return true;
+    }
+    return false;
+  };
+
+  // Check whether type marked as @typeWrapper is valid:
+  //
+  // - Has a single generic parameter <Storage>
+  // - Has `init(memberwise: <Storage>)`
+  // - Has at least one `subscript(storedKeyPath: KeyPath<...>)` overload
+
+  // Has a single generic parameter.
+  {
+    auto *genericParams = nominal->getGenericParams();
+    if (!genericParams || genericParams->size() != 1) {
+      diagnose(nominal->getLoc(),
+               diag::type_wrapper_requires_a_single_generic_param);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // `init(memberwise:)`
+  {
+    DeclName initName(ctx, DeclBaseName::createConstructor(),
+                      ArrayRef<Identifier>(ctx.Id_memberwise));
+
+    SmallVector<ValueDecl *, 2> inits;
+    if (findMembersOrDiagnose(initName, inits,
+                              diag::type_wrapper_requires_memberwise_init))
+      return;
+
+    llvm::SmallDenseMap<ConstructorDecl *, SmallVector<UnviabilityReason, 2>, 2>
+        nonViableInits;
+    for (auto *decl : inits) {
+      auto *init = cast<ConstructorDecl>(decl);
+
+      if (init->isFailable())
+        nonViableInits[init].push_back(UnviabilityReason::Failable);
+
+      if (isLessAccessibleThanType(init))
+        nonViableInits[init].push_back(UnviabilityReason::Inaccessible);
+    }
+
+    // If there are no viable initializers, let's complain.
+    if (inits.size() - nonViableInits.size() == 0) {
+      for (const auto &entry : nonViableInits) {
+        auto *init = entry.first;
+
+        for (auto reason : entry.second) {
+          switch (reason) {
+          case UnviabilityReason::Failable:
+            diagnose(init, diag::type_wrapper_failable_init, init->getName());
+            break;
+
+          case UnviabilityReason::Inaccessible:
+            diagnose(init, diag::type_wrapper_type_requirement_not_accessible,
+                     init->getFormalAccess(), init->getDescriptiveKind(),
+                     init->getName(), nominal->getDeclaredType(),
+                     nominal->getFormalAccess());
+            break;
+
+          case UnviabilityReason::InvalidType:
+            llvm_unreachable("init(memberwise:) type is not checked");
+          }
+        }
+      }
+
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // subscript(storedKeypath: KeyPath<...>)
+  {
+    DeclName subscriptName(
+        ctx, DeclBaseName::createSubscript(),
+        ArrayRef<Identifier>(ctx.getIdentifier("storageKeyPath")));
+
+    SmallVector<ValueDecl *, 2> subscripts;
+    if (findMembersOrDiagnose(subscriptName, subscripts,
+                              diag::type_wrapper_requires_subscript))
+      return;
+
+    llvm::SmallDenseMap<SubscriptDecl *, SmallVector<UnviabilityReason, 2>, 2>
+        nonViableSubscripts;
+
+    for (auto *decl : subscripts) {
+      auto *subscript = cast<SubscriptDecl>(decl);
+
+      auto *keyPathParam = subscript->getIndices()->get(0);
+
+      if (auto *BGT =
+              keyPathParam->getInterfaceType()->getAs<BoundGenericType>()) {
+        if (!(BGT->isKeyPath() || BGT->isWritableKeyPath() ||
+              BGT->isReferenceWritableKeyPath())) {
+          nonViableSubscripts[subscript].push_back(
+              UnviabilityReason::InvalidType);
+        }
+      } else {
+        nonViableSubscripts[subscript].push_back(
+            UnviabilityReason::InvalidType);
+      }
+
+      if (isLessAccessibleThanType(subscript))
+        nonViableSubscripts[subscript].push_back(
+            UnviabilityReason::Inaccessible);
+    }
+
+    if (subscripts.size() - nonViableSubscripts.size() == 0) {
+      for (const auto &entry : nonViableSubscripts) {
+        auto *subscript = entry.first;
+
+        for (auto reason : entry.second) {
+          switch (reason) {
+          case UnviabilityReason::InvalidType: {
+            auto paramTy = subscript->getIndices()->get(0)->getInterfaceType();
+            diagnose(subscript, diag::type_wrapper_invalid_subscript_param_type,
+                     paramTy);
+            break;
+          }
+
+          case UnviabilityReason::Inaccessible:
+            diagnose(subscript,
+                     diag::type_wrapper_type_requirement_not_accessible,
+                     subscript->getFormalAccess(),
+                     subscript->getDescriptiveKind(), subscript->getName(),
+                     nominal->getDeclaredType(), nominal->getFormalAccess());
+            break;
+
+          case UnviabilityReason::Failable:
+            llvm_unreachable("subscripts cannot be failable");
+          }
+        }
+      }
+
+      attr->setInvalid();
+      return;
+    }
+  }
 }
 
 void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
@@ -6214,6 +6455,16 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   auto fn = cast<FuncDecl>(D);
   if (!fn->isAsyncContext()) {
     diagnose(attr->getLocation(), diag::inherits_executor_without_async);
+  }
+}
+
+void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {}
+
+void AttributeChecker::visitLexicalAttr(LexicalAttr *attr) {
+  // @_lexical and @_eagerMove are opposites and can't be combined.
+  if (D->getAttrs().hasAttribute<EagerMoveAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::eagermove_and_lexical_combined);
+    return;
   }
 }
 
