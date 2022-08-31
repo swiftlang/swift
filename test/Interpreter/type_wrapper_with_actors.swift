@@ -14,6 +14,11 @@
 
 // REQUIRES: OS=macosx
 
+// This requires executable tests to be run on the same machine as the compiler,
+// as it links with a dylib that it doesn't arrange to get uploaded to remote executors.
+// (rdar://99051588)
+// UNSUPPORTED: remote_run || device_run
+
 import type_wrapper_defs
 
 @Wrapper
