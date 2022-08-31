@@ -3,15 +3,16 @@ from .Node import Node  # noqa: I201
 
 AVAILABILITY_NODES = [
     # availability-spec-list -> availability-entry availability-spec-list?
-    Node('AvailabilitySpecList', kind='SyntaxCollection',
-         element='AvailabilityArgument'),
+    Node('AvailabilitySpecList', name_for_diagnostics="'@availability' arguments",
+         kind='SyntaxCollection', element='AvailabilityArgument'),
 
     # Wrapper for all the different entries that may occur inside @available
     # availability-entry -> '*' ','?
     #                     | identifier ','?
     #                     | availability-version-restriction ','?
     #                     | availability-versioned-argument ','?
-    Node('AvailabilityArgument', kind='Syntax',
+    Node('AvailabilityArgument', name_for_diagnostics="'@available' argument",
+         kind='Syntax',
          description='''
          A single argument to an `@available` argument like `*`, `iOS 10.1`,
          or `message: "This has been deprecated"`.
@@ -38,7 +39,8 @@ AVAILABILITY_NODES = [
 
     # Representation of 'deprecated: 2.3', 'message: "Hello world"' etc.
     # availability-versioned-argument -> identifier ':' version-tuple
-    Node('AvailabilityLabeledArgument', kind='Syntax',
+    Node('AvailabilityLabeledArgument', name_for_diagnostics="'@available' argument",
+         kind='Syntax',
          description='''
          A argument to an `@available` attribute that consists of a label and
          a value, e.g. `message: "This has been deprecated"`.
@@ -57,7 +59,8 @@ AVAILABILITY_NODES = [
 
     # Representation for 'iOS 10', 'swift 3.4' etc.
     # availability-version-restriction -> identifier version-tuple
-    Node('AvailabilityVersionRestriction', kind='Syntax',
+    Node('AvailabilityVersionRestriction', name_for_diagnostics="'@available' argument",
+         kind='Syntax',
          description='''
          An argument to `@available` that restricts the availability on a
          certain platform to a version, e.g. `iOS 10` or `swift 3.4`.
@@ -76,7 +79,7 @@ AVAILABILITY_NODES = [
     # version-tuple -> integer-literal
     #                | float-literal
     #                | float-literal '.' integer-literal
-    Node('VersionTuple', kind='Syntax',
+    Node('VersionTuple', name_for_diagnostics='version tuple', kind='Syntax',
          description='''
          A version number of the form major.minor.patch in which the minor
          and patch part may be omitted.
