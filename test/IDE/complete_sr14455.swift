@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE | %FileCheck %s
 
+// https://github.com/apple/swift/issues/56811
+
 public enum Endpoint {
   case movieDetail
 

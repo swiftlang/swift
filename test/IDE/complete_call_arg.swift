@@ -930,11 +930,13 @@ func testCompleteLabelAfterVararg() {
     // COMPLETE_MEMBER_IN_VARARG: End completions
   }
 
-  struct Sr14515 {
+  // https://github.com/apple/swift/issues/56867
+
+  struct S_56867 {
     func test(_: Foo..., yArg: Baz) {}
   }
 
-  private func testSr14515(value: Sr14515, foo: Foo, baz: Baz) {
+  private func test_56867(value: S_56867, foo: Foo, baz: Baz) {
     value.test(foo, #^COMPLETE_VARARG_FOLLOWED_BY_NORMAL_ARG^#)
     // COMPLETE_VARARG_FOLLOWED_BY_NORMAL_ARG: Begin completions
     // COMPLETE_VARARG_FOLLOWED_BY_NORMAL_ARG-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: foo[#Foo#];
@@ -995,15 +997,17 @@ struct Rdar77867723 {
   }
 }
 
-struct SR14737<T> {
+// https://github.com/apple/swift/issues/57087
+
+struct S_57087<T> {
   init(arg1: T, arg2: Bool) {}
 }
-extension SR14737 where T == Int {
+extension S_57087 where T == Int {
   init(arg1: T, onlyInt: Bool) {}
 }
-func test_SR14737() {
+do {
   invalidCallee {
-    SR14737(arg1: true, #^GENERIC_INIT_IN_INVALID^#)
+    S_57087(arg1: true, #^GENERIC_INIT_IN_INVALID^#)
 // GENERIC_INIT_IN_INVALID: Begin completions, 1 item
 // GENERIC_INIT_IN_INVALID-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg2: Bool#}[#Bool#];
 // GENERIC_INIT_IN_INVALID: End completions

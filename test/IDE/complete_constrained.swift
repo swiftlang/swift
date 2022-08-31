@@ -88,7 +88,8 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT: End completions
 }
 
-//https://bugs.swift.org/browse/SR-9938
+// https://github.com/apple/swift/issues/52344
+
 enum Fruit     { case apple }
 enum Vegetable { case broccoli }
 enum Meat      { case chicken }

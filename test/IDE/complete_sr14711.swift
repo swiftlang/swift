@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test --code-completion --source-filename %s --code-completion-token=COMPLETE | %FileCheck %s
 
+// https://github.com/apple/swift/issues/57061
+
 struct TodaySectionEditView {
     var sections: [SectionHeaderView2] = []
     @ViewBuilder2 var body: some View2 {

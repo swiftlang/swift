@@ -2,7 +2,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename=%s -code-completion-token=B | %FileCheck %s --check-prefix=B
 // RUN: %swift-ide-test -code-completion -source-filename=%s -code-completion-token=D | %FileCheck %s --check-prefix=D
 
-// https://bugs.swift.org/browse/SR-13271
+// https://github.com/apple/swift/issues/55711
 // https://forums.swift.org/t/code-completion-enhancement-request/38677
 
 enum AIdentifier {
