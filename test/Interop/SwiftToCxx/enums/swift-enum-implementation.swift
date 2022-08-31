@@ -32,7 +32,9 @@ public struct S {
 // CHECK-NEXT:     foobar
 // CHECK-NEXT:   };
 // CHECK-EMPTY:
-// CHECK-NEXT:   static struct {  // impl struct for case x
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions" // allow use of inline static data member
+// CHECK-NEXT:   inline const static struct {  // impl struct for case x
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::x;
 // CHECK-NEXT:     }
@@ -41,7 +43,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isX() const;
 // CHECK-NEXT:   inline double getX() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   static struct {  // impl struct for case y
+// CHECK-NEXT:   inline const static struct {  // impl struct for case y
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::y;
 // CHECK-NEXT:     }
@@ -50,7 +52,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isY() const;
 // CHECK-NEXT:   inline void const * _Nullable getY() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   static struct {  // impl struct for case z
+// CHECK-NEXT:   inline const static struct {  // impl struct for case z
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::z;
 // CHECK-NEXT:     }
@@ -59,7 +61,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isZ() const;
 // CHECK-NEXT:   inline S getZ() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   static struct {  // impl struct for case w
+// CHECK-NEXT:   inline const static struct {  // impl struct for case w
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::w;
 // CHECK-NEXT:     }
@@ -68,7 +70,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isW() const;
 // CHECK-NEXT:   inline swift::Int getW() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   static struct {  // impl struct for case auto
+// CHECK-NEXT:   inline const static struct {  // impl struct for case auto
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::auto_;
 // CHECK-NEXT:     }
@@ -77,7 +79,7 @@ public struct S {
 // CHECK-NEXT:   inline bool isAuto_() const;
 // CHECK-NEXT:   inline void * _Nonnull getAuto_() const;
 // CHECK-EMPTY:
-// CHECK-NEXT:   static struct {  // impl struct for case foobar
+// CHECK-NEXT:   inline const static struct {  // impl struct for case foobar
 // CHECK-NEXT:     inline constexpr operator cases() const {
 // CHECK-NEXT:       return cases::foobar;
 // CHECK-NEXT:     }
@@ -85,7 +87,7 @@ public struct S {
 // CHECK-NEXT:   } foobar;
 // CHECK-NEXT:   inline bool isFoobar() const;
 // CHECK-EMPTY:
-// CHECK-EMPTY:
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT:   inline operator cases() const {
 // CHECK-NEXT:     switch (_getEnumTag()) {
 // CHECK-NEXT:       case 0: return cases::x;
@@ -139,12 +141,6 @@ public struct S {
 // CHECK-NEXT:   using _impl_auto = decltype(auto_);
 // CHECK-NEXT:   using _impl_foobar = decltype(foobar);
 // CHECK:      };
-// CHECK-NEXT: decltype(E::x) E::x;
-// CHECK-NEXT: decltype(E::y) E::y;
-// CHECK-NEXT: decltype(E::z) E::z;
-// CHECK-NEXT: decltype(E::w) E::w;
-// CHECK-NEXT: decltype(E::auto_) E::auto_;
-// CHECK-NEXT: decltype(E::foobar) E::foobar;
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:

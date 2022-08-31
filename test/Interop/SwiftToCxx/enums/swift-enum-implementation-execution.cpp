@@ -15,63 +15,63 @@
 
 using namespace Enums;
 
-void switchTest(const E &e) {
+int switchTest(const E &e) {
     switch (e) {
     case E::x:
         assert(e.isX());
         assert(e.getX() == 3.14);
-        break;
+        return 0;
     case E::y:
         assert(e.isY());
         assert(e.getY() == nullptr);
-        break;
+        return 1;
     case E::z:
         assert(e.isZ());
         assert(e.getZ().getX() == 1234);
-        break;
+        return 2;
     case E::w:
         assert(e.isW());
         assert(e.getW() == 5678);
-        break;
+        return 3;
     case E::auto_:
         assert(e.isAuto_());
         assert(e.getAuto_() == reinterpret_cast<void *>(1));
-        break;
+        return 4;
     case E::foobar:
         assert(e.isFoobar());
-        break;
+        return 5;
     }
 }
 
 int main() {
     {
         auto e = E::x(3.14);
-        switchTest(e);
+        assert(switchTest(e) == 0);
     }
 
     {
         auto e = E::y(nullptr);
-        switchTest(e);
+        assert(switchTest(e) == 1);
     }
 
     {
         auto e = E::z(S::init(1234));
-        switchTest(e);
+        assert(switchTest(e) == 2);
     }
 
     {
         auto e = E::w(5678);
-        switchTest(e);
+        assert(switchTest(e) == 3);
     }
 
     {
         auto e = E::auto_(reinterpret_cast<void *>(1));
-        switchTest(e);
+        assert(switchTest(e) == 4);
     }
 
     {
         auto e = E::foobar();
-        switchTest(e);
+        assert(switchTest(e) == 5);
     }
     return  0;
 }

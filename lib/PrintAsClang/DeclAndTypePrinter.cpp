@@ -517,7 +517,8 @@ private:
     auto printStruct = [&](StringRef caseName, EnumElementDecl *elementDecl,
                            Optional<IRABIDetailsProvider::EnumElementInfo>
                                elementInfo) {
-      os << "  static struct {  // impl struct for case " << caseName << '\n';
+      os << "  inline const static struct {  "
+         << "// impl struct for case " << caseName << '\n';
       os << "    inline constexpr operator cases() const {\n";
       os << "      return cases::";
       syntaxPrinter.printIdentifier(caseName);
@@ -670,6 +671,9 @@ private:
       }
       os << "\n  };\n\n"; // enum class cases' closing bracket
 
+      os << "#pragma clang diagnostic push\n";
+      os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"  "
+         << "// allow use of inline static data member\n";
       for (const auto &pair : elementTagMapping) {
         // Printing struct
         printStruct(pair.first->getNameStr(), pair.first, pair.second);
@@ -690,7 +694,7 @@ private:
         printIsFunction(resilientUnknownDefaultCaseName, ED);
         os << '\n';
       }
-      os << '\n';
+      os << "#pragma clang diagnostic pop\n";
 
       // Printing operator cases()
       os << "  inline operator cases() const {\n";
