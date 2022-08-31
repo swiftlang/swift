@@ -24,6 +24,13 @@ func foo() async {
   asyncDetached { () async -> () in } // expected-error{{Unavailable in task-to-thread concurrency model}}
   asyncDetached { () async throws -> () in } // expected-error{{Unavailable in task-to-thread concurrency model}}
   _ = MainActor.self // expected-error{{Unavailable in task-to-thread concurrency model}}
+  let _: Int = await withCheckedContinuation { _ in } // expected-error{{Unavailable in task-to-thread concurrency model}}
+  do {
+  let _: Int = try await withCheckedThrowingContinuation { _ in } // expected-error{{Unavailable in task-to-thread concurrency model}}
+  } catch let error {
+    _ = error
+  }
+  _ = CheckedContinuation<Int, Never>.self // expected-error{{Unavailable in task-to-thread concurrency model}}
 }
 
 func foo2(

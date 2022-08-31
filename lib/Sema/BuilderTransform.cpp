@@ -432,12 +432,7 @@ protected:
     // If the builder supports `buildPartialBlock(first:)` and
     // `buildPartialBlock(accumulated:next:)`, use this to combine
     // subexpressions pairwise.
-    if (!expressions.empty() &&
-        builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                         /*checkAvailability*/ true) &&
-        builder.supports(ctx.Id_buildPartialBlock,
-                         {ctx.Id_accumulated, ctx.Id_next},
-                         /*checkAvailability*/ true)) {
+    if (!expressions.empty() && builder.canUseBuildPartialBlock()) {
       // NOTE: The current implementation uses one-way constraints in between
       // subexpressions. It's functionally equivalent to the following:
       //   let v0 = Builder.buildPartialBlock(first: arg_0)
@@ -1087,12 +1082,7 @@ protected:
       // If the builder supports `buildPartialBlock(first:)` and
       // `buildPartialBlock(accumulated:next:)`, use this to combine
       // sub-expressions pairwise.
-      if (!buildBlockArguments.empty() &&
-          builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                           /*checkAvailability*/ true) &&
-          builder.supports(ctx.Id_buildPartialBlock,
-                           {ctx.Id_accumulated, ctx.Id_next},
-                           /*checkAvailability*/ true)) {
+      if (!buildBlockArguments.empty() && builder.canUseBuildPartialBlock()) {
         //   let v0 = Builder.buildPartialBlock(first: arg_0)
         //   let v1 = Builder.buildPartialBlock(accumulated: v0, next: arg_1)
         //   ...
@@ -2777,11 +2767,22 @@ std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
   return precheck.getReturnStmts();
 }
 
-bool TypeChecker::typeSupportsBuilderOp(
+ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
     Type builderType, DeclContext *dc, Identifier fnName,
-    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults,
-    bool checkAvailability) {
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+
+  auto isUnavailable = [&](Decl *D) -> bool {
+    if (AvailableAttr::isUnavailable(D))
+      return true;
+
+    auto loc = extractNearestSourceLoc(dc);
+    auto context = ExportContext::forFunctionBody(dc, loc);
+    return TypeChecker::checkDeclarationAvailability(D, context).hasValue();
+  };
+
   bool foundMatch = false;
+  bool foundUnavailable = false;
+
   SmallVector<ValueDecl *, 4> foundDecls;
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
@@ -2800,17 +2801,12 @@ bool TypeChecker::typeSupportsBuilderOp(
           continue;
       }
 
-      // If we are checking availability, the candidate must have enough
-      // availability in the calling context.
-      if (checkAvailability) {
-        if (AvailableAttr::isUnavailable(func))
-          continue;
-        if (TypeChecker::checkDeclarationAvailability(
-                func, ExportContext::forFunctionBody(
-                    dc, extractNearestSourceLoc(dc))))
-          continue;
+      // Check if the the candidate has a suitable availability for the
+      // calling context.
+      if (isUnavailable(func)) {
+        foundUnavailable = true;
+        continue;
       }
-
       foundMatch = true;
       break;
     }
@@ -2819,7 +2815,24 @@ bool TypeChecker::typeSupportsBuilderOp(
   if (allResults)
     allResults->append(foundDecls.begin(), foundDecls.end());
 
-  return foundMatch;
+  if (!foundMatch) {
+    return foundUnavailable ? ResultBuilderOpSupport::Unavailable
+                            : ResultBuilderOpSupport::Unsupported;
+  }
+  // If the builder type itself isn't available, don't consider any builder
+  // method available.
+  if (auto *D = builderType->getAnyNominal()) {
+    if (isUnavailable(D))
+      return ResultBuilderOpSupport::Unavailable;
+  }
+  return ResultBuilderOpSupport::Supported;
+}
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  return checkBuilderOpSupport(builderType, dc, fnName, argLabels, allResults)
+      .isSupported(/*requireAvailable*/ false);
 }
 
 Type swift::inferResultBuilderComponentType(NominalTypeDecl *builder) {
@@ -2978,18 +2991,43 @@ ResultBuilder::ResultBuilder(ConstraintSystem *CS, DeclContext *DC,
   }
 }
 
+bool ResultBuilder::supportsBuildPartialBlock(bool checkAvailability) {
+  auto &ctx = DC->getASTContext();
+  return supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                  checkAvailability) &&
+         supports(ctx.Id_buildPartialBlock, {ctx.Id_accumulated, ctx.Id_next},
+                  checkAvailability);
+}
+
+bool ResultBuilder::canUseBuildPartialBlock() {
+  // If buildPartialBlock doesn't exist at all, we can't use it.
+  if (!supportsBuildPartialBlock(/*checkAvailability*/ false))
+    return false;
+
+  // If buildPartialBlock exists and is available, use it.
+  if (supportsBuildPartialBlock(/*checkAvailability*/ true))
+    return true;
+
+  // We have buildPartialBlock, but it is unavailable. We can however still
+  // use it if buildBlock is also unavailable.
+  auto &ctx = DC->getASTContext();
+  return supports(ctx.Id_buildBlock) &&
+         !supports(ctx.Id_buildBlock, /*labels*/ {},
+                   /*checkAvailability*/ true);
+}
+
 bool ResultBuilder::supports(Identifier fnBaseName,
                              ArrayRef<Identifier> argLabels,
                              bool checkAvailability) {
   DeclName name(DC->getASTContext(), fnBaseName, argLabels);
   auto known = SupportedOps.find(name);
-  if (known != SupportedOps.end()) {
-    return known->second;
-  }
+  if (known != SupportedOps.end())
+    return known->second.isSupported(checkAvailability);
 
-  return SupportedOps[name] = TypeChecker::typeSupportsBuilderOp(
-             BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {},
-             checkAvailability);
+  auto support = TypeChecker::checkBuilderOpSupport(
+      BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {});
+  SupportedOps.insert({name, support});
+  return support.isSupported(checkAvailability);
 }
 
 Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,

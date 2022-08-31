@@ -1082,7 +1082,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1605,6 +1605,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 -DCMAKE_BUILD_WITH_INSTALL_RPATH="1"
             )
         fi
+
+        if [[ "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
+            llvm_cmake_options=(
+                "${llvm_cmake_options[@]}"
+                -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
+            )
+        fi
     fi
 
     llvm_cmake_options=(
@@ -1884,6 +1891,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                         -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
+                    )
+                fi
+
+                if [[ $(is_cross_tools_host ${host}) && "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
                     )
                 fi
 

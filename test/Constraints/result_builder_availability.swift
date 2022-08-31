@@ -167,3 +167,59 @@ tuplifyWithAvailabilityErasure(true) { cond in
     globalFuncAvailableOn10_52()
   }
 }
+
+// rdar://97533700 – Make sure we can prefer an unavailable buildPartialBlock if
+// buildBlock also isn't available.
+
+@resultBuilder
+struct UnavailableBuildPartialBlock {
+  static func buildPartialBlock(first: Int) -> Int { 0 }
+
+  @available(*, unavailable)
+  static func buildPartialBlock(accumulated: Int, next: Int) -> Int { 0 }
+
+  static func buildBlock(_ x: Int...) -> Int { 0 }
+}
+
+@UnavailableBuildPartialBlock
+func testUnavailableBuildPartialBlock() -> Int {
+  // We can use buildBlock here.
+  2
+  3
+}
+
+@resultBuilder
+struct UnavailableBuildPartialBlockAndBuildBlock {
+  @available(*, unavailable)
+  static func buildPartialBlock(first: Int) -> Int { 0 }
+  // expected-note@-1 {{'buildPartialBlock(first:)' has been explicitly marked unavailable here}}
+
+  static func buildPartialBlock(accumulated: Int, next: Int) -> Int { 0 }
+
+  @available(*, unavailable)
+  static func buildBlock(_ x: Int...) -> Int { 0 }
+}
+
+// We can still use buildPartialBlock here as both are unavailable.
+@UnavailableBuildPartialBlockAndBuildBlock
+func testUnavailableBuildPartialBlockAndBuildBlock() -> Int {
+  // expected-error@-1 {{'buildPartialBlock(first:)' is unavailable}}
+  2
+  3
+}
+
+@available(*, unavailable)
+@resultBuilder
+struct UnavailableBuilderWithPartialBlock { // expected-note {{'UnavailableBuilderWithPartialBlock' has been explicitly marked unavailable here}}
+  @available(*, unavailable)
+  static func buildPartialBlock(first: String) -> Int { 0 }
+  static func buildPartialBlock(accumulated: Int, next: Int) -> Int { 0 }
+  static func buildBlock(_ x: Int...) -> Int { 0 }
+}
+
+@UnavailableBuilderWithPartialBlock // expected-error {{'UnavailableBuilderWithPartialBlock' is unavailable}}
+func testUnavailableBuilderWithPartialBlock() -> Int {
+  // The builder itself is unavailable, so we can still opt for buildPartialBlock.
+  2 // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  3
+}

@@ -109,6 +109,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     bool IsExprStmt;
+    unsigned ExprNestingDepth;
     bool HasReachedSemanticsProvidingExpr;
 
     ASTContext &Ctx;
@@ -116,7 +117,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
-        : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
+        : IsExprStmt(isExprStmt), ExprNestingDepth(0),
+          HasReachedSemanticsProvidingExpr(false),
           Ctx(DC->getASTContext()), DC(DC) {}
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
@@ -130,6 +132,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<OpenExistentialExpr>(E)) {
+        // Don't increase ExprNestingDepth.
+        return { true, E };
+      }
 
       if (auto collection = dyn_cast<CollectionExpr>(E)) {
         if (collection->isTypeDefaulted()) {
@@ -275,9 +281,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       // Diagnose 'self.init' or 'super.init' nested in another expression
-      // or closure.
+      // or closure. The ExprNestingDepth thing is to allow this to be nested
+      // inside of an OpenExistentialExpr that is at the top level.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (!Parent.isNull() || !IsExprStmt || DC->getParent()->isLocalContext()) {
+        if (ExprNestingDepth > 0 || !IsExprStmt ||
+            DC->getParent()->isLocalContext()) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           Ctx.Diags.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -346,7 +354,18 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         HasReachedSemanticsProvidingExpr = true;
       }
 
+      ++ExprNestingDepth;
+
       return { true, E };
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      if (isa<OpenExistentialExpr>(E))
+        return E;
+
+      assert(ExprNestingDepth != 0);
+      --ExprNestingDepth;
+      return E;
     }
 
     /// Visit each component of the keypath and emit a diagnostic if they
@@ -1500,6 +1519,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   };
 
   DiagnoseWalker walker(var, fn);
+
   const_cast<Expr *>(E)->walk(walker);
 }
 

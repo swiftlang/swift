@@ -404,6 +404,11 @@ macro(configure_sdk_unix name architectures)
         message(STATUS "OpenBSD Version: ${openbsd_system_version}")
 
         set(SWIFT_SDK_OPENBSD_ARCH_amd64_TRIPLE "amd64-unknown-openbsd${openbsd_system_version}")
+
+	if(CMAKE_SYSROOT)
+	  set(SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH}" CACHE INTERNAL "sysroot path" FORCE)
+	  set(SWIFT_SDK_OPENBSD_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}" CACHE INTERNAL "sysroot libc path" FORCE)
+	endif()
       elseif("${prefix}" STREQUAL "CYGWIN")
         if(NOT arch STREQUAL x86_64)
           message(FATAL_ERROR "unsupported arch for cygwin: ${arch}")
