@@ -8,8 +8,9 @@ public protocol Protocol {
   static func foo(_: Self?)
 }
 
-// SR-3021: Ensure we pass the Self type metadata for Optional methods using the
-// formal Optional type and not a lowered SIL type.
+// https://github.com/apple/swift/issues/45611
+// Ensure we pass the 'Self' type metadata for 'Optional' methods using the
+// formal 'Optional' type and not a lowered SIL type.
 
 // CHECK-LABEL: @_TMaGSqFT_T__
 
@@ -23,7 +24,8 @@ entry(%x : $*Optional<@callee_guaranteed @substituted <T> () -> @out T for <()>>
   return undef : $()
 }
 
-// SR-3548: Ensure we correctly emit "metadata for layout" for lowered Optional types.
+// https://github.com/apple/swift/issues/46136
+// Ensure we correctly emit metadata for layout for lowered 'Optional' types.
 
 sil @alloc_stack_optional_with_generic : $@convention(thin) <T> () -> () {
   %a = alloc_stack $*Optional<(T, @convention(thin) () -> ())>

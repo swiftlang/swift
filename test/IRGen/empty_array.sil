@@ -8,7 +8,8 @@
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
 
-// FIXME: SR-3602 test is failing after being unintentionally disabled for a while
+// FIXME: https://github.com/apple/swift/issues/46187 test is failing after
+// being unintentionally disabled for a while.
 // REQUIRES: SR3602
 
 sil_stage canonical

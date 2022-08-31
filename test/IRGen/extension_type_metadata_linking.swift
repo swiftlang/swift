@@ -49,7 +49,9 @@ extension NSNumber {
   public struct Struct {}
 }
 
-// SR-9397: not emitting metadata for NSComparisonResult
+// https://github.com/apple/swift/issues/51863
+// Not emitting metadata for 'NSComparisonResult'
+
 protocol CommandTypes {
     associatedtype Result
     associatedtype Message

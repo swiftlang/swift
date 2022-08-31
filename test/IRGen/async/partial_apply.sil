@@ -299,8 +299,9 @@ bb0(%0 : $Int):
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24complex_generic_functionTA"(
 struct ComplexBoundedType<T: P2> {}
 
-// SR-901: Ensure that a partial_apply which captures bound generic type
-// metadata doesn't crash when restoring the generic context.
+// https://github.com/apple/swift/issues/43513
+// Ensure that a 'partial_apply' which captures bound generic type metadata
+// doesn't crash when restoring the generic context.
 
 sil hidden @generic_function : $@async @convention(thin) <T> () -> () {
   %0 = builtin "int_trap"() : $Never

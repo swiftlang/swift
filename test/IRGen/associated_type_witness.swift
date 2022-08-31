@@ -151,7 +151,9 @@ struct UsesVoid : HasSimpleAssoc {
   typealias Assoc = ()
 }
 
-// SR-11642: Failure to canonicalize type in associated type witness.
+// https://github.com/apple/swift/issues/54052
+// Failure to canonicalize type in associated type witness
+
 struct Validator<T> {
   let validatorFailureType: Any.Type
 }

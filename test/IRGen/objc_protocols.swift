@@ -212,7 +212,7 @@ func gallop<T : Vanner>(_ t: Stirrup<T>) {
   canter(t)
 }
 
-// SR-7130
+// https://github.com/apple/swift/issues/49678
 func triggerDoubleInheritedFunging() -> AnyObject {
   return NSDoubleInheritedFunging.self as AnyObject
 }
