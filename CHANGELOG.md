@@ -16,6 +16,43 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.7
 
+* [SE-0327][]:
+
+  There are a few notable changes in Swift 5.7 with respect to SE-0327.
+
+  First, the deinitializer and most kinds of initializers for `actor` types, and types constrained by a global actor like the `@MainActor`, have revised rules about what expressions are permitted in their body. The goal of these revisions has been to improve language expressivity and safety. In particular, many more programming patterns are now permitted in these initializers.
+
+  For example, a non-async initializer of an `actor` prior to Swift 5.7 would raise a diagnostic any time `self` escapes the initializer before returning. That diagnostic's purpose was to protect against a possible data race when accessing isolated stored proeprties. But, that diagnostic was emitted even if there was no dangerous racy access.
+
+  In Swift 5.7, the compiler now checks these initializers for dangerous accesses to isolated stored properties that occur after an escape of `self`:
+
+  ```swift
+  actor Database {
+    // ... other properties ...
+    var rows: Int = 0
+
+    init(_ world: DataUser) {
+      defer {
+        print("last = \(self.rows)") // ❌ this access to 'rows' is illegal.
+      }
+
+      print("before = \(self.rows)") // ✅ this access to 'rows' is OK
+      world.publishDatabase(self)    // ✅ passing 'self' is OK in Swift 5.7+
+      print("after = \(self.rows)")  // ❌ this access to 'rows' is illegal. 
+
+      Task { [weak self] in          // ✅ capturing 'self' is OK in Swift 5.7+
+        while let db = self { await db.prune() }
+      }
+    }
+  }
+  ```
+
+  This is a control-flow sensitive check, meaning an illegal access does not necessarily appear on a source line after an escape of `self` (in the example above, consider _when_ the `defer` is executed). The compiler will always point out one of the escapes of `self` that is causing an access to become illegal.
+
+  Next, delegating initializers of an actor are no longer always non-isolated. This means an `async` delegating initializer can do the same things as a non-delegating one.
+
+  Finally, the diagnostic about non-isolated default-value expressions introduced for Swift 5.6 in the Xcode 13.3 release has been removed. The proposed rule was not precise enough to avoid flagging an innocuous yet common pattern in SwiftUI code involving `@StateObject` properties and `@MainActor`.
+
 * The Swift compiler no longer warns about redundant requirements in generic declarations. For example,
   the following code diagnosed a warning in Swift 5.6 about the `T.Iterator : IteratorProtocol`
   requirement being redundant, because it is implied by `T : Sequence`:
