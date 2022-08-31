@@ -781,7 +781,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   @inlinable
   @_silgen_name("$sSp6assign9repeating5countyx_SitF")
   public func update(repeating repeatedValue: Pointee, count: Int) {
-    _debugPrecondition(count >= 0, "UnsafeMutablePointer.assign(repeating:count:) with negative count")
+    _debugPrecondition(count >= 0, "UnsafeMutablePointer.update(repeating:count:) with negative count")
     for i in 0..<count {
       self[i] = repeatedValue
     }
