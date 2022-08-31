@@ -342,6 +342,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   ///     }
   ///     print(numbers)
   ///     // Prints "[2, 1, 4, 3, 5]"
+  ///
+  ///     Uninitialized memory cannot be initialized to a nontrivial type
+  ///     using this subscript. Instead, use an initializing method, such as
+  ///     `initializeElement(at:to:)`
 %else:
   /// The following example uses the buffer pointer's subscript to access every
   /// other element of the buffer:

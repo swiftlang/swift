@@ -694,9 +694,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// side of an assignment, the instance is updated. The instance must
   /// be initialized or this pointer's `Pointee` type must be a trivial type.
   ///
-  /// Do not update an instance of a nontrivial type through `pointee` to
-  /// uninitialized memory. Instead, use an initializing method, such as
-  /// `initialize(repeating:count:)`.
+  /// Uninitialized memory cannot be initialized to a nontrivial type
+  /// using `pointee`. Instead, use an initializing method, such as
+  /// `initialize(to:)`.
   @inlinable // unsafe-performance
   public var pointee: Pointee {
     @_transparent unsafeAddress {
@@ -1096,9 +1096,9 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// side of an assignment, the memory at `p + i` is updated. The memory must
   /// be initialized or the pointer's `Pointee` type must be a trivial type.
   ///
-  /// Do not update an instance of a nontrivial type through the subscript to
-  /// uninitialized memory. Instead, use an initializing method, such as
-  /// `initialize(repeating:count:)`.
+  /// Uninitialized memory cannot be initialized to a nontrivial type
+  /// using this subscript. Instead, use an initializing method, such as
+  /// `initialize(to:)`.
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
