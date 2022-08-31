@@ -301,12 +301,13 @@ else()
       endif()
     endif()
     if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
-      set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
-      set(compatibility_libs
-          "swiftCompatibility50-${platform}"
-          "swiftCompatibility51-${platform}"
-          "swiftCompatibilityDynamicReplacements-${platform}")
-
+      # We cannot specify directly HostCompatibilityLibs
+      # because ultimately is used to specify a dependency for a
+      # custom target and, unlike `target_link_libraries`, such dependency
+      # would be lost at the generation of the build system.
+      get_property(compatibility_libs
+        TARGET HostCompatibilityLibs
+        PROPERTY INTERFACE_LINK_LIBRARIES)
       list(APPEND b0_deps ${compatibility_libs})
       list(APPEND b1_deps ${compatibility_libs})
     endif()
