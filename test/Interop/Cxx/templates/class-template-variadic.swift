@@ -2,7 +2,8 @@
 //
 // REQUIRES: executable_test
 //
-// We can't yet call member functions correctly on Windows (SR-13129).
+// We can't yet call member functions correctly on Windows
+// (https://github.com/apple/swift/issues/55575).
 // XFAIL: OS=windows-msvc
 // REQUIRES: fixing-after-30630
 
@@ -25,7 +26,8 @@ TemplatesTestSuite.test("typedeffed-variadic-class-template") {
   expectEqual(pairB.getValue(), 20)
 }
 
-// TODO(SR-13261): This test doesn't work because Swift sees this as passing in too many generic arguments.
+// TODO: This test doesn't work because Swift sees this as passing in too many
+// generic arguments (https://github.com/apple/swift/issues/55701).
 // TemplatesTestSuite.test("variadic-class-template") {
 //   let a = IntWrapper(value: 10)
 //   let b = IntWrapper(value: 20)

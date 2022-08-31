@@ -65,8 +65,8 @@ void takesDeclTypePointer(decltype(usedInDeclType<T>()) *) {}
 
 // TODO: Add test for DeducedTemplateSpecializationType once we support class templates.
 
-// TODO(SR-13809): We don't yet support dependent types but we still shouldn't
-// crash when importing one.
+// TODO: We don't yet support dependent types but we still shouldn't
+// crash when importing one (https://github.com/apple/swift/issues/56206).
 template <class T> struct Dep { using TT = T; };
 
 template <class T> void useDependentType(typename Dep<T>::TT) {}

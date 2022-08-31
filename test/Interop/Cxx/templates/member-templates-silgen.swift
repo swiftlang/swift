@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 
-// We can't yet call member functions correctly on Windows (SR-13129).
+// We can't yet call member functions correctly on Windows
+// (https://github.com/apple/swift/issues/55575).
 // XFAIL: OS=windows-msvc
 
 import MemberTemplates
