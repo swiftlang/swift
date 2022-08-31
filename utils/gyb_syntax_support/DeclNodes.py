@@ -105,6 +105,8 @@ DECL_NODES = [
                        Child('SwitchCases', kind='SwitchCaseList'),
                        Child('Decls', kind='MemberDeclList'),
                        Child('PostfixExpression', kind='Expr'),
+                       Child('ArrayElements', kind='ArrayElementList'),
+                       Child('DictionaryElements', kind='DictionaryElementList'),
                    ]),
          ]),
 

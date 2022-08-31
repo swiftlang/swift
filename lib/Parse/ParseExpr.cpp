@@ -3663,58 +3663,10 @@ ParserResult<Expr> Parser::parseExprCollection() {
   SmallVector<Expr *, 8> ElementExprs;
   SmallVector<SourceLoc, 8> CommaLocs;
 
-  {
-    SyntaxParsingContext ListCtx(SyntaxContext, SyntaxContextKind::Expr);
-
-    while (true) {
-      SyntaxParsingContext ElementCtx(SyntaxContext);
-
-      auto Element = parseExprCollectionElement(isDictionary);
-      Status |= Element;
-      ElementCtx.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryElement
-                                               : SyntaxKind::ArrayElement);
-      if (Element.isNonNull())
-        ElementExprs.push_back(Element.get());
-
-      // Skip to ']' or ',' in case of error.
-      // NOTE: This checks 'Status' instead of 'Element' to silence excessive
-      // diagnostics.
-      if (Status.isErrorOrHasCompletion()) {
-        skipUntilDeclRBrace(tok::r_square, tok::comma);
-        if (Tok.isNot(tok::comma))
-          break;
-      }
-
-      // Parse the ',' if exists.
-      if (Tok.is(tok::comma)) {
-        CommaLocs.push_back(consumeToken());
-        if (!Tok.is(tok::r_square))
-          continue;
-      }
-
-      // Close square.
-      if (Tok.is(tok::r_square))
-        break;
-
-      // If we found EOF or such, bailout.
-      if (Tok.is(tok::eof)) {
-        IsInputIncomplete = true;
-        break;
-      }
-
-      // If The next token is at the beginning of a new line and can never start
-      // an element, break.
-      if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfSwiftDecl() || isStartOfStmt()))
-        break;
-
-      diagnose(Tok, diag::expected_separator, ",")
-          .fixItInsertAfter(PreviousLoc, ",");
-      Status.setIsParseError();
-    }
-
-    ListCtx.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryElementList
-                                          : SyntaxKind::ArrayElementList);
+  Status |=
+      parseExprCollectionElementList(isDictionary, ElementExprs, CommaLocs);
+  if (!isDictionary.hasValue()) {
+    isDictionary = false;
   }
   ArrayOrDictContext.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryExpr
                                                    : SyntaxKind::ArrayExpr);
@@ -3730,7 +3682,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   }
 
   // Don't bother to create expression if any expressions aren't parsed.
-  if (ElementExprs.empty())
+  if (ElementExprs.empty() && Status.isErrorOrHasCompletion())
     return Status;
 
   Expr *expr;
@@ -3742,6 +3694,107 @@ ParserResult<Expr> Parser::parseExprCollection() {
                              RSquareLoc);
 
   return makeParserResult(Status, expr);
+}
+
+ParserStatus
+Parser::parseExprCollectionElementList(Optional<bool> &isDictionary,
+                                       SmallVectorImpl<Expr *> &ElementExprs,
+                                       SmallVectorImpl<SourceLoc> &CommaLocs) {
+  SyntaxParsingContext ListCtx(SyntaxContext, SyntaxContextKind::Expr);
+  ParserStatus Status;
+  bool isInIfConfigClause =
+      (StructureMarkers.back().Kind == StructureMarkerKind::IfConfig);
+
+  while (true) {
+    if (Tok.is(tok::pound_if)) {
+      Status |= parseIfConfig([&](SmallVectorImpl<ASTNode> &elements,
+                                  bool isActive) {
+        SmallVector<Expr *, 4> subElementExprs;
+        SmallVector<SourceLoc, 4> subCommaLocs;
+        Status |= parseExprCollectionElementList(isDictionary, subElementExprs,
+                                                 subCommaLocs);
+        // Only use elements in the active clause.
+        if (isActive) {
+          ElementExprs.append(subElementExprs.begin(), subElementExprs.end());
+          CommaLocs.append(subCommaLocs.begin(), subCommaLocs.end());
+        }
+      });
+      continue;
+    }
+    if (Tok.isAny(tok::pound_endif, tok::pound_else, tok::pound_elseif,
+                  tok::eof, tok::r_square)) {
+      break;
+    }
+
+    SyntaxParsingContext ElementCtx(SyntaxContext);
+
+    auto Element = parseExprCollectionElement(isDictionary);
+    Status |= Element;
+    ElementCtx.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryElement
+                                             : SyntaxKind::ArrayElement);
+    if (Element.isNonNull())
+      ElementExprs.push_back(Element.get());
+
+    // Skip to ']' or ',' in case of error.
+    // NOTE: This checks 'Status' instead of 'Element' to silence excessive
+    // diagnostics.
+    if (Status.isErrorOrHasCompletion()) {
+      skipUntilDeclRBrace(tok::r_square, tok::comma);
+      if (Tok.isNot(tok::comma))
+        break;
+    }
+
+    // Inside '#if'.
+    if (isInIfConfigClause) {
+      // ',' is mandatory inside '#if'.
+      SourceLoc commaLoc;
+      if (consumeIf(tok::comma, commaLoc)) {
+        CommaLocs.push_back(commaLoc);
+      } else {
+        diagnose(Tok, diag::expected_separator, ",")
+            .fixItInsertAfter(PreviousLoc, ",");
+      }
+
+      continue;
+    }
+
+    // Parse the ',' if exists.
+    if (Tok.is(tok::comma)) {
+      CommaLocs.push_back(consumeToken());
+      if (!Tok.is(tok::r_square))
+        continue;
+    }
+
+    // Close square.
+    if (Tok.is(tok::r_square))
+      break;
+
+    // If we found EOF or such, bailout.
+    if (Tok.is(tok::eof)) {
+      IsInputIncomplete = true;
+      break;
+    }
+
+    // If The next token is at the beginning of a new line and can never start
+    // an element, break.
+    if (Tok.isAtStartOfLine() && !Tok.is(tok::pound_if) &&
+        (Tok.isAny(tok::r_brace, tok::pound_endif) || isStartOfSwiftDecl() ||
+         isStartOfStmt()))
+      break;
+
+    diagnose(Tok, diag::expected_separator, ",")
+        .fixItInsertAfter(PreviousLoc, ",");
+    Status.setIsParseError();
+  }
+
+  // If we didn't parse any elements, 'isDictionary' might be null, in such
+  // case, let's assume this is an array literal.
+  // This only happens when the first `#if...#endif` clause doesn't have any
+  // elements.
+  ListCtx.setCreateSyntax(isDictionary && *isDictionary
+                              ? SyntaxKind::DictionaryElementList
+                              : SyntaxKind::ArrayElementList);
+  return Status;
 }
 
 /// parseExprCollectionElement - Parse an element for collection expr.

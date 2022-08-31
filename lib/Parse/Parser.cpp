@@ -851,7 +851,6 @@ bool Parser::parseEndIfDirective(SourceLoc &Loc) {
   Loc = Tok.getLoc();
   if (parseToken(tok::pound_endif, diag::expected_close_to_if_directive)) {
     Loc = PreviousLoc;
-    skipUntilConditionalBlockClose();
     return true;
   } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
     diagnose(Tok.getLoc(),

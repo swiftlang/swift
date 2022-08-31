@@ -1795,6 +1795,10 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
+  ParserStatus
+  parseExprCollectionElementList(Optional<bool> &isDictionary,
+                                 SmallVectorImpl<Expr *> &ElementExprs,
+                                 SmallVectorImpl<SourceLoc> &CommaLocs);
   ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
