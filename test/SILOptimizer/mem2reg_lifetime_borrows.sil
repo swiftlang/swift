@@ -484,3 +484,20 @@ bb3:
   return %r : $()
 }
 
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'storeborrow_multi_only_lexicalallocas'
+sil [ossa] @storeborrow_multi_only_lexicalallocas : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %l = load_borrow %0 : $*Klass
+  %1 = alloc_stack [lexical] $Klass
+  %sb = store_borrow %l to %1 : $*Klass
+  br bb1
+
+bb1:
+  end_borrow %sb : $*Klass
+  end_borrow %l : $Klass
+  dealloc_stack %1 : $*Klass
+  %6 = tuple ()
+  return %6 : $()
+}
+
