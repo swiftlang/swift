@@ -13,5 +13,7 @@ void test(void *p) {
   getEnumTagi32(p);
 }
 
-// CHECK: declare noundef{{( zeroext)?}} i8 @_Z12getEnumTagi8Pv(i8* noundef)
-// CHECK: declare noundef i32 @_Z13getEnumTagi32Pv(i8* noundef)
+// NOTE: it's important to verify that i32 function does not zeroext/signext return value.
+
+// CHECK: declare{{( noundef)?}}{{( zeroext)?}} i8 @_Z12getEnumTagi8Pv(i8* noundef)
+// CHECK: declare{{( noundef)?}} i32 @_Z13getEnumTagi32Pv(i8* noundef)
