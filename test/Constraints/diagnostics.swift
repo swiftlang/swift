@@ -222,7 +222,7 @@ class r20201968C {
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
   assert(a != nil, "ASSERT COMPILATION ERROR")
-  // expected-warning @-1 {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns true}}
+  // expected-warning @-1 {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
 }
 
 
@@ -537,7 +537,7 @@ func r21684487() {
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to 'nil' or 'Optional.none' always returns true}}
+  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to 'nil' always returns true}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
@@ -745,27 +745,27 @@ class C_44203 {
   func f(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns false}}
-    _ = (self === .none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns false}}
-    _ = (self === Optional.none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns false}}
+    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns false}}
+    _ = (self === .none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns false}}
+    _ = (self === Optional.none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns true}}
-    _ = (self !== .none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns true}}
-    _ = (self !== Optional.none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns true}}
+    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns true}}
+    _ = (self !== .none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns true}}
+    _ = (self !== Optional.none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns true}}
   }
 }
 
 func nilComparison(i: Int, o: AnyObject) {
-  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns false}}
-  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns false}}
-  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns true}}
-  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns true}}
+  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns false}}
+  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns false}}
+  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
+  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
 
-  _ = i == Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns false}}
-  _ = Optional.none == i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns false}}
-  _ = i != Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns true}}
-  _ = Optional.none != i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' or 'Optional.none' always returns true}}
+  _ = i == Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns false}}
+  _ = Optional.none == i // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns false}}
+  _ = i != Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns true}}
+  _ = Optional.none != i // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns true}}
   
   // FIXME(integers): uncomment these tests once the < is no longer ambiguous
   // _ = i < nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
@@ -777,8 +777,8 @@ func nilComparison(i: Int, o: AnyObject) {
   // _ = i >= nil // _xpected-error {{type 'Int' is not optional, value can never be nil}}
   // _ = nil >= i // _xpected-error {{type 'Int' is not optional, value can never be nil}}
 
-  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns false}}
-  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' or 'Optional.none' always returns true}}
+  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns false}}
+  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns true}}
 }
 
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion

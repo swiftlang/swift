@@ -5,10 +5,10 @@ var f = false
 
 func markUsed<T>(_ t: T) {}
 
-markUsed(t != nil) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' or 'Optional.none' always returns true}}
-markUsed(f != nil) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' or 'Optional.none' always returns true}}
-markUsed(t != Optional.none) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' or 'Optional.none' always returns true}}
-markUsed(f != Optional.none) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' or 'Optional.none' always returns true}}
+markUsed(t != nil) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' always returns true}}
+markUsed(f != nil) // expected-warning {{comparing non-optional value of type 'Bool' to 'nil' always returns true}}
+markUsed(t != Optional.none) // expected-warning {{comparing non-optional value of type 'Bool' to 'Optional.none' always returns true}}
+markUsed(f != Optional.none) // expected-warning {{comparing non-optional value of type 'Bool' to 'Optional.none' always returns true}}
 
 class C : Equatable {}
 
@@ -17,10 +17,10 @@ func == (lhs: C, rhs: C) -> Bool {
 }
 
 func test(_ c: C) {
-  if c == nil {}  // expected-warning {{comparing non-optional value of type 'C' to 'nil' or 'Optional.none' always returns false}}
-  if c == .none {}  // expected-warning {{comparing non-optional value of type 'C' to 'nil' or 'Optional.none' always returns false}}
-  if c == Optional.none {}  // expected-warning {{comparing non-optional value of type 'C' to 'nil' or 'Optional.none' always returns false}}
-  if c == C?.none {}  // expected-warning {{comparing non-optional value of type 'C' to 'nil' or 'Optional.none' always returns false}}
+  if c == nil {}  // expected-warning {{comparing non-optional value of type 'C' to 'nil' always returns false}}
+  if c == .none {}  // expected-warning {{comparing non-optional value of type 'C' to 'Optional.none' always returns false}}
+  if c == Optional.none {}  // expected-warning {{comparing non-optional value of type 'C' to 'Optional.none' always returns false}}
+  if c == C?.none {}  // expected-warning {{comparing non-optional value of type 'C' to 'Optional.none' always returns false}}
 }
 
 class D {}
