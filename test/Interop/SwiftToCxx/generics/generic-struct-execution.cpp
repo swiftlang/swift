@@ -51,6 +51,8 @@ int main() {
     // CHECK-NEXT: GenericPair<T, T2>::computeVar::set
     // CHECK-NEXT: GenericPair<T, T2>::computeVar::get
     // CHECK-NEXT: GenericPair<Int32, Int32>(x: -123456, y: 561)
+    assert(x.genericMethod<float>(2.25f, 4221) == 2.25f);
+    // CHECK-NEXT: GenericPair<T, T2>::genericMethod<T>::2.25,4221;
   }
 
   {
@@ -93,6 +95,11 @@ int main() {
     // CHECK-NEXT: GenericPair<T, T2>::init::0,3425,-987;
     // CHECK-NEXT: CONCRETE pair of UInt32: 0 3425 ;
     // CHECK-NEXT: GenericPair<T, T2>::testme::0,3425;
+    auto val = PairOfUInt64::init(0xafafa, 0x32443);
+    auto valprime = x.genericMethod(val, 4221);
+    assert(valprime.getX() == val.getX());
+    assert(valprime.getY() == val.getY());
+    // CHECK-NEXT: GenericPair<T, T2>::genericMethod<T>::PairOfUInt64(x: 719610, y: 205891),4221;
   }
   return 0;
 }
