@@ -2247,7 +2247,9 @@ public:
     RequestedPriority_width = 8,
 
     Task_IsChildTask                              = 8,
-    // bit 9 is unused
+    // Should only be set in task-to-thread model where Task.runInline is
+    // available
+    Task_IsInlineTask                             = 9,
     Task_CopyTaskLocals                           = 10,
     Task_InheritContext                           = 11,
     Task_EnqueueJob                               = 12,
@@ -2263,6 +2265,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsInlineTask,
+                                isInlineTask,
+                                setIsInlineTask)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_CopyTaskLocals,
                                 copyTaskLocals,
                                 setCopyTaskLocals)
