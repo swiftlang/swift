@@ -388,8 +388,12 @@ class InheritedProtocolCollector {
   /// For each type in \p directlyInherited, classify the protocols it refers to
   /// as included for printing or not, and record them in the appropriate
   /// vectors.
+  ///
+  /// If \p skipExtra is true then avoid recording any extra protocols to
+  /// print, such as synthesized conformances or conformances to non-public
+  /// protocols.
   void recordProtocols(ArrayRef<InheritedEntry> directlyInherited,
-                       const Decl *D, bool skipSynthesized = false) {
+                       const Decl *D, bool skipExtra = false) {
     Optional<AvailableAttrList> availableAttrs;
 
     for (InheritedEntry inherited : directlyInherited) {
@@ -398,6 +402,9 @@ class InheritedProtocolCollector {
         continue;
 
       bool canPrintNormally = canPrintProtocolTypeNormally(inheritedTy, D);
+      if (!canPrintNormally && skipExtra)
+        continue;
+
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolDecl *protoDecl : layout.getProtocols()) {
         if (canPrintNormally)
@@ -411,7 +418,7 @@ class InheritedProtocolCollector {
       // any of those besides 'AnyObject'.
     }
 
-    if (skipSynthesized)
+    if (skipExtra)
       return;
 
     // Check for synthesized protocols, like Hashable on enums.
@@ -493,11 +500,12 @@ public:
     if (auto *CD = dyn_cast<ClassDecl>(D)) {
       for (auto *SD = CD->getSuperclassDecl(); SD;
            SD = SD->getSuperclassDecl()) {
-        map[nominal].recordProtocols(
-            SD->getInherited(), SD, /*skipSynthesized=*/true);
+        map[nominal].recordProtocols(SD->getInherited(), SD,
+                                     /*skipExtra=*/true);
         for (auto *Ext: SD->getExtensions()) {
           if (shouldInclude(Ext)) {
-            map[nominal].recordProtocols(Ext->getInherited(), Ext);
+            map[nominal].recordProtocols(Ext->getInherited(), Ext,
+                                         /*skipExtra=*/true);
           }
         }
       }
