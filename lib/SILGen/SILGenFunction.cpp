@@ -981,6 +981,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
+  auto *const topLevelValue = value;
   auto *dc = function.getDecl()->getInnermostDeclContext();
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
@@ -1034,8 +1035,12 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
-  if (EmitProfilerIncrement)
-    emitProfilerIncrement(value);
+  if (EmitProfilerIncrement) {
+    // Emit a profiler increment for the top-level value, not looking through
+    // any function conversions. This is necessary as the counter would have
+    // been recorded for this expression, not the sub-expression.
+    emitProfilerIncrement(topLevelValue);
+  }
   prepareEpilog(interfaceType, false, CleanupLocation(Loc));
 
   {

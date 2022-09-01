@@ -36,6 +36,10 @@ final class VarInit {
   // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+1]]:42 : 0
   @Wrapper var initializedWrapperInit = 2
 
+  // CHECK: sil_coverage_map {{.*}} // variable initialization expression of coverage_var_init.VarInit.(_autoclosureWrapperInit
+  // CHECK-NEXT: [[@LINE+1]]:52 -> [[@LINE+1]]:53
+  @AutoClosureWrapper var autoclosureWrapperInit = 3
+
   // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC04lazydE033_49373CB2DFB47C8DC62FA963604688DFLLSSvgSSyXEfU_"
   // CHECK-NEXT: [[@LINE+1]]:42 -> [[@LINE+3]]:4 : 0
   private lazy var lazyVarInit: String = {
@@ -65,6 +69,14 @@ final class VarInit {
 @propertyWrapper struct Wrapper {
   init(wrappedValue: Int) {}
   var wrappedValue: Int { 1 }
+}
+
+@propertyWrapper
+struct AutoClosureWrapper<T> {
+  var wrappedValue: T
+  init(wrappedValue: @autoclosure () -> T) {
+    self.wrappedValue = wrappedValue()
+  }
 }
 
 VarInit().coverageFunction()
