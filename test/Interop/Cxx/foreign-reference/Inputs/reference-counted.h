@@ -11,6 +11,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 static int finalLocalRefCount = 100;
 
+namespace NS {
+
 struct __attribute__((swift_attr("import_as_ref")))
 __attribute__((swift_attr("retain:LCRetain")))
 __attribute__((swift_attr("release:LCRelease"))) LocalCount {
@@ -21,8 +23,10 @@ __attribute__((swift_attr("release:LCRelease"))) LocalCount {
   }
 };
 
-inline void LCRetain(LocalCount *x) { x->value++; }
-inline void LCRelease(LocalCount *x) {
+}
+
+inline void LCRetain(NS::LocalCount *x) { x->value++; }
+inline void LCRelease(NS::LocalCount *x) {
   x->value--;
   finalLocalRefCount = x->value;
 }

@@ -187,6 +187,29 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       escalatedPriority = waitingStatus.getStoredPriority();
     }
 
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    // In the task to thread model, we will execute the task that we are waiting
+    // on, on the current thread itself. As a result, do not bother adding the
+    // waitingTask to any thread queue. Instead, we will clear the old task, run
+    // the new one and then reattempt to continue running the old task
+
+    auto oldTask = _swift_task_clearCurrent();
+    assert(oldTask == waitingTask);
+
+    SWIFT_TASK_DEBUG_LOG("[RunInline] Switching away from running %p to now running %p", oldTask, this);
+    // Run the new task on the same thread now - this should run the new task to
+    // completion. All swift tasks in task-to-thread model run on generic
+    // executor
+    swift_job_run(this, ExecutorRef::generic());
+
+    SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", this, oldTask);
+
+    // We now are back in the context of the waiting task and need to reevaluate
+    // our state
+    _swift_task_setCurrent(oldTask);
+    queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+    continue;
+#else
     // Put the waiting task at the beginning of the wait queue.
     waitingTask->getNextWaitingTask() = queueHead.getTask();
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
@@ -198,6 +221,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       _swift_task_clearCurrent();
       return FutureFragment::Status::Executing;
     }
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   }
 }
 
@@ -255,8 +279,13 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
 
-  if (!waitingTask)
+  if (!waitingTask) {
     SWIFT_TASK_DEBUG_LOG("task %p had no waiting tasks", this);
+  } else {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    assert(false && "Task should have no waiters in task-to-thread model");
+#endif
+  }
 
   while (waitingTask) {
     // Find the next waiting task before we invalidate it by resuming
@@ -574,12 +603,16 @@ static inline bool isUnspecified(JobPriority priority) {
   return priority == JobPriority::Unspecified;
 }
 
-static inline bool taskIsUnstructured(JobFlags jobFlags) {
-  return !jobFlags.task_isAsyncLetTask() && !jobFlags.task_isGroupChildTask();
+static inline bool taskIsStructured(JobFlags jobFlags) {
+  return jobFlags.task_isAsyncLetTask() || jobFlags.task_isGroupChildTask();
+}
+
+static inline bool taskIsUnstructured(TaskCreateFlags createFlags, JobFlags jobFlags) {
+  return !taskIsStructured(jobFlags) && !createFlags.isInlineTask();
 }
 
 static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags) {
-  return taskIsUnstructured(jobFlags) && !createFlags.copyTaskLocals();
+  return taskIsUnstructured(createFlags, jobFlags) && !createFlags.copyTaskLocals();
 }
 
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
@@ -671,6 +704,9 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     }
     case TaskOptionRecordKind::RunInline: {
       runInlineOption = cast<RunInlineTaskOptionRecord>(option);
+      // TODO (rokhinip): We seem to be creating runInline tasks like detached
+      // tasks but they need to maintain the voucher and priority of calling
+      // thread and therefore need to behave a bit more like SC child tasks.
       break;
     }
     }
@@ -692,20 +728,27 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Start with user specified priority at creation time (if any)
   JobPriority basePriority = (taskCreateFlags.getRequestedPriority());
 
-  if (taskIsDetached(taskCreateFlags, jobFlags)) {
-     SWIFT_TASK_DEBUG_LOG("Creating a detached task from %p", currentTask);
-    // Case 1: No priority specified
-    //    Base priority = UN
-    //    Escalated priority = UN
-    // Case 2: Priority specified
-    //    Base priority = user specified priority
-    //    Escalated priority = UN
-    //
-    // Task will be created with max priority = max(base priority, UN) = base
-    // priority. We shouldn't need to do any additional manipulations here since
-    // basePriority should already be the right value
+  if (taskCreateFlags.isInlineTask()) {
+     SWIFT_TASK_DEBUG_LOG("Creating an inline task from %p", currentTask);
 
-  } else if (taskIsUnstructured(jobFlags)) {
+     // We'll take the current priority and set it as base and escalated
+     // priority of the task. No UI->IN downgrade needed.
+     basePriority = swift_task_getCurrentThreadPriority();
+
+  } else if (taskIsDetached(taskCreateFlags, jobFlags)) {
+     SWIFT_TASK_DEBUG_LOG("Creating a detached task from %p", currentTask);
+     // Case 1: No priority specified
+     //    Base priority = UN
+     //    Escalated priority = UN
+     // Case 2: Priority specified
+     //    Base priority = user specified priority
+     //    Escalated priority = UN
+     //
+     // Task will be created with max priority = max(base priority, UN) = base
+     // priority. We shouldn't need to do any additional manipulations here since
+     // basePriority should already be the right value
+
+  } else if (taskIsUnstructured(taskCreateFlags, jobFlags)) {
      SWIFT_TASK_DEBUG_LOG("Creating an unstructured task from %p", currentTask);
 
     if (isUnspecified(basePriority)) {
@@ -934,6 +977,15 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Attach to the group, if needed.
   if (group) {
     swift_taskGroup_attachChild(group, task);
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    // We need to take a retain here to keep the child task for the task group
+    // alive. In the non-task-to-thread model, we'd always take this retain
+    // below since we'd enqueue the child task. But since we're not going to be
+    // enqueueing the child task in this model, we need to take this +1 to
+    // balance out the release that exists after the task group child task
+    // creation
+    swift_retain(task);
+#endif
   }
 
   // If we're supposed to copy task locals, do so now.
@@ -948,6 +1000,9 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+    assert(false && "Should not be enqueuing tasks in task-to-thread model");
+#endif
     swift_retain(task);
     task->flagAsAndEnqueueOnExecutor(executor);
   }
@@ -1009,8 +1064,10 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   // containing a pointer to the allocation enabling us to provide our stack
   // allocation rather than swift_task_create_common having to malloc it.
   RunInlineTaskOptionRecord option(allocation, allocationBytes);
+  size_t taskCreateFlags = 1 << TaskCreateFlags::Task_IsInlineTask;
+
   auto taskAndContext = swift_task_create_common(
-      /*rawTaskCreateFlags=*/0, &option, futureResultType,
+      taskCreateFlags, &option, futureResultType,
       reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
       /*initialContextSize=*/closureContextSize);
 

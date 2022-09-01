@@ -40,7 +40,7 @@ namespace swift {
 // If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
-  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
+  fprintf(stderr, "[%#lx] [%s:%d](%s) " fmt "\n",                               \
           (unsigned long)Thread::current()::platformThreadId(), __FILE__,      \
           __LINE__, __FUNCTION__, __VA_ARGS__)
 #else
@@ -79,6 +79,8 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
+/// Set the active task reference for the current thread.
+AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
@@ -89,7 +91,7 @@ void _swift_tsan_release(void *addr);
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 inline SerialExecutorWitnessTable *
 _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
   extern SerialExecutorWitnessTable wtable
@@ -712,7 +714,9 @@ retry:;
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
 inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
-
+#if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
+#else
   SWIFT_TASK_DEBUG_LOG("%p->flagAsAndEnqueueOnExecutor()", this);
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
@@ -746,7 +750,7 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
         oldStatus.getStoredPriority(), this);
       swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
     }
-#endif
+#endif /* SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION */
     swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
     restoreTaskVoucher(this);
   }
@@ -759,6 +763,7 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
       Flags.task_isAsyncLetTask());
 
   swift_task_enqueue(this, newExecutor);
+#endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
 inline void AsyncTask::flagAsSuspended() {
