@@ -5038,13 +5038,44 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 
   private:
     std::string getKeyStringValue(const LiteralExpr *keyExpr) {
-      if (isa<MagicIdentifierLiteralExpr>(keyExpr)) {
-        return keyExpr->getLiteralKindDescription().str();
+      if (auto *MLE = dyn_cast<MagicIdentifierLiteralExpr>(keyExpr)) {
+        return getMagicLiteralKeyValue(MLE);
       }
       std::string out;
       llvm::raw_string_ostream OS(out);
       keyExpr->printConstExprValue(&OS, /*additionalCheck=*/nullptr);
       return out;
+    }
+
+    std::string getMagicLiteralKeyValue(const MagicIdentifierLiteralExpr *MLE) {
+      auto magicLiteralValue = MLE->getLiteralKindDescription().str();
+      switch (MLE->getKind()) {
+      case MagicIdentifierLiteralExpr::DSOHandle:
+      case MagicIdentifierLiteralExpr::FileID:
+      case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+      case MagicIdentifierLiteralExpr::FilePath:
+      case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+      case MagicIdentifierLiteralExpr::Function:
+        break;
+      // Those are literals that can evaluate to different values in a
+      // dictionary literal declaration context based on source position
+      // so we need to consider that position as part of the literal value.
+      case MagicIdentifierLiteralExpr::Column: {
+        unsigned int column;
+        std::tie(std::ignore, column) =
+            Ctx.SourceMgr.getPresumedLineAndColumnForLoc(MLE->getStartLoc());
+        magicLiteralValue += ":" + std::to_string(column);
+        break;
+      }
+      case MagicIdentifierLiteralExpr::Line: {
+        unsigned int line;
+        std::tie(line, std::ignore) =
+            Ctx.SourceMgr.getPresumedLineAndColumnForLoc(MLE->getStartLoc());
+        magicLiteralValue += ":" + std::to_string(line);
+        break;
+      }
+      }
+      return magicLiteralValue;
     }
 
     std::string getKeyStringValueForDiagnostic(const LiteralExpr *keyExpr) {
