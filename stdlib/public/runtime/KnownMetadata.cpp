@@ -233,12 +233,30 @@ namespace {
       return FunctionPointerBox::getExtraInhabitantTag((void *const *)src);
     }
   };
+  struct DiffFunctionBox
+    : AggregateBox<ThickFunctionBox, ThickFunctionBox, ThickFunctionBox> {
+
+    static constexpr unsigned numExtraInhabitants =
+      ThickFunctionBox::numExtraInhabitants;
+
+    static void storeExtraInhabitantTag(char *dest, unsigned tag) {
+      ThickFunctionBox::storeExtraInhabitantTag(dest, tag);
+    }
+
+    static unsigned getExtraInhabitantTag(const char *src) {
+      return ThickFunctionBox::getExtraInhabitantTag(src);
+    }
+  };
 } // end anonymous namespace
 
 /// The basic value-witness table for escaping function types.
 const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(FUNCTION_MANGLING) =
     ValueWitnessTableForBox<ThickFunctionBox>::table;
+
+const ValueWitnessTable
+  swift::VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING) =
+    ValueWitnessTableForBox<DiffFunctionBox>::table;
 
 /// The basic value-witness table for @noescape function types.
 const ValueWitnessTable
