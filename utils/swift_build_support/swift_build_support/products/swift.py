@@ -14,7 +14,6 @@ import os
 
 from . import cmark
 from . import earlyswiftdriver
-from . import earlyswiftsyntax
 from . import libcxx
 from . import llvm
 from . import product
@@ -214,6 +213,5 @@ updated without updating swift.py?")
     def get_dependencies(cls):
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
-                earlyswiftsyntax.EarlySwiftSyntax,
                 llvm.LLVM,
                 libcxx.LibCXX]
