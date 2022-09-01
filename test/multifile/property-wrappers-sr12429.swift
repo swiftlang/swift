@@ -6,5 +6,7 @@
 
 // REQUIRES: executable_test
 
+// https://github.com/apple/swift/issues/54868
+
 let object = MyClass()
 object.property = "value"
