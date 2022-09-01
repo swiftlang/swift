@@ -1633,3 +1633,8 @@ PassContext_loadFunction(BridgedPassContext context, StringRef name) {
   SILFunction *f = mod->loadFunction(name, SILModule::LinkingMode::LinkNormal);
   return {f};
 }
+
+SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  return mod->getOptions().EnableStackProtection;
+}
