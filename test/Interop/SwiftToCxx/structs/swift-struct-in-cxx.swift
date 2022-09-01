@@ -70,9 +70,11 @@
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Structs::StructWithIntField>() {
+// CHECK-NEXT: struct TypeMetadataTrait<Structs::StructWithIntField>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:   return Structs::_impl::$s7Structs18StructWithIntFieldVMa(0)._0;
 // CHECK-NEXT: }
+// CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isValueType<Structs::StructWithIntField> = true;

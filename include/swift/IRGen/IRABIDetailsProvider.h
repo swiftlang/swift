@@ -49,12 +49,45 @@ public:
   };
 
   /// Information about any ABI additional parameters.
-  struct ABIAdditionalParam {
-    enum class ABIParameterRole { GenericRequirementRole, Self, Error };
+  class ABIAdditionalParam {
+  public:
+    enum class ABIParameterRole {
+      /// A parameter that corresponds to a generic requirement that must be
+      /// fullfilled by a call to this function.
+      GenericRequirement,
+      /// A parameter that corresponds to a Swift type pointer sourced from a
+      /// valid metadata source, like the type of another argument.
+      GenericTypeMetadataSource,
+      /// A parameter that corresponds to the 'self' parameter.
+      Self,
+      /// The Swift error parameter.
+      Error
+    };
+
+    inline ABIParameterRole getRole() const { return role; }
+
+    inline GenericRequirement getGenericRequirement() {
+      assert(role == ABIParameterRole::GenericRequirement);
+      return *genericRequirement;
+    }
+
+    inline CanType getMetadataSourceType() {
+      assert(role == ABIParameterRole::GenericTypeMetadataSource);
+      return canType;
+    }
+
+  private:
+    inline ABIAdditionalParam(
+        ABIParameterRole role,
+        llvm::Optional<GenericRequirement> genericRequirement, CanType canType)
+        : role(role), genericRequirement(genericRequirement), canType(canType) {
+    }
 
     ABIParameterRole role;
     llvm::Optional<GenericRequirement> genericRequirement;
-    TypeDecl *type;
+    CanType canType;
+
+    friend class IRABIDetailsProviderImpl;
   };
 
   /// Returns the size and alignment for the given type, or \c None if the type

@@ -108,9 +108,10 @@ public:
       StringRef metadataVarName = "metadata",
       StringRef vwTableVarName = "vwTable");
 
-  static void printTypeGenericTraits(raw_ostream &os,
-                                     const NominalTypeDecl *typeDecl,
-                                     StringRef typeMetadataFuncName);
+  static void printTypeGenericTraits(
+      raw_ostream &os, const NominalTypeDecl *typeDecl,
+      StringRef typeMetadataFuncName,
+      ArrayRef<GenericRequirement> typeMetadataFuncRequirements);
 
   static void forwardDeclType(raw_ostream &os, const NominalTypeDecl *typeDecl);
 

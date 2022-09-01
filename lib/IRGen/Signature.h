@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_SIGNATURE_H
 #define SWIFT_IRGEN_SIGNATURE_H
 
+#include "MetadataSource.h"
 #include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -96,10 +97,38 @@ public:
   uint32_t AsyncResumeFunctionSwiftSelfIdx = 0;
 };
 
+/// Represents the source of the corresponding type pointer computed
+/// during the expansion of the polymorphic signature.
+///
+/// The source is either a \c GenericRequirement, or a \c MetadataSource.
+class PolymorphicSignatureExpandedTypeSource {
+public:
+  inline PolymorphicSignatureExpandedTypeSource(
+      const GenericRequirement &requirement)
+      : requirement(requirement){};
+  inline PolymorphicSignatureExpandedTypeSource(
+      const MetadataSource &metadataSource)
+      : metadataSource(metadataSource) {}
+
+  inline void
+  visit(llvm::function_ref<void(const GenericRequirement &)> requirementVisitor,
+        llvm::function_ref<void(const MetadataSource &)> metadataSourceVisitor)
+      const {
+    if (requirement)
+      return requirementVisitor(*requirement);
+    return metadataSourceVisitor(*metadataSource);
+  }
+
+private:
+  llvm::Optional<GenericRequirement> requirement;
+  llvm::Optional<MetadataSource> metadataSource;
+};
+
 /// Recorded information about the specific ABI details.
 struct SignatureExpansionABIDetails {
-  /// Generic requirements added to the signature during expansion.
-  llvm::SmallVector<GenericRequirement, 2> GenericRequirements;
+  /// Type sources added to the signature during expansion.
+  llvm::SmallVector<PolymorphicSignatureExpandedTypeSource, 2>
+      polymorphicSignatureExpandedTypeSources;
 };
 
 /// A signature represents something which can actually be called.

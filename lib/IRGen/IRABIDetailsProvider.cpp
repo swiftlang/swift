@@ -167,20 +167,30 @@ public:
     auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind,
                                             /*shouldComputeABIDetail=*/true);
 
-    for (const auto &reqt : signature.getABIDetails().GenericRequirements) {
-      params.push_back({IRABIDetailsProvider::ABIAdditionalParam::
-                            ABIParameterRole::GenericRequirementRole,
-                        reqt, typeConverter.Context.getOpaquePointerDecl()});
+    using ABIAdditionalParam = IRABIDetailsProvider::ABIAdditionalParam;
+    using ParamRole = ABIAdditionalParam::ABIParameterRole;
+    for (const auto &typeSource :
+         signature.getABIDetails().polymorphicSignatureExpandedTypeSources) {
+      typeSource.visit(
+          [&](const GenericRequirement &reqt) {
+            params.push_back(ABIAdditionalParam(ParamRole::GenericRequirement,
+                                                reqt, CanType()));
+          },
+          [&](const MetadataSource &metadataSource) {
+            auto index = metadataSource.getParamIndex();
+            auto canType =
+                silFuncType->getParameters()[index].getInterfaceType();
+            params.push_back(ABIAdditionalParam(
+                ParamRole::GenericTypeMetadataSource, llvm::None, canType));
+          });
     }
     for (auto attrSet : signature.getAttributes()) {
       if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftSelf))
         params.push_back(
-            {IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self,
-             llvm::None, typeConverter.Context.getOpaquePointerDecl()});
+            ABIAdditionalParam(ParamRole::Self, llvm::None, CanType()));
       if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftError))
         params.push_back(
-            {IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Error,
-             llvm::None, typeConverter.Context.getOpaquePointerDecl()});
+            ABIAdditionalParam(ParamRole::Error, llvm::None, CanType()));
     }
     return params;
   }

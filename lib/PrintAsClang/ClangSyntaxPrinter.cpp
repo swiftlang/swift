@@ -70,6 +70,33 @@ void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
   os << "::";
 }
 
+bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
+    const NominalTypeDecl *typeDecl) {
+  // FIXME: Full qualifiers for nested types?
+  if (!typeDecl->isGeneric())
+    return true;
+  printGenericSignature(
+      typeDecl->getGenericSignature().getCanonicalSignature());
+  return false;
+}
+
+void ClangSyntaxPrinter::printNominalTypeReference(
+    const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext) {
+  printModuleNamespaceQualifiersIfNeeded(typeDecl->getModuleContext(),
+                                         moduleContext);
+  // FIXME: Full qualifiers for nested types?
+  ClangSyntaxPrinter(os).printBaseName(typeDecl);
+  if (typeDecl->isGeneric())
+    printGenericSignatureParams(
+        typeDecl->getGenericSignature().getCanonicalSignature());
+}
+
+void ClangSyntaxPrinter::printNominalTypeQualifier(
+    const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext) {
+  printNominalTypeReference(typeDecl, moduleContext);
+  os << "::";
+}
+
 /// Print a C++ namespace declaration with the give name and body.
 void ClangSyntaxPrinter::printNamespace(
     llvm::function_ref<void(raw_ostream &OS)> namePrinter,
@@ -256,9 +283,9 @@ void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
   assert(!requirement.Protocol && "protocol requirements not supported yet!");
   auto *gtpt = requirement.TypeParameter->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
-  os << "swift::getTypeMetadata<";
+  os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);
-  os << ">()";
+  os << ">::getTypeMetadata()";
 }
 
 void ClangSyntaxPrinter::printGenericRequirementsInstantiantions(

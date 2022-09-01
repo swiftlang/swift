@@ -391,10 +391,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 
-  // FIXME: Type traits for generic structs.
-  if (genericSignature)
-    return;
-  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName);
+  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
+                         typeMetadataFuncGenericParams);
 }
 
 /// Print out the C stub struct that's used to pass/return a value type directly
@@ -545,7 +543,8 @@ void ClangValueTypePrinter::printValueTypeDirectReturnScaffold(
 
 void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
-    StringRef typeMetadataFuncName) {
+    StringRef typeMetadataFuncName,
+    ArrayRef<GenericRequirement> typeMetadataFuncRequirements) {
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
@@ -553,27 +552,34 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  os << "template<>\n";
-  os << "static inline const constexpr bool isUsableInGenericContext<";
+  if (typeMetadataFuncRequirements.empty()) {
+    // FIXME: generic type support.
+    os << "template<>\n";
+    os << "static inline const constexpr bool isUsableInGenericContext<";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+    printer.printBaseName(typeDecl);
+    os << "> = true;\n";
+  }
+  if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl))
+    os << "template<>\n";
+  os << "struct TypeMetadataTrait<";
+  printer.printNominalTypeReference(typeDecl,
+                                    /*moduleContext=*/nullptr);
+  os << "> {\n";
+  os << "  static inline void * _Nonnull getTypeMetadata() {\n";
+  os << "    return ";
   printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  printer.printBaseName(typeDecl);
-  os << "> = true;\n";
-  os << "template<>\n";
-  os << "inline void * _Nonnull getTypeMetadata<";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::";
-  printer.printBaseName(typeDecl);
-  os << ">() {\n";
-  os << "  return ";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::" << typeMetadataFuncName << "(0)._0;\n";
-  os << "}\n";
+  os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  ClangSyntaxPrinter(os).printSwiftTypeMetadataAccessFunctionCall(
+      typeMetadataFuncName, typeMetadataFuncRequirements);
+  os << "._0;\n";
+  os << "  }\n};\n";
 
   os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
 
-  if (!isa<ClassDecl>(typeDecl)) {
+  if (!isa<ClassDecl>(typeDecl) && typeMetadataFuncRequirements.empty()) {
+    // FIXME: generic support.
     os << "template<>\n";
     os << "static inline const constexpr bool isValueType<";
     printer.printBaseName(typeDecl->getModuleContext());
@@ -590,20 +596,23 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     }
   }
 
-        os << "template<>\n";
-        os << "struct implClassFor<";
-        printer.printBaseName(typeDecl->getModuleContext());
-        os << "::";
-        printer.printBaseName(typeDecl);
-        os << "> { using type = ";
-        printer.printBaseName(typeDecl->getModuleContext());
-        os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
-        printCxxImplClassName(os, typeDecl);
-        os << "; };\n";
-        os << "} // namespace\n";
-        os << "#pragma clang diagnostic pop\n";
-        os << "} // namespace swift\n";
-        os << "\nnamespace ";
-        printer.printBaseName(typeDecl->getModuleContext());
-        os << " {\n";
+  // FIXME: generic support.
+  if (typeMetadataFuncRequirements.empty()) {
+    os << "template<>\n";
+    os << "struct implClassFor<";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+    printer.printBaseName(typeDecl);
+    os << "> { using type = ";
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+    printCxxImplClassName(os, typeDecl);
+    os << "; };\n";
+  }
+  os << "} // namespace\n";
+  os << "#pragma clang diagnostic pop\n";
+  os << "} // namespace swift\n";
+  os << "\nnamespace ";
+  printer.printBaseName(typeDecl->getModuleContext());
+  os << " {\n";
 }
