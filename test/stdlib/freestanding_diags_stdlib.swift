@@ -27,6 +27,8 @@ func foo() async throws {
   _ = MainActor.self // expected-error{{Unavailable in task-to-thread concurrency model}}
   await Task.sleep(1 as UInt64) // expected-error{{Unavailable in task-to-thread concurrency model}}
   try await Task.sleep(nanoseconds: 1 as UInt64) // expected-error{{Unavailable in task-to-thread concurrency model}}
+  _ = AsyncStream<Int>.self // expected-error{{Unavailable in task-to-thread concurrency model}}
+  _ = AsyncThrowingStream<Int, Error>.self // expected-error{{Unavailable in task-to-thread concurrency model}}
 }
 
 @available(SwiftStdlib 5.7, *)
