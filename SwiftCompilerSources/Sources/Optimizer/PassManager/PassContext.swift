@@ -22,6 +22,8 @@ struct PassContext {
 
   let _bridged: BridgedPassContext
 
+  var options: Options { Options(_bridged: _bridged) }
+
   func continueWithNextSubpassRun(for inst: Instruction? = nil) -> Bool {
     let bridgedInst = OptionalBridgedInstruction(obj: inst?.bridged.obj)
     return PassContext_continueWithNextSubpassRun(_bridged, bridgedInst) != 0
