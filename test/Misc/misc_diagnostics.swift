@@ -169,9 +169,11 @@ func tuple_splat2(_ q : (a : Int, b : Int)) {
   tuple_splat2(1, b: 2)    // expected-error {{global function 'tuple_splat2' expects a single parameter of type '(a: Int, b: Int)'}} {{16-16=(}} {{23-23=)}}
 }
 
-// SR-1612: Type comparison of foreign types is always true.
-protocol SR1612_P {}
-class SR1612: NSObject, SR1612_P {}
+// https://github.com/apple/swift/issues/44221
+// Type comparison of foreign types is always true.
+
+protocol P_44221 {}
+class C_44221: NSObject, P_44221 {}
 // Existentials
 func is_foreign_anyobject(a: AnyObject) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
@@ -181,12 +183,12 @@ func is_foreign_any(a: Any) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
 }
 
-func is_foreign_p(a: SR1612_P) -> Bool {
+func is_foreign_p(a: P_44221) -> Bool {
   return a is CGColor // expected-warning {{'is' test is always true because 'CGColor' is a Core Foundation type}}
 }
 
 // Concrete type.
-func is_foreign_concrete(a: SR1612) -> Bool {
+func is_foreign_concrete(a: C_44221) -> Bool {
   return a is CGColor // False at runtime
 }
 // Concrete foundation.
