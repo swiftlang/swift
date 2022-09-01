@@ -35,7 +35,8 @@ func foo() {
   f1 { left, right in left == 0 || right == 1 }
 }
 
-// SR-2615: Display coverage for implicit member initializers without crashing
+// https://github.com/apple/swift/issues/45220
+// Display coverage for implicit member initializers without crashing.
 struct C1 {
   // CHECK-LABEL: sil_coverage_map{{.*}}// variable initialization expression of coverage_closures.C1
   // CHECK-NEXT: [[@LINE+1]]:24 -> [[@LINE+1]]:34 : 0
