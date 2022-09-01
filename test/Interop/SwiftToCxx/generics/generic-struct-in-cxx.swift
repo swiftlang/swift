@@ -89,7 +89,7 @@ public func inoutConcretePair(_ x: UInt32, _ y: inout GenericPair<UInt32, UInt32
 // CHECK-NEXT: class GenericPair final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~GenericPair() {
-// CHECK-NEXT:     auto metadata = _impl::$s8Generics11GenericPairVMa(0, swift::getTypeMetadata<T_0_0>(), swift::getTypeMetadata<T_0_1>());
+// CHECK-NEXT:     auto metadata = _impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 
 // CHECK: swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
@@ -119,14 +119,14 @@ public func inoutConcretePair(_ x: UInt32, _ y: inout GenericPair<UInt32, UInt32
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: inline void inoutGenericPair(GenericPair<T_0_0, T_0_1>& x, const T_0_0& y) noexcept {
-// CHECK-NEXT:   return _impl::$s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T_0_0>(), swift::getTypeMetadata<T_0_1>());
+// CHECK-NEXT:   return _impl::$s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: inline GenericPair<T_0_0, T_0_1> makeGenericPair(const T_0_0& x, const T_0_1& y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T_0_0>(), swift::getTypeMetadata<T_0_1>());
+// CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
@@ -140,7 +140,7 @@ public func inoutConcretePair(_ x: UInt32, _ y: inout GenericPair<UInt32, UInt32
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: inline GenericPair<T_0_0, T_0_1> passThroughGenericPair(const GenericPair<T_0_0, T_0_1>& x, const T_0_1& y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:     _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(result, _impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::getTypeMetadata<T_0_0>(), swift::getTypeMetadata<T_0_1>());
+// CHECK-NEXT:     _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(result, _impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
@@ -151,5 +151,5 @@ public func inoutConcretePair(_ x: UInt32, _ y: inout GenericPair<UInt32, UInt32
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: inline void takeGenericPair(const GenericPair<T_0_0, T_0_1>& x) noexcept {
-// CHECK-NEXT:  return _impl::$s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::getTypeMetadata<T_0_0>(), swift::getTypeMetadata<T_0_1>());
+// CHECK-NEXT:  return _impl::$s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT:}

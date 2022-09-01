@@ -214,11 +214,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
     os << "static inline const constexpr bool isUsableInGenericContext<"
        << typeInfo.name << "> = true;\n\n";
 
-    os << "template<>\ninline void * _Nonnull getTypeMetadata<";
-    os << typeInfo.name << ">() {\n";
-    os << "  return &" << cxx_synthesis::getCxxImplNamespaceName()
-       << "::" << typeMetadataVarName << ";\n";
-    os << "}\n\n";
+    os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
+       << "  static inline void * _Nonnull getTypeMetadata() {\n"
+       << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::" << typeMetadataVarName << ";\n"
+       << "  }\n};\n\n";
   }
 }
 

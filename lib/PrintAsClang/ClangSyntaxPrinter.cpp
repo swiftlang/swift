@@ -256,9 +256,9 @@ void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
   assert(!requirement.Protocol && "protocol requirements not supported yet!");
   auto *gtpt = requirement.TypeParameter->getAs<GenericTypeParamType>();
   assert(gtpt && "unexpected generic param type");
-  os << "swift::getTypeMetadata<";
+  os << "swift::TypeMetadataTrait<";
   printGenericTypeParamTypeName(gtpt);
-  os << ">()";
+  os << ">::getTypeMetadata()";
 }
 
 void ClangSyntaxPrinter::printGenericRequirementsInstantiantions(

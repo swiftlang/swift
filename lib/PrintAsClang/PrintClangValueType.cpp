@@ -559,17 +559,17 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "::";
   printer.printBaseName(typeDecl);
   os << "> = true;\n";
-  os << "template<>\n";
-  os << "inline void * _Nonnull getTypeMetadata<";
+  os << "template<>\nstruct TypeMetadataTrait<";
   printer.printBaseName(typeDecl->getModuleContext());
   os << "::";
   printer.printBaseName(typeDecl);
-  os << ">() {\n";
-  os << "  return ";
+  os << "> {\n";
+  os << "  static inline void * _Nonnull getTypeMetadata() {\n";
+  os << "    return ";
   printer.printBaseName(typeDecl->getModuleContext());
   os << "::" << cxx_synthesis::getCxxImplNamespaceName()
      << "::" << typeMetadataFuncName << "(0)._0;\n";
-  os << "}\n";
+  os << "  }\n};\n";
 
   os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
 

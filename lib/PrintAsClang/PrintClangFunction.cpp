@@ -650,9 +650,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           assert(!genericRequirement.Protocol);
           if (auto *gtpt = genericRequirement.TypeParameter
                                ->getAs<GenericTypeParamType>()) {
-            os << "swift::getTypeMetadata<";
+            os << "swift::TypeMetadataTrait<";
             ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
-            os << ">()";
+            os << ">::getTypeMetadata()";
             return;
           }
           os << "ERROR";
