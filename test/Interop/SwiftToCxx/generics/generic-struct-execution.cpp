@@ -28,6 +28,15 @@ int main() {
     inoutGenericPair(x, 0xFF);
     takeGenericPair(x);
     // CHECK-NEXT: GenericPair<Int32, Int32>(x: 255, y: 42)
+    x.method();
+    // CHECK-NEXT: GenericPair<T, T2>::testme::255,42;
+    x.mutatingMethod(xprime);
+    x.method();
+    // CHECK-NEXT: GenericPair<T, T2>::testme::-995,11;
+    takeGenericPair(x);
+    takeGenericPair(xprime);
+    // CHECK-NEXT: GenericPair<Int32, Int32>(x: -995, y: 11)
+    // CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: -995)
   }
 
   {
@@ -46,6 +55,13 @@ int main() {
     inoutConcretePair(77, x);
     takeConcretePair(x);
     // CHECK-NEXT: CONCRETE pair of UInt32: 77 130791 ;
+    x.method();
+    // CHECK-NEXT: GenericPair<T, T2>::testme::77,130791;
+    x.mutatingMethod(xprime);
+    x.method();
+    // CHECK-NEXT: GenericPair<T, T2>::testme::918,100000;
+    takeConcretePair(xprime);
+    // CHECK-NEXT: CONCRETE pair of UInt32: 100000 918 ;
   }
   return 0;
 }

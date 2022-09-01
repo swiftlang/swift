@@ -21,6 +21,7 @@
 
 #include "Fulfillment.h"
 #include "GenericRequirement.h"
+#include "MetadataSource.h"
 
 namespace llvm {
   class Type;
@@ -48,6 +49,7 @@ namespace irgen {
   class MetadataPath;
   class MetadataResponse;
   class NativeCCEntryPointArgumentEmission;
+  class PolymorphicSignatureExpandedTypeSource;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -102,7 +104,8 @@ namespace irgen {
   void expandPolymorphicSignature(
       IRGenModule &IGM, CanSILFunctionType type,
       SmallVectorImpl<llvm::Type *> &types,
-      SmallVectorImpl<GenericRequirement> *outReqs = nullptr);
+      SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs =
+          nullptr);
 
   /// Return the number of trailing arguments necessary for calling a
   /// witness method.
@@ -178,90 +181,6 @@ namespace irgen {
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanType srcType,
                                    ProtocolConformanceRef conformance);
-
-  class MetadataSource {
-  public:
-    enum class Kind {
-      /// Metadata is derived from a source class pointer.
-      ClassPointer,
-
-      /// Metadata is derived from a type metadata pointer.
-      Metadata,
-
-      /// Metadata is derived from the origin type parameter.
-      GenericLValueMetadata,
-
-      /// Metadata is obtained directly from the from a Self metadata
-      /// parameter passed via the WitnessMethod convention.
-      SelfMetadata,
-
-      /// Metadata is derived from the Self witness table parameter
-      /// passed via the WitnessMethod convention.
-      SelfWitnessTable,
-
-      /// Metadata is obtained directly from the FixedType indicated. Used with
-      /// Objective-C generics, where the actual argument is erased at runtime
-      /// and its existential bound is used instead.
-      ErasedTypeMetadata,
-    };
-
-    static bool requiresSourceIndex(Kind kind) {
-      return (kind == Kind::ClassPointer ||
-              kind == Kind::Metadata ||
-              kind == Kind::GenericLValueMetadata);
-    }
-
-    static bool requiresFixedType(Kind kind) {
-      return (kind == Kind::ErasedTypeMetadata);
-    }
-
-    enum : unsigned { InvalidSourceIndex = ~0U };
-
-  private:
-    /// The kind of source this is.
-    Kind TheKind;
-
-    /// For ClassPointer, Metadata, and GenericLValueMetadata, the source index;
-    /// for ErasedTypeMetadata, the type; for others, Index should be set to
-    /// InvalidSourceIndex.
-    union {
-      unsigned Index;
-      CanType FixedType;
-    };
-
-  public:
-    CanType Type;
-
-    MetadataSource(Kind kind, CanType type)
-      : TheKind(kind), Index(InvalidSourceIndex), Type(type)
-    {
-      assert(!requiresSourceIndex(kind) && !requiresFixedType(kind));
-    }
-
-
-    MetadataSource(Kind kind, CanType type, unsigned index)
-      : TheKind(kind), Index(index), Type(type) {
-      assert(requiresSourceIndex(kind));
-      assert(index != InvalidSourceIndex);
-    }
-
-    MetadataSource(Kind kind, CanType type, CanType fixedType)
-      : TheKind(kind), FixedType(fixedType), Type(type) {
-      assert(requiresFixedType(kind));
-    }
-
-    Kind getKind() const { return TheKind; }
-
-    unsigned getParamIndex() const {
-      assert(requiresSourceIndex(getKind()));
-      return Index;
-    }
-
-    CanType getFixedType() const {
-      assert(requiresFixedType(getKind()));
-      return FixedType;
-    }
-  };
 
   using GenericParamFulfillmentCallback =
     llvm::function_ref<void(CanType genericParamType,

@@ -65,6 +65,43 @@ public:
   printModuleNamespaceQualifiersIfNeeded(const ModuleDecl *referencedModule,
                                          const ModuleDecl *currentContext);
 
+  /// Print out additional C++ `template` and `requires` clauses that
+  /// are required to emit a member definition outside  a C++ class that is
+  /// generated for the given Swift type declaration.
+  ///
+  /// \returns true if nothing was printed.
+  ///
+  /// Examples:
+  ///    1) For Swift's `String` type, it will print nothing.
+  ///    2) For Swift's `Array<T>` type, it will print `template<class
+  ///    T_0_0>\nrequires swift::isUsableInGenericContext<T_0_0>\n`
+  bool printNominalTypeOutsideMemberDeclTemplateSpecifiers(
+      const NominalTypeDecl *typeDecl);
+
+  /// Print out the C++ class access qualifier for the given Swift  type
+  /// declaration.
+  ///
+  /// Examples:
+  ///    1) For Swift's `String` type, it will print `String
+  ///    2) For Swift's `Array<T>` type, it will print `Array<T_0_0>
+  ///    3) For Swift's `Array<T>.Index` type, it will print
+  ///    `Array<T_0_0>::Index` 4) For Swift's `String` type in another module,
+  ///    it will print `Swift::String`
+  void printNominalTypeReference(const NominalTypeDecl *typeDecl,
+                                 const ModuleDecl *moduleContext);
+
+  /// Print out the C++ class access qualifier for the given Swift  type
+  /// declaration.
+  ///
+  /// Examples:
+  ///    1) For Swift's `String` type, it will print `String::`.
+  ///    2) For Swift's `Array<T>` type, it will print `Array<T_0_0>::`
+  ///    3) For Swift's `Array<T>.Index` type, it will print
+  ///    `Array<T_0_0>::Index::` 4) For Swift's `String` type in another module,
+  ///    it will print `Swift::String::`
+  void printNominalTypeQualifier(const NominalTypeDecl *typeDecl,
+                                 const ModuleDecl *moduleContext);
+
   /// Print a C++ namespace declaration with the give name and body.
   void
   printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,

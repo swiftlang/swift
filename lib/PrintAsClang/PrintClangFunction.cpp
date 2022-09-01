@@ -235,6 +235,8 @@ public:
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (languageMode != OutputLanguageMode::Cxx && !genericArgs.empty() &&
           type->hasTypeParameter()) {
+        if (modifiersDelegate.prefixIndirectlyPassedParamTypeInC)
+          (*modifiersDelegate.prefixIndirectlyPassedParamTypeInC)(os);
         if (!isInOutParam)
           os << "const ";
         os << "void * _Nonnull";
@@ -328,24 +330,20 @@ public:
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             Optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
-    // FIXME: handle optionalKind.
-    if (typeUseKind == FunctionSignatureTypeUse::ReturnType ||
-        typeUseKind == FunctionSignatureTypeUse::TypeReference) {
-      // generic is always returned indirectly in C signature.
-      assert(languageMode == OutputLanguageMode::Cxx);
-      os << genericTpt->getName();
-      return ClangRepresentation::representable;
-    }
-    if (!isInOutParam)
+    bool isParam = typeUseKind == FunctionSignatureTypeUse::ParamType;
+    if (isParam && !isInOutParam)
       os << "const ";
-    if (languageMode == OutputLanguageMode::Cxx) {
-      // Pass a reference to a template type.
-      os << genericTpt->getName();
-      os << " &";
+    // FIXME: handle optionalKind.
+    if (languageMode != OutputLanguageMode::Cxx) {
+      assert(typeUseKind == FunctionSignatureTypeUse::ParamType);
+      // Pass an opaque param in C mode.
+      os << "void * _Nonnull";
       return ClangRepresentation::representable;
     }
-    // Pass an opaque param in C mode.
-    os << "void * _Nonnull";
+    ClangSyntaxPrinter(os).printGenericTypeParamTypeName(genericTpt);
+    // Pass a reference to the template type.
+    if (isParam)
+      os << '&';
     return ClangRepresentation::representable;
   }
 
@@ -384,32 +382,22 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
     FunctionSignatureModifiers modifiers) {
+  // Print any template and requires clauses for the
+  // C++ class context to which this C++ member will belong to.
+  if (const auto *typeDecl = modifiers.qualifierContext) {
+    assert(kind == FunctionSignatureKind::CxxInlineThunk);
+    ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclTemplateSpecifiers(
+        typeDecl);
+  }
   if (FD->isGeneric()) {
-    auto Signature = FD->getGenericSignature();
+    auto Signature = FD->getGenericSignature().getCanonicalSignature();
     auto Requirements = Signature.getRequirements();
     // FIXME: Support generic requirements.
     if (!Requirements.empty())
       return ClangRepresentation::unsupported;
-    if (kind == FunctionSignatureKind::CxxInlineThunk) {
-      os << "template<";
-      llvm::interleaveComma(FD->getGenericParams()->getParams(), os,
-                            [&](const GenericTypeParamDecl *genericParam) {
-                              os << "class ";
-                              ClangSyntaxPrinter(os).printBaseName(
-                                  genericParam);
-                            });
-      os << ">\n";
-      os << "requires ";
-      llvm::interleave(
-          FD->getGenericParams()->getParams(), os,
-          [&](const GenericTypeParamDecl *genericParam) {
-            os << "swift::isUsableInGenericContext<";
-            ClangSyntaxPrinter(os).printBaseName(genericParam);
-            os << ">";
-          },
-          " && ");
-      os << "\n";
-    }
+    // Print the template and requires clauses for this function.
+    if (kind == FunctionSignatureKind::CxxInlineThunk)
+      ClangSyntaxPrinter(os).printGenericSignature(Signature);
   }
   auto emittedModule = FD->getModuleContext();
   OutputLanguageMode outputLang = kind == FunctionSignatureKind::CFunctionProto
@@ -474,11 +462,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   }
 
   os << ' ';
-  if (modifiers.qualifierContext) {
-    // FIXME: Full qualifiers for nested types?
-    ClangSyntaxPrinter(os).printBaseName(modifiers.qualifierContext);
-    os << "::";
-  }
+  if (const auto *typeDecl = modifiers.qualifierContext)
+    ClangSyntaxPrinter(os).printNominalTypeQualifier(
+        typeDecl, typeDecl->getModuleContext());
   ClangSyntaxPrinter(os).printIdentifier(name);
   os << '(';
 
@@ -547,6 +533,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         if (param.genericRequirement->Protocol)
           ClangSyntaxPrinter(os).printBaseName(
               param.genericRequirement->Protocol);
+      } else if (param.role == AdditionalParam::Role::GenericTypeMetadata) {
+        os << "void * _Nonnull ";
       }
     });
   }
@@ -672,16 +660,24 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           assert(!genericRequirement.Protocol);
           if (auto *gtpt = genericRequirement.TypeParameter
                                ->getAs<GenericTypeParamType>()) {
-            assert(funcType);
-            auto *gft = dyn_cast<GenericFunctionType>(funcType);
-            if (gtpt->getDepth() == 0) {
-              os << "swift::getTypeMetadata<"
-                 << gft->getGenericParams()[gtpt->getIndex()]->getName()
-                 << ">()";
-              return;
-            }
+            os << "swift::TypeMetadataTrait<";
+            ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
+            os << ">::getTypeMetadata()";
+            return;
           }
           os << "ERROR";
+          return;
+        }
+        if (param.role == AdditionalParam::Role::GenericTypeMetadata) {
+          os << "swift::TypeMetadataTrait<";
+          CFunctionSignatureTypePrinterModifierDelegate delegate;
+          CFunctionSignatureTypePrinter typePrinter(
+              os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+              interopContext, delegate, moduleContext, declPrinter,
+              FunctionSignatureTypeUse::TypeReference);
+          auto result = typePrinter.visit(param.type, None, /*isInOut=*/false);
+          assert(!result.isUnsupported());
+          os << ">::getTypeMetadata()";
           return;
         }
         if (param.role == AdditionalParam::Role::Self && !hasThrows)
@@ -706,20 +702,25 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   // indirectly by a pointer.
   if (!isKnownCxxType(resultTy, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
-    if (resultTy->is<GenericTypeParamType>()) {
+    if (const auto *gtpt = resultTy->getAs<GenericTypeParamType>()) {
       std::string returnAddress;
       llvm::raw_string_ostream ros(returnAddress);
       ros << "reinterpret_cast<void *>(&returnValue)";
-      StringRef resultTyName = "T"; // FIXME
+      std::string resultTyName;
+      {
+        llvm::raw_string_ostream os(resultTyName);
+        ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
+      }
 
       os << "  if constexpr (std::is_base_of<::swift::"
-         << cxx_synthesis::getCxxImplNamespaceName()
-         << "::RefCountedClass, T>::value) {\n";
+         << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
+         << resultTyName << ">::value) {\n";
       os << "  void *returnValue;\n  ";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
       os << ";\n";
       os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-         << "::implClassFor<T>::type::makeRetained(returnValue);\n";
+         << "::implClassFor<" << resultTyName
+         << ">::type::makeRetained(returnValue);\n";
       os << "  } else if constexpr (::swift::"
          << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
          << resultTyName << ">) {\n";
@@ -729,7 +730,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
       os << ";\n  });\n";
       os << "  } else {\n";
-      os << "  T returnValue;\n";
+      os << "  " << resultTyName << " returnValue;\n";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
       os << ";\n  return returnValue;\n";
       os << "  }\n";

@@ -397,7 +397,8 @@ namespace {
     unsigned AsyncResumeFunctionSwiftSelfIdx = 0;
     FunctionPointerKind FnKind;
     bool ShouldComputeABIDetails;
-    SmallVector<GenericRequirement, 4> GenericRequirements;
+    SmallVector<PolymorphicSignatureExpandedTypeSource, 4>
+        polymorphicSignatureTypeSources;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
                        FunctionPointerKind fnKind,
@@ -1631,9 +1632,9 @@ void SignatureExpansion::expandParameters() {
   // Next, the generic signature.
   if (hasPolymorphicParameters(FnType) &&
       !FnKind.shouldSuppressPolymorphicArguments())
-    expandPolymorphicSignature(IGM, FnType, ParamIRTypes,
-                               ShouldComputeABIDetails ? &GenericRequirements
-                                                       : nullptr);
+    expandPolymorphicSignature(
+        IGM, FnType, ParamIRTypes,
+        ShouldComputeABIDetails ? &polymorphicSignatureTypeSources : nullptr);
 
   // Certain special functions are passed the continuation directly.
   if (FnKind.shouldPassContinuationDirectly()) {
@@ -1931,8 +1932,8 @@ Signature SignatureExpansion::getSignature() {
     result.ExtraDataKind = ExtraData::kindForMember<void>();
   }
   if (ShouldComputeABIDetails)
-    result.ABIDetails =
-        SignatureExpansionABIDetails{std::move(GenericRequirements)};
+    result.ABIDetails = SignatureExpansionABIDetails{
+        std::move(polymorphicSignatureTypeSources)};
   return result;
 }
 

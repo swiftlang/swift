@@ -119,97 +119,121 @@
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<bool> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<bool>() {
-// CHECK-NEXT:   return &_impl::$sSbN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<bool> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$sSbN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int8_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int8_t>() {
-// CHECK-NEXT:   return &_impl::$ss4Int8VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<int8_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss4Int8VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint8_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint8_t>() {
-// CHECK-NEXT:   return &_impl::$ss5UInt8VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<uint8_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss5UInt8VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int16_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int16_t>() {
-// CHECK-NEXT:   return &_impl::$ss5Int16VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<int16_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss5Int16VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint16_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint16_t>() {
-// CHECK-NEXT:   return &_impl::$ss6UInt16VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<uint16_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss6UInt16VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int32_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int32_t>() {
-// CHECK-NEXT:   return &_impl::$ss5Int32VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<int32_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss5Int32VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint32_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint32_t>() {
-// CHECK-NEXT:   return &_impl::$ss6UInt32VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<uint32_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss6UInt32VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<int64_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<int64_t>() {
-// CHECK-NEXT:   return &_impl::$ss5Int64VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<int64_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss5Int64VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<uint64_t> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<uint64_t>() {
-// CHECK-NEXT:   return &_impl::$ss6UInt64VN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<uint64_t> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss6UInt64VN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<float> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<float>() {
-// CHECK-NEXT:   return &_impl::$sSfN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<float> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$sSfN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<double> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<double>() {
-// CHECK-NEXT:   return &_impl::$sSdN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<double> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$sSdN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<void *> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<void *>() {
-// CHECK-NEXT:   return &_impl::$ss13OpaquePointerVN;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<void *> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return &_impl::$ss13OpaquePointerVN;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: #endif
 // CHECK-EMPTY:

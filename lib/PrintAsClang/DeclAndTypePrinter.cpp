@@ -1228,32 +1228,41 @@ private:
 
   // Converts the array of ABIAdditionalParam into an array of AdditionalParam
   void convertABIAdditionalParams(
-      AbstractFunctionDecl *FD, Type resultTy,
+      AbstractFunctionDecl *FD,
       llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> ABIparams,
       llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
           &params,
       Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
     for (auto param : ABIparams) {
-      if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
-                            ABIParameterRole::GenericRequirementRole)
+      using Role = IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole;
+      switch (param.getRole()) {
+      case Role::GenericRequirement:
         params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
                               Role::GenericRequirement,
-                          resultTy->getASTContext().getOpaquePointerType(),
-                          /*isIndirect=*/false, param.genericRequirement});
-      else if (param.role ==
-               IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole::Self)
+                          FD->getASTContext().getOpaquePointerType(),
+                          /*isIndirect=*/false, param.getGenericRequirement()});
+        break;
+      case Role::GenericTypeMetadataSource:
+        params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
+                              Role::GenericTypeMetadata,
+                          param.getMetadataSourceType(), /*isIndirect=*/false,
+                          None});
+        break;
+      case Role::Self:
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
              selfTypeDeclContext
-                 ? (*selfTypeDeclContext)->getDeclaredType()
-                 : resultTy->getASTContext().getOpaquePointerType(),
+                 ? (*selfTypeDeclContext)->getDeclaredInterfaceType()
+                 : FD->getASTContext().getOpaquePointerType(),
              /*isIndirect=*/
              isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
-      else if (param.role == IRABIDetailsProvider::ABIAdditionalParam::
-                                 ABIParameterRole::Error)
+        break;
+      case Role::Error:
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,
-             resultTy->getASTContext().getOpaquePointerType()});
+             FD->getASTContext().getOpaquePointerType()});
+        break;
+      }
     }
   }
 
@@ -1296,18 +1305,19 @@ private:
         llvm::find_if(
             ABIparams,
             [](const IRABIDetailsProvider::ABIAdditionalParam &Param) {
-              return Param.role == IRABIDetailsProvider::ABIAdditionalParam::
-                                       ABIParameterRole::Self;
+              return Param.getRole() ==
+                     IRABIDetailsProvider::ABIAdditionalParam::
+                         ABIParameterRole::Self;
             }) == ABIparams.end()) {
+      (*selfTypeDeclContext)->getDeclaredInterfaceType();
       funcABI.additionalParams.push_back(
           {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-           (*selfTypeDeclContext)->getDeclaredType(),
+           (*selfTypeDeclContext)->getDeclaredInterfaceType(),
            /*isIndirect=*/
            isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
     }
     if (!ABIparams.empty())
-      convertABIAdditionalParams(FD, resultTy, ABIparams,
-                                 funcABI.additionalParams,
+      convertABIAdditionalParams(FD, ABIparams, funcABI.additionalParams,
                                  /*selfContext=*/selfTypeDeclContext);
 
     auto representation = funcPrinter.printFunctionSignature(

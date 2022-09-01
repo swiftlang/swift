@@ -73,9 +73,11 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Structs::FirstSmallStruct>() {
+// CHECK-NEXT: struct TypeMetadataTrait<Structs::FirstSmallStruct> {
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:   return Structs::_impl::$s7Structs16FirstSmallStructVMa(0)._0;
 // CHECK-NEXT: }
+// CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;

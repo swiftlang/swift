@@ -140,8 +140,10 @@ using UInt = size_t;
 template <class T>
 static inline const constexpr bool isUsableInGenericContext = false;
 
-/// Returns the type metadat for the given Swift type T.
-template <class T> inline void *_Nonnull getTypeMetadata();
+/// Returns the type metadata for the given Swift type T.
+template <class T> struct TypeMetadataTrait {
+  static inline void *_Nonnull getTypeMetadata();
+};
 
 namespace _impl {
 
