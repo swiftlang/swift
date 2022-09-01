@@ -61,23 +61,19 @@ private func printAccessInfo(address: Value) {
 
   var apw = AccessPathWalker()
   let (ap, scope) = apw.getAccessPathWithScope(of: address)
-  if let scope = scope {
-    switch scope {
-    case let .scope(ba):
-      print("  Scope: \(ba)")
-    case .base(_):
-      print("  Scope: base")
-    }
+  switch scope {
+  case let .scope(ba):
+    print("  Scope: \(ba)")
+  case .base(_):
+    print("  Scope: base")
   }
 
-  if let ap = ap {
-    print("  Base: \(ap.base)")
-    print("  Path: \"\(ap.projectionPath)\"")
+  print("  Base: \(ap.base)")
+  print("  Path: \"\(ap.projectionPath)\"")
 
-    var arw = AccessStoragePathVisitor()
-    if !arw.visitAccessStorageRoots(of: ap) {
-      print("   no Storage paths")
-    }
+  var arw = AccessStoragePathVisitor()
+  if !arw.visitAccessStorageRoots(of: ap) {
+    print("   no Storage paths")
   }
 }
 
@@ -85,10 +81,9 @@ private func checkAliasInfo(forArgumentsOf apply: ApplyInst, expectDistinct: Boo
   let address1 = apply.arguments[0]
   let address2 = apply.arguments[1]
   var apw = AccessPathWalker()
-  guard let path1 = apw.getAccessPath(of: address1),
-        let path2 = apw.getAccessPath(of: address2) else {
-    return
-  }
+  let path1 = apw.getAccessPath(of: address1)
+  let path2 = apw.getAccessPath(of: address2)
+
   if path1.isDistinct(from: path2) != expectDistinct {
     print("wrong isDistinct result of \(apply)")
   } else if path2.isDistinct(from: path1) != expectDistinct {

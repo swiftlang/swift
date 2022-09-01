@@ -73,7 +73,11 @@ enum AccessBase : CustomStringConvertible, Hashable {
   /// An address which is derived from a `Builtin.RawPointer`.
   case pointer(PointerToAddressInst)
 
-  init?(baseAddress: Value) {
+  /// The access base is some SIL pattern which does not fit into any other case.
+  /// This should be a very rare situation.
+  case unidentified
+
+  init(baseAddress: Value) {
     switch baseAddress {
     case let rea as RefElementAddrInst   : self = .class(rea)
     case let rta as RefTailAddrInst      : self = .tail(rta)
@@ -85,15 +89,16 @@ enum AccessBase : CustomStringConvertible, Hashable {
       if let ba = mvr.instruction as? BeginApplyInst, baseAddress.type.isAddress {
         self = .yield(ba)
       } else {
-        return nil
+        self = .unidentified
       }
     default:
-      return nil
+      self = .unidentified
     }
   }
 
   var description: String {
     switch self {
+      case .unidentified:      return "?"
       case .box(let pbi):      return "box - \(pbi)"
       case .stack(let asi):    return "stack - \(asi)"
       case .global(let gl):    return "global - @\(gl.name)"
@@ -110,7 +115,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class, .tail:
         return true
-      case .box, .stack, .global, .argument, .yield, .pointer:
+      case .box, .stack, .global, .argument, .yield, .pointer, .unidentified:
         return false
     }
   }
@@ -121,7 +126,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
       case .box(let pbi):      return pbi.operand
       case .class(let rea):    return rea.operand
       case .tail(let rta):     return rta.operand
-      case .stack, .global, .argument, .yield, .pointer:
+      case .stack, .global, .argument, .yield, .pointer, .unidentified:
         return nil
     }
   }
@@ -130,7 +135,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class(let rea):    return rea.fieldIsLet
       case .global(let g):     return g.isLet
-      case .box, .stack, .tail, .argument, .yield, .pointer:
+      case .box, .stack, .tail, .argument, .yield, .pointer, .unidentified:
         return false
     }
   }
@@ -142,7 +147,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
       case .class(let rea):    return rea.operand is AllocRefInstBase
       case .tail(let rta):     return rta.operand is AllocRefInstBase
       case .stack:             return true
-      case .global, .argument, .yield, .pointer:
+      case .global, .argument, .yield, .pointer, .unidentified:
         return false
     }
   }
@@ -152,7 +157,7 @@ enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .box, .class, .tail, .stack, .global:
         return true
-      case .argument, .yield, .pointer:
+      case .argument, .yield, .pointer, .unidentified:
         return false
     }
   }
@@ -223,6 +228,10 @@ struct AccessPath : CustomStringConvertible {
 
   /// address projections only
   let projectionPath: SmallProjectionPath
+
+  static func unidentified() -> AccessPath {
+    return AccessPath(base: .unidentified, projectionPath: SmallProjectionPath())
+  }
 
   var description: String {
     "\(projectionPath): \(base)"
@@ -362,46 +371,46 @@ enum EnclosingScope {
 /// of the access (the base address and the address projections to the accessed fields) and
 /// the innermost enclosing scope (`begin_access`).
 struct AccessPathWalker {
-  mutating func getAccessPath(of address: Value) -> AccessPath? {
+  mutating func getAccessPath(of address: Value) -> AccessPath {
     assert(address.type.isAddress, "Expected address")
     walker.start()
     if walker.walkUp(address: address, path: Walker.Path()) == .abortWalk {
-      return nil
+      assert(walker.result.base == .unidentified,
+             "shouldn't have set an access base in an aborted walk")
     }
     return walker.result
   }
 
-  mutating func getAccessPathWithScope(of address: Value) -> (AccessPath?, EnclosingScope?) {
+  mutating func getAccessPathWithScope(of address: Value) -> (AccessPath, EnclosingScope) {
     let ap = getAccessPath(of: address)
     return (ap, walker.scope)
   }
 
-  mutating func getAccessBase(of address: Value) -> AccessBase? {
-    getAccessPath(of: address)?.base
+  mutating func getAccessBase(of address: Value) -> AccessBase {
+    getAccessPath(of: address).base
   }
 
-  mutating func getAccessScope(of address: Value) -> EnclosingScope? {
+  mutating func getAccessScope(of address: Value) -> EnclosingScope {
     getAccessPathWithScope(of: address).1
   }
 
   private var walker = Walker()
 
   private struct Walker : AddressUseDefWalker {
-    private(set) var result: AccessPath? = nil
+    private(set) var result = AccessPath.unidentified()
     private var foundBeginAccess: BeginAccessInst? = nil
     private var pointerId = PointerIdentification()
 
-    var scope: EnclosingScope? {
+    var scope: EnclosingScope {
       if let ba = foundBeginAccess {
         return .scope(ba)
       } else {
-        guard let accessPath = result else { return nil }
-        return .base(accessPath.base)
+        return .base(result.base)
       }
     }
 
     mutating func start() {
-      result = nil
+      result = .unidentified()
       foundBeginAccess = nil
     }
 
@@ -435,7 +444,7 @@ struct AccessPathWalker {
     }
 
     mutating func rootDef(address: Value, path: Path) -> WalkResult {
-      assert(result == nil, "rootDef should only called once")
+      assert(result.base == .unidentified, "rootDef should only called once")
       // Try identifying the address a pointer originates from
       if let p2ai = address as? PointerToAddressInst {
         if let originatingAddr = pointerId.getOriginatingAddress(of: p2ai) {
@@ -446,15 +455,9 @@ struct AccessPathWalker {
         }
       }
 
-      // If this is a base then we're done
-      if let base = AccessBase(baseAddress: address) {
-        self.result = AccessPath(base: base, projectionPath: path.projectionPath)
-        return .continueWalk
-      }
-
-      // The base is unidentified
-      self.result = nil
-      return .abortWalk
+      let base = AccessBase(baseAddress: address)
+      self.result = AccessPath(base: base, projectionPath: path.projectionPath)
+      return .continueWalk
     }
 
     mutating func walkUp(address: Value, path: Path) -> WalkResult {
@@ -464,7 +467,6 @@ struct AccessPathWalker {
       } else if path.indexAddr && !canBeOperandOfIndexAddr(address) {
         // An `index_addr` instruction cannot be derived from an address
         // projection. Bail out
-        self.result = nil
         return .abortWalk
       } else if let ba = address as? BeginAccessInst, foundBeginAccess == nil {
         foundBeginAccess = ba
@@ -496,7 +498,7 @@ extension AccessStoragePathWalker {
         return walkUp(value: rea.operand, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
       case .tail(let rta):
         return walkUp(value: rta.operand, path: path.push(.tailElements, index: 0)) != .abortWalk
-      case .stack, .global, .argument, .yield, .pointer:
+      case .stack, .global, .argument, .yield, .pointer, .unidentified:
         return false
     }
   }
