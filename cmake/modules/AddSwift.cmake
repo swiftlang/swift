@@ -504,7 +504,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
     # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
     # to the linker command line.
-    set(swift_ast_path_flags "-Wl")
+    set(swift_ast_path_flags " -Wl")
     get_property(modules GLOBAL PROPERTY swift_compiler_modules)
     foreach(module ${modules})
       get_target_property(module_file "SwiftModule${module}" "module_file")
