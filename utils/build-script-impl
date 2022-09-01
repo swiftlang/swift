@@ -1234,6 +1234,7 @@ LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
 LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
+SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
 # We cannot currently apply the normal rules of skipping here for LLVM. Even if
 # we are skipping building LLVM, we still need to at least build a few tools
@@ -2022,6 +2023,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
                     "${swift_cmake_options[@]}"
                 )
 

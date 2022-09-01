@@ -8861,15 +8861,12 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!anchor)
     return nullptr;
 
+  // Avoid checking implicit conversions injected by the compiler.
+  if (locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return nullptr;
+
   auto getType = [&cs](Expr *expr) -> Type {
     return cs.simplifyType(cs.getType(expr))->getRValueType();
-  };
-
-  auto locatorEndsWith =
-      [](ConstraintLocator *locator,
-         ConstraintLocator::PathElementKind eltKind) -> bool {
-    auto path = locator->getPath();
-    return !path.empty() && path.back().getKind() == eltKind;
   };
 
   Expr *baseExpr = nullptr;
@@ -8928,7 +8925,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // member.
     // We need to find type variable which represents contextual base.
     auto *baseLocator = cs.getConstraintLocator(
-        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
+        UME, locator->isLastElement<LocatorPathElt::ConstructorMember>()
                  ? ConstraintLocator::UnresolvedMember
                  : ConstraintLocator::MemberRefBase);
 
@@ -8943,7 +8940,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     baseType = cs.simplifyType(*result)->getRValueType();
     // Constraint for member base is formed as '$T.Type[.<member] = ...`
     // which means MetatypeType has to be added after finding a type variable.
-    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
+    if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
   } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`

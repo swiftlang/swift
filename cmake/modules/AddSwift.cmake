@@ -6,9 +6,10 @@ include(SwiftAndroidSupport)
 include(SwiftCXXUtils)
 
 function(_swift_gyb_target_sources target scope)
+  set(SWIFT_SYNTAX_GYB_SUPPORT_DIR "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder")
   file(GLOB GYB_UNICODE_DATA ${SWIFT_SOURCE_DIR}/utils/UnicodeData/*)
   file(GLOB GYB_STDLIB_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py)
-  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/*.py)
+  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_SYNTAX_GYB_SUPPORT_DIR}/gyb_syntax_support/*.py)
   file(GLOB GYB_SOURCEKIT_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/*.py)
   set(GYB_SOURCES
     ${SWIFT_SOURCE_DIR}/utils/gyb
@@ -26,7 +27,7 @@ function(_swift_gyb_target_sources target scope)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
-        $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+        ${CMAKE_COMMAND} -E env PYTHONPATH=${SWIFT_SYNTAX_GYB_SUPPORT_DIR} $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
