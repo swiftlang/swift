@@ -874,7 +874,8 @@ static std::string remapPropertyName(const AccessorDecl *accessor,
 
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
-    StringRef swiftSymbolName, Type resultTy, bool isDefinition) {
+    StringRef swiftSymbolName, Type resultTy, bool isDefinition,
+    ArrayRef<AdditionalParam> additionalParams) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   os << "  ";
 
@@ -894,10 +895,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
   printCxxThunkBody(swiftSymbolName, accessor->getModuleContext(), resultTy,
-                    accessor->getParameters(),
-                    {AdditionalParam{AdditionalParam::Role::Self,
-                                     typeDeclContext->getDeclaredType(),
-                                     /*isIndirect=*/accessor->isSetter()}});
+                    accessor->getParameters(), additionalParams);
   os << "  }\n";
 }
 

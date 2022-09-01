@@ -131,10 +131,10 @@ public:
                       ArrayRef<AdditionalParam> additionalParams);
 
   /// Print the C++ getter/setter method signature.
-  void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
-                                      const AccessorDecl *accessor,
-                                      StringRef swiftSymbolName, Type resultTy,
-                                      bool isDefinition);
+  void printCxxPropertyAccessorMethod(
+      const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
+      StringRef swiftSymbolName, Type resultTy, bool isDefinition,
+      ArrayRef<AdditionalParam> additionalParams);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
   ClangRepresentation

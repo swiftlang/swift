@@ -901,7 +901,7 @@ private:
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
         declPrinter.printCxxPropertyAccessorMethod(
             typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/false);
+            /*isDefinition=*/false, funcABI->additionalParams);
       } else {
         declPrinter.printCxxMethod(
             typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
@@ -917,7 +917,7 @@ private:
 
         defPrinter.printCxxPropertyAccessorMethod(
             typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/true);
+            /*isDefinition=*/true, funcABI->additionalParams);
       } else {
         defPrinter.printCxxMethod(
             typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,

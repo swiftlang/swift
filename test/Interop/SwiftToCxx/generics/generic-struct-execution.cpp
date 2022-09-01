@@ -37,6 +37,20 @@ int main() {
     takeGenericPair(xprime);
     // CHECK-NEXT: GenericPair<Int32, Int32>(x: -995, y: 11)
     // CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: -995)
+    assert(x.getY() == 11);
+    x.setY(561);
+    takeGenericPair(x);
+    // CHECK-NEXT: GenericPair<Int32, Int32>(x: -995, y: 561)
+    assert(x.getComputedProp() == 42);
+    assert(x.getComputedVar() == -995);
+    x.setComputedVar(-123456);
+    assert(x.getComputedVar() == -123456);
+    assert(x.getY() == 561);
+    takeGenericPair(x);
+    // CHECK-NEXT: GenericPair<T, T2>::computeVar::get
+    // CHECK-NEXT: GenericPair<T, T2>::computeVar::set
+    // CHECK-NEXT: GenericPair<T, T2>::computeVar::get
+    // CHECK-NEXT: GenericPair<Int32, Int32>(x: -123456, y: 561)
   }
 
   {
