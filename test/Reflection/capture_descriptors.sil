@@ -1,7 +1,7 @@
 
 // REQUIRES: no_asan
 
-// SR-12893
+// https://github.com/apple/swift/issues/55339
 // XFAIL: OS=openbsd
 // UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 

@@ -2,10 +2,10 @@
 // RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors%{target-shared-library-suffix}
 // RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors%{target-shared-library-suffix} | %FileCheck %s
 
-// SR-10758
+// https://github.com/apple/swift/issues/53148
 // UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
-// SR-12893
+// https://github.com/apple/swift/issues/55339
 // XFAIL: OS=openbsd
 
 sil_stage canonical
