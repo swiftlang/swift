@@ -739,3 +739,23 @@ bb0(%0 : $*Klass):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @test_aliasing_modify_access
+// CHECK:         [[A:%.*]] = ref_element_addr [immutable] %0 : $Klass, #Klass.a
+// CHECK-NOT:     copy_addr
+// CHECK:         [[L:%.*]] = load [[A]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'test_aliasing_modify_access'
+sil @test_aliasing_modify_access : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned String {
+bb0(%0 : $Klass, %1 : $Klass):
+  %2 = ref_element_addr [immutable] %0 : $Klass, #Klass.a
+  %3 = alloc_stack $String
+  copy_addr %2 to [initialization] %3 : $*String
+  %4 = ref_element_addr %1 : $Klass, #Klass.a
+  %5 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*String
+  end_access %5 : $*String
+  %323 = load %3 : $*String
+  destroy_addr %3 : $*String
+  dealloc_stack %3 : $*String
+  return %323 : $String
+}
