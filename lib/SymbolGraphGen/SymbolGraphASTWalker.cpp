@@ -237,6 +237,19 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     }
   }
 
+  // Clang decls that are inherited from protocols get the USR of the protocol
+  // symbol, regardless of which class it's actually appearing on. To prevent
+  // multiple of these symbols colliding with each other, treat them as
+  // synthesized symbols and use their parent type as the base type.
+  if (VD->isImplicit() && VD->hasClangNode() &&
+      VD->getClangNode().getAsDecl()) {
+    if (const auto *Parent =
+            dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext())) {
+      SG->recordNode(Symbol(SG, VD, Parent));
+      return true;
+    }
+  }
+
   // Otherwise, record this in the main module `M`'s symbol graph.
   SG->recordNode(Symbol(SG, VD, nullptr));
 
