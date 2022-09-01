@@ -35,3 +35,13 @@ _ = dopt == nil
 _ = diuopt == nil
 _ = diuopt is ExpressibleByNilLiteral // expected-warning {{'is' test is always true}}
 _ = produceD() is ExpressibleByNilLiteral // expected-warning {{'is' test is always true}}
+
+enum E {
+  case none
+}
+func test(_ e: E) {
+  _ = e == .none
+  _ = e == E.none
+  _ = e == Optional.none // expected-warning {{comparing non-optional value of type 'E' to 'nil' or 'Optional.none' always returns false}}
+  _ = e == E?.none // expected-warning {{comparing non-optional value of type 'E' to 'nil' or 'Optional.none' always returns false}}
+}
