@@ -240,17 +240,32 @@ class Verifier : public ASTWalker {
     pushScope(DC);
   }
 
+  template<typename Dumpable>
+  struct Detail {
+    llvm::StringRef description;
+    Dumpable* dumpee;
+
+    void dump(raw_ostream &Out) const {
+      if (description)
+        Out << description;
+      dumpee->dump(Out);
+    }
+
+    Detail()
+      : description(), dumpee(nullptr) {}
+    Detail(Dumpable* d)
+      : description(), dumpee(d) {}
+    Detail(llvm::StringRef description, Dumpable* d)
+      : description(description), dumpee(d) {}
+  };
+
   /// Emit an error message and abort.
-  void error(llvm::StringRef msg) {
-    error<Expr>(msg, {});
-  }
+  void error(llvm::StringRef msg) { error<Expr>(msg, {}); }
 
   /// Emit an error message, dump the value, and then abort.
   /// \param d the value to invoke \c dump(raw_ostream&) on.
   template<typename Dumpable>
-  void error(llvm::StringRef msg, Dumpable* d) {
-    error(msg, {d});
-  }
+  void error(llvm::StringRef msg, Dumpable* d) { error(msg, {d}); }
 
   /// Emit an error message and abort, optionally dumping the expression.
   /// Automatically adds a new-line after emitting the message.
@@ -1100,12 +1115,9 @@ public:
     
     void verifyChecked(EnumIsCaseExpr *E) {
       auto nom = E->getSubExpr()->getType()->getAnyNominal();
-      if (!nom || !isa<EnumDecl>(nom)) {
-        Out << "enum_is_decl operand is not an enum: ";
-        E->getSubExpr()->getType().print(Out);
-        Out << '\n';
-        abort();
-      }
+      if (!nom || !isa<EnumDecl>(nom))
+        error("enum_is_decl operand is not an enum: ",
+              E->getSubExpr()->getType().getPointer());
       
       if (nom != E->getEnumElement()->getParentEnum()) {
         Out << "enum_is_decl case is not member of enum:\n";
