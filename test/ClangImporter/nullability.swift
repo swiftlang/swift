@@ -5,12 +5,12 @@ import CoreCooling
 func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let ao1: Any = sc.methodA(osc)
   _ = ao1
-  if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' always returns false}}
-  if sc.methodA(osc) == Optional.none { } // expected-warning {{comparing non-optional value of type 'Any' to 'Optional.none' always returns false}}
+  if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' or 'Optional.none' always returns false}}
+  if sc.methodA(osc) == Optional.none { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' or 'Optional.none' always returns false}}
 
   let ao2: Any = sc.methodB(nil)
   _ = ao2
-  if sc.methodA(osc) == nil { }// expected-warning {{comparing non-optional value of type 'Any' to 'nil' always returns false}}
+  if sc.methodA(osc) == nil { }// expected-warning {{comparing non-optional value of type 'Any' to 'nil' or 'Optional.none' always returns false}}
 
   let ao3: Any? = sc.property.flatMap { .some($0) }
   _ = ao3
@@ -19,7 +19,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
 
   let ao4: Any = sc.methodD()
   _ = ao4
-  if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' always returns false}}
+  if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' or 'Optional.none' always returns false}}
 
   sc.methodE(sc)
   sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
@@ -44,7 +44,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let sc2 = SomeClass(int: ci)
   let sc2a: SomeClass = sc2
   _ = sc2a
-  if sc2 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to 'nil' always returns false}}
+  if sc2 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to 'nil' or 'Optional.none' always returns false}}
 
   let sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
@@ -56,7 +56,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let sc4 = sc.returnMe()
   let sc4a: SomeClass = sc4
   _ = sc4a
-  if sc4 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to 'nil' always returns false}}
+  if sc4 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to 'nil' or 'Optional.none' always returns false}}
 }
 
 // Nullability with CF types.
