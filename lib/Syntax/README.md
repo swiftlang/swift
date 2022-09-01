@@ -481,7 +481,7 @@ A couple of interesting points and reminders:
 ## API Generation
 
 The libSyntax APIs are generated automatically from a set of description files
-written in Python. These files are located in `utils/gyb_syntax_support/`, and
+written in Python. These files are located in the [swift-syntax repository](https://github.com/apple/swift-syntax/blob/main/utils/gyb_syntax_support), and
 all follow the same schema.
 
 ### Class Schema

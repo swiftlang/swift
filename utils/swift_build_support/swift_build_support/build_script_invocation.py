@@ -245,6 +245,11 @@ class BuildScriptInvocation(object):
             args.extra_cmake_options.append(
                 '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
 
+        swift_syntax_src = os.path.join(self.workspace.source_root,
+                                        "swift-syntax")
+        args.extra_cmake_options.append(
+            '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.

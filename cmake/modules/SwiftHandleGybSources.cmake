@@ -53,12 +53,14 @@ function(handle_gyb_source_single dependency_out_var_name)
   endforeach()
   list(REMOVE_DUPLICATES gyb_expand_deps)
 
+  set(SWIFT_SYNTAX_GYB_SUPPORT_DIR "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder")
+
   add_custom_command_target(
       dependency_target
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
+          "${CMAKE_COMMAND}" -E env PYTHONPATH=${SWIFT_SYNTAX_GYB_SUPPORT_DIR} "$<TARGET_FILE:Python3::Interpreter>" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
           "${CMAKE_COMMAND}" -E copy_if_different "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
       COMMAND
@@ -123,24 +125,24 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
       "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/__init__.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Child.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Classification.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/kinds.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Node.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AttributeNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AvailabilityNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/CommonNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/DeclNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/ExprNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/GenericNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/NodeSerializationCodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/PatternNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/StmtNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/TypeNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Trivia.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Traits.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/__init__.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/Child.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/Classification.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/kinds.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/Node.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/AttributeNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/AvailabilityNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/CommonNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/DeclNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/ExprNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/GenericNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/NodeSerializationCodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/PatternNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/StmtNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/TypeNodes.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/Token.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/Trivia.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder/gyb_syntax_support/Traits.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/__init__.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/UIDs.py")
 
