@@ -13,8 +13,8 @@
 #ifndef SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 #define SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include <memory>
 
 namespace swift {
@@ -36,15 +36,15 @@ public:
   IRABIDetailsProvider &getIrABIDetails();
 
   // Runs the given function if we haven't emitted some context-specific stub
-  // for the given declaration yet.
-  void runIfStubForDeclNotEmitted(const Decl *d,
+  // for the given concrete stub name.
+  void runIfStubForDeclNotEmitted(llvm::StringRef stubName,
                                   llvm::function_ref<void(void)> function);
 
 private:
   ModuleDecl &mod;
   const IRGenOptions &irGenOpts;
   std::unique_ptr<IRABIDetailsProvider> irABIDetails;
-  llvm::DenseSet<const Decl *> emittedStubs;
+  llvm::StringSet<> emittedStubs;
 };
 
 } // end namespace swift

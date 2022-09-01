@@ -14,6 +14,7 @@
 #define SWIFT_PRINTASCLANG_PRINTCLANGVALUETYPE_H
 
 #include "OutputLanguageMode.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
@@ -42,39 +43,51 @@ public:
   void printValueTypeDecl(const NominalTypeDecl *typeDecl,
                           llvm::function_ref<void(void)> bodyPrinter);
 
-  /// Print the pararameter type that referes to a Swift struct type in C/C++.
-  void printValueTypeParameterType(const NominalTypeDecl *type,
-                                   OutputLanguageMode outputLang,
-                                   const ModuleDecl *moduleContext,
-                                   bool isInOutParam);
-
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
-  void
-  printParameterCxxToCUseScaffold(bool isIndirect, const NominalTypeDecl *type,
-                                  const ModuleDecl *moduleContext,
-                                  llvm::function_ref<void()> cxxParamPrinter,
-                                  bool isInOut, bool isSelf);
+  void printParameterCxxToCUseScaffold(
+      bool isIndirect, const NominalTypeDecl *type, ArrayRef<Type> genericArgs,
+      const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
+      llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf);
+
+  enum class TypeUseKind {
+    // The name of the C++ class that corresponds to the Swift value type (with
+    // any qualifiers).
+    CxxTypeName,
+    // The name of the C++ _impl class that corresponds to the Swift value type
+    // (with any qualifiers).
+    CxxImplTypeName
+  };
 
   /// Print the return type that refers to a Swift struct type in C/C++.
   void printValueTypeReturnType(const NominalTypeDecl *typeDecl,
                                 OutputLanguageMode outputLang,
+                                TypeUseKind typeUse,
                                 const ModuleDecl *moduleContext);
+
+  /// Prints out the C stub name used to pass/return value directly for the
+  /// given value type.
+  ///
+  /// If the C stub isn't declared yet in the emitted header, that declaration
+  /// will be emitted by this function.
+  void printCStubType(Type type, const NominalTypeDecl *typeDecl,
+                      ArrayRef<Type> genericArgs);
 
   /// Print the supporting code  that's required to indirectly return a C++
   /// class that represents a Swift value type as it's being indirectly passed
   /// from the C function that represents the native Swift function.
   void printValueTypeIndirectReturnScaffold(
       const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext,
+      llvm::function_ref<void()> typePrinter,
       llvm::function_ref<void(StringRef)> bodyPrinter);
 
   /// Print the supporting code  that's required to directly return a C++ class
   /// that represents a Swift value type as it's being returned from the C
   /// function that represents the native Swift function.
-  void
-  printValueTypeDirectReturnScaffold(const NominalTypeDecl *typeDecl,
-                                     const ModuleDecl *moduleContext,
-                                     llvm::function_ref<void()> bodyPrinter);
+  void printValueTypeDirectReturnScaffold(
+      const NominalTypeDecl *typeDecl, ArrayRef<Type> genericArgs,
+      const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
+      llvm::function_ref<void()> bodyPrinter);
 
   /// Print out the C++ type name of the implementation class that provides
   /// hidden access to the private class APIs.
@@ -82,15 +95,16 @@ public:
                                     const NominalTypeDecl *type);
 
   /// Print a variable that can be used to access type's metadata function
-  static void printMetadataAccessAsVariable(raw_ostream &os,
-                                            StringRef metadataFuncName,
-                                            int indent = 4,
-                                            StringRef varName = "metadata");
+  static void printMetadataAccessAsVariable(
+      raw_ostream &os, StringRef metadataFuncName,
+      ArrayRef<GenericRequirement> genericRequirements, int indent = 4,
+      StringRef varName = "metadata");
 
   /// Print a variable that can be used to access type's metadata function and
   /// value witness table
   static void printValueWitnessTableAccessAsVariable(
-      raw_ostream &os, StringRef metadataFuncName, int indent = 4,
+      raw_ostream &os, StringRef metadataFuncName,
+      ArrayRef<GenericRequirement> genericRequirements, int indent = 4,
       StringRef metadataVarName = "metadata",
       StringRef vwTableVarName = "vwTable");
 
@@ -101,13 +115,6 @@ public:
   static void forwardDeclType(raw_ostream &os, const NominalTypeDecl *typeDecl);
 
 private:
-  /// Prints out the C stub name used to pass/return value directly for the
-  /// given value type.
-  ///
-  /// If the C stub isn't declared yet in the emitted header, that declaration
-  /// will be emitted by this function.
-  void printCStubTypeName(const NominalTypeDecl *type);
-
   raw_ostream &os;
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;

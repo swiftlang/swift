@@ -158,6 +158,10 @@ private:
       bool isIndirect = false,
       llvm::Optional<AdditionalParam::Role> paramRole = None);
 
+  // Print out the full type specifier that refers to the
+  // _impl::_impl_<typename> C++ class for the given Swift type.
+  void printTypeImplTypeSpecifier(Type type, const ModuleDecl *moduleContext);
+
   bool hasKnownOptionalNullableCxxMapping(Type type);
 
   raw_ostream &os;

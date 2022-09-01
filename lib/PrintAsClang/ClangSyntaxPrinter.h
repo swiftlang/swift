@@ -13,6 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
+#include "swift/AST/GenericRequirement.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringRef.h"
@@ -20,6 +21,8 @@
 
 namespace swift {
 
+class CanGenericSignature;
+class GenericTypeParamType;
 class ModuleDecl;
 class NominalTypeDecl;
 
@@ -41,6 +44,8 @@ StringRef getCxxOpaqueStorageClassName();
 
 class ClangSyntaxPrinter {
 public:
+  enum class LeadingTrivia { None, Comma };
+
   ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
@@ -98,7 +103,8 @@ public:
   static bool isClangKeyword(Identifier name);
 
   /// Print the call expression to the Swift type metadata access function.
-  void printSwiftTypeMetadataAccessFunctionCall(StringRef name);
+  void printSwiftTypeMetadataAccessFunctionCall(
+      StringRef name, ArrayRef<GenericRequirement> requirements);
 
   /// Print the set of statements to access the value witness table pointer
   /// ('vwTable') from the given type metadata variable.
@@ -106,8 +112,37 @@ public:
       StringRef metadataVariable, StringRef vwTableVariable, int indent);
 
   /// Print the metadata accessor function for the given type declaration.
-  void printCTypeMetadataTypeFunction(const NominalTypeDecl *typeDecl,
-                                      StringRef typeMetadataFuncName);
+  void printCTypeMetadataTypeFunction(
+      const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName,
+      llvm::ArrayRef<GenericRequirement> genericRequirements);
+
+  /// Print the name of the generic type param type in C++.
+  void printGenericTypeParamTypeName(const GenericTypeParamType *gtpt);
+
+  /// Print the Swift generic signature as C++ template declaration alongside
+  /// its requirements.
+  void printGenericSignature(const CanGenericSignature &signature);
+
+  /// Print the C++ template parameters that should be passed for a given
+  /// generic signature.
+  void printGenericSignatureParams(const CanGenericSignature &signature);
+
+  /// Print the call to the C++ type traits that computes the underlying type /
+  /// witness table pointer value that are passed to Swift for the given generic
+  /// requirement.
+  void
+  printGenericRequirementInstantiantion(const GenericRequirement &requirement);
+
+  /// Print the list of calls to C++ type traits that compute the generic
+  /// pointer values to pass to Swift.
+  void printGenericRequirementsInstantiantions(
+      ArrayRef<GenericRequirement> requirements,
+      LeadingTrivia leadingTrivia = LeadingTrivia::None);
+
+  // Print the C++ type name that corresponds to the primary user facing C++
+  // class for the given nominal type.
+  void printPrimaryCxxTypeName(const NominalTypeDecl *type,
+                               const ModuleDecl *moduleContext);
 
 protected:
   raw_ostream &os;
