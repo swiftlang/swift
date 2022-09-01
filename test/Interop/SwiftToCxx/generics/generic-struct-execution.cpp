@@ -77,5 +77,22 @@ int main() {
     takeConcretePair(xprime);
     // CHECK-NEXT: CONCRETE pair of UInt32: 100000 918 ;
   }
+
+  {
+    auto x = GenericPair<int, int>::init(11, 234242, 44);
+    takeGenericPair(x);
+    x.method();
+    assert(x.getY() == 44);
+    // CHECK-NEXT: GenericPair<T, T2>::init::11,44,234242;
+    // CHECK-NEXT: GenericPair<Int32, Int32>(x: 11, y: 44)
+    // CHECK-NEXT: GenericPair<T, T2>::testme::11,44;
+    auto y = GenericPair<uint32_t, uint32_t>::init(0, -987, 3425);
+    takeConcretePair(y);
+    y.method();
+    assert(y.getY() == 3425);
+    // CHECK-NEXT: GenericPair<T, T2>::init::0,3425,-987;
+    // CHECK-NEXT: CONCRETE pair of UInt32: 0 3425 ;
+    // CHECK-NEXT: GenericPair<T, T2>::testme::0,3425;
+  }
   return 0;
 }
