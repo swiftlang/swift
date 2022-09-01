@@ -4009,6 +4009,9 @@ WARNING(use_of_qq_on_non_optional_value,none,
 WARNING(nonoptional_compare_to_nil,none,
         "comparing non-optional value of type %0 to 'nil' always returns"
         " %select{false|true}1", (Type, bool))
+WARNING(nonoptional_compare_to_optional_none_case,none,
+        "comparing non-optional value of type %0 to 'Optional.none' always returns"
+        " %select{false|true}1", (Type, bool))
 WARNING(optional_check_nonoptional,none,
         "non-optional expression of type %0 used in a check for optionals",
         (Type))
