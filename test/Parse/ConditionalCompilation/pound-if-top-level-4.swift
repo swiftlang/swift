@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-// https://bugs.swift.org/browse/SR-4426
-// '#if' in top-level code that contains only decls should not disturb forward reference.
+// https://github.com/apple/swift/issues/47003
+// '#if' in top-level code that contains only declarations should not disturb
+// forward reference.
 
 typealias A = B
 

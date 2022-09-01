@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-// SR-1661: Dollar was accidentally allowed as an identifier in Swift 3.
+// https://github.com/apple/swift/issues/44270
+// Dollar was accidentally allowed as an identifier in Swift 3.
 // SE-0144: Reject this behavior in the future.
 
 func dollarVar() {
@@ -105,7 +106,8 @@ infix operator **: $Precedence
 #$UnknownDirective() // expected-error {{use of unknown directive '#$UnknownDirective'}}
 
 
-// SR-13232
+// https://github.com/apple/swift/issues/55672
+
 @propertyWrapper
 struct Wrapper {
   var wrappedValue: Int
@@ -118,5 +120,6 @@ struct S {
 
 let _ = S().$café // Okay
 
-infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}} // SR-13092
-infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}} // SR-13092
+// https://github.com/apple/swift/issues/55538
+infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
+infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}}

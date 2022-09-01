@@ -553,42 +553,43 @@ enum SE0155 {
   // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
 }
 
-// SR-11261
-enum SR11261 {
+// https://github.com/apple/swift/issues/53662
+
+enum E_53662 {
   case identifier
   case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}}
   case identifier2
 }
 
-enum SR11261_var {
+enum E_53662_var {
   case identifier
   case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
   case identifier2
 }
 
-enum SR11261_underscore {
+enum E_53662_underscore {
   case identifier
   case _ // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
   case identifier2
 }
 
-enum SR11261_Comma {
+enum E_53662_Comma {
   case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
 }
 
-enum SR11261_Newline {
+enum E_53662_Newline {
   case identifier1
   case identifier2
   case 
   case identifier // expected-error {{keyword 'case' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`case`}}
 }
 
-enum SR11261_Newline2 {
+enum E_53662_Newline2 {
   case 
   func foo() {} // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
 }
 
-enum SR11261_PatternMatching {
+enum E_53662_PatternMatching {
   case let .foo(x, y): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 

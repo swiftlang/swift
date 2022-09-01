@@ -75,27 +75,34 @@ protocol Animal<Food> {  // expected-error {{an associated type named 'Food' mus
 }
 
 
+// https://github.com/apple/swift/issues/43190
+// Crash with invalid parameter declaration
+do {
+  class Starfish {}
+  struct Salmon {}
+  func f(s Starfish,  // expected-error {{expected ':' following argument label and parameter name}}
+            _ ss: Salmon) -> [Int] {}
+  func g() { f(Starfish(), Salmon()) }
+}
 
-// SR-573 - Crash with invalid parameter declaration
-class Starfish {}
-struct Salmon {}
-func f573(s Starfish,  // expected-error {{expected ':' following argument label and parameter name}}
-          _ ss: Salmon) -> [Int] {}
-func g573() { f573(Starfish(), Salmon()) }
+// https://github.com/apple/swift/issues/43313
+do {
+  func f(_ a: Int, b: Int) {}
+  f(1, b: 2,) // expected-error {{unexpected ',' separator}}
+}
 
-func SR698(_ a: Int, b: Int) {}
-SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
+// https://github.com/apple/swift/issues/43591
+// Two inout crash compiler
 
-// SR-979 - Two inout crash compiler
-func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{17-23=}}
-func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
-// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
-func SR979d(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
-// expected-error @-1 {{expected ',' separator}} {{20-20=,}} 
+func f1_43591(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
+func f2_43591(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{15-20=}} {{30-30=inout }}
+// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{21-27=}}
+func f3_43591(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{15-18=`let`}}
+// expected-error @-1 {{expected ',' separator}} {{22-22=,}}
 // expected-error @-2 {{expected ':' following argument label and parameter name}}
-// expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{13-17=}}
-func SR979e(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
-func SR979g(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
+// expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{15-19=}}
+func f4_43591(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{15-20=}}
+func f5_43591(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{15-20=}}
 
 func repeat() {}
 // expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}
@@ -136,15 +143,17 @@ let x: () = ()
 !(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 
-func sr8202_foo(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
-func sr8202_bar(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@available' attribute cannot be applied to this declaration}}
-func sr8202_baz(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
-func sr8202_qux(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
-func sr8202_quux(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}
+// https://github.com/apple/swift/issues/50734
 
-class sr8202_cls<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
-func sr8202_func<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
-enum sr8202_enum<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
+func f1_50734(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func f2_50734(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@available' attribute cannot be applied to this declaration}}
+func f3_50734(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+func f4_50734(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
+func f5_50734(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}
+
+class C_50734<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func f6_50734<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+enum E_50734<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
 protocol P {
   @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@available' attribute cannot be applied to this declaration}}
 }

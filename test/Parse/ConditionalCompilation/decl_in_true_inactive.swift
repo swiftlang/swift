@@ -1,7 +1,10 @@
 // RUN: %target-typecheck-verify-swift -D FOO -D BAR
 
-// SR-3996 Incorrect type checking when using defines
+// https://github.com/apple/swift/issues/46581
+// Incorrect type checking when using defines
+//
 // Decls in true-but-inactive blocks used to be leaked.
+
 func f1() -> Int {
 #if FOO
   let val = 1

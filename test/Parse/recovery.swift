@@ -135,7 +135,7 @@ func missingControllingExprInRepeatWhile() {
   } while { true }() // expected-error{{missing condition in 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call to closure returning 'Bool' is unused}}
 }
 
-// SR-165
+// https://github.com/apple/swift/issues/42787
 func missingWhileInRepeat() {
   repeat {
   } // expected-error {{expected 'while' after body of 'repeat' statement}}
@@ -220,7 +220,7 @@ func missingControllingExprInForEach() {
   }
 #endif
   
-  // SR-5943
+  // https://github.com/apple/swift/issues/48502
   struct User { let name: String? }
   let users = [User]()
   for user in users whe { // expected-error {{expected '{' to start the body of for-each loop}}
@@ -569,14 +569,14 @@ func use_BracesInsideNominalDecl1() {
   var _ : BracesInsideNominalDecl1.A // no-error
 }
 
-class SR771 {
+// https://github.com/apple/swift/issues/43383
+class С_43383 {
     print("No one else was in the room where it happened") // expected-note {{'print()' previously declared here}}
     // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
     // expected-error @-2 {{expected '{' in body of function declaration}}
     // expected-error @-3 {{expected parameter name followed by ':'}}
 }
-
-extension SR771 {
+extension С_43383 {
     print("The room where it happened, the room where it happened")
     // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
     // expected-error @-2 {{expected '{' in body of function declaration}}
@@ -786,8 +786,8 @@ func r22387625() {
   let _= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{8-8= }}
   let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
-// <https://bugs.swift.org/browse/SR-3135>
-func SR3135() {
+// https://github.com/apple/swift/issues/45723
+do {
   let _: Int= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{13-13= }}
   let _: Array<Int>= [] // expected-error{{'=' must have consistent whitespace on both sides}} {{20-20= }}
 }
@@ -851,9 +851,10 @@ func f() { // expected-note 2{{did you mean 'f'?}}
 }
 
 
-// <rdar://problem/22478168> | SR-11006
+// rdar://problem/22478168
+// https://github.com/apple/swift/issues/53396
 // expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
-func SR11006(a: Int == 0) {}
+func f_53396(a: Int == 0) {}
 
 // rdar://38225184
 extension Collection where Element == Int && Index == Int {}
