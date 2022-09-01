@@ -173,7 +173,7 @@ import _Concurrency
 ///
 /// Implementing the remote calls correctly and efficiently is the important task for a distributed actor system library.
 /// Since those methods are not currently expressible as protocol requirements due to advanced use of generics
-/// combined with type aliases, they will not appear in the protocol's documentation as explicit requirements.
+/// combined with associated types, they will not appear in the protocol's documentation as explicit requirements.
 /// Instead, we present their signatures that a conforming type has to implement here:
 ///
 /// > Note: Although the `remoteCall` methods are not expressed as protocol requirements in source,
@@ -688,6 +688,32 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// Once encoded, the system should use some underlying transport mechanism to send the
 /// bytes serialized by the invocation to the remote peer.
 ///
+/// ### Protocol requirements
+/// Similar to the ``DistributedActorSystem`` and its `remoteCall` and `remoteCallVoid` protocol requirements,
+/// the `DistributedTargetInvocationEncoder` contains a few methods which are not possible to express in source due to
+/// advanced use generics combined with associated types. Specifically, the `recordArgument` and `recordReturnType`
+/// methods are not expressed in source as protocol requirements, but will be treated by the compiler as-if they were.
+///
+/// > Note: Although the `recordArgument` method is not expressed as protocol requirement in source,
+/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+///
+/// In addition to the compiler offering compile errors if those witnesses are missing in an adopting type,
+/// we present their signatures here for reference:
+///
+/// ```swift
+///  /// Record an argument of `Argument` type.
+///  /// This will be invoked for every argument of the target, in declaration order.
+/// mutating func recordArgument<Value: SerializationRequirement>(
+///     _ argument: DistributedTargetArgument<Value>
+/// ) throws
+///
+///  /// Ad-hoc requirement
+///  ///
+///  /// Record the return type of the distributed method.
+///  /// This method will not be invoked if the target is returning `Void`.
+///  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
+/// ```
+///
 /// ## Decoding an invocation
 /// Since every actor system is going to deal with a concrete invocation type, they may
 /// implement decoding them whichever way is most optimal for the given system.
@@ -771,6 +797,35 @@ public struct RemoteCallArgument<Value> {
 
 /// Decoder that must be provided to `executeDistributedTarget` and is used
 /// by the Swift runtime to decode arguments of the invocation.
+///
+/// ### Protocol requirements
+/// Similar to the ``DistributedTargetInvocationEncoder`` and its `recordArgument` and `recordReturnType` protocol requirements,
+/// the `DistributedTargetInvocationDecoder` contains a method which is not possible to express in source due to
+/// advanced use generics combined with associated types. Specifically, the `decodeNextArgument`
+/// method is not expressed in source as protocol requirement, but will be treated by the compiler as-if it was.
+///
+/// > Note: Although the `decodeNextArgument` method is not expressed as protocol requirement in source,
+/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+///
+/// In addition to the compiler offering compile errors if this witness is missing in an adopting type,
+/// we present its signature here for reference:
+///
+/// ```swift
+/// /// Ad-hoc protocol requirement
+/// ///
+/// /// Attempt to decode the next argument from the underlying buffers into pre-allocated storage
+/// /// pointed at by 'pointer'.
+/// ///
+/// /// This method should throw if it has no more arguments available, if decoding the argument failed,
+/// /// or, optionally, if the argument type we're trying to decode does not match the stored type.
+/// ///
+/// /// The result of the decoding operation must be stored into the provided 'pointer' rather than
+/// /// returning a value. This pattern allows the runtime to use a heavily optimized, pre-allocated
+/// /// buffer for all the arguments and their expected types. The 'pointer' passed here is a pointer
+/// /// to a "slot" in that pre-allocated buffer. That buffer will then be passed to a thunk that
+/// /// performs the actual distributed (local) instance method invocation.
+/// mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
+/// ```
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
   associatedtype SerializationRequirement
@@ -801,15 +856,50 @@ public protocol DistributedTargetInvocationDecoder {
   mutating func decodeReturnType() throws -> Any.Type?
 }
 
+/// Protocol a distributed invocation execution's result handler.
+///
+/// An instance conforming to this type must be passed when invoking
+/// ``executeDistributedTarget(on:target:invocationDecoder:handler:)`` while handling an incoming distributed call.
+///
+/// The handler will then be invoked with the return value (or error) that the invoked target returned (or threw).
+///
+/// ### Protocol requirements
+/// Similar to the ``DistributedActorSystem`` and its `remoteCall` and `remoteCallVoid` protocol requirements,
+/// the `DistributedTargetInvocationResultHandler` contains a method which is not possible to express in source due to
+/// advanced use generics combined with associated types. Specifically, the `onReturn` method is not expressed in
+/// source as protocol requirement, but will be treated by the compiler as-if they were.
+///
+/// > Note: Although the `onReturn` method is not expressed as protocol requirement in source,
+/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+///
+/// In addition to the compiler offering compile errors if this witnesses is missing in an adopting type,
+/// we present its signature here for reference:
+///
+/// ```swift
+/// /// Ad-hoc protocol requirement
+/// ///
+/// /// Invoked when the distributed target execution returned successfully.
+/// /// The `value` is the return value of the executed distributed invocation target.
+/// func onReturn<Success: SerializationRequirement>(value: Success) async throws
+/// ```
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationResultHandler {
   associatedtype SerializationRequirement
+
+//  /// Ad-hoc protocol requirement
+//  ///
+//  /// Invoked when the distributed target execution returned successfully.
+//  /// The `value` is the return value of the executed distributed invocation target.
 //  func onReturn<Success: SerializationRequirement>(value: Success) async throws
 
-  /// Invoked when the distributed target invocation of a `Void` returning
+  /// Invoked when the distributed target execution of a `Void` returning
   /// function has completed successfully.
   func onReturnVoid() async throws
 
+  /// Invoked when the distributed target execution of a target has thrown an error.
+  ///
+  /// It is not guaranteed that the error conform to the ``SerializationRequirement``;
+  /// This guarantee is only given to return values (and offered by `onReturn`).
   func onThrow<Err: Error>(error: Err) async throws
 }
 
