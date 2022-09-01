@@ -159,8 +159,10 @@ void ClangSyntaxPrinter::printNullability(
 }
 
 void ClangSyntaxPrinter::printSwiftTypeMetadataAccessFunctionCall(
-    StringRef name) {
-  os << name << "(0)";
+    StringRef name, ArrayRef<GenericRequirement> requirements) {
+  os << name << "(0";
+  printGenericRequirementsInstantiantions(requirements, LeadingTrivia::Comma);
+  os << ')';
 }
 
 void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
@@ -187,12 +189,92 @@ void ClangSyntaxPrinter::printValueWitnessTableAccessSequenceFromTypeMetadata(
 }
 
 void ClangSyntaxPrinter::printCTypeMetadataTypeFunction(
-    const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName) {
+    const NominalTypeDecl *typeDecl, StringRef typeMetadataFuncName,
+    llvm::ArrayRef<GenericRequirement> genericRequirements) {
+  // FIXME: Support generic requirements > 3.
+  if (!genericRequirements.empty())
+    os << "static_assert(" << genericRequirements.size()
+       << " <= " << NumDirectGenericTypeMetadataAccessFunctionArgs
+       << ", \"unsupported generic requirement list for metadata func\");\n";
   os << "// Type metadata accessor for " << typeDecl->getNameStr() << "\n";
   os << "SWIFT_EXTERN ";
   printSwiftImplQualifier();
   os << "MetadataResponseTy " << typeMetadataFuncName << '(';
   printSwiftImplQualifier();
-  os << "MetadataRequestTy)";
+  os << "MetadataRequestTy";
+  if (!genericRequirements.empty())
+    os << ", ";
+  llvm::interleaveComma(genericRequirements, os,
+                        [&](const GenericRequirement &) {
+                          // FIXME: Print parameter name.
+                          os << "void * _Nonnull";
+                        });
+  os << ')';
   os << " SWIFT_NOEXCEPT SWIFT_CALL;\n\n";
+}
+
+void ClangSyntaxPrinter::printGenericTypeParamTypeName(
+    const GenericTypeParamType *gtpt) {
+  os << "T_" << gtpt->getDepth() << '_' << gtpt->getIndex();
+}
+
+void ClangSyntaxPrinter::printGenericSignature(
+    const CanGenericSignature &signature) {
+  os << "template<";
+  llvm::interleaveComma(
+      signature.getGenericParams(), os,
+      [&](const CanTypeWrapper<GenericTypeParamType> &genericParamType) {
+        os << "class ";
+        printGenericTypeParamTypeName(genericParamType);
+      });
+  os << ">\n";
+  os << "requires ";
+  llvm::interleave(
+      signature.getGenericParams(), os,
+      [&](const CanTypeWrapper<GenericTypeParamType> &genericParamType) {
+        os << "swift::isUsableInGenericContext<";
+        printGenericTypeParamTypeName(genericParamType);
+        os << ">";
+      },
+      " && ");
+  os << "\n";
+}
+
+void ClangSyntaxPrinter::printGenericSignatureParams(
+    const CanGenericSignature &signature) {
+  os << '<';
+  llvm::interleaveComma(
+      signature.getGenericParams(), os,
+      [&](const CanTypeWrapper<GenericTypeParamType> &genericParamType) {
+        printGenericTypeParamTypeName(genericParamType);
+      });
+  os << '>';
+}
+
+void ClangSyntaxPrinter::printGenericRequirementInstantiantion(
+    const GenericRequirement &requirement) {
+  assert(!requirement.Protocol && "protocol requirements not supported yet!");
+  auto *gtpt = requirement.TypeParameter->getAs<GenericTypeParamType>();
+  assert(gtpt && "unexpected generic param type");
+  os << "swift::getTypeMetadata<";
+  printGenericTypeParamTypeName(gtpt);
+  os << ">()";
+}
+
+void ClangSyntaxPrinter::printGenericRequirementsInstantiantions(
+    ArrayRef<GenericRequirement> requirements, LeadingTrivia leadingTrivia) {
+  if (leadingTrivia == LeadingTrivia::Comma && !requirements.empty())
+    os << ", ";
+  llvm::interleaveComma(requirements, os,
+                        [&](const GenericRequirement &requirement) {
+                          printGenericRequirementInstantiantion(requirement);
+                        });
+}
+
+void ClangSyntaxPrinter::printPrimaryCxxTypeName(
+    const NominalTypeDecl *type, const ModuleDecl *moduleContext) {
+  printModuleNamespaceQualifiersIfNeeded(type->getModuleContext(),
+                                         moduleContext);
+  // FIXME: Print class qualifiers for nested class references.
+  printBaseName(type);
 }

@@ -105,6 +105,12 @@ public:
   /// access function.
   FunctionABISignature getTypeMetadataAccessFunctionSignature();
 
+  /// Returns additional generic requirement parameters that are required to
+  /// call the type metadata access function for the given type.
+  SmallVector<GenericRequirement, 2>
+  getTypeMetadataAccessFunctionGenericRequirementParameters(
+      NominalTypeDecl *nominal);
+
   struct EnumElementInfo {
     unsigned tag;
     StringRef globalVariableName;
