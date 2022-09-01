@@ -2242,13 +2242,13 @@ getImportTypeKindForParam(const clang::ParmVarDecl *param) {
 }
 
 Optional<swift::Type> ClangImporter::Implementation::importParameterType(
-    const clang::ParmVarDecl *param, OptionalTypeKind OptionalityOfParam,
+    const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
     bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
     bool paramIsError, bool paramIsCompletionHandler,
     Optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
-    llvm::function_ref<void(Diagnostic &&)> paramAddDiag, bool &isInOut,
-    bool &isParamTypeImplicitlyUnwrapped) {
+    llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
+    bool &isInOut, bool &isParamTypeImplicitlyUnwrapped) {
   auto paramTy = param->getType();
 
   ImportTypeKind importKind = getImportTypeKindForParam(param);
@@ -2282,7 +2282,7 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
                                       ? PTK_UnsafePointer
                                       : PTK_UnsafeMutablePointer;
     auto genericType = findGenericTypeInGenericDecls(
-        *this, templateParamType, genericParams, attrs, paramAddDiag);
+        *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
     swiftParamTy = genericType->wrapInPointer(pointerKind);
     if (!swiftParamTy)
       return None;
@@ -2291,13 +2291,13 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
     auto templateParamType =
         cast<clang::TemplateTypeParmType>(paramTy->getPointeeType());
     swiftParamTy = findGenericTypeInGenericDecls(
-        *this, templateParamType, genericParams, attrs, paramAddDiag);
+        *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
     if (!paramTy->getPointeeType().isConstQualified())
       isInOut = true;
   } else if (auto *templateParamType =
                  dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
     swiftParamTy = findGenericTypeInGenericDecls(
-        *this, templateParamType, genericParams, attrs, paramAddDiag);
+        *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
   } else if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
     // We don't support reference type to a dependent type, just bail.
     if (refType->getPointeeType()->isDependentType()) {
@@ -2317,11 +2317,11 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
       return None;
 
     swiftParamTy = ExistentialType::get(nsCopying);
-    if (OptionalityOfParam != OTK_None)
+    if (optionalityOfParam != OTK_None)
       swiftParamTy = OptionalType::get(swiftParamTy);
 
     isParamTypeImplicitlyUnwrapped =
-        OptionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
+        optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
   }
 
   if (!swiftParamTy) {
@@ -2339,11 +2339,11 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
     // for the specific case when the throws conversion works, but is not
     // sufficient if it fails. (The correct, overarching fix is ClangImporter
     // being lazier.)
-    auto importedType =
-        importType(paramTy, importKind, paramAddDiag, allowNSUIntegerAsInt,
-                   Bridgeability::Full, attrs, OptionalityOfParam,
-                   /*resugarNSErrorPointer=*/!paramIsError,
-                   completionHandlerErrorParamIndex);
+    auto importedType = importType(paramTy, importKind, addImportDiagnosticFn,
+                                   allowNSUIntegerAsInt, Bridgeability::Full,
+                                   attrs, optionalityOfParam,
+                                   /*resugarNSErrorPointer=*/!paramIsError,
+                                   completionHandlerErrorParamIndex);
     if (!importedType)
       return None;
 
@@ -2404,7 +2404,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     knownNonNull |= clangDecl->isFunctionTemplateSpecialization();
 
     // Check nullability of the parameter.
-    OptionalTypeKind OptionalityOfParam = getParamOptionality(param, knownNonNull);
+    OptionalTypeKind optionalityOfParam =
+        getParamOptionality(param, knownNonNull);
 
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
@@ -2412,7 +2413,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     bool isParamTypeImplicitlyUnwrapped = false;
 
     auto swiftParamTyOpt = importParameterType(
-        param, OptionalityOfParam, allowNSUIntegerAsInt,
+        param, optionalityOfParam, allowNSUIntegerAsInt,
         /*isNSDictionarySubscriptGetter=*/false,
         /*paramIsError=*/false,
         /*paramIsCompletionHandler=*/false,
