@@ -1371,6 +1371,18 @@ public:
   ///        being imported.
   /// \param allowNSUIntegerAsInt If true, NSUInteger will be import as Int
   ///        in certain contexts. If false, it will always be import as UInt.
+  /// \param isNSDictionarySubscriptGetter If true, the parameter is being
+  ///        imported as part of an NSDictionary subscript getter. If false,
+  ///        the parameter belongs to some other kind of method/function.
+  /// \param paramIsError If true, the parameter being imported is an NSError
+  ///        parameter. If false, the parameter is not an error parameter.
+  /// \param paramIsCompletionHandler If true, the parameter being imported is
+  ///        a completion handler. If false, the parameter is not a completion
+  ///        handler.
+  /// \param completionHandlerErrorParamIndex If it contains a value, the value
+  ///        indicates the index of the completion handler whose error
+  ///        parameter is used to indicate throwing. If None, the function does
+  ///        not have such parameter.
   /// \param genericParams For C++ functions, an array of the generic type
   ///        parameters of the function. For the rest of cases, an empty array
   ///        can be provided.
@@ -1386,7 +1398,10 @@ public:
   /// \returns The imported parameter type on success, or None on failure.
   Optional<swift::Type> importParameterType(
       const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
-      bool allowNSUIntegerAsInt, ArrayRef<GenericTypeParamDecl *> genericParams,
+      bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
+      bool paramIsError, bool paramIsCompletionHandler,
+      Optional<unsigned> completionHandlerErrorParamIndex,
+      ArrayRef<GenericTypeParamDecl *> genericParams,
       llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
       bool &isInOut, bool &isParamTypeImplicitlyUnwrapped);
 

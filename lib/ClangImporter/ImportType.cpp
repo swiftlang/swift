@@ -2243,7 +2243,10 @@ getImportTypeKindForParam(const clang::ParmVarDecl *param) {
 
 Optional<swift::Type> ClangImporter::Implementation::importParameterType(
     const clang::ParmVarDecl *param, OptionalTypeKind OptionalityOfParam,
-    bool allowNSUIntegerAsInt, ArrayRef<GenericTypeParamDecl *> genericParams,
+    bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
+    bool paramIsError, bool paramIsCompletionHandler,
+    Optional<unsigned> completionHandlerErrorParamIndex,
+    ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> paramAddDiag, bool &isInOut,
     bool &isParamTypeImplicitlyUnwrapped) {
   auto paramTy = param->getType();
@@ -2306,10 +2309,41 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
       isInOut = true;
   }
 
+  // Special case for NSDictionary's subscript.
+  if (isNSDictionarySubscriptGetter && paramTy->isObjCIdType()) {
+    // Not using `getImportTypeAttrs()` is unprincipled but OK for this hack.
+    auto nsCopying = SwiftContext.getNSCopyingType();
+    if (!nsCopying)
+      return None;
+
+    swiftParamTy = ExistentialType::get(nsCopying);
+    if (OptionalityOfParam != OTK_None)
+      swiftParamTy = OptionalType::get(swiftParamTy);
+
+    isParamTypeImplicitlyUnwrapped =
+        OptionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
+  }
+
   if (!swiftParamTy) {
+    bool sendableByDefault =
+        paramIsCompletionHandler &&
+        SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers);
+
+    auto attrs = getImportTypeAttrs(param, /*isParam=*/true, sendableByDefault);
+
+    // If this is the throws error parameter, we don't need to convert any
+    // NSError** arguments to the sugared NSErrorPointer typealias form,
+    // because all that is done with it is retrieving the canonical
+    // type. Avoiding the sugar breaks a loop in Foundation caused by method
+    // on NSString that has an error parameter. FIXME: This is a work-around
+    // for the specific case when the throws conversion works, but is not
+    // sufficient if it fails. (The correct, overarching fix is ClangImporter
+    // being lazier.)
     auto importedType =
         importType(paramTy, importKind, paramAddDiag, allowNSUIntegerAsInt,
-                   Bridgeability::Full, attrs, OptionalityOfParam);
+                   Bridgeability::Full, attrs, OptionalityOfParam,
+                   /*resugarNSErrorPointer=*/!paramIsError,
+                   completionHandlerErrorParamIndex);
     if (!importedType)
       return None;
 
@@ -2378,8 +2412,12 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     bool isParamTypeImplicitlyUnwrapped = false;
 
     auto swiftParamTyOpt = importParameterType(
-        param, OptionalityOfParam, importKind, allowNSUIntegerAsInt,
-        genericParams, paramAddDiag, isInOut, isParamTypeImplicitlyUnwrapped);
+        param, OptionalityOfParam, allowNSUIntegerAsInt,
+        /*isNSDictionarySubscriptGetter=*/false,
+        /*paramIsError=*/false,
+        /*paramIsCompletionHandler=*/false,
+        /*completionHandlerErrorParamIndex=*/None, genericParams, paramAddDiag,
+        isInOut, isParamTypeImplicitlyUnwrapped);
     if (!swiftParamTyOpt) {
       addImportDiagnostic(param,
                           Diagnostic(diag::parameter_type_not_imported, param),
@@ -2931,8 +2969,6 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     OptionalTypeKind optionalityOfParam =
         getParamOptionality(param, knownNonNull);
 
-    // Import the parameter type into Swift.
-
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
       StringRef name;
@@ -2945,68 +2981,22 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
         allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name);
     }
 
-    ImportTypeKind importKind = getImportTypeKindForParam(param);
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
     bool isInOut = false;
     bool paramIsIUO = false;
-
-    Type swiftParamTy;
-    if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
-      if (isUnavailableInSwift(typedefType->getDecl())) {
-        if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
-          // If this fails, it means that we need a stronger predicate for
-          // determining the relationship between an enum and typedef.
-          assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
-                 typedefType->getCanonicalTypeInternal());
-          if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-            swiftParamTy = cast<NominalTypeDecl>(swiftEnum)->getDeclaredType();
-          }
-        }
-      }
-    }
-
-    // Special case for NSDictionary's subscript.
-    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
-        paramTy->isObjCIdType()) {
-      // Not using `getImportTypeAttrs()` is unprincipled but OK for this hack.
-      auto nsCopying = SwiftContext.getNSCopyingType();
-      if (!nsCopying)
-        return {Type(), false};
-      swiftParamTy = ExistentialType::get(nsCopying);
-      if (optionalityOfParam != OTK_None)
-        swiftParamTy = OptionalType::get(swiftParamTy);
-
-      paramIsIUO = optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
-    } else if (!swiftParamTy) {
-      bool sendableByDefault = paramIsCompletionHandler &&
-        SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers);
-
-      // If this is the throws error parameter, we don't need to convert any
-      // NSError** arguments to the sugared NSErrorPointer typealias form,
-      // because all that is done with it is retrieving the canonical
-      // type. Avoiding the sugar breaks a loop in Foundation caused by method
-      // on NSString that has an error parameter. FIXME: This is a work-around
-      // for the specific case when the throws conversion works, but is not
-      // sufficient if it fails. (The correct, overarching fix is ClangImporter
-      // being lazier.)
-      auto importedParamType =
-          importType(paramTy, importKind, paramAddDiag,
-                     allowNSUIntegerAsIntInParam, Bridgeability::Full,
-                     getImportTypeAttrs(param, /*isParam=*/true,
-                                        sendableByDefault),
-                     optionalityOfParam,
-                     /*resugarNSErrorPointer=*/!paramIsError,
-                     completionHandlerErrorParamIndex);
-      paramIsIUO = importedParamType.isImplicitlyUnwrapped();
-      swiftParamTy = importedParamType.getType();
-    }
-    if (!swiftParamTy) {
+    auto swiftParamTyOpt = importParameterType(
+        param, optionalityOfParam, allowNSUIntegerAsIntInParam,
+        kind == SpecialMethodKind::NSDictionarySubscriptGetter, paramIsError,
+        paramIsCompletionHandler, completionHandlerErrorParamIndex,
+        ArrayRef<GenericTypeParamDecl *>(), paramAddDiag, isInOut, paramIsIUO);
+    if (!swiftParamTyOpt) {
       addImportDiagnostic(param,
                           Diagnostic(diag::parameter_type_not_imported, param),
                           param->getSourceRange().getBegin());
       return {Type(), false};
     }
+    auto swiftParamTy = *swiftParamTyOpt;
 
     swiftParamTy = mapGenericArgs(origDC, dc, swiftParamTy);
 
@@ -3029,6 +3019,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       if (Type replacedSwiftResultTy =
               decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
         swiftResultTy = replacedSwiftResultTy;
+
+        ImportTypeKind importKind = getImportTypeKindForParam(param);
 
         // Import the original completion handler type without adjustments.
         Type origSwiftParamTy = importType(
