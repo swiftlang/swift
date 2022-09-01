@@ -476,6 +476,27 @@ struct AccessPathWalker {
   }
 }
 
+extension Value {
+  // Convenient properties to avoid instantiating an explicit AccessPathWalker.
+  //
+  // Although an AccessPathWalker is created for each call of these properties,
+  // it's very unlikely that this will end up in memory allocations.
+  // Only in the rare case of `pointer_to_address` -> `address_to_pointer` pairs, which
+  // go through phi-arguments, the AccessPathWalker will allocate memnory in its cache.
+
+  /// Computes the access base of this address value.
+  var accessBase: AccessBase {
+    var apWalker = AccessPathWalker()
+    return apWalker.getAccessBase(of: self)
+  }
+  
+  /// Computes the enclosing access scope of this address value.
+  var accessScope: EnclosingScope {
+    var apWalker = AccessPathWalker()
+    return apWalker.getAccessScope(of: self)
+  }
+}
+
 /// A ValueUseDef walker that identifies which values a reference of an access path might
 /// originate from.
 protocol AccessStoragePathWalker : ValueUseDefWalker where Path == SmallProjectionPath {
