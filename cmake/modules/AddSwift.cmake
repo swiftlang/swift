@@ -467,9 +467,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       # the stdlib is not picked up from there, but from the SDK.
       # This requires to explicitly add all the needed compatibility libraries. We
       # can take them from the current build.
-      set(vsuffix "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-      set(conctarget "swiftCompatibilityConcurrency${vsuffix}")
-      target_link_libraries(${target} PUBLIC ${conctarget})
+      target_link_libraries(${target} PUBLIC HostCompatibilityLibs)
 
       # Add the SDK directory for the host platform.
       target_link_directories(${target} PRIVATE "${sdk_dir}")

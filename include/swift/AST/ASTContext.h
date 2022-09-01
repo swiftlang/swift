@@ -1255,7 +1255,7 @@ public:
   /// \param type The type for which we are retrieving the conformance.
   ///
   /// \param inherited The inherited conformance.
-  InheritedProtocolConformance *
+  ProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// Get the lazy data for the given declaration.

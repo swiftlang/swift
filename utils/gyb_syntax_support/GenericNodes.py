@@ -3,20 +3,20 @@ from .Node import Node  # noqa: I201
 
 GENERIC_NODES = [
     # generic-where-clause -> 'where' requirement-list
-    Node('GenericWhereClause', kind='Syntax',
+    Node('GenericWhereClause', name_for_diagnostics="'where' clause", kind='Syntax',
          children=[
              Child('WhereKeyword', kind='WhereToken'),
              Child('RequirementList', kind='GenericRequirementList',
                    collection_element_name='Requirement'),
          ]),
 
-    Node('GenericRequirementList', kind='SyntaxCollection',
+    Node('GenericRequirementList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='GenericRequirement',
          element_name='GenericRequirement'),
 
     # generic-requirement ->
     #     (same-type-requirement|conformance-requirement|layout-requirement) ','?
-    Node('GenericRequirement', kind='Syntax',
+    Node('GenericRequirement', name_for_diagnostics=None, kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
              Child('Body', kind='Syntax',
@@ -33,7 +33,8 @@ GENERIC_NODES = [
          ]),
 
     # same-type-requirement -> type-identifier == type
-    Node('SameTypeRequirement', kind='Syntax',
+    Node('SameTypeRequirement', name_for_diagnostics='same type requirement',
+         kind='Syntax',
          children=[
              Child('LeftTypeIdentifier', kind='Type'),
              Child('EqualityToken', kind='Token',
@@ -48,7 +49,7 @@ GENERIC_NODES = [
 
     # layout-requirement -> type-name : layout-constraint
     # layout-constraint -> identifier '('? integer-literal? ','? integer-literal? ')'?
-    Node('LayoutRequirement', kind='Syntax',
+    Node('LayoutRequirement', name_for_diagnostics='layout requirement', kind='Syntax',
          children=[
              Child('TypeIdentifier', kind='Type'),
              Child('Colon', kind='ColonToken'),
@@ -63,13 +64,13 @@ GENERIC_NODES = [
                    is_optional=True),
          ]),
 
-    Node('GenericParameterList', kind='SyntaxCollection',
+    Node('GenericParameterList', name_for_diagnostics=None, kind='SyntaxCollection',
          element='GenericParameter'),
 
     # generic-parameter -> type-name
     #                    | type-name : type-identifier
     #                    | type-name : protocol-composition-type
-    Node('GenericParameter', kind='Syntax',
+    Node('GenericParameter', name_for_diagnostics='generic parameter', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
              Child('Attributes', kind='AttributeList',
@@ -83,11 +84,11 @@ GENERIC_NODES = [
                    is_optional=True),
          ]),
 
-    Node('PrimaryAssociatedTypeList', kind='SyntaxCollection',
-         element='PrimaryAssociatedType'),
+    Node('PrimaryAssociatedTypeList', name_for_diagnostics=None,
+         kind='SyntaxCollection', element='PrimaryAssociatedType'),
 
     # primary-associated-type -> type-name ','?
-    Node('PrimaryAssociatedType', kind='Syntax',
+    Node('PrimaryAssociatedType', name_for_diagnostics=None, kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
              Child('Name', kind='IdentifierToken'),
@@ -96,7 +97,8 @@ GENERIC_NODES = [
          ]),
 
     # generic-parameter-clause -> '<' generic-parameter-list '>'
-    Node('GenericParameterClause', kind='Syntax',
+    Node('GenericParameterClause', name_for_diagnostics='generic parameter clause',
+         kind='Syntax',
          children=[
              Child('LeftAngleBracket', kind='LeftAngleToken'),
              Child('GenericParameterList', kind='GenericParameterList',
@@ -105,7 +107,8 @@ GENERIC_NODES = [
          ]),
 
     # conformance-requirement -> type-identifier : type-identifier
-    Node('ConformanceRequirement', kind='Syntax',
+    Node('ConformanceRequirement', name_for_diagnostics='conformance requirement',
+         kind='Syntax',
          children=[
              Child('LeftTypeIdentifier', kind='Type'),
              Child('Colon', kind='ColonToken'),
@@ -113,7 +116,8 @@ GENERIC_NODES = [
          ]),
 
     # primary-associated-type-clause -> '<' primary-associated-type-list '>'
-    Node('PrimaryAssociatedTypeClause', kind='Syntax',
+    Node('PrimaryAssociatedTypeClause',
+         name_for_diagnostics='primary associated type clause', kind='Syntax',
          children=[
              Child('LeftAngleBracket', kind='LeftAngleToken'),
              Child('PrimaryAssociatedTypeList', kind='PrimaryAssociatedTypeList',

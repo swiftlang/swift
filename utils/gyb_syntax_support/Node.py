@@ -11,8 +11,8 @@ class Node(object):
     subclass.
     """
 
-    def __init__(self, name, description=None, kind=None, traits=None,
-                 children=[], element=None, element_name=None,
+    def __init__(self, name, name_for_diagnostics, description=None, kind=None,
+                 traits=None, children=[], element=None, element_name=None,
                  element_choices=None, omit_when_empty=False,
                  elements_separated_by_newline=False):
         self.syntax_kind = name
@@ -20,6 +20,7 @@ class Node(object):
         self.swift_syntax_kind = lowercase_first_word(name)
         self.name = kind_to_type(self.syntax_kind)
         self.kind = kind
+        self.name_for_diagnostics = name_for_diagnostics
         self.description = description
 
         self.traits = traits or []

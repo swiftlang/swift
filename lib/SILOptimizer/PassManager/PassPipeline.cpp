@@ -396,6 +396,15 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addSROA();
   }
 
+  // Promote stack allocations to values.
+  P.addMem2Reg();
+
+  // Run the existential specializer Pass.
+  P.addExistentialSpecializer();
+
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+
   if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
@@ -405,15 +414,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     }
     P.addNonTransparentFunctionOwnershipModelEliminator();
   }
-
-  // Promote stack allocations to values.
-  P.addMem2Reg();
-
-  // Run the existential specializer Pass.
-  P.addExistentialSpecializer();
-
-  // Cleanup, which is important if the inliner has restarted the pass pipeline.
-  P.addPerformanceConstantPropagation();
 
   addSimplifyCFGSILCombinePasses(P);
 

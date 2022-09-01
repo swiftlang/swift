@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -140,6 +141,16 @@ public:
   printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
                                ModuleDecl *moduleContext,
                                OutputLanguageMode outputLang);
+
+  using PrinterTy =
+      llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;
+
+  /// Print generated C++ helper function
+  void printCustomCxxFunction(const SmallVector<Type> &neededTypes,
+                              PrinterTy retTypeAndNamePrinter,
+                              PrinterTy paramPrinter, bool isConstFunc,
+                              PrinterTy bodyPrinter, ModuleDecl *emittedModule,
+                              raw_ostream &outOfLineOS);
 
 private:
   void printCxxToCFunctionParameterUse(
