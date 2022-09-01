@@ -240,12 +240,26 @@ class Verifier : public ASTWalker {
     pushScope(DC);
   }
 
+  /// Emit an error message and abort.
+  void error(llvm::StringRef msg) {
+    error<Expr>(msg, {});
+  }
+
+  /// Emit an error message, dump the value, and then abort.
+  /// \param d the value to invoke \c dump(raw_ostream&) on.
+  template<typename Dumpable>
+  void error(llvm::StringRef msg, Dumpable* d) {
+    error(msg, {d});
+  }
+
   /// Emit an error message and abort, optionally dumping the expression.
-  /// \param E if non-null, the expression to dump() followed by a new-line.
-  void error(llvm::StringRef msg, Expr *E = nullptr) {
+  /// Automatically adds a new-line after emitting the message.
+  /// \param ds the values to invoke \c dump(raw_ostream&) on.
+  template<typename Dumpable>
+  void error(llvm::StringRef msg, std::initializer_list<Dumpable*> ds) {
     Out << msg << "\n";
-    if (E) {
-      E->dump(Out);
+    for (auto *d : ds) {
+      d->dump(Out);
       Out << "\n";
     }
     abort();
@@ -466,11 +480,8 @@ public:
         // For @objc enums, we serialize the pre-type-checked integer
         // literal raw values, and thus when they are deserialized
         // they do not have a type on them.
-        if (!isa<IntegerLiteralExpr>(E)) {
-          Out << "expression has no type\n";
-          E->dump(Out);
-          abort();
-        }
+        if (!isa<IntegerLiteralExpr>(E))
+          error("expression has no type", E);
       }
       return true;
     }
@@ -514,10 +525,9 @@ public:
     void verifyParsed(Pattern *P) {}
     void verifyParsed(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ", D);
-      if (!D->getDeclContext()) {
-        Out << "every Decl should have a DeclContext\n";
-        abort();
-      }
+      if (!D->getDeclContext())
+        error("every Decl should have a DeclContext");
+
       if (auto *DC = dyn_cast<DeclContext>(D)) {
         if (D->getDeclContext() != DC->getParent()) {
           Out << "Decl's DeclContext not in sync with DeclContext's parent\n";
@@ -563,11 +573,9 @@ public:
         // For @objc enums, we serialize the pre-type-checked integer
         // literal raw values, and thus when they are deserialized
         // they do not have a type on them.
-        if (!isa<IntegerLiteralExpr>(E)) {
-          Out << "expression has no type\n";
-          E->dump(Out);
-          abort();
-        }
+        if (!isa<IntegerLiteralExpr>(E))
+          error("expression has no type", E);
+
         return;
       }
     }
@@ -587,10 +595,8 @@ public:
         return;
 
       // Check for type variables that escaped the type checker.
-      if (type->hasTypeVariable()) {
-        Out << "a type variable escaped the type checker\n";
-        abort();
-      }
+      if (type->hasTypeVariable())
+        error("a type variable escaped the type checker");
 
       if (!type->hasArchetype())
         return;
@@ -917,33 +923,25 @@ public:
         if (!D->getASTContext().isAccessControlDisabled() &&
             D->getFormalAccessScope().isPublic() &&
             D->getFormalAccess() < AccessLevel::Public) {
-          Out << "non-public decl has no formal access scope\n";
-          D->dump(Out);
-          abort();
+          error("non-public decl has no formal access scope", D);
         }
         if (D->getEffectiveAccess() == AccessLevel::Private) {
-          Out << "effective access should use 'fileprivate' for 'private'\n";
-          D->dump(Out);
-          abort();
+          error("effective access should use 'fileprivate' for 'private'", D);
         }
       }
 
       if (auto Overridden = getOverriddenDeclIfAvailable(D)) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
           PrettyStackTraceDecl debugStack("verifying overridden", D);
-          Out << "cannot override a decl in the same DeclContext";
-          D->dump(Out);
-          Overridden->dump(Out);
-          abort();
+          error("cannot override a decl in the same DeclContext",
+                {D, Overridden});
         }
 
         if (!isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ProtocolDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
-          Out << "'override' attribute outside of a class or protocol\n";
-          D->dump(Out);
-          abort();
+          error("'override' attribute outside of a class or protocol", D);
         }
       }
 
@@ -983,11 +981,9 @@ public:
       
       if (S->hasResult()) {
         if (isa<ConstructorDecl>(func)) {
-          Out << "Expected ReturnStmt not to have a result. A constructor "
-                 "should not return a result. Returned expression: ";
-          S->getResult()->dump(Out);
-          Out << "\n";
-          abort();
+          error("Expected ReturnStmt not to have a result. A constructor "
+                "should not return a result. Returned expression: ",
+                S->getResult());
         }
 
         auto result = S->getResult();
@@ -1016,16 +1012,11 @@ public:
       }
 
       // Fail statements are only permitted in initializers.
-      if (!ctor) {
-        Out << "'fail' statement outside of initializer\n";
-        abort();
-      }
+      if (!ctor)
+        error("'fail' statement outside of initializer");
 
-      if (!ctor->isFailable() && !ctor->isInvalid()) {
-        Out << "non-failable initializer contains a 'fail' statement\n";
-        ctor->dump(Out);
-        abort();
-      }
+      if (!ctor->isFailable() && !ctor->isInvalid())
+        error("non-failable initializer contains a 'fail' statement", ctor);
     }
 
     void checkConditionElement(const StmtConditionElement &elt) {
