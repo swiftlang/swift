@@ -6,7 +6,6 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   let ao1: Any = sc.methodA(osc)
   _ = ao1
   if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' always returns false}}
-  if sc.methodA(osc) == Optional.none { } // expected-warning {{comparing non-optional value of type 'Any' to 'Optional.none' always returns false}}
 
   let ao2: Any = sc.methodB(nil)
   _ = ao2
