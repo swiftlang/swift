@@ -1282,19 +1282,28 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     }
     
-    /// Returns true if this is a 'nil' literal
-    bool isNilLiteral(Expr *E) {
+    /// Return true if this is a 'nil' literal.  This looks
+    /// like this if the type is Optional<T>:
+    ///
+    ///   (dot_syntax_call_expr type='String?'
+    ///     (declref_expr type='(Optional<String>.Type) -> Optional<String>'
+    ///      decl=Swift.(file).Optional.none function_ref=unapplied)
+    ///     (argument_list implicit
+    ///       (argument
+    ///         (type_expr implicit type='String?.Type' typerepr='String?'))))
+    ///
+    /// Or like this if it is any other ExpressibleByNilLiteral type:
+    ///
+    ///   (nil_literal_expr)
+    ///
+    bool isTypeCheckedOptionalNil(Expr *E) {
       if (dyn_cast<NilLiteralExpr>(E)) return true;
-      return false;
-    }
-    
-    /// Returns true if this is a expression is a reference to
-    /// the `Optional.none` case specifically (e.g. not `nil`).
-    bool isOptionalNoneCase(Expr *E) {
+
       auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
       if (!CE)
         return false;
 
+      // First case -- Optional.none
       if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
         return DRE->getDecl() == Ctx.getOptionalNoneDecl();
 
@@ -1339,30 +1348,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       
       if (calleeName == "==" || calleeName == "!=" ||
           calleeName == "===" || calleeName == "!==") {
-        bool isTrue = calleeName == "!=" || calleeName == "!==";
-        
-        // Diagnose a redundant comparison of a non-optional to a `nil` literal
         if (((subExpr = isImplicitPromotionToOptional(lhs)) &&
-             isNilLiteral(rhs)) ||
-            (isNilLiteral(lhs) &&
+             isTypeCheckedOptionalNil(rhs)) ||
+            (isTypeCheckedOptionalNil(lhs) &&
              (subExpr = isImplicitPromotionToOptional(rhs)))) {
           bool isTrue = calleeName == "!=" || calleeName == "!==";
+          bool isNilLiteral = isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs);
               
           Ctx.Diags.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
-                             subExpr->getType(), isTrue)
-            .highlight(lhs->getSourceRange())
-            .highlight(rhs->getSourceRange());
-          return;
-        }
-        
-        // Diagnose a redundant comparison of a non-optional to the `Optional.none` case
-        if (((subExpr = isImplicitPromotionToOptional(lhs)) &&
-             isOptionalNoneCase(rhs)) ||
-            (isOptionalNoneCase(lhs) &&
-             (subExpr = isImplicitPromotionToOptional(rhs)))) {
-          
-          Ctx.Diags.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_optional_none_case,
-                             subExpr->getType(), isTrue)
+                             subExpr->getType(), isNilLiteral, isTrue)
             .highlight(lhs->getSourceRange())
             .highlight(rhs->getSourceRange());
           return;

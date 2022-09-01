@@ -42,6 +42,6 @@ enum E {
 func test(_ e: E) {
   _ = e == .none
   _ = e == E.none
-  _ = e == Optional.none // expected-warning {{comparing non-optional value of type 'E' to 'nil' or 'Optional.none' always returns false}}
-  _ = e == E?.none // expected-warning {{comparing non-optional value of type 'E' to 'nil' or 'Optional.none' always returns false}}
+  _ = e == Optional.none // expected-warning {{comparing non-optional value of type 'E' to 'Optional.none' always returns false}}
+  _ = e == E?.none // expected-warning {{comparing non-optional value of type 'E' to 'Optional.none' always returns false}}
 }
