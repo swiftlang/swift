@@ -69,6 +69,8 @@
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
+#include "clang/Lex/Preprocessor.h"
+
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/LLVMContext.h"
@@ -164,17 +166,17 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \returns true if there were any errors
 ///
 /// \see swift::printAsClangHeader
-static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
-                                       StringRef bridgingHeader,
-                                       const FrontendOptions &frontendOpts,
-                                       const IRGenOptions &irGenOpts) {
+static bool printAsClangHeaderIfNeeded(
+    StringRef outputPath, ModuleDecl *M, StringRef bridgingHeader,
+    const FrontendOptions &frontendOpts, const IRGenOptions &irGenOpts,
+    clang::HeaderSearch &clangHeaderSearchInfo) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(M->getDiags(), outputPath,
-                        [&](raw_ostream &out) -> bool {
-                          return printAsClangHeader(out, M, bridgingHeader,
-                                                    frontendOpts, irGenOpts);
-                        });
+  return withOutputFile(
+      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
+        return printAsClangHeader(out, M, bridgingHeader, frontendOpts,
+                                  irGenOpts, clangHeaderSearchInfo);
+      });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -925,7 +927,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printAsClangHeaderIfNeeded(
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
         Instance.getMainModule(), BridgingHeaderPathForPrint, opts,
-        Invocation.getIRGenOptions());
+        Invocation.getIRGenOptions(),
+        Context.getClangModuleLoader()
+            ->getClangPreprocessor()
+            .getHeaderSearchInfo());
   }
 
   // Only want the header if there's been any errors, ie. there's not much
