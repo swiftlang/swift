@@ -79,7 +79,7 @@ public:
 
   /// Information about any additional parameters.
   struct AdditionalParam {
-    enum class Role { GenericRequirement, Self, Error };
+    enum class Role { GenericRequirement, GenericTypeMetadata, Self, Error };
 
     Role role;
     Type type;

@@ -235,6 +235,8 @@ public:
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (languageMode != OutputLanguageMode::Cxx && !genericArgs.empty() &&
           type->hasTypeParameter()) {
+        if (modifiersDelegate.prefixIndirectlyPassedParamTypeInC)
+          (*modifiersDelegate.prefixIndirectlyPassedParamTypeInC)(os);
         if (!isInOutParam)
           os << "const ";
         os << "void * _Nonnull";
@@ -380,12 +382,20 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     const AbstractFunctionDecl *FD, StringRef name, Type resultTy,
     FunctionSignatureKind kind, ArrayRef<AdditionalParam> additionalParams,
     FunctionSignatureModifiers modifiers) {
+  // Print any template and requires clauses for the
+  // C++ class context to which this C++ member will belong to.
+  if (const auto *typeDecl = modifiers.qualifierContext) {
+    assert(kind == FunctionSignatureKind::CxxInlineThunk);
+    ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclTemplateSpecifiers(
+        typeDecl);
+  }
   if (FD->isGeneric()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     auto Requirements = Signature.getRequirements();
     // FIXME: Support generic requirements.
     if (!Requirements.empty())
       return ClangRepresentation::unsupported;
+    // Print the template and requires clauses for this function.
     if (kind == FunctionSignatureKind::CxxInlineThunk)
       ClangSyntaxPrinter(os).printGenericSignature(Signature);
   }
@@ -452,11 +462,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   }
 
   os << ' ';
-  if (modifiers.qualifierContext) {
-    // FIXME: Full qualifiers for nested types?
-    ClangSyntaxPrinter(os).printBaseName(modifiers.qualifierContext);
-    os << "::";
-  }
+  if (const auto *typeDecl = modifiers.qualifierContext)
+    ClangSyntaxPrinter(os).printNominalTypeQualifier(
+        typeDecl, typeDecl->getModuleContext());
   ClangSyntaxPrinter(os).printIdentifier(name);
   os << '(';
 
@@ -525,6 +533,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         if (param.genericRequirement->Protocol)
           ClangSyntaxPrinter(os).printBaseName(
               param.genericRequirement->Protocol);
+      } else if (param.role == AdditionalParam::Role::GenericTypeMetadata) {
+        os << "void * _Nonnull ";
       }
     });
   }
@@ -656,6 +666,18 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
             return;
           }
           os << "ERROR";
+          return;
+        }
+        if (param.role == AdditionalParam::Role::GenericTypeMetadata) {
+          os << "swift::TypeMetadataTrait<";
+          CFunctionSignatureTypePrinterModifierDelegate delegate;
+          CFunctionSignatureTypePrinter typePrinter(
+              os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+              interopContext, delegate, moduleContext, declPrinter,
+              FunctionSignatureTypeUse::TypeReference);
+          auto result = typePrinter.visit(param.type, None, /*isInOut=*/false);
+          assert(!result.isUnsupported());
+          os << ">::getTypeMetadata()";
           return;
         }
         if (param.role == AdditionalParam::Role::Self && !hasThrows)

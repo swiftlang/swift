@@ -49,6 +49,7 @@ namespace irgen {
   class MetadataPath;
   class MetadataResponse;
   class NativeCCEntryPointArgumentEmission;
+  class PolymorphicSignatureExpandedTypeSource;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -103,7 +104,8 @@ namespace irgen {
   void expandPolymorphicSignature(
       IRGenModule &IGM, CanSILFunctionType type,
       SmallVectorImpl<llvm::Type *> &types,
-      SmallVectorImpl<GenericRequirement> *outReqs = nullptr);
+      SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs =
+          nullptr);
 
   /// Return the number of trailing arguments necessary for calling a
   /// witness method.
