@@ -20,6 +20,7 @@ from . import llvm
 from . import product
 from ..cmake import CMakeOptions
 
+
 class Swift(product.Product):
 
     def __init__(self, args, toolchain, source_dir, build_dir):
@@ -174,7 +175,7 @@ updated without updating swift.py?")
 
     @property
     def _early_swiftsyntax_flags(self):
-        result=[]
+        result = []
         if self.args.build_early_swiftsyntax:
             build_root = os.path.dirname(self.build_dir)
             early_swiftsyntax_build_dir = os.path.join(
@@ -211,11 +212,8 @@ updated without updating swift.py?")
 
     @classmethod
     def get_dependencies(cls):
-        deps = [cmark.CMark,
+        return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
+                earlyswiftsyntax.EarlySwiftSyntax,
                 llvm.LLVM,
                 libcxx.LibCXX]
-        if self.args.build_early_swiftsyntax:
-            deps.append(earlyswiftsyntax.EarlySwiftSyntax)
-
-        return deps
