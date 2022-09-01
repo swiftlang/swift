@@ -3,14 +3,14 @@ from .Node import Node  # noqa: I201
 
 ATTRIBUTE_NODES = [
     # token-list -> token? token-list?
-    Node('TokenList', kind='SyntaxCollection',
+    Node('TokenList', name_for_diagnostics='token list', kind='SyntaxCollection',
          element='Token'),
 
     # token-list -> token token-list?
-    Node('NonEmptyTokenList', kind='SyntaxCollection',
-         element='Token', omit_when_empty=True),
+    Node('NonEmptyTokenList', name_for_diagnostics='token list',
+         kind='SyntaxCollection', element='Token', omit_when_empty=True),
 
-    Node('CustomAttribute', kind='Syntax',
+    Node('CustomAttribute', name_for_diagnostics='attribute', kind='Syntax',
          description='''
          A custom `@` attribute.
          ''',
@@ -37,7 +37,7 @@ ATTRIBUTE_NODES = [
     #                | named-attribute-string-argument
     #                | back-deploy-attr-spec-list
     #              )? ')'?
-    Node('Attribute', kind='Syntax',
+    Node('Attribute', name_for_diagnostics='attribute', kind='Syntax',
          description='''
          An `@` attribute.
          ''',
@@ -89,7 +89,7 @@ ATTRIBUTE_NODES = [
          ]),
 
     # attribute-list -> attribute attribute-list?
-    Node('AttributeList', kind='SyntaxCollection',
+    Node('AttributeList', name_for_diagnostics='attributes', kind='SyntaxCollection',
          omit_when_empty=True,
          element='Syntax', element_name='Attribute',
          element_choices=[
@@ -102,7 +102,8 @@ ATTRIBUTE_NODES = [
     #                                  specialize-spec-attr-list?
     #                            | generic-where-clause
     #                                  specialize-spec-attr-list?
-    Node('SpecializeAttributeSpecList', kind='SyntaxCollection',
+    Node('SpecializeAttributeSpecList',
+         name_for_diagnostics="argument to '@_specialize", kind='SyntaxCollection',
          description='''
          A collection of arguments for the `@_specialize` attribute
          ''',
@@ -114,7 +115,7 @@ ATTRIBUTE_NODES = [
              'GenericWhereClause',
          ]),
 
-    Node('AvailabilityEntry', kind='Syntax',
+    Node('AvailabilityEntry', name_for_diagnostics='availability entry', kind='Syntax',
          description='''
          The availability argument for the _specialize attribute
          ''',
@@ -131,6 +132,7 @@ ATTRIBUTE_NODES = [
     # Representation of e.g. 'exported: true,'
     # labeled-specialize-entry -> identifier ':' token ','?
     Node('LabeledSpecializeEntry', kind='Syntax',
+         name_for_diagnostics='attribute argument',
          description='''
          A labeled argument for the `@_specialize` attribute like
          `exported: true`
@@ -151,6 +153,7 @@ ATTRIBUTE_NODES = [
     # Representation of e.g. 'exported: true,'
     # labeled-specialize-entry -> identifier ':' token ','?
     Node('TargetFunctionEntry', kind='Syntax',
+         name_for_diagnostics='attribute argument',
          description='''
          A labeled argument for the `@_specialize` attribute with a function
          decl value like
@@ -173,6 +176,7 @@ ATTRIBUTE_NODES = [
     # The argument of '@_dynamic_replacement(for:)' or '@_private(sourceFile:)'
     # named-attribute-string-arg -> 'name': string-literal
     Node('NamedAttributeStringArgument', kind='Syntax',
+         name_for_diagnostics='attribute argument',
          description='''
          The argument for the `@_dynamic_replacement` or `@_private`
          attribute of the form `for: "function()"` or `sourceFile:
@@ -188,7 +192,7 @@ ATTRIBUTE_NODES = [
                  Child('Declname', kind='DeclName'),
              ]),
          ]),
-    Node('DeclName', kind='Syntax', children=[
+    Node('DeclName', name_for_diagnostics='declaration name', kind='Syntax', children=[
          Child('DeclBaseName', kind='Syntax', description='''
                The base name of the protocol\'s requirement.
                ''',
@@ -205,7 +209,8 @@ ATTRIBUTE_NODES = [
     # The argument of '@_implements(...)'
     # implements-attr-arguments -> simple-type-identifier ','
     #                              (identifier | operator) decl-name-arguments
-    Node('ImplementsAttributeArguments', kind='Syntax',
+    Node('ImplementsAttributeArguments', name_for_diagnostics='@_implements arguemnts',
+         kind='Syntax',
          description='''
          The arguments for the `@_implements` attribute of the form
          `Type, methodName(arg1Label:arg2Label:)`
@@ -234,7 +239,8 @@ ATTRIBUTE_NODES = [
          ]),
 
     # objc-selector-piece -> identifier? ':'?
-    Node('ObjCSelectorPiece', kind='Syntax',
+    Node('ObjCSelectorPiece', name_for_diagnostics='Objective-C selector piece',
+         kind='Syntax',
          description='''
          A piece of an Objective-C selector. Either consisting of just an
          identifier for a nullary selector, an identifier and a colon for a
@@ -246,13 +252,15 @@ ATTRIBUTE_NODES = [
          ]),
 
     # objc-selector -> objc-selector-piece objc-selector?
-    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece'),
+    Node('ObjCSelector', name_for_diagnostics='Objective-C selector',
+         kind='SyntaxCollection', element='ObjCSelectorPiece'),
 
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
     #     differentiability-kind? '.'? differentiability-params-clause? ','?
     #     generic-where-clause?
-    Node('DifferentiableAttributeArguments', kind='Syntax',
+    Node('DifferentiableAttributeArguments',
+         name_for_diagnostics="'@differentiable' arguments", kind='Syntax',
          description='''
          The arguments for the `@differentiable` attribute: an optional
          differentiability kind, an optional differentiability parameter clause,
@@ -276,7 +284,8 @@ ATTRIBUTE_NODES = [
 
     # differentiability-params-clause ->
     #     'wrt' ':' (differentiability-param | differentiability-params)
-    Node('DifferentiabilityParamsClause', kind='Syntax',
+    Node('DifferentiabilityParamsClause',
+         name_for_diagnostics="'@differentiable' argument", kind='Syntax',
          description='A clause containing differentiability parameters.',
          children=[
              Child('WrtLabel', kind='IdentifierToken',
@@ -292,7 +301,8 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiability-params -> '(' differentiability-param-list ')'
-    Node('DifferentiabilityParams', kind='Syntax',
+    Node('DifferentiabilityParams', name_for_diagnostics='differentiability parameters',
+         kind='Syntax',
          description='The differentiability parameters.',
          children=[
              Child('LeftParen', kind='LeftParenToken'),
@@ -304,11 +314,13 @@ ATTRIBUTE_NODES = [
 
     # differentiability-param-list ->
     #     differentiability-param differentiability-param-list?
-    Node('DifferentiabilityParamList', kind='SyntaxCollection',
+    Node('DifferentiabilityParamList',
+         name_for_diagnostics='differentiability parameters', kind='SyntaxCollection',
          element='DifferentiabilityParam'),
 
     # differentiability-param -> ('self' | identifier | integer-literal) ','?
-    Node('DifferentiabilityParam', kind='Syntax',
+    Node('DifferentiabilityParam', name_for_diagnostics='differentiability parameter',
+         kind='Syntax',
          description='''
          A differentiability parameter: either the "self" identifier, a function
          parameter name, or a function parameter index.
@@ -330,7 +342,9 @@ ATTRIBUTE_NODES = [
     #
     # derivative-registration-attr-arguments ->
     #     'of' ':' func-decl-name ','? differentiability-params-clause?
-    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
+    Node('DerivativeRegistrationAttributeArguments',
+         name_for_diagnostics='attribute arguments',
+         kind='Syntax',
          description='''
          The arguments for the '@derivative(of:)' and '@transpose(of:)'
          attributes: the 'of:' label, the original declaration name, and an
@@ -369,6 +383,7 @@ ATTRIBUTE_NODES = [
     # base-type ->
     #     member-type-identifier | base-type-identifier
     Node('QualifiedDeclName', kind='Syntax',
+         name_for_diagnostics='declaration name',
          description='''
          An optionally qualified function declaration name (e.g. `+(_:_:)`,
          `A.B.C.foo(_:_:)`).
@@ -402,6 +417,7 @@ ATTRIBUTE_NODES = [
     # NOTE: This is duplicated with `DeclName` above. Change `DeclName`
     # description and use it if possible.
     Node('FunctionDeclName', kind='Syntax',
+         name_for_diagnostics='function declaration name',
          description='A function declaration name (e.g. `foo(_:_:)`).',
          children=[
              Child('Name', kind='Syntax', description='''
@@ -423,6 +439,7 @@ ATTRIBUTE_NODES = [
     # The arguments of '@_backDeploy(...)'
     # back-deploy-attr-spec-list -> 'before' ':' back-deploy-version-list
     Node('BackDeployAttributeSpecList', kind='Syntax',
+         name_for_diagnostics="'@_backDeploy' arguments",
          description='''
          A collection of arguments for the `@_backDeploy` attribute
          ''',
@@ -441,11 +458,11 @@ ATTRIBUTE_NODES = [
 
     # back-deploy-version-list ->
     #   back-deploy-version-entry back-deploy-version-list?
-    Node('BackDeployVersionList', kind='SyntaxCollection',
-         element='BackDeployVersionArgument'),
+    Node('BackDeployVersionList', name_for_diagnostics='version list',
+         kind='SyntaxCollection', element='BackDeployVersionArgument'),
 
     # back-deploy-version-entry -> availability-version-restriction ','?
-    Node('BackDeployVersionArgument', kind='Syntax',
+    Node('BackDeployVersionArgument', name_for_diagnostics='version', kind='Syntax',
          description='''
          A single platform/version pair in a `@_backDeploy` attribute,
          e.g. `iOS 10.1`.

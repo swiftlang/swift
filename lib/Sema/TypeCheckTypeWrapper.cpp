@@ -195,7 +195,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
       /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
-                        VarDecl::Introducer::Var, AccessLevel::Private);
+                        VarDecl::Introducer::Var, AccessLevel::Internal);
 }
 
 VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
@@ -312,10 +312,6 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   if (!(parent && parent->hasTypeWrapper()))
     return false;
 
-  // Don't attempt to wrap the `$_storage` property.
-  if (property->getName() == property->getASTContext().Id_TypeWrapperProperty)
-    return false;
-
   if (property->isStatic() || property->isLet())
     return false;
 
@@ -345,6 +341,11 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
           PropertyWrapperSynthesizedPropertyKind::Backing))
       return true;
   }
+
+  // Don't wrap any compiler synthesized properties except to
+  // property wrapper backing storage (checked above).
+  if (property->isImplicit())
+    return false;
 
   // Check whether this is a computed property.
   {

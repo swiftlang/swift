@@ -152,7 +152,13 @@ public:
     if (printIfKnownSimpleType(alias, optionalKind, isInOutParam))
       return ClangRepresentation::representable;
 
-    return visitPart(aliasTy->getSinglyDesugaredType(), optionalKind,
+    return visitSugarType(aliasTy, optionalKind, isInOutParam);
+  }
+
+  ClangRepresentation visitSugarType(SugarType *sugarTy,
+                                     Optional<OptionalTypeKind> optionalKind,
+                                     bool isInOutParam) {
+    return visitPart(sugarTy->getSinglyDesugaredType(), optionalKind,
                      isInOutParam);
   }
 
@@ -818,4 +824,45 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     }
   }
   return false;
+}
+
+void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
+    const SmallVector<Type> &neededTypes, PrinterTy retTypeAndNamePrinter,
+    PrinterTy paramPrinter, bool isConstFunc, PrinterTy bodyPrinter,
+    ModuleDecl *emittedModule, raw_ostream &outOfLineOS) {
+  llvm::MapVector<Type, std::string> types;
+
+  for (auto &type : neededTypes) {
+    std::string typeStr;
+    llvm::raw_string_ostream typeOS(typeStr);
+    OptionalTypeKind optKind;
+    Type objectType;
+    std::tie(objectType, optKind) =
+        DeclAndTypePrinter::getObjectTypeAndOptionality(
+            type->getNominalOrBoundGenericNominal(), type);
+
+    // Use FunctionSignatureTypeUse::ReturnType to avoid printing extra const or
+    // references
+    CFunctionSignatureTypePrinter typePrinter(
+        typeOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+        interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+        emittedModule, declPrinter, FunctionSignatureTypeUse::ReturnType);
+    typePrinter.visit(objectType, optKind, /* isInOutParam */ false);
+
+    types.insert({type, typeStr});
+  }
+
+  retTypeAndNamePrinter(types);
+  os << '(';
+  outOfLineOS << '(';
+  paramPrinter(types);
+  os << ')';
+  outOfLineOS << ')';
+  if (isConstFunc) {
+    os << " const;\n";
+    outOfLineOS << " const";
+  }
+  outOfLineOS << " {\n";
+  bodyPrinter(types);
+  outOfLineOS << "}\n";
 }

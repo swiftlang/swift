@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TypeWrappers
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature TypeWrappers
 
 // REQUIRES: asserts
 
@@ -379,4 +379,22 @@ func testDeclarationsWithUnmanagedProperties() {
   }
 
   _ = OnlyLazyLetAndComputed(name: "Arthur Dent") // Ok
+}
+
+func testActors() async {
+  @NoopWrapper
+  actor Person {
+    var name: String
+    // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+    var age: Int
+    // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+  }
+
+  let person = Person(name: "Arthur Dent", age: 30)
+
+  _ = await person.name
+  _ = await person.age
+
+  person.name = "NoName" // expected-error {{actor-isolated property 'name' can not be mutated from a non-isolated context}}
+  person.age = 0 // expected-error {{actor-isolated property 'age' can not be mutated from a non-isolated context}}
 }
