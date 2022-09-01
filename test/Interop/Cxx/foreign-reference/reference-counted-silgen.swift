@@ -20,12 +20,12 @@ public func testTrivial() {
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main14testNonTrivialyyF : $@convention(thin) () -> ()
-// CHECK:  copy_value %{{[0-9]+}} : $LocalCount
-// CHECK:  copy_value %{{[0-9]+}} : $LocalCount
-// CHECK:  copy_value %{{[0-9]+}} : $LocalCount
+// CHECK:  copy_value %{{[0-9]+}} : $NS.LocalCount
+// CHECK:  copy_value %{{[0-9]+}} : $NS.LocalCount
+// CHECK:  copy_value %{{[0-9]+}} : $NS.LocalCount
 // CHECK: return
 // CHECK-LABEL: end sil function '$s4main14testNonTrivialyyF'
 public func testNonTrivial() {
-    let x = LocalCount.create()
+    let x = NS.LocalCount.create()
     let t = (x, x, x)
 }
