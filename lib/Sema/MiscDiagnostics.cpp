@@ -1285,9 +1285,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     /// Return true if this is a 'nil' literal.  This looks
     /// like this if the type is Optional<T>:
     ///
-    ///   (dot_syntax_call_expr implicit type='Int?'
-    ///     (declref_expr implicit decl=Optional.none)
-    ///     (type_expr type=Int?))
+    ///   (dot_syntax_call_expr type='String?'
+    ///     (declref_expr type='(Optional<String>.Type) -> Optional<String>'
+    ///      decl=Swift.(file).Optional.none function_ref=unapplied)
+    ///     (argument_list implicit
+    ///       (argument
+    ///         (type_expr implicit type='String?.Type' typerepr='String?'))))
     ///
     /// Or like this if it is any other ExpressibleByNilLiteral type:
     ///
