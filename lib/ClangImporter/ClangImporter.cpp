@@ -6137,7 +6137,9 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
+  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(
+      swiftDecl->getClangDecl()->getOwningModule());
+  ctx.lookupInModule(parentModule, name, results);
 
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
