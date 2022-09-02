@@ -38,9 +38,9 @@ func testTernaryOneWayOverload(b: Bool) {
 
   // CHECK: solving component #1
   // CHECK: (attempting type variable $T11 := Int8 
-  // CHECK: (found solution: [non-default literal(s) = 2] [use of overloaded unapplied function(s) = 2])
+  // CHECK: (found solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2]) 
 
-  // CHECK: (composed solution: [non-default literal(s) = 2] [use of overloaded unapplied function(s) = 2])
-  // CHECK-NOT: (composed solution: [non-default literal(s) = 2] [use of overloaded unapplied function(s) = 2])
+  // CHECK: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
+  // CHECK-NOT: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
   let _: Int8 = b ? Builtin.one_way(int8Or16(17)) : Builtin.one_way(int8Or16(42))
 }
