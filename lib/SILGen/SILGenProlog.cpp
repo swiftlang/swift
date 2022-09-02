@@ -355,8 +355,19 @@ struct ArgumentInitHelper {
     SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(),
-                                      pd->getLifetimeAnnotation(), parent, loc);
+    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+    bool isNoImplicitCopy = false;
+    if (pd->isSelfParameter()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
+        lifetimeAnnotation = afd->getLifetimeAnnotation();
+      }
+    } else {
+      lifetimeAnnotation = pd->getLifetimeAnnotation();
+      isNoImplicitCopy = pd->isNoImplicitCopy();
+    }
+
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
+                                      lifetimeAnnotation, parent, loc);
 
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");

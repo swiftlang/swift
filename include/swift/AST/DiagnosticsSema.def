@@ -3209,6 +3209,8 @@ ERROR(reasync_without_async_parameter,none,
 ERROR(inherits_executor_without_async,none,
       "non-async functions cannot inherit an executor", ())
 
+ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
+      (DeclAttribute))
 ERROR(eagermove_and_lexical_combined,none,
       "@_eagerMove and @_lexical attributes are alternate styles of lifetimes "
       "and can't be combined", ())
