@@ -49,6 +49,10 @@ inline SILValue castToSILValue(BridgedValue value) {
   return static_cast<ValueBase *>(value.obj);
 }
 
+inline SILDebugLocation castToDebugLocation(BridgedLocation loc) {
+  return *reinterpret_cast<SILDebugLocation *>(&loc);
+}
+
 inline SILType castToSILType(BridgedType type) {
   return SILType::getFromOpaqueValue(type.typePtr);
 }
