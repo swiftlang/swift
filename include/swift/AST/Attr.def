@@ -768,6 +768,11 @@ SIMPLE_DECL_ATTR(typeWrapper, TypeWrapper,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   134)
 
+SIMPLE_DECL_ATTR(_spiOnly, SPIOnly,
+  OnImport | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  135)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

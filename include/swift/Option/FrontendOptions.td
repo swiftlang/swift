@@ -1110,4 +1110,8 @@ def enable_emit_generic_class_ro_t_list :
   Flag<["-"], "enable-emit-generic-class-ro_t-list">,
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
+
+def experimental_spi_only_imports :
+  Flag<["-"], "experimental-spi-only-imports">,
+  HelpText<"Enable use of @_spiOnly imports">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
