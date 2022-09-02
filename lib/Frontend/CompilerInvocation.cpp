@@ -719,6 +719,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.Features.insert(Feature::ExistentialAny);
   }
 
+  Opts.Features.insert(Feature::TypeWrappers);
+
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
   Opts.EnableSwift3ObjCInference =
