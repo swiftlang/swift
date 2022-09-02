@@ -134,6 +134,21 @@ bool SILSSAUpdater::tryRewriteUseByCloning(Operand &use) {
       return true;
     }
   }
+  if (auto *sli = dyn_cast<StringLiteralInst>(use.get())) {
+    // A string_literal argument to a int_instrprof_increment builtin must be
+    // statically known, so be sure to clone it instead of letting it become a
+    // phi node.
+    auto *bti = dyn_cast<BuiltinInst>(user);
+    if (!bti)
+      return false;
+    if (bti->getBuiltinKind() != BuiltinValueKind::IntInstrprofIncrement)
+      return false;
+
+    assert(areIdentical(*blockToAvailableValueMap) &&
+           "The string_literals need to have the same value");
+    use.set(cast<StringLiteralInst>(sli->clone(user)));
+    return true;
+  }
   return false;
 }
 

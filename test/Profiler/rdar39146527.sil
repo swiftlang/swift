@@ -1,0 +1,95 @@
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O -sil-verify-all -profile-generate %s
+
+import Builtin
+import Swift
+
+enum Name {
+  case short(Character, allowingJoined: Bool)
+  case longWithSingleDash(String)
+  case long(String)
+}
+
+sil @bar : $@convention(thin) () -> @owned String
+sil @baz : $@convention(thin) (Builtin.Int64) -> @owned Name
+
+// rdar://39146527 – Ensure when thread jumping from bb4 to bb7 that we preserve
+// the literal string argument to int_instrprof_increment in bb8.
+
+sil @foo : $@convention(thin) (Name, String, Builtin.Int64, Builtin.Int64) -> String {
+bb0(%0 : $Name, %1 : $String, %2 : $Builtin.Int64, %3 : $Builtin.Int64):
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int32, 0
+  %6 = integer_literal $Builtin.Int32, 1
+  %7 = integer_literal $Builtin.Int32, 2
+  %8 = integer_literal $Builtin.Int32, 3
+  %9 = string_literal utf8 "$s4Test4NameO4caseAC4CaseOvg"
+  %10 = integer_literal $Builtin.Int32, 4
+  br bb2(%2 : $Builtin.Int64)
+
+bb1:
+  %12 = string_literal utf8 "xxxx.swift:$sSK4TestAA4NameO7ElementRtzrlE09preferredC0ACSgvgAGyKXEfu_"
+  %13 = builtin "int_instrprof_increment"(%12 : $Builtin.RawPointer, %4 : $Builtin.Int64, %6 : $Builtin.Int32, %5 : $Builtin.Int32) : $()
+
+  %14 = function_ref @bar : $@convention(thin) () -> @owned String
+  %15 = apply %14() : $@convention(thin) () -> @owned String
+  br bb11(%15 : $String)
+
+bb2(%17 : $Builtin.Int64):
+  %18 = function_ref @baz : $@convention(thin) (Builtin.Int64) -> @owned Name
+  %19 = apply %18(%17) : $@convention(thin) (Builtin.Int64) -> @owned Name
+  switch_enum %19 : $Name, case #Name.short!enumelt: bb3, case #Name.longWithSingleDash!enumelt: bb4, case #Name.long!enumelt: bb5
+
+bb3(%21 : $(Character, allowingJoined: Bool)):
+  release_value %19 : $Name
+  %23 = builtin "int_instrprof_increment"(%9 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %6 : $Builtin.Int32) : $()
+  %24 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %24, bb1, bb6
+
+bb4(%26 : $String):
+  %27 = builtin "int_instrprof_increment"(%9 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %7 : $Builtin.Int32) : $()
+  br bb7(%19 : $Name)
+
+bb5(%29 : $String):
+  %30 = builtin "int_instrprof_increment"(%9 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %8 : $Builtin.Int32) : $()
+  br bb7(%0 : $Name)
+
+bb6:
+  br bb2(%3 : $Builtin.Int64)
+
+bb7(%33 : $Name):
+  // CHECK:      [[STR:%[0-9]+]] = string_literal utf8 "$s4Test4NameO11valueStringSSvg"
+  // CHECK-NEXT: builtin "int_instrprof_increment"([[STR]] : $Builtin.RawPointer
+  %34 = string_literal utf8 "$s4Test4NameO11valueStringSSvg"
+  %35 = builtin "int_instrprof_increment"(%34 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %5 : $Builtin.Int32) : $()
+  switch_enum %33 : $Name, case #Name.long!enumelt: bb8, case #Name.short!enumelt: bb9, case #Name.longWithSingleDash!enumelt: bb10
+
+bb8(%37 : $String):
+  // CHECK:      [[STR:%[0-9]+]] = string_literal utf8 "$s4Test4NameO11valueStringSSvg"
+  // CHECK-NEXT: builtin "int_instrprof_increment"([[STR]] : $Builtin.RawPointer
+  // CHECK:      [[STR:%[0-9]+]] = string_literal utf8 "$s4Test4NameO11valueStringSSvg"
+  // CHECK-NEXT: builtin "int_instrprof_increment"([[STR]] : $Builtin.RawPointer
+  %38 = builtin "int_instrprof_increment"(%34 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %6 : $Builtin.Int32) : $()
+  br bb11(%37 : $String)
+
+bb9(%40 : $(Character, allowingJoined: Bool)):
+  %41 = tuple_extract %40 : $(Character, allowingJoined: Bool), 0
+  %42 = struct_extract %41 : $Character, #Character._str
+  %43 = struct_extract %42 : $String, #String._guts
+  %44 = struct_extract %43 : $_StringGuts, #_StringGuts._object
+  %45 = struct_extract %44 : $_StringObject, #_StringObject._object
+  strong_retain %45 : $Builtin.BridgeObject
+  %47 = move_value [lexical] %41 : $Character
+  %48 = builtin "int_instrprof_increment"(%34 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %7 : $Builtin.Int32) : $()
+  %49 = struct_extract %47 : $Character, #Character._str
+  release_value %33 : $Name
+  br bb11(%49 : $String)
+
+bb10(%52 : $String):
+  %53 = builtin "int_instrprof_increment"(%34 : $Builtin.RawPointer, %4 : $Builtin.Int64, %10 : $Builtin.Int32, %8 : $Builtin.Int32) : $()
+  br bb11(%52 : $String)
+
+bb11(%55 : $String):
+  release_value %1 : $String
+  return %55 : $String
+}
