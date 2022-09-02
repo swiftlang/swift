@@ -1299,9 +1299,9 @@ void Solution::dump(raw_ostream &out) const {
   if (!overloadChoices.empty()) {
     out << "\nOverload choices:";
     for (auto ovl : overloadChoices) {
-      out.indent(2);
       if (ovl.first) {
         out << "\n";
+        out.indent(2);
         ovl.first->dump(sm, out);
       }
 
@@ -1466,16 +1466,17 @@ void ConstraintSystem::print(raw_ostream &out) const {
              });
   for (auto tv : typeVariables) {
     out.indent(2);
-    tv->getImpl().print(out);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
+        tv->getImpl().print(out);
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
         const_cast<ConstraintSystem *>(this)->getBindingsFor(tv).dump(out, 1);
       }
     } else {
+      tv->getImpl().print(out);
       out << " equivalent to ";
       Type(rep).print(out, PO);
     }
