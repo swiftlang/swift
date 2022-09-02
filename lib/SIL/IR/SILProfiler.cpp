@@ -51,11 +51,6 @@ static bool isUnmapped(ASTNode N) {
   }
 
   if (auto *E = N.dyn_cast<Expr *>()) {
-    if (isa<LiteralExpr>(E)) {
-      LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: literal expr\n");
-      return true;
-    }
-
     if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
       // Only map closure expressions with bodies.
       if (!doesClosureHaveBody(CE)) {
