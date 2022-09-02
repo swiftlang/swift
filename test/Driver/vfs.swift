@@ -1,4 +1,6 @@
-// Verifies that the driver passes the -vfsoverlay flag to the frontend (SR-12834).
+// https://github.com/apple/swift/issues/55280
+
+// Verifies that the driver passes the -vfsoverlay flag to the frontend.
 // RUN: %swiftc_driver -driver-print-jobs -c -vfsoverlay overlay.yaml %s | %FileCheck --check-prefix=CHECK-ONE %s
 
 // CHECK-ONE: bin{{/|\\\\}}swift{{(-frontend|c)?(\.exe)?"?}} -frontend{{.*}}-c{{.*}}-vfsoverlay overlay.yaml

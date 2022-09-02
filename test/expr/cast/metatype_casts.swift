@@ -50,9 +50,11 @@ use(C.self as P.Type) // expected-error{{cannot convert value of type 'C.Type' t
 use(E.self as P.Protocol) // expected-error{{cannot convert value of type 'E.Type' to type '(any P).Type' in coercion}}
 use(E.self as P.Type)
 
-// SR-12946
-func SR12946<T>(_ e: T) {
-  _ = AnyObject.self is T.Type // OK
-}
+// https://github.com/apple/swift/issues/55392
+do {
+  func f<T>(_ e: T) {
+    _ = AnyObject.self is T.Type // OK
+  }
 
-SR12946(1 as AnyObject)
+  f(1 as AnyObject)
+}
