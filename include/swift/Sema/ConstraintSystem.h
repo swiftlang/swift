@@ -4447,7 +4447,8 @@ public:
     if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 2) << "(added constraint: ";
-      constraint->print(log, &getASTContext().SourceMgr);
+      constraint->print(log, &getASTContext().SourceMgr,
+                        solverState->getCurrentIndent() + 4);
       log << ")\n";
     }
 
@@ -4465,7 +4466,8 @@ public:
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 2)
           << "(removed constraint: ";
-      constraint->print(log, &getASTContext().SourceMgr);
+      constraint->print(log, &getASTContext().SourceMgr,
+                        solverState->getCurrentIndent() + 4);
       log << ")\n";
     }
 
