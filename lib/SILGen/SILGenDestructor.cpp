@@ -81,10 +81,11 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     }
   }
 
-  emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.
   if (deinitBodyBB)
     B.emitBlock(deinitBodyBB);
+
+  emitProfilerIncrement(dd->getTypecheckedBody());
   emitStmt(dd->getTypecheckedBody());
 
   Optional<SILValue> maybeReturnValue;
