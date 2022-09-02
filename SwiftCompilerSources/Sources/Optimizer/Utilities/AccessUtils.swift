@@ -381,33 +381,30 @@ struct AccessPathWalker {
     return walker.result
   }
 
-  mutating func getAccessPathWithScope(of address: Value) -> (AccessPath, EnclosingScope) {
+  mutating func getAccessPathWithScope(of address: Value) -> (AccessPath, scope: BeginAccessInst?) {
     let ap = getAccessPath(of: address)
-    return (ap, walker.scope)
+    return (ap, walker.foundBeginAccess)
   }
 
   mutating func getAccessBase(of address: Value) -> AccessBase {
     getAccessPath(of: address).base
   }
 
-  mutating func getAccessScope(of address: Value) -> EnclosingScope {
-    getAccessPathWithScope(of: address).1
+  mutating func getEnclosingScope(of address: Value) -> EnclosingScope {
+    let accessPath = getAccessPath(of: address)
+  
+    if let ba = walker.foundBeginAccess {
+      return .scope(ba)
+    }
+    return .base(accessPath.base)
   }
 
   private var walker = Walker()
 
   private struct Walker : AddressUseDefWalker {
     private(set) var result = AccessPath.unidentified()
-    private var foundBeginAccess: BeginAccessInst? = nil
+    private(set) var foundBeginAccess: BeginAccessInst?
     private var pointerId = PointerIdentification()
-
-    var scope: EnclosingScope {
-      if let ba = foundBeginAccess {
-        return .scope(ba)
-      } else {
-        return .base(result.base)
-      }
-    }
 
     mutating func start() {
       result = .unidentified()
@@ -489,11 +486,23 @@ extension Value {
     var apWalker = AccessPathWalker()
     return apWalker.getAccessBase(of: self)
   }
-  
-  /// Computes the enclosing access scope of this address value.
-  var accessScope: EnclosingScope {
+
+  /// Computes the access path of this address value.
+  var accessPath: AccessPath {
     var apWalker = AccessPathWalker()
-    return apWalker.getAccessScope(of: self)
+    return apWalker.getAccessPath(of: self)
+  }
+
+  /// Computes the access path of this address value and also returns the scope.
+  var accessPathWithScope: (AccessPath, scope: BeginAccessInst?) {
+    var apWalker = AccessPathWalker()
+    return apWalker.getAccessPathWithScope(of: self)
+  }
+
+  /// Computes the enclosing access scope of this address value.
+  var enclosingAccessScope: EnclosingScope {
+    var apWalker = AccessPathWalker()
+    return apWalker.getEnclosingScope(of: self)
   }
 }
 
