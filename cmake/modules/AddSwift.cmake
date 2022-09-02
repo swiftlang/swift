@@ -504,7 +504,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
 
     # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
     # to the linker command line.
-    set(swift_ast_path_flags "-Wl")
+    set(swift_ast_path_flags " -Wl")
     get_property(modules GLOBAL PROPERTY swift_compiler_modules)
     foreach(module ${modules})
       get_target_property(module_file "SwiftModule${module}" "module_file")
@@ -607,6 +607,11 @@ function(add_swift_host_library name)
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
   translate_flags(ASHL "${options}")
+
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_SWIFT_PARSER AND ASHL_SHARED)
+    set(ASHL_HAS_SWIFT_MODULES ON)
+  endif()
 
   if(NOT ASHL_SHARED AND NOT ASHL_STATIC AND NOT ASHL_OBJECT)
     message(FATAL_ERROR "One of SHARED/STATIC/OBJECT must be specified")
@@ -832,6 +837,11 @@ function(add_swift_host_tool executable)
   if(SWIFT_PARALLEL_LINK_JOBS)
     set_target_properties(${executable} PROPERTIES
       JOB_POOL_LINK swift_link_job_pool)
+  endif()
+
+  # Once the new Swift parser is linked in, every host tool has Swift modules.
+  if (SWIFT_SWIFT_PARSER)
+    set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
   if (ASHT_HAS_SWIFT_MODULES)

@@ -78,5 +78,9 @@ function(add_swift_unittest test_dirname)
         LINK_FLAGS " -fsanitize=thread")
     endif()
   endif()
+
+  if (SWIFT_SWIFT_PARSER)
+    _add_swift_runtime_link_flags(${test_dirname} "../../lib" "")
+  endif()
 endfunction()
 

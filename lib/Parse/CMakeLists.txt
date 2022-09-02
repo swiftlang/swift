@@ -35,6 +35,34 @@ target_link_libraries(swiftParse PRIVATE
   swiftSyntaxParse
 )
 
+if (SWIFT_SWIFT_PARSER)
+  # Link against the SwiftSyntax parser and libraries it depends on. The actual
+  # formulation of this is a hack to work around a CMake bug in Ninja file
+  # generation that results in multiple Ninja targets producing the same file in
+  # a downstream SourceKit target. This should be expressed as:
+  #
+  #   target_link_libraries(swiftParse
+  #     PRIVATE
+  #     SwiftSyntax::SwiftParser
+  #   )
+  target_link_libraries(swiftParse
+    PRIVATE
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
+  )
+
+  target_include_directories(swiftParse
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../swift-syntax/Sources/SwiftParser
+  )
+
+  target_compile_definitions(swiftParse
+    PRIVATE
+    SWIFT_SWIFT_PARSER_ROUNDTRIP
+  )
+endif()
+
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)
 
 set_swift_llvm_is_available(swiftParse)

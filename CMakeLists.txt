@@ -868,6 +868,23 @@ if(XCODE)
   set(SWIFT_SDKS "OSX")
 endif()
 
+# When we have the early SwiftSyntax build, we can include its parser.
+if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
+  # An option that specifies how the SwiftSyntax-based Swift parser is
+  # integrated.
+  option(SWIFT_SWIFT_PARSER_MODE [=[
+How to use the SwiftSyntax-based Swift parser. Possible values are
+    OFF:           do not use this parser at all
+    ROUNDTRIP:     ensure that the SwiftSyntax-based Swift parser round-trips
+]=] OFF)
+
+  if(SWIFT_SWIFT_PARSER_MODE)
+    set(SWIFT_SWIFT_PARSER TRUE)
+    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
+  endif()
+endif()
+
+
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
 # and we have to specify SWIFT_SDK_ANDROID_ARCHITECTURES separately.
