@@ -11,14 +11,14 @@ import SwiftShims
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-  %2 = string_literal utf8 "<stdin>:__tlcd_line:1:1" // user: %6
+  %2 = string_literal utf8 "xxxxx" // user: %6
   %3 = integer_literal $Builtin.Int64, 0          // user: %6
   %4 = integer_literal $Builtin.Int32, 2          // user: %6
   %5 = integer_literal $Builtin.Int32, 0          // user: %6
 
   // Pass an invalid SIL value to the int_instrprof_increment intrinsic
   // to force IRGen to drop it.
-  %6 = builtin "int_instrprof_increment"(%3 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int32, %5 : $Builtin.Int32) : $()
+  %6 = builtin "int_instrprof_increment"(%2 : $Builtin.RawPointer, %3 : $Builtin.Int64, %4 : $Builtin.Int32, %5 : $Builtin.Int32) : $()
 
   return %0 : $Int32                             // id: %33
 } // end sil function 'main'

@@ -1815,6 +1815,11 @@ public:
       require(!isa<SILArgument>(BI->getArguments()[1]),
               "llvm.invariant.end parameter #2 must be an integer literal");
       break;
+    case llvm::Intrinsic::instrprof_increment:
+      const auto &Name = BI->getArguments()[0];
+      require(isa<StringLiteralInst>(Name),
+              "name argument of profiling intrinsic must be a string literal");
+      break;
     }
   }
 

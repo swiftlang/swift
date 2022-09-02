@@ -416,14 +416,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Extract the PGO function name.
     auto *NameGEP = cast<llvm::User>(args.claimNext());
     auto *NameGV = dyn_cast<llvm::GlobalVariable>(NameGEP->stripPointerCasts());
-
-    // TODO: The SIL optimizer may rewrite the name argument in a way that
-    // makes it impossible to lower. Until that issue is fixed, defensively
-    // refuse to lower ill-formed intrinsics (rdar://39146527).
-    if (!NameGV) {
-      (void)args.claimAll();
-      return;
-    }
+    assert(NameGV && "Need a literal function name for instrprof_increment");
 
     auto *NameC = NameGV->getInitializer();
     StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
