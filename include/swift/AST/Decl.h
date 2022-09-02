@@ -986,6 +986,10 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
+  }
+
   AvailabilityContext getAvailabilityForLinkage() const;
 
   /// Whether this declaration or one of its outer contexts has the
@@ -5781,10 +5785,6 @@ public:
 
   void setDefaultArgumentKind(ArgumentAttrs K) {
     setDefaultArgumentKind(K.argumentKind);
-  }
-
-  bool isNoImplicitCopy() const {
-    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
 
   /// Whether this parameter has a default argument expression available.

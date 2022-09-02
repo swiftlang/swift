@@ -979,7 +979,7 @@ namespace {
         break;
       }
 
-      if (P->getAttrs().hasAttribute<NoImplicitCopyAttr>())
+      if (P->isNoImplicitCopy())
         OS << " noImplicitCopy";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
