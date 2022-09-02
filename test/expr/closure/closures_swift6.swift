@@ -12,7 +12,8 @@ class ExplicitSelfRequiredTest {
   }
 }
 
-class SR14120 {
+// https://github.com/apple/swift/issues/56501
+class C_56501 {
   func operation() {}
 
   func test1() {

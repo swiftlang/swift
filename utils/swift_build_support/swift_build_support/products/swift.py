@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
@@ -54,6 +56,9 @@ class Swift(product.Product):
 
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
+
+        # Add path for the early SwiftSyntax build.
+        self.cmake_options.extend(self._early_swiftsyntax_flags)
 
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
@@ -166,6 +171,18 @@ updated without updating swift.py?")
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
+
+    @property
+    def _early_swiftsyntax_flags(self):
+        result = []
+        if self.args.build_early_swiftsyntax:
+            build_root = os.path.dirname(self.build_dir)
+            early_swiftsyntax_build_dir = os.path.join(
+                '..', build_root, '%s-%s' % ('earlyswiftsyntax',
+                                             self.args.host_target))
+            result.append(('SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH',
+                           early_swiftsyntax_build_dir))
+        return result
 
     @property
     def _enable_stdlib_static_vprintf(self):
