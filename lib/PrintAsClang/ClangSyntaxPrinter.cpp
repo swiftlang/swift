@@ -248,17 +248,16 @@ void ClangSyntaxPrinter::printGenericTypeParamTypeName(
 void ClangSyntaxPrinter::printGenericSignature(
     const CanGenericSignature &signature) {
   os << "template<";
-  llvm::interleaveComma(
-      signature.getGenericParams(), os,
-      [&](const CanTypeWrapper<GenericTypeParamType> &genericParamType) {
-        os << "class ";
-        printGenericTypeParamTypeName(genericParamType);
-      });
+  llvm::interleaveComma(signature.getInnermostGenericParams(), os,
+                        [&](const GenericTypeParamType *genericParamType) {
+                          os << "class ";
+                          printGenericTypeParamTypeName(genericParamType);
+                        });
   os << ">\n";
   os << "requires ";
   llvm::interleave(
-      signature.getGenericParams(), os,
-      [&](const CanTypeWrapper<GenericTypeParamType> &genericParamType) {
+      signature.getInnermostGenericParams(), os,
+      [&](const GenericTypeParamType *genericParamType) {
         os << "swift::isUsableInGenericContext<";
         printGenericTypeParamTypeName(genericParamType);
         os << ">";
@@ -270,11 +269,10 @@ void ClangSyntaxPrinter::printGenericSignature(
 void ClangSyntaxPrinter::printGenericSignatureParams(
     const CanGenericSignature &signature) {
   os << '<';
-  llvm::interleaveComma(
-      signature.getGenericParams(), os,
-      [&](const CanTypeWrapper<GenericTypeParamType> &genericParamType) {
-        printGenericTypeParamTypeName(genericParamType);
-      });
+  llvm::interleaveComma(signature.getInnermostGenericParams(), os,
+                        [&](const GenericTypeParamType *genericParamType) {
+                          printGenericTypeParamTypeName(genericParamType);
+                        });
   os << '>';
 }
 
