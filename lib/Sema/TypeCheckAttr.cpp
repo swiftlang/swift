@@ -343,6 +343,19 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
     return;
   }
 
+  if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
+    if (visitLifetimeAttr(attr))
+      return;
+
+    // We only handle non-lvalue arguments today.
+    if (funcDecl->isMutating()) {
+      auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+      diagnoseAndRemoveAttr(attr, error);
+      return;
+    }
+    return;
+  }
+
   auto *dc = D->getDeclContext();
 
   // If we have a param decl that is marked as no implicit copy, change our

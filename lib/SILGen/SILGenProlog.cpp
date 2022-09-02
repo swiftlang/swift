@@ -360,6 +360,7 @@ struct ArgumentInitHelper {
     if (pd->isSelfParameter()) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
         lifetimeAnnotation = afd->getLifetimeAnnotation();
+        isNoImplicitCopy = afd->isNoImplicitCopy();
       }
     } else {
       lifetimeAnnotation = pd->getLifetimeAnnotation();

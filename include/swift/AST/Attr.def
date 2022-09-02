@@ -698,7 +698,7 @@ SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
   UserInaccessible |
   ABIStableToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIBreakingToRemove |
-  OnParam | OnVar,
+  OnFunc | OnParam | OnVar,
   122)
 
 SIMPLE_DECL_ATTR(_noLocks, NoLocks,
