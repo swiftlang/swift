@@ -451,6 +451,13 @@ This prevents types from that module being exposed in API
 (types of public functions, constraints in public extension etc.)
 and ABI (usage in `@inlinable` code).
 
+## `@_spiOnly`
+
+Marks an import to be used in SPI and implementation details only.
+The import statement will be printed in the private swiftinterface only and
+skipped in the public swiftinterface. Any use of imported types and decls in API
+will be diagnosed.
+
 ## `@_implements(ProtocolName, Requirement)`
 
 An attribute that indicates that a function with one name satisfies

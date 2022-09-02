@@ -536,6 +536,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     import.options |= ImportFlags::ImplementationOnly;
 
+  if (ID->getAttrs().hasAttribute<SPIOnlyAttr>())
+    import.options |= ImportFlags::SPIOnly;
+
   if (auto *privateImportAttr =
           ID->getAttrs().getAttribute<PrivateImportAttr>()) {
     import.options |= ImportFlags::PrivateImport;

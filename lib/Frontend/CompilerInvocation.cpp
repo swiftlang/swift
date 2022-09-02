@@ -721,6 +721,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
+
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
                                    OPT_warn_swift3_objc_inference_minimal,

@@ -88,7 +88,11 @@ enum class ImportFlags {
   WeakLinked = 0x40,
 
   /// Used for DenseMap.
-  Reserved = 0x80
+  Reserved = 0x80,
+
+  /// The imported module can only be referenced from SPI decls, or
+  /// implementation details.
+  SPIOnly = 0x100
 };
 
 /// \see ImportFlags
