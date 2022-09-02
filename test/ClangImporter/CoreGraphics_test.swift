@@ -6,6 +6,9 @@ import CoreGraphics
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 
+@_silgen_name("blackHole")
+func blackHole<T>(_ value: T) -> Void
+
 // CHECK: [[SWITCHTABLE:@.*]] = private unnamed_addr constant [8 x i64] [i64 0, i64 12, i64 23, i64 34, i64 45, i64 55, i64 67, i64 71]
 
 // CHECK-LABEL: define swiftcc i64 {{.*}}testEnums{{.*}} {
@@ -99,9 +102,9 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
 // CHECK:   call void @CGAffineTransformInvert(%struct.CGAffineTransform* {{.*}}, %struct.CGAffineTransform* {{.*}})
 // CHECK:   call void @CGAffineTransformConcat(%struct.CGAffineTransform* {{.*}}, %struct.CGAffineTransform* {{.*}}, %struct.CGAffineTransform* {{.*}})
 
-  let _ = point.applying(transform)
+  blackHole(point.applying(transform))
   var rect = rect.applying(transform)
-  let _ = size.applying(transform)
+  blackHole(size.applying(transform))
 // CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGPointApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
 // CHECK:   call void @CGRectApplyAffineTransform(%struct.CGRect* {{.*}}, %struct.CGRect* {{.*}}, %struct.CGAffineTransform* {{.*}})
 // CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGSizeApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
