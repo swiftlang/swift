@@ -313,6 +313,16 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
   for (const SILInstruction &initInst : *global) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(&initInst)) {
       SILFunction *referencedFunc = FRI->getReferencedFunction();
+      
+      // In conservative mode we don't want to turn non-public functions into
+      // public functions, because that can increase code size. E.g. if the
+      // function is completely inlined afterwards.
+      // Also, when emitting TBD files, we cannot introduce a new public symbol.
+      if ((conservative || M.getOptions().emitTBD) &&
+          !hasPublicVisibility(referencedFunc->getLinkage())) {
+        return false;
+      }
+
       if (!canUseFromInline(referencedFunc))
         return false;
     }
