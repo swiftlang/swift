@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/textual)
 // RUN: %empty-directory(%t/binary)
-// RUN: %empty-directory(%t/module-cache)
 
 // RUN: echo "public func foo() {}" > %t/Foo.swift
 // RUN: %target-swift-frontend -emit-module %t/Foo.swift -module-name Foo -swift-version 5 -disable-implicit-concurrency-module-import -user-module-version 113.330.1.2.3 -emit-module-interface-path %t/textual/Foo.swiftinterface -enable-library-evolution -emit-module-path %t/binary/Foo.swiftmodule
@@ -86,6 +85,7 @@ func canImportVersioned() {
 #endif
 }
 
+/// Test versions specified as string literals.
 func canImportVersionedString() {
 #if canImport(Foo, _version: "0")
   let majorZero = 1 // expected-warning {{initialization of immutable value 'majorZero' was never used; consider replacing with assignment to '_' or removing it}}
@@ -143,7 +143,7 @@ func canImportVersionedString() {
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, _underlyingVersion: 113.33)
+#if canImport(Foo, _underlyingVersion: "113.33")
   // Foo is a Swift module with no underlying clang module.
   let underlyingMinorSmaller = 1
 #endif
