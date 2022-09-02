@@ -26,12 +26,13 @@ var e2b: E2 = .Second(5)
 e2b = .First
 var e2c: E2 = .First // expected-error{{generic parameter 'T' could not be inferred}}
 
-// SR-13357
-struct SR13357 {}
-extension Optional where Wrapped == SR13357 {
-    static var sr13357: Self { .none }
+// https://github.com/apple/swift/issues/55797
+
+struct S_55797 {}
+extension Optional where Wrapped == S_55797 {
+    static var v55797: Self { .none }
 }
 
-func f_sr13357<T>(_: T?) { }
+func f_55797<T>(_: T?) { }
 
-f_sr13357(.sr13357)
+f_55797(.v55797)
