@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 var t1a: (Int...) = (1)
-// expected-error@-1 {{cannot create a variadic tuple}}
+// expected-error@-1 {{variadic expansion 'Int' must contain at least one variadic generic parameter}}
 var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}} {{18-23=}}
 
 func f1(_ a: Int...) { for _ in a {} }

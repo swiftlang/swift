@@ -508,14 +508,6 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       fromDC->getParentModule(), typeDecl, selfType, /*useArchetypes=*/false);
 }
 
-static TypeResolutionOptions
-adjustOptionsForGenericArgs(TypeResolutionOptions options) {
-  options.setContext(None);
-  options -= TypeResolutionFlags::SILType;
-
-  return options;
-}
-
 /// This function checks if a bound generic type is UnsafePointer<Void> or
 /// UnsafeMutablePointer<Void>. For these two type representations, we should
 /// warn users that they are deprecated and replace them with more handy
@@ -713,8 +705,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // to a parameterized existential type.
     if (options.is(TypeResolverContext::ExistentialConstraint))
       options |= TypeResolutionFlags::DisallowOpaqueTypes;
-    auto genericResolution =
-      resolution.withOptions(adjustOptionsForGenericArgs(options));
+    auto argOptions = options.withoutContext().withContext(
+        TypeResolverContext::GenericArgument);
+    auto genericResolution = resolution.withOptions(argOptions);
 
     SmallVector<Type, 2> argTys;
     for (auto *genericArg : genericArgs) {
@@ -810,8 +803,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   }
 
   // Resolve the types of the generic arguments.
-  auto genericResolution =
-      resolution.withOptions(adjustOptionsForGenericArgs(options));
+  auto argOptions = options.withoutContext().withContext(
+      TypeResolverContext::GenericArgument);
+  auto genericResolution = resolution.withOptions(argOptions);
 
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
@@ -3910,14 +3904,15 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  options = adjustOptionsForGenericArgs(options);
+  auto argOptions = options.withoutContext().withContext(
+      TypeResolverContext::GenericArgument);
 
-  auto keyTy = resolveType(repr->getKey(), options.withoutContext());
+  auto keyTy = resolveType(repr->getKey(), argOptions);
   if (keyTy->hasError()) {
     return ErrorType::get(getASTContext());
   }
 
-  auto valueTy = resolveType(repr->getValue(), options.withoutContext());
+  auto valueTy = resolveType(repr->getValue(), argOptions);
   if (valueTy->hasError()) {
     return ErrorType::get(getASTContext());
   }
@@ -3973,6 +3968,9 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::PatternBindingDecl:
     doDiag = !isDirect;
     break;
+  case TypeResolverContext::TupleElement:
+  case TypeResolverContext::GenericArgument:
+  case TypeResolverContext::ProtocolGenericArgument:
   case TypeResolverContext::VariadicFunctionInput:
   case TypeResolverContext::ForEachStmt:
   case TypeResolverContext::ExtensionBinding:
@@ -4068,9 +4066,17 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
                                                      TypeResolutionOptions options) {
   auto pair = maybeResolvePackExpansionType(repr, options);
 
-  // If there's no reference to a variadic generic parameter, complain
-  // - the pack won't actually expand to anything meaningful.
-  if (!pair.first->hasError() && !pair.second) {
+  if (pair.first->hasError())
+    return ErrorType::get(getASTContext());
+
+  // We might not allow variadic expansions here at all.
+  if (!options.isPackExpansionSupported()) {
+    diagnose(repr->getLoc(), diag::expansion_not_allowed, pair.first);
+    return ErrorType::get(getASTContext());
+  }
+
+  // The pattern type must contain at least one variadic generic parameter.
+  if (!pair.second) {
     diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
       .highlight(repr->getSourceRange());
     return ErrorType::get(getASTContext());
@@ -4090,6 +4096,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = elementOptions.withoutContext(true);
+    elementOptions = elementOptions.withContext(TypeResolverContext::TupleElement);
   }
 
   bool hadError = false;
