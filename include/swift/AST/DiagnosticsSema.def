@@ -1641,6 +1641,14 @@ ERROR(originally_definedin_must_not_before_available_version,none,
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
 
+// Dependency Scanning
+ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+NOTE(dependency_as_imported_by_main_module,none,
+     "a dependency of main module '%0'", (StringRef))
+NOTE(dependency_as_imported_by, none,
+     "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
+
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))

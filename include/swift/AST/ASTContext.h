@@ -989,7 +989,8 @@ public:
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool cacheOnly = false);
+      bool cacheOnly = false,
+      llvm::Optional<std::pair<std::string, swift::ModuleDependenciesKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   Optional<ModuleDependencies> getSwiftModuleDependencies(
