@@ -2241,14 +2241,14 @@ getImportTypeKindForParam(const clang::ParmVarDecl *param) {
   return importKind;
 }
 
-Optional<swift::Type> ClangImporter::Implementation::importParameterType(
+Optional<ClangImporter::Implementation::ImportParameterTypeResult>
+ClangImporter::Implementation::importParameterType(
     const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
     bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
     bool paramIsError, bool paramIsCompletionHandler,
     Optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
-    llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
-    bool &isInOut, bool &isParamTypeImplicitlyUnwrapped) {
+    llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
   auto paramTy = param->getType();
 
   ImportTypeKind importKind = getImportTypeKindForParam(param);
@@ -2256,6 +2256,8 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
   // Import the parameter type into Swift.
   auto attrs = getImportTypeAttrs(param, /*isParam=*/true);
   Type swiftParamTy;
+  bool isInOut = false;
+  bool isParamTypeImplicitlyUnwrapped = false;
 
   // Sometimes we import unavailable typedefs as enums. If that's the case,
   // use the enum, not the typedef here.
@@ -2351,7 +2353,8 @@ Optional<swift::Type> ClangImporter::Implementation::importParameterType(
     swiftParamTy = importedType.getType();
   }
 
-  return swiftParamTy;
+  return ImportParameterTypeResult{swiftParamTy, isInOut,
+                                   isParamTypeImplicitlyUnwrapped};
 }
 
 static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
@@ -2409,23 +2412,22 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
-    bool isInOut = false;
-    bool isParamTypeImplicitlyUnwrapped = false;
-
     auto swiftParamTyOpt = importParameterType(
         param, optionalityOfParam, allowNSUIntegerAsInt,
         /*isNSDictionarySubscriptGetter=*/false,
         /*paramIsError=*/false,
         /*paramIsCompletionHandler=*/false,
-        /*completionHandlerErrorParamIndex=*/None, genericParams, paramAddDiag,
-        isInOut, isParamTypeImplicitlyUnwrapped);
+        /*completionHandlerErrorParamIndex=*/None, genericParams, paramAddDiag);
     if (!swiftParamTyOpt) {
       addImportDiagnostic(param,
                           Diagnostic(diag::parameter_type_not_imported, param),
                           param->getSourceRange().getBegin());
       return nullptr;
     }
-    auto swiftParamTy = *swiftParamTyOpt;
+    auto swiftParamTy = swiftParamTyOpt->swiftTy;
+    bool isInOut = swiftParamTyOpt->isInOut;
+    bool isParamTypeImplicitlyUnwrapped =
+        swiftParamTyOpt->isParamTypeImplicitlyUnwrapped;
 
     // Retrieve the argument name.
     Identifier name;
@@ -2984,20 +2986,21 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
-    bool isInOut = false;
-    bool paramIsIUO = false;
     auto swiftParamTyOpt = importParameterType(
         param, optionalityOfParam, allowNSUIntegerAsIntInParam,
         kind == SpecialMethodKind::NSDictionarySubscriptGetter, paramIsError,
         paramIsCompletionHandler, completionHandlerErrorParamIndex,
-        ArrayRef<GenericTypeParamDecl *>(), paramAddDiag, isInOut, paramIsIUO);
+        ArrayRef<GenericTypeParamDecl *>(), paramAddDiag);
     if (!swiftParamTyOpt) {
       addImportDiagnostic(param,
                           Diagnostic(diag::parameter_type_not_imported, param),
                           param->getSourceRange().getBegin());
       return {Type(), false};
     }
-    auto swiftParamTy = *swiftParamTyOpt;
+    auto swiftParamTy = swiftParamTyOpt->swiftTy;
+    bool isInOut = swiftParamTyOpt->isInOut;
+    bool isParamTypeImplicitlyUnwrapped =
+        swiftParamTyOpt->isParamTypeImplicitlyUnwrapped;
 
     swiftParamTy = mapGenericArgs(origDC, dc, swiftParamTy);
 
@@ -3044,8 +3047,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     ++nameIndex;
 
     // Set up the parameter info
-    auto paramInfo =
-        getParameterInfo(this, param, name, swiftParamTy, isInOut, paramIsIUO);
+    auto paramInfo = getParameterInfo(this, param, name, swiftParamTy, isInOut,
+                                      isParamTypeImplicitlyUnwrapped);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

@@ -1364,6 +1364,15 @@ public:
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
       ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
 
+  struct ImportParameterTypeResult {
+    /// The imported parameter Swift type.
+    swift::Type swiftTy;
+    /// If the parameter is or not inout.
+    bool isInOut;
+    /// If the parameter is implicitly unwrapped or not.
+    bool isParamTypeImplicitlyUnwrapped;
+  };
+
   /// Import a parameter type
   ///
   /// \param param The underlaying parameter declaraction.
@@ -1390,20 +1399,15 @@ public:
   ///        diagnostics to the declaration being imported. This can be any
   ///        lambda or callable object, but it's designed to be compatible
   ///        with \c ImportDiagnosticAdder .
-  /// \param[out] isInOut On return, true if the parameter is inout. False,
-  ///             otherwise.
-  /// \param[out] isParamTypeImplicitlyUnwrapped On return, true if the
-  ///             parameter is implicitly unwrapped. False, otherwise.
   ///
-  /// \returns The imported parameter type on success, or None on failure.
-  Optional<swift::Type> importParameterType(
+  /// \returns The imported parameter result on success, or None on failure.
+  Optional<ImportParameterTypeResult> importParameterType(
       const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
       bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
       bool paramIsError, bool paramIsCompletionHandler,
       Optional<unsigned> completionHandlerErrorParamIndex,
       ArrayRef<GenericTypeParamDecl *> genericParams,
-      llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
-      bool &isInOut, bool &isParamTypeImplicitlyUnwrapped);
+      llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
