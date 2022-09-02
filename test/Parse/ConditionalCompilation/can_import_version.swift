@@ -4,19 +4,11 @@
 
 // RUN: echo "public func foo() {}" > %t/Foo.swift
 // RUN: %target-swift-frontend -emit-module %t/Foo.swift -module-name Foo -swift-version 5 -disable-implicit-concurrency-module-import -user-module-version 113.330.1.2.3 -emit-module-interface-path %t/textual/Foo.swiftinterface -enable-library-evolution -emit-module-path %t/binary/Foo.swiftmodule
-// RUN: %target-swift-frontend -emit-module %t/Foo.swift -module-name Bar -swift-version 5 -disable-implicit-concurrency-module-import -emit-module-interface-path %t/textual/Bar.swiftinterface -enable-library-evolution -emit-module-path %t/binary/Bar.swiftmodule
 
 // RUN: %target-typecheck-verify-swift -disable-implicit-concurrency-module-import -I %t/textual
 // RUN: %target-typecheck-verify-swift -disable-implicit-concurrency-module-import -I %t/binary
 
 import Foo
-import Bar
-
-#if canImport(Bar, _version: 113.331) // expected-warning {{cannot find user version number for Swift module 'Bar'; version number ignored}}
-#endif
-
-#if canImport(Bar, _version: 2) // expected-warning {{cannot find user version number for Swift module 'Bar'; version number ignored}}
-#endif
 
 func canImportVersioned() {
 #if canImport(Foo, _version: 0)

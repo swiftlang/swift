@@ -9,8 +9,14 @@
 
 import Simple
 
-func canImportVersioned() {
+func canImportUnderlyingVersion() {
 #if canImport(Simple, _underlyingVersion: 3.3) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
+  let a = 1  // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+}
+
+func canImportVersion() {
+#if canImport(Simple, _version: 3.3) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
   let a = 1  // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }
