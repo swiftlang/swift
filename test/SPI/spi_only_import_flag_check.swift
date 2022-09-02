@@ -16,7 +16,19 @@
 // RUN:   -module-name Client -emit-module-path %t/Client.swiftmodule \
 // RUN:   -experimental-spi-only-imports
 
+/// Attribute is accepted without the flag when in a swiftinterface.
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \
+// RUN:   -I %t -module-name Client
+
 //--- Empty.swift
 //--- Client.swift
 
 @_spiOnly import Empty // expected-error {{'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'}}
+
+//--- Client.private.swiftinterface
+
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 5.8-dev effective-4.1.50
+// swift-module-flags: -swift-version 4 -module-name Client
+import Swift
+@_spiOnly import Empty

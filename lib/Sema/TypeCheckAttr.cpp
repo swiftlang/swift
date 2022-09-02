@@ -3911,7 +3911,9 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
 void
 AttributeChecker::visitSPIOnlyAttr(SPIOnlyAttr *attr) {
-  if (!Ctx.LangOpts.EnableSPIOnlyImports) {
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  if (!Ctx.LangOpts.EnableSPIOnlyImports &&
+      SF->Kind != SourceFileKind::Interface) {
     diagnoseAndRemoveAttr(attr, diag::spi_only_imports_not_enabled);
   }
 }
