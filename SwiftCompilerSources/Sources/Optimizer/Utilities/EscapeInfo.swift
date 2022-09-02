@@ -734,7 +734,7 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
     case is AllocStackInst:
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
     case let arg as FunctionArgument:
-      if canIgnoreForLoadOrArgument(path) && arg.isExclusiveIndirectParameter && !path.followStores {
+      if canIgnoreForLoadOrArgument(path) && arg.convention.isExclusiveIndirect && !path.followStores {
         return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
       } else {
         return isEscaping

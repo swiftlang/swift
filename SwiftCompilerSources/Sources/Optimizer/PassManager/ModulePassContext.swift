@@ -91,6 +91,8 @@ struct ModulePassContext {
     DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
   }
 
+  var options: Options { Options(_bridged: _bridged) }
+
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
   ///
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
