@@ -101,6 +101,11 @@ public:
   /// merging val_1 and val_2.
   SILValue getValueInMiddleOfBlock(SILBasicBlock *block);
 
+  /// Attempts to rewrite a use by directly cloning it, returning \c true if the
+  /// instruction was cloned, \c false if the instruction requires a general
+  /// rewrite.
+  bool tryRewriteUseByCloning(Operand &use);
+
   void rewriteUse(Operand &operand);
 
   void *allocate(unsigned size, unsigned align) const;

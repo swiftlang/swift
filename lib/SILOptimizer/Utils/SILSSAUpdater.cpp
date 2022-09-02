@@ -102,38 +102,46 @@ areIdentical(llvm::DenseMap<SILBasicBlock *, SILValue> &availableValues) {
   return true;
 }
 
-/// This should be called in top-down order of each def that needs its uses
-/// rewrited. The order that we visit uses for a given def is irrelevant.
-void SILSSAUpdater::rewriteUse(Operand &use) {
+bool SILSSAUpdater::tryRewriteUseByCloning(Operand &use) {
+  auto *user = use.getUser();
+
   // Replicate function_refs to their uses. SILGen can't build phi nodes for
   // them and it would not make much sense anyways.
   if (auto *fri = dyn_cast<FunctionRefInst>(use.get())) {
     assert(areIdentical(*blockToAvailableValueMap) &&
            "The function_refs need to have the same value");
-    SILInstruction *user = use.getUser();
     use.set(cast<FunctionRefInst>(fri->clone(user)));
-    return;
-  } else if (auto *pdfri =
+    return true;
+  }
+  if (auto *pdfri =
                  dyn_cast<PreviousDynamicFunctionRefInst>(use.get())) {
     assert(areIdentical(*blockToAvailableValueMap) &&
            "The function_refs need to have the same value");
-    SILInstruction *user = use.getUser();
     use.set(cast<PreviousDynamicFunctionRefInst>(pdfri->clone(user)));
-    return;
-  } else if (auto *dfri = dyn_cast<DynamicFunctionRefInst>(use.get())) {
+    return true;
+  }
+  if (auto *dfri = dyn_cast<DynamicFunctionRefInst>(use.get())) {
     assert(areIdentical(*blockToAvailableValueMap) &&
            "The function_refs need to have the same value");
-    SILInstruction *user = use.getUser();
     use.set(cast<DynamicFunctionRefInst>(dfri->clone(user)));
-    return;
-  } else if (auto *ili = dyn_cast<IntegerLiteralInst>(use.get()))
+    return true;
+  }
+  if (auto *ili = dyn_cast<IntegerLiteralInst>(use.get())) {
     if (areIdentical(*blockToAvailableValueMap)) {
       // Some llvm intrinsics don't like phi nodes as their constant inputs (e.g
       // ctlz).
-      SILInstruction *user = use.getUser();
       use.set(cast<IntegerLiteralInst>(ili->clone(user)));
-      return;
+      return true;
     }
+  }
+  return false;
+}
+
+/// This should be called in top-down order of each def that needs its uses
+/// rewrited. The order that we visit uses for a given def is irrelevant.
+void SILSSAUpdater::rewriteUse(Operand &use) {
+  if (tryRewriteUseByCloning(use))
+    return;
 
   // Again we need to be careful here, because ssa construction (with the
   // existing representation) can change the operand from under us.
