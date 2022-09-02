@@ -1618,9 +1618,9 @@ namespace {
           Mval = Mval.materialize(SGF, loc);
         }
 
-        SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
-                                     initFn.getValue(), setterFn.getValue(),
-                                     AssignByWrapperInst::Unknown);
+        SGF.B.createAssignByPropertyWrapper(
+            loc, Mval.forward(SGF), proj.forward(SGF), initFn.getValue(),
+            setterFn.getValue(), AssignByWrapperInst::Unknown);
 
         return;
       }
