@@ -641,7 +641,8 @@ func f(a : FooClass, b : LetStructMembers) {
   b.f = 42    // expected-error {{cannot assign to value: 'f' is a method}}
 }
 
-// SR-2354: Reject subscript declarations with mutable parameters.
+// https://github.com/apple/swift/issues/44961
+// Reject subscript declarations with mutable parameters.
 class MutableSubscripts {
   var x : Int = 0
 
@@ -656,9 +657,10 @@ class MutableSubscripts {
 }
 
 
-// SR-4214: Misleading location-less diagnostic when closure parameter type
-// is inferred to be inout.
-func sr4214() {
+// https://github.com/apple/swift/issues/46797
+// Misleading location-less diagnostic when closure parameter type is inferred
+// to be 'inout'.
+do {
   func sequence<T>(_ x : T, _ f : (T) -> T) -> T {
     return f(x)
   }
@@ -718,14 +720,16 @@ struct S {
 
   struct Nested {
     func foo() {
-      // SR-11786: Make sure we don't offer the 'self.' fix-it here.
+      // https://github.com/apple/swift/issues/54196
+      // Make sure we don't offer the 'self.' fix-it here.
       let x = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
       x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
     }
   }
 
   func bar() {
-    // SR-11787: Make sure we insert "self." in the right location.
+    // https://github.com/apple/swift/issues/54197
+    // Make sure we insert 'self.' in the right location.
     let x = 0 // expected-note 3{{change 'let' to 'var' to make it mutable}}
     x += 1 // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
@@ -736,7 +740,8 @@ struct S {
     x = 1 // expected-error {{cannot assign to value: 'x' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'S'}} {{5-5=self.}}
 
-    // SR-11788: Insert "Type." for a static property.
+    // https://github.com/apple/swift/issues/54198
+    // Insert 'Type.' for a static property.
     let y = 0 // expected-note {{change 'let' to 'var' to make it mutable}}
     y += 1 // expected-error {{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
     // expected-note@-1 {{add explicit 'S.' to refer to mutable static property of 'S'}} {{5-5=S.}}

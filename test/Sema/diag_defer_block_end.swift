@@ -8,14 +8,17 @@ if (x > y) {
     }
 }
 
-func sr7307(_ value: Bool) {
-    let negated = !value 
-    defer { // expected-warning {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
-        print("negated value is \(negated)")
-    }
-}
+// https://github.com/apple/swift/issues/49855
+do {
+  func f(_ value: Bool) {
+      let negated = !value
+      defer { // expected-warning {{'defer' statement at end of scope always executes immediately}}{{7-12=do}}
+          print("negated value is \(negated)")
+      }
+  }
 
-sr7307(true)
+  f(true)
+}
 
 defer { // No note
     print("end of program.")

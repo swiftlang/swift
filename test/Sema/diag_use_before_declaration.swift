@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-5163
-func sr5163() {
+// https://github.com/apple/swift/issues/47739
+do {
   func foo(_ x: Int) -> Int? { return 1 }
   
   func fn() {
@@ -11,17 +11,18 @@ func sr5163() {
   }
 }
 
-// SR-6726
+// https://github.com/apple/swift/issues/49275
+
 var foo: Int?
 
-func test() {
+test: do {
   guard let bar = foo else {
-    return
+    break test
   }
   let foo = String(bar) // expected-warning {{initialization of immutable value 'foo' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
-// SR-7660
+// https://github.com/apple/swift/issues/50200
 class C {
   var variable: Int?
   func f() {
@@ -30,16 +31,16 @@ class C {
   }
 }
 
-// SR-7517
-func testExample() {
+// https://github.com/apple/swift/issues/50059
+do {
   let app = app2 // expected-error {{use of local variable 'app2' before its declaration}}
   let app2 = app // expected-note {{'app2' declared here}}
 }
 
-// SR-8447
+// https://github.com/apple/swift/issues/50968
 func test_circular() {
-  let obj = sr8447 // expected-error {{use of local variable 'sr8447' before its declaration}}
-  let _ = obj.prop, sr8447 // expected-note {{'sr8447' declared here}} expected-error {{type annotation missing in pattern}}
+  let obj = x // expected-error {{use of local variable 'x' before its declaration}}
+  let _ = obj.prop, x // expected-note {{'x' declared here}} expected-error {{type annotation missing in pattern}}
 }
 
 //===----------------------------------------------------------------------===//

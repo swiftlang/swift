@@ -104,10 +104,13 @@ func warnCollectionOfIUOToAnyCoercion(_ a: Int!) { // expected-note 2{{implicitl
   // expected-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{40-40= as Any}}
 }
 
-func takesAny_sr10199(_ x: Any) {}
+// https://github.com/apple/swift/issues/52599
+do {
+  func takesAny(_ x: Any) {}
 
-let fn_sr10199: (() -> Int?)! = { return nil }
-takesAny_sr10199(fn_sr10199()) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
-// expected-note@-1 {{provide a default value to avoid this warning}}
-// expected-note@-2 {{force-unwrap the value to avoid this warning}}
-// expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  let fn: (() -> Int?)! = { return nil }
+  takesAny(fn()) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+}
