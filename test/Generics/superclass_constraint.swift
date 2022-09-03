@@ -144,7 +144,8 @@ func superclassLookup2<T: P8>(_: T) where T.A == T.B, T: C8 { }
 // CHECK-NEXT: Generic signature: <T where T : C8, T : P8, T.[P8]B == C8.A>
 func superclassLookup3<T>(_: T) where T.A == T.B, T: C8, T: P8 { }
 
-// SR-5165
+// https://github.com/apple/swift/issues/47741
+
 class C9 {}
 
 protocol P9 {}
@@ -173,7 +174,8 @@ class Horse<T>: Rump { }
 func hasRedundantConformanceConstraint<X : Horse<T>, T>(_: X) where X : Rump {}
 // expected-warning@-1 {{redundant conformance constraint 'Horse<T>' : 'Rump'}}
 
-// SR-5862
+// https://github.com/apple/swift/issues/48432
+
 protocol X {
 	associatedtype Y : A
 }
@@ -182,7 +184,7 @@ protocol X {
 // CHECK: Generic signature: <C where C : X, C.[X]Y == B>
 func noRedundancyWarning<C : X>(_ wrapper: C) where C.Y == B {}
 
-// Qualified lookup bug -- <https://bugs.swift.org/browse/SR-2190>
+// [qualified lookup] https://github.com/apple/swift/issues/44798
 
 protocol Init {
   init(x: ())
