@@ -11,5 +11,5 @@ target_link_libraries(swift-syntax-test
                         swiftDriver
                         swiftFrontend
                         swiftSema
-                        swiftSyntax
+                        legacySwiftSyntax
                         swiftCompilerModules_SwiftSyntax)

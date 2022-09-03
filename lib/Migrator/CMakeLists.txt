@@ -57,7 +57,7 @@ add_swift_host_library(swiftMigrator STATIC
   RewriteBufferEditsReceiver.cpp)
 target_link_libraries(swiftMigrator PRIVATE
   swiftIDE
-  swiftSyntax)
+  legacySwiftSyntax)
 
 add_dependencies(swiftMigrator
   "symlink_migrator_data")

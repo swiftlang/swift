@@ -33,6 +33,7 @@ add_swift_host_library(swiftAST STATIC
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
+  CASTBridging.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
@@ -155,7 +156,7 @@ endif()
 
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
-  PRIVATE swiftSyntax)
+  PRIVATE legacySwiftSyntax)
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   # Remove dependencies from clangBasic to avoid bringing along some llvm
   # libraries that we don't need to be building.
