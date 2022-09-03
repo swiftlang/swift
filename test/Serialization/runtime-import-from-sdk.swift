@@ -47,7 +47,7 @@
 
 // FIXME: We can't properly test this on a non-Darwin platform because we'll get
 // the same error message for "unloadable standard library" and "no standard
-// library". (SR-10097)
+// library" (https://github.com/apple/swift/issues/52499).
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t/mcp)
