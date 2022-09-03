@@ -6,6 +6,9 @@ else()
   set(SWIFT_GYB_FLAGS --line-directive "\'#line" "%(line)d" "\"%(file)s\"\'")
 endif()
 
+add_subdirectory(${SWIFT_SOURCE_DIR}/../swift-syntax ${CMAKE_CURRENT_BINARY_DIR}/swift-syntax)
+add_dependencies(ASTGen swiftAST)
+
 add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
@@ -32,7 +35,7 @@ _swift_gyb_target_sources(swiftParse PRIVATE
     ParsedSyntaxRecorder.cpp.gyb)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  swiftSyntax
+  legacySwiftSyntax
   swiftSyntaxParse
 )
 
@@ -67,6 +70,7 @@ if (SWIFT_SWIFT_PARSER)
   )
 endif()
 
+add_dependencies(swiftParse ASTGen)
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)
 
 set_swift_llvm_is_available(swiftParse)

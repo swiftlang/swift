@@ -15,6 +15,10 @@ module ASTBridging {
   export *
 }
 
+module CASTBridging {
+  header "AST/CASTBridging.h"
+}
+
 module SILBridging {
   header "SIL/SILBridging.h"
   header "SIL/SILLocation.h"

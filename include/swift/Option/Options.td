@@ -635,6 +635,12 @@ def enable_experimental_cxx_interop_in_clang_header :
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
   HelpText<"Enable experimental Swift to C++ interop code generation in generated Clang header">;
 
+def enable_experimental_swift_parser :
+  Flag<["-"], "enable-experimental-swift-parser">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  HelpText<"Enable the new and expiremental Swift parser + AST generation.">;
+
+
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   Flags<[HelpHidden]>,
