@@ -11,6 +11,19 @@
 import Module
 import ModuleTBD
 
+// CHECK-LABEL: sil_global public_external [serialized] @$s6Module0A6StructV21publicFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int = {
+// CHECK:        %0 = function_ref @$s6Module16incrementByThreeyS2iF
+
+// CHECK-LABEL: sil_global public_external @$s6Module0A6StructV22privateFunctionPointeryS2icvpZ : $@callee_guaranteed (Int) -> Int{{$}}
+
+public func callPublicFunctionPointer(_ x: Int) -> Int {
+  return Module.ModuleStruct.publicFunctionPointer(x)
+}
+
+public func callPrivateFunctionPointer(_ x: Int) -> Int {
+  return Module.ModuleStruct.privateFunctionPointer(x)
+}
+
 // CHECK-LABEL: sil @$s4Main11doIncrementyS2iF
 // CHECK-NOT:     function_ref 
 // CHECK-NOT:     apply 
@@ -73,3 +86,4 @@ public func getModuleKlassMember() -> Int {
 public func getModuleKlassMemberTBD() -> Int {
   return ModuleTBD.moduleKlassMember()
 }
+

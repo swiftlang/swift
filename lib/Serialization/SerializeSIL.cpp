@@ -2557,6 +2557,10 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)g.isLet(),
                                  TyID, dID);
 
+  // Don't emit the initializer instructions if not marked as "serialized".
+  if (!g.isSerialized())
+    return;
+
   ValueIDs.clear();
   InstID = 0;
   unsigned ValueID = 2;
