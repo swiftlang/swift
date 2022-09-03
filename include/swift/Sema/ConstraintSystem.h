@@ -626,7 +626,7 @@ public:
 
   /// Print the type variable to the given output stream.
   void print(llvm::raw_ostream &OS);
-  
+
 private:
   StringRef getTypeVariableOptions(TypeVariableOptions TVO) const {
   #define ENTRY(Kind, String) case TypeVariableOptions::Kind: return String
@@ -1144,15 +1144,14 @@ struct Score {
     bool hasNonDefault = false;
     for (unsigned int i = 0; i < NumScoreKinds; ++i) {
       if (Data[i] != 0) {
-        out << " [";
+        out << " [component: ";
         out << getNameFor(ScoreKind(i));
-        out << "(s) = ";
+        out << "(s), value: ";
         out << std::to_string(Data[i]);
         out << "]";
         hasNonDefault = true;
       }
     }
-
     if (!hasNonDefault) {
       out << " <default ";
       out << *this;
