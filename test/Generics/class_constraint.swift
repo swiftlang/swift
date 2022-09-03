@@ -25,7 +25,9 @@ struct Z<U> {
   let bad3: X<U> // expected-error{{'X' requires that 'U' be a class type}}
 }
 
-// SR-7168: layout constraints weren't getting merged.
+// https://github.com/apple/swift/issues/49716
+// Layout constraints weren't getting merged.
+
 protocol P1 {
   associatedtype A
   var a: A { get }
