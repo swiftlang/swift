@@ -2460,7 +2460,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       return;
 
     // These effect both operands.
-    case BuiltinValueKind::Move:
     case BuiltinValueKind::Copy:
       visitor(&builtin->getAllOperands()[1]);
       return;
