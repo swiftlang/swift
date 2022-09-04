@@ -84,7 +84,8 @@ func testMagicLiterals(file: String = #file,
 //
 // NEGATIVE-NOT: sil hidden [ossa] @$s17default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
 
-// SR-11623
+// https://github.com/apple/swift/issues/54034
+
 func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #column) -> T { x }
 
 // CHECK-LABEL: sil hidden [ossa] @$s17default_arguments23testGenericMagicLiteralyyF
@@ -411,7 +412,8 @@ func genericMagic<T : ExpressibleByStringLiteral>(x: T = #file) -> T {
 
 let _: String = genericMagic()
 
-// SR-11778
+// https://github.com/apple/swift/issues/54185
+
 struct CallableWithDefault {
   func callAsFunction(x: Int = 4) {}
   func callAsFunction(y: Int, z: String = #function) {}

@@ -122,7 +122,8 @@ struct I {
   init<T>(_: T) {}
 }
 
-// https://bugs.swift.org/browse/SR-10075
+// https://github.com/apple/swift/issues/52477
+
 func defaultValue<T>() -> T {
     fatalError()
 }
