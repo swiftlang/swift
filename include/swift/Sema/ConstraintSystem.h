@@ -4421,7 +4421,7 @@ public:
 
     if (isDebugMode()) {
       auto &log = llvm::errs();
-      log.indent(solverState ? solverState->getCurrentIndent() : 0)
+      log.indent(solverState ? solverState->getCurrentIndent() + 4 : 0)
           << "(failed constraint ";
       constraint->print(log, &getASTContext().SourceMgr);
       log << ")\n";
@@ -4446,7 +4446,7 @@ public:
 
     if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
       auto &log = llvm::errs();
-      log.indent(solverState->getCurrentIndent() + 2) << "(added constraint: ";
+      log.indent(solverState->getCurrentIndent() + 4) << "(added constraint: ";
       constraint->print(log, &getASTContext().SourceMgr,
                         solverState->getCurrentIndent() + 4);
       log << ")\n";
@@ -4464,7 +4464,7 @@ public:
 
     if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
       auto &log = llvm::errs();
-      log.indent(solverState->getCurrentIndent() + 2)
+      log.indent(solverState->getCurrentIndent() + 4)
           << "(removed constraint: ";
       constraint->print(log, &getASTContext().SourceMgr,
                         solverState->getCurrentIndent() + 4);

@@ -351,6 +351,14 @@ bool ConstraintSystem::simplify() {
       log << "(considering -> ";
       constraint->print(log, &getASTContext().SourceMgr);
       log << "\n";
+
+      // {Dis, Con}junction are returned unsolved in \c simplifyConstraint() and
+      // handled separately by solver steps.
+      if (constraint->getKind() != ConstraintKind::Disjunction &&
+          constraint->getKind() != ConstraintKind::Conjunction) {
+        log.indent(solverState->getCurrentIndent() + 2)
+            << "(simplification result:\n";
+      }
     }
 
     // Simplify this constraint.
@@ -359,6 +367,7 @@ bool ConstraintSystem::simplify() {
       retireFailedConstraint(constraint);
       if (isDebugMode()) {
         auto &log = llvm::errs();
+        log.indent(solverState->getCurrentIndent() + 2) << ")\n";
         log.indent(solverState->getCurrentIndent() + 2) << "(outcome: error)\n";
       }
       break;
@@ -369,6 +378,7 @@ bool ConstraintSystem::simplify() {
       retireConstraint(constraint);
       if (isDebugMode()) {
         auto &log = llvm::errs();
+        log.indent(solverState->getCurrentIndent() + 2) << ")\n";
         log.indent(solverState->getCurrentIndent() + 2)
             << "(outcome: simplified)\n";
       }
@@ -379,6 +389,7 @@ bool ConstraintSystem::simplify() {
         ++solverState->NumUnsimplifiedConstraints;
       if (isDebugMode()) {
         auto &log = llvm::errs();
+        log.indent(solverState->getCurrentIndent() + 2) << ")\n";
         log.indent(solverState->getCurrentIndent() + 2)
             << "(outcome: unsolved)\n";
       }
