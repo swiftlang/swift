@@ -429,7 +429,7 @@ public func test(_ p: Proto) {
 // CHECK: end_apply [[TOKEN]]
 // CHECK: return
 
-// SR-11748
+// https://github.com/apple/swift/issues/54155
 
 protocol SelfReturningSubscript {
   subscript(b: Int) -> Self { get }
