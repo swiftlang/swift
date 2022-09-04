@@ -160,7 +160,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMandatorySILLinker();
 
   // Before we promote any loads, perform _move checking for addresses.
-  P.addMoveFunctionCanonicalization();
   P.addMoveKillsCopyableAddressesChecker();
 
   // Now perform move object checking. We again do this before predictable

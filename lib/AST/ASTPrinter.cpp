@@ -2917,10 +2917,6 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinMove(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }

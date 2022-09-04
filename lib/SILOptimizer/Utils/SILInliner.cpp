@@ -697,23 +697,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
   if (IKind == InlineKind::MandatoryInline) {
     if (auto kind = Inst->getBuiltinKind()) {
-      if (*kind == BuiltinValueKind::Move) {
-        auto otherResultAddr = getOpValue(Inst->getOperand(0));
-        auto otherSrcAddr = getOpValue(Inst->getOperand(1));
-        auto opLoc = getOpLocation(Inst->getLoc());
-
-        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-
-        // Convert the builtin to a mark_unresolved_move_addr. This builtin is a
-        // +1, but mark_unresolved_move_addr simulates a +0, so we put in our
-        // own destroy_addr.
-        getBuilder().createMarkUnresolvedMoveAddr(opLoc, otherSrcAddr,
-                                                  otherResultAddr);
-        getBuilder().createDestroyAddr(opLoc, otherSrcAddr);
-        auto *tup = getBuilder().createTuple(opLoc, {});
-        return recordFoldedValue(Inst, tup);
-      }
-
       if (*kind == BuiltinValueKind::Copy) {
         auto otherResultAddr = getOpValue(Inst->getOperand(0));
         auto otherSrcAddr = getOpValue(Inst->getOperand(1));
