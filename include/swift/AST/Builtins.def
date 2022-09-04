@@ -774,19 +774,6 @@ BUILTIN_MISC_OPERATION(CreateTaskGroup,
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
 
-
-/// A builtin that can only be called from a transparent generic function. Takes
-/// two operands, the first operand the result address, the second operand the
-/// input address. Transforms into load [take] + move_value + store [init] when
-/// transparently inlined into a caller that has the generic of the callee
-/// specialized into a loadable type. If the transparent inlining does not
-/// specialize the type (due to being inlined into a non-generic context, the
-/// SILVerifier will abort).
-///
-/// Illegal to call except for in Swift._move in the stdlib. This is enforced by
-/// the SILVerifier.
-BUILTIN_MISC_OPERATION(Move, "move", "", Special)
-
 /// A builtin that can only be called from a transparent generic function. Takes
 /// two operands, the first operand the result address, the second operand the
 /// input address. Transforms into
