@@ -9124,8 +9124,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       // Bodies of single-expression closures use a special locator
       // for contextual type conversion to make sure that result is
       // convertible to `Void` when `return` is not used explicitly.
-      if (contextualTypePurpose == CTP_ClosureResult) {
-        auto *closure = cast<ClosureExpr>(target.getDeclContext());
+      auto *closure = dyn_cast<ClosureExpr>(target.getDeclContext());
+      if (closure && closure->hasSingleExpressionBody() &&
+          contextualTypePurpose == CTP_ClosureResult) {
         auto *returnStmt =
             castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
 
