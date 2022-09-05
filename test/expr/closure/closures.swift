@@ -751,6 +751,22 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
     return s.isEmpty
 }.filter { $0 }
 
+func producer<T>(_ f: (String) -> T) -> T {}
+func f59716() -> some BinaryInteger { // expected-note{{required by opaque return type of global function 'f59716()'}}
+  // expected-note@+1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  return producer { s in // expected-error{{type '()' cannot conform to 'BinaryInteger'}}
+    if s == "1" { return }
+    return s.count // expected-error{{cannot convert value of type 'Int' to closure result type '()'}}
+  }
+}
+
+func f59716_1() -> some BinaryInteger {
+  return producer { s in 
+    if s == "1" { return 1 }
+    return s.count 
+  }
+}
+
 // https://github.com/apple/swift/issues/60781
 func f60781<T>(_ x: T) -> T { x }
 func f60781<T>(_ x: T, _ y: T) -> T { x }
