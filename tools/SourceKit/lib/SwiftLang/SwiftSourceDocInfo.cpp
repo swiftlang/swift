@@ -1286,7 +1286,7 @@ static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
   auto *VD = CursorInfo.ValueD;
 
   // If the given name is not a function name, and the cursor points to
-  // a contructor call, we use the type declaration instead of the init
+  // a constructor call, we use the type declaration instead of the init
   // declaration to translate the name.
   if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
     if (auto *TD = CursorInfo.CtorTyRef) {
