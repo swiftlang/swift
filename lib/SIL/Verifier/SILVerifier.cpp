@@ -4744,8 +4744,18 @@ public:
         if (F.getModule().getStage() != SILStage::Lowered) {
           // During the lowered stage, a function type might have different
           // signature
-          require(eltArgTy == bbArgTy,
-                  "switch_enum destination bbarg must match case arg type");
+          //
+          // We allow for move only wrapped enums to have trivial payloads that
+          // are not move only wrapped. This occurs since we want to lower
+          // trivial move only wrapped types earlier in the pipeline than
+          // non-trivial types.
+          if (bbArgTy.isTrivial(F)) {
+            require(eltArgTy == bbArgTy.copyingMoveOnlyWrapper(eltArgTy),
+                    "switch_enum destination bbarg must match case arg type");
+          } else {
+            require(eltArgTy == bbArgTy,
+                    "switch_enum destination bbarg must match case arg type");
+          }
         }
         require(!dest->getArguments()[0]->getType().isAddress(),
                 "switch_enum destination bbarg type must not be an address");
