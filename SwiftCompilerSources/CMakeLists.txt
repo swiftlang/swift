@@ -160,6 +160,21 @@ function(add_swift_compiler_modules_library name)
     if (add_to_syntaxparse)
       set(syntaxparse_obj_files ${syntaxparse_obj_files} ${module_obj_file})
     endif()
+    set(c_include_paths
+      # LLVM modules and headers.
+      "${LLVM_MAIN_INCLUDE_DIR}"
+      # Generated LLVM headers.
+      "${LLVM_INCLUDE_DIR}"
+      # Clang modules and headers.
+      ${CLANG_INCLUDE_DIRS}
+      # Bridging modules and headers.
+      "${SWIFT_MAIN_INCLUDE_DIR}"
+      # Generated C headers.
+      "${CMAKE_CURRENT_BINARY_DIR}/../include")
+    set(c_include_paths_args)
+    foreach(c_include_path ${c_include_paths})
+      list(APPEND c_include_paths_args "-Xcc" "-I" "-Xcc" "${c_include_path}")
+    endforeach()
 
     # Compile the module into an object file
     add_custom_command_target(dep_target OUTPUT ${module_obj_file}
@@ -173,14 +188,7 @@ function(add_swift_compiler_modules_library name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
-              # LLVM modules and headers.
-              "-Xcc" "-I" "-Xcc" "${LLVM_MAIN_INCLUDE_DIR}"
-              # Generated LLVM headers.
-              "-Xcc" "-I" "-Xcc" "${LLVM_INCLUDE_DIR}"
-              # Bridging modules and headers.
-              "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
-              # Generated C headers.
-              "-Xcc" "-I" "-Xcc" "${CMAKE_CURRENT_BINARY_DIR}/../include"
+              ${c_include_paths_args}
               # Generated swift modules.
               "-I" "${build_dir}"
       COMMENT "Building swift module ${module}")
