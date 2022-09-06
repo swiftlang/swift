@@ -9,7 +9,7 @@ import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-#if !os(Windows)    // SR-13129
+#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
@@ -69,7 +69,7 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
-#if !os(Windows)    // SR-13129
+#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   var wrapper = LoadableBoolWrapper(value: true)
 
@@ -242,7 +242,7 @@ OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
   expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
 }
 
-#if !os(Windows)    // SR-13129
+#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   var arr = NonTrivialArrayByVal()
   let NonTrivialByVal = arr[0];

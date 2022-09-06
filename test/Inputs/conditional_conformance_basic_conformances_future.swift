@@ -420,9 +420,11 @@ func dynamicCastToP1(_ value: Any) -> P1? {
   return value as? P1
 }
 
+// https://github.com/apple/swift/issues/49649
+
 protocol P4 {}
 typealias P4Typealias = P4
 protocol P5 {}
 
-struct SR7101<T> {}
-extension SR7101 : P5 where T == P4Typealias {}
+struct S_49649<T> {}
+extension S_49649 : P5 where T == P4Typealias {}
