@@ -136,3 +136,13 @@ public struct PersonWithUnmanagedTest {
 
   @PropWrapper public var favoredColor: String = "red"
 }
+
+@Wrapper
+public class ClassWithDesignatedInit {
+  public var a: Int
+  @PropWrapperWithoutInit public var b: [Int]
+
+  public init(a: Int, b: [Int] = [1, 2, 3]) {
+    $_storage = .init(memberwise: $Storage(a: 42, _b: PropWrapperWithoutInit(value: b)))
+  }
+}
