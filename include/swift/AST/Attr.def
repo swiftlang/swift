@@ -773,6 +773,11 @@ SIMPLE_DECL_ATTR(_spiOnly, SPIOnly,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   135)
 
+DECL_ATTR(_documentation, Documentation,
+  OnAnyDecl | UserInaccessible |
+  APIBreakingToAdd | APIStableToRemove | ABIStableToAdd | ABIStableToRemove,
+  136)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

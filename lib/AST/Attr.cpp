@@ -1450,6 +1450,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_backDeploy";
   case DAK_Expose:
     return "_expose";
+  case DAK_Documentation:
+    return "_documentation";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

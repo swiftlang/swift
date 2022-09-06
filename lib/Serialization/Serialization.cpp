@@ -2871,6 +2871,23 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                        theAttr->isImplicit(), theAttr->Name);
       return;
     }
+
+    case DAK_Documentation: {
+      auto *theAttr = cast<DocumentationAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[DocumentationDeclAttrLayout::Code];
+      auto metadataIDPair = S.addUniquedString(theAttr->Metadata);
+      bool hasVisibility = false;
+      uint8_t visibility = static_cast<uint8_t>(AccessLevel::Private);
+      if (theAttr->Visibility) {
+        hasVisibility = true;
+        visibility = getRawStableAccessLevel(*theAttr->Visibility);
+      }
+
+      DocumentationDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          metadataIDPair.second, hasVisibility, visibility);
+      return;
+    }
     }
   }
 

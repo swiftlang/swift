@@ -1491,6 +1491,7 @@ namespace  {
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
+    UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(DynamicCallable)
     UNINTERESTING_ATTR(DynamicMemberLookup)

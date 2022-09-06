@@ -794,12 +794,14 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
 
 void swift::collectParsedExportedImports(const ModuleDecl *M,
                                          SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports) {
+                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
+                                         llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
           if (import.options.contains(ImportFlags::Exported) &&
+              (!includeImport || includeImport(import)) &&
               import.module.importedModule->shouldCollectDisplayDecls()) {
             auto *TheModule = import.module.importedModule;
 

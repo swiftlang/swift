@@ -1930,6 +1930,123 @@ bool Parser::parseBackDeployAttribute(DeclAttributes &Attributes,
   return true;
 }
 
+static bool isKnownDocumentationAttributeArgument(StringRef ArgumentName) {
+  return llvm::StringSwitch<bool>(ArgumentName)
+    .Case("visibility", true)
+    .Case("metadata", true)
+    .Default(false);
+}
+
+bool Parser::parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
+                                                 Optional<AccessLevel> &Visibility) {
+  if (Tok.isNot(tok::identifier)) {
+    diagnose(Tok.getLoc(), diag::documentation_attr_expected_argument);
+    return false;
+  }
+
+  auto ArgumentName = Tok.getText();
+
+  if (!isKnownDocumentationAttributeArgument(ArgumentName)) {
+    diagnose(Tok.getLoc(), diag::documentation_attr_unknown_argument, ArgumentName);
+    return false;
+  }
+
+  consumeToken(tok::identifier);
+  if (!consumeIf(tok::colon)) {
+    diagnose(Tok.getLoc(), diag::expected_colon_after_label, ArgumentName);
+    return false;
+  }
+
+  if (ArgumentName == "visibility") {
+    if (!Tok.isAny(tok::kw_public, tok::kw_internal, tok::kw_private, tok::kw_fileprivate, tok::identifier)) {
+      diagnose(Tok.getLoc(), diag::documentation_attr_expected_access_level);
+      return false;
+    }
+    auto ArgumentValue = Tok.getText();
+    Optional<AccessLevel> ParsedVisibility =
+      llvm::StringSwitch<Optional<AccessLevel>>(ArgumentValue)
+        .Case("open", AccessLevel::Open)
+        .Case("public", AccessLevel::Public)
+        .Case("internal", AccessLevel::Internal)
+        .Case("private", AccessLevel::Private)
+        .Case("fileprivate", AccessLevel::FilePrivate)
+        .Default(None);
+
+    if (!ParsedVisibility) {
+      diagnose(Tok.getLoc(), diag::documentation_attr_unknown_access_level, ArgumentValue);
+      return false;
+    }
+
+    if (Visibility) {
+      diagnose(Tok.getLoc(), diag::documentation_attr_duplicate_visibility);
+      return false;
+    }
+
+    consumeToken();
+    Visibility = ParsedVisibility;
+  } else if (ArgumentName == "metadata") {
+    if (!Tok.isAny(tok::identifier, tok::string_literal)) {
+      diagnose(Tok.getLoc(), diag::documentation_attr_metadata_expected_text);
+      return false;
+    }
+    auto ArgumentValue = Tok.getText();
+    if (ArgumentValue.front() == '\"' && ArgumentValue.back() == '\"') {
+      // String literals get saved with surrounding quotes. Trim them off if they're present.
+      ArgumentValue = ArgumentValue.slice(1, ArgumentValue.size() - 1);
+    }
+
+    if (Metadata) {
+      diagnose(Tok.getLoc(), diag::documentation_attr_duplicate_metadata);
+      return false;
+    }
+
+    consumeToken();
+    Metadata = ArgumentValue;
+  } else {
+    llvm_unreachable("unimplemented @_documentation attr argument");
+  }
+
+  return true;
+}
+
+ParserResult<DocumentationAttr>
+Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+  StringRef AttrName = "_documentation";
+  bool declModifier = DeclAttribute::isDeclModifier(DAK_Documentation);
+  Optional<AccessLevel> Visibility = None;
+  Optional<StringRef> Metadata = None;
+
+  if (!consumeIf(tok::l_paren)) {
+    diagnose(Loc, diag::attr_expected_lparen, AttrName,
+             declModifier);
+    return makeParserError();
+  }
+
+  while (Tok.isNot(tok::r_paren)) {
+    if (!parseDocumentationAttributeArgument(Metadata, Visibility))
+      return makeParserError();
+
+    if (Tok.is(tok::comma)) {
+      consumeToken();
+    } else if (Tok.isNot(tok::r_paren)) {
+      diagnose(Tok, diag::expected_separator, ",");
+      return makeParserError();
+    }
+  }
+
+  auto range = SourceRange(Loc, Tok.getRange().getStart());
+
+  if (!consumeIf(tok::r_paren)) {
+    diagnose(Loc, diag::attr_expected_rparen, AttrName,
+             declModifier);
+    return makeParserError();
+  }
+
+  StringRef FinalMetadata = Metadata.getValueOr("");
+
+  return makeParserResult(new (Context) DocumentationAttr(Loc, range, FinalMetadata, Visibility, false));
+}
+
 /// Processes a parsed option name by attempting to match it to a list of
 /// alternative name/value pairs provided by a chain of \c when() calls, ending
 /// in either \c whenOmitted() if omitting the option is allowed, or
@@ -2999,6 +3116,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
   case DAK_BackDeploy: {
     if (!parseBackDeployAttribute(Attributes, AttrName, AtLoc, Loc))
+      return false;
+    break;
+  }
+  case DAK_Documentation: {
+    auto Attr = parseDocumentationAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    else
       return false;
     break;
   }
@@ -8780,8 +8905,10 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
             .fixItRemove({typesStartLoc, typesEndLoc});
     } else {
       if (isPrefix || isPostfix) {
+        // If we have nothing after the colon, then just remove the colon.
+        auto endLoc = groupLoc.isValid() ? groupLoc : colonLoc;
         diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, groupLoc});
+            .fixItRemove({colonLoc, endLoc});
       }
       // Nothing to complete here, simply consume the token.
       if (Tok.is(tok::code_complete))

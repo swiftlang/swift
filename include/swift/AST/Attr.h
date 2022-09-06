@@ -2244,6 +2244,27 @@ public:
   }
 };
 
+/// The `@_documentation(...)` attribute, used to override a symbol's visibility
+/// in symbol graphs, and/or adding arbitrary metadata to it.
+class DocumentationAttr: public DeclAttribute {
+public:
+  DocumentationAttr(SourceLoc AtLoc, SourceRange Range,
+                    StringRef Metadata, Optional<AccessLevel> Visibility,
+                    bool Implicit)
+  : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
+    Metadata(Metadata), Visibility(Visibility) {}
+
+  DocumentationAttr(StringRef Metadata, Optional<AccessLevel> Visibility, bool Implicit)
+  : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility, Implicit) {}
+
+  const StringRef Metadata;
+  const Optional<AccessLevel> Visibility;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Documentation;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

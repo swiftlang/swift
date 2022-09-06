@@ -1763,6 +1763,28 @@ WARNING(warn_attr_unsafe_removed,none,
         "'%0' attribute has been removed in favor of @preconcurrency",
         (StringRef))
 
+// _documentation
+ERROR(documentation_attr_expected_argument,none,
+      "@_documentation attribute expected 'visibility' or 'metadata' argument",
+      ())
+ERROR(documentation_attr_unknown_argument,none,
+      "unknown argument '%0', expected 'visibility' or 'metadata'",
+      (StringRef))
+ERROR(documentation_attr_expected_access_level,none,
+      "@_documentation attribute's 'visibility' argument expected an access level",
+      ())
+ERROR(documentation_attr_unknown_access_level,none,
+      "unknown visibility '%0', expected an access level keyword",
+      (StringRef))
+ERROR(documentation_attr_duplicate_visibility,none,
+      "cannot give more than one visibility to the same item", ())
+ERROR(documentation_attr_metadata_expected_text,none,
+      "@_documentation attribute's 'metadata' argument expected an identifier or "
+      "quoted string",
+      ())
+ERROR(documentation_attr_duplicate_metadata,none,
+      "cannot give more than one metadata argument to the same item", ())
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
