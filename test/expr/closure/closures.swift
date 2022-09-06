@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -690,7 +690,7 @@ func test_55680_ArgsFn() -> Int {
 func test_55680_MultiExpr() -> Int {
   callit {
     print("hello") 
-    return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+    return print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
 
@@ -734,23 +734,38 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
 }
 
 // https://github.com/apple/swift/issues/59716
-// FIXME: Diagnostic should be tailored for closure result
 ["foo"].map { s in
-    if s == "1" { return } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    if s == "1" { return } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
     return s.isEmpty
 }.filter { $0 }
 
 ["foo"].map { s in
-    if s == "1" { return } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    if s == "1" { return } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
     if s == "2" { return }
     if s == "3" { return }
     return s.isEmpty
 }.filter { $0 }
 
 ["foo"].map { s in
-    if s == "1" { return () } // expected-error{{cannot convert return expression of type '()' to return type 'Bool'}}
+    if s == "1" { return () } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
     return s.isEmpty
 }.filter { $0 }
+
+func producer<T>(_ f: (String) -> T) -> T {}
+func f59716() -> some BinaryInteger { // expected-note{{required by opaque return type of global function 'f59716()'}}
+  // expected-note@+1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  return producer { s in // expected-error{{type '()' cannot conform to 'BinaryInteger'}}
+    if s == "1" { return }
+    return s.count // expected-error{{cannot convert value of type 'Int' to closure result type '()'}}
+  }
+}
+
+func f59716_1() -> some BinaryInteger {
+  return producer { s in 
+    if s == "1" { return 1 }
+    return s.count 
+  }
+}
 
 // https://github.com/apple/swift/issues/60781
 func f60781<T>(_ x: T) -> T { x }
