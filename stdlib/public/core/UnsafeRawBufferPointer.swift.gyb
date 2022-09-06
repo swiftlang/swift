@@ -535,14 +535,14 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   be less than or equal to this buffer's `count`.
   @inlinable
   public func copyBytes(from source: some Collection<UInt8>) {
-    _debugPrecondition(source.count <= self.count,
-      "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
       return
     }
     
     if source.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<UInt8>) -> Void in
+      _debugPrecondition(source.count <= self.count,
+        "${Self}.copyBytes source has too many elements")
       if let base = buffer.baseAddress {
         position.copyMemory(from: base, byteCount: buffer.count)
       }
@@ -551,6 +551,8 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
 
     for (index, byteValue) in source.enumerated() {
+      _debugPrecondition(index < self.count,
+        "${Self}.copyBytes source has too many elements")
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)
     }
@@ -711,14 +713,14 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func initializeMemory<T>(as type: T.Type, repeating repeatedValue: T)
     -> UnsafeMutableBufferPointer<T> {
     guard let base = _position else {
-      return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
+      return .init(start: nil, count: 0)
     }
     
     let count = (_end._unsafelyUnwrappedUnchecked-base) / MemoryLayout<T>.stride
-    let typed = base.initializeMemory(as: type,
-                                      repeating: repeatedValue,
-                                      count: count)
-    return UnsafeMutableBufferPointer<T>(start: typed, count: count)
+    let initialized = base.initializeMemory(
+      as: type, repeating: repeatedValue, count: count
+    )
+    return .init(start: initialized, count: count)
   }
 
   /// Initializes the buffer's memory with the given elements, binding the
@@ -749,8 +751,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func initializeMemory<S: Sequence>(
     as type: S.Element.Type, from source: S
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
-    // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
-
     var it = source.makeIterator()
     var idx = startIndex
     let elementStride = MemoryLayout<S.Element>.stride
@@ -907,13 +907,13 @@ extension Unsafe${Mutable}RawBufferPointer {
     guard let sourceAddress = source.baseAddress, !source.isEmpty else {
       return .init(start: nil, count: 0)
     }
-    _precondition(
-      source.count * MemoryLayout<T>.stride <= self.count,
-      "buffer cannot contain every element from source."
-    )
     _debugPrecondition(
       Int(bitPattern: baseAddress) % MemoryLayout<T>.stride == 0,
       "buffer base address must be properly aligned to access T"
+    )
+    _precondition(
+      source.count * MemoryLayout<T>.stride <= self.count,
+      "buffer cannot contain every element from source."
     )
     let initialized = baseAddress?.moveInitializeMemory(
       as: T.self, from: sourceAddress, count: source.count
