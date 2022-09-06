@@ -47,10 +47,12 @@ func test2<T: FontStyle>(x: T) {
   // COMPLETE_ON_GENERIC_FUNC: End completions
 }
 
-struct Sr12973 {}
+// https://github.com/apple/swift/issues/55419
+
+struct Struct {}
 struct Indicator<T> {}
-extension Indicator where T == Sr12973 {
-  static var activity: Indicator<Sr12973> { fatalError() }
+extension Indicator where T == Struct {
+  static var activity: Indicator<Struct> { fatalError() }
 }
 
 func receiver<T>(_ inidicator: Indicator<T>) {}
@@ -60,7 +62,7 @@ func test() {
 }
 // COMPLETE_GENERIC_TYPE: Begin completions, 2 items
 // COMPLETE_GENERIC_TYPE: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
-// COMPLETE_GENERIC_TYPE: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: activity[#Indicator<Sr12973>#];
+// COMPLETE_GENERIC_TYPE: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: activity[#Indicator<Struct>#];
 // COMPLETE_GENERIC_TYPE: End completions
 
 func testRecursive<T>(_ inidicator: Indicator<T>) {
