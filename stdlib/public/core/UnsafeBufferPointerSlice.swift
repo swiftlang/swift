@@ -13,14 +13,14 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
 
   /// Copies from a collection of `UInt8` into this buffer slice's memory.
   ///
-  /// If the `source.count` bytes of memory referenced by this buffer are bound
-  /// to a type `T`, then `T` must be a trivial type, the underlying pointer
-  /// must be properly aligned for accessing `T`, and `source.count` must be a
-  /// multiple of `MemoryLayout<T>.stride`.
+  /// If the first `source.count` bytes of memory referenced by
+  /// this buffer slice are bound to a type `T`, then `T` must be a trivial
+  /// type, the underlying pointer must be properly aligned for accessing `T`,
+  /// and `source.count` must be a multiple of `MemoryLayout<T>.stride`.
   ///
   /// After calling `copyBytes(from:)`, the first `source.count` bytes of memory
-  /// referenced by this buffer are initialized to raw bytes. If the memory is
-  /// bound to type `T`, then it contains values of type `T`.
+  /// referenced by this buffer slice are initialized to raw bytes.
+  /// If the memory is bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer slice's `count`.
@@ -31,20 +31,22 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
     buffer.copyBytes(from: source)
   }
 
-  /// Initializes the memory referenced by this buffer with the given value,
-  /// binds the memory to the value's type, and returns a typed buffer of the
-  /// initialized memory.
+  /// Initializes the memory referenced by this buffer slice with the given
+  /// value, binds the memory to the value's type, and returns a typed
+  /// buffer of the initialized memory.
   ///
-  /// The memory referenced by this buffer must be uninitialized or
+  /// The memory referenced by this buffer slice must be uninitialized or
   /// initialized to a trivial type, and must be properly aligned for
   /// accessing `T`.
   ///
-  /// After calling this method on a raw buffer with non-nil `baseAddress` `b`,
+  /// After calling this method on a raw buffer slice referencing memory
+  /// starting at `b = base.baseAddress + startIndex`,
   /// the region starting at `b` and continuing up to
-  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound to type `T` and
-  /// initialized. If `T` is a nontrivial type, you must eventually deinitialize
-  /// or move the values in this region to avoid leaks. If `baseAddress` is
-  /// `nil`, this function does nothing and returns an empty buffer pointer.
+  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound
+  /// to type `T` and is initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize or move the values in this region to avoid leaks.
+  /// If `base.baseAddress` is `nil`, this function does nothing
+  /// and returns an empty buffer pointer.
   ///
   /// - Parameters:
   ///   - type: The type to bind this buffer’s memory to.
@@ -65,15 +67,15 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// Initializes the buffer's memory with the given elements, binding the
   /// initialized memory to the elements' type.
   ///
-  /// When calling the `initializeMemory(as:from:)` method on a buffer `b`,
-  /// the memory referenced by `b` must be uninitialized or initialized to a
-  /// trivial type, and must be properly aligned for accessing `S.Element`.
+  /// When calling the `initializeMemory(as:from:)` method on a buffer slice,
+  /// the memory referenced by the slice must be uninitialized or initialised
+  /// to a trivial type, and must be properly aligned for accessing `S.Element`.
   /// The buffer must contain sufficient memory to accommodate
   /// `source.underestimatedCount`.
   ///
-  /// This method initializes the buffer with elements from `source` until
-  /// `source` is exhausted or, if `source` is a sequence but not a
-  /// collection, the buffer has no more room for its elements. After calling
+  /// This method initializes the buffer slice with elements from `source` until
+  /// `source` is exhausted or, if `source` is a sequence but not a collection,
+  /// the buffer slice has no more room for source's elements. After calling
   /// `initializeMemory(as:from:)`, the memory referenced by the returned
   /// `UnsafeMutableBufferPointer` instance is bound and initialized to type
   /// `S.Element`.
@@ -203,11 +205,11 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
     return buffer.moveInitializeMemory(as: T.self, fromContentsOf: source)
   }
 
-  /// Binds this buffer’s memory to the specified type and returns a typed buffer
-  /// of the bound memory.
+  /// Binds this buffer slice’s memory to the specified type and returns
+  /// a typed buffer of the bound memory.
   ///
   /// Use the `bindMemory(to:)` method to bind the memory referenced
-  /// by this buffer to the type `T`. The memory must be uninitialized or
+  /// by this buffer slice to the type `T`. The memory must be uninitialized or
   /// initialized to a type that is layout compatible with `T`. If the memory
   /// is uninitialized, it is still uninitialized after being bound to `T`.
   ///
@@ -219,7 +221,8 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///   - type: The type `T` to bind the memory to.
   /// - Returns: A typed buffer of the newly bound memory. The memory in this
   ///   region is bound to `T`, but has not been modified in any other way.
-  ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
+  ///   instances of `T`.
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
@@ -228,10 +231,10 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
     return buffer.bindMemory(to: T.self)
   }
 
-  /// Executes the given closure while temporarily binding the buffer to
+  /// Executes the given closure while temporarily binding the buffer slice to
   /// instances of type `T`.
   ///
-  /// Use this method when you have a buffer to raw memory and you need
+  /// Use this method when you have a buffer slice to raw memory and you need
   /// to access that memory as instances of a given type `T`. Accessing
   /// memory as a type `T` requires that the memory be bound to that type.
   /// A memory location may only be bound to one type at a time, so accessing
@@ -244,27 +247,27 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// uninitialized.) Accessing a `T` whose underlying memory
   /// is in a mixed initialization state shall be undefined behaviour.
   ///
-  /// If the byte count of the original buffer is not a multiple of
+  /// If the byte count of the original buffer slice is not a multiple of
   /// the stride of `T`, then the re-bound buffer is shorter
   /// than the original buffer.
   ///
   /// After executing `body`, this method rebinds memory back to its original
   /// binding state. This can be unbound memory, or bound to a different type.
   ///
-  /// - Note: The buffer's base address must match the
-  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
-  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  /// - Note: The buffer slice's start address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`). That is,
+  ///   `Int(bitPattern: base.baseAddress+startIndex) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
-  /// - Note: A raw buffer may represent memory that has been bound to a type.
-  ///   If that is the case, then `T` must be layout compatible with the
+  /// - Note: A raw buffer slice may represent memory that has been bound to
+  ///   a type. If that is the case, then `T` must be layout compatible with the
   ///   type to which the memory has been bound. This requirement does not
   ///   apply if the raw buffer represents memory that has not been bound
   ///   to any type.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///     buffer slice.
   ///   - body: A closure that takes a typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -281,7 +284,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
     return try buffer.withMemoryRebound(to: T.self, body)
   }
 
-  /// Returns a typed buffer to the memory referenced by this buffer,
+  /// Returns a typed buffer to the memory referenced by this buffer slice,
   /// assuming that the memory is already bound to the specified type.
   ///
   /// Use this method when you have a raw buffer to memory that has already
@@ -290,9 +293,9 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// pointer is undefined if the memory has not been bound to `T`. To bind
   /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
   ///
-  /// - Note: The buffer's base address must match the
-  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
-  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  /// - Note: The buffer slice's start address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`). That is,
+  ///   `Int(bitPattern: base.baseAddress+startIndex) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
@@ -430,11 +433,11 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
 
 extension Slice where Base == UnsafeRawBufferPointer {
 
-  /// Binds this buffer’s memory to the specified type and returns a typed buffer
-  /// of the bound memory.
+  /// Binds this buffer slice’s memory to the specified type and returns
+  /// a typed buffer of the bound memory.
   ///
   /// Use the `bindMemory(to:)` method to bind the memory referenced
-  /// by this buffer to the type `T`. The memory must be uninitialized or
+  /// by this buffer slice to the type `T`. The memory must be uninitialized or
   /// initialized to a type that is layout compatible with `T`. If the memory
   /// is uninitialized, it is still uninitialized after being bound to `T`.
   ///
@@ -446,7 +449,8 @@ extension Slice where Base == UnsafeRawBufferPointer {
   ///   - type: The type `T` to bind the memory to.
   /// - Returns: A typed buffer of the newly bound memory. The memory in this
   ///   region is bound to `T`, but has not been modified in any other way.
-  ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
+  ///   instances of `T`.
   @discardableResult
   @inlinable
   @_alwaysEmitIntoClient
@@ -455,10 +459,10 @@ extension Slice where Base == UnsafeRawBufferPointer {
     return buffer.bindMemory(to: T.self)
   }
 
-  /// Executes the given closure while temporarily binding the buffer to
+  /// Executes the given closure while temporarily binding the buffer slice to
   /// instances of type `T`.
   ///
-  /// Use this method when you have a buffer to raw memory and you need
+  /// Use this method when you have a buffer slice to raw memory and you need
   /// to access that memory as instances of a given type `T`. Accessing
   /// memory as a type `T` requires that the memory be bound to that type.
   /// A memory location may only be bound to one type at a time, so accessing
@@ -471,27 +475,27 @@ extension Slice where Base == UnsafeRawBufferPointer {
   /// uninitialized.) Accessing a `T` whose underlying memory
   /// is in a mixed initialization state shall be undefined behaviour.
   ///
-  /// If the byte count of the original buffer is not a multiple of
+  /// If the byte count of the original buffer slice is not a multiple of
   /// the stride of `T`, then the re-bound buffer is shorter
   /// than the original buffer.
   ///
   /// After executing `body`, this method rebinds memory back to its original
   /// binding state. This can be unbound memory, or bound to a different type.
   ///
-  /// - Note: The buffer's base address must match the
-  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
-  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  /// - Note: The buffer slice's start address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`). That is,
+  ///   `Int(bitPattern: base.baseAddress+startIndex) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
-  /// - Note: A raw buffer may represent memory that has been bound to a type.
-  ///   If that is the case, then `T` must be layout compatible with the
+  /// - Note: A raw buffer slice may represent memory that has been bound to
+  ///   a type. If that is the case, then `T` must be layout compatible with the
   ///   type to which the memory has been bound. This requirement does not
   ///   apply if the raw buffer represents memory that has not been bound
   ///   to any type.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///     buffer slice.
   ///   - body: A closure that takes a typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -508,7 +512,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
     return try buffer.withMemoryRebound(to: T.self, body)
   }
 
-  /// Returns a typed buffer to the memory referenced by this buffer,
+  /// Returns a typed buffer to the memory referenced by this buffer slice,
   /// assuming that the memory is already bound to the specified type.
   ///
   /// Use this method when you have a raw buffer to memory that has already
@@ -517,9 +521,9 @@ extension Slice where Base == UnsafeRawBufferPointer {
   /// pointer is undefined if the memory has not been bound to `T`. To bind
   /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
   ///
-  /// - Note: The buffer's base address must match the
-  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
-  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  /// - Note: The buffer slice's start address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`). That is,
+  ///   `Int(bitPattern: base.baseAddress+startIndex) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
@@ -615,8 +619,8 @@ extension Slice {
   /// Executes the given closure while temporarily binding the memory referenced
   /// by this buffer slice to the given type.
   ///
-  /// Use this method when you have a buffer of memory bound to one type and
-  /// you need to access that memory as a buffer of another type. Accessing
+  /// Use this method when you have a buffer slice of memory bound to one type
+  /// and you need to access that memory as a buffer of another type. Accessing
   /// memory as type `T` requires that the memory be bound to that type. A
   /// memory location may only be bound to one type at a time, so accessing
   /// the same memory as an unrelated type without first rebinding the memory
@@ -643,22 +647,22 @@ extension Slice {
   /// After executing `body`, this method rebinds memory back to the original
   /// `Element` type.
   ///
-  /// - Note: Only use this method to rebind the buffer's memory to a type
+  /// - Note: Only use this method to rebind the buffer slice's memory to a type
   ///   that is layout compatible with the currently bound `Element` type.
   ///   The stride of the temporary type (`T`) may be an integer multiple
   ///   or a whole fraction of `Element`'s stride.
   ///   To bind a region of memory to a type that does not match these
   ///   requirements, convert the buffer to a raw buffer and use the
-  ///   `bindMemory(to:)` method.
-  ///   If `T` and `Element` have different alignments, this buffer's
-  ///   `baseAddress` must be aligned with the larger of the two alignments.
+  ///   `withMemoryRebound(to:)` method on the raw buffer.
+  ///   If `T` and `Element` have different alignments, this buffer slice
+  ///   must be aligned with the larger of the two alignments.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     buffer. The type `T` must be layout compatible
+  ///     buffer slice. The type `T` must be layout compatible
   ///     with the pointer's `Element` type.
   ///   - body: A closure that takes a typed buffer to the
-  ///     same memory as this buffer, only bound to type `T`. The buffer
+  ///     same memory as this buffer slice, only bound to type `T`. The buffer
   ///     parameter contains a number of complete instances of `T` based
   ///     on the capacity of the original buffer and the stride of `Element`.
   ///     The closure's buffer argument is valid only for the duration of the
@@ -702,7 +706,7 @@ extension Slice {
   /// or the `Element` type must be a trivial type. After the call,
   /// the memory referenced by the buffer slice up to, but not including,
   /// the returned index is initialized.
-  /// The buffer must contain sufficient memory to accommodate
+  /// The buffer slice must contain sufficient memory to accommodate
   /// `source.underestimatedCount`.
   ///
   /// The returned index is the position of the next uninitialized element
@@ -728,27 +732,30 @@ extension Slice {
     return (iterator, startIndex.advanced(by: distance))
   }
 
-  /// Initializes the buffer slice's memory with with every element of the source.
+  /// Initializes the buffer slice's memory with with
+  /// every element of the source.
   ///
   /// Prior to calling the `initialize(fromContentsOf:)` method
   /// on a buffer slice, the memory it references must be uninitialized,
   /// or the `Element` type must be a trivial type. After the call,
   /// the memory referenced by the buffer slice up to, but not including,
   /// the returned index is initialized.
+  /// The buffer slice must reference enough memory to accommodate
+  /// `source.count` elements.
   ///
   /// The returned index is the index of the next uninitialized element
   /// in the buffer slice, one past the index of the last element written.
   /// If `source` contains no elements, the returned index is equal to
-  /// the buffer's `startIndex`. If `source` contains as many elements
+  /// the buffer slice's `startIndex`. If `source` contains as many elements
   /// as the buffer slice can hold, the returned index is equal to
   /// to the slice's `endIndex`.
   ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A collection of elements to be used to
-  ///     initialize the buffer's storage.
-  /// - Returns: An index to the next uninitialized element in the
-  ///     buffer slice, or `endIndex`.
+  ///     initialize the buffer slice's storage.
+  /// - Returns: The index one past the last element of the buffer slice
+  ///    initialized by this function.
   @inlinable
   @_alwaysEmitIntoClient
   public func initialize<C>(
@@ -783,9 +790,9 @@ extension Slice {
   /// must be a trivial type.
   ///
   /// - Parameter source: A sequence of elements to be used to update
-  ///   the buffer's contents.
+  ///   the contents of the buffer slice.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
-  ///   buffer, and the index one past the last updated element in the buffer.
+  ///   buffer slice, and the index one past the last updated element.
   @inlinable
   @_alwaysEmitIntoClient
   public func update<S>(
@@ -798,18 +805,19 @@ extension Slice {
     return (iterator, startIndex.advanced(by: distance))
   }
 
-  /// Updates the buffer slice's initialized memory with every element of the source.
+  /// Updates the buffer slice's initialized memory with
+  /// every element of the source.
   ///
   /// Prior to calling the `update(fromContentsOf:)` method on a buffer
   /// slice, the first `source.count` elements of the referenced memory must be
-  /// initialized, or the buffer's `Element` type must be a trivial type.
-  /// The buffer must reference enough initialized memory to accommodate
+  /// initialized, or the `Element` type must be a trivial type.
+  /// The buffer slice must reference enough initialized memory to accommodate
   /// `source.count` elements.
   ///
-  /// The returned index is one past the index of the last element updated.
-  /// If `source` contains no elements, the returned index is equal to the
-  /// buffer's `startIndex`. If `source` contains as many elements as the buffer
-  /// slice can hold, the returned index is equal to the slice's `endIndex`.
+  /// The returned index is one past the index of the last element updated. If
+  /// `source` contains no elements, the returned index is the buffer slice's
+  /// `startIndex`. If `source` contains as many elements as the buffer slice
+  /// can hold, the returned index is the buffer slice's `endIndex`.
   ///
   /// - Precondition: `self.count` >= `source.count`
   ///
@@ -818,10 +826,9 @@ extension Slice {
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient
-  public func update<C>(
-    fromContentsOf source: C
-  ) -> Index
-    where C: Collection, Base == UnsafeMutableBufferPointer<C.Element> {
+  public func update<Element>(
+    fromContentsOf source: some Collection<Element>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.update(fromContentsOf: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
@@ -852,8 +859,8 @@ extension Slice {
   /// - Parameter source: A buffer containing the values to copy.
   ///     The memory region underlying `source` must be initialized. The memory
   ///     regions referenced by `source` and this buffer may overlap.
-  /// - Returns: An index to the next uninitialized element in the buffer,
-  ///     or `endIndex`.
+  /// - Returns: The index one past the last element of the buffer slice
+  ///    initialized by this function.
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitialize<Element>(
@@ -889,8 +896,8 @@ extension Slice {
   /// - Parameter source: A buffer slice containing the values to copy.
   ///     The memory region underlying `source` must be initialized. The memory
   ///     regions referenced by `source` and this buffer slice may overlap.
-  /// - Returns: An index to the next uninitialized element in the buffer,
-  ///     or `endIndex`.
+  /// - Returns: The index one past the last element of the buffer slice
+  ///    initialized by this function.
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitialize<Element>(
@@ -908,9 +915,11 @@ extension Slice {
   ///
   /// The region of memory starting at the beginning of this buffer slice and
   /// covering `source.count` instances of its `Element` type  must be
-  /// initialized, or `Element` must be a trivial type. After calling
-  /// `moveUpdate(fromContentsOf:)`,
+  /// initialized, or its `Element` type must be a trivial type.
+  /// After calling `moveUpdate(fromContentsOf:)`,
   /// the region of memory underlying `source` is uninitialized.
+  /// The buffer slice must reference enough initialized memory
+  /// to accommodate `source.count` elements.
   ///
   /// The returned index is one past the index of the last element updated.
   /// If `source` contains no elements, the returned index is equal to the
@@ -940,9 +949,11 @@ extension Slice {
   ///
   /// The region of memory starting at the beginning of this buffer slice and
   /// covering `source.count` instances of its `Element` type  must be
-  /// initialized, or `Element` must be a trivial type. After calling
-  /// `moveUpdate(fromContentsOf:)`,
+  /// initialized, or its `Element` type must be a trivial type.
+  /// After calling `moveUpdate(fromContentsOf:)`,
   /// the region of memory underlying `source` is uninitialized.
+  /// The buffer slice must reference enough initialized memory
+  /// to accommodate `source.count` elements.
   ///
   /// The returned index is one past the index of the last element updated.
   /// If `source` contains no elements, the returned index is equal to the
@@ -1038,8 +1049,8 @@ extension Slice {
   /// Executes the given closure while temporarily binding the memory referenced
   /// by this buffer slice to the given type.
   ///
-  /// Use this method when you have a buffer of memory bound to one type and
-  /// you need to access that memory as a buffer of another type. Accessing
+  /// Use this method when you have a buffer slice of memory bound to one type
+  /// and you need to access that memory as a buffer of another type. Accessing
   /// memory as type `T` requires that the memory be bound to that type. A
   /// memory location may only be bound to one type at a time, so accessing
   /// the same memory as an unrelated type without first rebinding the memory
@@ -1066,22 +1077,22 @@ extension Slice {
   /// After executing `body`, this method rebinds memory back to the original
   /// `Element` type.
   ///
-  /// - Note: Only use this method to rebind the buffer's memory to a type
+  /// - Note: Only use this method to rebind the buffer slice's memory to a type
   ///   that is layout compatible with the currently bound `Element` type.
   ///   The stride of the temporary type (`T`) may be an integer multiple
   ///   or a whole fraction of `Element`'s stride.
   ///   To bind a region of memory to a type that does not match these
-  ///   requirements, convert the buffer to a raw buffer and use the
-  ///   `bindMemory(to:)` method.
-  ///   If `T` and `Element` have different alignments, this buffer's
-  ///   `baseAddress` must be aligned with the larger of the two alignments.
+  ///   requirements, convert the buffer slice to a raw buffer and use the
+  ///   raw buffer's `withMemoryRebound(to:)` method.
+  ///   If `T` and `Element` have different alignments, this buffer slice
+  ///   must be aligned with the larger of the two alignments.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     buffer. The type `T` must be layout compatible
+  ///     buffer slice. The type `T` must be layout compatible
   ///     with the pointer's `Element` type.
-  ///   - body: A closure that takes a ${Mutable.lower()} typed buffer to the
-  ///     same memory as this buffer, only bound to type `T`. The buffer
+  ///   - body: A closure that takes a typed buffer to the
+  ///     same memory as this buffer slice, only bound to type `T`. The buffer
   ///     parameter contains a number of complete instances of `T` based
   ///     on the capacity of the original buffer and the stride of `Element`.
   ///     The closure's buffer argument is valid only for the duration of the

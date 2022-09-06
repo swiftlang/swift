@@ -522,10 +522,10 @@ extension Unsafe${Mutable}RawBufferPointer {
 
   /// Copies from a collection of `UInt8` into this buffer's memory.
   ///
-  /// If the `source.count` bytes of memory referenced by this buffer are bound
-  /// to a type `T`, then `T` must be a trivial type, the underlying pointer
-  /// must be properly aligned for accessing `T`, and `source.count` must be a
-  /// multiple of `MemoryLayout<T>.stride`.
+  /// If the first `source.count` bytes of memory referenced by this buffer
+  /// are bound to a type `T`, then `T` must be a trivial type,
+  /// the underlying pointer must be properly aligned for accessing `T`,
+  /// and `source.count` must be a multiple of `MemoryLayout<T>.stride`.
   ///
   /// After calling `copyBytes(from:)`, the first `source.count` bytes of memory
   /// referenced by this buffer are initialized to raw bytes. If the memory is
@@ -697,7 +697,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// After calling this method on a raw buffer with non-nil `baseAddress` `b`, 
   /// the region starting at `b` and continuing up to
   /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound
-  /// to type `T` and initialized. If `T` is a nontrivial type, you must
+  /// to type `T` and is initialized. If `T` is a nontrivial type, you must
   /// eventually deinitialize or move the values in this region to avoid leaks.
   /// If `baseAddress` is `nil`, this function does nothing
   /// and returns an empty buffer pointer.
@@ -733,8 +733,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// `source.underestimatedCount`.
   ///
   /// This method initializes the buffer with elements from `source` until
-  /// `source` is exhausted or, if `source` is a sequence but not a
-  /// collection, the buffer has no more room for its elements. After calling
+  /// `source` is exhausted or, if `source` is a sequence but not a collection,
+  /// the buffer has no more room for source's elements. After calling
   /// `initializeMemory(as:from:)`, the memory referenced by the returned
   /// `UnsafeMutableBufferPointer` instance is bound and initialized to type
   /// `S.Element`. This method does not change
@@ -977,7 +977,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type `T` to bind the memory to.
   /// - Returns: A typed buffer of the newly bound memory. The memory in this
   ///   region is bound to `T`, but has not been modified in any other way.
-  ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
+  ///   instances of `T`.
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -1029,7 +1030,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///     buffer.
   ///   - body: A closure that takes a typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's

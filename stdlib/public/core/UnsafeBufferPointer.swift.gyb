@@ -636,7 +636,8 @@ extension Unsafe${Mutable}BufferPointer {
     return UnsafeMutableBufferPointer(start: base, count: count)
   }
   
-  /// Initializes every element in this buffer's memory to a copy of the given value.
+  /// Initializes every element in this buffer's memory to
+  /// a copy of the given value.
   ///
   /// The destination memory must be uninitialized or the buffer's `Element`
   /// must be a trivial type. After a call to `initialize(repeating:)`, the
@@ -682,7 +683,8 @@ extension Unsafe${Mutable}BufferPointer {
     return source._copyContents(initializing: self)
   }
 
-  /// Initializes the buffer's memory with every element of the source.
+  /// Initializes the buffer's memory with
+  /// every element of the source.
   ///
   /// Prior to calling the `initialize(fromContentsOf:)` method on a buffer,
   /// the memory referenced by the buffer must be uninitialized,
@@ -701,8 +703,9 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A collection of elements to be used to
-  ///   initialize the buffer's storage.
-  /// - Returns: An index to the next uninitialized element in the buffer.
+  ///     initialize the buffer's storage.
+  /// - Returns: The index one past the last element of the buffer initialized
+  ///     by this function.
   @inlinable
   @_alwaysEmitIntoClient
   public func initialize(
@@ -784,7 +787,8 @@ extension Unsafe${Mutable}BufferPointer {
     return (iterator, index)
   }
 
-  /// Updates the buffer's initialized memory with every element of the source.
+  /// Updates the buffer's initialized memory with
+  /// every element of the source.
   ///
   /// Prior to calling the `update(fromContentsOf:)` method on a buffer,
   /// the first `source.count` elements of the buffer's memory must be
@@ -869,8 +873,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter source: A buffer containing the values to copy. The memory
   ///     region underlying `source` must be initialized. The memory regions
   ///     referenced by `source` and this buffer may overlap.
-  /// - Returns: An index to the next uninitialized element in the buffer,
-  ///     or `endIndex`.
+  /// - Returns: The index one past the last element of the buffer initialized
+  ///     by this function.
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitialize(fromContentsOf source: Self) -> Index {
@@ -909,8 +913,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameter source: A buffer containing the values to copy. The memory
   ///     region underlying `source` must be initialized. The memory regions
   ///     referenced by `source` and this buffer may overlap.
-  /// - Returns: An index to the next uninitialized element in the buffer,
-  ///     or `endIndex`.
+  /// - Returns: The index one past the last element of the buffer initialized
+  ///     by this function.
   @inlinable
   @_alwaysEmitIntoClient
   public func moveInitialize(fromContentsOf source: Slice<Self>) -> Index {
@@ -1091,7 +1095,7 @@ extension Unsafe${Mutable}BufferPointer {
   ///   or a whole fraction of `Element`'s stride.
   ///   To bind a region of memory to a type that does not match these
   ///   requirements, convert the buffer to a raw buffer and use the
-  ///   `bindMemory(to:)` method.
+  ///   raw buffer's `withMemoryRebound(to:)` method.
   ///   If `T` and `Element` have different alignments, this buffer's
   ///   `baseAddress` must be aligned with the larger of the two alignments.
   ///
