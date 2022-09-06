@@ -65,7 +65,8 @@ hasLoopInvariantOperands(SILInstruction *inst, SILLoop *loop,
 static bool
 canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                               SILBasicBlock *bb,
-                              SmallVectorImpl<SILInstruction *> &moves) {
+                              SmallVectorImpl<SILInstruction *> &moves,
+                              SinkAddressProjections &sinkProj) {
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
@@ -119,6 +120,9 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
       moves.push_back(inst);
       invariants.insert(inst);
       continue;
+    }
+    if (!sinkProj.analyzeAddressProjections(inst)) {
+      return false;
     }
 
     cost += (int)instructionInlineCost(instRef);
@@ -392,8 +396,9 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> moveToPreheader;
-  if (!canDuplicateOrMoveToPreheader(loop, preheader, header,
-                                     moveToPreheader)) {
+  SinkAddressProjections sinkProj;
+  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
+                                     sinkProj)) {
     LLVM_DEBUG(llvm::dbgs()
                << *loop << " instructions in header preventing rotating\n");
     return false;
@@ -439,6 +444,13 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The other instructions are just cloned to the preheader.
   TermInst *preheaderBranch = preheader->getTerminator();
+
+  // sink address projections to avoid address phis.
+  for (auto &inst : *header) {
+    bool success = sinkProj.analyzeAddressProjections(&inst);
+    assert(success);
+    sinkProj.cloneProjections();
+  }
 
   for (auto &inst : *header) {
     if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
