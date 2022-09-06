@@ -160,10 +160,11 @@ struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class typ
 struct S04<T : P5 & (P6)> {}
 struct S05<T> where T : P5? & P6 {} // expected-error {{non-protocol, non-class type '(any P5)?' cannot be used within a protocol-constrained type}}
 
-// SR-3124 - Protocol Composition Often Migrated Incorrectly
-struct S3124<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{17-34=P1 & P3>}}
-func f3124_1<U where U: protocol<P1, P3>>(x: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{25-42=P1 & P3>}} // expected-error {{'where' clause}}
-func f3124_2<U : protocol<P1>>(x: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{18-31=P1>}}
+// https://github.com/apple/swift/issues/45712
+// Protocol Composition Often Migrated Incorrectly
+struct S_45712<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{19-36=P1 & P3>}}
+func f1_45712<U where U: protocol<P1, P3>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}} {{26-43=P1 & P3>}} // expected-error {{'where' clause}}
+func f2_45712<U : protocol<P1>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{19-32=P1>}}
 
 // Make sure we correctly form compositions in expression context
 func takesP1AndP2(_: [AnyObject & P1 & P2]) {}
