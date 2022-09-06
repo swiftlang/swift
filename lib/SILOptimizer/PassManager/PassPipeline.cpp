@@ -140,10 +140,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
                                          //   value.
   P.addTrivialMoveOnlyTypeEliminator();
-  // As a temporary measure, we also eliminate move only for non-trivial types
-  // until we can audit the later part of the pipeline. Eventually, this should
-  // occur before IRGen.
-  P.addMoveOnlyTypeEliminator();
 
   P.addAddressLowering();
 
@@ -221,6 +217,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
+
+  // As a temporary measure, we also eliminate move only for non-trivial types
+  // until we can audit the later part of the pipeline. Eventually, this should
+  // occur before IRGen.
+  P.addMoveOnlyTypeEliminator();
 }
 
 SILPassPipelinePlan
