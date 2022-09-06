@@ -4325,8 +4325,6 @@ Type ExistentialType::get(Type constraint) {
   if (constraint->is<ExistentialMetatypeType>())
     return constraint;
 
-  assert(constraint->isConstraintType());
-
   bool printWithAny = true;
   if (constraint->isEqual(C.TheAnyType) || constraint->isAnyObject())
     printWithAny = false;
