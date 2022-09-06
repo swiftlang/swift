@@ -149,6 +149,8 @@ const char ExtensionError::ID = '\0';
 void ExtensionError::anchor() {}
 const char DeclAttributesDidNotMatch::ID = '\0';
 void DeclAttributesDidNotMatch::anchor() {}
+const char InvalidRecordKindError::ID = '\0';
+void InvalidRecordKindError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -432,7 +434,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     return SILLayout::get(getContext(), canSig, fields, capturesGenerics);
   }
   default:
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
 
@@ -503,7 +505,7 @@ ProtocolConformanceDeserializer::read(
 
   // Not a protocol conformance.
   default:
-    MF.fatal();
+    MF.fatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
 
@@ -5085,7 +5087,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       default:
         // We don't know how to deserialize this kind of attribute.
-        MF.fatal();
+        MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
       }
 
       if (!skipAttr) {
@@ -5211,7 +5213,7 @@ DeclDeserializer::getDeclCheckedImpl(
   
   default:
     // We don't know how to deserialize this kind of decl.
-    MF.fatal();
+    MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 }
 

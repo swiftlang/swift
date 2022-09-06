@@ -585,6 +585,8 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
       << "'";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << " (built with -experimental-allow-module-with-compiler-errors)";
+  if (ModuleInputBuffer)
+    os << " at '" << ModuleInputBuffer->getBufferIdentifier() << "'";
 }
 
 ModuleFileSharedCore::~ModuleFileSharedCore() { }
