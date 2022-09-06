@@ -26,9 +26,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   ///   be less than or equal to this buffer slice's `count`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func copyBytes<C: Collection>(
-    from source: C
-  ) where C.Element == UInt8 {
+  public func copyBytes(from source: some Collection<UInt8>) {
     let buffer = Base(rebasing: self)
     buffer.copyBytes(from: source)
   }
