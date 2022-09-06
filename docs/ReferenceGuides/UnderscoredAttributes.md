@@ -121,6 +121,27 @@ extension Text {
 }
 ```
 
+## `@_documentation(metadata: ...)`
+
+Adds "documentation metadata" to the symbol. The identifier in the attribute is
+added to the symbol graph in the `"metadata"` field of the symbol. This can be
+used to add an arbitrary grouping or other indicator to symbols for use in
+documentation.
+
+## `@_documentation(visibility: ...)`
+
+Forces the symbol to be treated as the given access level when checking
+visibility. This can be used to, for example, force a symbol with an underscored
+name to appear in `public` symbol graphs, or treat an otherwise-`public` symbol
+as being `internal` or `private` for the purposes of documentation, to hide it
+from `public` docs.
+
+This can also be applied to `@_exported import` statements to only include the
+imported symbols in symbol graphs with the given minimum access level. For
+example, applying `@_documentation(visibility: internal)` to an `@_exported
+import` statement will hide the imported symbols from `public` symbol graphs and
+documentation, but show them on `internal` symbol graphs and documentation.
+
 ## `@_dynamicReplacement(for: targetFunc(label:))`
 
 Marks a function as the dynamic replacement for another `dynamic` function.

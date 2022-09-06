@@ -19,6 +19,7 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/SourceManager.h"
@@ -452,6 +453,12 @@ void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
   OS.attribute("accessLevel", getAccessLevelSpelling(VD->getFormalAccess()));
 }
 
+void Symbol::serializeMetadataMixin(llvm::json::OStream &OS) const {
+  StringRef Category = documentationMetadataForDecl(VD);
+  if (!Category.empty())
+    OS.attribute("metadata", Category);
+}
+
 void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
   if (ClangNode ClangN = VD->getClangNode()) {
     if (!Graph->Walker.Options.IncludeClangDocs)
@@ -592,6 +599,7 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeDeclarationFragmentMixin(OS);
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
+    serializeMetadataMixin(OS);
     serializeLocationMixin(OS);
     serializeSPIMixin(OS);
   });

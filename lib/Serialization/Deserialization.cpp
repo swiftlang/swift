@@ -5058,6 +5058,21 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Documentation_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t CategoryID;
+        bool hasVisibility;
+        uint8_t visibilityID;
+        serialization::decls_block::DocumentationDeclAttrLayout::readRecord(
+            scratch, isImplicit, CategoryID, hasVisibility, visibilityID);
+        StringRef CategoryText = MF.getIdentifierText(CategoryID);
+        Optional<swift::AccessLevel> realVisibility = None;
+        if (hasVisibility)
+          realVisibility = getActualAccessLevel(visibilityID);
+        Attr = new (ctx) DocumentationAttr(CategoryText, realVisibility, isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
