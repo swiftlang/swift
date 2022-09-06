@@ -8780,8 +8780,10 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
             .fixItRemove({typesStartLoc, typesEndLoc});
     } else {
       if (isPrefix || isPostfix) {
+        // If we have nothing after the colon, then just remove the colon.
+        auto endLoc = groupLoc.isValid() ? groupLoc : colonLoc;
         diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, groupLoc});
+            .fixItRemove({colonLoc, endLoc});
       }
       // Nothing to complete here, simply consume the token.
       if (Tok.is(tok::code_complete))
