@@ -21,5 +21,5 @@ public func noStackProtector() {
     g(x)
     g(x) // avoid function merging by calling `g` two times
 }
+// CHECK: [[SSPATTRS]] = { sspreq {{.*}}"stack-protector-buffer-size"="8"
 
-// CHECK: [[SSPATTRS]] = { sspstrong {{.*}}"stack-protector-buffer-size"="8"
