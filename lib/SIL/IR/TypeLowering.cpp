@@ -2500,10 +2500,9 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
           // Otherwise, the whole type would be lexical.
 
           if (!fieldDecl) {
-            // The field is non-trivial and the whole type is non-lexical.
-            // If there's no field decl which might be annotated
-            // @_eagerMove, we have a problem.
-            return false;
+            // There is no field decl that might be annotated @_eagerMove.  The
+            // field is @_eagerMove iff its type is annotated @_eagerMove.
+            return getLifetimeAnnotation(ty) == LifetimeAnnotation::EagerMove;
           }
 
           // The field is non-trivial and the whole type is non-lexical.
