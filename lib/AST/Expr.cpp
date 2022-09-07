@@ -1779,6 +1779,29 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
+ActorIsolation ClosureActorIsolation::getActorIsolation() const {
+  switch (getKind()) {
+  case ClosureActorIsolation::Independent:
+    return ActorIsolation::forIndependent().withPreconcurrency(
+        preconcurrency());
+
+  case ClosureActorIsolation::GlobalActor: {
+    return ActorIsolation::forGlobalActor(getGlobalActor(), /*unsafe=*/false)
+        .withPreconcurrency(preconcurrency());
+  }
+
+  case ClosureActorIsolation::ActorInstance: {
+    auto selfDecl = getActorInstance();
+    auto actor =
+        selfDecl->getType()->getReferenceStorageReferent()->getAnyActor();
+    assert(actor && "Bad closure actor isolation?");
+    // FIXME: This could be a parameter... or a capture... hmmm.
+    return ActorIsolation::forActorInstanceSelf(actor).withPreconcurrency(
+        preconcurrency());
+  }
+  }
+}
+
 void AbstractClosureExpr::setParameterList(ParameterList *P) {
   parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
