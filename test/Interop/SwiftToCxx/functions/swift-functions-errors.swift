@@ -8,8 +8,8 @@
 
 // CHECK-LABEL: namespace _impl {
 
-// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _self, SWIFT_ERROR_RESULT void ** _error) SWIFT_CALL; // emptyThrowFunction()
-// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _self, SWIFT_ERROR_RESULT void ** _error) SWIFT_CALL; // throwFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _self, SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error) SWIFT_CALL; // emptyThrowFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _self, SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error) SWIFT_CALL; // throwFunction()
 
 // CHECK: }
 
@@ -25,7 +25,27 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK: void* self = nullptr;
 // CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(self, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: throw (swift::Error(opaqueError))
+// CHECK: }
+
+class TestDestroyed {
+  deinit {
+    print("Test destroyed")
+  }
+}
+
+public struct DestroyedError : Error {
+  let t = TestDestroyed()
+}
+
+public func testDestroyedError() throws { throw DestroyedError() }
+
+// CHECK: inline void testDestroyedError() {
+// CHECK: void* opaqueError = nullptr;
+// CHECK: void* self = nullptr;
+// CHECK: _impl::$s9Functions18testDestroyedErroryyKF(self, &opaqueError);
+// CHECK: if (opaqueError != nullptr)
+// CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
 
 public func throwFunction() throws {
@@ -38,7 +58,7 @@ public func throwFunction() throws {
 // CHECK: void* self = nullptr;
 // CHECK: _impl::$s9Functions13throwFunctionyyKF(self, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
 
 public func throwFunctionWithReturn() throws -> Int {
@@ -52,6 +72,6 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: void* self = nullptr;
 // CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(self, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
-// CHECK: throw (swift::_impl::NaiveException("Exception"));
+// CHECK: throw (swift::Error(opaqueError))
 // CHECK: return returnValue;
 // CHECK: }

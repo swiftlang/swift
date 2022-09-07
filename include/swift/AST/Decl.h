@@ -986,6 +986,19 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
+  LifetimeAnnotation getLifetimeAnnotation() const {
+    auto &attrs = getAttrs();
+    if (attrs.hasAttribute<EagerMoveAttr>())
+      return LifetimeAnnotation::EagerMove;
+    if (attrs.hasAttribute<LexicalAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::None;
+  }
+
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
+  }
+
   AvailabilityContext getAvailabilityForLinkage() const;
 
   /// Whether this declaration or one of its outer contexts has the
@@ -2714,15 +2727,6 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
-
-  LifetimeAnnotation getLifetimeAnnotation() const {
-    auto &attrs = getAttrs();
-    if (attrs.hasAttribute<EagerMoveAttr>())
-      return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<LexicalAttr>())
-      return LifetimeAnnotation::Lexical;
-    return LifetimeAnnotation::None;
-  }
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5807,10 +5811,6 @@ public:
 
   void setDefaultArgumentKind(ArgumentAttrs K) {
     setDefaultArgumentKind(K.argumentKind);
-  }
-
-  bool isNoImplicitCopy() const {
-    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
 
   /// Whether this parameter has a default argument expression available.

@@ -7,7 +7,7 @@ Resolves SR-NNNN.
 <!--
 Before merging this pull request, you must run the Swift continuous integration tests.
 For information about triggering CI builds via @swift-ci, see:
-https://github.com/apple/swift/blob/master/docs/ContinuousIntegration.md#swift-ci
+https://github.com/apple/swift/blob/main/docs/ContinuousIntegration.md#swift-ci
 
 Thank you for your contribution to Swift!
 -->

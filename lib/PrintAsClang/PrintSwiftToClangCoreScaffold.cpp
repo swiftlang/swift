@@ -158,7 +158,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 
 void printCxxNaiveException(raw_ostream &os) {
   os << "/// Naive exception class that should be thrown\n";
-  os << "class NaiveException {\n";
+  os << "class NaiveException : public swift::Error {\n";
   os << "public:\n";
   os << "  inline NaiveException(const char * _Nonnull msg) noexcept : "
      << "msg_(msg) { }\n";

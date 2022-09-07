@@ -30,6 +30,19 @@ class VarDecl;
 class NominalTypeDecl;
 class SubstitutionMap;
 class AbstractFunctionDecl;
+class AbstractClosureExpr;
+class ClosureActorIsolation;
+
+/// Trampoline for AbstractClosureExpr::getActorIsolation.
+ClosureActorIsolation
+__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
+
+/// Returns a function reference to \c __AbstractClosureExpr_getActorIsolation.
+/// This is needed so we can use it as a default argument for
+/// \c getActorIsolationOfContext without knowing the layout of
+/// \c ClosureActorIsolation.
+llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+_getRef__AbstractClosureExpr_getActorIsolation();
 
 /// Determine whether the given types are (canonically) equal, declared here
 /// to avoid having to include Types.h.
@@ -209,7 +222,15 @@ public:
 ActorIsolation getActorIsolation(ValueDecl *value);
 
 /// Determine how the given declaration context is isolated.
-ActorIsolation getActorIsolationOfContext(DeclContext *dc);
+/// \p getClosureActorIsolation allows the specification of actor isolation for
+/// closures that haven't been saved been saved to the AST yet. This is useful
+/// for solver-based code completion which doesn't modify the AST but stores the
+/// actor isolation of closures in the constraint system solution.
+ActorIsolation getActorIsolationOfContext(
+    DeclContext *dc,
+    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+        getClosureActorIsolation =
+            _getRef__AbstractClosureExpr_getActorIsolation());
 
 /// Check if both the value, and context are isolated to the same actor.
 bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);
