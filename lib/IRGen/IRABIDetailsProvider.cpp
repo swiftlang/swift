@@ -174,8 +174,21 @@ public:
         SignatureExpansionABIDetails(Signature::getUncachedABIDetails(
             IGM, silFuncType, funcPointerKind));
 
-    return IRABIDetailsProvider::LoweredFunctionSignature(fd, *this,
-                                                          *abiDetails);
+    auto result =
+        IRABIDetailsProvider::LoweredFunctionSignature(fd, *this, *abiDetails);
+    // Save metadata source types to avoid keeping the SIL func around.
+    for (const auto &typeSource :
+         abiDetails->polymorphicSignatureExpandedTypeSources) {
+      typeSource.visit(
+          [&](const GenericRequirement &reqt) {},
+          [&](const MetadataSource &metadataSource) {
+            auto index = metadataSource.getParamIndex();
+            auto canType =
+                silFuncType->getParameters()[index].getInterfaceType();
+            result.metadataSourceTypes.push_back(canType);
+          });
+    }
+    return result;
   }
 
   llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1>
@@ -193,21 +206,6 @@ public:
 
     using ABIAdditionalParam = IRABIDetailsProvider::ABIAdditionalParam;
     using ParamRole = ABIAdditionalParam::ABIParameterRole;
-    for (const auto &typeSource :
-         abiDetails.polymorphicSignatureExpandedTypeSources) {
-      typeSource.visit(
-          [&](const GenericRequirement &reqt) {
-            params.push_back(ABIAdditionalParam(ParamRole::GenericRequirement,
-                                                reqt, CanType()));
-          },
-          [&](const MetadataSource &metadataSource) {
-            auto index = metadataSource.getParamIndex();
-            auto canType =
-                silFuncType->getParameters()[index].getInterfaceType();
-            params.push_back(ABIAdditionalParam(
-                ParamRole::GenericTypeMetadataSource, llvm::None, canType));
-          });
-    }
     // FIXME: remove second signature computation.
     auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind);
     for (auto attrSet : signature.getAttributes()) {
@@ -293,6 +291,14 @@ bool IRABIDetailsProvider::LoweredFunctionSignature::DirectParameter::
   return hasError;
 }
 
+IRABIDetailsProvider::LoweredFunctionSignature::GenericRequirementParameter::
+    GenericRequirementParameter(const GenericRequirement &requirement)
+    : requirement(requirement) {}
+
+IRABIDetailsProvider::LoweredFunctionSignature::MetadataSourceParameter::
+    MetadataSourceParameter(const CanType &type)
+    : type(type) {}
+
 llvm::Optional<IRABIDetailsProvider::LoweredFunctionSignature::DirectResultType>
 IRABIDetailsProvider::LoweredFunctionSignature::getDirectResultType() const {
   if (!abiDetails.directResult)
@@ -309,7 +315,11 @@ IRABIDetailsProvider::LoweredFunctionSignature::getNumIndirectResultValues()
 void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
     llvm::function_ref<void(const IndirectResultValue &)> indirectResultVisitor,
     llvm::function_ref<void(const DirectParameter &)> directParamVisitor,
-    llvm::function_ref<void(const IndirectParameter &)> indirectParamVisitor) {
+    llvm::function_ref<void(const IndirectParameter &)> indirectParamVisitor,
+    llvm::function_ref<void(const GenericRequirementParameter &)>
+        genericRequirementVisitor,
+    llvm::function_ref<void(const MetadataSourceParameter &)>
+        metadataSourceVisitor) {
   // Indirect result values come before parameters.
   llvm::SmallVector<IndirectResultValue, 1> result;
   for (const auto &r : abiDetails.indirectResults)
@@ -355,7 +365,23 @@ void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
            currentSilParam == silParamMapping.size());
   else
     assert(currentSilParam == silParamMapping.size());
-  // FIXME: Traverse generic requirements and other additional params.
+
+  // Generic requirements come next.
+  size_t metadataSourceIndex = 0;
+  for (const auto &typeSource :
+       abiDetails.polymorphicSignatureExpandedTypeSources) {
+    typeSource.visit(
+        [&](const GenericRequirement &reqt) {
+          genericRequirementVisitor(GenericRequirementParameter(reqt));
+        },
+        [&](const MetadataSource &metadataSource) {
+          metadataSourceVisitor(MetadataSourceParameter(
+              metadataSourceTypes[metadataSourceIndex]));
+          ++metadataSourceIndex;
+        });
+  }
+
+  // FIXME: Traverse other additional params.
 }
 
 IRABIDetailsProvider::IRABIDetailsProvider(ModuleDecl &mod,

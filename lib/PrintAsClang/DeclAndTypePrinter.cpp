@@ -1234,18 +1234,6 @@ private:
     for (auto param : ABIparams) {
       using Role = IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole;
       switch (param.getRole()) {
-      case Role::GenericRequirement:
-        params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
-                              Role::GenericRequirement,
-                          FD->getASTContext().getOpaquePointerType(),
-                          /*isIndirect=*/false, param.getGenericRequirement()});
-        break;
-      case Role::GenericTypeMetadataSource:
-        params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
-                              Role::GenericTypeMetadata,
-                          param.getMetadataSourceType(), /*isIndirect=*/false,
-                          None});
-        break;
       case Role::Self:
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,

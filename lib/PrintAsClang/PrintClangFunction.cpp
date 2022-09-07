@@ -691,6 +691,18 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           else
             os << "void * _Nonnull";
           printParamName(param.getParamDecl());
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                GenericRequirementParameter &genericRequirementParam) {
+          emitNewParam();
+          os << "void * _Nonnull ";
+          if (auto *proto = genericRequirementParam.getRequirement().Protocol)
+            ClangSyntaxPrinter(os).printBaseName(proto);
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                MetadataSourceParameter &metadataSrcParam) {
+          emitNewParam();
+          os << "void * _Nonnull ";
         });
   } else {
 
@@ -745,13 +757,6 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       } else if (param.role == AdditionalParam::Role::Error) {
         os << "SWIFT_ERROR_RESULT ";
         os << "void * _Nullable * _Nullable _error";
-      } else if (param.role == AdditionalParam::Role::GenericRequirement) {
-        os << "void * _Nonnull ";
-        if (param.genericRequirement->Protocol)
-          ClangSyntaxPrinter(os).printBaseName(
-              param.genericRequirement->Protocol);
-      } else if (param.role == AdditionalParam::Role::GenericTypeMetadata) {
-        os << "void * _Nonnull ";
       }
     });
   }
@@ -883,14 +888,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                 IndirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/true,
                         /*directTypeEncoding=*/"");
-        });
-
-    if (additionalParams.size()) {
-      if (needsComma)
-        os << ", ";
-      interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-        if (param.role == AdditionalParam::Role::GenericRequirement) {
-          auto genericRequirement = *param.genericRequirement;
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                GenericRequirementParameter &genericRequirementParam) {
+          emitNewParam();
+          auto genericRequirement = genericRequirementParam.getRequirement();
           // FIXME: Add protocol requirement support.
           assert(!genericRequirement.Protocol);
           if (auto *gtpt = genericRequirement.TypeParameter
@@ -901,20 +903,26 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
             return;
           }
           os << "ERROR";
-          return;
-        }
-        if (param.role == AdditionalParam::Role::GenericTypeMetadata) {
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                MetadataSourceParameter &metadataSrcParam) {
+          emitNewParam();
           os << "swift::TypeMetadataTrait<";
           CFunctionSignatureTypePrinterModifierDelegate delegate;
           CFunctionSignatureTypePrinter typePrinter(
               os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
               interopContext, delegate, moduleContext, declPrinter,
               FunctionSignatureTypeUse::TypeReference);
-          auto result = typePrinter.visit(param.type, None, /*isInOut=*/false);
+          auto result = typePrinter.visit(metadataSrcParam.getType(), None,
+                                          /*isInOut=*/false);
           assert(!result.isUnsupported());
           os << ">::getTypeMetadata()";
-          return;
-        }
+        });
+
+    if (additionalParams.size()) {
+      if (needsComma)
+        os << ", ";
+      interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
         if (param.role == AdditionalParam::Role::Self && !hasThrows) {
           // FIXME: this is wonky.
           needsComma = false;

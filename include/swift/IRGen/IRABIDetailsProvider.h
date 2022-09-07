@@ -61,12 +61,6 @@ public:
   class ABIAdditionalParam {
   public:
     enum class ABIParameterRole {
-      /// A parameter that corresponds to a generic requirement that must be
-      /// fullfilled by a call to this function.
-      GenericRequirement,
-      /// A parameter that corresponds to a Swift type pointer sourced from a
-      /// valid metadata source, like the type of another argument.
-      GenericTypeMetadataSource,
       /// A parameter that corresponds to the 'self' parameter.
       Self,
       /// The Swift error parameter.
@@ -74,16 +68,6 @@ public:
     };
 
     inline ABIParameterRole getRole() const { return role; }
-
-    inline GenericRequirement getGenericRequirement() {
-      assert(role == ABIParameterRole::GenericRequirement);
-      return *genericRequirement;
-    }
-
-    inline CanType getMetadataSourceType() {
-      assert(role == ABIParameterRole::GenericTypeMetadataSource);
-      return canType;
-    }
 
   private:
     inline ABIAdditionalParam(
@@ -173,6 +157,30 @@ public:
       friend class LoweredFunctionSignature;
     };
 
+    /// Represents a generic requirement paremeter that must be passed to the
+    /// function.
+    class GenericRequirementParameter {
+    public:
+      inline GenericRequirement getRequirement() const { return requirement; }
+
+    private:
+      GenericRequirementParameter(const GenericRequirement &requirement);
+      GenericRequirement requirement;
+      friend class LoweredFunctionSignature;
+    };
+
+    /// Represents a parameter which is a Swift type pointer sourced from a
+    /// valid metadata source, like the type of another argument.
+    class MetadataSourceParameter {
+    public:
+      inline CanType getType() const { return type; }
+
+    private:
+      MetadataSourceParameter(const CanType &type);
+      CanType type;
+      friend class LoweredFunctionSignature;
+    };
+
     /// Returns lowered direct result details, or \c None if direct result is
     /// void.
     llvm::Optional<DirectResultType> getDirectResultType() const;
@@ -190,7 +198,11 @@ public:
             indirectResultVisitor,
         llvm::function_ref<void(const DirectParameter &)> directParamVisitor,
         llvm::function_ref<void(const IndirectParameter &)>
-            indirectParamVisitor);
+            indirectParamVisitor,
+        llvm::function_ref<void(const GenericRequirementParameter &)>
+            genericRequirementVisitor,
+        llvm::function_ref<void(const MetadataSourceParameter &)>
+            metadataSourceVisitor);
 
     /// FIXME: make private.
     SmallVector<ABIAdditionalParam, 1> additionalParams;
@@ -202,6 +214,7 @@ public:
     const AbstractFunctionDecl *FD;
     IRABIDetailsProviderImpl &owner;
     const irgen::SignatureExpansionABIDetails &abiDetails;
+    SmallVector<CanType, 1> metadataSourceTypes;
     friend class IRABIDetailsProviderImpl;
   };
 
