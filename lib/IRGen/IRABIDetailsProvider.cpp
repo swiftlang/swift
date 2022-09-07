@@ -209,9 +209,6 @@ public:
     // FIXME: remove second signature computation.
     auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind);
     for (auto attrSet : signature.getAttributes()) {
-      if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftSelf))
-        params.push_back(
-            ABIAdditionalParam(ParamRole::Self, llvm::None, CanType()));
       if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftError))
         params.push_back(
             ABIAdditionalParam(ParamRole::Error, llvm::None, CanType()));
@@ -319,7 +316,8 @@ void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
     llvm::function_ref<void(const GenericRequirementParameter &)>
         genericRequirementVisitor,
     llvm::function_ref<void(const MetadataSourceParameter &)>
-        metadataSourceVisitor) {
+        metadataSourceVisitor,
+    llvm::function_ref<void(const ContextParameter &)> contextParamVisitor) {
   // Indirect result values come before parameters.
   llvm::SmallVector<IndirectResultValue, 1> result;
   for (const auto &r : abiDetails.indirectResults)
@@ -379,6 +377,14 @@ void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
               metadataSourceTypes[metadataSourceIndex]));
           ++metadataSourceIndex;
         });
+  }
+
+  if (abiDetails.hasTrailingSelfParam) {
+    assert(!abiDetails.hasContextParam);
+    assert(FD->hasImplicitSelfDecl());
+    indirectParamVisitor(IndirectParameter(*FD->getImplicitSelfDecl()));
+  } else if (abiDetails.hasContextParam) {
+    contextParamVisitor(ContextParameter());
   }
 
   // FIXME: Traverse other additional params.

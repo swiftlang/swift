@@ -1234,15 +1234,6 @@ private:
     for (auto param : ABIparams) {
       using Role = IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole;
       switch (param.getRole()) {
-      case Role::Self:
-        params.push_back(
-            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-             selfTypeDeclContext
-                 ? (*selfTypeDeclContext)->getDeclaredInterfaceType()
-                 : FD->getASTContext().getOpaquePointerType(),
-             /*isIndirect=*/
-             isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
-        break;
       case Role::Error:
         params.push_back(
             {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,

@@ -157,6 +157,10 @@ public:
   /// Type sources added to the signature during expansion.
   llvm::SmallVector<PolymorphicSignatureExpandedTypeSource, 2>
       polymorphicSignatureExpandedTypeSources;
+  /// True if a trailing self parameter is passed to the call.
+  bool hasTrailingSelfParam = false;
+  /// True if a context parameter passed to the call.
+  bool hasContextParam = false;
 };
 
 /// A signature represents something which can actually be called.

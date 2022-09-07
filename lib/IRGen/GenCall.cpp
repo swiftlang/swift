@@ -1679,6 +1679,8 @@ void SignatureExpansion::expandParameters(
     if (claimSelf())
       IGM.addSwiftSelfAttributes(Attrs, curLength);
     expand(FnType->getSelfParameter());
+    if (recordedABIDetails)
+      recordedABIDetails->hasTrailingSelfParam = true;
     assert(ParamIRTypes.size() == curLength + 1 &&
            "adding 'self' added unexpected number of parameters");
   } else {
@@ -1706,6 +1708,8 @@ void SignatureExpansion::expandParameters(
       if (claimSelf())
         IGM.addSwiftSelfAttributes(Attrs, ParamIRTypes.size());
       ParamIRTypes.push_back(IGM.RefCountedPtrTy);
+      if (recordedABIDetails)
+        recordedABIDetails->hasContextParam = true;
     }
   }
 

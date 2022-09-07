@@ -8,8 +8,8 @@
 
 // CHECK-LABEL: namespace _impl {
 
-// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(SWIFT_CONTEXT const void * _Nonnull _self, SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error) SWIFT_CALL; // emptyThrowFunction()
-// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(SWIFT_CONTEXT const void * _Nonnull _self, SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error) SWIFT_CALL; // throwFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions18emptyThrowFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _ctx, SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error) SWIFT_CALL; // emptyThrowFunction()
+// CHECK: SWIFT_EXTERN void $s9Functions13throwFunctionyyKF(SWIFT_CONTEXT void * _Nonnull _ctx, SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error) SWIFT_CALL; // throwFunction()
 
 // CHECK: }
 
@@ -22,8 +22,8 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 
 // CHECK: inline void emptyThrowFunction() {
 // CHECK: void* opaqueError = nullptr;
-// CHECK: void* self = nullptr;
-// CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(self, &opaqueError);
+// CHECK: void* _ctx = nullptr;
+// CHECK: _impl::$s9Functions18emptyThrowFunctionyyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
@@ -42,8 +42,8 @@ public func testDestroyedError() throws { throw DestroyedError() }
 
 // CHECK: inline void testDestroyedError() {
 // CHECK: void* opaqueError = nullptr;
-// CHECK: void* self = nullptr;
-// CHECK: _impl::$s9Functions18testDestroyedErroryyKF(self, &opaqueError);
+// CHECK: void* _ctx = nullptr;
+// CHECK: _impl::$s9Functions18testDestroyedErroryyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
@@ -55,8 +55,8 @@ public func throwFunction() throws {
 
 // CHECK: inline void throwFunction() {
 // CHECK: void* opaqueError = nullptr;
-// CHECK: void* self = nullptr;
-// CHECK: _impl::$s9Functions13throwFunctionyyKF(self, &opaqueError);
+// CHECK: void* _ctx = nullptr;
+// CHECK: _impl::$s9Functions13throwFunctionyyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: throw (swift::Error(opaqueError))
 // CHECK: }
@@ -69,8 +69,8 @@ public func throwFunctionWithReturn() throws -> Int {
 
 // CHECK: inline swift::Int throwFunctionWithReturn() SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
-// CHECK: void* self = nullptr;
-// CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(self, &opaqueError);
+// CHECK: void* _ctx = nullptr;
+// CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: throw (swift::Error(opaqueError))
 // CHECK: return returnValue;

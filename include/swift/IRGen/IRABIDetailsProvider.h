@@ -61,8 +61,6 @@ public:
   class ABIAdditionalParam {
   public:
     enum class ABIParameterRole {
-      /// A parameter that corresponds to the 'self' parameter.
-      Self,
       /// The Swift error parameter.
       Error
     };
@@ -181,6 +179,9 @@ public:
       friend class LoweredFunctionSignature;
     };
 
+    /// Represents a context parameter passed to the call.
+    class ContextParameter {};
+
     /// Returns lowered direct result details, or \c None if direct result is
     /// void.
     llvm::Optional<DirectResultType> getDirectResultType() const;
@@ -202,7 +203,8 @@ public:
         llvm::function_ref<void(const GenericRequirementParameter &)>
             genericRequirementVisitor,
         llvm::function_ref<void(const MetadataSourceParameter &)>
-            metadataSourceVisitor);
+            metadataSourceVisitor,
+        llvm::function_ref<void(const ContextParameter &)> contextParamVisitor);
 
     /// FIXME: make private.
     SmallVector<ABIAdditionalParam, 1> additionalParams;

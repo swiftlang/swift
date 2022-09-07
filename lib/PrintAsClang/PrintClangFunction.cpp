@@ -679,7 +679,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           emitNewParam();
           if (param.getParamDecl().isSelfParameter())
             os << "SWIFT_CONTEXT ";
-          if (!param.getParamDecl().isInOut())
+          bool isConst =
+              !param.getParamDecl().isInOut() &&
+              !(param.getParamDecl().isSelfParameter() &&
+                !param.getParamDecl().getInterfaceType()->hasTypeParameter() &&
+                param.getParamDecl()
+                    .getInterfaceType()
+                    ->isAnyClassReferenceType());
+          if (isConst)
             os << "const ";
           if (isKnownCType(param.getParamDecl().getInterfaceType(),
                            typeMapping) ||
@@ -703,6 +710,11 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                 MetadataSourceParameter &metadataSrcParam) {
           emitNewParam();
           os << "void * _Nonnull ";
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                ContextParameter &) {
+          emitNewParam();
+          os << "SWIFT_CONTEXT void * _Nonnull _ctx";
         });
   } else {
 
@@ -742,19 +754,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       os << ", ";
     HasParams = true;
     interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-      if (param.role == AdditionalParam::Role::Self) {
-        os << "SWIFT_CONTEXT ";
-        // FIXME: this should be a proper param.
-        if (!param.isIndirect && !(FD->getImplicitSelfDecl() &&
-                                   !FD->getImplicitSelfDecl()
-                                        ->getInterfaceType()
-                                        ->hasTypeParameter() &&
-                                   FD->getImplicitSelfDecl()
-                                       ->getInterfaceType()
-                                       ->isAnyClassReferenceType()))
-          os << "const ";
-        os << "void * _Nonnull _self";
-      } else if (param.role == AdditionalParam::Role::Error) {
+      if (param.role == AdditionalParam::Role::Error) {
         os << "SWIFT_ERROR_RESULT ";
         os << "void * _Nullable * _Nullable _error";
       }
@@ -834,7 +834,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     const AnyFunctionType *funcType) {
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
-    os << "  void* self = nullptr;\n";
+    os << "  void* _ctx = nullptr;\n";
   }
   auto signature = interopContext.getIrABIDetails().getFunctionLoweredSignature(
       const_cast<AbstractFunctionDecl *>(FD));
@@ -917,19 +917,18 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                                           /*isInOut=*/false);
           assert(!result.isUnsupported());
           os << ">::getTypeMetadata()";
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                ContextParameter &) {
+          emitNewParam();
+          os << "_ctx";
         });
 
     if (additionalParams.size()) {
       if (needsComma)
         os << ", ";
       interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-        if (param.role == AdditionalParam::Role::Self && !hasThrows) {
-          // FIXME: this is wonky.
-          needsComma = false;
-          printParamUse(*FD->getImplicitSelfDecl(), /*isIndirect=*/true, "");
-        } else if (param.role == AdditionalParam::Role::Self && hasThrows) {
-          os << "self";
-        } else if (param.role == AdditionalParam::Role::Error && hasThrows) {
+        if (param.role == AdditionalParam::Role::Error && hasThrows) {
           os << "&opaqueError";
         }
       });
