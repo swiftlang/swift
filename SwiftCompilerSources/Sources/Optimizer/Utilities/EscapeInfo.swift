@@ -396,7 +396,7 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
       return walkDownUses(ofAddress: pta, path: path.with(knownType: nil))
     case let bi as BuiltinInst:
       switch bi.id {
-      case .DestroyArray:
+      case .destroyArray:
         // If it's not the array base pointer operand -> bail. Though, that shouldn't happen
         // because the other operands (metatype, count) shouldn't be visited anyway.
         if operand.index != 1 { return isEscaping }
