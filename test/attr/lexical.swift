@@ -15,6 +15,20 @@ func bar(@_lexical _ s: S) {} // okay
 
 func baz(@_eagerMove _ c: C) {} // okay
 
+@_eagerMove // expected-error {{@_eagerMove is only valid on methods}}
+func bazzoo(_ c: C) {}
+
+@_lexical // expected-error {{@_lexical is only valid on methods}}
+func bazzoozoo(_ c: C) {}
+
+extension C {
+  @_eagerMove
+  func pazzoo() {}
+
+  @_lexical
+  func pazzoozoo() {}
+}
+
 struct S2 {
   @_eagerMove let c: C // okay
   @_lexical let e: E // okay

@@ -322,6 +322,7 @@ public:
 
   void visitUnsafeInheritExecutorAttr(UnsafeInheritExecutorAttr *attr);
 
+  bool visitLifetimeAttr(DeclAttribute *attr);
   void visitEagerMoveAttr(EagerMoveAttr *attr);
   void visitLexicalAttr(LexicalAttr *attr);
 
@@ -343,6 +344,19 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
     auto error =
         diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
     diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
+    if (visitLifetimeAttr(attr))
+      return;
+
+    // We only handle non-lvalue arguments today.
+    if (funcDecl->isMutating()) {
+      auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+      diagnoseAndRemoveAttr(attr, error);
+      return;
+    }
     return;
   }
 
@@ -6469,9 +6483,26 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
   }
 }
 
-void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {}
+bool AttributeChecker::visitLifetimeAttr(DeclAttribute *attr) {
+  if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
+    auto declContext = funcDecl->getDeclContext();
+    // eagerMove attribute may only appear in type context
+    if (!declContext->getDeclaredInterfaceType()) {
+      diagnoseAndRemoveAttr(attr, diag::lifetime_invalid_global_scope, attr);
+      return true;
+    }
+  }
+  return false;
+}
+
+void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
+  if (visitLifetimeAttr(attr))
+    return;
+}
 
 void AttributeChecker::visitLexicalAttr(LexicalAttr *attr) {
+  if (visitLifetimeAttr(attr))
+    return;
   // @_lexical and @_eagerMove are opposites and can't be combined.
   if (D->getAttrs().hasAttribute<EagerMoveAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::eagermove_and_lexical_combined);

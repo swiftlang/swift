@@ -18,3 +18,13 @@ public func arguments(@_noImplicitCopy _ x: Klass) {
 public func argumentsOwned(@_noImplicitCopy _ x: __owned Klass) {
     x.doSomething()
 }
+
+extension Klass {
+// CHECK-LABEL: sil hidden [ossa] @noimplicitcopy_method_attr : $@convention(method) (@owned Klass) -> () {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @noImplicitCopy @owned $Klass):
+// CHECK-LABEL: } // end sil function 'noimplicitcopy_method_attr'
+  @_silgen_name("noimplicitcopy_method_attr")
+  @_noImplicitCopy
+  __consuming
+  func noimplicitcopy_method_attr() {}
+}
