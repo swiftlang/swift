@@ -1118,10 +1118,9 @@ extension Slice {
       var slice = UnsafeMutableBufferPointer(start: start, count: count)
       let (b,c) = (slice.baseAddress, slice.count)
       defer {
-        precondition(
+        _precondition(
           slice.baseAddress == b && slice.count == c,
-          "Slice.withContiguousMutableStorageIfAvailable: " +
-          "replacing the buffer is not allowed")
+          "withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
       }
       return try body(&slice)
     }
