@@ -893,7 +893,7 @@ func test_associated_values_dont_block_solver_when_unresolved() {
       // expected-note@-1 {{chain the optional using '?' to access member 'kind' only for non-'nil' base values}}
       // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 
-      switch v.kind { // expected-error {{value of type 'Value.Kind' has no member 'kind'}}
+      switch v.kind {
       case .a(_): "a"
       case .b: "b"
       }

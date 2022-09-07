@@ -1248,6 +1248,8 @@ do {
       "\($0)"
     } else if $0 == 42 {
       "the answer"
+    } else {
+      "xxx"
     }
   }
   // CHECK: the answer
