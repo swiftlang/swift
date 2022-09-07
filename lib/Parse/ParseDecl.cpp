@@ -185,7 +185,7 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
   StringRef contents =
       SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
 
-  if (Context.LangOpts.EnableSwiftParser) {
+  if (Context.LangOpts.hasFeature(Feature::SwiftParser)) {
     parseTopLevelSwift(contents.data(), CurDeclContext, &Context, &decls, appendToVector);
 
     for (auto decl : decls) {

@@ -275,8 +275,6 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
-    bool EnableSwiftParser = false;
-
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
 

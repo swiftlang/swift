@@ -32,7 +32,7 @@ _swift_gyb_target_sources(swiftParse PRIVATE
     ParsedSyntaxRecorder.cpp.gyb)
 target_link_libraries(swiftParse PRIVATE
   swiftAST
-  legacySwiftSyntax
+  swiftSyntax
   swiftSyntaxParse
 )
 

@@ -156,7 +156,7 @@ endif()
 
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
-  PRIVATE legacySwiftSyntax)
+  PRIVATE swiftSyntax)
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
   # Remove dependencies from clangBasic to avoid bringing along some llvm
   # libraries that we don't need to be building.

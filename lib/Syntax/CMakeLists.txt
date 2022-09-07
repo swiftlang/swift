@@ -4,13 +4,13 @@ else()
   set(SWIFT_GYB_FLAGS --line-directive "\'#line" "%(line)d" "\"%(file)s\"\'")
 endif()
 
-add_swift_host_library(legacySwiftSyntax STATIC
+add_swift_host_library(swiftSyntax STATIC
   AbsoluteRawSyntax.cpp
   RawSyntax.cpp
   Syntax.cpp
   SyntaxData.cpp
   UnknownSyntax.cpp)
-_swift_gyb_target_sources(legacySwiftSyntax PRIVATE
+_swift_gyb_target_sources(swiftSyntax PRIVATE
     SyntaxNodes.cpp.gyb
     SyntaxBuilders.cpp.gyb
     SyntaxKind.cpp.gyb
@@ -18,5 +18,5 @@ _swift_gyb_target_sources(legacySwiftSyntax PRIVATE
     SyntaxVisitor.cpp.gyb
     Trivia.cpp.gyb
     SyntaxSerialization.cpp.gyb)
-target_link_libraries(legacySwiftSyntax PRIVATE
+target_link_libraries(swiftSyntax PRIVATE
   swiftParse)

@@ -1,27 +1,29 @@
-add_subdirectory(${SWIFT_SOURCE_DIR}/../swift-syntax ${CMAKE_CURRENT_BINARY_DIR}/swift-syntax)
+# TODO: why do we need these on Linux?
+set(CMAKE_Swift_ARCHIVE_CREATE "<CMAKE_AR> crs <TARGET> <OBJECTS>")
+set(CMAKE_Swift_ARCHIVE_FINISH "")
 
-add_library(ASTGen
-        ASTGen.swift)
+if (SWIFT_SWIFT_PARSER)
+    add_library(ASTGen
+            ASTGen.swift)
+
+    target_link_libraries(ASTGen PUBLIC
+            SwiftSyntax
+            SwiftParser
+            SwiftDiagnostics)
+
+    target_link_directories(ASTGen PUBLIC
+            "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib")
+
+    target_include_directories(ASTGen PUBLIC
+            "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
+else()
+    add_library(ASTGen
+            DummyASTGen.swift)
+endif()
+
+set_target_properties(ASTGen PROPERTIES LINKER_LANGUAGE Swift)
 
 target_compile_options(ASTGen PUBLIC
         "-emit-module-interface")
-
-target_link_libraries(ASTGen PUBLIC
-  SwiftSyntax
-  SwiftParser
-  SwiftDiagnostics)
-  
-target_include_directories(SwiftParser PUBLIC
-  "${CMAKE_CURRENT_BINARY_DIR}/../Parser/swift-syntax/SwiftSyntax"
-  "${CMAKE_CURRENT_BINARY_DIR}/../Parser/swift-syntax/SwiftDiagnostics"
-  "${CMAKE_CURRENT_BINARY_DIR}/../Parser/swift-syntax/SwiftParser")
-
-set_property(GLOBAL APPEND PROPERTY SWIFTSYNTAX_EXPORTS ASTGen)
-
-install(TARGETS ASTGen
-  EXPORT SwiftSyntaxTargets
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
 
 add_dependencies(ASTGen swiftAST)
