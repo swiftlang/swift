@@ -82,39 +82,6 @@ public:
         fixedTI->getFixedAlignment().getValue()};
   }
 
-  bool shouldPassIndirectly(Type type) {
-    auto *TI = &IGM.getTypeInfoForUnlowered(type);
-    NativeConventionSchema schema(IGM, TI, /*isResult=*/false);
-    return schema.requiresIndirect();
-  }
-
-  bool shouldReturnIndirectly(Type type) {
-    if (type->isVoid())
-      return false;
-    auto *TI = &IGM.getTypeInfoForUnlowered(type);
-    NativeConventionSchema schema(IGM, TI, /*isResult=*/true);
-    return schema.requiresIndirect();
-  }
-
-  bool enumerateDirectPassingRecordMembers(
-      Type t, llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
-                  callback) {
-    auto *TI = &IGM.getTypeInfoForUnlowered(t);
-    NativeConventionSchema schema(IGM, TI, /*isResult=*/false);
-    bool hasError = false;
-    schema.enumerateComponents(
-        [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
-          auto primitiveType = getPrimitiveTypeFromLLVMType(
-              IGM.getSwiftModule()->getASTContext(), type);
-          if (!primitiveType) {
-            hasError = true;
-            return;
-          }
-          callback(offset, end, *primitiveType);
-        });
-    return hasError;
-  }
-
   IRABIDetailsProvider::FunctionABISignature
   getTypeMetadataAccessFunctionSignature() {
     auto &ctx = IGM.getSwiftModule()->getASTContext();
@@ -157,7 +124,7 @@ public:
     return elements;
   }
 
-  llvm::Optional<IRABIDetailsProvider::LoweredFunctionSignature>
+  llvm::Optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
     auto function = SILFunction::getFunction(SILDeclRef(fd), *silMod);
     auto silFuncType = function->getLoweredFunctionType();
@@ -174,8 +141,7 @@ public:
         SignatureExpansionABIDetails(Signature::getUncachedABIDetails(
             IGM, silFuncType, funcPointerKind));
 
-    auto result =
-        IRABIDetailsProvider::LoweredFunctionSignature(fd, *this, *abiDetails);
+    auto result = LoweredFunctionSignature(fd, *this, *abiDetails);
     // Save metadata source types to avoid keeping the SIL func around.
     for (const auto &typeSource :
          abiDetails->polymorphicSignatureExpandedTypeSources) {
@@ -191,51 +157,31 @@ public:
     // Verify that the signature param count matches the IR param count.
     size_t signatureParamCount = 0;
     result.visitParameterList(
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                IndirectResultValue &indirectResult) { ++signatureParamCount; },
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                DirectParameter &param) {
+        [&](const LoweredFunctionSignature::IndirectResultValue
+                &indirectResult) { ++signatureParamCount; },
+        [&](const LoweredFunctionSignature::DirectParameter &param) {
           param.enumerateRecordMembers([&](clang::CharUnits, clang::CharUnits,
                                            Type) { ++signatureParamCount; });
         },
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                IndirectParameter &param) { ++signatureParamCount; },
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                GenericRequirementParameter &genericRequirementParam) {
+        [&](const LoweredFunctionSignature::IndirectParameter &param) {
           ++signatureParamCount;
         },
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                MetadataSourceParameter &metadataSrcParam) {
+        [&](const LoweredFunctionSignature::GenericRequirementParameter
+                &genericRequirementParam) { ++signatureParamCount; },
+        [&](const LoweredFunctionSignature::MetadataSourceParameter
+                &metadataSrcParam) { ++signatureParamCount; },
+        [&](const LoweredFunctionSignature::ContextParameter &) {
           ++signatureParamCount;
         },
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                ContextParameter &) { ++signatureParamCount; },
-        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
-                ErrorResultValue &) { ++signatureParamCount; });
+        [&](const LoweredFunctionSignature::ErrorResultValue &) {
+          ++signatureParamCount;
+        });
     // Return nothing if we were unable to represent the exact signature
     // parameters.
     if (signatureParamCount != abiDetails->numParamIRTypesInSignature)
       return None;
 
     return result;
-  }
-
-  llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1>
-  getFunctionABIAdditionalParams(AbstractFunctionDecl *afd) {
-    llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> params;
-
-    auto function = SILFunction::getFunction(SILDeclRef(afd), *silMod);
-
-    auto silFuncType = function->getLoweredFunctionType();
-    auto funcPointerKind =
-        FunctionPointerKind(FunctionPointerKind::BasicKind::Function);
-
-    auto abiDetails =
-        Signature::getUncachedABIDetails(IGM, silFuncType, funcPointerKind);
-
-    using ABIAdditionalParam = IRABIDetailsProvider::ABIAdditionalParam;
-    using ParamRole = ABIAdditionalParam::ABIParameterRole;
-    return params;
   }
 
   Lowering::TypeConverter typeConverter;
@@ -250,20 +196,18 @@ public:
 
 } // namespace swift
 
-IRABIDetailsProvider::LoweredFunctionSignature::LoweredFunctionSignature(
+LoweredFunctionSignature::LoweredFunctionSignature(
     const AbstractFunctionDecl *FD, IRABIDetailsProviderImpl &owner,
     const irgen::SignatureExpansionABIDetails &abiDetails)
     : FD(FD), owner(owner), abiDetails(abiDetails) {}
 
-IRABIDetailsProvider::LoweredFunctionSignature::DirectResultType::
-    DirectResultType(IRABIDetailsProviderImpl &owner,
-                     const irgen::TypeInfo &typeDetails)
+LoweredFunctionSignature::DirectResultType::DirectResultType(
+    IRABIDetailsProviderImpl &owner, const irgen::TypeInfo &typeDetails)
     : owner(owner), typeDetails(typeDetails) {}
 
-bool IRABIDetailsProvider::LoweredFunctionSignature::DirectResultType::
-    enumerateRecordMembers(
-        llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
-            callback) const {
+bool LoweredFunctionSignature::DirectResultType::enumerateRecordMembers(
+    llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)> callback)
+    const {
   auto &schema = typeDetails.nativeReturnValueSchema(owner.IGM);
   assert(!schema.requiresIndirect());
   bool hasError = false;
@@ -280,20 +224,18 @@ bool IRABIDetailsProvider::LoweredFunctionSignature::DirectResultType::
   return hasError;
 }
 
-IRABIDetailsProvider::LoweredFunctionSignature::DirectParameter::
-    DirectParameter(IRABIDetailsProviderImpl &owner,
-                    const irgen::TypeInfo &typeDetails,
-                    const ParamDecl &paramDecl)
+LoweredFunctionSignature::DirectParameter::DirectParameter(
+    IRABIDetailsProviderImpl &owner, const irgen::TypeInfo &typeDetails,
+    const ParamDecl &paramDecl)
     : owner(owner), typeDetails(typeDetails), paramDecl(paramDecl) {}
 
-IRABIDetailsProvider::LoweredFunctionSignature::IndirectParameter::
-    IndirectParameter(const ParamDecl &paramDecl)
+LoweredFunctionSignature::IndirectParameter::IndirectParameter(
+    const ParamDecl &paramDecl)
     : paramDecl(paramDecl) {}
 
-bool IRABIDetailsProvider::LoweredFunctionSignature::DirectParameter::
-    enumerateRecordMembers(
-        llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
-            callback) const {
+bool LoweredFunctionSignature::DirectParameter::enumerateRecordMembers(
+    llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)> callback)
+    const {
   auto &schema = typeDetails.nativeParameterValueSchema(owner.IGM);
   assert(!schema.requiresIndirect());
   bool hasError = false;
@@ -310,28 +252,26 @@ bool IRABIDetailsProvider::LoweredFunctionSignature::DirectParameter::
   return hasError;
 }
 
-IRABIDetailsProvider::LoweredFunctionSignature::GenericRequirementParameter::
+LoweredFunctionSignature::GenericRequirementParameter::
     GenericRequirementParameter(const GenericRequirement &requirement)
     : requirement(requirement) {}
 
-IRABIDetailsProvider::LoweredFunctionSignature::MetadataSourceParameter::
-    MetadataSourceParameter(const CanType &type)
+LoweredFunctionSignature::MetadataSourceParameter::MetadataSourceParameter(
+    const CanType &type)
     : type(type) {}
 
-llvm::Optional<IRABIDetailsProvider::LoweredFunctionSignature::DirectResultType>
-IRABIDetailsProvider::LoweredFunctionSignature::getDirectResultType() const {
+llvm::Optional<LoweredFunctionSignature::DirectResultType>
+LoweredFunctionSignature::getDirectResultType() const {
   if (!abiDetails.directResult)
     return None;
   return DirectResultType(owner, abiDetails.directResult->typeInfo);
 }
 
-size_t
-IRABIDetailsProvider::LoweredFunctionSignature::getNumIndirectResultValues()
-    const {
+size_t LoweredFunctionSignature::getNumIndirectResultValues() const {
   return abiDetails.indirectResults.size();
 }
 
-void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
+void LoweredFunctionSignature::visitParameterList(
     llvm::function_ref<void(const IndirectResultValue &)> indirectResultVisitor,
     llvm::function_ref<void(const DirectParameter &)> directParamVisitor,
     llvm::function_ref<void(const IndirectParameter &)> indirectParamVisitor,
@@ -340,9 +280,9 @@ void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
     llvm::function_ref<void(const MetadataSourceParameter &)>
         metadataSourceVisitor,
     llvm::function_ref<void(const ContextParameter &)> contextParamVisitor,
-    llvm::function_ref<void(const ErrorResultValue &)> errorResultVisitor) {
+    llvm::function_ref<void(const ErrorResultValue &)> errorResultVisitor)
+    const {
   // Indirect result values come before parameters.
-  llvm::SmallVector<IndirectResultValue, 1> result;
   for (const auto &r : abiDetails.indirectResults)
     indirectResultVisitor(IndirectResultValue(r.hasSRet));
 
@@ -425,29 +365,9 @@ IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
 }
 
-llvm::Optional<IRABIDetailsProvider::LoweredFunctionSignature>
+llvm::Optional<LoweredFunctionSignature>
 IRABIDetailsProvider::getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
   return impl->getFunctionLoweredSignature(fd);
-}
-
-llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1>
-IRABIDetailsProvider::getFunctionABIAdditionalParams(
-    AbstractFunctionDecl *afd) {
-  return impl->getFunctionABIAdditionalParams(afd);
-}
-
-bool IRABIDetailsProvider::shouldPassIndirectly(Type t) {
-  return impl->shouldPassIndirectly(t);
-}
-
-bool IRABIDetailsProvider::shouldReturnIndirectly(Type t) {
-  return impl->shouldReturnIndirectly(t);
-}
-
-bool IRABIDetailsProvider::enumerateDirectPassingRecordMembers(
-    Type t, llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
-                callback) {
-  return impl->enumerateDirectPassingRecordMembers(t, callback);
 }
 
 IRABIDetailsProvider::FunctionABISignature

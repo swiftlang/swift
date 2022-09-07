@@ -32,6 +32,7 @@ class AnyFunctionType;
 class FuncDecl;
 class ModuleDecl;
 class NominalTypeDecl;
+class LoweredFunctionSignature;
 class ParamDecl;
 class ParameterList;
 class PrimitiveTypeMapping;
@@ -77,17 +78,6 @@ public:
     CxxInlineThunk
   };
 
-  /// Information about any additional parameters.
-  struct AdditionalParam {
-    enum class Role { Error };
-
-    Role role;
-    Type type;
-    // Should self be passed indirectly?
-    bool isIndirect = false;
-    llvm::Optional<GenericRequirement> genericRequirement = None;
-  };
-
   /// Optional modifiers that can be applied to function signature.
   struct FunctionSignatureModifiers {
     /// Additional qualifier to add before the function's name.
@@ -104,34 +94,34 @@ public:
   ///
   /// \return value describing in which Clang language mode the function is
   /// supported, if any.
-  ClangRepresentation
-  printFunctionSignature(const AbstractFunctionDecl *FD, StringRef name,
-                         Type resultTy, FunctionSignatureKind kind,
-                         ArrayRef<AdditionalParam> additionalParams = {},
-                         FunctionSignatureModifiers modifiers = {});
+  ClangRepresentation printFunctionSignature(
+      const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
+      StringRef name, Type resultTy, FunctionSignatureKind kind,
+      FunctionSignatureModifiers modifiers = {});
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
   void printCxxThunkBody(const AbstractFunctionDecl *FD,
+                         const LoweredFunctionSignature &signature,
                          StringRef swiftSymbolName,
                          const ModuleDecl *moduleContext, Type resultTy,
-                         const ParameterList *params,
-                         ArrayRef<AdditionalParam> additionalParams = {},
-                         bool hasThrows = false,
+                         const ParameterList *params, bool hasThrows = false,
                          const AnyFunctionType *funcType = nullptr);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
-                      const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
-                      Type resultTy, bool isDefinition,
-                      ArrayRef<AdditionalParam> additionalParams);
+                      const AbstractFunctionDecl *FD,
+                      const LoweredFunctionSignature &signature,
+                      StringRef swiftSymbolName, Type resultTy,
+                      bool isDefinition);
 
   /// Print the C++ getter/setter method signature.
-  void printCxxPropertyAccessorMethod(
-      const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
-      StringRef swiftSymbolName, Type resultTy, bool isDefinition,
-      ArrayRef<AdditionalParam> additionalParams);
+  void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
+                                      const AccessorDecl *accessor,
+                                      const LoweredFunctionSignature &signature,
+                                      StringRef swiftSymbolName, Type resultTy,
+                                      bool isDefinition);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
   ClangRepresentation
