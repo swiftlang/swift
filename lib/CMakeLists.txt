@@ -19,6 +19,7 @@ list(APPEND LLVM_COMMON_DEPENDS swift-parse-syntax-generated-headers)
 
 add_subdirectory(APIDigester)
 add_subdirectory(AST)
+add_subdirectory(ASTGen) # Must come before Parse
 add_subdirectory(ASTSectionImporter)
 add_subdirectory(Basic)
 add_subdirectory(ConstExtract)

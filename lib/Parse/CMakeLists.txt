@@ -6,9 +6,6 @@ else()
   set(SWIFT_GYB_FLAGS --line-directive "\'#line" "%(line)d" "\"%(file)s\"\'")
 endif()
 
-add_subdirectory(${SWIFT_SOURCE_DIR}/../swift-syntax ${CMAKE_CURRENT_BINARY_DIR}/swift-syntax)
-add_dependencies(ASTGen swiftAST)
-
 add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
