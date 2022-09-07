@@ -301,23 +301,19 @@ IRABIDetailsProvider::LoweredFunctionSignature::getDirectResultType() const {
 }
 
 size_t
-IRABIDetailsProvider::LoweredFunctionSignature::getNumIndirectResults() const {
+IRABIDetailsProvider::LoweredFunctionSignature::getNumIndirectResultValues()
+    const {
   return abiDetails.indirectResults.size();
 }
 
-llvm::SmallVector<
-    IRABIDetailsProvider::LoweredFunctionSignature::IndirectResultType, 1>
-IRABIDetailsProvider::LoweredFunctionSignature::getIndirectResultTypes() const {
-  llvm::SmallVector<IndirectResultType, 1> result;
-  for (const auto &r : abiDetails.indirectResults)
-    result.push_back(IndirectResultType(r.hasSRet));
-  return result;
-}
-
 void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
+    llvm::function_ref<void(const IndirectResultValue &)> indirectResultVisitor,
     llvm::function_ref<void(const DirectParameter &)> directParamVisitor,
     llvm::function_ref<void(const IndirectParameter &)> indirectParamVisitor) {
-  // FIXME: Traverse indirect result values.
+  // Indirect result values come before parameters.
+  llvm::SmallVector<IndirectResultValue, 1> result;
+  for (const auto &r : abiDetails.indirectResults)
+    indirectResultVisitor(IndirectResultValue(r.hasSRet));
 
   // Traverse ABI parameters, mapping them back to the AST parameters.
   llvm::SmallVector<const ParamDecl *, 8> silParamMapping;

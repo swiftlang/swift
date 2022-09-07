@@ -564,10 +564,10 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
 
     auto directResultType = signature->getDirectResultType();
     // FIXME: support direct + indirect results.
-    if (directResultType && signature->getNumIndirectResults() > 0)
+    if (directResultType && signature->getNumIndirectResultValues() > 0)
       return ClangRepresentation::unsupported;
     // FIXME: support multiple indirect results.
-    if (signature->getNumIndirectResults() > 1)
+    if (signature->getNumIndirectResultValues() > 1)
       return ClangRepresentation::unsupported;
 
     if (!directResultType) {
@@ -608,16 +608,6 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   bool HasParams = false;
 
   if (kind == FunctionSignatureKind::CFunctionProto) {
-    // Indirect result is passed in as the first parameter.
-    // FIXME: make visitor!
-    for (const auto &result : signature->getIndirectResultTypes()) {
-      HasParams = true;
-      if (result.hasSRet())
-        os << "SWIFT_INDIRECT_RESULT ";
-      // FIXME: it would be nice to print out the C struct type here.
-      os << "void * _Nonnull";
-    }
-
     // First, verify that the C++ param types are representable.
     for (auto param : *FD->getParameters()) {
       OptionalTypeKind optKind;
@@ -636,7 +626,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
         return resultingRepresentation;
     }
 
-    bool NeedsComma = HasParams;
+    bool NeedsComma = false;
     auto emitNewParam = [&]() {
       HasParams = true;
       if (NeedsComma)
@@ -667,6 +657,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       assert(!s.isUnsupported());
     };
     signature->visitParameterList(
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                IndirectResultValue &indirectResult) {
+          emitNewParam();
+          if (indirectResult.hasSRet())
+            os << "SWIFT_INDIRECT_RESULT ";
+          // FIXME: it would be nice to print out the C struct type here.
+          os << "void * _Nonnull";
+        },
         [&](const IRABIDetailsProvider::LoweredFunctionSignature::
                 DirectParameter &param) {
           emitNewParam();
@@ -744,7 +742,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                                        ->isAnyClassReferenceType()))
           os << "const ";
         os << "void * _Nonnull _self";
-      } else if (param.role ==  AdditionalParam::Role::Error) {
+      } else if (param.role == AdditionalParam::Role::Error) {
         os << "SWIFT_ERROR_RESULT ";
         os << "void * _Nullable * _Nullable _error";
       } else if (param.role == AdditionalParam::Role::GenericRequirement) {
@@ -840,21 +838,17 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     os << cxx_synthesis::getCxxImplNamespaceName() << "::" << swiftSymbolName
        << '(';
 
-    bool hasParams = false;
-    if (additionalParam) {
-      hasParams = true;
-      os << *additionalParam;
-    }
-
-    bool needsComma = hasParams;
+    bool needsComma = false;
     size_t paramIndex = 1;
-    auto printParamUse = [&](const ParamDecl &param, bool isIndirect,
-
-                             std::string directTypeEncoding) {
+    auto emitNewParam = [&]() {
       if (needsComma)
         os << ", ";
       needsComma = true;
-      hasParams = true;
+    };
+    auto printParamUse = [&](const ParamDecl &param, bool isIndirect,
+
+                             std::string directTypeEncoding) {
+      emitNewParam();
       std::string paramName;
       if (param.isSelfParameter()) {
         paramName = "*this";
@@ -873,6 +867,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
     signature->visitParameterList(
         [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                IndirectResultValue &) {
+          emitNewParam();
+          assert(additionalParam);
+          os << *additionalParam;
+          additionalParam = None;
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
                 DirectParameter &param) {
           printParamUse(
               param.getParamDecl(), /*isIndirect=*/false,
@@ -885,7 +886,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         });
 
     if (additionalParams.size()) {
-      if (hasParams)
+      if (needsComma)
         os << ", ";
       interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
         if (param.role == AdditionalParam::Role::GenericRequirement) {

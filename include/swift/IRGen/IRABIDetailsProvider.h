@@ -123,14 +123,15 @@ public:
       friend class LoweredFunctionSignature;
     };
 
-    class IndirectResultType {
+    /// Represents a result value returned indirectly out of a function.
+    class IndirectResultValue {
     public:
       /// Returns true if this indirect result type uses the `sret` LLVM
       /// attribute.
       inline bool hasSRet() const { return hasSRet_; }
 
     private:
-      inline IndirectResultType(bool hasSRet_) : hasSRet_(hasSRet_) {}
+      inline IndirectResultValue(bool hasSRet_) : hasSRet_(hasSRet_) {}
       bool hasSRet_;
       friend class LoweredFunctionSignature;
     };
@@ -177,10 +178,7 @@ public:
     llvm::Optional<DirectResultType> getDirectResultType() const;
 
     /// Returns the number of indirect result values in this function signature.
-    size_t getNumIndirectResults() const;
-
-    /// Returns lowered indirect result details.
-    llvm::SmallVector<IndirectResultType, 1> getIndirectResultTypes() const;
+    size_t getNumIndirectResultValues() const;
 
     /// Traverse the entire parameter list of the function signature.
     ///
@@ -188,6 +186,8 @@ public:
     /// values returned indirectly, and additional values, like generic
     /// requirements for polymorphic calls and the error parameter as well.
     void visitParameterList(
+        llvm::function_ref<void(const IndirectResultValue &)>
+            indirectResultVisitor,
         llvm::function_ref<void(const DirectParameter &)> directParamVisitor,
         llvm::function_ref<void(const IndirectParameter &)>
             indirectParamVisitor);
