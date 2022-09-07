@@ -9211,7 +9211,10 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
       ActorIsolation::forUnspecified());
 }
 
-ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
+ActorIsolation swift::getActorIsolationOfContext(
+    DeclContext *dc,
+    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+        getClosureActorIsolation) {
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
   if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
@@ -9226,7 +9229,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     return getActorIsolation(var);
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
-    return closure->getActorIsolation().getActorIsolation();
+    return getClosureActorIsolation(closure).getActorIsolation();
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {

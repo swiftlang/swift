@@ -921,7 +921,10 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
   if (!F.isAsync()) {
     llvm::report_fatal_error("Builtin.hopToActor must be in an async function");
   }
-  auto isolation = getActorIsolationOfContext(FunctionDC);
+  auto isolation =
+      getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
+        return CE->getActorIsolation();
+      });
   if (isolation != ActorIsolation::Independent
       && isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in independent

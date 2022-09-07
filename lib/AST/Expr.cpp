@@ -1903,6 +1903,16 @@ Expr *AbstractClosureExpr::getSingleExpressionBody() const {
   return nullptr;
 }
 
+ClosureActorIsolation
+swift::__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE) {
+  return CE->getActorIsolation();
+}
+
+llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+swift::_getRef__AbstractClosureExpr_getActorIsolation() {
+  return __AbstractClosureExpr_getActorIsolation;
+}
+
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
   SourceRange CLASS::getSourceRange() const {     \
     return (NODE)->getSourceRange();              \
