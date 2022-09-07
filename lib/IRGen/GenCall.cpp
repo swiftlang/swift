@@ -1986,6 +1986,7 @@ SignatureExpansionABIDetails Signature::getUncachedABIDetails(
   SignatureExpansion expansion(IGM, formalType, kind);
   SignatureExpansionABIDetails result;
   expansion.expandFunctionType(&result);
+  result.numParamIRTypesInSignature = expansion.ParamIRTypes.size();
   return result;
 }
 

@@ -163,6 +163,8 @@ public:
   bool hasContextParam = false;
   /// True if an error result value indirect parameter is passed to the call.
   bool hasErrorResult = false;
+  /// The number of LLVM IR parameters in the LLVM IR function signature.
+  size_t numParamIRTypesInSignature = 0;
 };
 
 /// A signature represents something which can actually be called.

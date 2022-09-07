@@ -188,6 +188,35 @@ public:
             result.metadataSourceTypes.push_back(canType);
           });
     }
+    // Verify that the signature param count matches the IR param count.
+    size_t signatureParamCount = 0;
+    result.visitParameterList(
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                IndirectResultValue &indirectResult) { ++signatureParamCount; },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                DirectParameter &param) {
+          param.enumerateRecordMembers([&](clang::CharUnits, clang::CharUnits,
+                                           Type) { ++signatureParamCount; });
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                IndirectParameter &param) { ++signatureParamCount; },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                GenericRequirementParameter &genericRequirementParam) {
+          ++signatureParamCount;
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                MetadataSourceParameter &metadataSrcParam) {
+          ++signatureParamCount;
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                ContextParameter &) { ++signatureParamCount; },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                ErrorResultValue &) { ++signatureParamCount; });
+    // Return nothing if we were unable to represent the exact signature
+    // parameters.
+    if (signatureParamCount != abiDetails->numParamIRTypesInSignature)
+      return None;
+
     return result;
   }
 
