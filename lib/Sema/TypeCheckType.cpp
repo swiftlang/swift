@@ -119,6 +119,51 @@ static DescriptiveDeclKind describeDeclOfType(Type t) {
   return DescriptiveDeclKind::Type;
 }
 
+static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
+  switch (options.getBaseContext()) {
+  case TypeResolverContext::GenericRequirement:
+  case TypeResolverContext::SameTypeRequirement:
+    return 0;
+
+  case TypeResolverContext::GenericParameterInherited:
+    return 1;
+
+  case TypeResolverContext::AssociatedTypeInherited:
+    return 2;
+
+  case TypeResolverContext::None:
+  case TypeResolverContext::Inherited:
+  case TypeResolverContext::FunctionInput:
+  case TypeResolverContext::TupleElement:
+  case TypeResolverContext::GenericArgument:
+  case TypeResolverContext::ProtocolGenericArgument:
+  case TypeResolverContext::ExtensionBinding:
+  case TypeResolverContext::TypeAliasDecl:
+  case TypeResolverContext::GenericTypeAliasDecl:
+  case TypeResolverContext::ExistentialConstraint:
+  case TypeResolverContext::MetatypeBase:
+  case TypeResolverContext::InExpression:
+  case TypeResolverContext::ExplicitCastExpr:
+  case TypeResolverContext::ForEachStmt:
+  case TypeResolverContext::PatternBindingDecl:
+  case TypeResolverContext::EditorPlaceholderExpr:
+  case TypeResolverContext::ClosureExpr:
+  case TypeResolverContext::VariadicFunctionInput:
+  case TypeResolverContext::InoutFunctionInput:
+  case TypeResolverContext::FunctionResult:
+  case TypeResolverContext::SubscriptDecl:
+  case TypeResolverContext::EnumElementDecl:
+  case TypeResolverContext::EnumPatternPayload:
+  case TypeResolverContext::ProtocolMetatypeBase:
+  case TypeResolverContext::ImmediateOptionalTypeArgument:
+  case TypeResolverContext::AbstractFunctionDecl:
+  case TypeResolverContext::CustomAttr:
+    break;
+  }
+
+  llvm_unreachable("Invalid type resolution context");
+}
+
 Type TypeResolution::resolveDependentMemberType(
                                           Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
@@ -144,6 +189,24 @@ Type TypeResolution::resolveDependentMemberType(
 
   // Look for a nested type with the given name.
   if (auto nestedType = genericSig->lookupNestedType(baseTy, refIdentifier)) {
+    if (options.isGenericRequirement()) {
+      if (auto *protoDecl = nestedType->getDeclContext()->getExtendedProtocolDecl()) {
+        if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+          unsigned kind = getGenericRequirementKind(options);
+          ctx.Diags.diagnose(ref->getNameLoc(),
+                             diag::protocol_extension_in_where_clause,
+                             nestedType->getName(), protoDecl->getName(), kind);
+          if (protoDecl->getLoc() && nestedType->getLoc()) {
+            ctx.Diags.diagnose(nestedType->getLoc(),
+                               diag::protocol_extension_in_where_clause_note,
+                               nestedType->getName(), protoDecl->getName());
+          }
+        }
+
+        return ErrorType::get(ctx);
+      }
+    }
+
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
@@ -3991,6 +4054,8 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::ClosureExpr:
   case TypeResolverContext::Inherited:
+  case TypeResolverContext::GenericParameterInherited:
+  case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
     doDiag = true;
     break;
