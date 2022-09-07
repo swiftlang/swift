@@ -758,10 +758,9 @@ extension Slice {
   ///    initialized by this function.
   @inlinable
   @_alwaysEmitIntoClient
-  public func initialize<C>(
-    fromContentsOf source: C
-  ) -> Index
-    where C : Collection, Base == UnsafeMutableBufferPointer<C.Element> {
+  public func initialize<Element>(
+    fromContentsOf source: some Collection<Element>
+  ) -> Index where Base == UnsafeMutableBufferPointer<Element> {
     let buffer = Base(rebasing: self)
     let index = buffer.initialize(fromContentsOf: source)
     let distance = buffer.distance(from: buffer.startIndex, to: index)
