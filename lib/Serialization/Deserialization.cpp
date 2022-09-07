@@ -1174,7 +1174,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   }
   default:
     // Not a generic signature; no way to recover.
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   // If we've already deserialized this generic signature, start over to return
@@ -1216,7 +1216,7 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != GENERIC_ENVIRONMENT)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   GenericSignatureID parentSigID;
   TypeID existentialID;
@@ -1275,7 +1275,7 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != SUBSTITUTION_MAP)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   GenericSignatureID genericSigID;
   uint64_t numReplacementIDs;
@@ -1631,7 +1631,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   default:
     // Unknown xref kind.
     pathTrace.addUnknown(recordID);
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   auto getXRefDeclNameForError = [&]() -> DeclName {
@@ -6433,7 +6433,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   #undef TYPE
     default:
       // We don't know how to deserialize this kind of type.
-      fatal();
+      fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
   }
 
@@ -6552,7 +6552,7 @@ ModuleFile::getClangType(ClangTypeID TID) {
     DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
   if (recordID != decls_block::CLANG_TYPE)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   auto &clangLoader = *getContext().getClangModuleLoader();
   auto clangType =
