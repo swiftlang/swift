@@ -427,7 +427,7 @@ protected:
         // so we just need to call `buildIf` now, since we're at the top level.
         if (isOptional && (ifStmt->getThenStmt() == anchor ||
                            ifStmt->getElseStmt() == anchor)) {
-          builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
+          builderCall = builder.buildCall(ifStmt->getEndLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
         }

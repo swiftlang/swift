@@ -3293,7 +3293,8 @@ private:
 
     SmallVector<Constraint *, 4> disabledConstraints;
     SmallVector<Constraint *, 4> favoredConstraints;
-    
+
+  public:
     /// Depth of the solution stack.
     unsigned depth = 0;
   };
