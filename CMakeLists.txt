@@ -1185,6 +1185,7 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
+  set(SWIFT_STDLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlib")
   # Some of the things below depend on the threading library
   add_subdirectory(stdlib/public/Threading)
 
