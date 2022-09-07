@@ -45,8 +45,6 @@ func test(valueOptOpt: MyStruct??) {
     case let x where x < 2:
       let unrelated3 = FORBIDDEN_Struct()
       _ = { xx in
-        let unrelated4 = FORBIDDEN_Struct()
-
         if xx == localFunc(value.#^FUNCTIONBODY^#) {
           let unrelated5 = FORBIDDEN_Struct()
           return 1
