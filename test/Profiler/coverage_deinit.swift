@@ -5,16 +5,10 @@ func foo() {}
 
 public class Foo {
   // CHECK-LABEL: sil @$s15coverage_deinit3FooCfd
-  // CHECK:       integer_literal $Builtin.Int64, 0
-  // CHECK:       integer_literal $Builtin.Int32, 2
-  // CHECK:       integer_literal $Builtin.Int32, 0
-  // CHECK-NEXT:  builtin "int_instrprof_increment"
+  // CHECK:       increment_profiler_counter 0
   // CHECK:       function_ref @$sSb6randomSbyFZ
   // CHECK:       cond_br
-  // CHECK:       integer_literal $Builtin.Int64, 0
-  // CHECK:       integer_literal $Builtin.Int32, 2
-  // CHECK:       integer_literal $Builtin.Int32, 1
-  // CHECK-NEXT:  builtin "int_instrprof_increment"
+  // CHECK:       increment_profiler_counter 1
   // CHECK-NEXT:  // function_ref coverage_deinit.foo() -> ()
   deinit {
     if .random() {

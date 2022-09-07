@@ -21,20 +21,12 @@ distributed actor MyDistActor {
   // CHECK:       cond_br {{%[0-9]+}}, {{bb[0-9]+}}, [[DEINITBODYBB:bb[0-9]+]]
 
   // CHECK:       [[DEINITBODYBB]]:
-  // CHECK-NEXT:  string_literal utf8
-  // CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 2
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 0
-  // CHECK-NEXT:  int_instrprof_increment
+  // CHECK-NEXT:  increment_profiler_counter 0
   // CHECK:       function_ref @$sSb6randomSbyFZ
   // CHECK:       cond_br {{%[0-9]+}}, [[TRUEBB:bb[0-9]+]], {{bb[0-9]+}}
 
   // CHECK:       [[TRUEBB]]:
-  // CHECK-NEXT:  string_literal utf8
-  // CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 2
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 1
-  // CHECK-NEXT:  int_instrprof_increment
+  // CHECK-NEXT:  increment_profiler_counter 1
 
   // CHECK-LABEL: sil_coverage_map {{.*}} "$s13coverage_dist11MyDistActorCfd" {{.*}} // coverage_dist.MyDistActor.deinit
   // CHECK-NEXT:  [[@LINE+3]]:10 -> [[@LINE+5]]:4 : 0

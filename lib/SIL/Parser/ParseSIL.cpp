@@ -2991,6 +2991,54 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::IncrementProfilerCounterInst: {
+    // First argument is the counter index.
+    unsigned CounterIdx;
+    if (parseInteger(CounterIdx, diag::expected_sil_profiler_counter_idx))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Parse the PGO function name.
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_sil_profiler_counter_pgo_func_name);
+      return true;
+    }
+    // Drop the double quotes.
+    auto FuncName = P.Tok.getText().drop_front().drop_back();
+    P.consumeToken(tok::string_literal);
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Parse the number of counters.
+    if (parseVerbatim("num_counters"))
+      return true;
+
+    unsigned NumCounters;
+    if (parseInteger(NumCounters, diag::expected_sil_profiler_counter_total))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Parse the PGO function hash.
+    if (parseVerbatim("hash"))
+      return true;
+
+    uint64_t Hash;
+    if (parseInteger(Hash, diag::expected_sil_profiler_counter_hash))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createIncrementProfilerCounter(InstLoc, CounterIdx, FuncName,
+                                                 NumCounters, Hash);
+    break;
+  }
+
   case SILInstructionKind::ProjectBoxInst: {
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))

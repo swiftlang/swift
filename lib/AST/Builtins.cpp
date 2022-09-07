@@ -1190,15 +1190,6 @@ static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getIntInstrprofIncrement(ASTContext &C, Identifier Id) {
-  // (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ()
-  Type Int64Ty = BuiltinIntegerType::get(64, C);
-  Type Int32Ty = BuiltinIntegerType::get(32, C);
-  return getBuiltinFunction(Id,
-                            {C.TheRawPointerType, Int64Ty, Int32Ty, Int32Ty},
-                            TupleType::getEmpty(C));
-}
-
 static ValueDecl *getTypePtrAuthDiscriminator(ASTContext &C, Identifier Id) {
   // <T : AnyObject> (T.Type) -> Int64
   BuiltinFunctionBuilder builder(C);
@@ -2843,9 +2834,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getBuiltinFunction(Id,
                               {},
                               TupleType::getEmpty(Context));
-
-  case BuiltinValueKind::IntInstrprofIncrement:
-    return getIntInstrprofIncrement(Context, Id);
 
   case BuiltinValueKind::TypePtrAuthDiscriminator:
     return getTypePtrAuthDiscriminator(Context, Id);

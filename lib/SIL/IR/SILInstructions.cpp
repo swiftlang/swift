@@ -438,6 +438,22 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
       Substitutions(Subs) {
 }
 
+IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
+    SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
+    unsigned NumCounters, uint64_t PGOFuncHash, SILModule &M) {
+
+  auto PGOFuncNameLength = PGOFuncName.size();
+  auto Size = totalSizeToAlloc<char>(PGOFuncNameLength);
+  auto Buffer = M.allocateInst(Size, alignof(IncrementProfilerCounterInst));
+
+  auto *Inst = ::new (Buffer) IncrementProfilerCounterInst(
+      Loc, CounterIdx, PGOFuncNameLength, NumCounters, PGOFuncHash);
+
+  std::uninitialized_copy(PGOFuncName.begin(), PGOFuncName.end(),
+                          Inst->getTrailingObjects<char>());
+  return Inst;
+}
+
 InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
