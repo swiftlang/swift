@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "TypeCheckRegex.h"
 #include "TypeChecker.h"
@@ -2161,6 +2162,8 @@ namespace {
 
           closureParams.push_back(param->toFunctionParam(externalType));
         }
+
+        checkVariadicParameters(paramList, closure);
       }
 
       auto extInfo = CS.closureEffects(closure);

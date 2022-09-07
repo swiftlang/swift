@@ -1316,6 +1316,10 @@ public:
     CustomAttribute,
   };
 
+  ParserResult<TypeRepr> parseTypeScalar(
+      Diag<> MessageID,
+      ParseTypeReason reason);
+
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(
       Diag<> MessageID,
@@ -1432,9 +1436,6 @@ public:
     ///
     /// \p SecondName is the name.
     SourceLoc SecondNameLoc;
-
-    /// The location of the '...', if present.
-    SourceLoc EllipsisLoc;
 
     /// The first name.
     Identifier FirstName;

@@ -1018,7 +1018,7 @@ void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
   PlaceholderNotator().check(writtenType, inferredType);
 }
 
-/// Check the default arguments that occur within this pattern.
+/// Check the default arguments that occur within this parameter list.
 static void checkDefaultArguments(ParameterList *params) {
   // Force the default values in case they produce diagnostics.
   for (auto *param : *params) {
@@ -1037,6 +1037,39 @@ static void checkDefaultArguments(ParameterList *params) {
       TypeChecker::notePlaceholderReplacementTypes(
           ifacety, expr->getType()->mapTypeOutOfContext());
     }
+  }
+}
+
+void swift::checkVariadicParameters(ParameterList *params, DeclContext *dc) {
+  bool lastWasVariadic = false;
+
+  for (auto *param : *params) {
+    if (lastWasVariadic) {
+      if (param->getArgumentName().empty()) {
+        if (isa<AbstractClosureExpr>(dc))
+          param->diagnose(diag::closure_unlabeled_parameter_following_variadic_parameter);
+        else
+          param->diagnose(diag::unlabeled_parameter_following_variadic_parameter);
+      }
+
+      lastWasVariadic = false;
+    }
+
+    if (!param->isVariadic() &&
+        !param->getInterfaceType()->is<PackExpansionType>())
+      continue;
+
+    if (param->isDefaultArgument())
+      param->diagnose(diag::parameter_vararg_default);
+
+    // Enum elements don't allow old-style variadics.
+    if (param->isVariadic() &&
+        isa<EnumElementDecl>(dc)) {
+      param->diagnose(diag::enum_element_ellipsis);
+      continue;
+    }
+
+    lastWasVariadic = true;
   }
 }
 
@@ -2236,6 +2269,7 @@ public:
     TypeChecker::checkParameterList(SD->getIndices(), SD);
 
     checkDefaultArguments(SD->getIndices());
+    checkVariadicParameters(SD->getIndices(), SD);
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -2935,6 +2969,7 @@ public:
         checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
     checkDefaultArguments(FD->getParameters());
+    checkVariadicParameters(FD->getParameters(), FD);
 
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
@@ -3011,6 +3046,7 @@ public:
       TypeChecker::checkParameterList(PL, EED);
 
       checkDefaultArguments(PL);
+      checkVariadicParameters(PL, EED);
     }
 
     auto &DE = getASTContext().Diags;
@@ -3306,6 +3342,7 @@ public:
     }
 
     checkDefaultArguments(CD->getParameters());
+    checkVariadicParameters(CD->getParameters(), CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {

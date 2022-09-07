@@ -2532,6 +2532,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return { };
   }
 
+  case TypeReprKind::PackExpansion: {
+    auto packExpansionRepr = cast<PackExpansionTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getPatternType(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
@@ -2804,10 +2811,6 @@ createOpaqueParameterGenericParams(
   SmallVector<GenericTypeParamDecl *, 2> implicitGenericParams;
   auto dc = value->getInnermostDeclContext();
   for (auto param : *params) {
-    // Don't permit variadic parameters.
-    if (param->isVariadic())
-      continue;
-
     auto typeRepr = param->getTypeRepr();
     if (!typeRepr)
       continue;

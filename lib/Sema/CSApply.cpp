@@ -5723,7 +5723,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // Handle variadic generic parameters.
     if (ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
-      assert(param.isVariadic());
       assert(!param.isInOut());
 
       SmallVector<Expr *, 4> variadicArgs;

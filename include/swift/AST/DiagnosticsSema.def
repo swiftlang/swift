@@ -5014,14 +5014,25 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
-ERROR(tuple_ellipsis,none,
-      "cannot create a variadic tuple", ())
+ERROR(expansion_not_allowed,none,
+      "variadic expansion %0 cannot appear outside of a function parameter list, "
+      "function result, tuple element or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
-      "cannot create expansion with non-variadic type %0", (Type))
+      "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
+ERROR(multiple_ellipsis_in_tuple,none,
+      "only a single element can be variadic", ())
+
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
+ERROR(unlabeled_parameter_following_variadic_parameter,none,
+      "a parameter following a variadic parameter requires a label", ())
+ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
+      "no parameters may follow a variadic parameter in a closure", ())
+
+ERROR(parameter_vararg_default,none,
+      "variadic parameter cannot have a default value", ())
 
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
@@ -5142,8 +5153,6 @@ ERROR(opened_bad_constraint_type,none,
       "@opened constraint type %0 is not a protocol or protocol composition", (Type))
 ERROR(opened_bad_interface_type,none,
       "@opened interface type %0 is not a type parameter", (Type))
-ERROR(sil_function_ellipsis,PointsToFirstBadToken,
-      "SIL function types cannot be variadic", ())
 ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
 ERROR(sil_function_output_label,PointsToFirstBadToken,
