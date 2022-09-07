@@ -1164,29 +1164,15 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
   if (!SP->hasRegionCounters() || !getModule().getOptions().UseProfile.empty())
     return;
 
-  auto &C = B.getASTContext();
   const auto &RegionCounterMap = SP->getRegionCounterMap();
   auto CounterIt = RegionCounterMap.find(N);
 
   assert(CounterIt != RegionCounterMap.end() &&
          "cannot increment non-existent counter");
 
-  auto Int32Ty = getLoweredType(BuiltinIntegerType::get(32, C));
-  auto Int64Ty = getLoweredType(BuiltinIntegerType::get(64, C));
-
-  SILLocation Loc = getLocation(N);
-  SILValue Args[] = {
-      // The intrinsic must refer to the function profiling name var, which is
-      // inaccessible during SILGen. Rely on irgen to rewrite the function name.
-      B.createStringLiteral(Loc, SP->getPGOFuncName(),
-                            StringLiteralInst::Encoding::UTF8),
-      B.createIntegerLiteral(Loc, Int64Ty, SP->getPGOFuncHash()),
-      B.createIntegerLiteral(Loc, Int32Ty, SP->getNumRegionCounters()),
-      B.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
-  B.createBuiltin(
-      Loc,
-      C.getIdentifier(getBuiltinName(BuiltinValueKind::IntInstrprofIncrement)),
-      SGM.Types.getEmptyTupleType(), {}, Args);
+  B.createIncrementProfilerCounter(
+      getLocation(N), CounterIt->second, SP->getPGOFuncName(),
+      SP->getNumRegionCounters(), SP->getPGOFuncHash());
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {

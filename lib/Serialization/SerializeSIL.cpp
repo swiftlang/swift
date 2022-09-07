@@ -1647,6 +1647,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         0, 0, S.addUniquedStringRef(CFI->getMessage()));
     break;
   }
+  case SILInstructionKind::IncrementProfilerCounterInst: {
+    auto *IPCI = cast<IncrementProfilerCounterInst>(&SI);
+    llvm::SmallString<10> HashStr;
+    APInt(64, IPCI->getPGOFuncHash()).toStringUnsigned(HashStr);
+    SILInstIncrementProfilerCounterLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstIncrementProfilerCounterLayout::Code],
+        S.addUniquedStringRef(IPCI->getPGOFuncName()),
+        S.addUniquedStringRef(HashStr),
+        IPCI->getCounterIndex(),
+        IPCI->getNumCounters());
+    break;
+  }
   case SILInstructionKind::StringLiteralInst: {
     auto SLI = cast<StringLiteralInst>(&SI);
     StringRef Str = SLI->getValue();
@@ -2848,6 +2861,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
   registerSILAbbr<SILInstLinearFunctionExtractLayout>();
+  registerSILAbbr<SILInstIncrementProfilerCounterLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();

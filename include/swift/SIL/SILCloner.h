@@ -2620,6 +2620,17 @@ SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
                                         Inst->getMessage()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIncrementProfilerCounterInst(
+    IncrementProfilerCounterInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createIncrementProfilerCounter(
+                              getOpLocation(Inst->getLoc()),
+                              Inst->getCounterIndex(), Inst->getPGOFuncName(),
+                              Inst->getNumCounters(), Inst->getPGOFuncHash()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {

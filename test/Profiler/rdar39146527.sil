@@ -1,0 +1,91 @@
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O -sil-verify-all -profile-generate %s
+
+import Builtin
+import Swift
+
+enum Name {
+  case short(Character, allowingJoined: Bool)
+  case longWithSingleDash(String)
+  case long(String)
+}
+
+sil @bar : $@convention(thin) () -> @owned String
+sil @baz : $@convention(thin) (Builtin.Int64) -> @owned Name
+
+// rdar://39146527 – Ensure that we can thread jump from bb4 to bb7 without
+// breaking the profiling instructions.
+
+sil @foo : $@convention(thin) (Name, String, Builtin.Int64, Builtin.Int64) -> String {
+bb0(%0 : $Name, %1 : $String, %2 : $Builtin.Int64, %3 : $Builtin.Int64):
+  br bb2(%2 : $Builtin.Int64)
+
+bb1:
+  // CHECK: increment_profiler_counter 0, "xxxx.swift:$sSK4TestAA4NameO7ElementRtzrlE09preferredC0ACSgvgAGyKXEfu_", num_counters 1, hash 0
+  increment_profiler_counter 0, "xxxx.swift:$sSK4TestAA4NameO7ElementRtzrlE09preferredC0ACSgvgAGyKXEfu_", num_counters 1, hash 0
+
+  %6 = function_ref @bar : $@convention(thin) () -> @owned String
+  %7 = apply %6() : $@convention(thin) () -> @owned String
+  br bb11(%7 : $String)
+
+bb2(%9 : $Builtin.Int64):
+
+  %10 = function_ref @baz : $@convention(thin) (Builtin.Int64) -> @owned Name
+  %11 = apply %10(%9) : $@convention(thin) (Builtin.Int64) -> @owned Name
+  switch_enum %11 : $Name, case #Name.short!enumelt: bb3, case #Name.longWithSingleDash!enumelt: bb4, case #Name.long!enumelt: bb5
+
+bb3(%13 : $(Character, allowingJoined: Bool)):
+  release_value %11 : $Name
+
+  // CHECK: increment_profiler_counter 1, "$s4Test4NameO4caseAC4CaseOvg", num_counters 4, hash 0
+  increment_profiler_counter 1, "$s4Test4NameO4caseAC4CaseOvg", num_counters 4, hash 0
+  %16 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %16, bb1, bb6
+
+bb4(%18 : $String):
+  // CHECK: increment_profiler_counter 2, "$s4Test4NameO4caseAC4CaseOvg", num_counters 4, hash 0
+  increment_profiler_counter 2, "$s4Test4NameO4caseAC4CaseOvg", num_counters 4, hash 0
+  br bb7(%11 : $Name)
+
+bb5(%21 : $String):
+  // CHECK: increment_profiler_counter 3, "$s4Test4NameO4caseAC4CaseOvg", num_counters 4, hash 0
+  increment_profiler_counter 3, "$s4Test4NameO4caseAC4CaseOvg", num_counters 4, hash 0
+  br bb7(%0 : $Name)
+
+bb6:
+  br bb2(%3 : $Builtin.Int64)
+
+bb7(%25 : $Name):
+  // CHECK: increment_profiler_counter 0, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  increment_profiler_counter 0, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  switch_enum %25 : $Name, case #Name.long!enumelt: bb8, case #Name.short!enumelt: bb9, case #Name.longWithSingleDash!enumelt: bb10
+
+bb8(%28 : $String):
+  // CHECK: increment_profiler_counter 1, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  increment_profiler_counter 1, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  br bb11(%28 : $String)
+
+bb9(%31 : $(Character, allowingJoined: Bool)):
+  %32 = tuple_extract %31 : $(Character, allowingJoined: Bool), 0
+  %33 = struct_extract %32 : $Character, #Character._str
+  %34 = struct_extract %33 : $String, #String._guts
+  %35 = struct_extract %34 : $_StringGuts, #_StringGuts._object
+  %36 = struct_extract %35 : $_StringObject, #_StringObject._object
+  strong_retain %36 : $Builtin.BridgeObject
+  %38 = move_value [lexical] %32 : $Character
+
+  // CHECK: increment_profiler_counter 2, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  increment_profiler_counter 2, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  %40 = struct_extract %38 : $Character, #Character._str
+  release_value %25 : $Name
+  br bb11(%40 : $String)
+
+bb10(%43 : $String):
+  // CHECK: increment_profiler_counter 3, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  increment_profiler_counter 3, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
+  br bb11(%43 : $String)
+
+bb11(%46 : $String):
+  release_value %1 : $String
+  return %46 : $String
+}

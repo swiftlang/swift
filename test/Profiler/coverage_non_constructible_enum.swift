@@ -3,7 +3,7 @@
 // Reduced from Carthage (https://github.com/Carthage/Carthage).
 enum NoError: Error, Equatable {
 // CHECK-LABEL: static coverage_non_constructible_enum.NoError.== infix
-// CHECK: builtin "int_instrprof_increment"
+// CHECK: increment_profiler_counter
 // CHECK: unreachable
 
 // CHECK-LABEL: sil_coverage_map {{.*}} static coverage_non_constructible_enum.NoError.== infix

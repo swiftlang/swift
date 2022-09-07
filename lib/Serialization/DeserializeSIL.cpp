@@ -1250,6 +1250,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
+  case SIL_INST_INCREMENT_PROFILER_COUNTER:
+    SILInstIncrementProfilerCounterLayout::readRecord(scratch, ValID, ValID2,
+                                                      Attr, Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::IncrementProfilerCounterInst;
+    break;
   }
 
   // FIXME: validate
@@ -1798,6 +1803,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
+  case SILInstructionKind::IncrementProfilerCounterInst: {
+    auto PGOFuncName = MF->getIdentifierText(ValID);
+    auto PGOHashStr = MF->getIdentifierText(ValID2);
+
+    uint64_t PGOHash;
+    auto HadError = PGOHashStr.getAsInteger(/*radix*/ 10, PGOHash);
+    assert(!HadError && "Failed to deserialize PGO hash");
+    (void)HadError;
+
+    ResultInst = Builder.createIncrementProfilerCounter(
+        Loc, /*CounterIdx*/ Attr, PGOFuncName, /*NumCounters*/ Attr2, PGOHash);
     break;
   }
   case SILInstructionKind::IntegerLiteralInst: {

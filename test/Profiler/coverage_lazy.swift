@@ -7,18 +7,11 @@ class C {
   // CHECK-LABEL: sil hidden [lazy_getter] [noinline] @$s13coverage_lazy1CC6offsetSivg : $@convention(method) (@guaranteed C) -> Int
   // CHECK:       switch_enum {{%[0-9]+}} : $Optional<Int>, case #Optional.some!enumelt: {{bb[0-9]}}, case #Optional.none!enumelt: [[INITBB:bb[0-9]]]
   // CHECK:       [[INITBB]]
-  // CHECK-NEXT:  string_literal
-  // CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 4
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 2
-  // CHECK-NEXT:  int_instrprof_increment
+  // CHECK-NEXT:  increment_profiler_counter 2
   // CHECK:       function_ref @$sSb6randomSbyFZ : $@convention(method) (@thin Bool.Type) -> Bool
   // CHECK:       cond_br {{%[0-9]+}}, [[TRUEBB:bb[0-9]]], {{bb[0-9]}}
   // CHECK:       [[TRUEBB]]
-  // CHECK-NEXT:  string_literal
-  // CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 4
-  // CHECK-NEXT:  integer_literal $Builtin.Int32, 3
+  // CHECK-NEXT:  increment_profiler_counter 3
 
   // CHECK-LABEL: sil_coverage_map {{.*}} // coverage_lazy.C.offset.getter : Swift.Int
   // CHECK-NEXT: [[@LINE+4]]:38 -> [[@LINE+4]]:40 : 3

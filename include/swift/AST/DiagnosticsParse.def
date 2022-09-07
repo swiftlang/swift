@@ -531,6 +531,14 @@ ERROR(sil_invalid_attribute_for_instruction,none,
 ERROR(sil_invalid_attribute_for_expected,none,
       "Invalid attribute '%0' (expected '%1').", 
       (StringRef, StringRef))
+ERROR(expected_sil_profiler_counter_idx,none,
+      "expected profiler counter index", ())
+ERROR(expected_sil_profiler_counter_pgo_func_name,none,
+      "expected profiler counter PGO function name", ())
+ERROR(expected_sil_profiler_counter_total,none,
+      "expected profiler counter total", ())
+ERROR(expected_sil_profiler_counter_hash,none,
+      "expected profiler counter hash", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
