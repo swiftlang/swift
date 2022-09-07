@@ -3455,8 +3455,7 @@ public:
 
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
-                           ValueDecl *(const ValueDecl *, const AvailableAttr *,
-                                       bool isKnownObjC),
+                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3465,7 +3464,7 @@ private:
   friend SimpleRequest;
 
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *attached,
-                      const AvailableAttr *attr, bool isKnownObjC) const;
+                      const AvailableAttr *attr) const;
 
 public:
   bool isCached() const { return true; }
