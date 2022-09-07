@@ -158,6 +158,12 @@ ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
                            nullptr);
 }
 
+NominalTypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetTypeWrapperStorage{mutableSelf}, nullptr);
+}
+
 NominalTypeDecl *
 GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *parent) const {
@@ -190,8 +196,8 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   if (!typeWrapper)
     return nullptr;
 
-  auto *storage =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+  auto *storage = parent->getTypeWrapperStorageDecl();
+  assert(storage);
 
   auto *typeWrapperType =
       evaluateOrDefault(ctx.evaluator, GetTypeWrapperType{parent}, Type())
@@ -217,10 +223,7 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
   if (!property->isAccessedViaTypeWrapper())
     return nullptr;
 
-  auto &ctx = wrappedType->getASTContext();
-
-  auto *storage = evaluateOrDefault(
-      ctx.evaluator, GetTypeWrapperStorage{wrappedType}, nullptr);
+  auto *storage = wrappedType->getTypeWrapperStorageDecl();
   assert(storage);
 
   return injectProperty(storage, property->getName(),
@@ -394,8 +397,7 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
   // self.$_storage = .init(memberwise: $Storage(...))
-  auto *storageType =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+  auto *storageType = parent->getTypeWrapperStorageDecl();
   assert(storageType);
 
   auto *typeWrapperVar = parent->getTypeWrapperProperty();
@@ -493,8 +495,7 @@ VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
   if (!(DC && DC->hasTypeWrapper()))
     return nullptr;
 
-  auto *storageDecl =
-      evaluateOrDefault(evaluator, GetTypeWrapperStorage{DC}, nullptr);
+  auto *storageDecl = DC->getTypeWrapperStorageDecl();
   assert(storageDecl);
 
   SmallVector<TupleTypeElt, 4> members;

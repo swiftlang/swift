@@ -3775,6 +3775,11 @@ public:
   /// applicable property access routing).
   VarDecl *getTypeWrapperProperty() const;
 
+  /// If this declaration has a type wrapper, return `$Storage`
+  /// declaration that contains all the stored properties managed
+  /// by the wrapper.
+  NominalTypeDecl *getTypeWrapperStorageDecl() const;
+
   /// Get an initializer that could be used to instantiate a
   /// type wrapped type.
   ConstructorDecl *getTypeWrapperInitializer() const;
