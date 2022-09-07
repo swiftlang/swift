@@ -56,11 +56,58 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   return c_string_utils::create_clone(ResultStr.c_str());
 }
 
+void DependencyScannerDiagnosticCollectingConsumer::handleDiagnostic(SourceManager &SM,
+                      const DiagnosticInfo &Info) {
+  addDiagnostic(SM, Info);
+  for (auto ChildInfo : Info.ChildDiagnosticInfo) {
+    addDiagnostic(SM, *ChildInfo);
+  }
+}
+
+void DependencyScannerDiagnosticCollectingConsumer::addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) {
+  // Determine what kind of diagnostic we're emitting.
+  llvm::SourceMgr::DiagKind SMKind;
+  switch (Info.Kind) {
+  case DiagnosticKind::Error:
+    SMKind = llvm::SourceMgr::DK_Error;
+    break;
+  case DiagnosticKind::Warning:
+    SMKind = llvm::SourceMgr::DK_Warning;
+    break;
+  case DiagnosticKind::Note:
+    SMKind = llvm::SourceMgr::DK_Note;
+    break;
+  case DiagnosticKind::Remark:
+    SMKind = llvm::SourceMgr::DK_Remark;
+    break;
+  }
+  // Translate ranges.
+  SmallVector<llvm::SMRange, 2> Ranges;
+  for (auto R : Info.Ranges)
+    Ranges.push_back(getRawRange(SM, R));
+  // Translate fix-its.
+  SmallVector<llvm::SMFixIt, 2> FixIts;
+  for (DiagnosticInfo::FixIt F : Info.FixIts)
+    FixIts.push_back(getRawFixIt(SM, F));
+
+  std::string ResultingMessage;
+  llvm::raw_string_ostream Stream(ResultingMessage);
+  const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
+  
+  // Actually substitute the diagnostic arguments into the diagnostic text.
+  llvm::SmallString<256> Text;
+  llvm::raw_svector_ostream Out(Text);
+  DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                         Info.FormatArgs);
+  auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts);
+  Diagnostics.push_back(ScannerDiagnosticInfo{Msg.getMessage().str(), SMKind});
+}
+
 DependencyScanningTool::DependencyScanningTool()
     : SharedCache(std::make_unique<GlobalModuleDependenciesCache>()),
       VersionedPCMInstanceCacheCache(
           std::make_unique<CompilerArgInstanceCacheMap>()),
-      PDC(), Alloc(), Saver(Alloc) {}
+      CDC(), Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
@@ -126,7 +173,7 @@ DependencyScanningTool::getDependencies(
 void DependencyScanningTool::serializeCache(llvm::StringRef path) {
   SourceManager SM;
   DiagnosticEngine Diags(SM);
-  Diags.addConsumer(PDC);
+  Diags.addConsumer(CDC);
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
       Diags, path, *SharedCache);
 }
@@ -134,7 +181,7 @@ void DependencyScanningTool::serializeCache(llvm::StringRef path) {
 bool DependencyScanningTool::loadCache(llvm::StringRef path) {
   SourceManager SM;
   DiagnosticEngine Diags(SM);
-  Diags.addConsumer(PDC);
+  Diags.addConsumer(CDC);
   SharedCache = std::make_unique<GlobalModuleDependenciesCache>();
   bool readFailed =
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
@@ -147,6 +194,10 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 
 void DependencyScanningTool::resetCache() {
   SharedCache.reset(new GlobalModuleDependenciesCache());
+}
+
+void DependencyScanningTool::resetDiagnostics() {
+  CDC.reset();
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
@@ -165,7 +216,7 @@ DependencyScanningTool::initCompilerInstanceForScan(
     ArrayRef<const char *> CommandArgs) {
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
-  Instance->addDiagnosticConsumer(&PDC);
+  Instance->addDiagnosticConsumer(&CDC);
 
   // Basic error checking on the arguments
   if (CommandArgs.empty()) {

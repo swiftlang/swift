@@ -160,4 +160,10 @@ struct swiftscan_scan_invocation_s {
   swiftscan_string_set_t *argv;
 };
 
+struct swiftscan_diagnostic_info_s {
+  swiftscan_string_ref_t message;
+  swiftscan_diagnostic_severity_t severity;
+  // TODO: SourceLoc
+};
+
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

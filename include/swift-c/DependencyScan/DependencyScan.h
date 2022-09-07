@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 2
+#define SWIFTSCAN_VERSION_MINOR 3
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -51,6 +51,9 @@ typedef struct swiftscan_dependency_graph_s *swiftscan_dependency_graph_t;
 
 /// Opaque container to contain the result of a dependency prescan.
 typedef struct swiftscan_import_set_s *swiftscan_import_set_t;
+
+/// Opaque container to contain the info of a diagnostics emitted by the scanner.
+typedef struct swiftscan_diagnostic_info_s *swiftscan_diagnostic_info_t;
 
 /// Full Dependency Graph (Result)
 typedef struct {
@@ -328,6 +331,37 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
 /// swiftscan_import_set_dispose .
 SWIFTSCAN_PUBLIC swiftscan_import_set_t swiftscan_import_set_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
+
+
+//=== Scanner Diagnostics -------------------------------------------------===//
+typedef enum {
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR = 0,
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING = 1,
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE = 2,
+  SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK = 3
+} swiftscan_diagnostic_severity_t;
+
+typedef struct {
+  swiftscan_diagnostic_info_t *diagnostics;
+  size_t count;
+} swiftscan_diagnostic_set_t;
+
+/// For the specified \c scanner instance, query all insofar emitted diagnostics
+SWIFTSCAN_PUBLIC swiftscan_diagnostic_set_t*
+swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner);
+
+/// For the specified \c scanner instance, reset its diagnostic state
+SWIFTSCAN_PUBLIC void
+swiftscan_scanner_diagnostics_reset(swiftscan_scanner_t scanner);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_diagnostic_get_message(swiftscan_diagnostic_info_t diagnostic);
+
+SWIFTSCAN_PUBLIC swiftscan_diagnostic_severity_t
+swiftscan_diagnostic_get_severity(swiftscan_diagnostic_info_t diagnostic);
+
+SWIFTSCAN_PUBLIC void
+swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics);
 
 //=== Scanner Cache Operations --------------------------------------------===//
 // The following operations expose an implementation detail of the dependency
