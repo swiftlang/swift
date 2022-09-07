@@ -1231,16 +1231,7 @@ private:
       llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
           &params,
       Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
-    for (auto param : ABIparams) {
-      using Role = IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole;
-      switch (param.getRole()) {
-      case Role::Error:
-        params.push_back(
-            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,
-             FD->getASTContext().getOpaquePointerType()});
-        break;
-      }
-    }
+    // FIXME: remove.
   }
 
   // Print out the extern C Swift ABI function signature.

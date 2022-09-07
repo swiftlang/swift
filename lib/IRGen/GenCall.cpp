@@ -1723,6 +1723,8 @@ void SignatureExpansion::expandParameters(
         IGM.getStorageType(getSILFuncConventions().getSILType(
             FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
     ParamIRTypes.push_back(errorType->getPointerTo());
+    if (recordedABIDetails)
+      recordedABIDetails->hasErrorResult = true;
   }
 
   // Witness methods have some extra parameter types.

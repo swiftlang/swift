@@ -206,13 +206,6 @@ public:
 
     using ABIAdditionalParam = IRABIDetailsProvider::ABIAdditionalParam;
     using ParamRole = ABIAdditionalParam::ABIParameterRole;
-    // FIXME: remove second signature computation.
-    auto signature = Signature::getUncached(IGM, silFuncType, funcPointerKind);
-    for (auto attrSet : signature.getAttributes()) {
-      if (attrSet.hasAttribute(llvm::Attribute::AttrKind::SwiftError))
-        params.push_back(
-            ABIAdditionalParam(ParamRole::Error, llvm::None, CanType()));
-    }
     return params;
   }
 
@@ -317,7 +310,8 @@ void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
         genericRequirementVisitor,
     llvm::function_ref<void(const MetadataSourceParameter &)>
         metadataSourceVisitor,
-    llvm::function_ref<void(const ContextParameter &)> contextParamVisitor) {
+    llvm::function_ref<void(const ContextParameter &)> contextParamVisitor,
+    llvm::function_ref<void(const ErrorResultValue &)> errorResultVisitor) {
   // Indirect result values come before parameters.
   llvm::SmallVector<IndirectResultValue, 1> result;
   for (const auto &r : abiDetails.indirectResults)
@@ -387,7 +381,8 @@ void IRABIDetailsProvider::LoweredFunctionSignature::visitParameterList(
     contextParamVisitor(ContextParameter());
   }
 
-  // FIXME: Traverse other additional params.
+  if (abiDetails.hasErrorResult)
+    errorResultVisitor(ErrorResultValue());
 }
 
 IRABIDetailsProvider::IRABIDetailsProvider(ModuleDecl &mod,

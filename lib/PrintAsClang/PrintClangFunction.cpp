@@ -715,6 +715,11 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                 ContextParameter &) {
           emitNewParam();
           os << "SWIFT_CONTEXT void * _Nonnull _ctx";
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                ErrorResultValue &) {
+          emitNewParam();
+          os << "SWIFT_ERROR_RESULT void * _Nullable * _Nullable _error";
         });
   } else {
 
@@ -747,18 +752,6 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
       if (resultingRepresentation.isUnsupported())
         return resultingRepresentation;
     }
-  }
-  if (additionalParams.size()) {
-    assert(kind == FunctionSignatureKind::CFunctionProto);
-    if (HasParams)
-      os << ", ";
-    HasParams = true;
-    interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-      if (param.role == AdditionalParam::Role::Error) {
-        os << "SWIFT_ERROR_RESULT ";
-        os << "void * _Nullable * _Nullable _error";
-      }
-    });
   }
   if (kind == FunctionSignatureKind::CFunctionProto && !HasParams) {
     // Emit 'void' in an empty parameter list for C function declarations.
@@ -922,18 +915,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                 ContextParameter &) {
           emitNewParam();
           os << "_ctx";
-        });
-
-    if (additionalParams.size()) {
-      if (needsComma)
-        os << ", ";
-      interleaveComma(additionalParams, os, [&](const AdditionalParam &param) {
-        if (param.role == AdditionalParam::Role::Error && hasThrows) {
+        },
+        [&](const IRABIDetailsProvider::LoweredFunctionSignature::
+                ErrorResultValue &) {
+          emitNewParam();
           os << "&opaqueError";
-        }
-      });
-    }
-
+        });
     os << ')';
   };
 

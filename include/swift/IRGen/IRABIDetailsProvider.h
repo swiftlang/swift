@@ -62,7 +62,7 @@ public:
   public:
     enum class ABIParameterRole {
       /// The Swift error parameter.
-      Error
+      None
     };
 
     inline ABIParameterRole getRole() const { return role; }
@@ -182,6 +182,9 @@ public:
     /// Represents a context parameter passed to the call.
     class ContextParameter {};
 
+    /// Represents an out error parameter passed indirectly to the call.
+    class ErrorResultValue {};
+
     /// Returns lowered direct result details, or \c None if direct result is
     /// void.
     llvm::Optional<DirectResultType> getDirectResultType() const;
@@ -204,7 +207,8 @@ public:
             genericRequirementVisitor,
         llvm::function_ref<void(const MetadataSourceParameter &)>
             metadataSourceVisitor,
-        llvm::function_ref<void(const ContextParameter &)> contextParamVisitor);
+        llvm::function_ref<void(const ContextParameter &)> contextParamVisitor,
+        llvm::function_ref<void(const ErrorResultValue &)> errorResultVisitor);
 
     /// FIXME: make private.
     SmallVector<ABIAdditionalParam, 1> additionalParams;

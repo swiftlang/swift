@@ -161,6 +161,8 @@ public:
   bool hasTrailingSelfParam = false;
   /// True if a context parameter passed to the call.
   bool hasContextParam = false;
+  /// True if an error result value indirect parameter is passed to the call.
+  bool hasErrorResult = false;
 };
 
 /// A signature represents something which can actually be called.
