@@ -350,26 +350,26 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [ACTIVE]   [[ARRAY:%.*]] = apply %14<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 // CHECK: [USEFUL]   [[INT_LIT:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   [[TUP:%.*]] = apply %19<Float>([[INT_LIT]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE]   [[TUP:%.*]] = apply %18<Float>([[INT_LIT]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [ACTIVE] (**[[LHS:%.*]]**, [[RHS:%.*]]) = destructure_tuple [[TUP]] : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED] ([[LHS]], **[[RHS]]**) = destructure_tuple [[TUP]] : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [ACTIVE]   [[FLOAT_PTR:%.*]] = pointer_to_address [[RHS]] : $Builtin.RawPointer to [strict] $*Float
 // CHECK: [USEFUL]   [[ZERO_LITERAL:%.*]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK: [USEFUL]   [[META:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   [[RESULT_2:%.*]] = apply %26([[ZERO_LITERAL]], [[META]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   [[RESULT_2:%.*]] = apply %25([[ZERO_LITERAL]], [[META]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %29 = apply %28<Float>([[FLOAT_PTR]], [[RESULT_2]], %16) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [NONE]   %28 = apply %27<Float>([[FLOAT_PTR]], [[RESULT_2]], %15) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [VARIED]   [[ONE_LITERAL:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK: [ACTIVE]   [[INDEX_ADDR:%.*]] = index_addr [[FLOAT_PTR]] : $*Float, [[ONE_LITERAL]] : $Builtin.Word
 // CHECK: [USEFUL]   [[ONE_LITERAL_AGAIN:%.*]] = integer_literal $Builtin.IntLiteral, 1
 // CHECK: [USEFUL]   [[META_AGAIN:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [USEFUL]   %35 = apply %34([[ONE_LITERAL_AGAIN]], [[META_AGAIN]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [USEFUL]   %34 = apply %33([[ONE_LITERAL_AGAIN]], [[META_AGAIN]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]   %37 = apply %36<Float>(%31, %35, %16) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [NONE]   %36 = apply %35<Float>(%30, %34, %15) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %39 = apply %38<Float>(%21) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// CHECK: [ACTIVE]   %38 = apply %37<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-978: Test array literal initialized with `apply` indirect results.
 struct Wrapper<T: Differentiable>: Differentiable {
@@ -617,7 +617,7 @@ func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveInoutArgument{{.*}} at parameter indices (0, 1) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Array<Float>
 // CHECK: [ACTIVE] %1 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %4 = alloc_stack [lexical] $Array<Float>, var, name "array"
+// CHECK: [ACTIVE]   %4 = alloc_stack $Array<Float>, var, name "array"
 // CHECK: [ACTIVE]   %5 = copy_value %0 : $Array<Float>
 // CHECK: [USEFUL]   %7 = integer_literal $Builtin.IntLiteral, 0
 // CHECK: [USEFUL]   %8 = metatype $@thin Int.Type
@@ -654,7 +654,7 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
 
 // CHECK-LABEL: [AD] Activity info for ${{.*}}testBeginApplyActiveButInitiallyNonactiveInoutArgument{{.*}} at parameter indices (0) and result indices (0)
 // CHECK: [ACTIVE] %0 = argument of bb0 : $Float
-// CHECK: [ACTIVE]   %2 = alloc_stack [lexical] $Array<Float>, var, name "array"
+// CHECK: [ACTIVE]   %2 = alloc_stack $Array<Float>, var, name "array"
 // CHECK: [USEFUL]   %3 = integer_literal $Builtin.Word, 1
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
 // CHECK: [USEFUL]   %5 = apply %4<Float>(%3) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
