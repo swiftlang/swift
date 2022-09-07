@@ -2421,8 +2421,9 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC,
-                                /*LeaveBodyUnchecked=*/true);
+  bool LeaveBodyUnchecked = !ctx.CompletionCallback;
+
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC, LeaveBodyUnchecked);
   return false;
 }
 
