@@ -3202,7 +3202,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
 
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
   const SILOptions &opts = IRGen.SIL.getOptions();
-  return (opts.EnableStackProtection) ?
+  return (opts.EnableStackProtection && f->needsStackProtection()) ?
     StackProtectorMode::StackProtector : StackProtectorMode::NoStackProtector;
 }
 

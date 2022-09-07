@@ -6,7 +6,7 @@
 // throwing. We really just shouldn't expect this at all. I filed: rdar://94656178
 // to track that work.
 
-// CHECK-LABEL: sil hidden @$s4main1fyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}@$s4main1fyyF : $@convention(thin) () -> () {
 // CHECK: [[STACK:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
 // CHECK: inject_enum_addr [[STACK]] : $*Optional<NSError>, #Optional.none!enumelt
 // CHECK: [[FN:%.*]] = objc_method {{%[0-9]+}} : $MyClass, #MyClass.submit!foreign : (MyClass) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<NSError>>, MyClass) -> ObjCBool
