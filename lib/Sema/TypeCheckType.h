@@ -300,43 +300,6 @@ public:
     }
   }
 
-  /// Whether parameterized protocol types are supported in this context.
-  bool isParameterizedProtocolSupported() const {
-    switch (context) {
-    case Context::Inherited:
-    case Context::ExtensionBinding:
-    case Context::TypeAliasDecl:
-    case Context::GenericTypeAliasDecl:
-    case Context::GenericRequirement:
-    case Context::ExistentialConstraint:
-    case Context::MetatypeBase:
-      return true;
-    case Context::None:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
-    case Context::TupleElement:
-    case Context::InExpression:
-    case Context::ExplicitCastExpr:
-    case Context::ForEachStmt:
-    case Context::PatternBindingDecl:
-    case Context::EditorPlaceholderExpr:
-    case Context::ClosureExpr:
-    case Context::FunctionInput:
-    case Context::VariadicFunctionInput:
-    case Context::InoutFunctionInput:
-    case Context::FunctionResult:
-    case Context::SubscriptDecl:
-    case Context::EnumElementDecl:
-    case Context::EnumPatternPayload:
-    case Context::SameTypeRequirement:
-    case Context::ProtocolMetatypeBase:
-    case Context::ImmediateOptionalTypeArgument:
-    case Context::AbstractFunctionDecl:
-    case Context::CustomAttr:
-      return false;
-    }
-  }
-
   /// Whether pack expansion types are supported in this context.
   bool isPackExpansionSupported() const {
     switch (context) {

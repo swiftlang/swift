@@ -692,7 +692,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (!resolution.getOptions().isParameterizedProtocolSupported()) {
+    if (resolution.getOptions().isConstraintImplicitExistential()) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
                      protoDecl->getExistentialType(),
@@ -4202,7 +4202,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       }
 
       if (ty->is<ParameterizedProtocolType>() &&
-          options.isParameterizedProtocolSupported() &&
+          !options.isConstraintImplicitExistential() &&
           options.getContext() != TypeResolverContext::ExistentialConstraint) {
         HasProtocol = true;
         Members.push_back(ty);
