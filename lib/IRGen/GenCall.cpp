@@ -396,18 +396,14 @@ namespace {
     unsigned AsyncContextIdx;
     unsigned AsyncResumeFunctionSwiftSelfIdx = 0;
     FunctionPointerKind FnKind;
-    bool ShouldComputeABIDetails;
-    SmallVector<PolymorphicSignatureExpandedTypeSource, 4>
-        polymorphicSignatureTypeSources;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       FunctionPointerKind fnKind,
-                       bool ShouldComputeABIDetails = false)
-        : IGM(IGM), FnType(fnType), FnKind(fnKind),
-          ShouldComputeABIDetails(ShouldComputeABIDetails) {}
+                       FunctionPointerKind fnKind)
+        : IGM(IGM), FnType(fnType), FnKind(fnKind) {}
 
     /// Expand the components of the primary entrypoint of the function type.
-    void expandFunctionType();
+    void expandFunctionType(
+        SignatureExpansionABIDetails *recordedABIDetails = nullptr);
 
     /// Expand the components of the continuation entrypoint of the
     /// function type.
@@ -427,7 +423,7 @@ namespace {
     Signature getSignature();
 
   private:
-    void expand(SILParameterInfo param);
+    const TypeInfo &expand(SILParameterInfo param);
     llvm::Type *addIndirectResult();
 
     SILFunctionConventions getSILFuncConventions() const {
@@ -466,10 +462,13 @@ namespace {
     void addCoroutineContextParameter();
     void addAsyncParameters();
 
-    void expandResult();
-    llvm::Type *expandDirectResult();
+    void expandResult(SignatureExpansionABIDetails *recordedABIDetails);
+    /// Returns the LLVM type pointer and its type info for
+    /// the direct result of this function. If the result is passed indirectly,
+    /// a void type is returned instead, with a \c null type info.
+    std::pair<llvm::Type *, const TypeInfo *> expandDirectResult();
     void expandIndirectResults();
-    void expandParameters();
+    void expandParameters(SignatureExpansionABIDetails *recordedABIDetails);
     void expandExternalSignatureTypes();
 
     void expandCoroutineResult(bool forContinuation);
@@ -491,7 +490,8 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
 }
 
 /// Expand all of the direct and indirect result types.
-void SignatureExpansion::expandResult() {
+void SignatureExpansion::expandResult(
+    SignatureExpansionABIDetails *recordedABIDetails) {
   if (FnType->isAsync()) {
     // The result will be stored within the SwiftContext that is passed to async
     // functions.
@@ -511,11 +511,27 @@ void SignatureExpansion::expandResult() {
   if (fnConv.getNumIndirectSILResults() > 1)
     CanUseSRet = false;
 
+  // Ensure that no parameters were added before to correctly record their ABI
+  // details.
+  assert(ParamIRTypes.empty());
   // Expand the direct result.
-  ResultIRType = expandDirectResult();
+  const TypeInfo *directResultTypeInfo;
+  std::tie(ResultIRType, directResultTypeInfo) = expandDirectResult();
 
   // Expand the indirect results.
   expandIndirectResults();
+
+  // Record ABI details if asked.
+  if (!recordedABIDetails)
+    return;
+  if (directResultTypeInfo)
+    recordedABIDetails->directResult =
+        SignatureExpansionABIDetails::DirectResult{*directResultTypeInfo};
+  for (unsigned i = 0; i < ParamIRTypes.size(); ++i) {
+    bool hasSRet = Attrs.hasParamAttr(i, llvm::Attribute::StructRet);
+    recordedABIDetails->indirectResults.push_back(
+        SignatureExpansionABIDetails::IndirectResult{hasSRet});
+  }
 }
 
 void SignatureExpansion::expandIndirectResults() {
@@ -840,7 +856,8 @@ NativeConventionSchema::getCoercionTypes(
 
 // TODO: Direct to Indirect result conversion could be handled in a SIL
 // AddressLowering pass.
-llvm::Type *SignatureExpansion::expandDirectResult() {
+std::pair<llvm::Type *, const TypeInfo *>
+SignatureExpansion::expandDirectResult() {
   // Handle the direct result type, checking for supposedly scalar
   // result types that we actually want to return indirectly.
   auto resultType = getSILFuncConventions().getSILResultType(
@@ -849,7 +866,7 @@ llvm::Type *SignatureExpansion::expandDirectResult() {
   // Fast-path the empty tuple type.
   if (auto tuple = resultType.getAs<TupleType>())
     if (tuple->getNumElements() == 0)
-      return IGM.VoidTy;
+      return std::make_pair(IGM.VoidTy, nullptr);
 
   switch (FnType->getLanguage()) {
   case SILFunctionLanguage::C:
@@ -859,11 +876,11 @@ llvm::Type *SignatureExpansion::expandDirectResult() {
     auto &ti = IGM.getTypeInfo(resultType);
     auto &native = ti.nativeReturnValueSchema(IGM);
     if (native.requiresIndirect())
-      return addIndirectResult();
+      return std::make_pair(addIndirectResult(), nullptr);
 
     // Disable the use of sret if we have a non-trivial direct result.
     if (!native.empty()) CanUseSRet = false;
-    return native.getExpandedType(IGM);
+    return std::make_pair(native.getExpandedType(IGM), &ti);
   }
   }
 
@@ -1503,8 +1520,7 @@ static ArrayRef<llvm::Type *> expandScalarOrStructTypeToArray(llvm::Type *&ty) {
   return expandedTys;
 }
 
-
-void SignatureExpansion::expand(SILParameterInfo param) {
+const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
   auto paramSILType = getSILFuncConventions().getSILType(
       param, IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(paramSILType);
@@ -1515,7 +1531,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
     addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
-    return;
+    return ti;
 
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
@@ -1524,7 +1540,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
         conv == ParameterConvention::Indirect_InoutAliasable);
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
-    return;
+    return ti;
 
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
@@ -1532,7 +1548,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
     switch (FnType->getLanguage()) {
     case SILFunctionLanguage::C: {
       llvm_unreachable("Unexpected C/ObjC method in parameter expansion!");
-      return;
+      return ti;
     }
     case SILFunctionLanguage::Swift: {
       auto &nativeSchema = ti.nativeParameterValueSchema(IGM);
@@ -1540,17 +1556,17 @@ void SignatureExpansion::expand(SILParameterInfo param) {
         addIndirectValueParameterAttributes(IGM, Attrs, ti,
                                             ParamIRTypes.size());
         ParamIRTypes.push_back(ti.getStorageType()->getPointerTo());
-        return;
+        return ti;
       }
       if (nativeSchema.empty()) {
         assert(ti.getSchema().empty());
-        return;
+        return ti;
       }
       auto expandedTy = nativeSchema.getExpandedType(IGM);
       auto expandedTysArray = expandScalarOrStructTypeToArray(expandedTy);
       for (auto *Ty : expandedTysArray)
         ParamIRTypes.push_back(Ty);
-      return;
+      return ti;
     }
     }
     llvm_unreachable("bad abstract CC");
@@ -1594,9 +1610,18 @@ bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
   return false;
 }
 
+static void addParamInfo(SignatureExpansionABIDetails *details,
+                         const TypeInfo &ti, ParameterConvention convention) {
+  if (!details)
+    return;
+  details->parameters.push_back(
+      SignatureExpansionABIDetails::Parameter(ti, convention));
+}
+
 /// Expand the abstract parameters of a SIL function type into the physical
 /// parameters of an LLVM function type (results have already been expanded).
-void SignatureExpansion::expandParameters() {
+void SignatureExpansion::expandParameters(
+    SignatureExpansionABIDetails *recordedABIDetails) {
   assert(FnType->getRepresentation() != SILFunctionTypeRepresentation::Block
          && "block with non-C calling conv?!");
 
@@ -1626,15 +1651,20 @@ void SignatureExpansion::expandParameters() {
   }
 
   for (auto param : params) {
-    expand(param);
+    const TypeInfo &ti = expand(param);
+    addParamInfo(recordedABIDetails, ti, param.getConvention());
   }
+  if (recordedABIDetails && FnType->hasSelfParam() && !hasSelfContext)
+    recordedABIDetails->parameters.back().isSelf = true;
 
   // Next, the generic signature.
   if (hasPolymorphicParameters(FnType) &&
       !FnKind.shouldSuppressPolymorphicArguments())
     expandPolymorphicSignature(
         IGM, FnType, ParamIRTypes,
-        ShouldComputeABIDetails ? &polymorphicSignatureTypeSources : nullptr);
+        recordedABIDetails
+            ? &recordedABIDetails->polymorphicSignatureExpandedTypeSources
+            : nullptr);
 
   // Certain special functions are passed the continuation directly.
   if (FnKind.shouldPassContinuationDirectly()) {
@@ -1701,15 +1731,16 @@ void SignatureExpansion::expandParameters() {
 /// Expand the result and parameter types of a SIL function into the
 /// physical parameter types of an LLVM function and return the result
 /// type.
-void SignatureExpansion::expandFunctionType() {
+void SignatureExpansion::expandFunctionType(
+    SignatureExpansionABIDetails *recordedABIDetails) {
   switch (FnType->getLanguage()) {
   case SILFunctionLanguage::Swift: {
     if (FnType->isAsync()) {
       expandAsyncEntryType();
       return;
     }
-    expandResult();
-    expandParameters();
+    expandResult(recordedABIDetails);
+    expandParameters(recordedABIDetails);
     return;
   }
   case SILFunctionLanguage::C:
@@ -1931,21 +1962,25 @@ Signature SignatureExpansion::getSignature() {
   } else {
     result.ExtraDataKind = ExtraData::kindForMember<void>();
   }
-  if (ShouldComputeABIDetails)
-    result.ABIDetails = SignatureExpansionABIDetails{
-        std::move(polymorphicSignatureTypeSources)};
   return result;
 }
 
 Signature Signature::getUncached(IRGenModule &IGM,
                                  CanSILFunctionType formalType,
-                                 FunctionPointerKind fpKind,
-                                 bool shouldComputeABIDetails) {
+                                 FunctionPointerKind fpKind) {
   GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, formalType, fpKind,
-                               shouldComputeABIDetails);
+  SignatureExpansion expansion(IGM, formalType, fpKind);
   expansion.expandFunctionType();
   return expansion.getSignature();
+}
+
+SignatureExpansionABIDetails Signature::getUncachedABIDetails(
+    IRGenModule &IGM, CanSILFunctionType formalType, FunctionPointerKind kind) {
+  GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
+  SignatureExpansion expansion(IGM, formalType, kind);
+  SignatureExpansionABIDetails result;
+  expansion.expandFunctionType(&result);
+  return result;
 }
 
 Signature Signature::forCoroutineContinuation(IRGenModule &IGM,

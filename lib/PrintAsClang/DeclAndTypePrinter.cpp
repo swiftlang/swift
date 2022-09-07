@@ -347,7 +347,6 @@ private:
     // FIXME: Print struct's doc comment.
     // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
-                                  owningPrinter.typeMapping,
                                   owningPrinter.interopContext);
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/[&]() { printMembers(SD->getMembers()); });
@@ -396,7 +395,6 @@ private:
 
     // FIXME: Print enum's availability
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
-                                           owningPrinter.typeMapping,
                                            owningPrinter.interopContext);
     ClangSyntaxPrinter syntaxPrinter(os);
     DeclAndTypeClangFunctionPrinter clangFuncPrinter(
@@ -410,7 +408,7 @@ private:
         owningPrinter.typeMapping, owningPrinter.interopContext, owningPrinter);
     ClangValueTypePrinter outOfLineValTyPrinter(
         owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
-        owningPrinter.typeMapping, owningPrinter.interopContext);
+        owningPrinter.interopContext);
 
     auto elementTagMapping =
         owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
@@ -1300,22 +1298,6 @@ private:
         owningPrinter.interopContext, owningPrinter);
     auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
                          .getFunctionABIAdditionalParams(FD);
-    // FIXME: Ideally direct 'self' would come from IR provider too.
-    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD) &&
-        llvm::find_if(
-            ABIparams,
-            [](const IRABIDetailsProvider::ABIAdditionalParam &Param) {
-              return Param.getRole() ==
-                     IRABIDetailsProvider::ABIAdditionalParam::
-                         ABIParameterRole::Self;
-            }) == ABIparams.end()) {
-      (*selfTypeDeclContext)->getDeclaredInterfaceType();
-      funcABI.additionalParams.push_back(
-          {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-           (*selfTypeDeclContext)->getDeclaredInterfaceType(),
-           /*isIndirect=*/
-           isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
-    }
     if (!ABIparams.empty())
       convertABIAdditionalParams(FD, ABIparams, funcABI.additionalParams,
                                  /*selfContext=*/selfTypeDeclContext);
@@ -1381,7 +1363,7 @@ private:
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(),
+    funcPrinter.printCxxThunkBody(FD, funcABI.getSymbolName(),
                                   FD->getModuleContext(), resultTy,
                                   FD->getParameters(), funcABI.additionalParams,
                                   funcTy->isThrowing(), funcTy);

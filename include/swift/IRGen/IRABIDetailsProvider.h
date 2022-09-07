@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -31,8 +32,16 @@ class ASTContext;
 class IRGenOptions;
 class ModuleDecl;
 class NominalTypeDecl;
+class ParamDecl;
 
 class IRABIDetailsProviderImpl;
+
+namespace irgen {
+
+class SignatureExpansionABIDetails;
+class TypeInfo;
+
+} // namespace irgen
 
 /// Provides access to the IRGen-based queries that can be performed on
 /// declarations to get their various ABI details.
@@ -89,6 +98,121 @@ public:
 
     friend class IRABIDetailsProviderImpl;
   };
+
+  /// Describes the lowered Swift function signature.
+  class LoweredFunctionSignature {
+  public:
+    class DirectResultType {
+    public:
+      /// Enumerates all of the members of the underlying record in terms of
+      /// their primitive types that needs to be stored in a Clang/LLVM record
+      /// when this type is passed or returned directly to/from swiftcc
+      /// function.
+      ///
+      /// Returns true if an error occurred when a particular member can't be
+      /// represented with an AST type.
+      bool enumerateRecordMembers(
+          llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
+              callback) const;
+
+    private:
+      DirectResultType(IRABIDetailsProviderImpl &owner,
+                       const irgen::TypeInfo &typeDetails);
+      IRABIDetailsProviderImpl &owner;
+      const irgen::TypeInfo &typeDetails;
+      friend class LoweredFunctionSignature;
+    };
+
+    class IndirectResultType {
+    public:
+      /// Returns true if this indirect result type uses the `sret` LLVM
+      /// attribute.
+      inline bool hasSRet() const { return hasSRet_; }
+
+    private:
+      inline IndirectResultType(bool hasSRet_) : hasSRet_(hasSRet_) {}
+      bool hasSRet_;
+      friend class LoweredFunctionSignature;
+    };
+
+    /// Represents a parameter passed directly to the function.
+    class DirectParameter {
+    public:
+      /// Enumerates all of the members of the underlying record in terms of
+      /// their primitive types that needs to be stored in a Clang/LLVM record
+      /// when this type is passed or returned directly to/from swiftcc
+      /// function.
+      ///
+      /// Returns true if an error occurred when a particular member can't be
+      /// represented with an AST type.
+      bool enumerateRecordMembers(
+          llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
+              callback) const;
+
+      inline const ParamDecl &getParamDecl() const { return paramDecl; }
+
+    private:
+      DirectParameter(IRABIDetailsProviderImpl &owner,
+                      const irgen::TypeInfo &typeDetails,
+                      const ParamDecl &paramDecl);
+      IRABIDetailsProviderImpl &owner;
+      const irgen::TypeInfo &typeDetails;
+      const ParamDecl &paramDecl;
+      friend class LoweredFunctionSignature;
+    };
+
+    /// Represents a parameter passed indirectly to the function.
+    class IndirectParameter {
+    public:
+      inline const ParamDecl &getParamDecl() const { return paramDecl; }
+
+    private:
+      IndirectParameter(const ParamDecl &paramDecl);
+      const ParamDecl &paramDecl;
+      friend class LoweredFunctionSignature;
+    };
+
+    /// Returns lowered direct result details, or \c None if direct result is
+    /// void.
+    llvm::Optional<DirectResultType> getDirectResultType() const;
+
+    /// Returns the number of indirect result values in this function signature.
+    size_t getNumIndirectResults() const;
+
+    /// Returns lowered indirect result details.
+    llvm::SmallVector<IndirectResultType, 1> getIndirectResultTypes() const;
+
+    /// Traverse the entire parameter list of the function signature.
+    ///
+    /// The parameter list can include actual Swift function parameters, result
+    /// values returned indirectly, and additional values, like generic
+    /// requirements for polymorphic calls and the error parameter as well.
+    void visitParameterList(
+        llvm::function_ref<void(const DirectParameter &)> directParamVisitor,
+        llvm::function_ref<void(const IndirectParameter &)>
+            indirectParamVisitor);
+
+    /// FIXME: make private.
+    SmallVector<ABIAdditionalParam, 1> additionalParams;
+
+  private:
+    LoweredFunctionSignature(
+        const AbstractFunctionDecl *FD, IRABIDetailsProviderImpl &owner,
+        const irgen::SignatureExpansionABIDetails &abiDetails);
+    const AbstractFunctionDecl *FD;
+    IRABIDetailsProviderImpl &owner;
+    const irgen::SignatureExpansionABIDetails &abiDetails;
+    friend class IRABIDetailsProviderImpl;
+  };
+
+  /// Returns the function signature lowered to its C / LLVM - like
+  /// representation, or \c None if such representation could not be computed.
+  llvm::Optional<LoweredFunctionSignature>
+  getFunctionLoweredSignature(AbstractFunctionDecl *fd);
+
+  /// Returns the additional params if they exist after lowering the function.
+  SmallVector<ABIAdditionalParam, 1>
+  getFunctionABIAdditionalParams(AbstractFunctionDecl *fd);
 
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.
@@ -153,10 +277,6 @@ public:
   /// their tag indices from the given EnumDecl
   llvm::MapVector<EnumElementDecl *, EnumElementInfo>
   getEnumTagMapping(const EnumDecl *ED);
-
-  /// Returns the additional params if they exist after lowering the function.
-  SmallVector<ABIAdditionalParam, 1>
-  getFunctionABIAdditionalParams(AbstractFunctionDecl *fd);
 
 private:
   std::unique_ptr<IRABIDetailsProviderImpl> impl;

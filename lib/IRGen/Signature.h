@@ -45,6 +45,7 @@ namespace irgen {
 
 class FunctionPointerKind;
 class IRGenModule;
+class TypeInfo;
 
 /// An encapsulation of different foreign calling-convention lowering
 /// information we might have.  Should be interpreted according to the
@@ -125,7 +126,34 @@ private:
 };
 
 /// Recorded information about the specific ABI details.
-struct SignatureExpansionABIDetails {
+class SignatureExpansionABIDetails {
+public:
+  /// Recorded information about the direct result type convention.
+  struct DirectResult {
+    std::reference_wrapper<const irgen::TypeInfo> typeInfo;
+    inline DirectResult(const irgen::TypeInfo &typeInfo) : typeInfo(typeInfo) {}
+  };
+  /// The direct result, or \c None if direct result is void.
+  llvm::Optional<DirectResult> directResult;
+  /// Recorded information about the indirect result parameters convention.
+  struct IndirectResult {
+    /// Does this indirect result parameter have the `sret` attribute?
+    bool hasSRet;
+  };
+  /// The indirect results passed as parameters to the call.
+  llvm::SmallVector<IndirectResult, 1> indirectResults;
+  /// Recorded information about the parameter convention.
+  struct Parameter {
+    std::reference_wrapper<const irgen::TypeInfo> typeInfo;
+    ParameterConvention convention;
+    bool isSelf;
+
+    inline Parameter(const irgen::TypeInfo &typeInfo,
+                     ParameterConvention convention)
+        : typeInfo(typeInfo), convention(convention), isSelf(false) {}
+  };
+  /// The parameters passed to the call.
+  llvm::SmallVector<Parameter, 8> parameters;
   /// Type sources added to the signature during expansion.
   llvm::SmallVector<PolymorphicSignatureExpandedTypeSource, 2>
       polymorphicSignatureExpandedTypeSources;
@@ -164,8 +192,11 @@ public:
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
-                               FunctionPointerKind kind,
-                               bool shouldComputeABIDetails = false);
+                               FunctionPointerKind kind);
+
+  static SignatureExpansionABIDetails
+  getUncachedABIDetails(IRGenModule &IGM, CanSILFunctionType formalType,
+                        FunctionPointerKind kind);
 
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,

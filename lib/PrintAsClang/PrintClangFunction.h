@@ -110,13 +110,10 @@ public:
                          ArrayRef<AdditionalParam> additionalParams = {},
                          FunctionSignatureModifiers modifiers = {});
 
-  /// Print the use of the C++ function thunk parameter as it's passed to the C
-  /// function declaration.
-  void printCxxToCFunctionParameterUse(const ParamDecl *param, StringRef name);
-
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(StringRef swiftSymbolName,
+  void printCxxThunkBody(const AbstractFunctionDecl *FD,
+                         StringRef swiftSymbolName,
                          const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params,
                          ArrayRef<AdditionalParam> additionalParams = {},
@@ -153,10 +150,11 @@ public:
                               raw_ostream &outOfLineOS);
 
 private:
-  void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
-      bool isIndirect = false,
-      llvm::Optional<AdditionalParam::Role> paramRole = None);
+  void printCxxToCFunctionParameterUse(Type type, StringRef name,
+                                       const ModuleDecl *moduleContext,
+                                       bool isInOut, bool isIndirect,
+                                       std::string directTypeEncoding,
+                                       bool isSelf);
 
   // Print out the full type specifier that refers to the
   // _impl::_impl_<typename> C++ class for the given Swift type.
