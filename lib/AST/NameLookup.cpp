@@ -1741,15 +1741,6 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   }))
     return false;
 
-  // If we're looking at protocol requirements, is the new method an async
-  // alternative of any existing method, or vice versa?
-  if (isa<ProtocolDecl>(ty) &&
-      llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  }))
-    return false;
-
   return true;
 }
 
