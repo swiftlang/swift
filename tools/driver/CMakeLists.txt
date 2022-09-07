@@ -14,6 +14,8 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   )
   target_link_libraries(swift-frontend-bootstrapping0
                         PRIVATE
+                          ASTGen
+                          swiftCore
                           swiftDriverTool
                           swiftCompilerStub)
 
@@ -33,6 +35,8 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   )
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
+                          ASTGen
+                          swiftCore
                           swiftDriverTool
                           swiftCompilerModules-bootstrapping1)
 
@@ -50,10 +54,11 @@ add_swift_host_tool(swift-frontend
 target_link_libraries(swift-frontend
                       PUBLIC
                         ASTGen
-                        SwiftParser
-                        SwiftSyntax
+                        swiftCore
                         swiftDriverTool
                         swiftCompilerModules)
+
+_add_swift_runtime_link_flags(swift-frontend "../../lib" "")
 
 # Create a `swift-driver` executable adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.

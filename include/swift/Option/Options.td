@@ -640,7 +640,6 @@ def enable_experimental_swift_parser :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable the new and expiremental Swift parser + AST generation.">;
 
-
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   Flags<[HelpHidden]>,

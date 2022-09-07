@@ -864,7 +864,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_experimental_cxx_interop);
-  Opts.EnableSwiftParser |= Args.hasArg(OPT_enable_experimental_swift_parser);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());

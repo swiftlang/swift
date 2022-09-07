@@ -41,7 +41,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSema
   swiftBasic
   swiftSerialization
-  legacySwiftSyntax
+  swiftSyntax
   swiftOption
   swiftSymbolGraphGen
   libcmark-gfm_static
