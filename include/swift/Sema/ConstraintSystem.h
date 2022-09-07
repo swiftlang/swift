@@ -153,7 +153,7 @@ private:
   unsigned VarCounter = 0;
 
 public:
-  ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
+  ResultBuilder(ConstraintSystem &CS, DeclContext *DC, Type builderType);
 
   DeclContext *getDeclContext() const { return DC; }
 
