@@ -2453,7 +2453,7 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
     asyncAlternatives;
   for (auto method : methods) {
     if (isa<ProtocolDecl>(method->getDeclContext())) {
-      if (auto alt = method->getAsyncAlternative(/*isKnownObjC=*/true))
+      if (auto alt = method->getAsyncAlternative())
         asyncAlternatives[method] = alt;
     }
   }
