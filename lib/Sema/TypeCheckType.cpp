@@ -2925,18 +2925,6 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   if (!ty) ty = resolveType(repr, instanceOptions);
   if (!ty || ty->hasError()) return ty;
 
-  // In SIL mode only, build one-element tuples.
-  if (attrs.has(TAK_tuple)) {
-    SmallVector<TupleTypeElt, 1> elements;
-    if (auto *parenTy = dyn_cast<ParenType>(ty.getPointer()))
-      ty = parenTy->getUnderlyingType();
-
-    elements.emplace_back(ty);
-    ty = TupleType::get(elements, getASTContext());
-
-    attrs.clearAttribute(TAK_tuple);
-  }
-
   // Type aliases inside protocols are not yet resolved in the structural
   // stage of type resolution
   if (ty->is<DependentMemberType>() &&
@@ -3780,19 +3768,28 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
                                 SmallVectorImpl<SILResultInfo> &ordinaryResults,
                                 Optional<SILResultInfo> &errorResult) {
   if (auto tuple = dyn_cast<TupleTypeRepr>(repr)) {
-    bool hadError = false;
+    // If any of the elements have a label, or an explicit missing label (_:),
+    // resolve the entire result type as a single tuple type.
     for (auto &element : tuple->getElements()) {
-      if (element.UnderscoreLoc.isValid())
-        diagnose(element.UnderscoreLoc, diag::sil_function_output_label);
+      if (element.NameLoc.isValid()) {
+        return resolveSingleSILResult(repr, options,
+                                      yields, ordinaryResults, errorResult);
+      }
     }
+
+    // Otherwise, resolve each tuple element into its own result type.
+    bool hadError = false;
+
     for (auto elt : tuple->getElements()) {
       if (resolveSingleSILResult(elt.Type, options,
                                  yields, ordinaryResults, errorResult))
         hadError = true;
     }
+
     return hadError;
   }
 
+  // Not a tuple type.
   return resolveSingleSILResult(repr, options,
                                 yields, ordinaryResults, errorResult);
 }
@@ -4199,7 +4196,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+  if (options.contains(TypeResolutionFlags::SILType) ||
+      ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
     if (repr->isParenType())
       return ParenType::get(ctx, elements[0].getType());
   } else {

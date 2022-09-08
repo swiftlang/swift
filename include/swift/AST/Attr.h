@@ -2542,9 +2542,6 @@ public:
   };
   Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
 
-  // Force construction of a one-element tuple type.
-  bool IsTuple = false;
-
   TypeAttributes() {}
 
   bool isValid() const { return AtLoc.isValid(); }

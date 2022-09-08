@@ -4736,7 +4736,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       unsigned Field = 0;
-      TupleType *TT = Val->getType().getAs<TupleType>();
+      TupleType *TT = Val->getType().castTo<TupleType>();
       if (P.Tok.isNot(tok::integer_literal) ||
           parseIntegerLiteral(P.Tok.getText(), 10, Field) ||
           Field >= TT->getNumElements()) {
