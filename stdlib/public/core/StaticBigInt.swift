@@ -59,10 +59,10 @@ public struct StaticBigInt:
 @available(SwiftStdlib 5.8, *)
 extension StaticBigInt {
 
-  /// Returns `-1`, `0`, or `+1` to indicate whether this value is less than,
-  /// equal to, or greater than zero.
+  /// Indicates the value's sign.
   ///
-  /// The return type is `Int` rather than `Self`.
+  /// - Returns: `-1` if the value is less than zero, `0` if it is equal to
+  ///   zero, or `+1` if it is greater than zero.
   @available(SwiftStdlib 5.8, *)
   @inlinable
   public func signum() -> Int {
@@ -79,8 +79,8 @@ extension StaticBigInt {
   /// including the sign bit, and excluding the sign extension.
   ///
   /// The following examples show the least significant byte of each value's
-  /// binary representation, separated into excluded and included bits. Negative
-  /// values are in two's complement.
+  /// binary representation, separated (by an underscore) into excluded and
+  /// included bits. Negative values are in two's complement.
   ///
   /// * `-4` (`0b11111_100`) is 3 bits.
   /// * `-3` (`0b11111_101`) is 3 bits.
