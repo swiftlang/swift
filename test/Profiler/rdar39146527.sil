@@ -1,6 +1,10 @@
 // RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -O -sil-verify-all -profile-generate %s
 
+// Test contains a reference to _StringObject._object, which is not defined on
+// some architectures.
+// REQUIRES: CPU=x86_64
+
 import Builtin
 import Swift
 

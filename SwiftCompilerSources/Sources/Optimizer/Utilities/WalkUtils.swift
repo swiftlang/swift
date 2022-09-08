@@ -294,7 +294,7 @@ extension ValueDefUseWalker {
     case is InitExistentialRefInst, is OpenExistentialRefInst,
       is BeginBorrowInst, is CopyValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst:
+      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
     case let mdi as MarkDependenceInst:
       if operand.index == 0 {
@@ -419,7 +419,7 @@ extension AddressDefUseWalker {
         return unmatchedPath(address: operand, path: path)
       }
     case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst,
-      is IndexAddrInst:
+         is IndexAddrInst, is MarkMustCheckInst:
       // FIXME: for now `index_addr` is treated as a forwarding instruction since
       // SmallProjectionPath does not track indices.
       // This is ok since `index_addr` is eventually preceeded by a `tail_addr`
@@ -558,7 +558,7 @@ extension ValueUseDefWalker {
     case is InitExistentialRefInst, is OpenExistentialRefInst,
       is BeginBorrowInst, is CopyValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst:
+      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let arg as BlockArgument:
       if arg.isPhiArgument {
@@ -643,7 +643,8 @@ extension AddressUseDefWalker {
     case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
       return walkUp(address: (def as! UnaryInstruction).operand,
                     path: path.push(.enumCase, index: (def as! EnumInstruction).caseIndex))
-    case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst, is IndexAddrInst:
+    case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst, is IndexAddrInst,
+         is MarkMustCheckInst:
       // FIXME: for now `index_addr` is treated as a forwarding instruction since
       // SmallProjectionPath does not track indices.
       // This is ok since `index_addr` is eventually preceeded by a `tail_addr`
