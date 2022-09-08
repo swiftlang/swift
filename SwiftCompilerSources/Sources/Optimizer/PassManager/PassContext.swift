@@ -240,3 +240,10 @@ extension RefCountingInst {
     RefCountingInst_setIsAtomic(bridged, isAtomic)
   }
 }
+
+extension Function {
+  func set(needStackProtection: Bool, _ context: PassContext) {
+    context.notifyFunctionDataChanged()
+    SILFunction_setNeedStackProtection(bridged, needStackProtection ? 1 : 0)
+  }
+}

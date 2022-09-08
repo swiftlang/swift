@@ -14,4 +14,8 @@ import OptimizerBridging
 
 struct Options {
   let _bridged: BridgedPassContext
+
+  var enableStackProtection: Bool {
+    SILOptions_enableStackProtection(_bridged) != 0
+  }
 }

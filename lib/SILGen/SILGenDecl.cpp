@@ -1295,7 +1295,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     SILLocation loc(PBD);
     SILValue resultBuf = emitTemporaryAllocation(loc, initLoweredTy);
     SILValue resultBufPtr = B.createAddressToPointer(loc, resultBuf,
-                          SILType::getPrimitiveObjectType(C.TheRawPointerType));
+                          SILType::getPrimitiveObjectType(C.TheRawPointerType),
+                          /*needsStackProtection=*/ false);
     
     // Emit the closure for the child task.
     // Prepare the opaque `AsyncLet` representation.

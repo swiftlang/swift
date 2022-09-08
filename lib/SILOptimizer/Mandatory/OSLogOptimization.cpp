@@ -558,7 +558,8 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
     if (elementIndex != 0) {
       SILValue indexSIL = builder.createIntegerLiteral(
           loc, SILType::getBuiltinWordType(astContext), elementIndex);
-      currentStorageAddr = builder.createIndexAddr(loc, storageAddr, indexSIL);
+      currentStorageAddr = builder.createIndexAddr(loc, storageAddr, indexSIL,
+                              /*needsStackProtection=*/ false);
     } else {
       currentStorageAddr = storageAddr;
     }

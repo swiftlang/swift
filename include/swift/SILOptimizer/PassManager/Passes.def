@@ -401,6 +401,10 @@ SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
      "Test pass which prints the SIL of a function")
 SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
+SWIFT_MODULE_PASS(StackProtection, "stack-protection",
+     "Decides which functions need stack protectors")
+SWIFT_FUNCTION_PASS(FunctionStackProtection, "function-stack-protection",
+     "Decides which functions need stack protectors")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",

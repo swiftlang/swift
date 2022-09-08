@@ -184,6 +184,8 @@ PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table);
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
 
+SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif

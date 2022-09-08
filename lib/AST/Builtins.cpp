@@ -2691,6 +2691,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getReinterpretCastOperation(Context, Id);
       
   case BuiltinValueKind::AddressOf:
+  case BuiltinValueKind::UnprotectedAddressOf:
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
 
@@ -2698,6 +2699,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
+  case BuiltinValueKind::UnprotectedAddressOfBorrow:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
