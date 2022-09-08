@@ -538,6 +538,30 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
   return nullptr;
 }
 
+VarDecl *DIMemoryObjectInfo::getAsTypeWrapperLocalStorageVar() const {
+  if (!MemoryInst->isVar())
+    return nullptr;
+
+  if (!isa<TupleType>(getASTType()))
+    return nullptr;
+
+  auto *DC = MemoryInst->getFunction()->getDeclContext();
+  if (!DC)
+    return nullptr;
+
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl());
+  if (!ctor || ctor->isImplicit())
+    return nullptr;
+
+  if (auto *var = getLoc().getAsASTNode<VarDecl>()) {
+    auto &ctx = var->getASTContext();
+    if (var->isImplicit() && var->getName() == ctx.Id_localStorageVar)
+      return var;
+  }
+
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                        DIMemoryUse Implementation
 //===----------------------------------------------------------------------===//

@@ -164,6 +164,11 @@ public:
   /// actor's initializer. Otherwise, returns nullptr.
   ConstructorDecl *getActorInitSelf() const;
 
+  /// If \c TheMemory is a temporary variable that is responsible for
+  /// member-by-member initialization of `$Storage` in a user-defined
+  /// initializer of a type wrapped type, return its declaration.
+  VarDecl *getAsTypeWrapperLocalStorageVar() const;
+
   /// True if this memory object is the 'self' of a derived class initializer.
   bool isDerivedClassSelf() const { return MemoryInst->isDerivedClassSelf(); }
 
