@@ -639,6 +639,8 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
+final public
+class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
