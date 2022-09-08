@@ -1461,7 +1461,8 @@ SILCloner<ImplClass>::visitAddressToPointerInst(AddressToPointerInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAddressToPointer(getOpLocation(Inst->getLoc()),
                                                 getOpValue(Inst->getOperand()),
-                                                getOpType(Inst->getType())));
+                                                getOpType(Inst->getType()),
+                                                Inst->needsStackProtection()));
 }
 
 template<typename ImplClass>
@@ -2638,7 +2639,8 @@ SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createIndexAddr(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getBase()),
-                                         getOpValue(Inst->getIndex())));
+                                         getOpValue(Inst->getIndex()),
+                                         Inst->needsStackProtection()));
 }
 
 template<typename ImplClass>

@@ -103,6 +103,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     SILFunction_isSwift51RuntimeAvailable(bridged) != 0
   }
 
+  public var needsStackProtection: Bool {
+    SILFunction_needsStackProtection(bridged) != 0
+  }
+
   // Only to be called by PassContext
   public func _modifyEffects(_ body: (inout FunctionEffects) -> ()) {
     body(&effects)

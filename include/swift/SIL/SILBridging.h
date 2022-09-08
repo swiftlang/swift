@@ -266,6 +266,9 @@ SwiftInt SILFunction_isPossiblyUsedExternally(BridgedFunction function);
 SwiftInt SILFunction_isAvailableExternally(BridgedFunction function);
 SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
                                       llvm::StringRef attrName);
+SwiftInt SILFunction_needsStackProtection(BridgedFunction function);
+void SILFunction_setNeedStackProtection(BridgedFunction function,
+                                        SwiftInt needSP);
 
 llvm::StringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
@@ -359,6 +362,8 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
+SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp);
+SwiftInt IndexAddrInst_needsStackProtection(BridgedInstruction ia);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
 BridgedFunction FunctionRefBaseInst_getReferencedFunction(BridgedInstruction fri);
 llvm::StringRef StringLiteralInst_getValue(BridgedInstruction sli);

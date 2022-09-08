@@ -326,8 +326,8 @@ func gep_raw32(_ p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins3gep{{[_0-9a-zA-Z]*}}F
 func gep<Elem>(_ p: Builtin.RawPointer, i: Builtin.Word, e: Elem.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0
-  // CHECK: [[GEP:%.*]] = index_addr [[P2A]] : $*Elem, %1 : $Builtin.Word
-  // CHECK: [[A2P:%.*]] = address_to_pointer [[GEP]]
+  // CHECK: [[GEP:%.*]] = index_addr [stack_protection] [[P2A]] : $*Elem, %1 : $Builtin.Word
+  // CHECK: [[A2P:%.*]] = address_to_pointer [stack_protection] [[GEP]]
   // CHECK: return [[A2P]]
   return Builtin.gep_Word(p, i, e)
 }
@@ -385,6 +385,40 @@ func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Typ
   // CHECK: return [[A2P]]
   return Builtin.getTailAddr_Word(start, i, ty1, ty2)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins18protectedAddressOfyBpxzlF
+func protectedAddressOf<T>(_ x: inout T) -> Builtin.RawPointer {
+  // CHECK: [[A:%.*]] = begin_access [modify] [unknown] %0
+  // CHECK: [[P:%.*]] = address_to_pointer [stack_protection] [[A]]
+  // CHECK: return [[P]]
+  return Builtin.addressof(&x)
+}
+// CHECK: } // end sil function '$s8builtins18protectedAddressOfyBpxzlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20unprotectedAddressOfyBpxzlF
+func unprotectedAddressOf<T>(_ x: inout T) -> Builtin.RawPointer {
+  // CHECK: [[A:%.*]] = begin_access [modify] [unknown] %0
+  // CHECK: [[P:%.*]] = address_to_pointer [[A]]
+  // CHECK: return [[P]]
+  return Builtin.unprotectedAddressOf(&x)
+}
+// CHECK: } // end sil function '$s8builtins20unprotectedAddressOfyBpxzlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins24protectedAddressOfBorrowyBpxlF
+func protectedAddressOfBorrow<T>(_ x: T) -> Builtin.RawPointer {
+  // CHECK: [[P:%.*]] = address_to_pointer [stack_protection] %0
+  // CHECK: return [[P]]
+  return Builtin.addressOfBorrow(x)
+}
+// CHECK: } // end sil function '$s8builtins24protectedAddressOfBorrowyBpxlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins26unprotectedAddressOfBorrowyBpxlF
+func unprotectedAddressOfBorrow<T>(_ x: T) -> Builtin.RawPointer {
+  // CHECK: [[P:%.*]] = address_to_pointer %0
+  // CHECK: return [[P]]
+  return Builtin.unprotectedAddressOfBorrow(x)
+}
+// CHECK: } // end sil function '$s8builtins26unprotectedAddressOfBorrowyBpxlF'
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins25beginUnpairedModifyAccess{{[_0-9a-zA-Z]*}}F
 func beginUnpairedModifyAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {

@@ -1033,7 +1033,8 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
 
   auto *newIndex = Builder.createIntegerLiteral(IA->getLoc(),
                                     IA->getIndex()->getType(), index + index2);
-  return Builder.createIndexAddr(IA->getLoc(), base2, newIndex);
+  return Builder.createIndexAddr(IA->getLoc(), base2, newIndex,
+    IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection());
 }
 
 /// Walks over all fields of an aggregate and checks if a reference count

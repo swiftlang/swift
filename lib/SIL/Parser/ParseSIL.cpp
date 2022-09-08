@@ -983,6 +983,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  PerformanceConstraints *perfConstraints,
                                  bool *isLet,
                                  bool *isWeakImported,
+                                 bool *needStackProtection,
                                  AvailabilityContext *availability,
                                  bool *isWithoutActuallyEscapingThunk,
                                  SmallVectorImpl<std::string> *Semantics,
@@ -1015,6 +1016,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isCanonical = true;
     else if (hasOwnershipSSA && SP.P.Tok.getText() == "ossa")
       *hasOwnershipSSA = true;
+    else if (needStackProtection && SP.P.Tok.getText() == "stack_protection")
+      *needStackProtection = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
     else if (isThunk && SP.P.Tok.getText() == "signature_optimized_thunk")
@@ -3766,6 +3769,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc ToLoc;
     bool not_guaranteed = false;
     bool without_actually_escaping = false;
+    bool needsStackProtection = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
@@ -3774,7 +3778,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         else
           return true;
       }
+    } if (Opcode == SILInstructionKind::AddressToPointerInst) {
+      if (parseSILOptional(needsStackProtection, *this, "stack_protection"))
+        return true;
     }
+  
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "to"))
@@ -3838,7 +3846,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           B.createConvertEscapeToNoEscape(InstLoc, Val, Ty, !not_guaranteed);
       break;
     case SILInstructionKind::AddressToPointerInst:
-      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);
+      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty, needsStackProtection);
       break;
     case SILInstructionKind::BridgeObjectToRefInst:
       ResultVal =
@@ -5164,11 +5172,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     case SILInstructionKind::IndexAddrInst: {
       SILValue IndexVal;
-      if (parseTypedValueRef(Val, B) ||
+      bool needsStackProtection = false;
+      if (parseSILOptional(needsStackProtection, *this, "stack_protection") ||
+          parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseTypedValueRef(IndexVal, B) || parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal);
+      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection);
       break;
     }
     case SILInstructionKind::TailAddrInst: {
@@ -6527,6 +6537,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
+  bool needStackProtection = false;
   AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
@@ -6546,7 +6557,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isThunk, &isDynamic, &isDistributed, &isExactSelfClass,
           &DynamicallyReplacedFunction, &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr, nullptr,
-          &isWeakImported, &availability,
+          &isWeakImported, &needStackProtection, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, &argEffectLocs, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
@@ -6779,7 +6790,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -6830,7 +6841,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, SP, M))
+                           nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6899,7 +6910,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7419,7 +7430,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

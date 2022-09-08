@@ -1764,6 +1764,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
+  Opts.EnableStackProtection =
+      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableStackProtection);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -2413,10 +2416,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_disable_new_llvm_pass_manager,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
-
-  Opts.EnableStackProtector =
-      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
-                   Opts.EnableStackProtector);
 
   return false;
 }

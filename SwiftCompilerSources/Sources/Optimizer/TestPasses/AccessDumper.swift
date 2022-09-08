@@ -61,10 +61,9 @@ private func printAccessInfo(address: Value) {
 
   var apw = AccessPathWalker()
   let (ap, scope) = apw.getAccessPathWithScope(of: address)
-  switch scope {
-  case let .scope(ba):
-    print("  Scope: \(ba)")
-  case .base(_):
+  if let beginAccess = scope {
+    print("  Scope: \(beginAccess)")
+  } else {
     print("  Scope: base")
   }
 
