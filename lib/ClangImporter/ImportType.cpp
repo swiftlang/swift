@@ -360,8 +360,8 @@ namespace {
       case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamount:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamount:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
       case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
       case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         return Type();
