@@ -559,7 +559,7 @@ checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
 /// \param module The module to use for conformance lookup.
 /// \param contextSig The generic signature that should be used to map
 /// \p parentTy into context. We pass a generic signature to secure on-demand
-/// computation of the associated generic enviroment.
+/// computation of the associated generic environment.
 ///
 /// \returns \c true on success.
 bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,

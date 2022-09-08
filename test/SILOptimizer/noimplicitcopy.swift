@@ -1797,7 +1797,7 @@ public func enumPatternMatchSwitch1(_ x: EnumTy) {
     switch x2 { // expected-note {{consuming use}}
     case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
-        // This should be flagged as the use after free use. We are atleast
+        // This should be flagged as the use after free use. We are at least
         // erroring though.
         enumUseMoveOnlyWithoutEscaping(x2)
     case .int:
@@ -1809,7 +1809,7 @@ public func enumPatternMatchSwitch1Arg(@_noImplicitCopy _ x2: EnumTy) { // expec
     switch x2 { // expected-note {{consuming use}}
     case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
-        // This should be flagged as the use after free use. We are atleast
+        // This should be flagged as the use after free use. We are at least
         // erroring though.
         enumUseMoveOnlyWithoutEscaping(x2)
     case .int:
@@ -1821,7 +1821,7 @@ public func enumPatternMatchSwitch1OwnedArg(@_noImplicitCopy _ x2: __owned EnumT
     switch x2 { // expected-note {{consuming use}}
     case let .klass(k):
         classUseMoveOnlyWithoutEscaping(k)
-        // This should be flagged as the use after free use. We are atleast
+        // This should be flagged as the use after free use. We are at least
         // erroring though.
         enumUseMoveOnlyWithoutEscaping(x2)
     case .int:

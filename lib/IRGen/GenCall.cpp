@@ -1102,8 +1102,8 @@ namespace {
       case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamount:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamount:
       case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
       case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         llvm_unreachable("OpenCL type in ABI lowering");
@@ -4554,7 +4554,7 @@ static bool canMatchByTruncation(IRGenModule &IGM,
   if (expandedTys.size() == 1) return false;
 
   // If there are multiple elements, the pairs of types need to
-  // match in size upto the penultimate for the truncation to work.
+  // match in size up to the penultimate for the truncation to work.
   size_t e = expandedTys.size();
   for (size_t i = 0; i != e - 1; ++i) {
     // Check that we can truncate the last element.

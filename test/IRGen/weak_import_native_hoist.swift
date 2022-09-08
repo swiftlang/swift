@@ -7,7 +7,7 @@
 
 import weak_import_native_hoist_helper
 
-// We should not hoist the metadata accessor accross the version check.
+// We should not hoist the metadata accessor across the version check.
 
 // CHECK-LABEL: define {{.*}} void @"$s24weak_import_native_hoist09test_not_D14_weakly_linkedyyF"()
 // CHECK-NOT: 15ResilientStructVMa

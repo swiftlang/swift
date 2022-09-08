@@ -4065,7 +4065,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
     if (getASTContext().isSwiftVersionAtLeast(5)) {
       // Mark this repr as invalid. This is the only way to indicate that
-      // something went wrong without supressing checking other reprs in
+      // something went wrong without suppressing checking other reprs in
       // the same type. For example:
       //
       // struct S<T, U> { ... }

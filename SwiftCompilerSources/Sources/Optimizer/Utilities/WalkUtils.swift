@@ -422,7 +422,7 @@ extension AddressDefUseWalker {
       is IndexAddrInst:
       // FIXME: for now `index_addr` is treated as a forwarding instruction since
       // SmallProjectionPath does not track indices.
-      // This is ok since `index_addr` is eventually preceeded by a `tail_addr`
+      // This is ok since `index_addr` is eventually preceded by a `tail_addr`
       // which has pushed a `"ct"` component on the path that matches any
       // `index_addr` address.
       return walkDownUses(ofAddress: instruction as! SingleValueInstruction, path: path)
@@ -465,7 +465,7 @@ extension AddressDefUseWalker {
 ///     to reflect that a further projection is needed to reach the value of interest from the new initial value.
 ///   2. If the instruction of the definition is a value construction such as `struct` and
 ///     the head of the path matches the instruction type then the walk continues
-///     with a call to `walkUp` with initial value the operand defintion denoted by the path
+///     with a call to `walkUp` with initial value the operand definition denoted by the path
 ///     and the suffix path as path since the target value can now be reached with fewer projections.
 ///     If the defining instruction of the value does not match the head of the path as in
 ///     `%t = tuple ...` and `"s0.t1"` then `unmatchedPath(%t, ...)` is called.
@@ -646,7 +646,7 @@ extension AddressUseDefWalker {
     case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst, is IndexAddrInst:
       // FIXME: for now `index_addr` is treated as a forwarding instruction since
       // SmallProjectionPath does not track indices.
-      // This is ok since `index_addr` is eventually preceeded by a `tail_addr`
+      // This is ok since `index_addr` is eventually preceded by a `tail_addr`
       // which has pushed a `"ct"` component on the path that matches any
       // `index_addr` address.
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)

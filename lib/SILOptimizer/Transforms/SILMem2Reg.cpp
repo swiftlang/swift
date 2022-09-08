@@ -395,7 +395,7 @@ static bool isGuaranteedLexicalValue(SILValue src) {
 /// The lifetime cannot be ended during this if we don't have enough information
 /// to end it.  That can occur when the running value associated with a
 /// store_borrow does not have a borrow, because the source already guarantees
-/// lexical lifetime or we have a load which was not preceeded by a store in the
+/// lexical lifetime or we have a load which was not preceded by a store in the
 /// basic block.  In that case, the lifetime end will be added later, when we
 /// have enough information, namely the live in values, to end it.
 static bool canEndLexicalLifetime(LiveValues values) { return values.borrow; }
@@ -537,7 +537,7 @@ class StackAllocationPromoter {
   BlockToInstMap<> initializationPoints;
 
   /// The first instruction in each block that deinitializes the storage that is
-  /// not preceeded by an instruction that initializes it.
+  /// not preceded by an instruction that initializes it.
   ///
   /// That includes:
   ///     store

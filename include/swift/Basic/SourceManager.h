@@ -51,7 +51,7 @@ private:
   /// to speed up stats.
   mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
 
-  /// Holds replaced ranges. Keys are orignal ranges, and values are new ranges
+  /// Holds replaced ranges. Keys are original ranges, and values are new ranges
   /// in different buffers. This is used for code completion and ASTContext
   /// reusing compilation.
   llvm::DenseMap<SourceRange, SourceRange> ReplacedRanges;

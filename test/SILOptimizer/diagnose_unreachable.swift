@@ -512,6 +512,6 @@ public enum DynamicLookupEnum {
 
 func keypathWithDynamicLookup() {
   // Check that we still don't diagnose the keypath getter as unreachable
-  // when used in conjuction with a dynamicMemberLookup enum.
+  // when used in conjunction with a dynamicMemberLookup enum.
   let _ = \DynamicLookupEnum.innerEnum // no warning
 }

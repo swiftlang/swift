@@ -117,7 +117,7 @@ class CompletionInstance {
           Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
-  /// request. The \c CompilerInstace passed to the callback already performed
+  /// request. The \c CompilerInstance passed to the callback already performed
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
   void performNewOperation(

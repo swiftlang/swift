@@ -23,7 +23,7 @@ struct Witness: OwnershipProto {
 // Check the conventions of the witnesses
 
 // CHECK-LABEL: sil hidden [ossa] @$s15value_ownership7WitnessV6elidedyySS_S2StF : $@convention(method) (@guaranteed String, @guaranteed String, @guaranteed String, @guaranteed Witness) -> () {
-// CHECK-LABEL: sil hidden [ossa] @$s15value_ownership7WitnessV8explicityySS_SShSSntF : $@convention(method) (@guaranteed String, @guaranteed String, @owned String, @owned Witness) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s15value_ownership7WitnessV8explicitlyySS_SShSSntF : $@convention(method) (@guaranteed String, @guaranteed String, @owned String, @owned Witness) -> () {
 // CHECK-LABEL: sil hidden [ossa] @$s15value_ownership7WitnessV17elidedPropertyGetSSvg : $@convention(method) (@guaranteed Witness) -> @owned String
 // CHECK-LABEL: sil hidden [ossa] @$s15value_ownership7WitnessV19explicitPropertyGetSSvg : $@convention(method) (@owned Witness) -> @owned String
 
@@ -43,13 +43,13 @@ struct Witness: OwnershipProto {
 
 // Check that the explicit witness' thunk doesn't copy or borrow
 
-// CHECK-LABEL: @$s15value_ownership7WitnessVAA14OwnershipProtoA2aDP8explicityySS_SShSSntFTW :
+// CHECK-LABEL: @$s15value_ownership7WitnessVAA14OwnershipProtoA2aDP8explicitlyySS_SShSSntFTW :
 // CHECK:       bb0([[ARG0:%.*]] : @guaranteed $String, [[ARG1:%.*]] : @guaranteed $String, [[ARG2:%.*]] : @owned $String, [[WITNESS_VALUE:%.*]] : $*Witness):
 // CHECK-NEXT:    [[LOAD_WITNESS:%.*]] = load [take] [[WITNESS_VALUE]] : $*Witness
 // CHECK-NEXT:    // function_ref Witness.explicit(_:_:_:)
-// CHECK-NEXT:    [[WITNESS_FUNC:%.*]] = function_ref @$s15value_ownership7WitnessV8explicityySS_SShSSntF
+// CHECK-NEXT:    [[WITNESS_FUNC:%.*]] = function_ref @$s15value_ownership7WitnessV8explicitlyySS_SShSSntF
 // CHECK-NEXT:    apply [[WITNESS_FUNC]]([[ARG0]], [[ARG1]], [[ARG2]], [[LOAD_WITNESS]])
-// CHECK:       } // end sil function '$s15value_ownership7WitnessVAA14OwnershipProtoA2aDP8explicityySS_SShSSntFTW'
+// CHECK:       } // end sil function '$s15value_ownership7WitnessVAA14OwnershipProtoA2aDP8explicitlyySS_SShSSntFTW'
 
 // Check the signature of the property accessor witness thunks.
 // If a protocol asks for a __consuming get it should get a +1-in +1-out

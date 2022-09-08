@@ -296,7 +296,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     if (!DC || !isa<AbstractFunctionDecl>(DC))
       return false;
 
-    // OK, we can perform fast completion for this. Update the orignal delayed
+    // OK, we can perform fast completion for this. Update the original delayed
     // decl state.
 
     // Fast completion keeps the buffer in memory for multiple completions.

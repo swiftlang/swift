@@ -2271,7 +2271,7 @@ static void addNamespaceMembers(Decl *decl,
   for (auto redecl : namespaceDecl->redecls()) {
     for (auto member : redecl->decls()) {
       if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Add all specializations to a worklist so we don't accidently mutate
+        // Add all specializations to a worklist so we don't accidentally mutate
         // the list of decls we're iterating over.
         llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
         for (auto spec : classTemplate->specializations())
@@ -3092,7 +3092,7 @@ static bool usesFeatureAdditiveArithmeticDerivedConformances(Decl *decl) {
 static void
 suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<PrintOptions> orignalOptions(options);
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressNoAsyncAvailabilityAttr = true;
   action();
 }

@@ -1084,7 +1084,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                        callbacks))
         return false;
     } else {
-      // A preceeding partial_apply -> apply conversion (done in
+      // A preceding partial_apply -> apply conversion (done in
       // tryOptimizeApplyOfPartialApply) already ensured that the arguments are
       // kept alive until the end of the partial_apply's lifetime.
       SmallVector<Operand *, 8> argsToHandle;

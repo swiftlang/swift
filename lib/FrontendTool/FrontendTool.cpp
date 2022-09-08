@@ -612,7 +612,7 @@ static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
   if (FileType == swift::file_types::ID::TY_INVALID) {
     auto PathStem = llvm::sys::path::stem(Path);
     // If this path has a multiple '.' extension (e.g. .abi.json),
-    // then iterate over all preceeding possible extension variants.
+    // then iterate over all preceding possible extension variants.
     while (llvm::sys::path::has_extension(PathStem)) {
       auto NextExtension = llvm::sys::path::extension(PathStem);
       PathStem = llvm::sys::path::stem(PathStem);

@@ -434,7 +434,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       // only has consuming uses. If so, we can duplicate the instruction into
       // the consuming use blocks and destroy any destroy_value uses of it that
       // we see. This makes it easier for SILCombine to fold instructions with
-      // owned paramaters since chains of these values will be in the same
+      // owned parameters since chains of these values will be in the same
       // block.
       if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
         if ((isa<FirstArgOwnershipForwardingSingleValueInst>(svi) ||

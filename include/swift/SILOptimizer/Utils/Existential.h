@@ -30,7 +30,7 @@ namespace swift {
 ///   : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q>
 ///     (@guaranteed τ_0_0) -> @owned τ_0_0
 ///
-/// When successfull, ConcreteExistentialInfo can be used to determine the
+/// When successful, ConcreteExistentialInfo can be used to determine the
 /// concrete type of the opened existential.
 struct OpenedArchetypeInfo {
   OpenedArchetypeType *OpenedArchetype = nullptr;
@@ -85,7 +85,7 @@ struct ConcreteExistentialInfo {
 
   // Search for a recognized pattern in which the given existential value is
   // initialized to a concrete type. Constructs a valid ConcreteExistentialInfo
-  // object if successfull.
+  // object if successful.
   ConcreteExistentialInfo(SILValue existential, SILInstruction *user);
 
   // This constructor initializes a ConcreteExistentialInfo based on already

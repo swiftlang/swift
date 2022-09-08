@@ -145,25 +145,25 @@ public:
     return Protocol;
   }
 
-  /// Retreive the raw value of the Protocol requirement pointer.
+  /// Retrieve the raw value of the Protocol requirement pointer.
   int32_t getUnresolvedProtocolAddress() const {
     assert(getKind() == GenericRequirementKind::Protocol);
     return Protocol.getUnresolvedProtocolAddress();
   }
 
-  /// Retreive the offset to the Protocol field
+  /// Retrieve the offset to the Protocol field
   constexpr inline auto
   getProtocolOffset() const -> typename Runtime::StoredSize {
     return offsetof(typename std::remove_reference<decltype(*this)>::type, Protocol);
   }
 
-  /// Retreive the offset to the Type field
+  /// Retrieve the offset to the Type field
   constexpr inline auto
   getSameTypeNameOffset() const -> typename Runtime::StoredSize {
     return offsetof(typename std::remove_reference<decltype(*this)>::type, Type);
   }
 
-  /// Retreive the offset to the Type field
+  /// Retrieve the offset to the Type field
   constexpr inline auto
   getParamOffset() const -> typename Runtime::StoredSize {
     return offsetof(typename std::remove_reference<decltype(*this)>::type, Param);

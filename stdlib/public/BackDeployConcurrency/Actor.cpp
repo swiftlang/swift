@@ -701,7 +701,7 @@ private:
 
   /// Schedule an inline processing job.  This can generally only be
   /// done if we know nobody else is trying to do it at the same time,
-  /// e.g. if this thread just sucessfully transitioned the actor from
+  /// e.g. if this thread just successfully transitioned the actor from
   /// Idle to Scheduled.
   void scheduleNonOverrideProcessJob(JobPriority priority,
                                      bool hasActiveInlineJob);

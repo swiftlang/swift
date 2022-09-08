@@ -1258,7 +1258,7 @@ void swift::ide::deliverCompletionResults(
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
 
-  SmallPtrSet<ModuleDecl *, 4> explictlyImportedModules;
+  SmallPtrSet<ModuleDecl *, 4> explicitlyImportedModules;
   {
     // Collect modules directly imported in this SourceFile.
     SmallVector<ImportedModule, 4> directImport;
@@ -1266,15 +1266,15 @@ void swift::ide::deliverCompletionResults(
                           {ModuleDecl::ImportFilterKind::Default,
                            ModuleDecl::ImportFilterKind::ImplementationOnly});
     for (auto import : directImport)
-      explictlyImportedModules.insert(import.importedModule);
+      explicitlyImportedModules.insert(import.importedModule);
 
     // Exclude modules implicitly imported in the current module.
     auto implicitImports = SF.getParentModule()->getImplicitImports();
     for (auto import : implicitImports.imports)
-      explictlyImportedModules.erase(import.module.importedModule);
+      explicitlyImportedModules.erase(import.module.importedModule);
 
     // Consider the current module "explicit".
-    explictlyImportedModules.insert(SF.getParentModule());
+    explicitlyImportedModules.insert(SF.getParentModule());
   }
 
   for (auto &Request: Lookup.RequestedCachedResults) {
@@ -1338,7 +1338,7 @@ void swift::ide::deliverCompletionResults(
         auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
             (!Lookup.isHiddenModuleName(TheModuleName) ||
-             explictlyImportedModules.contains(TheModule)) &&
+             explicitlyImportedModules.contains(TheModule)) &&
             seenModuleNames.insert(TheModuleName).second)
           Lookup.addModuleName(TheModule);
       }

@@ -1257,7 +1257,7 @@ static bool isStoredProperty(ValueDecl const *member) {
 }
 
 /// Based on the former escaping-use restriction, which was replaced by
-/// flow-isolation. We need this to support backwards compatability in the
+/// flow-isolation. We need this to support backwards compatibility in the
 /// type-checker for programs prior to Swift 6.
 /// \param fn either a constructor or destructor of an actor.
 static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
@@ -1333,7 +1333,7 @@ static void noteIsolatedActorMember(
 /// An ad-hoc check specific to member isolation checking. assumed to be
 /// queried when a self-member is being accessed in a context which is not
 /// isolated to self. The "special permission" is part of a backwards
-/// compatability with actor inits and deinits that maintains the
+/// compatibility with actor inits and deinits that maintains the
 /// permissive nature of the escaping-use restriction, which was only
 /// staged in as a warning. See implementation for more details.
 ///

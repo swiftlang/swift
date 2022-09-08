@@ -88,7 +88,7 @@ struct ScopedAddressValue {
   /// Pass all scope ending instructions to the visitor.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
   /// Returns false, if liveness cannot be computed due to pointer escape or
-  /// unkown address use. Add this scope's live blocks into the PrunedLiveness
+  /// unknown address use. Add this scope's live blocks into the PrunedLiveness
   /// result.
   bool computeLiveness(PrunedLiveness &liveness) const;
 

@@ -983,7 +983,7 @@ public:
 ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
                                           DiagnosticEngine &DiagEngine) {
   SmallVector<CannotExtractReason, 2> AllReasons;
-  // If any declared declaration is refered out of the given range, return false.
+  // If any declared declaration is referred out of the given range, return false.
   auto Declared = RangeInfo.DeclaredDecls;
   auto It = std::find_if(Declared.begin(), Declared.end(),
                          [](DeclaredDecl DD) { return DD.ReferredAfterRange; });
@@ -1264,7 +1264,7 @@ bool RefactoringActionExtractFunction::performChange() {
   // Correct the given name if collision happens.
   PreferredName = correctNewDeclName(InsertToDC, PreferredName);
 
-  // Collect the paramters to pass down to the new function.
+  // Collect the parameters to pass down to the new function.
   std::vector<ReferencedDecl> Parameters;
   for (auto &RD: RangeInfo.ReferencedDecls) {
     // If the referenced decl is declared elsewhere, no need to pass as parameter

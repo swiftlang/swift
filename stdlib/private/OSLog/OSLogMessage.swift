@@ -192,7 +192,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
     isScalar: Bool
   ) -> UInt8 {
     var preamble = self.preamble
-    if privacy.isAtleastPrivate {
+    if privacy.isAt leastPrivate {
       preamble |= privateBitMask
     }
     if !isScalar || privacy.hasMask {

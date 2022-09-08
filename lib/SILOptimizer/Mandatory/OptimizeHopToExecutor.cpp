@@ -266,7 +266,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
 bool OptimizeHopToExecutor::removeDeadHopToExecutors() {
 
   // Initialize the dataflow: go bottom up and if we see any instruction which
-  // might require a dedicated executor, don't remove a preceeding
+  // might require a dedicated executor, don't remove a preceding
   // hop_to_executor instruction.
   for (BlockState &state : blockStates) {
     state.exit = (state.block->getSuccessors().empty() ?

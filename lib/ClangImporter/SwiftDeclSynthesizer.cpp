@@ -648,7 +648,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
   return constructor;
 }
 
-// MARK: Struct RawValue intializers
+// MARK: Struct RawValue initializers
 
 /// Synthesizer callback for a raw value bridging constructor body.
 static std::pair<BraceStmt *, bool>

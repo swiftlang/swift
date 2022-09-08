@@ -59,7 +59,7 @@
 /// Code Overview:
 ///
 /// The function 'OSLogOptimization::run' implements the overall driver for
-/// steps 1 to 4. The function 'beginOfInterpolation' identifies the begining of
+/// steps 1 to 4. The function 'beginOfInterpolation' identifies the beginning of
 /// interpolation (step 1) and the function 'getEndPointsOfDataDependentChain'
 /// identifies the last transitive users of the OSLogMessage instance (step 1).
 /// The function 'constantFold' is a driver for the steps 2 to 4. Step 2 is
@@ -1263,7 +1263,7 @@ static bool constantFold(SILInstruction *start,
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
 /// 'ExpressibleByStringInterpolation', find the first instruction, if any, that
-/// marks the begining of the string interpolation that is used to create an
+/// marks the beginning of the string interpolation that is used to create an
 /// OSLogMessage instance. This function traverses the backward data-dependence
 /// chain of the given OSLogMessage initializer: \p oslogInit. As a special case
 /// it avoids chasing the data-dependencies from the captured values of

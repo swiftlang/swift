@@ -31,7 +31,7 @@ struct Context;
 /// arguments if the phi arguments are the only thing that kept us from
 /// converting these incoming values to be guaranteed.
 ///
-/// \returns true if we converted atleast one phi from owned -> guaranteed and
+/// \returns true if we converted at least one phi from owned -> guaranteed and
 /// eliminated ARC traffic as a result.
 bool tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) LLVM_LIBRARY_VISIBILITY;
 

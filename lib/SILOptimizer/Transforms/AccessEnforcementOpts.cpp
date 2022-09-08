@@ -40,7 +40,7 @@
 /// considerable difference in the implementation. For example,
 /// DiagnoseStaticExclusivity must be able to fully analyze all @inout_aliasable
 /// parameters because they aren't dynamically enforced. This optimization
-/// completely ignores @inout_aliasable paramters because it only cares about
+/// completely ignores @inout_aliasable parameters because it only cares about
 /// dynamic enforcement. This optimization also does not attempt to
 /// differentiate accesses on disjoint subaccess paths, because it should not
 /// weaken enforcement in any way--a program that traps at -Onone should also

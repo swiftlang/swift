@@ -333,7 +333,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
                           /*callDepth*/ 0);
 
   // If the allocation escapes (e.g. it is stored somewhere), we should not
-  // give a warning, becuase it can be a false alarm. The allocation could be
+  // give a warning, because it can be a false alarm. The allocation could be
   // kept alive by references we don't see.
   if (state == CanEscape)
     return;

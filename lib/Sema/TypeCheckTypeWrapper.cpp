@@ -390,7 +390,7 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
       typeWrapperVar->getName());
 
   // Check whether given parameter requires a direct assignment to
-  // intialize the property.
+  // initialize the property.
   //
   // If `$Storage` doesn't have a member that corresponds
   // to the current parameter it means that this is a property

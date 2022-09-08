@@ -99,7 +99,7 @@ internal func comparisons(a: Int, b: Int, c: Int8, d: Int8) -> Bool {
 }
 
 @_semantics("test_driver")
-internal func interpretComparisions() -> Bool {
+internal func interpretComparisons() -> Bool {
   return comparisons(a: 20, b: 55, c: 56, d: 101)
 }
 

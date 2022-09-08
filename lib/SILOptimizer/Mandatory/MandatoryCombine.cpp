@@ -13,7 +13,7 @@
 ///  \file
 ///
 ///  Defines the MandatoryCombiner function transform.  The pass contains basic
-///  instruction combines to be performed at the begining of both the Onone and
+///  instruction combines to be performed at the beginning of both the Onone and
 ///  also the performance pass pipelines, after the diagnostics passes have been
 ///  run.  It is intended to be run before and to be independent of other
 ///  transforms.

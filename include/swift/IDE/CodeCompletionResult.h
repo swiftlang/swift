@@ -354,7 +354,7 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef FilterName;
 
   /// If the result represents a \c ValueDecl the name by which this decl should
-  /// be refered to in diagnostics.
+  /// be referred to in diagnostics.
   NullTerminatedStringRef NameForDiagnostics;
 
 public:

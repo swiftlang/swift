@@ -21,7 +21,7 @@
 //    initializer annotated "array.uninitialized_intrinsic". This is done in
 //    `run` method.
 //
-// 2. For every "array.uninintialized_intrinsic" initializer call, try
+// 2. For every "array.unininitialized_intrinsic" initializer call, try
 //    extracting the elements with which the array is initialized, and classify
 //    the uses of the array into incidental uses, forEach calls and uses that
 //    can write into the array. If any of the following conditions hold, give
@@ -368,7 +368,7 @@ void ArrayInfo::getLastDestroys(
   for (SILInstruction *frontierInst : frontier) {
     // Skip frontier instructions at the start of a basic block as they do not
     // follow a destroy_value of the array. Note that the goal is to collect
-    // the last destroys, which must always immediately preceed a frontier
+    // the last destroys, which must always immediately preced a frontier
     // instruction as it marks the end of the use of the array.
     if (frontierInst == &frontierInst->getParent()->front())
       continue;

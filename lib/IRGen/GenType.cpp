@@ -688,7 +688,7 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
 
   llvm::Value *caseIndexFromValue = zero;
   if (fixedSize > Size(0)) {
-    // llvm only supports integer types upto a certain size (i.e selection dag
+    // llvm only supports integer types up to a certain size (i.e selection dag
     // will crash).
     if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
       // Read up to one pointer-sized 'chunk' of the payload.

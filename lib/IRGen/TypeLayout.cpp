@@ -1048,7 +1048,7 @@ void AlignedGroupEntry::destroy(IRGenFunction &IGF, Address addr) const {
     auto remainingEntries = entries.size();
     for (auto *entry : entries) {
       if (currentDest.getAddress() != addr.getAddress()) {
-        // Align upto the current entry's requirement.
+        // Align up to the current entry's requirement.
         auto entryMask = entry->alignmentMask(IGF);
         currentDest = alignAddress(IGF, currentDest, entryMask);
       }
@@ -1096,7 +1096,7 @@ void AlignedGroupEntry::withEachEntry(
     auto remainingEntries = entries.size();
     for (auto *entry : entries) {
       if (currentDest.getAddress() != dest.getAddress()) {
-        // Align upto the current entry's requirement.
+        // Align up to the current entry's requirement.
         auto entryMask = entry->alignmentMask(IGF);
         currentDest = alignAddress(IGF, currentDest, entryMask);
         currentSrc = alignAddress(IGF, currentSrc, entryMask);
@@ -1194,7 +1194,7 @@ llvm::Value *AlignedGroupEntry::withExtraInhabitantProvidingEntry(
       mergePHI = llvm::PHINode::Create(IGM.Int32Ty, remainingEntries);
     for (auto *entry : entries) {
       if (currentAddr.getAddress() != addr.getAddress()) {
-        // Align upto the current entry's requirement.
+        // Align up to the current entry's requirement.
         auto entryMask = entry->alignmentMask(IGF);
         currentAddr = alignAddress(IGF, currentAddr, entryMask);
       }

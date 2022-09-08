@@ -5717,7 +5717,7 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
 }
 
 #ifndef NDEBUG
-static bool isSourceLocInOrignalBuffer(const Decl *D, SourceLoc Loc) {
+static bool isSourceLocInOriginalBuffer(const Decl *D, SourceLoc Loc) {
   assert(Loc.isValid());
   auto bufferID = D->getDeclContext()->getParentSourceFile()->getBufferID();
   assert(bufferID.hasValue() && "Source buffer ID must be set");
@@ -5731,7 +5731,7 @@ void AbstractFunctionDecl::keepOriginalBodySourceRange() {
   auto result =
       impl.OriginalBodySourceRanges.insert({this, getBodySourceRange()});
   assert((!result.second ||
-          isSourceLocInOrignalBuffer(this, result.first->getSecond().Start)) &&
+          isSourceLocInOriginalBuffer(this, result.first->getSecond().Start)) &&
          "This function must be called before setting new body range");
   (void)result;
 }
