@@ -1762,6 +1762,11 @@ public:
   /// Emit a resilient class stub.
   llvm::Constant *emitObjCResilientClassStub(ClassDecl *D, bool isPublic);
 
+  /// Runs additional lowering logic on the given SIL function to ensure that
+  /// the SIL function is correctly lowered even if the lowering passes do not
+  /// run on the SIL module that owns this function.
+  void lowerSILFunction(SILFunction *f);
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,

@@ -5,14 +5,14 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function)
 
 
-// CHECK:      SWIFT_EXTERN struct swift_interop_stub_Init_FirstSmallStruct $s4Init16FirstSmallStructVACycfC(void) SWIFT_NOEXCEPT SWIFT_CALL; // init()
-// CHECK-NEXT: SWIFT_EXTERN struct swift_interop_stub_Init_FirstSmallStruct $s4Init16FirstSmallStructVyACSicfC(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:)
+// CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Init_uint32_t_0_4 $s4Init16FirstSmallStructVACycfC(void) SWIFT_NOEXCEPT SWIFT_CALL; // init()
+// CHECK-NEXT: SWIFT_EXTERN struct swift_interop_returnStub_Init_uint32_t_0_4 $s4Init16FirstSmallStructVyACSicfC(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:)
 
 // CHECK:      SWIFT_EXTERN void $s4Init11LargeStructVACycfC(SWIFT_INDIRECT_RESULT void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL; // init()
-// CHECK-NEXT: SWIFT_EXTERN void $s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(SWIFT_INDIRECT_RESULT void * _Nonnull, ptrdiff_t x, struct swift_interop_stub_Init_FirstSmallStruct y) SWIFT_NOEXCEPT SWIFT_CALL; // init(x:y:)
+// CHECK-NEXT: SWIFT_EXTERN void $s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(SWIFT_INDIRECT_RESULT void * _Nonnull, ptrdiff_t x, struct swift_interop_passStub_Init_uint32_t_0_4 y) SWIFT_NOEXCEPT SWIFT_CALL; // init(x:y:)
 
-// CHECK:      SWIFT_EXTERN struct swift_interop_stub_Init_StructWithRefCountStoredProp $s4Init28StructWithRefCountStoredPropVACycfC(void) SWIFT_NOEXCEPT SWIFT_CALL; // init()
-// CHECK-NEXT: SWIFT_EXTERN struct swift_interop_stub_Init_StructWithRefCountStoredProp $s4Init28StructWithRefCountStoredPropV1xACSi_tcfC(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // init(x:)
+// CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Init_[[PTRENC:void_ptr_0_[0-9]]] $s4Init28StructWithRefCountStoredPropVACycfC(void) SWIFT_NOEXCEPT SWIFT_CALL; // init()
+// CHECK-NEXT: SWIFT_EXTERN struct swift_interop_returnStub_Init_[[PTRENC]] $s4Init28StructWithRefCountStoredPropV1xACSi_tcfC(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // init(x:)
 
 public struct FirstSmallStruct {
     public let x: UInt32
@@ -95,37 +95,37 @@ public struct StructWithRefCountStoredProp {
 
 
 // CHECK:      inline uint32_t FirstSmallStruct::getX() const {
-// CHECK-NEXT: return _impl::$s4Init16FirstSmallStructV1xs6UInt32Vvg(_impl::swift_interop_passDirect_Init_FirstSmallStruct(_getOpaquePointer()));
+// CHECK-NEXT: return _impl::$s4Init16FirstSmallStructV1xs6UInt32Vvg(_impl::swift_interop_passDirect_Init_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
 // CHECK-NEXT: inline FirstSmallStruct FirstSmallStruct::init() {
 // CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_FirstSmallStruct(result, _impl::$s4Init16FirstSmallStructVACycfC());
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_uint32_t_0_4(result, _impl::$s4Init16FirstSmallStructVACycfC());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: inline FirstSmallStruct FirstSmallStruct::init(swift::Int x) {
 // CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_FirstSmallStruct(result, _impl::$s4Init16FirstSmallStructVyACSicfC(x));
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_uint32_t_0_4(result, _impl::$s4Init16FirstSmallStructVyACSicfC(x));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK:      inline LargeStruct LargeStruct::init() {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s4Init11LargeStructVACycfC(result);
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: inline LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& y) {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:   _impl::$s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(result, x, _impl::swift_interop_passDirect_Init_FirstSmallStruct(_impl::_impl_FirstSmallStruct::getOpaquePointer(y)));
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   _impl::$s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(result, x, _impl::swift_interop_passDirect_Init_uint32_t_0_4(_impl::_impl_FirstSmallStruct::getOpaquePointer(y)));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK:      inline StructWithRefCountStoredProp StructWithRefCountStoredProp::init() {
 // CHECK-NEXT: return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_StructWithRefCountStoredProp(result, _impl::$s4Init28StructWithRefCountStoredPropVACycfC());
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_[[PTRENC]](result, _impl::$s4Init28StructWithRefCountStoredPropVACycfC());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: inline StructWithRefCountStoredProp StructWithRefCountStoredProp::init(swift::Int x) {
 // CHECK-NEXT: return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_StructWithRefCountStoredProp(result, _impl::$s4Init28StructWithRefCountStoredPropV1xACSi_tcfC(x));
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_[[PTRENC]](result, _impl::$s4Init28StructWithRefCountStoredPropV1xACSi_tcfC(x));
 // CHECK-NEXT: });
 // CHECK-NEXT: }

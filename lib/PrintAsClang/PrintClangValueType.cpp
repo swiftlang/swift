@@ -28,22 +28,11 @@
 using namespace swift;
 
 /// Print out the C type name of a struct/enum declaration.
-static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type,
-                           ArrayRef<Type> genericArgs) {
+static void printCTypeName(raw_ostream &os, const NominalTypeDecl *type) {
   ClangSyntaxPrinter printer(os);
   printer.printModuleNameCPrefix(*type->getParentModule());
   // FIXME: add nested type qualifiers to fully disambiguate the name.
   printer.printBaseName(type);
-  if (!genericArgs.empty()) {
-    os << '_';
-    llvm::interleave(
-        genericArgs, os,
-        [&](Type t) {
-          swift::Mangle::ASTMangler mangler;
-          os << mangler.mangleTypeWithoutPrefix(t);
-        },
-        "_");
-  }
 }
 
 /// Print out the C++ type name of a struct/enum declaration.
@@ -85,7 +74,7 @@ static void
 printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
                              IRABIDetailsProvider::SizeAndAlignment layout) {
   os << "struct ";
-  printCTypeName(os, typeDecl, /*genericArgs=*/{});
+  printCTypeName(os, typeDecl);
   os << " {\n";
   os << "  _Alignas(" << layout.alignment << ") ";
   os << "char _storage[" << layout.size << "];\n";
@@ -113,6 +102,31 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
     // FIXME: This is an extension, we should
     // just expose the method to C once extensions are
     // supported.
+    // FIXME: This C passing should not be here, remove it.
+    cPrologueOS << "struct swift_interop_stub_Swift_String {\n"
+                   "#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu\n"
+                   "uint64_t _1;\n"
+                   "void * _Nullable _2;\n"
+                   "#elif UINTPTR_MAX == 0xFFFFFFFF\n"
+                   "uint32_t _1;\n"
+                   "uint32_t _2;\n"
+                   "uint32_t _3;\n"
+                   "#endif\n"
+                   "};\n";
+    cPrologueOS << "static inline struct swift_interop_stub_Swift_String "
+                   "swift_interop_passDirect_Swift_String(const char * "
+                   "_Nonnull value) {\n"
+                   "struct swift_interop_stub_Swift_String result;\n"
+                   "#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFu\n"
+                   "memcpy(&result._1, value, 8);\n"
+                   "memcpy(&result._2, value + 8, 8);\n"
+                   "#elif UINTPTR_MAX == 0xFFFFFFFF\n"
+                   "memcpy(&result._1, value, 4);\n"
+                   "memcpy(&result._2, value + 4, 4);\n"
+                   "memcpy(&result._3, value + 8, 4);\n"
+                   "#endif\n"
+                   "return result;\n"
+                   "};\n";
     cPrologueOS << "SWIFT_EXTERN void *_Nonnull "
                    "$sSS23_bridgeToObjectiveCImplyXlyF(swift_interop_stub_"
                    "Swift_String) SWIFT_NOEXCEPT SWIFT_CALL;\n";
@@ -395,70 +409,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
                          typeMetadataFuncGenericParams);
 }
 
-/// Print out the C stub struct that's used to pass/return a value type directly
-/// to/from swiftcc function.
-static void
-printCStructStubForDirectPassing(raw_ostream &os, StringRef stubName, Type type,
-                                 PrimitiveTypeMapping &typeMapping,
-                                 SwiftToClangInteropContext &interopContext) {
-  // Print out a C stub for this value type.
-  os << "// Stub struct to be used to pass/return values to/from Swift "
-        "functions.\n";
-  os << "struct " << stubName << " {\n";
-  llvm::SmallVector<std::pair<clang::CharUnits, clang::CharUnits>, 8> fields;
-  interopContext.getIrABIDetails().enumerateDirectPassingRecordMembers(
-      type, [&](clang::CharUnits offset, clang::CharUnits end, Type t) {
-        auto info =
-            typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
-        if (!info)
-          return;
-        os << "  " << info->name;
-        if (info->canBeNullable)
-          os << " _Null_unspecified";
-        os << " _" << (fields.size() + 1) << ";\n";
-        fields.push_back(std::make_pair(offset, end));
-      });
-  os << "};\n\n";
-  auto minimalStubName = stubName;
-  minimalStubName.consume_front("swift_interop_stub_");
-
-  // Emit a stub that returns a value directly from swiftcc function.
-  os << "static inline void swift_interop_returnDirect_" << minimalStubName;
-  os << "(char * _Nonnull result, struct " << stubName << " value";
-  os << ") __attribute__((always_inline)) {\n";
-  for (size_t i = 0; i < fields.size(); ++i) {
-    os << "  memcpy(result + " << fields[i].first.getQuantity() << ", "
-       << "&value._" << (i + 1) << ", "
-       << (fields[i].second - fields[i].first).getQuantity() << ");\n";
-  }
-  os << "}\n\n";
-
-  // Emit a stub that is used to pass value type directly to swiftcc function.
-  os << "static inline struct " << stubName << " swift_interop_passDirect_"
-     << minimalStubName;
-  os << "(const char * _Nonnull value) __attribute__((always_inline)) {\n";
-  os << "  struct " << stubName << " result;\n";
-  for (size_t i = 0; i < fields.size(); ++i) {
-    os << "  memcpy(&result._" << (i + 1) << ", value + "
-       << fields[i].first.getQuantity() << ", "
-       << (fields[i].second - fields[i].first).getQuantity() << ");\n";
-  }
-  os << "  return result;\n";
-  os << "}\n\n";
-}
-
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
-    bool isIndirect, const NominalTypeDecl *type, ArrayRef<Type> genericArgs,
     const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
-    llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf) {
+    llvm::function_ref<void()> cxxParamPrinter, bool isSelf) {
   // A Swift value type is passed to its underlying Swift function
-  assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
-  if (!isIndirect && !isInOut) {
-    os << cxx_synthesis::getCxxImplNamespaceName() << "::"
-       << "swift_interop_passDirect_";
-    printCTypeName(os, type, genericArgs);
-    os << '(';
-  }
   if (isSelf) {
     os << "_getOpaquePointer()";
   } else {
@@ -466,9 +420,6 @@ void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
     typePrinter();
     os << "::getOpaquePointer(";
     cxxParamPrinter();
-    os << ')';
-  }
-  if (!isIndirect && !isInOut) {
     os << ')';
   }
 }
@@ -492,52 +443,16 @@ void ClangValueTypePrinter::printValueTypeReturnType(
   }
 }
 
-void ClangValueTypePrinter::printCStubType(Type type,
-                                           const NominalTypeDecl *typeDecl,
-                                           ArrayRef<Type> genericArgs) {
-  os << "struct ";
-  std::string stubName;
-  {
-    llvm::raw_string_ostream stubNameOS(stubName);
-    stubNameOS << "swift_interop_stub_";
-    printCTypeName(stubNameOS, typeDecl, genericArgs);
-  }
-  os << stubName;
-  // Ensure the stub is declared in the header.
-  interopContext.runIfStubForDeclNotEmitted(stubName, [&]() {
-    printCStructStubForDirectPassing(cPrologueOS, stubName, type, typeMapping,
-                                     interopContext);
-  });
-}
-
-void ClangValueTypePrinter::printValueTypeIndirectReturnScaffold(
+void ClangValueTypePrinter::printValueTypeReturnScaffold(
     const NominalTypeDecl *type, const ModuleDecl *moduleContext,
     llvm::function_ref<void()> typePrinter,
     llvm::function_ref<void(StringRef)> bodyPrinter) {
   assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
   os << "  return ";
   typePrinter();
-  os << "::returnNewValue([&](void * _Nonnull result) {\n    ";
+  os << "::returnNewValue([&](char * _Nonnull result) {\n    ";
   bodyPrinter("result");
   os << ";\n";
-  os << "  });\n";
-}
-
-void ClangValueTypePrinter::printValueTypeDirectReturnScaffold(
-    const NominalTypeDecl *type, ArrayRef<Type> genericArgs,
-    const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
-    llvm::function_ref<void()> bodyPrinter) {
-  assert(isa<StructDecl>(type) || isa<EnumDecl>(type));
-  os << "  return ";
-  typePrinter();
-  os << "::returnNewValue([&](char * _Nonnull result) {\n";
-  os << "    ";
-  os << cxx_synthesis::getCxxImplNamespaceName() << "::"
-     << "swift_interop_returnDirect_";
-  printCTypeName(os, type, genericArgs);
-  os << "(result, ";
-  bodyPrinter();
-  os << ");\n";
   os << "  });\n";
 }
 
