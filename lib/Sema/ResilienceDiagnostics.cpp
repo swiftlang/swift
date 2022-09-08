@@ -255,7 +255,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      M->getName(),
                      static_cast<unsigned>(originKind))
       .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
-                                !ctx.LangOpts.EnableConformanceAvailabilityErrors) ||
+                                !ctx.LangOpts.EnableConformanceAvailabilityErrors &&
+                                originKind != DisallowedOriginKind::SPIOnly) ||
                                originKind == DisallowedOriginKind::ImplicitlyImported,
                                6);
 
