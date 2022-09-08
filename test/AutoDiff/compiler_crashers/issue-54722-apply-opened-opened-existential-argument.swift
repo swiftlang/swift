@@ -1,6 +1,7 @@
 // RUN: not --crash %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
 
-// SR-14223: Differentiation transform crash for `apply` with opened existential arguments.
+// https://github.com/apple/swift/issues/54722
+// Differentiation transform crash for `apply` with opened existential arguments
 
 import _Differentiation
 
