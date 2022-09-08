@@ -368,7 +368,7 @@ void ArrayInfo::getLastDestroys(
   for (SILInstruction *frontierInst : frontier) {
     // Skip frontier instructions at the start of a basic block as they do not
     // follow a destroy_value of the array. Note that the goal is to collect
-    // the last destroys, which must always immediately preced a frontier
+    // the last destroys, which must always immediately precede a frontier
     // instruction as it marks the end of the use of the array.
     if (frontierInst == &frontierInst->getParent()->front())
       continue;
