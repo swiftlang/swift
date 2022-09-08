@@ -198,7 +198,7 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
 void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
-#ifdef SWIFT_SWIFT_PARSER
+#if SWIFT_SWIFT_PARSER
   if ((Context.LangOpts.hasFeature(Feature::Macros) ||
        Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
        Context.LangOpts.hasFeature(Feature::ParserASTGen)) &&

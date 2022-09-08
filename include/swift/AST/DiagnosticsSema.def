@@ -6696,8 +6696,12 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
 //------------------------------------------------------------------------------
 // MARK: Macros
 //------------------------------------------------------------------------------
+
 ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
       "expected macro expansion to produce an expression", ())
+ERROR(macro_undefined,PointsToFirstBadToken,
+      "macro '%0' is undefined; use `-load-plugin-library` to specify dynamic "
+      "libraries that contain this macro", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -3633,6 +3633,12 @@ namespace {
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
         auto macroIdent = expr->getMacroName().getBaseIdentifier();
         auto refType = CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        if (!refType) {
+          // FIXME: This is currently hard-coded to (Int, String) just for
+          // testing Stringify, before we can parse a type signature from the
+          // macro plugin.
+          return TupleType::get({ctx.getIntType(), ctx.getStringType()}, ctx);
+        }
         if (expr->getArgs()) {
           CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
           // FIXME: Do we have object-like vs. function-like macros?

@@ -5400,7 +5400,6 @@ namespace {
           cs.cacheExprTypes(E);
           return E;
         }
-
         // Fall through to use old implementation.
       }
 #endif

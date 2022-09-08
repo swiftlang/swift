@@ -203,7 +203,8 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       });
       return None;
     }
-    case ModuleSearchPathKind::RuntimeLibrary: {
+    case ModuleSearchPathKind::RuntimeLibrary:
+    case ModuleSearchPathKind::CompilerPlugin: {
       // Look for:
       // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
       // (Other OS)  $PATH/{name}.{extension}
@@ -613,7 +614,8 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
 
     switch (searchPath->getKind()) {
     case ModuleSearchPathKind::Import:
-    case ModuleSearchPathKind::RuntimeLibrary: {
+    case ModuleSearchPathKind::RuntimeLibrary:
+    case ModuleSearchPathKind::CompilerPlugin: {
       isFramework = false;
 
       // On Apple platforms, we can assume that the runtime libraries use

@@ -44,6 +44,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -132,6 +133,7 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
+  class CompilerPlugin;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -346,6 +348,12 @@ public:
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
+
+  /// Cache of compiler plugins keyed by their name.
+  llvm::StringMap<CompilerPlugin> LoadedPlugins;
+
+  /// Cache of loaded symbols.
+  llvm::StringMap<void *> LoadedSymbols;
 
 private:
   /// The current generation number, which reflects the number of
@@ -1435,6 +1443,14 @@ public:
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
 
+  /// Finds the loaded compiler plugin given its name.
+  CompilerPlugin *getLoadedPlugin(StringRef name);
+
+  /// Finds the address of the given symbol. If `libraryHint` is non-null,
+  /// search within the library.
+  void *getAddressOfSymbol(StringRef name,
+                           llvm::sys::DynamicLibrary *libraryHint = nullptr);
+
 private:
   friend Decl;
 
@@ -1446,6 +1462,8 @@ private:
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
+
+  void loadCompilerPlugins();
 
   friend TypeBase;
   friend ArchetypeType;

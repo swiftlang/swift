@@ -37,6 +37,7 @@ add_swift_host_library(swiftAST STATIC
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
+  CompilerPlugin.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
@@ -154,6 +155,13 @@ if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
     clangLex
     clangAPINotes
     clangBasic)
+endif()
+
+if(SWIFT_SWIFT_PARSER)
+  target_compile_definitions(swiftAST
+    PRIVATE
+    SWIFT_SWIFT_PARSER
+  )
 endif()
 
 target_link_libraries(swiftAST

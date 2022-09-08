@@ -1695,4 +1695,11 @@ def nostartfiles:
 
 // END ONLY SUPPORTED IN NEW DRIVER
 
+def load_plugin_library:
+  Separate<["-"], "load-plugin-library">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to a dynamic library containing compiler plugins such as "
+           "macros">,
+  MetaVarName<"<path>">;
+
 include "FrontendOptions.td"
