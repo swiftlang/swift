@@ -230,7 +230,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       auto ExtendedModule = ExtendedNominal->getModuleContext();
       auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
-      if (ExtendedModule != &M) {
+      if (ExtendedModule != &M && !isExportedImportedModule(ExtendedModule)) {
         ExtendedSG->recordNode(Symbol(ExtendedSG, VD, nullptr));
         return true;
       }
