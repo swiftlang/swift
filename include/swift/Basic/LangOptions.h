@@ -529,6 +529,8 @@ namespace swift {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }
 
+    LangOptions();
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

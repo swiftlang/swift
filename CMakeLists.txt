@@ -870,18 +870,8 @@ endif()
 
 # When we have the early SwiftSyntax build, we can include its parser.
 if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
-  # An option that specifies how the SwiftSyntax-based Swift parser is
-  # integrated.
-  option(SWIFT_SWIFT_PARSER_MODE [=[
-How to use the SwiftSyntax-based Swift parser. Possible values are
-    OFF:           do not use this parser at all
-    ROUNDTRIP:     ensure that the SwiftSyntax-based Swift parser round-trips
-]=] OFF)
-
-  if(SWIFT_SWIFT_PARSER_MODE)
-    set(SWIFT_SWIFT_PARSER TRUE)
-    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
-  endif()
+  set(SWIFT_SWIFT_PARSER TRUE)
+  include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
 endif()
 
 
@@ -1091,7 +1081,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
-  message(STATUS "  Swift parser:   ${SWIFT_SWIFT_PARSER_MODE}")
+  message(STATUS "  Swift parser:   ${SWIFT_SWIFT_PARSER}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
