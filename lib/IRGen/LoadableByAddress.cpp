@@ -2909,6 +2909,17 @@ void LoadableByAddress::updateLoweredTypes(SILFunction *F) {
   F->rewriteLoweredTypeUnsafe(newFuncTy);
 }
 
+void IRGenModule::lowerSILFunction(SILFunction *f) {
+  CanSILFunctionType funcType = f->getLoweredFunctionType();
+  GenericEnvironment *genEnv = getSubstGenericEnvironment(f);
+  if (!genEnv && funcType->getSubstGenericSignature()) {
+    genEnv = getSubstGenericEnvironment(funcType);
+  }
+  LargeSILTypeMapper MapperCache;
+  auto newFuncTy = MapperCache.getNewSILFunctionType(genEnv, funcType, *this);
+  f->rewriteLoweredTypeUnsafe(newFuncTy);
+}
+
 bool LoadableByAddress::shouldTransformGlobal(SILGlobalVariable *global) {
   SILInstruction *init = global->getStaticInitializerValue();
   if (!init)

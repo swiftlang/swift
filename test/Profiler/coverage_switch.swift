@@ -2,11 +2,7 @@
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 // CHECK-LABEL: sil hidden @$s15coverage_switch2f1yys5Int32VF : $@convention(thin) (Int32) -> ()
-// CHECK:       string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 4
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 0
-// CHECK-NEXT:  int_instrprof_increment
+// CHECK:       increment_profiler_counter 0
 
 // CHECK:       integer_literal $Builtin.Int32, 1
 // CHECK:       cmp_eq_Int32
@@ -18,30 +14,18 @@
 // CHECK:       cond_br {{%[0-9]+}}, [[CASE2:bb[0-9]+]], [[NOTCASE2:bb[0-9]+]]
 
 // CHECK:       [[NOTCASE2]]
-// CHECK-NEXT:  string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 4
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:  int_instrprof_increment
+// CHECK-NEXT:  increment_profiler_counter 3
 // CHECK-NEXT:  br [[DEFAULT:bb[0-9]+]]
 
 // CHECK:       [[CASE2]]
-// CHECK-NEXT:  string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 4
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 2
-// CHECK-NEXT:  int_instrprof_increment
+// CHECK-NEXT:  increment_profiler_counter 2
 // CHECK-NEXT:  br [[DEFAULT]]
 
 // CHECK:       [[DEFAULT]]
 // CHECK:       function_ref @$s15coverage_switch2f1yys5Int32VF : $@convention(thin) (Int32) -> ()
 
 // CHECK:       [[CASE1]]
-// CHECK-NEXT:  string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 4
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:  int_instrprof_increment
+// CHECK-NEXT:  increment_profiler_counter 1
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_switch.f1
 func f1(_ x : Int32) { // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+11]]:2 : 0

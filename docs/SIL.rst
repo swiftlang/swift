@@ -3898,6 +3898,22 @@ It is worth noting that a SIL DIExpression is similar to
 info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
 SIL DIExpression can have elements with various types, like AST nodes or strings.
 
+Profiling
+~~~~~~~~~
+
+increment_profiler_counter
+``````````````````````````
+::
+
+  sil-instruction ::= 'increment_profiler_counter' int-literal ',' string-literal ',' 'num_counters' int-literal ',' 'hash' int-literal
+
+  increment_profiler_counter 1, "$foo", num_counters 3, hash 0
+
+Increments a given profiler counter for a given PGO function name. This is
+lowered to the ``llvm.instrprof.increment`` LLVM intrinsic. This instruction
+is emitted when profiling is enabled, and enables features such as code coverage
+and profile-guided optimization.
+
 Accessing Memory
 ~~~~~~~~~~~~~~~~
 

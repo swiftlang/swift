@@ -738,9 +738,6 @@ BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 // TypePtrAuthDiscriminator has type <T> (T.Type) -> Int64
 BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n", Special)
 
-//  int_instrprof_increment has type (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ().
-BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Special)
-
 /// Initialize the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Special)
 

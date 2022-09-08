@@ -1315,7 +1315,9 @@ public:
   void visitRebindMemoryInst(RebindMemoryInst *i);
 
   void visitCondFailInst(CondFailInst *i);
-  
+
+  void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *I);
+
   void visitConvertFunctionInst(ConvertFunctionInst *i);
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *i);
   void visitUpcastInst(UpcastInst *i);
@@ -6954,6 +6956,39 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Builder.SetInsertPoint(origInsertionPoint);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
+}
+
+void IRGenSILFunction::visitIncrementProfilerCounterInst(
+    IncrementProfilerCounterInst *i) {
+  // If we import profiling intrinsics from a swift module but profiling is
+  // not enabled, ignore the increment.
+  if (!getSILModule().getOptions().GenerateProfile)
+    return;
+
+  // Retrieve the global variable that stores the PGO function name, creating it
+  // if needed.
+  auto funcName = i->getPGOFuncName();
+  auto varLinkage = llvm::GlobalValue::LinkOnceAnyLinkage;
+  auto *nameVar = IGM.Module.getNamedGlobal(
+      llvm::getPGOFuncNameVarName(funcName, varLinkage));
+  if (!nameVar)
+    nameVar = llvm::createPGOFuncNameVar(IGM.Module, varLinkage, funcName);
+
+  // We need to GEP the function name global to point to the first character of
+  // the string.
+  llvm::SmallVector<llvm::Value *, 2> indices;
+  indices.append(2, llvm::ConstantInt::get(IGM.SizeTy, 0));
+  auto *nameGEP = llvm::ConstantExpr::getGetElementPtr(
+      nameVar->getValueType(), nameVar, makeArrayRef(indices));
+
+  // Emit the call to the 'llvm.instrprof.increment' LLVM intrinsic.
+  llvm::Value *args[] = {
+    nameGEP,
+    llvm::ConstantInt::get(IGM.Int64Ty, i->getPGOFuncHash()),
+    llvm::ConstantInt::get(IGM.Int32Ty, i->getNumCounters()),
+    llvm::ConstantInt::get(IGM.Int32Ty, i->getCounterIndex())
+  };
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::instrprof_increment, args);
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {

@@ -810,7 +810,10 @@ NON_VALUE_INST(AbortApplyInst, abort_apply,
 BRIDGED_NON_VALUE_INST(CondFailInst, cond_fail,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
-NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
+NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
+               SILInstruction, MayReadWrite, DoesNotRelease)
+
+NODE_RANGE(NonValueInstruction, UnreachableInst, IncrementProfilerCounterInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,

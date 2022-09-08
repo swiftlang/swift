@@ -141,7 +141,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::TargetOSVersionAtLeast:
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
-    case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:

@@ -2359,7 +2359,14 @@ public:
     *this << getIDAndType(FI->getOperand()) << ", "
           << QuotedString(FI->getMessage());
   }
-  
+
+  void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *IPCI) {
+    *this << IPCI->getCounterIndex() << ", "
+          << QuotedString(IPCI->getPGOFuncName()) << ", "
+          << "num_counters " << IPCI->getNumCounters() << ", "
+          << "hash " << IPCI->getPGOFuncHash();
+  }
+
   void visitIndexAddrInst(IndexAddrInst *IAI) {
     *this << getIDAndType(IAI->getBase()) << ", "
           << getIDAndType(IAI->getIndex());

@@ -1169,50 +1169,6 @@ bb0(%0 : $B):
   return %7 : $FakeOptional<B>
 }
 
-// Negative test corresponding to the previous test.
-// CHECK-LABEL: sil @no_enum_promotion_of_non_concrete_types
-// CHECK: bb0
-// CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
-// CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT:  inject_enum_addr
-// CHECK-NEXT: cond_br
-// CHECK: bb1:
-// CHECK-NEXT: br bb3
-// CHECK: bb2:
-// CHECK-NEXT: br bb3
-// CHECK: bb3
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: tuple
-// CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: return
-sil @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@inout T, Builtin.Int1) -> @out FakeOptional<T> {
-bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
-  %3 = alloc_stack $FakeOptional<T>
-  inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
-  %4 = alloc_stack $FakeOptional<T>
-  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
-  copy_addr [take] %1 to [initialization] %5 : $*T
-  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
-  cond_br %2, bb1, bb2
-
-bb1:
-  br bb3(%3 : $*FakeOptional<T>)
-
-bb2:
-  br bb3(%4 : $*FakeOptional<T>)
-
-bb3(%6 : $*FakeOptional<T>):
-  copy_addr [take] %6 to [initialization] %0 : $*FakeOptional<T>
-  %7 = tuple()
-  dealloc_stack %4 : $*FakeOptional<T>
-  dealloc_stack %3 : $*FakeOptional<T>
-  return %7 : $()
-}
-
 // (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
 // CHECK-LABEL: sil @unchecked_ref_cast_round_trip : $@convention(thin) (B) -> B {
 // CHECK: bb0

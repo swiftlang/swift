@@ -1315,8 +1315,7 @@ ParameterListInfo::ParameterListInfo(
       inheritActorContext.set(i);
     }
 
-    if (param->isVariadic() &&
-        param->getVarargBaseTy()->hasTypeSequence()) {
+    if (param->getInterfaceType()->is<PackExpansionType>()) {
       variadicGenerics.set(i);
     }
   }

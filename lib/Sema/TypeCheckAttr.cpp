@@ -328,6 +328,7 @@ public:
 
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
+  void checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs);
   void checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs);
 
   void visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr);
@@ -1421,8 +1422,10 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     TypeChecker::applyAccessNote(VD);
 
   AttributeChecker Checker(D);
-  // We need to check all OriginallyDefinedInAttr and BackDeployAttr relative
-  // to each other, so collect them and check in batch later.
+  // We need to check all availableAttrs, OriginallyDefinedInAttr and
+  // BackDeployAttr relative to each other, so collect them and check in
+  // batch later.
+  llvm::SmallVector<AvailableAttr *, 4> availableAttrs;
   llvm::SmallVector<BackDeployAttr *, 4> backDeployAttrs;
   llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
   for (auto attr : D->getAttrs()) {
@@ -1436,6 +1439,10 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
       } else if (auto *BD = dyn_cast<BackDeployAttr>(attr)) {
         backDeployAttrs.push_back(BD);
       } else {
+        // check @available attribute both collectively and individually.
+        if (auto *AV = dyn_cast<AvailableAttr>(attr)) {
+          availableAttrs.push_back(AV);
+        }
         // Otherwise, check it.
         Checker.visit(attr);
       }
@@ -1475,6 +1482,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
+  Checker.checkAvailableAttrs(availableAttrs);
   Checker.checkBackDeployAttrs(backDeployAttrs);
   Checker.checkOriginalDefinedInAttrs(ODIAttrs);
 }
@@ -4000,6 +4008,17 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
       return;
     }
   }
+}
+
+void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
+  if (Attrs.empty())
+    return;
+  // If all available are spi available, we should use @_spi instead.
+  if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
+    return AV->IsSPI;
+  })) {
+    diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
+  };
 }
 
 void AttributeChecker::checkBackDeployAttrs(ArrayRef<BackDeployAttr *> Attrs) {
@@ -6657,8 +6676,7 @@ static bool parametersMatch(const AbstractFunctionDecl *a,
 
 ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
                                         const ValueDecl *attached,
-                                        const AvailableAttr *attr,
-                                        bool isKnownObjC) const {
+                                        const AvailableAttr *attr) const {
   if (!attached || !attr)
     return nullptr;
 
@@ -6689,7 +6707,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   auto minAccess = AccessLevel::Private;
   if (attached->getModuleContext()->isExternallyConsumed())
     minAccess = AccessLevel::Public;
-  bool attachedIsObjcVisible = isKnownObjC ||
+  bool attachedIsObjcVisible =
       objc_translation::isVisibleToObjC(attached, minAccess);
 
   SmallVector<ValueDecl *, 4> lookupResults;

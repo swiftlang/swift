@@ -2132,6 +2132,19 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Profiler
+  //===--------------------------------------------------------------------===//
+
+  IncrementProfilerCounterInst *
+  createIncrementProfilerCounter(SILLocation Loc, unsigned CounterIdx,
+                                 StringRef PGOFuncName, unsigned NumCounters,
+                                 uint64_t PGOFuncHash) {
+    return insert(IncrementProfilerCounterInst::create(
+        getSILDebugLocation(Loc), CounterIdx, PGOFuncName, NumCounters,
+        PGOFuncHash, getModule()));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Array indexing instructions
   //===--------------------------------------------------------------------===//
 

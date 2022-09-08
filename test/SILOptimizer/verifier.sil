@@ -91,17 +91,17 @@ class AClass {
 
 sil @testPhiCycle : $@convention(thin) (@guaranteed AClass) -> () {
 bb0(%0 : $AClass):
-  %accessAddr = ref_element_addr %0 : $AClass, #AClass.aStoredProp
-  br bbloop(%accessAddr : $*Builtin.Int32)
+  br bbloop
 
-bbloop(%phiAddr : $*Builtin.Int32):
-  %access = begin_access [read] [dynamic] [no_nested_conflict] %phiAddr : $*Builtin.Int32
+bbloop:
+  %accessAddr = ref_element_addr %0 : $AClass, #AClass.aStoredProp
+  %access = begin_access [read] [dynamic] [no_nested_conflict] %accessAddr : $*Builtin.Int32
   %val = load %access : $*Builtin.Int32
   end_access %access : $*Builtin.Int32
   cond_br undef, bbtail, bbreturn
 
 bbtail:
-  br bbloop(%phiAddr : $*Builtin.Int32)
+  br bbloop
 
 bbreturn:
   %v = tuple ()

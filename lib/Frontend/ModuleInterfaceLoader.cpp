@@ -1947,9 +1947,8 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
   return std::make_error_code(std::errc::not_supported);
 }
 
-bool ExplicitSwiftModuleLoader::canImportModule(ImportPath::Module path,
-                                                llvm::VersionTuple version,
-                                                bool underlyingVersion) {
+bool ExplicitSwiftModuleLoader::canImportModule(
+    ImportPath::Module path, ModuleVersionInfo *versionInfo) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;

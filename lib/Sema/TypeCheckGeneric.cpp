@@ -635,16 +635,22 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           continue;
 
         auto paramOptions = baseOptions;
-        paramOptions.setContext(param->isVariadic()
-                                    ? TypeResolverContext::VariadicFunctionInput
-                                    : TypeResolverContext::FunctionInput);
+
+        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
+          typeRepr = specifier->getBase();
+
+        if (auto *packExpansion = dyn_cast<PackExpansionTypeRepr>(typeRepr)) {
+          typeRepr = packExpansion->getPatternType();
+
+          paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
+        } else {
+          paramOptions.setContext(TypeResolverContext::FunctionInput);
+        }
+
         paramOptions |= TypeResolutionFlags::Direct;
 
         const auto type =
             resolution.withOptions(paramOptions).resolveType(typeRepr);
-
-        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
-          typeRepr = specifier->getBase();
 
         inferenceSources.emplace_back(typeRepr, type);
       }

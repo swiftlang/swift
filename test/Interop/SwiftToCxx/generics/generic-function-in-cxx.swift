@@ -97,7 +97,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
     return TestSmallStruct(x1: x)
 }
 
-// CHECK: SWIFT_EXTERN void $s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, struct swift_interop_stub_Functions_TestSmallStruct _self, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericMethodPassThrough(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, struct swift_interop_passStub_Functions_uint32_t_0_4 _self, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericMethodPassThrough(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions15TestSmallStructV20genericMethodMutTakeyyxlF(const void * _Nonnull x, void * _Nonnull , SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // genericMethodMutTake(_:)
 
 // CHECK: SWIFT_EXTERN void $s9Functions20genericPrintFunctionyyxlF(const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunction(_:)
@@ -168,15 +168,15 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: inline T_0_0 TestSmallStruct::genericMethodPassThrough(const T_0_0& x) const {
 // CHECK-NEXT:   if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:   void *returnValue;
-// CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_TestSmallStruct(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
+// CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
 // CHECK-NEXT:   } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
 // CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
-// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(returnValue, swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_TestSmallStruct(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
+// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(returnValue, swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT:   } else {
 // CHECK-NEXT:   T_0_0 returnValue;
-// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_TestSmallStruct(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
+// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   return returnValue;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   }

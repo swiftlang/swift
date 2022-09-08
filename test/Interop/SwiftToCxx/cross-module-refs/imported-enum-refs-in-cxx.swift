@@ -30,12 +30,12 @@ public func inoutLargeEnum(_ s: inout LargeEnum) {
 // CHECK-NEXT: }
 
 // CHECK: inline Enums::LargeEnum UsesEnumsLargeEnum::passThroughStructSeveralI64(const Enums::LargeEnum& y) const {
-// CHECK-NEXT: return Enums::_impl::_impl_LargeEnum::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return Enums::_impl::_impl_LargeEnum::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s9UsesEnums0aB9LargeEnumV27passThroughStructSeveralI64y0B00cD0OAGF(result, Enums::_impl::_impl_LargeEnum::getOpaquePointer(y), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: inline Enums::LargeEnum UsesEnumsLargeEnum::getX() const {
-// CHECK-NEXT: return Enums::_impl::_impl_LargeEnum::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return Enums::_impl::_impl_LargeEnum::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s9UsesEnums0aB9LargeEnumV1x0B00cD0Ovg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }

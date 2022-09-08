@@ -43,25 +43,25 @@ public func passThroughStructSmallDirect(_ x: SmallStructDirectPassing) -> Small
 
 
 // CHECK:      inline Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:  return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::$s11UsesStructs27passThroughStructSeveralI64y0B00efG0VAEF(result, Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 // CHECK:      inline Structs::SmallStructDirectPassing passThroughStructSmallDirect(const Structs::SmallStructDirectPassing& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return Structs::_impl::_impl_SmallStructDirectPassing::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_SmallStructDirectPassing(result, _impl::$s11UsesStructs28passThroughStructSmallDirecty0B00feG7PassingVAEF(_impl::swift_interop_passDirect_Structs_SmallStructDirectPassing(Structs::_impl::_impl_SmallStructDirectPassing::getOpaquePointer(x))));
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_UsesStructs_uint32_t_0_4(result, _impl::$s11UsesStructs28passThroughStructSmallDirecty0B00feG7PassingVAEF(_impl::swift_interop_passDirect_UsesStructs_uint32_t_0_4(Structs::_impl::_impl_SmallStructDirectPassing::getOpaquePointer(x))));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 // CHECK: inline Structs::StructSeveralI64 UsesStructsStruct::passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const {
-// CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF(result, Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(y), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK: inline Structs::StructSeveralI64 UsesStructsStruct::getX() const {
-// CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s11UsesStructs0aB6StructV1x0B00C10SeveralI64Vvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }

@@ -5904,10 +5904,8 @@ public:
 
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
-  /// Whether or not this parameter is varargs.
-  bool isVariadic() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
-  }
+  /// Whether or not this parameter is old-style variadic.
+  bool isVariadic() const;
   void setVariadic(bool value = true) {
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
@@ -6827,7 +6825,7 @@ public:
   bool hasDynamicSelfResult() const;
 
   /// The async function marked as the alternative to this function, if any.
-  AbstractFunctionDecl *getAsyncAlternative(bool isKnownObjC = false) const;
+  AbstractFunctionDecl *getAsyncAlternative() const;
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the

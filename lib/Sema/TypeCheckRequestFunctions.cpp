@@ -31,28 +31,38 @@ Type InheritedTypeRequest::evaluate(
     unsigned index, TypeResolutionStage stage) const {
   // Figure out how to resolve types.
   DeclContext *dc;
+  TypeResolverContext context;
+
   if (auto typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = (DeclContext *)nominal;
+      context = TypeResolverContext::Inherited;
     } else {
       dc = typeDecl->getDeclContext();
+      if (isa<GenericTypeParamDecl>(typeDecl))
+        context = TypeResolverContext::GenericParameterInherited;
+      else {
+        assert(isa<AssociatedTypeDecl>(typeDecl));
+        context = TypeResolverContext::AssociatedTypeInherited;
+      }
     }
   } else {
     dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+    context = TypeResolverContext::Inherited;
   }
 
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution =
-        TypeResolution::forStructural(dc, TypeResolverContext::Inherited,
+        TypeResolution::forStructural(dc, context,
                                       /*unboundTyOpener*/ nullptr,
                                       /*placeholderHandler*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
-        TypeResolution::forInterface(dc, TypeResolverContext::Inherited,
+        TypeResolution::forInterface(dc, context,
                                      /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr);
     break;

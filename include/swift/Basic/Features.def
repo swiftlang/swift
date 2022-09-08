@@ -126,6 +126,9 @@ EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
 /// wrapped type.
 EXPERIMENTAL_FEATURE(TypeWrappers)
 
+/// Whether to perform round-trip testing of the Swift Swift parser.
+EXPERIMENTAL_FEATURE(ParserRoundTrip)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
