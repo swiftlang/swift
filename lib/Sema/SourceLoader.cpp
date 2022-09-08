@@ -71,8 +71,7 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
 }
 
 bool SourceLoader::canImportModule(ImportPath::Module path,
-                                   llvm::VersionTuple version,
-                                   bool underlyingVersion) {
+                                   ModuleVersionInfo *versionInfo) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -90,6 +89,7 @@ bool SourceLoader::canImportModule(ImportPath::Module path,
 
     return false;
   }
+
   return true;
 }
 

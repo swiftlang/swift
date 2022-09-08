@@ -2184,6 +2184,27 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
+static bool isClangModuleVersion(const ModuleLoader::ModuleVersionInfo &info) {
+  switch (info.getSourceKind()) {
+  case ModuleLoader::ModuleVersionSourceKind::ClangModuleTBD:
+    return true;
+  case ModuleLoader::ModuleVersionSourceKind::SwiftBinaryModule:
+  case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
+    return false;
+  }
+}
+
+static StringRef
+getModuleVersionKindString(const ModuleLoader::ModuleVersionInfo &info) {
+  switch (info.getSourceKind()) {
+  case ModuleLoader::ModuleVersionSourceKind::ClangModuleTBD:
+    return "Clang";
+  case ModuleLoader::ModuleVersionSourceKind::SwiftBinaryModule:
+  case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
+    return "Swift";
+  }
+}
+
 bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
                                      llvm::VersionTuple version,
                                      bool underlyingVersion,
@@ -2195,22 +2216,60 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
-  // If no specific version, the module is importable if it has already been imported.
+
   if (version.empty()) {
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
-  }
-  // Otherwise, ask the module loaders.
-  for (auto &importer : getImpl().ModuleLoaders) {
-    if (importer->canImportModule(ModuleName, version, underlyingVersion)) {
-      return true;
+
+    // Otherwise, ask whether any module loader can load the module.
+    for (auto &importer : getImpl().ModuleLoaders) {
+      if (importer->canImportModule(ModuleName, nullptr))
+        return true;
     }
+
+    if (updateFailingList)
+      FailedModuleImportNames.insert(ModuleNameStr);
+
+    return false;
   }
-  if (updateFailingList && version.empty()) {
-    FailedModuleImportNames.insert(ModuleNameStr);
+
+  // We need to check whether the version of the module is high enough.
+  // Retrieve a module version from each module loader that can find the module
+  // and use the best source available for the query.
+  ModuleLoader::ModuleVersionInfo bestVersionInfo;
+  for (auto &importer : getImpl().ModuleLoaders) {
+    ModuleLoader::ModuleVersionInfo versionInfo;
+
+    if (!importer->canImportModule(ModuleName, &versionInfo))
+      continue; // The loader can't find the module.
+
+    if (!versionInfo.isValid())
+      continue; // The loader didn't attempt to parse a version.
+
+    if (underlyingVersion && !isClangModuleVersion(versionInfo))
+      continue; // We're only matching Clang module versions.
+
+    if (bestVersionInfo.isValid() &&
+        versionInfo.getSourceKind() <= bestVersionInfo.getSourceKind())
+      continue; // This module version's source is lower priority.
+
+    bestVersionInfo = versionInfo;
   }
-  return false;
+
+  if (!bestVersionInfo.isValid())
+    return false;
+
+  if (bestVersionInfo.getVersion().empty()) {
+    // The module version could not be parsed from the preferred source for
+    // this query. Diagnose and treat the query as if it succeeded.
+    auto mID = ModuleName[0];
+    Diags.diagnose(mID.Loc, diag::cannot_find_project_version,
+                   getModuleVersionKindString(bestVersionInfo), mID.Item.str());
+    return true;
+  }
+
+  return version <= bestVersionInfo.getVersion();
 }
 
 bool ASTContext::canImportModule(ImportPath::Module ModuleName,
