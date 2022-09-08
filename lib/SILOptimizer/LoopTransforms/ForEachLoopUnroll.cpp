@@ -21,7 +21,7 @@
 //    initializer annotated "array.uninitialized_intrinsic". This is done in
 //    `run` method.
 //
-// 2. For every "array.unininitialized_intrinsic" initializer call, try
+// 2. For every "array.uninitialized_intrinsic" initializer call, try
 //    extracting the elements with which the array is initialized, and classify
 //    the uses of the array into incidental uses, forEach calls and uses that
 //    can write into the array. If any of the following conditions hold, give
