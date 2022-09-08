@@ -293,13 +293,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
-      // Diagnose single-element tuple expressions.
-      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-        if (tupleExpr->getNumElements() == 1) {
-          Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
-                             diag::tuple_single_element)
-            .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
-                              tupleExpr->getElement(0)->getStartLoc());
+      if (!Ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+        // Diagnose single-element tuple expressions.
+        if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+          if (tupleExpr->getNumElements() == 1) {
+            Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
+                               diag::tuple_single_element)
+              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+                                tupleExpr->getElement(0)->getStartLoc());
+          }
         }
       }
 

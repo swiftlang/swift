@@ -4129,22 +4129,24 @@ TypeResolver::maybeResolvePackExpansionType(PackExpansionTypeRepr *repr,
 
 NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr,
                                                      TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+
   auto pair = maybeResolvePackExpansionType(repr, options);
 
   if (pair.first->hasError())
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
 
   // We might not allow variadic expansions here at all.
   if (!options.isPackExpansionSupported()) {
     diagnose(repr->getLoc(), diag::expansion_not_allowed, pair.first);
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   // The pattern type must contain at least one variadic generic parameter.
   if (!pair.second) {
     diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
       .highlight(repr->getSourceRange());
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(ctx);
   }
 
   return PackExpansionType::get(pair.first, pair.second);
@@ -4152,6 +4154,8 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
 
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                              TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
 
@@ -4188,30 +4192,33 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   }
 
   if (hadError)
-    return ErrorType::get(getASTContext());
-
-  // Single-element labeled tuples are not permitted outside of declarations
-  // or SIL, either.
-  if (elements.size() == 1 && elements[0].hasName()
-      && !(options & TypeResolutionFlags::SILType)) {
-    diagnose(repr->getElementNameLoc(0), diag::tuple_single_element)
-      .fixItRemoveChars(repr->getElementNameLoc(0),
-                        repr->getElementType(0)->getStartLoc());
-
-    elements[0] = TupleTypeElt(elements[0].getType());
-  }
+    return ErrorType::get(ctx);
 
   // Tuples with duplicate element labels are not permitted
   if (foundDupLabel) {
     diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
-  // FIXME: One-element pack expansions should retain the tuple type
-  // wrapper
-  if (elements.size() == 1 && !elements[0].hasName())
-    return ParenType::get(getASTContext(), elements[0].getType());
+  if (ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+    if (repr->isParenType())
+      return ParenType::get(ctx, elements[0].getType());
+  } else {
+    // Single-element labeled tuples are not permitted outside of declarations
+    // or SIL, either.
+    if (elements.size() == 1 && elements[0].hasName()
+        && !(options & TypeResolutionFlags::SILType)) {
+      diagnose(repr->getElementNameLoc(0), diag::tuple_single_element)
+        .fixItRemoveChars(repr->getElementNameLoc(0),
+                          repr->getElementType(0)->getStartLoc());
 
-  return TupleType::get(elements, getASTContext());
+      elements[0] = TupleTypeElt(elements[0].getType());
+    }
+
+    if (elements.size() == 1 && !elements[0].hasName())
+      return ParenType::get(ctx, elements[0].getType());
+  }
+
+  return TupleType::get(elements, ctx);
 }
 
 NeverNullType
