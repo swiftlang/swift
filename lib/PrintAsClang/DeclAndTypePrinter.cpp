@@ -720,6 +720,8 @@ private:
       }
       os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
+      
+      printMembers(ED->getMembers());
     });
   }
 

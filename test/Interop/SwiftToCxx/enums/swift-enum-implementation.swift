@@ -11,6 +11,18 @@ public enum E {
     case w(i: Int)
     case auto(UnsafeMutableRawPointer)
     case foobar
+
+    public init() {
+        self = .foobar
+    }
+
+    public var ten: Int {
+        return 10
+    }
+
+    public func printSelf() {
+        print("self")
+    }
 }
 
 public struct S {
@@ -99,7 +111,11 @@ public struct S {
 // CHECK-NEXT:       default: abort();
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
-// CHECK:      private:
+// CHECK-EMPTY:
+// CHECK-NEXT:   static inline E init();
+// CHECK-NEXT:   inline swift::Int getTen() const;
+// CHECK-NEXT:   inline void printSelf() const;
+// CHECK-NEXT: private:
 // CHECK:        inline char * _Nonnull _destructiveProjectEnumData() {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
 // CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
@@ -256,4 +272,15 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   inline bool E::isFoobar() const {
 // CHECK-NEXT:     return *this == E::foobar;
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline E E::init() {
+// CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:       _impl::swift_interop_returnDirect_Enums_uint64_t_0_8_uint8_t_8_9(result, _impl::$s5Enums1EOACycfC());
+// CHECK-NEXT:     });
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline swift::Int E::getTen() const {
+// CHECK-NEXT:     return _impl::$s5Enums1EO3tenSivg(_impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline void E::printSelf() const {
+// CHECK-NEXT:     return _impl::$s5Enums1EO9printSelfyyF(_impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));
 // CHECK-NEXT:   }

@@ -154,6 +154,18 @@ This status table describes which of the following Swift language features have 
 | Copy and destroy semantics     | Yes                                                      |
 | Initializers                   | Partially, as static `init` methods. No failable support |
 
+**Enums**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Fixed layout enums           | Yes                                                      |
+| Resilient / opaque enums     | Yes                                                      |
+| Copy and destroy semantics   | Yes                                                      |
+| Creation                     | Yes                                                      |
+| Enums with associated values | Partially: only support structs and enums                |
+| Enums with raw values        | No                                                       |
+| Indirect enums               | No                                                       |
+
 **Class types**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
