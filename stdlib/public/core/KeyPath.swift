@@ -1951,8 +1951,9 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
       keyPath: _unsafeUncheckedDowncast(keyPath,
         to: ReferenceWritableKeyPath<Root, Value>.self))
   }
-  let ptr = UnsafePointer<Root>(Builtin.unprotectedAddressOf(&root))
-  return keyPath._projectMutableAddress(from: ptr)
+  return _withUnprotectedUnsafePointer(to: &root) {
+    keyPath._projectMutableAddress(from: $0)
+  }
 }
 
 // The release that ends the access scope is guaranteed to happen
@@ -1981,8 +1982,9 @@ func _setAtWritableKeyPath<Root, Value>(
       value: value)
   }
   // TODO: we should be able to do this more efficiently than projecting.
-  let ptr = UnsafePointer<Root>(Builtin.unprotectedAddressOf(&root))
-  let (addr, owner) = keyPath._projectMutableAddress(from: ptr)
+  let (addr, owner) = _withUnprotectedUnsafePointer(to: &root) {
+    keyPath._projectMutableAddress(from: $0)
+  }
   addr.pointee = value
   _fixLifetime(owner)
   // FIXME: this needs a deallocation barrier to ensure that the

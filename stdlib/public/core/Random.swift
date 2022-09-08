@@ -158,12 +158,9 @@ public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
-#if $BuiltinUnprotectedAddressOf
-    let ptr = UnsafeMutablePointer<UInt64>(Builtin.unprotectedAddressOf(&random))
-#else
-    let ptr = UnsafeMutablePointer<UInt64>(Builtin.addressof(&random))
-#endif
-    swift_stdlib_random(ptr, MemoryLayout<UInt64>.size)
+    _withUnprotectedUnsafeMutablePointer(to: &random) {
+      swift_stdlib_random($0, MemoryLayout<UInt64>.size)
+    }
     return random
   }
 }

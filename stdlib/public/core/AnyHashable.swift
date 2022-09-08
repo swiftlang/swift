@@ -159,10 +159,11 @@ public struct AnyHashable {
     }
 
     self.init(_box: _ConcreteHashableBox(false)) // Dummy value
-    let ptr = UnsafeMutablePointer<AnyHashable>(Builtin.unprotectedAddressOf(&self))
-    _makeAnyHashableUpcastingToHashableBaseType(
-      base,
-      storingResultInto: ptr)
+    _withUnprotectedUnsafeMutablePointer(to: &self) {
+      _makeAnyHashableUpcastingToHashableBaseType(
+        base,
+        storingResultInto: $0)
+    }
   }
 
   internal init<H: Hashable>(_usingDefaultRepresentationOf base: H) {
