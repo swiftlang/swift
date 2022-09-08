@@ -13,3 +13,9 @@ module ConstRefParameter {
   requires objc
   requires cplusplus
 }
+
+module ConstRefCxxObjCCtorInitParameter {
+  header "reference-silgen-cxx-objc-ctors+init.h"
+  requires objc
+  requires cplusplus
+}
