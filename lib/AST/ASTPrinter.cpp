@@ -2935,6 +2935,10 @@ static bool usesFeatureTypeWrappers(Decl *decl) {
   return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
 }
 
+static bool usesFeatureParserRoundTrip(Decl *decl) {
+  return false;
+}
+
 static void suppressingFeatureSpecializeAttributeWithAvailability(
                                         PrintOptions &options,
                                         llvm::function_ref<void()> action) {

@@ -59,7 +59,7 @@ if (SWIFT_SWIFT_PARSER)
 
   target_compile_definitions(swiftParse
     PRIVATE
-    SWIFT_SWIFT_PARSER_ROUNDTRIP
+    SWIFT_SWIFT_PARSER
   )
 endif()
 
