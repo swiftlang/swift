@@ -127,6 +127,7 @@ public:
   llvm::Optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
     auto function = SILFunction::getFunction(SILDeclRef(fd), *silMod);
+    IGM.lowerSILFunction(function);
     auto silFuncType = function->getLoweredFunctionType();
     // FIXME: Async function support.
     if (silFuncType->isAsync())

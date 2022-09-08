@@ -56,6 +56,9 @@ public struct GenericPair<T, T2> {
             y_ = ClassWithT<T2>(newValue)
         }
     }
+    #if INDIRECT_KNOWN_LAYOUT
+    let val1, val2, val3, val4: Int
+    #endif
     #else
     var x: T
     public var y: T2
@@ -65,6 +68,12 @@ public struct GenericPair<T, T2> {
 #if KNOWN_LAYOUT
         self.x_ = ClassWithT<T>(x)
         self.y_ = ClassWithT<T2>(y)
+#if INDIRECT_KNOWN_LAYOUT
+        val1 = 0
+        val2 = 0
+        val3 = 0
+        val4 = 0
+#endif
 #else
         self.x = x
         self.y = y
@@ -75,6 +84,12 @@ public struct GenericPair<T, T2> {
 #if KNOWN_LAYOUT
         self.x_ = ClassWithT<T>(x)
         self.y_ = ClassWithT<T2>(y)
+#if INDIRECT_KNOWN_LAYOUT
+        val1 = 0
+        val2 = 0
+        val3 = 0
+        val4 = 0
+#endif
 #else
         self.x = x
         self.y = y
