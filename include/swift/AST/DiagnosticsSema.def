@@ -865,6 +865,15 @@ NOTE(invalid_redecl_implicit_wrapper,none,
      "%select{projected value|backing storage}1",
      (DeclName, bool))
 
+ERROR(protocol_extension_in_where_clause,none,
+      "%0 was defined in extension of protocol %1 and cannot be referenced "
+      "from a %select{'where' clause|generic parameter inheritance clause|"
+      "associated type inheritance clause}2",
+      (Identifier, Identifier, unsigned))
+NOTE(protocol_extension_in_where_clause_note,none,
+     "consider moving %0 into the definition of protocol %1",
+     (Identifier, Identifier))
+
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
 ERROR(invalid_member_type,none,

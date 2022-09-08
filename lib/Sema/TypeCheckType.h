@@ -162,8 +162,14 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is the type of an editor placeholder.
   EditorPlaceholderExpr,
 
-  /// Whether this is an "inherited" type.
+  /// Whether this is an inheritance clause of a concrete type.
   Inherited,
+
+  /// Whether this is an inheritance clause of a generic parameter.
+  GenericParameterInherited,
+
+  /// Whether this is an inheritance clause of an associated type.
+  AssociatedTypeInherited,
 
   /// Whether this is a custom attribute.
   CustomAttr
@@ -256,6 +262,8 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
       return false;
     }
@@ -267,6 +275,8 @@ public:
   bool isConstraintImplicitExistential() const {
     switch (context) {
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -311,6 +321,8 @@ public:
     case Context::None:
     case Context::ProtocolGenericArgument:
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -330,6 +342,47 @@ public:
     case Context::EnumElementDecl:
     case Context::EnumPatternPayload:
     case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in a `where` clause, generic parameter
+  /// declaration inheritance clause, or associated type inheritance clause.
+  bool isGenericRequirement() const {
+    switch (base) {
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
+      return true;
+
+    case Context::None:
+    case Context::Inherited:
+    case Context::FunctionInput:
+    case Context::TupleElement:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::EnumPatternPayload:
     case Context::ProtocolMetatypeBase:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
