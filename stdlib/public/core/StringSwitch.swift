@@ -68,7 +68,11 @@ func _findStringSwitchCaseWithCache(
   string: String,
   cache: inout _OpaqueStringSwitchCache) -> Int {
 
+#if $BuiltinUnprotectedAddressOf
   let ptr = UnsafeMutableRawPointer(Builtin.unprotectedAddressOf(&cache))
+#else
+  let ptr = UnsafeMutableRawPointer(Builtin.addressof(&cache))
+#endif
   let oncePtr = ptr
   let cacheRawPtr = oncePtr + MemoryLayout<Builtin.Word>.stride
   let cachePtr = cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
