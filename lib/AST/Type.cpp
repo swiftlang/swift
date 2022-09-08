@@ -5560,8 +5560,12 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      elements.push_back(transformedEltTy);
-      ++Index;
+      if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
+        elements.append(transformedPack->getElementTypes().begin(),
+                        transformedPack->getElementTypes().end());
+      } else {
+        elements.push_back(transformedEltTy);
+      }
     }
 
     if (!anyChanged)
@@ -5698,17 +5702,12 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      if (eltTy->isTypeSequenceParameter() &&
-          transformedEltTy->is<PackType>()) {
-        assert(anyChanged);
-        // Splat the tuple in by copying in all of the transformed elements.
-        auto tuple = dyn_cast<PackType>(transformedEltTy.getPointer());
-        elements.append(tuple->getElementTypes().begin(),
-                        tuple->getElementTypes().end());
+      if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
+        elements.append(transformedPack->getElementTypes().begin(),
+                        transformedPack->getElementTypes().end());
       } else {
         // Add the new tuple element, with the transformed type.
         elements.push_back(elt.getWithType(transformedEltTy));
-        ++Index;
       }
     }
 
