@@ -1,9 +1,10 @@
 // RUN: %target-build-swift -g %s
 
-// SR-12650: IRGenDebugInfo type reconstruction crash because `@noDerivative`
-// parameters are not mangled.
+// https://github.com/apple/swift/issues/55094
+// IRGenDebugInfo type reconstruction crash because `@noDerivative` parameters
+// are not mangled
 
-// FIXME(SR-13021): Disabled due to flakiness on Linux, likely related to TF-1197.
+// FIXME: Disabled due to flakiness on Linux (https://github.com/apple/swift/issues/55466), likely related to TF-1197.
 // REQUIRES: SR13021
 
 import _Differentiation

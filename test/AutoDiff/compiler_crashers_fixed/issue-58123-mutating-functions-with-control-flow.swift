@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -O -g -debug-info-format=dwarf -emit-module -module-name sr15849 -emit-module-path %t/sr15849.swiftmodule -swift-version 5 -c %S/sr15849-mutating-functions-with-control-flow.swift
+// RUN: %target-build-swift -O -g -debug-info-format=dwarf -emit-module -module-name M -emit-module-path %t/M.swiftmodule -swift-version 5 -c %s
 
-// SR-15849: Mutating functions with control flow can cause assertion failure
-// for conflicting debug variable type.
+// https://github.com/apple/swift/issues/58123
+// Mutating functions with control flow can cause assertion failure for
+// conflicting debug variable type
 
 import _Differentiation
 

@@ -1,6 +1,8 @@
 // RUN: %target-build-swift %s
 
-// SR-13411: Semantic member getter pullback generation crash due to tangent value category mismatch
+// https://github.com/apple/swift/issues/55852
+// Semantic member getter pullback generation crash due to tangent value
+// category mismatch
 
 import _Differentiation
 

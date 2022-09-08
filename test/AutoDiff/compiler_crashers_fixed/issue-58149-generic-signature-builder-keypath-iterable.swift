@@ -1,9 +1,12 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-// SR-15884: Crash while compiling Swift for TensorFlow. This was caused by a
-// bug in GenericSignatureBuilder, similar to one involving `CaseIterable`. In
-// this reproducer, `KeyPathIterabe` is similar enough to `CaseIterable` to 
-// cause the GSB crash. It was fixed by RequirementMachine abstract signatures.
+// https://github.com/apple/swift/issues/58149
+// Crash while compiling Swift for TensorFlow
+//
+// This was caused by a bug in GenericSignatureBuilder, similar to one involving
+// `CaseIterable`. In this reproducer, `KeyPathIterable` is similar enough to
+// `CaseIterable` to have caused the GSB to crash. It was fixed by
+// RequirementMachine abstract signatures.
 
 import _Differentiation
 @_spi(Reflection) import Swift

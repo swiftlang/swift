@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -c -enable-library-evolution %s
 
-// SR-13865: AutoDiff crasher on property derivatives in library evolution mode.
+// https://github.com/apple/swift/issues/56263
+// AutoDiff crasher on property derivatives in library evolution mode
 
 import _Differentiation
 

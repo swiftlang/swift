@@ -1,6 +1,7 @@
 // RUN: not %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
 
-// SR-12656: Differentiation transform crashes for original function with opaque
+// https://github.com/apple/swift/issues/55099
+// Differentiation transform crashes for original function with opaque
 // result type.
 //
 // If supporting this is non-trivial, we could reject earlier during Sema.
