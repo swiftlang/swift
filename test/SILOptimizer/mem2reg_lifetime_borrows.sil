@@ -501,3 +501,28 @@ bb1:
   return %6 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_nested_sbi :
+// CHECK: alloc_stack 
+// CHECK-NOT: alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'test_nested_sbi'
+sil [ossa] @test_nested_sbi : $@convention(thin) (@guaranteed WrapperStruct) -> () {
+bb0(%0 : @guaranteed $WrapperStruct):
+  %2 = alloc_stack [lexical] $WrapperStruct
+  %3 = store_borrow %0 to %2 : $*WrapperStruct
+  %6 = load_borrow %3 : $*WrapperStruct
+  %7 = alloc_stack [lexical] $WrapperStruct
+  %8 = store_borrow %6 to %7 : $*WrapperStruct
+  %9 = struct_element_addr %8 : $*WrapperStruct, #WrapperStruct.val
+  %16 = load_borrow %9 : $*Klass
+  end_borrow %16 : $Klass
+  end_borrow %8 : $*WrapperStruct
+  dealloc_stack %7 : $*WrapperStruct
+  end_borrow %6 : $WrapperStruct
+  %27 = load_borrow %3 : $*WrapperStruct
+  end_borrow %27 : $WrapperStruct
+  end_borrow %3 : $*WrapperStruct
+  dealloc_stack %2 : $*WrapperStruct
+  %33 = tuple ()
+  return %33 : $()
+}
+
