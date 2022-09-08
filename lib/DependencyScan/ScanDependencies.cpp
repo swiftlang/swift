@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
@@ -177,7 +178,8 @@ resolveDirectDependencies(CompilerInstance &instance, ModuleDependencyID module,
     // Figure out what kind of module we need.
     bool onlyClangModule = !isSwift || module.first == dependsOn;
     if (auto found = ctx.getModuleDependencies(dependsOn, onlyClangModule,
-                                               cache, ASTDelegate, cacheOnly)) {
+                                               cache, ASTDelegate, cacheOnly,
+                                               module)) {
       result.insert({dependsOn, found->getKind()});
     }
   }
@@ -1108,8 +1110,10 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       }
       newGlobalCache->configureForTriple(
           newInstance->getInvocation().getLangOptions().Target.str());
+      
+      auto mainModuleName = newInstance->getMainModule()->getNameStr();
       auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
-          *newGlobalCache);
+          *newGlobalCache, mainModuleName);
       pInstance = newInstance.get();
       pCache = newLocalCache.get();
       subInstanceMap->insert(
@@ -1253,7 +1257,8 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   if (opts.ReuseDependencyScannerCache)
     deserializeDependencyCache(instance, globalCache);
 
-  ModuleDependenciesCache cache(globalCache);
+  ModuleDependenciesCache cache(globalCache,
+                                instance.getMainModule()->getNameStr());
 
   // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
@@ -1288,7 +1293,8 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache);
+  ModuleDependenciesCache cache(singleUseGlobalCache,
+                                instance.getMainModule()->getNameStr());
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -1319,7 +1325,8 @@ bool swift::dependencies::batchScanDependencies(
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache);
+  ModuleDependenciesCache cache(singleUseGlobalCache,
+                                instance.getMainModule()->getNameStr());
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
@@ -1354,7 +1361,8 @@ bool swift::dependencies::batchPrescanDependencies(
   GlobalModuleDependenciesCache singleUseGlobalCache;
   singleUseGlobalCache.configureForTriple(instance.getInvocation()
                                                   .getLangOptions().Target.str());
-  ModuleDependenciesCache cache(singleUseGlobalCache);
+  ModuleDependenciesCache cache(singleUseGlobalCache,
+                                instance.getMainModule()->getNameStr());
   (void)instance.getMainModule();
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver saver(alloc);
