@@ -128,7 +128,11 @@ struct UnboundImport {
 
 private:
   void validatePrivate(ModuleDecl *topLevelModule);
-  void validateImplementationOnly(ASTContext &ctx);
+
+  /// Check that no import has more than one of the following modifiers:
+  /// @_exported, @_implementationOnly, and @_spiOnly.
+  void validateRestrictedImport(ASTContext &ctx);
+
   void validateTestable(ModuleDecl *topLevelModule);
   void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                           SourceFile &SF);
@@ -598,7 +602,7 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
 
 void UnboundImport::validateOptions(NullablePtr<ModuleDecl> topLevelModule,
                                     SourceFile &SF) {
-  validateImplementationOnly(SF.getASTContext());
+  validateRestrictedImport(SF.getASTContext());
 
   if (auto *top = topLevelModule.getPtrOrNull()) {
     // FIXME: Having these two calls in this if condition seems dubious.
@@ -633,16 +637,55 @@ void UnboundImport::validatePrivate(ModuleDecl *topLevelModule) {
   import.sourceFileArg = StringRef();
 }
 
-void UnboundImport::validateImplementationOnly(ASTContext &ctx) {
-  if (!import.options.contains(ImportFlags::ImplementationOnly) ||
-      !import.options.contains(ImportFlags::Exported))
+void UnboundImport::validateRestrictedImport(ASTContext &ctx) {
+  static llvm::SmallVector<ImportFlags, 2> flags = {ImportFlags::Exported,
+                                                    ImportFlags::ImplementationOnly,
+                                                    ImportFlags::SPIOnly};
+  llvm::SmallVector<ImportFlags, 2> conflicts;
+
+  for (auto flag : flags) {
+    if (import.options.contains(flag))
+      conflicts.push_back(flag);
+  }
+
+  // Quit if there's no conflicting attributes.
+  if (conflicts.size() < 2)
     return;
 
-  // Remove one flag to maintain the invariant.
-  import.options -= ImportFlags::ImplementationOnly;
+  // Remove all but one flag to maintain the invariant.
+  for (auto iter = conflicts.begin(); iter != std::prev(conflicts.end()); iter ++)
+    import.options -= *iter;
 
-  diagnoseInvalidAttr(DAK_ImplementationOnly, ctx.Diags,
-                      diag::import_implementation_cannot_be_exported);
+  DeclAttrKind attrToRemove = conflicts[0] == ImportFlags::ImplementationOnly?
+                                      DAK_Exported : DAK_ImplementationOnly;
+
+  auto flagName = [](ImportFlags flag) {
+    switch (flag) {
+      case ImportFlags::ImplementationOnly:
+        return "implementation-only";
+      case ImportFlags::SPIOnly:
+        return "SPI only";
+      case ImportFlags::Exported:
+        return "exported";
+      default:
+        llvm_unreachable("Unexpected ImportFlag");
+    }
+  };
+
+  // Report the conflict, only the first two conflicts should be enough.
+  auto diag = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
+                                 diag::import_restriction_conflict,
+                                 import.module.getModulePath().front().Item,
+                                 flagName(conflicts[0]),
+                                 flagName(conflicts[1]));
+
+  auto *ID = getImportDecl().getPtrOrNull();
+  if (!ID) return;
+  auto *attr = ID->getAttrs().getAttribute(attrToRemove);
+  if (!attr) return;
+
+  diag.fixItRemove(attr->getRangeWithAt());
+  attr->setInvalid();
 }
 
 void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
