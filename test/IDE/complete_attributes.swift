@@ -24,9 +24,9 @@ struct MyValue {
 // MEMBER_MyValue-DAG: Decl[StaticVar]/CurrNominal:        val[#Int#];
 // MEMBER_MyValue: End completions
 
-class TestUnknownDanglingAttr1 {
+class TestUnkownDanglingAttr1 {
   @UknownAttr(arg: MyValue.#^ATTRARG_MEMBER^#)
 }
-class TestUnknownDanglingAttr2 {
+class TestUnkownDanglingAttr2 {
   @UknownAttr(arg: { MyValue.#^ATTRARG_MEMBER_IN_CLOSURE^# })
 }
