@@ -454,8 +454,9 @@ bb0(%0 : $Int):
 
 struct ComplexBoundedType<T: P2> {}
 
-// SR-901: Ensure that a partial_apply which captures bound generic type
-// metadata doesn't crash when restoring the generic context.
+// https://github.com/apple/swift/issues/43513
+// Ensure that a 'partial_apply' which captures bound generic type metadata
+// doesn't crash when restoring the generic context.
 
 sil hidden_external @generic_function : $@convention(thin) <T> () -> ()
 sil @partial_apply_with_generic_type : $@convention(thin) <U: P2> () -> () {
