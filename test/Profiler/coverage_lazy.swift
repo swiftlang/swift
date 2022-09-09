@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sil -module-name coverage_lazy %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
-// Test that the crash from SR-8429 is avoided, and that we generate the
-// correct coverage.
+// Test that the crash from https://github.com/apple/swift/issues/50953 is
+// avoided, and that we generate the correct coverage.
 class C {
   // CHECK-LABEL: sil hidden [lazy_getter] [noinline] @$s13coverage_lazy1CC6offsetSivg : $@convention(method) (@guaranteed C) -> Int
   // CHECK:       switch_enum {{%[0-9]+}} : $Optional<Int>, case #Optional.some!enumelt: {{bb[0-9]}}, case #Optional.none!enumelt: [[INITBB:bb[0-9]]]

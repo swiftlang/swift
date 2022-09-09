@@ -14,8 +14,8 @@ import ObjectiveC
   // FIXME: The imported typedefs should be printed directly as the param types,
   // but one level of sugar is currently lost when applying @noescape. The importer
   // also loses __attribute__((noescape)) for params of imported function types.
-  // <https://bugs.swift.org/browse/SR-2520>
-  // <https://bugs.swift.org/browse/SR-2529>
+  // https://github.com/apple/swift/issues/45125
+  // https://github.com/apple/swift/issues/45134
   
   // CHECK-NEXT: - (void)noescapeParam1:(SWIFT_NOESCAPE void (^ _Nonnull)(void))input;
   // CHECK-NEXT: - (void)noescapeParam2:(SWIFT_NOESCAPE void (^ _Nonnull)(PlainBlock _Nullable))input;

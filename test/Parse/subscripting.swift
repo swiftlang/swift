@@ -95,13 +95,16 @@ struct Y1 {
   }
 }
 
-// Mutating getters on constants (https://bugs.swift.org/browse/SR-845)
+// Mutating getters on constants
+// https://github.com/apple/swift/issues/43457
+
 struct Y2 {
   subscript(_: Int) -> Int {
     mutating get { return 0 }
   }
 }
 
+// FIXME: This test case does not belong in Parse/
 let y2 = Y2() // expected-note{{change 'let' to 'var' to make it mutable}}{{1-4=var}}
 _ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2' is a 'let' constant}}
 
