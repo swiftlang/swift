@@ -2941,6 +2941,10 @@ static bool usesFeatureParserRoundTrip(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureParserValidation(Decl *decl) {
+  return false;
+}
+
 static void suppressingFeatureSpecializeAttributeWithAvailability(
                                         PrintOptions &options,
                                         llvm::function_ref<void()> action) {
