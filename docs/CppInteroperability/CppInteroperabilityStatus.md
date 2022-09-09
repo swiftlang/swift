@@ -178,13 +178,23 @@ This status table describes which of the following Swift language features have 
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Instance methods               | Yes, for structs and classes only                                    |
+| Instance methods               | Yes                                                      |
 | Static methods                 | No                                                       |
 
 **Properties**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name. For structs and classes only                   |
-| Setter accessors               | Yes, via `set<name>`. For structs and classes only                   |
+| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name                         |
+| Setter accessors               | Yes, via `set<name>`                                     |
 | Mutation accessors             | No                                                       |
+
+**Generics**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Generic functions            | Partially, only without generic constraints              |
+| Generic methods              | Partially, only without generic constraints              |
+| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
+| Generic `enum` types         | No |
+| Generic `class` types        | No |
