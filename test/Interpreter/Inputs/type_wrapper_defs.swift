@@ -146,3 +146,10 @@ public class ClassWithDesignatedInit {
     $_storage = .init(memberwise: $Storage(a: 42, _b: PropWrapperWithoutInit(value: b)))
   }
 }
+
+@Wrapper
+public class PersonWithIgnoredAge {
+  public var name: String
+  @typeWrapperIgnored public var age: Int = 0
+  @typeWrapperIgnored @PropWrapper public var manufacturer: String?
+}

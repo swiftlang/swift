@@ -408,3 +408,44 @@ do {
   // CHECK: in getter
   // CHECK-NEXT: [42]
 }
+
+do {
+  var arthur = PersonWithIgnoredAge(name: "Arthur Dent", age: 30)
+  // CHECK: Wrapper.init($Storage(name: "Arthur Dent"))
+
+  print(arthur.name)
+  // CHECK: in getter
+  // CHECK-NEXT: Arthur Dent
+
+  print(arthur.age)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: 30
+
+  print(arthur.manufacturer)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: nil
+
+  arthur.age = 32
+  // CHECK-NOT: in setter
+
+  var marvin = PersonWithIgnoredAge(name: "Marvin The Paranoid Android", manufacturer: "Sirius Cybernetics Corporation")
+  // CHECK: Wrapper.init($Storage(name: "Marvin The Paranoid Android"))
+
+  print(marvin.name)
+  // CHECK: in getter
+  // CHECK-NEXT: Marvin The Paranoid Android
+
+  print(marvin.age)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: 0
+
+  print(marvin.manufacturer)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: Sirius Cybernetics Corporation
+
+  marvin.age = 1000
+  // CHECK-NOT: in setter
+
+  marvin.manufacturer = nil
+  // CHECK-NOT: in setter
+}
