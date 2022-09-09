@@ -44,6 +44,7 @@ enum class DisallowedOriginKind : uint8_t {
   ImplementationOnly,
   SPIImported,
   SPILocal,
+  SPIOnly,
   ImplicitlyImported,
   None
 };
