@@ -355,8 +355,20 @@ struct ArgumentInitHelper {
     SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(),
-                                      pd->getLifetimeAnnotation(), parent, loc);
+    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+    bool isNoImplicitCopy = false;
+    if (pd->isSelfParameter()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
+        lifetimeAnnotation = afd->getLifetimeAnnotation();
+        isNoImplicitCopy = afd->isNoImplicitCopy();
+      }
+    } else {
+      lifetimeAnnotation = pd->getLifetimeAnnotation();
+      isNoImplicitCopy = pd->isNoImplicitCopy();
+    }
+
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
+                                      lifetimeAnnotation, parent, loc);
 
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -921,7 +933,10 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
   if (!F.isAsync()) {
     llvm::report_fatal_error("Builtin.hopToActor must be in an async function");
   }
-  auto isolation = getActorIsolationOfContext(FunctionDC);
+  auto isolation =
+      getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
+        return CE->getActorIsolation();
+      });
   if (isolation != ActorIsolation::Independent
       && isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in independent

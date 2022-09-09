@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %s
-// [SR-12745]
+
 // rdar://problem/62957095
+// https://github.com/apple/swift/issues/55190
+
 struct S1 {
   var x : Int = 0
 }

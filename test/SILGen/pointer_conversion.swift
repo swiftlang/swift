@@ -177,7 +177,7 @@ func inoutToPointer() {
   // CHECK: [[PB:%.*]] = project_box [[INT]]
   takesMutablePointer(&int)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [stack_protection] [[WRITE]]
   // CHECK: [[CONVERT:%.*]] = function_ref @$ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>({{%.*}}, [[POINTER]])
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$s18pointer_conversion19takesMutablePointer{{[_0-9a-zA-Z]*}}F
@@ -199,7 +199,7 @@ func inoutToPointer() {
 
   takesMutableRawPointer(&int)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [stack_protection] [[WRITE]]
   // CHECK: [[CONVERT:%.*]] = function_ref @$ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutableRawPointer>({{%.*}}, [[POINTER]])
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$s18pointer_conversion22takesMutableRawPointer{{[_0-9a-zA-Z]*}}F
@@ -230,7 +230,7 @@ func classInoutToPointer() {
   // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
   takesPlusOnePointer(&c)
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITE]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [stack_protection] [[WRITE]]
   // CHECK: [[CONVERT:%.*]] = function_ref @$ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @$s18pointer_conversion19takesPlusOnePointer{{[_0-9a-zA-Z]*}}F
@@ -242,7 +242,7 @@ func classInoutToPointer() {
   // CHECK: [[OWNED:%.*]] = load_borrow [[WRITE2]]
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
   // CHECK: store [[UNOWNED]] to [trivial] [[WRITEBACK]]
-  // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
+  // CHECK: [[POINTER:%.*]] = address_to_pointer [stack_protection] [[WRITEBACK]]
   // CHECK: [[CONVERT:%.*]] = function_ref @$ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<AutoreleasingUnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @$s18pointer_conversion20takesPlusZeroPointeryySAyAA1CCGF
@@ -271,7 +271,7 @@ func functionInoutToPointer() {
   var f: () -> () = {}
 
   // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
-  // CHECK: address_to_pointer [[REABSTRACT_BUF]]
+  // CHECK: address_to_pointer [stack_protection] [[REABSTRACT_BUF]]
   takesMutableVoidPointer(&f)
 }
 

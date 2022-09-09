@@ -64,93 +64,102 @@ class Variadic {
 Variadic.foo(1.0, 2.0, 3.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
-//=-------------- SR-7918 --------------=/
-class sr7918_Suit {
-  static func foo<T: Any>(_ :inout T) {}
-  static func foo() {}
+// https://github.com/apple/swift/issues/50453
+do {
+  class Suit {
+    static func foo<T: Any>(_ :inout T) {}
+    static func foo() {}
+  }
+
+  class RandomNumberGenerator {}
+
+  let myRNG = RandomNumberGenerator() // expected-note {{change 'let' to 'var' to make it mutable}}
+  _ = Suit.foo(&myRNG) // expected-error {{cannot pass immutable value as inout argument: 'myRNG' is a 'let' constant}}
 }
 
-class sr7918_RandomNumberGenerator {}
+// https://github.com/apple/swift/issues/50325
+do {
+  struct S {
+    func foo() -> UInt { return 0 }
+    func foo<T: UnsignedInteger>(bar: T) -> T { // expected-note {{where 'T' = 'Int'}}
+      return bar
+    }
+  }
 
-let myRNG = sr7918_RandomNumberGenerator() // expected-note {{change 'let' to 'var' to make it mutable}}
-_ = sr7918_Suit.foo(&myRNG) // expected-error {{cannot pass immutable value as inout argument: 'myRNG' is a 'let' constant}}
+  let s = S()
+  let a = s.foo()
+  let b = s.foo(bar: 123) // expected-error {{instance method 'foo(bar:)' requires that 'Int' conform to 'UnsignedInteger'}}
+  let c: UInt = s.foo(bar: 123)
+  let d = s.foo(bar: 123 as UInt)
+}
 
-
-//=-------------- SR-7786 --------------=/
-struct sr7786 {
-  func foo() -> UInt { return 0 }
-  func foo<T: UnsignedInteger>(bar: T) -> T { // expected-note {{where 'T' = 'Int'}}
-    return bar
+// https://github.com/apple/swift/issues/49983
+do {
+  struct ITunesGenre {
+    let genre: Int // expected-note {{'genre' declared here}}
+    let name: String
+  }
+  class Genre {
+    static func fetch<B: BinaryInteger>(genreID: B, name: String) {}
+    static func fetch(_ iTunesGenre: ITunesGenre) -> Genre {
+      return Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
+      // expected-error@-1 {{value of type 'ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
+      // expected-error@-2 {{cannot convert return expression of type '()' to return type 'Genre'}}
+    }
   }
 }
 
-let s = sr7786()
-let a = s.foo()
-let b = s.foo(bar: 123) // expected-error {{instance method 'foo(bar:)' requires that 'Int' conform to 'UnsignedInteger'}}
-let c: UInt = s.foo(bar: 123)
-let d = s.foo(bar: 123 as UInt)
+// https://github.com/apple/swift/issues/47730
 
-
-//=-------------- SR-7440 --------------=/
-struct sr7440_ITunesGenre {
-  let genre: Int // expected-note {{'genre' declared here}}
-  let name: String
-}
-class sr7440_Genre {
-  static func fetch<B: BinaryInteger>(genreID: B, name: String) {}
-  static func fetch(_ iTunesGenre: sr7440_ITunesGenre) -> sr7440_Genre {
-    return sr7440_Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
-// expected-error@-1 {{value of type 'sr7440_ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
-// expected-error@-2 {{cannot convert return expression of type '()' to return type 'sr7440_Genre'}}
-  }
-}
-
-
-//=-------------- SR-5154 --------------=/
-protocol sr5154_Scheduler {
+protocol Scheduler {
   func inBackground(run task: @escaping () -> Void)
 }
 
-extension sr5154_Scheduler {
-  func inBackground(run task: @escaping () -> [Count], completedBy resultHandler: @escaping ([Count]) -> Void) {}
+extension Scheduler {
+  func inBackground(run task: @escaping () -> [Count],
+                    completedBy resultHandler: @escaping ([Count]) -> Void) {}
 }
 
 struct Count { // expected-note {{'init(title:)' declared here}}
   let title: String
 }
 
-func getCounts(_ scheduler: sr5154_Scheduler, _ handler: @escaping ([Count]) -> Void) {
+func getCounts(_ scheduler: Scheduler, _ handler: @escaping ([Count]) -> Void) {
   scheduler.inBackground(run: {
     return [Count()] // expected-error {{missing argument for parameter 'title' in call}}
   }, completedBy: { // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{20-20= _ in}}
   })
 }
 
-// SR-12689
-func SR12689(_ u: UnsafeBufferPointer<UInt16>) {}
+// https://github.com/apple/swift/issues/55133
+do {
+  func f(_ u: UnsafeBufferPointer<UInt16>) {}
 
-let array : [UInt16] = [1, 2]
+  let array : [UInt16]
 
-array.withUnsafeBufferPointer {
-  _ = SR12689(UnsafeRawPointer($0).bindMemory(to: UInt16.self, capacity: 1)) // expected-error {{cannot convert value of type 'UnsafePointer<UInt16>' to expected argument type 'UnsafeBufferPointer<UInt16>'}}
-  // expected-error@-1 {{cannot convert value of type 'UnsafeBufferPointer<UInt16>' to expected argument type 'UnsafeMutableRawPointer'}}
+  array.withUnsafeBufferPointer {
+    _ = f(UnsafeRawPointer($0).bindMemory(to: UInt16.self, capacity: 1)) // expected-error {{cannot convert value of type 'UnsafePointer<UInt16>' to expected argument type 'UnsafeBufferPointer<UInt16>'}}
+    // expected-error@-1 {{cannot convert value of type 'UnsafeBufferPointer<UInt16>' to expected argument type 'UnsafeMutableRawPointer'}}
+  }
+
+  array.withUnsafeBufferPointer {
+    _ = UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{cannot convert value of type 'UnsafeRawPointer' to type 'UnsafeBufferPointer<UInt16>' in coercion}}
+    // expected-error@-1 {{cannot convert value of type 'UnsafeBufferPointer<UInt16>' to expected argument type 'UnsafeMutableRawPointer'}}
+  }
 }
+do {
+  func f1(_ u: Int) -> String {} // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func f1(_ u: String) -> Double {} // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
+  func f2(_ u: Int) {}
 
-array.withUnsafeBufferPointer {
-  _ = UnsafeRawPointer($0) as UnsafeBufferPointer<UInt16> // expected-error {{cannot convert value of type 'UnsafeRawPointer' to type 'UnsafeBufferPointer<UInt16>' in coercion}}
-  // expected-error@-1 {{cannot convert value of type 'UnsafeBufferPointer<UInt16>' to expected argument type 'UnsafeMutableRawPointer'}}
+  f2(f1(1 as Double)) // expected-error {{no exact matches in call to local function 'f1'}}
+  f1(1 as Double) as Int // expected-error {{no exact matches in call to local function 'f1'}}
 }
+do {
+  // Ambiguous OverloadRefExpr
+  func f1(_ p: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
+  func f1(_ p: Double) {} // expected-note {{found candidate with type '(Double) -> ()'}}
+  func f2(_ param: (String)-> Void) {}
 
-func SR12689_1(_ u: Int) -> String { "" } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
-func SR12689_1(_ u: String) -> Double { 0 } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
-func SR12689_2(_ u: Int) {}
-
-SR12689_2(SR12689_1(1 as Double)) // expected-error {{no exact matches in call to global function 'SR12689_1'}}
-SR12689_1(1 as Double) as Int // expected-error {{no exact matches in call to global function 'SR12689_1'}}
-
-// Ambiguous OverloadRefExpr
-func SR12689_O(_ p: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
-func SR12689_O(_ p: Double) {} // expected-note {{found candidate with type '(Double) -> ()'}}
-func SR12689_3(_ param: (String)-> Void) {}
-
-SR12689_3(SR12689_O) // expected-error {{no 'SR12689_O' candidates produce the expected type '(String) -> Void' for parameter #0}}
+  f2(f1) // expected-error {{no 'f1' candidates produce the expected type '(String) -> Void' for parameter #0}}
+}

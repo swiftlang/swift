@@ -3,11 +3,7 @@
 
 // CHECK-LABEL: sil hidden @$s11coverage_do3fooyyF : $@convention(thin) () -> ()
 
-// CHECK:       string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 0
-// CHECK-NEXT:  int_instrprof_increment
+// CHECK:       increment_profiler_counter 0
 // CHECK:       function_ref @$sSb6randomSbyFZ
 // CHECK:       cond_br {{%[0-9]+}}, [[EXITBB:bb[0-9]]], [[BB1:bb[0-9]]]
 
@@ -16,16 +12,10 @@
 // CHECK:       cond_br {{%[0-9]+}}, [[BRKBB:bb[0-9]]], {{bb[0-9]}}
 
 // CHECK:       [[BRKBB]]
-// CHECK-NEXT:  string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:  increment_profiler_counter 2
 
 // CHECK:       [[EXITBB]]
-// CHECK-NEXT:  string_literal
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:  integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  increment_profiler_counter 1
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s11coverage_do3fooyyF"
 // CHECK-NEXT:  [[@LINE+11]]:12 -> [[@LINE+18]]:2 : 0

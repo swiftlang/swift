@@ -1826,6 +1826,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (!sbi) {
         continue;
       }
+      if (sbi->getDest() != asi) {
+        continue;
+      }
       if (!runningVals.hasValue()) {
         continue;
       }

@@ -327,6 +327,12 @@ namespace swift {
   /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 
+  /// Determine the isolation of a particular closure.
+  ClosureActorIsolation determineClosureActorIsolation(
+      AbstractClosureExpr *closure, llvm::function_ref<Type(Expr *)> getType,
+      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+          getClosureActorIsolation);
+
   /// If the capture list shadows any declarations using shorthand syntax, i.e.
   /// syntax that names both the newly declared variable and the referenced
   /// variable by the same identifier in the source text, i.e. `[foo]`, return

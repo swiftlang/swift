@@ -22,6 +22,8 @@ struct PassContext {
 
   let _bridged: BridgedPassContext
 
+  var options: Options { Options(_bridged: _bridged) }
+
   func continueWithNextSubpassRun(for inst: Instruction? = nil) -> Bool {
     let bridgedInst = OptionalBridgedInstruction(obj: inst?.bridged.obj)
     return PassContext_continueWithNextSubpassRun(_bridged, bridgedInst) != 0
@@ -236,5 +238,12 @@ extension RefCountingInst {
   func setAtomicity(isAtomic: Bool, _ context: PassContext) {
     context.notifyInstructionsChanged()
     RefCountingInst_setIsAtomic(bridged, isAtomic)
+  }
+}
+
+extension Function {
+  func set(needStackProtection: Bool, _ context: PassContext) {
+    context.notifyFunctionDataChanged()
+    SILFunction_setNeedStackProtection(bridged, needStackProtection ? 1 : 0)
   }
 }

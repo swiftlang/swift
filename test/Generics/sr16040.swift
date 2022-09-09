@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck %s -disable-availability-checking -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/58301
+
 public protocol View {
   associatedtype Body : View
   var body: Body { get }

@@ -12,14 +12,16 @@ TemplatesTestSuite.test("typedeffed-non-type-parameter") {
   expectEqual(pair.t, (1, 2))
 }
 
-// TODO(SR-13261): This test doesn't work because Swift doesn't support defaulted generic parameters.
+// TODO: This test doesn't work because Swift doesn't support defaulted generic
+// parameters (https://github.com/apple/swift/issues/55701).
 // TemplatesTestSuite.test("defaulted-non-type-parameter") {
 //   var intWrapper = IntWrapper(value: 5)
 //   var pair = MagicArray<IntWrapper>(t: (intWrapper))
 //   expectEqual(pair.t, (intWrapper))
 // }
 
-// TODO(SR-13261): This test doesn't work because Swift only expects types as generic arguments.
+// TODO: This test doesn't work because Swift only expects types as generic
+// arguments (https://github.com/apple/swift/issues/55701).
 // TemplatesTestSuite.test("non-type-parameter") {
 //   var pair = MagicArray<IntWrapper, 5>(
 //     data: (

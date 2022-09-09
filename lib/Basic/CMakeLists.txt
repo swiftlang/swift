@@ -98,6 +98,10 @@ target_link_libraries(swiftBasic PUBLIC
 target_link_libraries(swiftBasic PRIVATE
   ${UUID_LIBRARIES})
 
+# This is because swiftBasic uses InFlightDiagnostic::flush, which is defined
+# in swiftAST. This is a cyclic link dependency and it should be removed.
+target_link_libraries(swiftBasic PUBLIC swiftAST)
+
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")
 

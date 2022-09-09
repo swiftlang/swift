@@ -4,8 +4,8 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// SR-14856: IRGen couldn't handle `SILLocation` with `FilenameAndLocationKind`
-// storage kind.
+// https://github.com/apple/swift/issues/57203
+// IRGen couldn't handle 'SILLocation' with 'FilenameAndLocationKind'.
 
 sil_scope 2 { loc "the_file.swift":2:6 parent @foo : $@convention(thin) () -> () }
 sil_scope 3 { loc "the_file.swift":3:5 parent 2 }

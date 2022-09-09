@@ -18,6 +18,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -594,6 +595,12 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     return true;
   }
 
+  // If the decl has a `@_documentation(visibility: <access>)` attribute, override any other heuristic
+  auto DocVisibility = documentationVisibilityForDecl(D);
+  if (DocVisibility) {
+    return Walker.Options.MinimumAccessLevel > (*DocVisibility);
+  }
+
   // Don't record effectively internal declarations if specified
   if (D->hasUnderscoredNaming()) {
     // Some implicit decls from Clang with underscored names sneak in, so throw those out
@@ -639,6 +646,13 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     }
 
     // Special cases below.
+
+    // Symbols from exported-imported modules should only be included if they
+    // were originally public.
+    if (Walker.isFromExportedImportedModule(D) &&
+        VD->getFormalAccess() < AccessLevel::Public) {
+      return true;
+    }
 
     auto BaseName = VD->getBaseName().userFacingName();
 

@@ -21,19 +21,22 @@ int main() {
 
   try {
     Functions::emptyThrowFunction();
-  } catch (swift::_impl::NaiveException& e) {
-    printf("%s\n", e.getMessage());
+  } catch (swift::Error& e) {
+    printf("Exception\n");
   }
   try {
     Functions::throwFunction();
-  } catch (swift::_impl::NaiveException& e) {
-    printf("%s\n", e.getMessage());
+  } catch (swift::Error& e) {
+     printf("Exception\n");
   }
   try {
     Functions::throwFunctionWithReturn();
-  } catch (swift::_impl::NaiveException& e) {
-    printf("%s\n", e.getMessage());
+  } catch (swift::Error& e) {
+     printf("Exception\n");
   }
+  try {
+    Functions::testDestroyedError();
+  } catch(const swift::Error &e) { }
 
   return 0;
 }
@@ -43,3 +46,4 @@ int main() {
 // CHECK-NEXT: Exception
 // CHECK-NEXT: passThrowFunctionWithReturn
 // CHECK-NEXT: Exception
+// CHECK-NEXT: Test destroyed

@@ -986,6 +986,19 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
+  LifetimeAnnotation getLifetimeAnnotation() const {
+    auto &attrs = getAttrs();
+    if (attrs.hasAttribute<EagerMoveAttr>())
+      return LifetimeAnnotation::EagerMove;
+    if (attrs.hasAttribute<LexicalAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::None;
+  }
+
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
+  }
+
   AvailabilityContext getAvailabilityForLinkage() const;
 
   /// Whether this declaration or one of its outer contexts has the
@@ -2714,15 +2727,6 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
-
-  LifetimeAnnotation getLifetimeAnnotation() const {
-    auto &attrs = getAttrs();
-    if (attrs.hasAttribute<EagerMoveAttr>())
-      return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<LexicalAttr>())
-      return LifetimeAnnotation::Lexical;
-    return LifetimeAnnotation::None;
-  }
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5809,10 +5813,6 @@ public:
     setDefaultArgumentKind(K.argumentKind);
   }
 
-  bool isNoImplicitCopy() const {
-    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
-  }
-
   /// Whether this parameter has a default argument expression available.
   ///
   /// Note that this will return false for deserialized declarations, which only
@@ -5904,10 +5904,8 @@ public:
 
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
-  /// Whether or not this parameter is varargs.
-  bool isVariadic() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
-  }
+  /// Whether or not this parameter is old-style variadic.
+  bool isVariadic() const;
   void setVariadic(bool value = true) {
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
@@ -6827,7 +6825,7 @@ public:
   bool hasDynamicSelfResult() const;
 
   /// The async function marked as the alternative to this function, if any.
-  AbstractFunctionDecl *getAsyncAlternative(bool isKnownObjC = false) const;
+  AbstractFunctionDecl *getAsyncAlternative() const;
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the

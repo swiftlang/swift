@@ -1125,15 +1125,12 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
   return result;
 }
 
-bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
-                                                 llvm::VersionTuple version,
-                                                 bool underlyingVersion) {
+bool SerializedModuleLoaderBase::canImportModule(
+    ImportPath::Module path, ModuleVersionInfo *versionInfo) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
-  // If underlying version is specified, this should be handled by Clang importer.
-  if (!version.empty() && underlyingVersion)
-    return false;
+
   // Look on disk.
   SmallVectorImpl<char> *unusedModuleInterfacePath = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleBuffer = nullptr;
@@ -1145,7 +1142,7 @@ bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
   llvm::SmallString<256> moduleInterfacePath;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
   std::unique_ptr<llvm::MemoryBuffer> moduleDocBuffer;
-  if (!version.empty()) {
+  if (versionInfo) {
     unusedModuleInterfacePath = &moduleInterfacePath;
     unusedModuleBuffer = &moduleInputBuffer;
     unusedModuleDocBuffer = &moduleDocBuffer;
@@ -1159,58 +1156,53 @@ bool SerializedModuleLoaderBase::canImportModule(ImportPath::Module path,
   // If we cannot find the module, don't continue.
   if (!found)
     return false;
-  // If no version number is specified, don't continue.
-  if (version.empty())
+
+  // If the caller doesn't want version info we're done.
+  if (!versionInfo)
     return true;
+
   assert(found);
-  assert(!version.empty());
-  assert(!underlyingVersion);
-  llvm::VersionTuple currentVersion;
+  llvm::VersionTuple swiftInterfaceVersion;
   if (!moduleInterfacePath.empty()) {
-    currentVersion = extractUserModuleVersionFromInterface(moduleInterfacePath);
+    swiftInterfaceVersion =
+        extractUserModuleVersionFromInterface(moduleInterfacePath);
   }
-  // If failing to extract the user version from the interface file, try the binary
-  // format, if present.
-  if (currentVersion.empty() && *unusedModuleBuffer) {
+
+  // If failing to extract the user version from the interface file, try the
+  // binary module format, if present.
+  if (swiftInterfaceVersion.empty() && *unusedModuleBuffer) {
     auto metaData = serialization::validateSerializedAST(
         (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
         Ctx.LangOpts.SDKName);
-    currentVersion = metaData.userModuleVersion;
+    versionInfo->setVersion(metaData.userModuleVersion,
+                            ModuleVersionSourceKind::SwiftBinaryModule);
+  } else {
+    versionInfo->setVersion(swiftInterfaceVersion,
+                            ModuleVersionSourceKind::SwiftInterface);
   }
 
-  if (currentVersion.empty()) {
-    Ctx.Diags.diagnose(mID.Loc, diag::cannot_find_project_version, "Swift",
-                       mID.Item.str());
-    return true;
-  }
-
-  return currentVersion >= version;
+  return true;
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    ImportPath::Module path, llvm::VersionTuple version,
-    bool underlyingVersion) {
+    ImportPath::Module path, ModuleVersionInfo *versionInfo) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
-  // If underlying version is specified, this should be handled by Clang importer.
-  if (!version.empty() && underlyingVersion)
-    return false;
+
   auto mID = path[0];
   auto mIt = MemoryBuffers.find(mID.Item.str());
   if (mIt == MemoryBuffers.end())
     return false;
-  if (version.empty())
+
+  if (!versionInfo)
     return true;
-  if (mIt->second.userVersion.empty()) {
-    Ctx.Diags.diagnose(mID.Loc, diag::cannot_find_project_version, "Swift",
-                       mID.Item.str());
-    return true;
-  }
-  assert(!version.empty());
-  assert(!(mIt->second.userVersion.empty()));
-  return mIt->second.userVersion >= version;
+
+  versionInfo->setVersion(mIt->second.userVersion,
+                          ModuleVersionSourceKind::SwiftBinaryModule);
+  return true;
 }
+
 ModuleDecl *
 SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                                        ImportPath::Module path) {

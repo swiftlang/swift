@@ -667,7 +667,7 @@ SIMPLE_DECL_ATTR(_eagerMove, EagerMove,
   UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove |
-  OnParam | OnVar | OnNominalType,
+  OnFunc | OnParam | OnVar | OnNominalType,
   117)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
@@ -680,7 +680,7 @@ SIMPLE_DECL_ATTR(_lexical, Lexical,
   UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove |
-  OnParam | OnVar | OnNominalType,
+  OnFunc | OnParam | OnVar | OnNominalType,
   119)
 
 SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
@@ -699,7 +699,7 @@ SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
   UserInaccessible |
   ABIStableToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIBreakingToRemove |
-  OnParam | OnVar,
+  OnFunc | OnParam | OnVar,
   122)
 
 SIMPLE_DECL_ATTR(_noLocks, NoLocks,
@@ -767,6 +767,16 @@ SIMPLE_DECL_ATTR(typeWrapper, TypeWrapper,
   OnStruct | OnClass | OnEnum |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   134)
+
+SIMPLE_DECL_ATTR(_spiOnly, SPIOnly,
+  OnImport | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  135)
+
+DECL_ATTR(_documentation, Documentation,
+  OnAnyDecl | UserInaccessible |
+  APIBreakingToAdd | APIStableToRemove | ABIStableToAdd | ABIStableToRemove,
+  136)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

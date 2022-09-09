@@ -2205,28 +2205,39 @@ static Type validateParameterType(ParamDecl *decl) {
       options |= TypeResolutionFlags::Preconcurrency;
   }
 
-  // If the element is a variadic parameter, resolve the parameter type as if
-  // it were in non-parameter position, since we want functions to be
-  // @escaping in this case.
-  options.setContext(decl->isVariadic() ?
-                       TypeResolverContext::VariadicFunctionInput :
-                       TypeResolverContext::FunctionInput);
-  options |= TypeResolutionFlags::Direct;
-
   if (dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
-  const auto resolution =
-      TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get);
-  auto Ty = resolution.resolveType(decl->getTypeRepr());
+  Type Ty;
 
-  if (Ty->hasError()) {
-    decl->setInvalid();
-    return ErrorType::get(ctx);
+  auto *nestedRepr = decl->getTypeRepr();
+  while (true) {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+      nestedRepr = attrTypeRepr->getTypeRepr();
+      continue;
+    }
+    if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      nestedRepr = specifierTypeRepr->getBase();
+      continue;
+    }
+    break;
   }
 
-  if (decl->isVariadic()) {
+  if (auto *packExpansionRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    options.setContext(TypeResolverContext::VariadicFunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    // FIXME: This duplicates code found elsewhere
+    auto *patternRepr = packExpansionRepr->getPatternType();
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(patternRepr);
+
     // Find the first type sequence parameter and use that as the count type.
     SmallVector<Type, 2> rootTypeSequenceParams;
     Ty->getTypeSequenceParameters(rootTypeSequenceParams);
@@ -2238,19 +2249,28 @@ static Type validateParameterType(ParamDecl *decl) {
     } else {
       // Monovariadic types (T...) for <T> resolve to [T].
       Ty = VariadicSequenceType::get(Ty);
-    }
-    if (!ctx.getArrayDecl()) {
-      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                         diag::sugar_type_not_found, 0);
-      return ErrorType::get(ctx);
-    }
 
-    // Disallow variadic parameters in enum elements.
-    if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
-      decl->diagnose(diag::enum_element_ellipsis);
-      decl->setInvalid();
-      return ErrorType::get(ctx);
+      // Set the old-style variadic bit.
+      decl->setVariadic();
+      if (!ctx.getArrayDecl()) {
+        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                           diag::sugar_type_not_found, 0);
+        return ErrorType::get(ctx);
+      }
     }
+  } else {
+    options.setContext(TypeResolverContext::FunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(decl->getTypeRepr());
+  }
+
+  if (Ty->hasError()) {
+    decl->setInvalid();
+    return ErrorType::get(ctx);
   }
 
   return Ty;

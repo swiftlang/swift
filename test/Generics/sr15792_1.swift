@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift %s
 
+// https://github.com/apple/swift/issues/58069
+
 protocol Collection {
   associatedtype SubSequence: Collection
 }

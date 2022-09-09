@@ -217,6 +217,26 @@ static void printImports(raw_ostream &out,
     allImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   }
 
+  /// Collect @_spiOnly imports that are not imported elsewhere publicly.
+  llvm::SmallSet<ImportedModule, 4, ImportedModule::Order> spiOnlyImportSet;
+  if (Opts.PrintSPIs) {
+    SmallVector<ImportedModule, 4> spiOnlyImports, otherImports;
+    M->getImportedModules(spiOnlyImports,
+                          ModuleDecl::ImportFilterKind::SPIOnly);
+
+    M->getImportedModules(otherImports,
+                          allImportFilter);
+    llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> otherImportsSet;
+    otherImportsSet.insert(otherImports.begin(), otherImports.end());
+
+    // Rule out inconsistent imports.
+    for (auto import: spiOnlyImports)
+      if (otherImportsSet.count(import) == 0)
+        spiOnlyImportSet.insert(import);
+
+    allImportFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
+  }
+
   SmallVector<ImportedModule, 8> allImports;
   M->getImportedModules(allImports, allImportFilter);
 
@@ -231,7 +251,6 @@ static void printImports(raw_ostream &out,
   SmallVector<ImportedModule, 8> publicImports;
   M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Exported);
   llvm::SmallSet<ImportedModule, 8, ImportedModule::Order> publicImportSet;
-
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
@@ -259,8 +278,18 @@ static void printImports(raw_ostream &out,
     if (publicImportSet.count(import))
       out << "@_exported ";
 
-    // SPI attribute on imports
     if (Opts.PrintSPIs) {
+      // An import visible in the private swiftinterface only.
+      //
+      // In the long term, we want to print this attribute for consistency and
+      // to enforce exportability analysis of generated code.
+      // For now, not printing the attribute allows us to have backwards
+      // compatible swiftinterfaces and we can live without
+      // checking the generate code for a while.
+      if (spiOnlyImportSet.count(import))
+        out << "/*@_spiOnly*/ ";
+
+      // List of imported SPI groups for local use.
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }
@@ -388,8 +417,12 @@ class InheritedProtocolCollector {
   /// For each type in \p directlyInherited, classify the protocols it refers to
   /// as included for printing or not, and record them in the appropriate
   /// vectors.
+  ///
+  /// If \p skipExtra is true then avoid recording any extra protocols to
+  /// print, such as synthesized conformances or conformances to non-public
+  /// protocols.
   void recordProtocols(ArrayRef<InheritedEntry> directlyInherited,
-                       const Decl *D, bool skipSynthesized = false) {
+                       const Decl *D, bool skipExtra = false) {
     Optional<AvailableAttrList> availableAttrs;
 
     for (InheritedEntry inherited : directlyInherited) {
@@ -398,6 +431,9 @@ class InheritedProtocolCollector {
         continue;
 
       bool canPrintNormally = canPrintProtocolTypeNormally(inheritedTy, D);
+      if (!canPrintNormally && skipExtra)
+        continue;
+
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolDecl *protoDecl : layout.getProtocols()) {
         if (canPrintNormally)
@@ -411,7 +447,7 @@ class InheritedProtocolCollector {
       // any of those besides 'AnyObject'.
     }
 
-    if (skipSynthesized)
+    if (skipExtra)
       return;
 
     // Check for synthesized protocols, like Hashable on enums.
@@ -493,11 +529,12 @@ public:
     if (auto *CD = dyn_cast<ClassDecl>(D)) {
       for (auto *SD = CD->getSuperclassDecl(); SD;
            SD = SD->getSuperclassDecl()) {
-        map[nominal].recordProtocols(
-            SD->getInherited(), SD, /*skipSynthesized=*/true);
+        map[nominal].recordProtocols(SD->getInherited(), SD,
+                                     /*skipExtra=*/true);
         for (auto *Ext: SD->getExtensions()) {
           if (shouldInclude(Ext)) {
-            map[nominal].recordProtocols(Ext->getInherited(), Ext);
+            map[nominal].recordProtocols(Ext->getInherited(), Ext,
+                                         /*skipExtra=*/true);
           }
         }
       }

@@ -324,10 +324,8 @@ bool swift::isInstrumentation(SILInstruction *Instruction) {
   if (isSanitizerInstrumentation(Instruction))
     return true;
 
-  if (BuiltinInst *bi = dyn_cast<BuiltinInst>(Instruction)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::IntInstrprofIncrement)
-      return true;
-  }
+  if (isa<IncrementProfilerCounterInst>(Instruction))
+    return true;
 
   return false;
 }
@@ -482,6 +480,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::EndCOWMutationInst:
     return RuntimeEffect::NoEffect;
 

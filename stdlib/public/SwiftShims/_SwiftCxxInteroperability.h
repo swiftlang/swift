@@ -140,8 +140,10 @@ using UInt = size_t;
 template <class T>
 static inline const constexpr bool isUsableInGenericContext = false;
 
-/// Returns the type metadat for the given Swift type T.
-template <class T> inline void *_Nonnull getTypeMetadata();
+/// Returns the type metadata for the given Swift type T.
+template <class T> struct TypeMetadataTrait {
+  static inline void *_Nonnull getTypeMetadata();
+};
 
 namespace _impl {
 
@@ -173,6 +175,32 @@ template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
 }
 
 } // namespace _impl
+
+extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
+
+extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
+
+class Error {
+public:
+  Error() {}
+  Error(void* _Nonnull swiftError) { opaqueValue = swiftError; }
+  ~Error() {
+    if (opaqueValue)
+      swift_errorRelease(opaqueValue);
+  }
+  void* _Nonnull getPointerToOpaquePointer() { return opaqueValue; }
+  Error(Error &&other) : opaqueValue(other.opaqueValue) {
+    other.opaqueValue = nullptr;
+  }
+  Error(const Error &other) {
+    if (other.opaqueValue)
+      swift_errorRetain(other.opaqueValue);
+    opaqueValue = other.opaqueValue;
+  }
+
+private:
+  void * _Nonnull opaqueValue = nullptr;
+};
 
 #pragma clang diagnostic pop
 

@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
-// SR-5726
+// https://github.com/apple/swift/issues/48296
+
 protocol Foo
 {
   associatedtype Bar

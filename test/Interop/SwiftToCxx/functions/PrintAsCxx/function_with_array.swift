@@ -5,5 +5,5 @@
 // CHECK: namespace function_with_array
 // FIXME: we don't actually emit a declaration for this, but for now at least
 // check that we don't crash.
-// CHECK-NOT: void f
+// CHECK: void f(const Swift::Array<swift::Int>&
 public func f(_: [Int]) { }

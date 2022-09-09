@@ -169,7 +169,7 @@ typealias Typealias1 = FooNonExistentProtocol // expected-error {{cannot find ty
 // NO-TYREPR: {{^}}typealias Typealias1 = <<error type>>{{$}}
 // TYREPR: {{^}}typealias Typealias1 = FooNonExistentProtocol{{$}}
 
-// sr-197
+// https://github.com/apple/swift/issues/42819
 func foo(bar: Typealias1<Int>) {} // Should not generate error "cannot specialize non-generic type '<<error type>>'"
 
 // Associated types.

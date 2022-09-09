@@ -199,7 +199,7 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
          "Expected PlaceholderSwiftModuleScanner as the first dependency scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, llvm::VersionTuple(), false)) {
+    if (scanner->canImportModule(modulePath, nullptr)) {
       // Record the dependencies.
       cache.recordDependencies(moduleName, *(scanner->dependencies));
       return std::move(scanner->dependencies);

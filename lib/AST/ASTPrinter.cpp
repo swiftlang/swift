@@ -2917,13 +2917,11 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinMove(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }
+
+static bool usesFeatureBuiltinUnprotectedAddressOf(Decl *) { return false; }
 
 static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -2937,6 +2935,14 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
 
 static bool usesFeatureTypeWrappers(Decl *decl) {
   return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
+}
+
+static bool usesFeatureParserRoundTrip(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureParserValidation(Decl *decl) {
+  return false;
 }
 
 static void suppressingFeatureSpecializeAttributeWithAvailability(
@@ -3836,13 +3842,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
   }
 
-  // If the parameter is variadic, we will print the "..." after it, but we have
-  // to strip off the added array type.
-  if (param->isVariadic() && TheTypeLoc.getType()) {
-    if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
-      TheTypeLoc.setType(BGT->getGenericArgs()[0]);
-  }
-
   {
     Printer.printStructurePre(PrintStructureKind::FunctionParameterType);
     SWIFT_DEFER {
@@ -3857,9 +3856,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
     printTypeLocForImplicitlyUnwrappedOptional(
       TheTypeLoc, param->isImplicitlyUnwrappedOptional());
-
-    if (param->isVariadic())
-      Printer << "...";
   }
 
   if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {

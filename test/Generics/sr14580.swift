@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/56932
+
 public protocol ScalarProtocol: ScalarMultiplicative where Self == Scalar {
 }
 

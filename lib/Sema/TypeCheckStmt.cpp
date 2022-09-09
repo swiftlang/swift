@@ -1988,7 +1988,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       // isolation checked before nested ones are being checked by the way
       // TypeCheckASTNodeAtLocRequest is called multiple times, as described
       // above.
-      auto ActorIsolation = determineClosureActorIsolation(CE);
+      auto ActorIsolation = determineClosureActorIsolation(
+          CE, __Expr_getType, __AbstractClosureExpr_getActorIsolation);
       CE->setActorIsolation(ActorIsolation);
       if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
         return false;

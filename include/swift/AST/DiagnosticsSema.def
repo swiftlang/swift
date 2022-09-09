@@ -865,6 +865,15 @@ NOTE(invalid_redecl_implicit_wrapper,none,
      "%select{projected value|backing storage}1",
      (DeclName, bool))
 
+ERROR(protocol_extension_in_where_clause,none,
+      "%0 was defined in extension of protocol %1 and cannot be referenced "
+      "from a %select{'where' clause|generic parameter inheritance clause|"
+      "associated type inheritance clause}2",
+      (Identifier, Identifier, unsigned))
+NOTE(protocol_extension_in_where_clause_note,none,
+     "consider moving %0 into the definition of protocol %1",
+     (Identifier, Identifier))
+
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
 ERROR(invalid_member_type,none,
@@ -1637,9 +1646,21 @@ ERROR(originally_definedin_must_not_before_available_version,none,
       "symbols are moved to the current module before they were available in "
       "the OSs", ())
 
+WARNING(spi_preferred_over_spi_available,none,
+        "symbols that are @_spi_available on all platforms should use @_spi "
+        "instead", ())
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
+
+// Dependency Scanning
+ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+NOTE(dependency_as_imported_by_main_module,none,
+     "a dependency of main module '%0'", (StringRef))
+NOTE(dependency_as_imported_by, none,
+     "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
@@ -1902,6 +1923,9 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
         (DeclName, StringRef))
+ERROR(spi_only_imports_not_enabled, none,
+      "'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'",
+      ())
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -3221,6 +3245,8 @@ ERROR(reasync_without_async_parameter,none,
 ERROR(inherits_executor_without_async,none,
       "non-async functions cannot inherit an executor", ())
 
+ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
+      (DeclAttribute))
 ERROR(eagermove_and_lexical_combined,none,
       "@_eagerMove and @_lexical attributes are alternate styles of lifetimes "
       "and can't be combined", ())
@@ -4796,7 +4822,7 @@ ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
 ERROR(redundant_any_in_existential,none,
-       "redundant 'any' has no effect on existential type %0",
+       "redundant 'any' in type %0",
        (Type))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
@@ -5009,14 +5035,25 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
-ERROR(tuple_ellipsis,none,
-      "cannot create a variadic tuple", ())
+ERROR(expansion_not_allowed,none,
+      "variadic expansion %0 cannot appear outside of a function parameter list, "
+      "function result, tuple element or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
-      "cannot create expansion with non-variadic type %0", (Type))
+      "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
+ERROR(multiple_ellipsis_in_tuple,none,
+      "only a single element can be variadic", ())
+
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
+ERROR(unlabeled_parameter_following_variadic_parameter,none,
+      "a parameter following a variadic parameter requires a label", ())
+ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
+      "no parameters may follow a variadic parameter in a closure", ())
+
+ERROR(parameter_vararg_default,none,
+      "variadic parameter cannot have a default value", ())
 
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
@@ -5137,8 +5174,6 @@ ERROR(opened_bad_constraint_type,none,
       "@opened constraint type %0 is not a protocol or protocol composition", (Type))
 ERROR(opened_bad_interface_type,none,
       "@opened interface type %0 is not a type parameter", (Type))
-ERROR(sil_function_ellipsis,PointsToFirstBadToken,
-      "SIL function types cannot be variadic", ())
 ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
 ERROR(sil_function_output_label,PointsToFirstBadToken,

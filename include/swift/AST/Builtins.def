@@ -339,10 +339,24 @@ BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 /// only valid for the duration of the original binding.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
+/// unprotectedAddressOf (inout T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a physical lvalue. The returned pointer is
+/// only valid for the duration of the original binding.
+/// In contrast to `addressof`, this builtin doesn't trigger an insertion of
+/// stack protectors.
+BUILTIN_SIL_OPERATION(UnprotectedAddressOf, "unprotectedAddressOf", Special)
+
 /// addressOfBorrow (__shared T) -> Builtin.RawPointer
 /// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
 /// valid within the scope of the borrow.
 BUILTIN_SIL_OPERATION(AddressOfBorrow, "addressOfBorrow", Special)
+
+/// unprotectedAddressOfBorrow (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+/// In contrast to `addressOfBorrow`, this builtin doesn't trigger an insertion of
+/// stack protectors.
+BUILTIN_SIL_OPERATION(UnprotectedAddressOfBorrow, "unprotectedAddressOfBorrow", Special)
 
 /// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 ///
@@ -738,9 +752,6 @@ BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 // TypePtrAuthDiscriminator has type <T> (T.Type) -> Int64
 BUILTIN_MISC_OPERATION(TypePtrAuthDiscriminator, "typePtrAuthDiscriminator", "n", Special)
 
-//  int_instrprof_increment has type (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ().
-BUILTIN_MISC_OPERATION(IntInstrprofIncrement, "int_instrprof_increment", "", Special)
-
 /// Initialize the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Special)
 
@@ -773,19 +784,6 @@ BUILTIN_MISC_OPERATION(CreateTaskGroup,
 /// Destroy a task group.
 BUILTIN_MISC_OPERATION(DestroyTaskGroup,
                        "destroyTaskGroup", "", Special)
-
-
-/// A builtin that can only be called from a transparent generic function. Takes
-/// two operands, the first operand the result address, the second operand the
-/// input address. Transforms into load [take] + move_value + store [init] when
-/// transparently inlined into a caller that has the generic of the callee
-/// specialized into a loadable type. If the transparent inlining does not
-/// specialize the type (due to being inlined into a non-generic context, the
-/// SILVerifier will abort).
-///
-/// Illegal to call except for in Swift._move in the stdlib. This is enforced by
-/// the SILVerifier.
-BUILTIN_MISC_OPERATION(Move, "move", "", Special)
 
 /// A builtin that can only be called from a transparent generic function. Takes
 /// two operands, the first operand the result address, the second operand the

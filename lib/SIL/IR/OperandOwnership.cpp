@@ -119,6 +119,7 @@ SHOULD_NEVER_VISIT_INST(ReleaseValue)
 SHOULD_NEVER_VISIT_INST(ReleaseValueAddr)
 SHOULD_NEVER_VISIT_INST(StrongRelease)
 SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
+SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -794,8 +795,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Move)
 BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)

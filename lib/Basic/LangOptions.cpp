@@ -29,6 +29,10 @@
 
 using namespace swift;
 
+LangOptions::LangOptions() {
+  // Note: Introduce default-on language options here.
+}
+
 struct SupportedConditionalValue {
   StringRef value;
 

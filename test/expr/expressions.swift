@@ -79,8 +79,9 @@ func basictest() {
   bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}{{13-15=}}
 }
 
-// <https://bugs.swift.org/browse/SR-3522>
-func testUnusedLiterals_SR3522() {
+// https://github.com/apple/swift/issues/46110
+// Test unused literals.
+do {
   42 // expected-warning {{integer literal is unused}}
   2.71828 // expected-warning {{floating-point literal is unused}}
   true // expected-warning {{boolean literal is unused}}
@@ -899,7 +900,8 @@ func r22913570() {
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
-// SR-628 mixing lvalues and rvalues in tuple expression
+// https://github.com/apple/swift/issues/43245
+// Mixing lvalues and rvalues in tuple expression
 do {
   var x = 0
   var y = 1
@@ -911,8 +913,9 @@ do {
   x = (x,(3,y)).1.1
 }
 
-// SR-3439 subscript with pound expressions.
-Sr3439: do {
+// https://github.com/apple/swift/issues/46027
+// Subscripting with pound expressions
+do {
   class B {
     init() {}
     subscript(x: Int) -> Int { return x }

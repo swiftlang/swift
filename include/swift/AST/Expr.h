@@ -3658,6 +3658,8 @@ public:
   bool preconcurrency() const {
     return storage.getInt();
   }
+
+  ActorIsolation getActorIsolation() const;
 };
 
 /// A base class for closure expressions.

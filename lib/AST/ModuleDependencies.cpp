@@ -531,8 +531,9 @@ ModuleDependenciesCache::getDependencyReferencesMap(
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
-    GlobalModuleDependenciesCache &globalCache)
-    : globalCache(globalCache) {
+    GlobalModuleDependenciesCache &globalCache,
+    StringRef mainScanModuleName)
+    : globalCache(globalCache), mainScanModuleName(mainScanModuleName) {
   for (auto kind = ModuleDependenciesKind::FirstKind;
        kind != ModuleDependenciesKind::LastKind; ++kind) {
     ModuleDependenciesMap.insert(

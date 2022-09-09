@@ -28,8 +28,8 @@ IRABIDetailsProvider &SwiftToClangInteropContext::getIrABIDetails() {
 }
 
 void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
-    const Decl *d, llvm::function_ref<void(void)> function) {
-  auto result = emittedStubs.insert(d);
+    StringRef stubName, llvm::function_ref<void(void)> function) {
+  auto result = emittedStubs.insert(stubName);
   if (result.second)
     function();
 }

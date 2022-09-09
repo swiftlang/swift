@@ -983,6 +983,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  PerformanceConstraints *perfConstraints,
                                  bool *isLet,
                                  bool *isWeakImported,
+                                 bool *needStackProtection,
                                  AvailabilityContext *availability,
                                  bool *isWithoutActuallyEscapingThunk,
                                  SmallVectorImpl<std::string> *Semantics,
@@ -1015,6 +1016,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isCanonical = true;
     else if (hasOwnershipSSA && SP.P.Tok.getText() == "ossa")
       *hasOwnershipSSA = true;
+    else if (needStackProtection && SP.P.Tok.getText() == "stack_protection")
+      *needStackProtection = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
     else if (isThunk && SP.P.Tok.getText() == "signature_optimized_thunk")
@@ -2991,6 +2994,54 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::IncrementProfilerCounterInst: {
+    // First argument is the counter index.
+    unsigned CounterIdx;
+    if (parseInteger(CounterIdx, diag::expected_sil_profiler_counter_idx))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Parse the PGO function name.
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_sil_profiler_counter_pgo_func_name);
+      return true;
+    }
+    // Drop the double quotes.
+    auto FuncName = P.Tok.getText().drop_front().drop_back();
+    P.consumeToken(tok::string_literal);
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Parse the number of counters.
+    if (parseVerbatim("num_counters"))
+      return true;
+
+    unsigned NumCounters;
+    if (parseInteger(NumCounters, diag::expected_sil_profiler_counter_total))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    // Parse the PGO function hash.
+    if (parseVerbatim("hash"))
+      return true;
+
+    uint64_t Hash;
+    if (parseInteger(Hash, diag::expected_sil_profiler_counter_hash))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createIncrementProfilerCounter(InstLoc, CounterIdx, FuncName,
+                                                 NumCounters, Hash);
+    break;
+  }
+
   case SILInstructionKind::ProjectBoxInst: {
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
@@ -3383,11 +3434,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::MarkMustCheckInst: {
-    if (parseTypedValueRef(Val, B))
-      return true;
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-
     StringRef AttrName;
     if (!parseSILOptional(AttrName, *this)) {
       auto diag = diag::sil_markmustcheck_requires_attribute;
@@ -3406,6 +3452,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
       return true;
     }
+
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
     auto *MVI = B.createMarkMustCheckInst(InstLoc, Val, CKind);
     ResultVal = MVI;
     break;
@@ -3718,6 +3770,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc ToLoc;
     bool not_guaranteed = false;
     bool without_actually_escaping = false;
+    bool needsStackProtection = false;
     if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       StringRef attrName;
       if (parseSILOptional(attrName, *this)) {
@@ -3726,7 +3779,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         else
           return true;
       }
+    } if (Opcode == SILInstructionKind::AddressToPointerInst) {
+      if (parseSILOptional(needsStackProtection, *this, "stack_protection"))
+        return true;
     }
+  
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "to"))
@@ -3790,7 +3847,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           B.createConvertEscapeToNoEscape(InstLoc, Val, Ty, !not_guaranteed);
       break;
     case SILInstructionKind::AddressToPointerInst:
-      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);
+      ResultVal = B.createAddressToPointer(InstLoc, Val, Ty, needsStackProtection);
       break;
     case SILInstructionKind::BridgeObjectToRefInst:
       ResultVal =
@@ -5116,11 +5173,13 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     case SILInstructionKind::IndexAddrInst: {
       SILValue IndexVal;
-      if (parseTypedValueRef(Val, B) ||
+      bool needsStackProtection = false;
+      if (parseSILOptional(needsStackProtection, *this, "stack_protection") ||
+          parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseTypedValueRef(IndexVal, B) || parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal);
+      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection);
       break;
     }
     case SILInstructionKind::TailAddrInst: {
@@ -6479,6 +6538,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
+  bool needStackProtection = false;
   AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
@@ -6498,7 +6558,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isThunk, &isDynamic, &isDistributed, &isExactSelfClass,
           &DynamicallyReplacedFunction, &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr, nullptr,
-          &isWeakImported, &availability,
+          &isWeakImported, &needStackProtection, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, &argEffectLocs, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
@@ -6731,7 +6791,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -6782,7 +6842,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, SP, M))
+                           nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6851,7 +6911,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7371,7 +7431,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

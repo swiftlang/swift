@@ -891,8 +891,9 @@ private:
         return;
       }
 
+      auto contextualResultInfo = getContextualResultInfo();
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       getContextualResultType(),
+                       contextualResultInfo.getType(),
                        cs.getConstraintLocator(
                            context.getAbstractClosureExpr(),
                            LocatorPathElt::ClosureBody(
@@ -913,8 +914,10 @@ private:
       resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
     }
 
+    auto contextualResultInfo = getContextualResultInfo();
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     CTP_ReturnStmt, getContextualResultType(),
+                                     contextualResultInfo.purpose,
+                                     contextualResultInfo.getType(),
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -923,8 +926,8 @@ private:
     }
 
     cs.setContextualType(target.getAsExpr(),
-                         TypeLoc::withoutLoc(getContextualResultType()),
-                         CTP_ReturnStmt);
+                         TypeLoc::withoutLoc(contextualResultInfo.getType()),
+                         contextualResultInfo.purpose);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
@@ -939,15 +942,15 @@ private:
     return context.hasSingleExpressionBody();
   }
 
-  Type getContextualResultType() const {
+  ContextualTypeInfo getContextualResultInfo() const {
     if (auto transform = cs.getAppliedResultBuilderTransform(context))
-      return transform->bodyResultType;
+      return {transform->bodyResultType, CTP_ReturnStmt};
 
     if (auto *closure =
             getAsExpr<ClosureExpr>(context.getAbstractClosureExpr()))
-      return cs.getClosureType(closure)->getResult();
+      return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
 
-    return context.getBodyResultType();
+    return {context.getBodyResultType(), CTP_ReturnStmt};
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \

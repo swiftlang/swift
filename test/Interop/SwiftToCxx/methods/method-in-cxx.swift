@@ -119,7 +119,7 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: }
 
 // CHECK:      inline LargeStruct LargeStruct::doubled() const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV7doubledACyF(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
@@ -127,18 +127,18 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: return _impl::$s7Methods11LargeStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: inline LargeStruct LargeStruct::scaled(swift::Int x, swift::Int y) const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV6scaledyACSi_SitF(result, x, y, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: inline LargeStruct LargeStruct::added(const LargeStruct& x) const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV5addedyA2CF(result, _impl::_impl_LargeStruct::getOpaquePointer(x), _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK: inline LargeStruct PassStructInClassMethod::retStruct(swift::Int x) {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Methods23PassStructInClassMethodC03retC0yAA05LargeC0VSiF(result, x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: });
 // CHECK-NEXT: }

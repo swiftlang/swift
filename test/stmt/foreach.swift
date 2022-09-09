@@ -250,3 +250,10 @@ func test_no_ambiguity_with_prefix_iterator<C: Collection>(c: C) {
   for _ in c.prefix(1) { // Ok
   }
 }
+
+// https://github.com/apple/swift/issues/60962
+// Make sure we produce a meaningful diagnostic here.
+do {
+  for (x, y) in (0, 0) {}
+  // expected-error@-1 {{for-in loop requires '(Int, Int)' to conform to 'Sequence'}}
+}

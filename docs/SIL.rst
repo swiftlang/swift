@@ -1055,6 +1055,12 @@ the top-level `switch_enum`_.
 Cross-module references to this function should always use weak linking.
 ::
 
+  sil-function-attribute ::= '[stack_protection]'
+
+Stack protectors are inserted into this function to detect stack related
+buffer overflows.
+::
+
   sil-function-attribute ::= '[available' sil-version-tuple ']'
   sil-version-tuple ::= [0-9]+ ('.' [0-9]+)*
 
@@ -3898,6 +3904,22 @@ It is worth noting that a SIL DIExpression is similar to
 info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
 SIL DIExpression can have elements with various types, like AST nodes or strings.
 
+Profiling
+~~~~~~~~~
+
+increment_profiler_counter
+``````````````````````````
+::
+
+  sil-instruction ::= 'increment_profiler_counter' int-literal ',' string-literal ',' 'num_counters' int-literal ',' 'hash' int-literal
+
+  increment_profiler_counter 1, "$foo", num_counters 3, hash 0
+
+Increments a given profiler counter for a given PGO function name. This is
+lowered to the ``llvm.instrprof.increment`` LLVM intrinsic. This instruction
+is emitted when profiling is enabled, and enables features such as code coverage
+and profile-guided optimization.
+
 Accessing Memory
 ~~~~~~~~~~~~~~~~
 
@@ -4292,7 +4314,7 @@ index_addr
 ``````````
 ::
 
-  sil-instruction ::= 'index_addr' sil-operand ',' sil-operand
+  sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? sil-operand ',' sil-operand
 
   %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
   // %0 must be of an address type $*T
@@ -4307,6 +4329,9 @@ bytes within a value, using ``index_addr``. (``Int8`` address types have no
 special behavior in this regard, unlike ``char*`` or ``void*`` in C.) It is
 also undefined behavior to index out of bounds of an array, except to index
 the "past-the-end" address of the array.
+
+The ``stack_protection`` flag indicates that stack protection is done for
+the pointer origin.
 
 tail_addr
 `````````
@@ -6542,7 +6567,7 @@ address_to_pointer
 ``````````````````
 ::
 
-  sil-instruction ::= 'address_to_pointer' sil-operand 'to' sil-type
+  sil-instruction ::= 'address_to_pointer' ('[' 'stack_protection' ']')? sil-operand 'to' sil-type
 
   %1 = address_to_pointer %0 : $*T to $Builtin.RawPointer
   // %0 must be of an address type $*T
@@ -6553,6 +6578,9 @@ Converting the result pointer back to an address of the same type will give
 an address equivalent to ``%0``. It is undefined behavior to cast the
 ``RawPointer`` to any address type other than its original address type or
 any `layout compatible types`_.
+
+The ``stack_protection`` flag indicates that stack protection is done for
+the pointer origin.
 
 pointer_to_address
 ``````````````````

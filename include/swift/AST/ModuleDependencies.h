@@ -606,6 +606,9 @@ private:
   /// `clangModuleDependencies` for Clang dependencies accimulated during
   /// the current scanning action.
   ModuleDependenciesKindRefMap ModuleDependenciesMap;
+  
+  /// Name of the module under scan
+  StringRef mainScanModuleName;
 
   /// Discovered Clang modules are only cached locally.
   llvm::StringMap<ModuleDependenciesVector> clangModuleDependencies;
@@ -640,7 +643,8 @@ private:
                    Optional<ModuleDependenciesKind> kind) const;
 
 public:
-  ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache);
+  ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache,
+                          StringRef mainScanModuleName);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
   virtual ~ModuleDependenciesCache() { destroyClangImpl(); }
@@ -694,6 +698,10 @@ public:
 
   const std::vector<ModuleDependencyID> &getAllSourceModules() const {
     return globalCache.getAllSourceModules();
+  }
+  
+  StringRef getMainModuleName() const {
+    return mainScanModuleName;
   }
 };
 

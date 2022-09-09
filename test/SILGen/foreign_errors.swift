@@ -22,7 +22,7 @@ func test0() throws {
   // CHECK: [[T0:%.*]] = load_borrow [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = ref_to_unmanaged [[T0]]
   // CHECK: store [[T1]] to [trivial] [[ERR_TEMP1]]
-  // CHECK: address_to_pointer [[ERR_TEMP1]]
+  // CHECK: address_to_pointer [stack_protection] [[ERR_TEMP1]]
 
   //   Call the method.
   // CHECK: [[RESULT:%.*]] = apply [[METHOD]]({{.*}}, [[SELF]])

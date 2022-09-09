@@ -79,10 +79,10 @@ LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
-LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
 LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
+LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
@@ -126,6 +126,13 @@ EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
 /// declare a type that controls access to all stored properties of the
 /// wrapped type.
 EXPERIMENTAL_FEATURE(TypeWrappers)
+
+/// Whether to perform round-trip testing of the Swift Swift parser.
+EXPERIMENTAL_FEATURE(ParserRoundTrip)
+
+/// Whether to perform validation of the parse tree produced by the Swift
+/// Swift parser.
+EXPERIMENTAL_FEATURE(ParserValidation)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
