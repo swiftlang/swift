@@ -198,3 +198,12 @@ This status table describes which of the following Swift language features have 
 | Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
 | Generic `enum` types         | No |
 | Generic `class` types        | No |
+
+### Swift standard library
+
+This status table describes which of the following Swift standard library APIs have some experimental support for using them in C++.
+
+| **Swift Library Type**     | **Can be used from C++** |
+|--------------------------------|----------------------------------------------------------|
+| `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++   |
+| `Array<T>`   | Can be used as a type in C++. APIs in extensions are not exposed to C++   |
