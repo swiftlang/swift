@@ -27,6 +27,8 @@
 
 // REQUIRES: executable_test
 
+// REQUIRES: rdar99707958
+
 import Swift
 import StdlibUnittest
 import mysimd
