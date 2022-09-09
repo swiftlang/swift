@@ -395,8 +395,11 @@ static int compareImportModulesByName(const ImportModuleTy *left,
 
 static void writeImports(raw_ostream &out,
                          llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                         ModuleDecl &M, StringRef bridgingHeader) {
-  out << "#if __has_feature(modules)\n";
+                         ModuleDecl &M, StringRef bridgingHeader,
+                         bool useCxxImport = false) {
+  // Note: we can't use has_feature(modules) as it's always enabled in C++20
+  // mode.
+  out << "#if __has_feature(objc_modules)\n";
 
   out << "#if __has_warning(\"-Watimport-in-framework-header\")\n"
       << "#pragma clang diagnostic ignored \"-Watimport-in-framework-header\"\n"
@@ -420,6 +423,8 @@ static void writeImports(raw_ostream &out,
   // Track printed names to handle overlay modules.
   llvm::SmallPtrSet<Identifier, 8> seenImports;
   bool includeUnderlying = false;
+  StringRef importDirective =
+      useCxxImport ? "#pragma clang module import" : "@import";
   for (auto import : sortedImports) {
     if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
       auto Name = swiftModule->getName();
@@ -428,12 +433,12 @@ static void writeImports(raw_ostream &out,
         continue;
       }
       if (seenImports.insert(Name).second)
-        out << "@import " << Name.str() << ";\n";
+        out << importDirective << ' ' << Name.str() << ";\n";
     } else {
       const auto *clangModule = import.get<const clang::Module *>();
       assert(clangModule->isSubModule() &&
              "top-level modules should use a normal swift::ModuleDecl");
-      out << "@import ";
+      out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << ";\n";
     }
@@ -489,16 +494,14 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
   return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
 }
 
-static std::string
-getModuleContentsCxxString(ModuleDecl &M,
-                           SwiftToClangInteropContext &interopContext,
-                           bool requiresExposedAttribute) {
-  SmallPtrSet<ImportModuleTy, 8> imports;
+static std::string getModuleContentsCxxString(
+    ModuleDecl &M, SmallPtrSet<ImportModuleTy, 8> &imports,
+    SwiftToClangInteropContext &interopContext, bool requiresExposedAttribute) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
   printModuleContentsAsCxx(moduleContents, imports, M, interopContext,
                            requiresExposedAttribute);
-  return moduleContents.str();
+  return std::move(moduleContents.str());
 }
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
@@ -522,9 +525,13 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     // FIXME: Expose Swift with @expose by default.
     if (ExposePublicDeclsInClangHeader ||
         M->DeclContext::getASTContext().LangOpts.EnableCXXInterop) {
-      os << getModuleContentsCxxString(
-          *M, interopContext,
+      SmallPtrSet<ImportModuleTy, 8> imports;
+      auto contents = getModuleContentsCxxString(
+          *M, imports, interopContext,
           /*requiresExposedAttribute=*/!ExposePublicDeclsInClangHeader);
+      // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
+      writeImports(os, imports, *M, bridgingHeader, /*useCxxImport=*/true);
+      os << contents;
     }
   });
   writeEpilogue(os);

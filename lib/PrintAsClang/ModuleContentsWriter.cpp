@@ -26,6 +26,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Strings.h"
 
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
@@ -178,6 +179,14 @@ public:
       }
     }
 
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      // Only add C++ imports in C++ mode for now.
+      if (!D->hasClangNode())
+        return true;
+      if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
+        return true;
+    }
+
     imports.insert(otherModule);
     return true;
   }
@@ -258,8 +267,10 @@ public:
     if (outputLangMode == OutputLanguageMode::Cxx) {
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
-        forwardDeclare(
-            NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        if (!addImport(NTD)) {
+          forwardDeclare(
+              NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        }
       }
       return;
     }

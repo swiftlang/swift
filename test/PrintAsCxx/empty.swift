@@ -90,12 +90,13 @@
 // CHECK:       # define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 
 // CHECK-LABEL: #if defined(__OBJC__)
-// CHECK-NEXT:  #if __has_feature(modules)
+// CHECK-NEXT:  #if __has_feature(objc_modules)
 
 // CHECK-LABEL: #if defined(__OBJC__)
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
-// CHECK-NEXT:  #ifndef SWIFT_PRINTED_CORE
+// CHECK-NEXT:  #if __has_feature(objc_modules)
+// CHECK:       #ifndef SWIFT_PRINTED_CORE
 // CHECK:       } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
