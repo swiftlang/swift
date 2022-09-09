@@ -778,6 +778,11 @@ DECL_ATTR(_documentation, Documentation,
   APIBreakingToAdd | APIStableToRemove | ABIStableToAdd | ABIStableToRemove,
   136)
 
+SIMPLE_DECL_ATTR(typeWrapperIgnored, TypeWrapperIgnored,
+  OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  137)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
