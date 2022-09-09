@@ -31,9 +31,17 @@ def main(arguments):
 # with runpath-relative loads of system libraries on some dyld versions.
 # (rdar://78851265)
 def unrpathize(filename):
-    dylibsOutput = subprocess.check_output(
-        ['xcrun', 'dyldinfo', '-dylibs', filename],
-        universal_newlines=True)
+    dylibsOutput = None
+    try:
+        # `dyldinfo` has been replaced with `dyld_info`, so we try it first
+        # before falling back to `dyldinfo`
+        dylibsOutput = subprocess.check_output(
+            ['xcrun', 'dyld_info', '-dependents', filename],
+            universal_newlines=True)
+    except subprocess.CalledProcessError:
+        dylibsOutput = subprocess.check_output(
+            ['xcrun', 'dyldinfo', '-dylibs', filename],
+            universal_newlines=True)
 
     # Do not rewrite @rpath-relative load commands for these libraries:
     # they are test support libraries that are never installed under
