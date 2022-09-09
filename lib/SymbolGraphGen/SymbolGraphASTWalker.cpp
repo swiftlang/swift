@@ -228,7 +228,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       auto ExtendedModule = ExtendedNominal->getModuleContext();
       auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
-      if (ExtendedModule != &M && !isExportedImportedModule(ExtendedModule)) {
+      if (!isOurModule(ExtendedModule)) {
         ExtendedSG->recordNode(Symbol(ExtendedSG, VD, nullptr));
         return true;
       }
@@ -303,4 +303,8 @@ bool SymbolGraphASTWalker::isExportedImportedModule(const ModuleDecl *M) const {
   return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
     return areModulesEqual(M, MD->getModuleContext());
   });
+}
+
+bool SymbolGraphASTWalker::isOurModule(const ModuleDecl *M) const {
+  return areModulesEqual(M, &this->M) || isExportedImportedModule(M);
 }
