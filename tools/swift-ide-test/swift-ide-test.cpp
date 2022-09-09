@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "XMLValidator.h"
 #include "ModuleAPIDiff.h"
+#include "XMLValidator.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
@@ -27,35 +27,37 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
-#include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
+#include "swift/Markup/Markup.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Markup/Markup.h"
-#include "swift/Config.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -64,7 +66,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ManagedStatic.h"
 #include <system_error>
 
 #include <algorithm>
@@ -4347,9 +4348,8 @@ int main(int argc, char *argv[]) {
     // Honor the *last* -swift-version specified.
     const auto &LastSwiftVersion =
       options::SwiftVersion[options::SwiftVersion.size()-1];
-    if (auto swiftVersion =
-          version::Version::parseVersionString(LastSwiftVersion,
-                                               SourceLoc(), nullptr)) {
+    if (auto swiftVersion = VersionParser::parseVersionString(
+            LastSwiftVersion, SourceLoc(), nullptr)) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }

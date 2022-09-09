@@ -22,6 +22,7 @@ add_swift_host_library(swiftParse STATIC
   ParseRequests.cpp
   ParseStmt.cpp
   ParseType.cpp
+  ParseVersion.cpp
   PersistentParserState.cpp
   SyntaxParsingCache.cpp
   SyntaxParsingContext.cpp)
