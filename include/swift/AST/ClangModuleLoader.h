@@ -33,6 +33,7 @@ namespace swift {
 
 class ConcreteDeclRef;
 class Decl;
+class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
 class SwiftLookupTable;
@@ -266,6 +267,10 @@ public:
 
   virtual Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) = 0;
+
+  virtual Type importVarDeclType(const clang::VarDecl *clangDecl,
+                                 VarDecl *swiftDecl,
+                                 DeclContext *dc) = 0;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
