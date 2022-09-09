@@ -1,8 +1,8 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-// https://bugs.swift.org/browse/SR-3452
+// https://github.com/apple/swift/issues/46040
 // See test/Compatibility/enum_element_pattern.swift for Swift3 behavior.
-// As for FIXME cases: see https://bugs.swift.org/browse/SR-3466
+// As for FIXME cases: see https://github.com/apple/swift/issues/46054
 
 enum E {
   case A, B, C, D

@@ -19,6 +19,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
@@ -431,8 +432,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
     if (vers.hasValue()) {
       if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
@@ -445,8 +446,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     if (vers.hasValue()) {
       Opts.PackageDescriptionVersion = vers.getValue();
     } else {
@@ -910,8 +911,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()) == "target")
       return Opts.getMinPlatformVersion();
 
-    if (auto vers = version::Version::parseVersionString(A->getValue(),
-                                                         SourceLoc(), &Diags))
+    if (auto vers = VersionParser::parseVersionString(A->getValue(),
+                                                      SourceLoc(), &Diags))
       return (llvm::VersionTuple)*vers;
 
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,

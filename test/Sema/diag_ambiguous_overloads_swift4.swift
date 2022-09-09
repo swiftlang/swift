@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-//=-------------- SR-7295 --------------=/
-class sr7295 {
+// https://github.com/apple/swift/issues/49843
+class C_49843 {
   func doSomething(a: (() -> Void)? = nil, completion: @escaping ((String, Error?) -> Void)) {}
   func doSomething(b: @escaping ((String, Error?, Bool) -> Void)) {}
   func a() {
