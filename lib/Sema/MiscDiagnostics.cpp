@@ -1299,13 +1299,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool isTypeCheckedOptionalNil(Expr *E) {
       if (dyn_cast<NilLiteralExpr>(E)) return true;
 
-      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
-      if (!CE)
-        return false;
-
-      // First case -- Optional.none
-      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
-        return DRE->getDecl() == Ctx.getOptionalNoneDecl();
+      if (auto *DSCE = dyn_cast_or_null<DotSyntaxCallExpr>(E->getSemanticsProvidingExpr())) {
+        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getSemanticFn()))
+          return DRE->getDecl() == Ctx.getOptionalNoneDecl();
+      }
 
       return false;
     }
