@@ -25,12 +25,10 @@ namespace {
 
 /// Compare the two \c ModuleDecl instances to see whether they are the same.
 ///
-/// Pass \c true to the \c ignoreUnderlying argument to consider two modules the same even if
-/// one is a Swift module and the other a non-Swift module. This allows a Swift module and its
-/// underlying Clang module to compare as equal.
-bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool ignoreUnderlying = false) {
-  return lhs->getNameStr() == rhs->getNameStr()
-    && (ignoreUnderlying || lhs->isNonSwiftModule() == rhs->isNonSwiftModule());
+/// This does a by-name comparison to consider a module's underlying Clang module to be equivalent
+/// to the wrapping module of the same name.
+bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs) {
+  return lhs->getNameStr() == rhs->getNameStr();
 }
 
 } // anonymous namespace
@@ -64,10 +62,10 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     }
   }
 
-  if (areModulesEqual(&this->M, M, true)) {
+  if (areModulesEqual(&this->M, M)) {
     return &MainGraph;
   } else if (MainGraph.DeclaringModule.hasValue() &&
-             areModulesEqual(MainGraph.DeclaringModule.getValue(), M, true)) {
+             areModulesEqual(MainGraph.DeclaringModule.getValue(), M)) {
     // Cross-import overlay modules already appear as "extensions" of their declaring module; we
     // should put actual extensions of that module into the main graph
     return &MainGraph;
