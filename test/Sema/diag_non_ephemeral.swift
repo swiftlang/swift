@@ -47,7 +47,8 @@ takesOptMutableRaw(&arr) // expected-error {{cannot use inout expression here; a
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'takesOptMutableRaw'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-// FIXME(SR-9100): This currently uses inout-to-pointer instead of array-to-pointer.
+// FIXME: This currently uses inout-to-pointer instead of array-to-pointer
+// (https://github.com/apple/swift/issues/51597).
 takesOptMutableRaw(&optionalArr)
 
 takesOptConst(arr) // expected-error {{cannot pass '[Int8]' to parameter; argument #1 must be a pointer that outlives the call to 'takesOptConst'}}

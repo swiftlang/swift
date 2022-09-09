@@ -73,15 +73,17 @@ _ = p =*= &o
 func rdar25963182(_ bytes: [UInt8] = nil) {}
 // expected-error@-1 {{nil default argument value cannot be converted to type}}
 
-// SR-13262
-struct SR13262_S {}
+// https://github.com/apple/swift/issues/55702
+do {
+  struct S {}
 
-func SR13262(_ x: Int) {}
-func SR13262_Int(_ x: Int) -> Int { 0 }
-func SR13262_SF(_ x: Int) -> SR13262_S { SR13262_S() }
+  func returnVoid(_ x: Int) {}
+  func returnInt(_ x: Int) -> Int {}
+  func returnS(_ x: Int) -> S {}
 
-func testSR13262(_ arr: [Int]) {
-  for x in arr where SR13262(x) {} // expected-error {{cannot convert value of type '()' to expected condition type 'Bool'}}
-  for x in arr where SR13262_Int(x) {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{22-22=(}} {{36-36= != 0)}} 
-  for x in arr where SR13262_SF(x) {} // expected-error {{cannot convert value of type 'SR13262_S' to expected condition type 'Bool'}}
+  let arr: [Int]
+
+  for x in arr where returnVoid(x) {} // expected-error {{cannot convert value of type '()' to expected condition type 'Bool'}}
+  for x in arr where returnInt(x) {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{22-22=(}} {{34-34= != 0)}}
+  for x in arr where returnS(x) {} // expected-error {{cannot convert value of type 'S' to expected condition type 'Bool'}}
 }
