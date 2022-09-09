@@ -35,6 +35,7 @@
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/Option/Options.h"
+#include "swift/Parse/ParseVersion.h"
 #include <functional>
 
 using namespace swift;
@@ -2425,8 +2426,8 @@ public:
     if (!SwiftVersion.empty()) {
       using version::Version;
       bool isValid = false;
-      if (auto Version =
-              Version::parseVersionString(SwiftVersion, SourceLoc(), nullptr)) {
+      if (auto Version = VersionParser::parseVersionString(
+              SwiftVersion, SourceLoc(), nullptr)) {
         if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
           InitInvoke.getLangOptions().EffectiveLanguageVersion = *Effective;
           isValid = true;

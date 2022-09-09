@@ -21,6 +21,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -147,8 +148,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     using version::Version;
     auto SwiftVersion = A->getValue();
     bool isValid = false;
-    if (auto Version =
-            Version::parseVersionString(SwiftVersion, SourceLoc(), nullptr)) {
+    if (auto Version = VersionParser::parseVersionString(
+            SwiftVersion, SourceLoc(), nullptr)) {
       if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
         Invocation.getLangOptions().EffectiveLanguageVersion = *Effective;
         isValid = true;

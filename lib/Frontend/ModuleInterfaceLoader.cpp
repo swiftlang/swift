@@ -22,6 +22,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Strings.h"
@@ -1315,7 +1316,14 @@ static bool readSwiftInterfaceVersionAndArgs(
 
   assert(VersMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
-  auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
+  auto Vers =
+      VersionParser::parseVersionString(VersMatches[1], SourceLoc(), &Diags);
+  if (!Vers.hasValue()) {
+    InterfaceSubContextDelegateImpl::diagnose(
+        interfacePath, diagnosticLoc, SM, &Diags,
+        diag::error_extracting_version_from_module_interface);
+    return true;
+  }
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
@@ -1328,10 +1336,10 @@ static bool readSwiftInterfaceVersionAndArgs(
   // For now: we support anything with the same "major version" and assume
   // minor versions might be interesting for debugging, or special-casing a
   // compatible field variant.
-  if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
+  if (Vers->asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
-        diag::unsupported_version_of_module_interface, interfacePath, Vers);
+        diag::unsupported_version_of_module_interface, interfacePath, *Vers);
     return true;
   }
   return false;

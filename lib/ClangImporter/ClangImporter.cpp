@@ -41,6 +41,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -73,8 +74,8 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include <algorithm>
-#include <string>
 #include <memory>
+#include <string>
 
 using namespace swift;
 using namespace importer;
@@ -608,7 +609,7 @@ importer::getNormalInvocationArguments(
 
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
-    auto V = version::Version::getCurrentCompilerVersion();
+    auto V = version::getCurrentCompilerVersion();
     if (!V.empty()) {
       // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
       // "X" component resided in its digits.
