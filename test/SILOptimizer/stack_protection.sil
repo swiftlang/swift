@@ -9,14 +9,14 @@ import Builtin
 import Swift
 
 class C {
-  @_hasStorage var i: Int
-  @_hasStorage var j: Int
+  @_hasStorage var i: Int64
+  @_hasStorage var j: Int64
   @_hasStorage var s: S
 }
 
 struct S {
-  @_hasStorage var a: Int
-  @_hasStorage var b: Int
+  @_hasStorage var a: Int64
+  @_hasStorage var b: Int64
 }
 
 // CHECK-LABEL: sil [stack_protection] @function_local_stack
@@ -24,9 +24,9 @@ struct S {
 // CHECK:       } // end sil function 'function_local_stack'
 sil @function_local_stack : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $Int
-  %1 = address_to_pointer [stack_protection] %0 : $*Int to $Builtin.RawPointer
-  dealloc_stack %0 : $*Int
+  %0 = alloc_stack $Int64
+  %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
+  dealloc_stack %0 : $*Int64
   %r = tuple ()
   return %r : $()
 }
@@ -36,11 +36,11 @@ bb0:
 // CHECK:       } // end sil function 'no_stack_protection'
 sil @no_stack_protection : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack $Int
-  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
+  %0 = alloc_stack $Int64
+  %1 = address_to_pointer %0 : $*Int64 to $Builtin.RawPointer
   %2 = integer_literal $Builtin.Word, 1
-  %3 = index_addr %0 : $*Int, %2 : $Builtin.Word
-  dealloc_stack %0 : $*Int
+  %3 = index_addr %0 : $*Int64, %2 : $Builtin.Word
+  dealloc_stack %0 : $*Int64
   %r = tuple ()
   return %r : $()
 }
@@ -64,9 +64,9 @@ sil @function_local_stack_obj : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref [stack] $C
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   dealloc_stack_ref %0 : $C
   %r = tuple ()
   return %r : $()
@@ -81,24 +81,24 @@ sil @function_local_obj : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $C
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   strong_release %0 : $C
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil [stack_protection] @inout_with_unknown_callers1
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int
-// CHECK:         copy_addr [take] %0 to [initialization] [[T]] : $*Int
+// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
+// CHECK:         copy_addr [take] %0 to [initialization] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] %0 : $*Int
-// CHECK:         dealloc_stack [[T]] : $*Int
+// CHECK:         copy_addr [take] [[T]] to [initialization] %0 : $*Int64
+// CHECK:         dealloc_stack [[T]] : $*Int64
 // CHECK:       } // end sil function 'inout_with_unknown_callers1'
-sil @inout_with_unknown_callers1 : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
-  %1 = address_to_pointer [stack_protection] %0 : $*Int to $Builtin.RawPointer
+sil @inout_with_unknown_callers1 : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
   %r = tuple ()
   return %r : $()
 }
@@ -107,40 +107,40 @@ bb0(%0 : $*Int):
 // CHECK:         address_to_pointer [stack_protection] %0
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'in_with_unknown_callers'
-sil @in_with_unknown_callers : $@convention(thin) (@in_guaranteed Int) -> () {
-bb0(%0 : $*Int):
-  %1 = address_to_pointer [stack_protection] %0 : $*Int to $Builtin.RawPointer
+sil @in_with_unknown_callers : $@convention(thin) (@in_guaranteed Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil [stack_protection] @inout_with_modify_access
-// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [dynamic] %0 : $*Int
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int
+// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [dynamic] %0 : $*Int64
+// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
+// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int
-// CHECK:         dealloc_stack [[T]] : $*Int
+// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
+// CHECK:         dealloc_stack [[T]] : $*Int64
 // CHECK:       } // end sil function 'inout_with_modify_access'
-sil @inout_with_modify_access : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
-  %1 = begin_access [modify] [dynamic] %0 : $*Int
-  %2 = address_to_pointer [stack_protection] %1 : $*Int to $Builtin.RawPointer
-  end_access %1 : $*Int
+sil @inout_with_modify_access : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = begin_access [modify] [dynamic] %0 : $*Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  end_access %1 : $*Int64
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil @inout_with_read_access
-// CHECK:         [[A:%[0-9]+]] = begin_access [read] [dynamic] %0 : $*Int
+// CHECK:         [[A:%[0-9]+]] = begin_access [read] [dynamic] %0 : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[A]]
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'inout_with_read_access'
-sil @inout_with_read_access : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
-  %1 = begin_access [read] [dynamic] %0 : $*Int
-  %2 = address_to_pointer [stack_protection] %1 : $*Int to $Builtin.RawPointer
-  end_access %1 : $*Int
+sil @inout_with_read_access : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = begin_access [read] [dynamic] %0 : $*Int64
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
+  end_access %1 : $*Int64
   %r = tuple ()
   return %r : $()
 }
@@ -158,101 +158,101 @@ bb0(%0 : $*Int):
 sil @inout_with_unknown_callers2 : $@convention(thin) (@inout S) -> () {
 bb0(%0 : $*S):
   %1 = struct_element_addr %0 : $*S, #S.a
-  %2 = address_to_pointer [stack_protection] %1 : $*Int to $Builtin.RawPointer
+  %2 = address_to_pointer [stack_protection] %1 : $*Int64 to $Builtin.RawPointer
   %3 = struct_element_addr %0 : $*S, #S.b
-  %4 = address_to_pointer [stack_protection] %3 : $*Int to $Builtin.RawPointer
+  %4 = address_to_pointer [stack_protection] %3 : $*Int64 to $Builtin.RawPointer
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil [stack_protection] @object_with_unknown_callers1
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int
+// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
+// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
+// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int
-// CHECK:         dealloc_stack [[T]] : $*Int
-// CHECK:         end_access [[A]] : $*Int
+// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
+// CHECK:         dealloc_stack [[T]] : $*Int64
+// CHECK:         end_access [[A]] : $*Int64
 // CHECK:       } // end sil function 'object_with_unknown_callers1'
 sil @object_with_unknown_callers1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil [stack_protection] @object_with_unknown_callers2
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int
-// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int
+// CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
+// CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
+// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int
-// CHECK:         dealloc_stack [[T]] : $*Int
-// CHECK:         end_access [[A]] : $*Int
+// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
+// CHECK:         dealloc_stack [[T]] : $*Int64
+// CHECK:         end_access [[A]] : $*Int64
 // CHECK:       } // end sil function 'object_with_unknown_callers2'
 sil @object_with_unknown_callers2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  %4 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  %4 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil [stack_protection] @object_with_unknown_callers3
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[AI:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int
-// CHECK:         [[TI:%[0-9]+]] = alloc_stack $Int
-// CHECK:         copy_addr [take] [[AI]] to [initialization] [[TI]] : $*Int
+// CHECK:         [[AI:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
+// CHECK:         [[TI:%[0-9]+]] = alloc_stack $Int64
+// CHECK:         copy_addr [take] [[AI]] to [initialization] [[TI]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[TI]]
 // CHECK:         [[J:%[0-9]+]] = ref_element_addr %0 : $C, #C.j
-// CHECK:         [[AJ:%[0-9]+]] = begin_access [modify] [static] [[J]] : $*Int
-// CHECK:         [[TJ:%[0-9]+]] = alloc_stack $Int
-// CHECK:         copy_addr [take] [[AJ]] to [initialization] [[TJ]] : $*Int
-// CHECK:         copy_addr [take] [[TI]] to [initialization] [[AI]] : $*Int
-// CHECK:         end_access [[AI]] : $*Int
+// CHECK:         [[AJ:%[0-9]+]] = begin_access [modify] [static] [[J]] : $*Int64
+// CHECK:         [[TJ:%[0-9]+]] = alloc_stack $Int64
+// CHECK:         copy_addr [take] [[AJ]] to [initialization] [[TJ]] : $*Int64
+// CHECK:         copy_addr [take] [[TI]] to [initialization] [[AI]] : $*Int64
+// CHECK:         end_access [[AI]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[TJ]]
-// CHECK:         copy_addr [take] [[TJ]] to [initialization] [[AJ]] : $*Int
-// CHECK:         dealloc_stack [[TJ]] : $*Int
-// CHECK:         dealloc_stack [[TI]] : $*Int
-// CHECK:         end_access [[AJ]] : $*Int
+// CHECK:         copy_addr [take] [[TJ]] to [initialization] [[AJ]] : $*Int64
+// CHECK:         dealloc_stack [[TJ]] : $*Int64
+// CHECK:         dealloc_stack [[TI]] : $*Int64
+// CHECK:         end_access [[AJ]] : $*Int64
 // CHECK:       } // end sil function 'object_with_unknown_callers3'
 sil @object_with_unknown_callers3 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
   // Accesses don't need to be properly nested.
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
   %4 = ref_element_addr %0 : $C, #C.j
-  %5 = begin_access [modify] [static] %4 : $*Int
-  end_access %2 : $*Int
-  %7 = address_to_pointer [stack_protection] %5 : $*Int to $Builtin.RawPointer
-  end_access %5 : $*Int
+  %5 = begin_access [modify] [static] %4 : $*Int64
+  end_access %2 : $*Int64
+  %7 = address_to_pointer [stack_protection] %5 : $*Int64 to $Builtin.RawPointer
+  end_access %5 : $*Int64
   %r = tuple ()
   return %r : $()
 }
 
 // CHECK-LABEL: sil @object_with_read_access
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
-// CHECK:         [[A:%[0-9]+]] = begin_access [read] [static] [[I]] : $*Int
+// CHECK:         [[A:%[0-9]+]] = begin_access [read] [static] [[I]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[A]]
 // CHECK-NOT:     copy_addr
-// CHECK:         end_access [[A]] : $*Int
+// CHECK:         end_access [[A]] : $*Int64
 // CHECK:       } // end sil function 'object_with_read_access'
 sil @object_with_read_access : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [read] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [read] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   %r = tuple ()
   return %r : $()
 }
@@ -262,13 +262,13 @@ bb0(%0 : $C):
 // MODULE-NOT:       copy_addr
 // FUNCTION:         copy_addr
 // CHECK:          } // end sil function 'known_callers_inout'
-sil hidden @known_callers_inout : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
+sil hidden @known_callers_inout : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
   %2 = integer_literal $Builtin.Int64, 2
-  %3 = struct $Int (%2 : $Builtin.Int64)
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
   %4 = integer_literal $Builtin.Word, 1
-  %5 = index_addr [stack_protection] %0 : $*Int, %4 : $Builtin.Word
-  store %3 to %5 : $*Int
+  %5 = index_addr [stack_protection] %0 : $*Int64, %4 : $Builtin.Word
+  store %3 to %5 : $*Int64
   %7 = tuple ()
   return %7 : $()
 }
@@ -279,10 +279,10 @@ bb0(%0 : $*Int):
 // CHECK:          } // end sil function 'call_internal_with_inout1'
 sil @call_internal_with_inout1 : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack [lexical] $Int
-  %1 = function_ref @known_callers_inout : $@convention(thin) (@inout Int) -> ()
-  %2 = apply %1(%0) : $@convention(thin) (@inout Int) -> ()
-  dealloc_stack %0 : $*Int
+  %0 = alloc_stack [lexical] $Int64
+  %1 = function_ref @known_callers_inout : $@convention(thin) (@inout Int64) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Int64) -> ()
+  dealloc_stack %0 : $*Int64
 
   // Introduce a cycle in the call graph.
   %f = function_ref @call_internal_with_inout2 : $@convention(thin) () -> ()
@@ -298,10 +298,10 @@ bb0:
 // CHECK:          } // end sil function 'call_internal_with_inout2'
 sil @call_internal_with_inout2 : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_stack [lexical] $Int
-  %1 = function_ref @known_callers_inout : $@convention(thin) (@inout Int) -> ()
-  %2 = apply %1(%0) : $@convention(thin) (@inout Int) -> ()
-  dealloc_stack %0 : $*Int
+  %0 = alloc_stack [lexical] $Int64
+  %1 = function_ref @known_callers_inout : $@convention(thin) (@inout Int64) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Int64) -> ()
+  dealloc_stack %0 : $*Int64
   cond_br undef, bb1, bb2
 bb1:
   // Introduce a cycle in the call graph.
@@ -319,13 +319,13 @@ bb3:
 // CHECK:         copy_addr
 // CHECK:         copy_addr
 // CHECK:       } // end sil function 'unknown_callers'
-sil hidden @unknown_callers : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
+sil hidden @unknown_callers : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
   %2 = integer_literal $Builtin.Int64, 2
-  %3 = struct $Int (%2 : $Builtin.Int64)
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
   %4 = integer_literal $Builtin.Word, 1
-  %5 = index_addr [stack_protection] %0 : $*Int, %4 : $Builtin.Word
-  store %3 to %5 : $*Int
+  %5 = index_addr [stack_protection] %0 : $*Int64, %4 : $Builtin.Word
+  store %3 to %5 : $*Int64
   %7 = tuple ()
   return %7 : $()
 }
@@ -333,10 +333,10 @@ bb0(%0 : $*Int):
 // CHECK-LABEL: sil @call_unknown_callers
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'call_unknown_callers'
-sil @call_unknown_callers : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
-  %1 = function_ref @unknown_callers : $@convention(thin) (@inout Int) -> ()
-  %2 = apply %1(%0) : $@convention(thin) (@inout Int) -> ()
+sil @call_unknown_callers : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = function_ref @unknown_callers : $@convention(thin) (@inout Int64) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Int64) -> ()
   %4 = tuple ()
   return %4 : $()
 }
@@ -349,9 +349,9 @@ bb0(%0 : $*Int):
 sil hidden @known_callers_obj1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   %7 = tuple ()
   return %7 : $()
 }
@@ -398,9 +398,9 @@ bb3(%5 : $C):
 sil hidden @known_callers_obj2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.i
-  %2 = begin_access [modify] [static] %1 : $*Int
-  %3 = address_to_pointer [stack_protection] %2 : $*Int to $Builtin.RawPointer
-  end_access %2 : $*Int
+  %2 = begin_access [modify] [static] %1 : $*Int64
+  %3 = address_to_pointer [stack_protection] %2 : $*Int64 to $Builtin.RawPointer
+  end_access %2 : $*Int64
   %7 = tuple ()
   return %7 : $()
 }
@@ -433,9 +433,9 @@ bb3(%5 : $C):
 // MODULE-NOT:       copy_addr
 // FUNCTION:         copy_addr
 // CHECK:          } // end sil function 'closure_with_inout_capture'
-sil private @closure_with_inout_capture : $@convention(thin) (@inout_aliasable Int) -> () {
-bb0(%0 : $*Int):
-  %1 = address_to_pointer [stack_protection] %0 : $*Int to $Builtin.RawPointer
+sil private @closure_with_inout_capture : $@convention(thin) (@inout_aliasable Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
   %r = tuple ()
   return %r : $()
 }
@@ -448,18 +448,18 @@ sil @call_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -
 // CHECK:          } // end sil function 'test_closure_with_inout_capture'
 sil @test_closure_with_inout_capture : $@convention(thin) () -> () {
 bb0:
-  %2 = alloc_stack [lexical] $Int
+  %2 = alloc_stack [lexical] $Int64
   %3 = integer_literal $Builtin.Int64, 2
-  %4 = struct $Int (%3 : $Builtin.Int64)
-  store %4 to %2 : $*Int
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  store %4 to %2 : $*Int64
 
-  %6 = function_ref @closure_with_inout_capture : $@convention(thin) (@inout_aliasable Int) -> ()
-  %7 = partial_apply [callee_guaranteed] [on_stack] %6(%2) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %6 = function_ref @closure_with_inout_capture : $@convention(thin) (@inout_aliasable Int64) -> ()
+  %7 = partial_apply [callee_guaranteed] [on_stack] %6(%2) : $@convention(thin) (@inout_aliasable Int64) -> ()
 
   %8 = function_ref @call_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   dealloc_stack %7 : $@noescape @callee_guaranteed () -> ()
-  dealloc_stack %2 : $*Int
+  dealloc_stack %2 : $*Int64
   %12 = tuple ()
   return %12 : $()
 }
@@ -469,25 +469,25 @@ bb0:
 // CHECK:         copy_addr
 // CHECK:         copy_addr
 // CHECK:       } // end sil function 'closure_with_inout_arg'
-sil private @closure_with_inout_arg : $@convention(thin) (@inout Int) -> () {
-bb0(%0 : $*Int):
-  %1 = address_to_pointer [stack_protection] %0 : $*Int to $Builtin.RawPointer
+sil private @closure_with_inout_arg : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %1 = address_to_pointer [stack_protection] %0 : $*Int64 to $Builtin.RawPointer
   %r = tuple ()
   return %r : $()
 }
 
-sil @call_closure_with_arg : $@convention(thin) (@noescape @callee_guaranteed (@inout Int) -> ()) -> ()
+sil @call_closure_with_arg : $@convention(thin) (@noescape @callee_guaranteed (@inout Int64) -> ()) -> ()
 
 // CHECK-LABEL: sil @test_closure_with_inout_arg
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function 'test_closure_with_inout_arg'
 sil @test_closure_with_inout_arg : $@convention(thin) () -> () {
 bb0:
-  %6 = function_ref @closure_with_inout_arg : $@convention(thin) (@inout Int) -> ()
-  %7 = partial_apply [callee_guaranteed] [on_stack] %6() : $@convention(thin) (@inout Int) -> ()
-  %8 = function_ref @call_closure_with_arg : $@convention(thin) (@noescape @callee_guaranteed (@inout Int) -> ()) -> ()
-  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed (@inout Int) -> ()) -> ()
-  dealloc_stack %7 : $@noescape @callee_guaranteed (@inout Int) -> ()
+  %6 = function_ref @closure_with_inout_arg : $@convention(thin) (@inout Int64) -> ()
+  %7 = partial_apply [callee_guaranteed] [on_stack] %6() : $@convention(thin) (@inout Int64) -> ()
+  %8 = function_ref @call_closure_with_arg : $@convention(thin) (@noescape @callee_guaranteed (@inout Int64) -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed (@inout Int64) -> ()) -> ()
+  dealloc_stack %7 : $@noescape @callee_guaranteed (@inout Int64) -> ()
   %12 = tuple ()
   return %12 : $()
 }
