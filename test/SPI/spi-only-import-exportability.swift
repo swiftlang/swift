@@ -20,10 +20,11 @@
 // RUN:   -enable-library-evolution
 
 /// Generate the swiftinterface of the working code and verify it.
-// RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) \
+// RUN: %target-swift-emit-module-interfaces(%t/Client.swiftinterface, %t/Client.private.swiftinterface) \
 // RUN:   %t/Client.swift -I %t -DSKIP_ERRORS \
 // RUN:   -experimental-spi-only-imports
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -I %t
 
 
 //--- PublicLib.swift
