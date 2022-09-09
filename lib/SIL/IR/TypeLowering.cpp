@@ -2099,6 +2099,7 @@ namespace {
       if (D->isCxxNonTrivial()) {
         properties.setAddressOnly();
         properties.setNonTrivial();
+        properties.setLexical(IsLexical);
       }
 
       auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
@@ -2158,6 +2159,9 @@ namespace {
       // may be added resiliently later.
       if (D->isIndirect()) {
         properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        properties =
+            applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
         return new (TC) LoadableEnumTypeLowering(enumType, properties,
                                                  Expansion);
       }
@@ -2173,6 +2177,9 @@ namespace {
         // Indirect elements only make the type nontrivial.
         if (elt->isIndirect()) {
           properties.setNonTrivial();
+          properties.setLexical(IsLexical);
+          properties =
+              applyLifetimeAnnotation(elt->getLifetimeAnnotation(), properties);
           continue;
         }
         
