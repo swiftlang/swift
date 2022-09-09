@@ -752,6 +752,9 @@ extension Slice {
   ///
   /// - Precondition: `self.count` >= `source.count`
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer slice
+  ///     must not overlap.
+  ///
   /// - Parameter source: A collection of elements to be used to
   ///     initialize the buffer slice's storage.
   /// - Returns: The index one past the last element of the buffer slice
@@ -818,6 +821,9 @@ extension Slice {
   /// `startIndex`. If `source` contains as many elements as the buffer slice
   /// can hold, the returned index is the buffer slice's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer slice
+  ///     may overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A collection of elements to be used to update
@@ -853,11 +859,13 @@ extension Slice {
   /// slice's `startIndex`. If `source` contains as many elements as the slice
   /// can hold, the returned index is equal to the slice's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer slice
+  ///     may overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A buffer containing the values to copy.
-  ///     The memory region underlying `source` must be initialized. The memory
-  ///     regions referenced by `source` and this buffer may overlap.
+  ///     The memory region underlying `source` must be initialized.
   /// - Returns: The index one past the last element of the buffer slice
   ///    initialized by this function.
   @inlinable
@@ -890,11 +898,13 @@ extension Slice {
   /// slice's `startIndex`. If `source` contains as many elements as the slice
   /// can hold, the returned index is equal to the slice's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer slice
+  ///     may overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A buffer slice containing the values to copy.
-  ///     The memory region underlying `source` must be initialized. The memory
-  ///     regions referenced by `source` and this buffer slice may overlap.
+  ///     The memory region underlying `source` must be initialized.
   /// - Returns: The index one past the last element of the buffer slice
   ///    initialized by this function.
   @inlinable
@@ -925,11 +935,13 @@ extension Slice {
   /// buffer's `startIndex`. If `source` contains as many elements as the buffer
   /// slice can hold, the returned index is equal to the slice's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer slice
+  ///     must not overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A buffer containing the values to move.
-  ///     The memory region underlying `source` must be initialized. The memory
-  ///     regions referenced by `source` and this buffer slice must not overlap.
+  ///     The memory region underlying `source` must be initialized.
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient
@@ -959,11 +971,13 @@ extension Slice {
   /// buffer's `startIndex`. If `source` contains as many elements as the buffer
   /// slice can hold, the returned index is equal to the slice's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer slice
+  ///     must not overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A buffer slice containing the values to move.
-  ///     The memory region underlying `source` must be initialized. The memory
-  ///     regions referenced by `source` and this buffer slice must not overlap.
+  ///     The memory region underlying `source` must be initialized.
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient

@@ -804,6 +804,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// to the type `C.Element` and is initialized. This method does not change
   /// the binding state of the unused portion of the buffer, if any.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     must not overlap.
+  ///
   /// - Parameters:
   ///   - type: The type of element to which this buffer's memory will be bound.
   ///   - source: A collection of elements to be used to
@@ -889,11 +892,13 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// to the type `T` and is initialized. This method does not change
   /// the binding state of the unused portion of the buffer, if any.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
   /// - Parameters:
   ///   - type: The type of element to which this buffer's memory will be bound.
   ///   - source: A buffer referencing the values to copy.
   ///     The memory region underlying `source` must be initialized.
-  ///     The memory regions referenced by `source` and this buffer may overlap.
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.
@@ -940,11 +945,13 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// to the type `T` and is initialized. This method does not change
   /// the binding state of the unused portion of the buffer, if any.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
   /// - Parameters:
   ///   - type: The type of element to which this buffer's memory will be bound.
   ///   - source: A buffer referencing the values to copy.
   ///     The memory region underlying `source` must be initialized.
-  ///     The memory regions referenced by `source` and this buffer may overlap.
   /// - Returns: A typed buffer referencing the initialized elements.
   ///     The returned buffer references memory starting at the same
   ///     base address as this buffer, and its count is equal to `source.count`.

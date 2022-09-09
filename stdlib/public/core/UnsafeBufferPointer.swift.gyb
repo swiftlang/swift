@@ -702,6 +702,9 @@ extension Unsafe${Mutable}BufferPointer {
   ///
   /// - Precondition: `self.count` >= `source.count`
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     must not overlap.
+  ///
   /// - Parameter source: A collection of elements to be used to
   ///     initialize the buffer's storage.
   /// - Returns: The index one past the last element of the buffer initialized
@@ -801,6 +804,9 @@ extension Unsafe${Mutable}BufferPointer {
   /// buffer's `startIndex`. If `source` contains as many elements as the buffer
   /// can hold, the returned index is equal to the buffer's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A collection of elements to be used to update
@@ -870,9 +876,11 @@ extension Unsafe${Mutable}BufferPointer {
   ///
   /// - Precondition: `self.count` >= `source.count`
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
   /// - Parameter source: A buffer containing the values to copy. The memory
-  ///     region underlying `source` must be initialized. The memory regions
-  ///     referenced by `source` and this buffer may overlap.
+  ///     region underlying `source` must be initialized.
   /// - Returns: The index one past the last element of the buffer initialized
   ///     by this function.
   @inlinable
@@ -910,9 +918,11 @@ extension Unsafe${Mutable}BufferPointer {
   ///
   /// - Precondition: `self.count` >= `source.count`
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
   /// - Parameter source: A buffer containing the values to copy. The memory
-  ///     region underlying `source` must be initialized. The memory regions
-  ///     referenced by `source` and this buffer may overlap.
+  ///     region underlying `source` must be initialized.
   /// - Returns: The index one past the last element of the buffer initialized
   ///     by this function.
   @inlinable
@@ -937,11 +947,13 @@ extension Unsafe${Mutable}BufferPointer {
   /// buffer's `startIndex`. If `source` contains as many elements as the buffer
   /// can hold, the returned index is equal to the buffer's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     must not overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A buffer containing the values to move.
-  ///     The memory region underlying `source` must be initialized. The memory
-  ///     regions referenced by `source` and this buffer must not overlap.
+  ///     The memory region underlying `source` must be initialized.
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient
@@ -973,11 +985,13 @@ extension Unsafe${Mutable}BufferPointer {
   /// buffer's `startIndex`. If `source` contains as many elements as the buffer
   /// can hold, the returned index is equal to the buffer's `endIndex`.
   ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     must not overlap.
+  ///
   /// - Precondition: `self.count` >= `source.count`
   ///
   /// - Parameter source: A buffer slice containing the values to move.
-  ///   The memory region underlying `source` must be initialized. The
-  ///   memory regions referenced by `source` and this pointer must not overlap.
+  ///     The memory region underlying `source` must be initialized.
   /// - Returns: An index one past the index of the last element updated.
   @inlinable
   @_alwaysEmitIntoClient
