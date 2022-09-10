@@ -2277,6 +2277,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return nullptr; // not needed for the parser library.
   #endif
 
+  // Builtin.TheTupleType resolves to the singleton instance of BuiltinTupleDecl.
+  if (Id == Context.Id_TheTupleType)
+    return Context.getBuiltinTupleDecl();
+
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
 

@@ -5179,8 +5179,6 @@ ERROR(opened_bad_interface_type,none,
       "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
-ERROR(sil_function_output_label,PointsToFirstBadToken,
-      "SIL function types cannot have labeled results", ())
 ERROR(sil_non_coro_yields,PointsToFirstBadToken,
       "non-coroutine SIL function types cannot have @yield results", ())
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,

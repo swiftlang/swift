@@ -1054,6 +1054,8 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
     return false;
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
   llvm_unreachable("covered switch");
 }

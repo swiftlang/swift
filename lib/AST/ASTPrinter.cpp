@@ -3673,6 +3673,11 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
                        Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
+
+void PrintAST::visitBuiltinTupleDecl(BuiltinTupleDecl *decl) {
+  llvm_unreachable("Not implemented");
+}
+
 static bool isStructOrClassContext(DeclContext *dc) {
   auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
@@ -5563,13 +5568,6 @@ public:
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
-    // Single-element tuples can only appear in SIL mode.
-    if (T->getNumElements() == 1 &&
-        !T->getElement(0).hasName() &&
-        !T->getElementType(0)->is<PackExpansionType>()) {
-      Printer << "@tuple ";
-    }
-
     Printer << "(";
 
     auto Fields = T->getElements();
@@ -5587,6 +5585,10 @@ public:
       if (TD.hasName()) {
         Printer.printName(TD.getName(), PrintNameContext::TupleElement);
         Printer << ": ";
+      } else if (e == 1 && !EltType->is<PackExpansionType>()) {
+        // Unlabeled one-element tuples always print the empty label to
+        // distinguish them from the older syntax for ParenType.
+        Printer << "_: ";
       }
       visit(EltType);
     }
@@ -6332,6 +6334,10 @@ public:
     } else {
       visit(T->getConstraintType());
     }
+  }
+
+  void visitBuiltinTupleType(BuiltinTupleType *T) {
+    printQualifiedType(T);
   }
 
   void visitLValueType(LValueType *T) {

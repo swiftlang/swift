@@ -1330,7 +1330,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Struct:
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct: {
+    case TypeKind::BoundGenericStruct:
+    case TypeKind::BuiltinTuple: {
       GenericTypeDecl *Decl;
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
         Decl = typeAlias->getDecl();
@@ -2473,6 +2474,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     return;
   }
 
+  if (nominal && isa<BuiltinTupleDecl>(nominal))
+    return appendOperator("BT");
+
   appendContextOf(decl);
 
   // Always use Clang names for imported Clang declarations, unless they don't
@@ -2554,6 +2558,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     case DeclKind::Struct:
       appendOperator("V");
       break;
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("Not implemented");
     }
   }
 
