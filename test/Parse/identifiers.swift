@@ -47,3 +47,16 @@ _ = sil_witness_table // expected-error {{cannot find 'sil_witness_table' in sco
 _ = sil_default_witness_table // expected-error {{cannot find 'sil_default_witness_table' in scope}}
 _ = sil_coverage_map // expected-error {{cannot find 'sil_coverage_map' in scope}}
 _ = sil_scope // expected-error {{cannot find 'sil_scope' in scope}}
+
+// https://github.com/apple/swift/issues/57542
+// Make sure we do not parse the '_' on the newline as being part of the 'variable' identifier on the line before.
+
+@propertyWrapper 
+struct Wrapper {
+  var wrappedValue = 0
+}
+
+func localScope() {
+  @Wrapper var variable
+  _ = 0
+}
