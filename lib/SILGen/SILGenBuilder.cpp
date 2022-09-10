@@ -625,7 +625,8 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
   // updated.
   assert((isa<UncheckedTrivialBitCastInst>(cast) ||
           isa<UncheckedRefCastInst>(cast) ||
-          isa<UncheckedBitwiseCastInst>(cast)) &&
+          isa<UncheckedBitwiseCastInst>(cast) ||
+          isa<ConvertFunctionInst>(cast)) &&
          "SILGenBuilder is out of sync with SILBuilder.");
 
   // If we have a trivial inst, just return early.
