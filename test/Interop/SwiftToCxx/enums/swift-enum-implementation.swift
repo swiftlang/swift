@@ -275,12 +275,12 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   inline E E::init() {
 // CHECK-NEXT:     return _impl::_impl_E::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:       _impl::swift_interop_returnDirect_Enums_uint64_t_0_8_uint8_t_8_9(result, _impl::$s5Enums1EOACycfC());
+// CHECK-NEXT:       _impl::swift_interop_returnDirect_Enums[[ENUMENCODING:[a-z0-9_]+]](result, _impl::$s5Enums1EOACycfC());
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
 // CHECK-NEXT:   inline swift::Int E::getTen() const {
-// CHECK-NEXT:     return _impl::$s5Enums1EO3tenSivg(_impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));
+// CHECK-NEXT:     return _impl::$s5Enums1EO3tenSivg(_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }
 // CHECK-NEXT:   inline void E::printSelf() const {
-// CHECK-NEXT:     return _impl::$s5Enums1EO9printSelfyyF(_impl::swift_interop_passDirect_Enums_uint64_t_0_8_uint8_t_8_9(_getOpaquePointer()));
+// CHECK-NEXT:     return _impl::$s5Enums1EO9printSelfyyF(_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }
