@@ -3053,7 +3053,12 @@ TypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   }
 
+  auto *dc = getDeclContext();
+  auto &ctx = dc->getASTContext();
+  
   if (returnRepr && returnRepr->hasOpaque()) {
+    return returnRepr;
+  } else if (returnRepr && ctx.LangOpts.hasFeature(Feature::ImplicitSome) && returnRepr->isProtocol(dc)) {
     return returnRepr;
   } else {
     return nullptr;
@@ -8315,7 +8320,7 @@ GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
 }
 
 Optional<unsigned> OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(
-    OpaqueReturnTypeRepr *repr) const {
+    TypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&
          "can't do opaque param lookup without underlying interface repr");
   auto opaqueReprs = getOpaqueReturnTypeReprs();

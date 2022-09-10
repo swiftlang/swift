@@ -2904,7 +2904,7 @@ public:
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
   Optional<unsigned> getAnonymousOpaqueParamOrdinal(
-      OpaqueReturnTypeRepr *repr) const;
+      TypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;

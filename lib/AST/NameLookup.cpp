@@ -2765,16 +2765,11 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
-/// Verify there are only protocols in the set of declarations.
+/// Verify there is at least one protocols in the set of declarations.
 static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   if (decls.empty())
     return false;
-
-  for (auto decl : decls) {
-    if (!isa<ProtocolDecl>(decl))
-        return false;
-  }
-  return true;
+  return llvm::any_of(decls, [&](const TypeDecl *decl) { return isa<ProtocolDecl>(decl); });;;
 }
 
 bool TypeRepr::isProtocol(DeclContext *dc){
@@ -2816,16 +2811,17 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         return false;
       }
       
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)){
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
         Reprs.push_back(opaqueRepr);
         if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
           return false;
       }
       
-      if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)){
-        if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
+      if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+        if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
           if (!compositionRepr->isTypeReprAny())
             Reprs.push_back(compositionRepr);
+          return false;
         } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
           if (identRepr->isProtocol(dc))
             Reprs.push_back(identRepr);

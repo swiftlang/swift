@@ -2243,8 +2243,30 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                              options);
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
-  case TypeReprKind::CompoundIdent:
-    return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
+  case TypeReprKind::CompoundIdent: {
+    auto *DC = getDeclContext();
+    auto diagnoseDisallowedExistential = [&](Type ty) {
+      if (!(options & TypeResolutionFlags::SilenceErrors) &&
+          options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
+        // We're specifically looking at an existential type `any P<some Q>`,
+        // so emit a tailored diagnostic. We don't emit an ErrorType here
+        // for better recovery.
+        diagnose(repr->getLoc(),
+                 diag::unsupported_opaque_type_in_existential);
+        // FIXME: We shouldn't have to invalid the type repr here, but not
+        // doing so causes a double-diagnostic.
+        repr->setInvalid();
+      }
+      return ty;
+    };
+    
+      if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
+          return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+      } else {
+        return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
+      }
+  }
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {
@@ -3825,7 +3847,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
-    if ( ctx.LangOpts.hasFeature(Feature::ImplicitSome) & !options.is(TypeResolverContext::Inherited) ){
+    if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) && options.isConstraintImplicitExistential()) {
       // Check whether any of the generic parameters in the context represents
       // this opaque type. If so, return that generic parameter.
       if (auto declDC = dc->getAsDecl()) {
