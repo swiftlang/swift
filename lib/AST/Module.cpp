@@ -32,6 +32,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
@@ -1138,9 +1139,45 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     Type type, const TupleType *tupleType, ProtocolDecl *protocol,
     ModuleDecl *module) {
+  ASTContext &ctx = protocol->getASTContext();
+
+  // This is the new code path.
+  //
+  // FIXME: Remove the Sendable stuff below.
+  auto *tupleDecl = ctx.getBuiltinTupleDecl();
+
+  // Find the (unspecialized) conformance.
+  SmallVector<ProtocolConformance *, 2> conformances;
+  if (tupleDecl->lookupConformance(protocol, conformances)) {
+    // If we have multiple conformances, first try to filter out any that are
+    // unavailable on the current deployment target.
+    //
+    // FIXME: Conformance lookup should really depend on source location for
+    // this to be 100% correct.
+    if (conformances.size() > 1) {
+      SmallVector<ProtocolConformance *, 2> availableConformances;
+
+      for (auto *conformance : conformances) {
+        if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+          availableConformances.push_back(conformance);
+      }
+
+      // Don't filter anything out if all conformances are unavailable.
+      if (!availableConformances.empty())
+        std::swap(availableConformances, conformances);
+    }
+
+    auto *conformance = cast<NormalProtocolConformance>(conformances.front());
+    auto subMap = type->getContextSubstitutionMap(module,
+                                                  conformance->getDeclContext());
+
+    // TODO: labels
+    auto *specialized = ctx.getSpecializedConformance(type, conformance, subMap);
+    return ProtocolConformanceRef(specialized);
+  }
+
   // Tuple type are Sendable when all of their element types are Sendable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-    ASTContext &ctx = protocol->getASTContext();
 
     // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
     // generic signature <T1, T2, ..., TN>.
@@ -1259,6 +1296,33 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+static ProtocolConformanceRef getPackTypeConformance(
+    PackType *type, ProtocolDecl *protocol, ModuleDecl *mod) {
+  SmallVector<ProtocolConformanceRef, 2> patternConformances;
+
+  for (auto packElement : type->getElementTypes()) {
+    if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
+      auto patternType = packExpansion->getPatternType();
+
+      auto patternConformance =
+          (patternType->isTypeParameter()
+           ? ProtocolConformanceRef(protocol)
+           : mod->lookupConformance(patternType, protocol));
+      patternConformances.push_back(patternConformance);
+      continue;
+    }
+
+    auto patternConformance =
+        (packElement->isTypeParameter()
+         ? ProtocolConformanceRef(protocol)
+         : mod->lookupConformance(packElement, protocol));
+    patternConformances.push_back(patternConformance);
+  }
+
+  return ProtocolConformanceRef(
+      PackConformance::get(type, protocol, patternConformances));
+}
+
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
@@ -1321,6 +1385,11 @@ LookupConformanceInModuleRequest::evaluate(
   // intended type might have. Same goes for PlaceholderType.
   if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
     return ProtocolConformanceRef(protocol);
+
+  // Pack types can conform to protocols.
+  if (auto packType = type->getAs<PackType>()) {
+    return getPackTypeConformance(packType, protocol, mod);
+  }
 
   // Tuple types can conform to protocols.
   if (auto tupleType = type->getAs<TupleType>()) {

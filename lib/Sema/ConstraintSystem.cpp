@@ -3621,6 +3621,12 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
         auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance) {
+          // FIXME: This regresses diagnostics if removed, but really the
+          // handling of a missing conformance should be the same for
+          // tuples and non-tuples.
+          if (lookupBaseType->is<TupleType>())
+            return DependentMemberType::get(lookupBaseType, assocType);
+
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in

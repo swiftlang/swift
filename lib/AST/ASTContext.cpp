@@ -552,6 +552,12 @@ struct ASTContext::Implementation {
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
+
+  /// The singleton Builtin.TheTupleType.
+  BuiltinTupleDecl *TheTupleTypeDecl = nullptr;
+
+  /// The declared interface type of Builtin.TheTupleType.
+  BuiltinTupleType *TheTupleType = nullptr;
 };
 
 ASTContext::Implementation::Implementation()
@@ -3173,6 +3179,14 @@ PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
   RecursiveTypeProperties properties;
   bool isCanonical = true;
   for (Type eltTy : elements) {
+    assert(!eltTy->isTypeParameter() ||
+           !eltTy->getRootGenericParam()->isTypeSequence() &&
+           "Pack type parameter outside of a pack expansion");
+    assert(!eltTy->is<SequenceArchetypeType>() &&
+           "Pack type archetype outside of a pack expansion");
+    assert(!eltTy->is<PackType>() &&
+           "Cannot have pack directly inside another pack");
+
     properties |= eltTy->getRecursiveProperties();
     if (!eltTy->isCanonical())
       isCanonical = false;
@@ -4510,6 +4524,11 @@ Type ExistentialType::get(Type constraint) {
                                                 canonicalContext,
                                                 properties);
 }
+
+BuiltinTupleType::BuiltinTupleType(BuiltinTupleDecl *TheDecl,
+                                   const ASTContext &Ctx)
+  : NominalType(TypeKind::BuiltinTuple, &Ctx, TheDecl, Type(),
+                RecursiveTypeProperties()) { }
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
@@ -5913,4 +5932,31 @@ bool ASTContext::isASCIIString(StringRef s) const {
     }
   }
   return true;
+}
+
+/// The special Builtin.TheTupleType, which parents tuple extensions and
+/// conformances.
+BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
+  auto &result = getImpl().TheTupleTypeDecl;
+
+  if (result)
+    return result;
+
+  result = new (*this) BuiltinTupleDecl(Id_TheTupleType,
+                                        TheBuiltinModule->getFiles()[0]);
+  result->setAccess(AccessLevel::Public);
+
+  return result;
+}
+
+/// The declared interface type of Builtin.TheTupleType.
+BuiltinTupleType *ASTContext::getBuiltinTupleType() {
+  auto &result = getImpl().TheTupleType;
+
+  if (result)
+    return result;
+
+  result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
+
+  return result;
 }

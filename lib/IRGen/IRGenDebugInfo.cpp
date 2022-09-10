@@ -1533,6 +1533,9 @@ private:
     case TypeKind::PackExpansion:
       llvm_unreachable("Unimplemented!");
 
+    case TypeKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType should not show up here");
+
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral
       // (not nominal) they don't have a source location.

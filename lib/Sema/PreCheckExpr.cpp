@@ -1702,11 +1702,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
       // If the tuple element has a label, propagate it.
       elt.Type = eltTE->getTypeRepr();
-      Identifier name = TE->getElementName(EltNo);
-      if (!name.empty()) {
-        elt.Name = name;
-        elt.NameLoc = TE->getElementNameLoc(EltNo);
-      }
+      elt.Name = TE->getElementName(EltNo);
+      elt.NameLoc = TE->getElementNameLoc(EltNo);
 
       Elts.push_back(elt);
       ++EltNo;

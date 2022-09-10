@@ -75,6 +75,7 @@ IDENTIFIER_WITH_NAME(PatternMatchVar, "$match")
 IDENTIFIER(dynamicallyCall)
 IDENTIFIER(dynamicMember)
 IDENTIFIER(Element)
+IDENTIFIER(Elements)
 IDENTIFIER_(enclosingInstance)
 IDENTIFIER(Encodable)
 IDENTIFIER(encode)
@@ -312,6 +313,9 @@ IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
 IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$_storage")
 IDENTIFIER(storageKeyPath)
 IDENTIFIER(memberwise)
+
+// The singleton instance of TupleTypeDecl in the Builtin module
+IDENTIFIER(TheTupleType)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

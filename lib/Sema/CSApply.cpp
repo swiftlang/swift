@@ -6967,6 +6967,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     llvm_unreachable("Unimplemented!");
   }
 
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType should not show up here");
+
   // Coerce from a tuple to a tuple.
   case TypeKind::Tuple: {
     auto fromTuple = cast<TupleType>(desugaredFromType);
@@ -7321,6 +7324,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
     break;
+
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType should not show up here");
   }
 
   // Unresolved types come up in diagnostics for lvalue and inout types.
