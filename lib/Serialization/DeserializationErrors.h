@@ -452,10 +452,13 @@ class InvalidRecordKindError :
   void anchor() override;
 
   unsigned recordKind;
+  const char *extraText;
 
 public:
-  explicit InvalidRecordKindError(unsigned kind) {
+  explicit InvalidRecordKindError(unsigned kind,
+                                  const char *extraText = nullptr) {
     this->recordKind = kind;
+    this->extraText = extraText;
   }
 
   void log(raw_ostream &OS) const override {
@@ -463,7 +466,10 @@ public:
     if (recordKind >= decls_block::SILGenName_DECL_ATTR)
       OS << " (attribute kind "
          << recordKind - decls_block::SILGenName_DECL_ATTR << ")";
-    OS << "; this may be a compiler bug";
+    if (extraText)
+      OS << ": " << extraText;
+    OS << "; this may be a compiler bug, or a file on disk may have changed "
+          "during compilation";
   }
 
   std::error_code convertToErrorCode() const override {

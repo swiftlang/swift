@@ -241,8 +241,8 @@ ParameterList *ModuleFile::readParameterList() {
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   unsigned recordID =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  assert(recordID == PARAMETERLIST);
-  (void) recordID;
+  if (recordID != PARAMETERLIST)
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::ParameterListLayout::readRecord(scratch, rawMemberIDs);
@@ -314,7 +314,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       assert(next.Kind == llvm::BitstreamEntry::Record);
 
       kind = fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
-      assert(kind == decls_block::TUPLE_PATTERN_ELT);
+      if (kind != decls_block::TUPLE_PATTERN_ELT)
+        fatal(llvm::make_error<InvalidRecordKindError>(kind));
 
       // FIXME: Add something for this record or remove it.
       IdentifierID labelID;
@@ -395,7 +396,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
 
   default:
-    return nullptr;
+    return llvm::make_error<InvalidRecordKindError>(kind);
   }
 }
 
@@ -1896,7 +1897,8 @@ giveUpFastPath:
       }
         
       default:
-        llvm_unreachable("Unhandled path piece");
+        fatal(llvm::make_error<InvalidRecordKindError>(recordID,
+                                                       "Unhandled path piece"));
       }
 
       pathTrace.addValue(memberName);
@@ -2102,7 +2104,7 @@ giveUpFastPath:
     default:
       // Unknown xref path piece.
       pathTrace.addUnknown(recordID);
-      fatal();
+      fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
 
     Optional<PrettyStackTraceModuleFile> traceMsg;
@@ -2275,7 +2277,8 @@ DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
   }
 
   default:
-    llvm_unreachable("Unknown record ID found when reading local DeclContext.");
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID,
+                   "Unknown record ID found when reading local DeclContext."));
   }
   return declContextOrOffset;
 }
@@ -6642,8 +6645,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   unsigned kind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, memberIDBuffer));
-  assert(kind == decls_block::MEMBERS);
-  (void)kind;
+  if (kind != decls_block::MEMBERS)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind));
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
@@ -6847,9 +6850,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   unsigned kind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  (void) kind;
-  assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
-         "registered lazy loader incorrectly");
+  if (kind != NORMAL_PROTOCOL_CONFORMANCE)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind,
+                    "registered lazy loader incorrectly"));
+
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
