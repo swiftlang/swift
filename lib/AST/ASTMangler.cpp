@@ -1324,16 +1324,14 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendType(ET->getConstraintType(), sig, forDecl);
     }
 
-    case TypeKind::BuiltinTuple:
-      llvm_unreachable("Not implemented");
-
     case TypeKind::UnboundGeneric:
     case TypeKind::Class:
     case TypeKind::Enum:
     case TypeKind::Struct:
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct: {
+    case TypeKind::BoundGenericStruct:
+    case TypeKind::BuiltinTuple: {
       GenericTypeDecl *Decl;
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
         Decl = typeAlias->getDecl();
@@ -2475,6 +2473,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     addTypeSubstitution(nominal->getDeclaredType(), nullptr);
     return;
   }
+
+  if (nominal && isa<BuiltinTupleDecl>(nominal))
+    return appendOperator("BT");
 
   appendContextOf(decl);
 
