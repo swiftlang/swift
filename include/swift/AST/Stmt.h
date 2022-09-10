@@ -168,7 +168,8 @@ public:
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
 
-  SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
 
   bool empty() const { return getNumElements() == 0; }
   unsigned getNumElements() const { return Bits.BraceStmt.NumElements; }
@@ -563,8 +564,8 @@ public:
 
   SourceLoc getDoLoc() const { return DoLoc; }
   
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(DoLoc); }
-  SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *s) { Body = s; }
