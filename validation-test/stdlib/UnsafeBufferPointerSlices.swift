@@ -280,10 +280,12 @@ UnsafeMutableBufferPointerSliceTests.test(
 
   var a = UnsafeMutableBufferPointer<String>.allocate(capacity: c)
   defer { a.deallocate() }
-  a.initialize(fromContentsOf: Array(repeating: ".", count: c))
+  var i: Int? = a.initialize(fromContentsOf: Array(repeating: ".", count: c))
   defer { a.deinitialize() }
+  expectEqual(i, c)
+  expectTrue(a.allSatisfy({ $0 == "." }))
 
-  var i = a.withContiguousMutableStorageIfAvailable {
+  i = a.withContiguousMutableStorageIfAvailable {
     $0.update(fromContentsOf: Array(repeating: " ", count: c))
   }
   expectEqual(i, c)
