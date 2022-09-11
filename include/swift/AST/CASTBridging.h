@@ -126,6 +126,8 @@ void *SimpleIdentTypeRepr_create(void *ctx, void *loc, const char *id);
 
 void *UnresolvedDotExpr_create(void *ctx, void *base, void *dotLoc, const char *name, void *nameLoc);
 
+void *ClosureExpr_create(void *ctx, void *body, void *dc);
+
     void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);
 void Decl_dump(void *);

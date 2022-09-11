@@ -4,7 +4,7 @@ set(CMAKE_Swift_ARCHIVE_FINISH "")
 
 if (SWIFT_SWIFT_PARSER)
     add_library(ASTGen
-            ASTGen.swift)
+            Sources/ASTGen/ASTGen.swift)
 
     target_link_libraries(ASTGen PUBLIC
             SwiftSyntax
@@ -18,12 +18,13 @@ if (SWIFT_SWIFT_PARSER)
             "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
 else()
     add_library(ASTGen
-            DummyASTGen.swift)
+            Sources/ASTGen/DummyASTGen.swift)
 endif()
 
 set_target_properties(ASTGen PROPERTIES LINKER_LANGUAGE Swift)
 
 target_compile_options(ASTGen PUBLIC
-        "-emit-module-interface")
+        "-emit-module-interface"
+        "-g")
 
 add_dependencies(ASTGen swiftAST)

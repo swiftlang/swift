@@ -195,6 +195,22 @@ void *UnresolvedDotExpr_create(void *ctx, void *base, void *dotLoc, const char *
                                          DeclNameLoc(*(SourceLoc *)&nameLoc), false);
 }
 
+void *ClosureExpr_create(void *ctx, void *body, void *dc) {
+  DeclAttributes attributes;
+  SourceRange bracketRange;
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+  SourceLoc arrowLoc;
+  SourceLoc inLoc;
+
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto *out = new (Context) ClosureExpr(attributes, bracketRange, nullptr,
+                                        nullptr, asyncLoc, throwsLoc, arrowLoc,
+                                        inLoc, nullptr, 0, (DeclContext *)dc);
+  out->setBody((BraceStmt *)body, true);
+  return (Expr *)out;
+}
+
 void TopLevelCodeDecl_dump(void *decl) { ((TopLevelCodeDecl *)decl)->dump(); }
 
 void Expr_dump(void *expr) { ((Expr *)expr)->dump(); }
