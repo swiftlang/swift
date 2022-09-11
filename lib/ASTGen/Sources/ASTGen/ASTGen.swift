@@ -57,11 +57,30 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
     
     return out
   }
+  
+  public func visit(_ node: ClosureExprSyntax) -> UnsafeMutableRawPointer {
+    let statements = node.statements.map(self.visit)
+    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+
+    let body = statements.withBridgedArrayRef { ref in
+      BraceStmt_create(ctx, loc, ref, loc)
+    }
+    
+    return ClosureExpr_create(ctx, body, declContext)
+  }
 
   public func visit(_ node: FunctionCallExprSyntax) -> UnsafeMutableRawPointer {
+    // Transform the trailing closure into an argument.
+    if let trailingClosure = node.trailingClosure {
+      let tupleElement = TupleExprElementSyntax(label: nil, colon: nil, expression: ExprSyntax(trailingClosure), trailingComma: nil)
+      
+      return visit(node.addArgument(tupleElement).withTrailingClosure(nil))
+    }
+    
     let args = visit(node.argumentList)
     // TODO: hack
     let callee = visit(node.calledExpression)
+
     return SwiftFunctionCallExpr_create(self.ctx, callee, args)
   }
 
@@ -123,6 +142,10 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
     return elements.withBridgedArrayRef { elementsRef in
       SwiftTupleExpr_create(self.ctx, lParenLoc, elementsRef, rParenLoc)
     }
+  }
+
+  public func visit(_ node: InitializerClauseSyntax) -> UnsafeMutableRawPointer {
+    visit(node.value)
   }
 
   public func visit(_ node: VariableDeclSyntax) -> UnsafeMutableRawPointer {
