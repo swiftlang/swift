@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
-// https://bugs.swift.org/browse/SR-13850
+// https://github.com/apple/swift/issues/56248
 
 // CHECK: Requirement signature: <Self where Self.[P1]A : P2>
 protocol P1 {

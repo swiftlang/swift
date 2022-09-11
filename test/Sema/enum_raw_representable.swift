@@ -168,47 +168,57 @@ func rdar32432253(_ condition: Bool = false) {
   // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{17-17=.rawValue}}
 }
 
-func sr8150_helper1(_: Int) {}
-func sr8150_helper1(_: Double) {}
+// https://github.com/apple/swift/issues/50682
+do {
+  func helper1(_: Int) {}
+  func helper1(_: Double) {}
 
-func sr8150_helper2(_: Double) {}
-func sr8150_helper2(_: Int) {}
+  func helper2(_: Double) {}
+  func helper2(_: Int) {}
 
-func sr8150_helper3(_: Foo) {}
-func sr8150_helper3(_: Bar) {}
+  func helper3(_: Foo) {}
+  func helper3(_: Bar) {}
 
-func sr8150_helper4(_: Bar) {}
-func sr8150_helper4(_: Foo) {}
+  func helper4(_: Bar) {}
+  func helper4(_: Foo) {}
 
-func sr8150(bar: Bar) {
-  sr8150_helper1(bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{21-21=.rawValue}}
-  sr8150_helper2(bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{21-21=.rawValue}}
-  sr8150_helper3(0.0)
-  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=) ?? <#default value#>}}
-  sr8150_helper4(0.0)
-  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=) ?? <#default value#>}}
-}
+  do {
+    let bar: Bar
 
-class SR8150Box {
-  var bar: Bar
-  init(bar: Bar) { self.bar = bar }
-}
-// Bonus problem with mutable values being passed.
-func sr8150_mutable(obj: SR8150Box) {
-  sr8150_helper1(obj.bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{25-25=.rawValue}}
+    helper1(bar)
+    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{16-16=.rawValue}}
+    helper2(bar)
+    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{16-16=.rawValue}}
+    helper3(0.0)
+    // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{13-13=Bar(rawValue: }} {{16-16=) ?? <#default value#>}}
+    helper4(0.0)
+    // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{13-13=Bar(rawValue: }} {{16-16=) ?? <#default value#>}}
+  }
 
-  var bar = obj.bar
-  sr8150_helper1(bar)
-  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{21-21=.rawValue}}
+  // Bonus problem with mutable values being passed.
+  do {
+    class Box {
+      var bar: Bar
+      init(bar: Bar) {}
+    }
 
-  func test(_ opt: Bar?) {
-    sr8150_helper1(opt)
-    // expected-error@-1 {{cannot convert value of type 'Bar?' to expected argument type 'Double'}} {{23-23=?.rawValue ?? <#default value#>}}
-    sr8150_helper1(opt ?? Bar.a)
-    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{20-20=(}} {{32-32=).rawValue}}
+    let box: Box
+
+    helper1(box.bar)
+    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{20-20=.rawValue}}
+
+    var bar = box.bar
+    helper1(bar)
+    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{16-16=.rawValue}}
+  }
+
+  do {
+    let opt: Bar?
+
+    helper1(opt)
+    // expected-error@-1 {{cannot convert value of type 'Bar?' to expected argument type 'Double'}} {{16-16=?.rawValue ?? <#default value#>}}
+    helper1(opt ?? Bar.a)
+    // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{13-13=(}} {{25-25=).rawValue}}
     let _: Double? = opt
     // expected-error@-1 {{cannot convert value of type 'Bar?' to specified type 'Double?'}} {{25-25=?.rawValue}}
   }

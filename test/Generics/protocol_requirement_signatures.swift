@@ -61,7 +61,8 @@ protocol Q7: Q2, Q3, Q4 {
     associatedtype X: P3 // expected-warning{{redeclaration of associated type 'X'}}
 }
 
-// SR-5945
+// https://github.com/apple/swift/issues/48504
+
 class SomeBaseClass {}
 
 // CHECK-DAG: .P4@
@@ -77,7 +78,8 @@ protocol P5 {
 	associatedtype AType : P4 where AType.BType == Self
 }
 
-// SR-8119
+// https://github.com/apple/swift/issues/50651
+
 protocol P6 {
   associatedtype A1: P7
 }

@@ -258,3 +258,44 @@ bb10: // Exit dominated by bb3
 bb11: // Non-exit dominated by bb1
   return %4 : $Builtin.Int1
 }
+
+class Klass {
+}
+
+struct WrapperStruct {
+  var val: Klass
+}
+
+sil @use_klass : $@convention(thin) (@in_guaranteed Klass) -> ()
+
+sil @test_sink_address_proj : $@convention(thin) (@inout MyArray<MyClass>, @in_guaranteed WrapperStruct) -> () {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*WrapperStruct):
+  %3 = load %0 : $*MyArray<MyClass>
+  br bb1
+
+bb1:
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  retain_value %3 : $MyArray<MyClass>
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %ele = struct_element_addr %1 : $*WrapperStruct, #WrapperStruct.val
+  cond_br undef, bb5, bb2
+
+bb2:
+ %6 = integer_literal $Builtin.Int1, -1
+ cond_br %6, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+ br bb6
+
+bb5:
+ %f = function_ref @use_klass : $@convention(thin) (@in_guaranteed Klass) -> ()
+ %a = apply %f(%ele) : $@convention(thin) (@in_guaranteed Klass) -> ()
+ br bb6
+
+bb6:
+ %t = tuple ()
+ return %t : $()
+}

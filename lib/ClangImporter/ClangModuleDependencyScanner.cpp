@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ImporterImpl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -338,8 +339,14 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   auto clangDependencies = clangImpl->tool.getFullDependencies(
       commandLineArgs, workingDir, clangImpl->alreadySeen);
   if (!clangDependencies) {
-    // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
+    auto errorStr = toString(clangDependencies.takeError());
+    // We ignore the "module 'foo' not found" error, the Swift dependency
+    // scanner will report such an error only if all of the module loaders
+    // fail as well.
+    if (errorStr.find("fatal error: module '" + moduleName.str() + "' not found") == std::string::npos)
+      ctx.Diags.diagnose(SourceLoc(),
+                         diag::clang_dependency_scan_error,
+                         errorStr);
     return None;
   }
 

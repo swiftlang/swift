@@ -4037,7 +4037,8 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 
       auto ImageBaseAddr = B.createGlobalAddr(SILLoc, ImageBase);
       auto ImageBasePointer =
-          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy);
+          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy,
+              /*needsStackProtection=*/ false);
       S = B.createStruct(SILLoc, UnsafeRawPtrTy, { ImageBasePointer });
     } else {
       auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
@@ -4049,7 +4050,8 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 
       auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
       auto DSOPointer =
-          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy);
+          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy,
+              /*needsStackProtection=*/ false);
       S = B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
     }
 
@@ -4094,7 +4096,8 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     if (index != 0) {
       SILValue indexValue = SGF.B.createIntegerLiteral(
           loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue);
+      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
+              /*needsStackProtection=*/ false);
     }
     auto &destTL = varargsInfo.getBaseTypeLowering();
     // Create a dormant cleanup for the value in case we exit before the
@@ -5653,7 +5656,8 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   SILValue address =
     emitAddressOfLValue(loc, std::move(lv)).getUnmanagedValue();
   address = B.createAddressToPointer(loc, address,
-                               SILType::getRawPointerType(getASTContext()));
+                               SILType::getRawPointerType(getASTContext()),
+              /*needsStackProtection=*/ true);
   
   // Disable nested writeback scopes for any calls evaluated during the
   // conversion intrinsic.

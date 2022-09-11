@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
+//  https://github.com/apple/swift/issues/54431
+
 // CHECK: sr11997.(file).A@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[A]X.[B]Y, Self.[A]X : B>
 protocol A {

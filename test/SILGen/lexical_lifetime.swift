@@ -129,6 +129,24 @@ func lexical_borrow_arg_trivial(_ trivial: Trivial) {
   use_generic(trivial)
 }
 
+extension C {
+// CHECK-LABEL: sil hidden [ossa] @lexical_method_attr : $@convention(method) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_lexical @owned $C):
+// CHECK-LABEL: } // end sil function 'lexical_method_attr'
+  @_silgen_name("lexical_method_attr")
+  @_lexical
+  __consuming
+  func lexical_method_attr() {}
+
+// CHECK-LABEL: sil hidden [ossa] @eagermove_method_attr : $@convention(method) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove @owned $C):
+// CHECK-LABEL: } // end sil function 'eagermove_method_attr'
+  @_silgen_name("eagermove_method_attr")
+  @_eagerMove
+  __consuming
+  func eagermove_method_attr() {}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Test                                                                       }}
 ////////////////////////////////////////////////////////////////////////////////

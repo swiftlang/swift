@@ -530,7 +530,8 @@ static bool matchCallArgumentsImpl(
     }
 
     // Handle variadic parameters.
-    if (param.isVariadic()) {
+    if (param.isVariadic() ||
+        param.getPlainType()->is<PackExpansionType>()) {
       // Claim the next argument with the name of this parameter.
       auto claimed =
           claimNextNamed(nextArgIdx, paramLabel, ignoreNameMismatch);
@@ -546,7 +547,8 @@ static bool matchCallArgumentsImpl(
 
       // If the argument is itself variadic, we're forwarding varargs
       // with a VarargExpansionExpr; don't collect any more arguments.
-      if (args[*claimed].isVariadic()) {
+      if (args[*claimed].isVariadic() ||
+          args[*claimed].getPlainType()->is<PackExpansionType>()) {
         return;
       }
 
@@ -796,7 +798,8 @@ static bool matchCallArgumentsImpl(
       const auto &param = params[paramIdx];
 
       // Variadic parameters can be unfulfilled.
-      if (param.isVariadic())
+      if (param.isVariadic() ||
+          param.getPlainType()->is<PackExpansionType>())
         continue;
 
       // Parameters with defaults can be unfulfilled.
@@ -885,7 +888,9 @@ static bool matchCallArgumentsImpl(
           continue;
 
         // Does nothing for variadic tail.
-        if (params[paramIdx].isVariadic() && paramBindIdx > 0) {
+        if ((params[paramIdx].isVariadic() ||
+             params[paramIdx].getPlainType()->is<PackExpansionType>()) &&
+            paramBindIdx > 0) {
           assert(args[fromArgIdx].getLabel().empty());
           continue;
         }
@@ -1576,7 +1581,7 @@ shouldOpenExistentialCallArgument(
     return None;
 
   // If the parameter is non-generic variadic, don't open.
-  if (param->isVariadic() && !param->getVarargBaseTy()->hasTypeSequence())
+  if (param->isVariadic())
     return None;
 
   // Look through an inout type on the formal type of the parameter.
@@ -2432,8 +2437,9 @@ static bool isSingleTupleParam(ASTContext &ctx,
     return false;
 
   const auto &param = params.front();
-  if (param.isVariadic() || param.isInOut() || param.hasLabel() ||
-      param.isIsolated())
+  if ((param.isVariadic() ||
+       param.getPlainType()->is<PackExpansionType>()) ||
+      param.isInOut() || param.hasLabel() || param.isIsolated())
     return false;
 
   auto paramType = param.getPlainType();
@@ -8861,15 +8867,12 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!anchor)
     return nullptr;
 
+  // Avoid checking implicit conversions injected by the compiler.
+  if (locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return nullptr;
+
   auto getType = [&cs](Expr *expr) -> Type {
     return cs.simplifyType(cs.getType(expr))->getRValueType();
-  };
-
-  auto locatorEndsWith =
-      [](ConstraintLocator *locator,
-         ConstraintLocator::PathElementKind eltKind) -> bool {
-    auto path = locator->getPath();
-    return !path.empty() && path.back().getKind() == eltKind;
   };
 
   Expr *baseExpr = nullptr;
@@ -8928,7 +8931,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // member.
     // We need to find type variable which represents contextual base.
     auto *baseLocator = cs.getConstraintLocator(
-        UME, locatorEndsWith(locator, ConstraintLocator::ConstructorMember)
+        UME, locator->isLastElement<LocatorPathElt::ConstructorMember>()
                  ? ConstraintLocator::UnresolvedMember
                  : ConstraintLocator::MemberRefBase);
 
@@ -8943,7 +8946,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     baseType = cs.simplifyType(*result)->getRValueType();
     // Constraint for member base is formed as '$T.Type[.<member] = ...`
     // which means MetatypeType has to be added after finding a type variable.
-    if (locatorEndsWith(baseLocator, ConstraintLocator::MemberRefBase))
+    if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
   } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
@@ -9852,7 +9855,9 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   auto *calleeLocator = cs.getCalleeLocator(cs.getConstraintLocator(locator));
   auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
   if (!(selectedOverload &&
-        selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
+        (selectedOverload->choice.getKind() == OverloadChoiceKind::Decl ||
+         selectedOverload->choice.getKind() ==
+             OverloadChoiceKind::DeclViaUnwrappedOptional)))
     return Type();
 
   auto *choice = selectedOverload->choice.getDecl();

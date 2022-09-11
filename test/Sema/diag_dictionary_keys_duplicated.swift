@@ -209,3 +209,21 @@ let _: [String: String] = [
   "\(a)": "B",
   "\(1)": "C"
 ]
+
+// https://github.com/apple/swift/issues/60873
+let _: [Int: String] = [
+  #line: "A",
+  #line: "B"
+]
+
+let _: [Int: String] = [#line: "A", #line: "B"] // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for #line literal key}}
+// expected-note@-1{{duplicate key declared here}} {{25-35=}} {{35-36=}}
+// expected-note@-2{{duplicate key declared here}} {{37-47=}} {{35-36=}}
+
+let _: [Int: String] = [#column: "A", #column: "B"] // OK
+
+let _: [Int: String] = [
+  // expected-note@+1{{duplicate key declared here}} {{3-15=}} {{15-16=}} 
+  #column: "A", // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for #column literal key}}
+  #column: "B"  // expected-note{{duplicate key declared here}} {{3-16=}} {{227:15-16=}}
+]

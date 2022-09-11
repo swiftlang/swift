@@ -960,8 +960,9 @@ namespace {
         }
       }
 
-      if (P->isVariadic())
-        OS << " variadic";
+      if (P->hasInterfaceType())
+        if (P->isVariadic())
+          OS << " variadic";
 
       if (P->isAutoClosure())
         OS << " autoclosure";
@@ -980,7 +981,7 @@ namespace {
         break;
       }
 
-      if (P->getAttrs().hasAttribute<NoImplicitCopyAttr>())
+      if (P->isNoImplicitCopy())
         OS << " noImplicitCopy";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
@@ -3085,6 +3086,12 @@ public:
     printRec(T->getKey());
     OS << '\n';
     printRec(T->getValue());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
+    printCommon("pack_expansion") << '\n';
+    printRec(T->getPatternType());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

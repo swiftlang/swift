@@ -66,6 +66,7 @@ public func registerSILClasses() {
   register(BuiltinInst.self)
   register(UpcastInst.self)
   register(UncheckedRefCastInst.self)
+  register(MarkMustCheckInst.self)
   register(RawPointerToRefInst.self)
   register(AddressToPointerInst.self)
   register(PointerToAddressInst.self)

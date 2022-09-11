@@ -2460,7 +2460,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       return;
 
     // These effect both operands.
-    case BuiltinValueKind::Move:
     case BuiltinValueKind::Copy:
       visitor(&builtin->getAllOperands()[1]);
       return;
@@ -2495,7 +2494,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DestroyArray:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
-    case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
@@ -2692,6 +2690,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::UncheckedRefCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:

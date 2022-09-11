@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include <cassert>
@@ -59,16 +60,6 @@ void checkFunctionActorIsolation(AbstractFunctionDecl *decl);
 void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
 void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
-
-/// Determine the isolation of a particular closure.
-///
-/// This forwards to \c ActorIsolationChecker::determineClosureActorIsolation
-/// and thus assumes that enclosing closures have already had their isolation
-/// checked.
-///
-/// This does not set the closure's actor isolation
-ClosureActorIsolation
-determineClosureActorIsolation(AbstractClosureExpr *closure);
 
 /// States the reason for checking the Sendability of a given declaration.
 enum class SendableCheckReason {
@@ -244,13 +235,13 @@ public:
   /// provided when referencing the declaration. This can be either the base
   /// of a member access or a parameter passed to a function.
   static ActorReferenceResult forReference(
-      ConcreteDeclRef declRef,
-      SourceLoc declRefLoc,
-      const DeclContext *fromDC,
+      ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
       Optional<VarRefUseEnv> useKind = None,
       Optional<ReferencedActor> actorInstance = None,
       Optional<ActorIsolation> knownDeclIsolation = None,
-      Optional<ActorIsolation> knownContextIsolation = None);
+      Optional<ActorIsolation> knownContextIsolation = None,
+      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+          getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation);
 
   operator Kind() const { return kind; }
 };

@@ -1879,6 +1879,9 @@ bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
 bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
   return doIt(T->getBase());
 }
+bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
+  return doIt(T->getPatternType());
+}
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
   for (auto &elem : T->getElements()) {

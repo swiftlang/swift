@@ -450,7 +450,7 @@ public:
   LetValueInitialization(VarDecl *vd, SILGenFunction &SGF) : vd(vd) {
     const TypeLowering *lowering = nullptr;
     if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
+        vd->isNoImplicitCopy()) {
       lowering = &SGF.getTypeLowering(
           SILMoveOnlyWrappedType::get(vd->getType()->getCanonicalType()));
     } else {
@@ -487,8 +487,7 @@ public:
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
     if (SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) &&
-        lowering->isAddressOnly() &&
-        vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
+        lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
     }
@@ -569,8 +568,7 @@ public:
       // ... and we don't have a no implicit copy trivial type, just return
       // value.
       if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) ||
-          !vd->getAttrs().hasAttribute<NoImplicitCopyAttr>() ||
-          !value->getType().isTrivial(SGF.F))
+          !vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
         return value;
 
       // Otherwise, we have a no implicit copy trivial type, so wrap it in the
@@ -626,7 +624,7 @@ public:
 
     // Otherwise, if we do not have a no implicit copy variable, just follow
     // the "normal path": perform a lexical borrow if the lifetime is lexical.
-    if (!vd->getAttrs().hasAttribute<NoImplicitCopyAttr>()) {
+    if (!vd->isNoImplicitCopy()) {
       if (SGF.F.getLifetime(vd, value->getType()).isLexical())
         return SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true);
       else
@@ -1297,7 +1295,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     SILLocation loc(PBD);
     SILValue resultBuf = emitTemporaryAllocation(loc, initLoweredTy);
     SILValue resultBufPtr = B.createAddressToPointer(loc, resultBuf,
-                          SILType::getPrimitiveObjectType(C.TheRawPointerType));
+                          SILType::getPrimitiveObjectType(C.TheRawPointerType),
+                          /*needsStackProtection=*/ false);
     
     // Emit the closure for the child task.
     // Prepare the opaque `AsyncLet` representation.

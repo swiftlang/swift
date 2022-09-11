@@ -3462,9 +3462,11 @@ namespace {
       : PolymorphicConvention(IGM, fn) {}
 
     void expand(SmallVectorImpl<llvm::Type *> &out,
-                SmallVectorImpl<GenericRequirement> *reqs) {
+                SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
+      auto outStartSize = out.size();
+      (void)outStartSize;
       for (auto &source : getSources())
-        addEarlySource(source, out);
+        addEarlySource(source, out, reqs);
 
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
         if (reqs)
@@ -3472,16 +3474,21 @@ namespace {
         out.push_back(reqt.Protocol ? IGM.WitnessTablePtrTy
                                     : IGM.TypeMetadataPtrTy);
       });
+      assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
+             "missing type source for type");
     }
 
   private:
     /// Add signature elements for the source metadata.
-    void addEarlySource(const MetadataSource &source,
-                        SmallVectorImpl<llvm::Type*> &out) {
+    void addEarlySource(
+        const MetadataSource &source, SmallVectorImpl<llvm::Type *> &out,
+        SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
       switch (source.getKind()) {
       case MetadataSource::Kind::ClassPointer: return; // already accounted for
       case MetadataSource::Kind::Metadata: return; // already accounted for
       case MetadataSource::Kind::GenericLValueMetadata:
+        if (reqs)
+          reqs->push_back(source);
         return out.push_back(IGM.TypeMetadataPtrTy);
       case MetadataSource::Kind::SelfMetadata:
       case MetadataSource::Kind::SelfWitnessTable:
@@ -3498,7 +3505,7 @@ namespace {
 void irgen::expandPolymorphicSignature(
     IRGenModule &IGM, CanSILFunctionType polyFn,
     SmallVectorImpl<llvm::Type *> &out,
-    SmallVectorImpl<GenericRequirement> *outReqs) {
+    SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs) {
   ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
 }
 

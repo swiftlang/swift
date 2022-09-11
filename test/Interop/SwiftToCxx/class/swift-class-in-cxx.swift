@@ -66,9 +66,11 @@ public final class ClassWithIntField {
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
 // CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Class::ClassWithIntField>() {
-// CHECK-NEXT:   return Class::_impl::$s5Class0A12WithIntFieldCMa(0)._0;
-// CHECK-NEXT: }
+// CHECK-NEXT: struct TypeMetadataTrait<Class::ClassWithIntField> {
+// CHECK-NEXT:   inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return Class::_impl::$s5Class0A12WithIntFieldCMa(0)._0;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct implClassFor<Class::ClassWithIntField> { using type = Class::_impl::_impl_ClassWithIntField; };

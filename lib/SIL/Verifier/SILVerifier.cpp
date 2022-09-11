@@ -985,24 +985,6 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
-  // FIXME: For sanity, address-type phis should be prohibited at all SIL
-  // stages. However, the optimizer currently breaks the invariant in three
-  // places:
-  // 1. Normal Simplify CFG during conditional branch simplification
-  //    (sneaky jump threading).
-  // 2. Simplify CFG via Jump Threading.
-  // 3. Loop Rotation.
-  //
-  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
-  // designed to avoid this issue, we just need to make sure all passes use it
-  // correctly.
-  //
-  // Minimally, we must prevent address-type phis as long as access markers are
-  // preserved. A goal is to preserve access markers in OSSA.
-  bool prohibitAddressPhis() {
-    return F.hasOwnership();
-  }
-
   void visitSILPhiArgument(SILPhiArgument *arg) {
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
@@ -1026,7 +1008,7 @@ public:
                 "All phi argument inputs must be from branches.");
       }
     }
-    if (arg->isPhi() && prohibitAddressPhis()) {
+    if (arg->isPhi()) {
       // As a property of well-formed SIL, we disallow address-type
       // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
@@ -2015,22 +1997,6 @@ public:
       requireObjectType(BuiltinExecutorType, BI,
                         "result of build*ExecutorRef");
       return;
-    }
-
-    if (builtinKind == BuiltinValueKind::Move) {
-      // We expect that this builtin will be specialized during transparent
-      // inlining into move_value if we inline into a non-generic context. If
-      // the builtin still remains and is not in the specific move semantic
-      // function (which is the only function marked with
-      // semantics::LIFETIMEMANAGEMENT_MOVE), then we know that we did
-      // transparent inlining into a function that did not result in the Builtin
-      // being specialized out which is user error.
-      //
-      // NOTE: Once we have opaque values, this restriction will go away. This
-      // is just so we can call Builtin.move outside of the stdlib.
-      auto semanticName = semantics::LIFETIMEMANAGEMENT_MOVE;
-      require(BI->getFunction()->hasSemanticsAttr(semanticName),
-              "_move used within a generic context");
     }
 
     if (builtinKind == BuiltinValueKind::Copy) {
@@ -4760,8 +4726,18 @@ public:
         if (F.getModule().getStage() != SILStage::Lowered) {
           // During the lowered stage, a function type might have different
           // signature
-          require(eltArgTy == bbArgTy,
-                  "switch_enum destination bbarg must match case arg type");
+          //
+          // We allow for move only wrapped enums to have trivial payloads that
+          // are not move only wrapped. This occurs since we want to lower
+          // trivial move only wrapped types earlier in the pipeline than
+          // non-trivial types.
+          if (bbArgTy.isTrivial(F)) {
+            require(eltArgTy == bbArgTy.copyingMoveOnlyWrapper(eltArgTy),
+                    "switch_enum destination bbarg must match case arg type");
+          } else {
+            require(eltArgTy == bbArgTy,
+                    "switch_enum destination bbarg must match case arg type");
+          }
         }
         require(!dest->getArguments()[0]->getType().isAddress(),
                 "switch_enum destination bbarg type must not be an address");

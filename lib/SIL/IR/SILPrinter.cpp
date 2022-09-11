@@ -1855,6 +1855,7 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
+    *this << (CI->needsStackProtection() ? "[stack_protection] " : "");
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
@@ -2359,9 +2360,17 @@ public:
     *this << getIDAndType(FI->getOperand()) << ", "
           << QuotedString(FI->getMessage());
   }
-  
+
+  void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *IPCI) {
+    *this << IPCI->getCounterIndex() << ", "
+          << QuotedString(IPCI->getPGOFuncName()) << ", "
+          << "num_counters " << IPCI->getNumCounters() << ", "
+          << "hash " << IPCI->getPGOFuncHash();
+  }
+
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    *this << getIDAndType(IAI->getBase()) << ", "
+    *this << (IAI->needsStackProtection() ? "[stack_protection] " : "")
+          << getIDAndType(IAI->getBase()) << ", "
           << getIDAndType(IAI->getIndex());
   }
 
@@ -3116,6 +3125,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // form, print [ossa].
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
+
+  if (needsStackProtection())
+    OS << "[stack_protection] ";
 
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
   printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);

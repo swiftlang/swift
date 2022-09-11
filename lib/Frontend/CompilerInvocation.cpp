@@ -721,6 +721,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
+
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
                                    OPT_warn_swift3_objc_inference_minimal,
@@ -1762,6 +1764,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
+  Opts.EnableStackProtection =
+      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableStackProtection);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -2296,6 +2301,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
       } else if (version.equals("5.5")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
+      } else if (version.equals("5.6")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -2409,10 +2416,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_disable_new_llvm_pass_manager,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
-
-  Opts.EnableStackProtector =
-      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
-                   Opts.EnableStackProtector);
 
   return false;
 }

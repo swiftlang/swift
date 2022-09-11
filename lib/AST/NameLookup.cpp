@@ -1741,15 +1741,6 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   }))
     return false;
 
-  // If we're looking at protocol requirements, is the new method an async
-  // alternative of any existing method, or vice versa?
-  if (isa<ProtocolDecl>(ty) &&
-      llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  }))
-    return false;
-
   return true;
 }
 
@@ -2532,6 +2523,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return { };
   }
 
+  case TypeReprKind::PackExpansion: {
+    auto packExpansionRepr = cast<PackExpansionTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getPatternType(), dc,
+                                       allowUsableFromInline);
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
@@ -2804,10 +2802,6 @@ createOpaqueParameterGenericParams(
   SmallVector<GenericTypeParamDecl *, 2> implicitGenericParams;
   auto dc = value->getInnermostDeclContext();
   for (auto param : *params) {
-    // Don't permit variadic parameters.
-    if (param->isVariadic())
-      continue;
-
     auto typeRepr = param->getTypeRepr();
     if (!typeRepr)
       continue;

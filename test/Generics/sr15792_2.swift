@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck %s
 
+// https://github.com/apple/swift/issues/58069
+//
 // Reduced from Realm open source project: https://github.com/realm/realm-swift.git
 
 internal protocol RealmCollectionImpl: RealmCollection where Index == Int, SubSequence == Slice<Self> {}

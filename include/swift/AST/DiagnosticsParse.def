@@ -531,6 +531,14 @@ ERROR(sil_invalid_attribute_for_instruction,none,
 ERROR(sil_invalid_attribute_for_expected,none,
       "Invalid attribute '%0' (expected '%1').", 
       (StringRef, StringRef))
+ERROR(expected_sil_profiler_counter_idx,none,
+      "expected profiler counter index", ())
+ERROR(expected_sil_profiler_counter_pgo_func_name,none,
+      "expected profiler counter PGO function name", ())
+ERROR(expected_sil_profiler_counter_total,none,
+      "expected profiler counter total", ())
+ERROR(expected_sil_profiler_counter_hash,none,
+      "expected profiler counter hash", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -852,8 +860,6 @@ NOTE(subscript_array_element_fix_it_remove_space, none,
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
       "expected ')' at end of tuple list", ())
-ERROR(multiple_ellipsis_in_tuple,none,
-      "only a single element can be variadic", ())
 ERROR(tuple_type_init,none,
       "default argument not permitted in a tuple type", ())
 ERROR(protocol_method_argument_init,none,
@@ -959,8 +965,6 @@ ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
 ERROR(expected_assignment_instead_of_comparison_operator,none,
       "expected '=' instead of '==' to assign default value for parameter", ())
-ERROR(parameter_vararg_default,none,
-      "variadic parameter cannot have a default value", ())
 ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
@@ -994,11 +998,6 @@ ERROR(false_available_is_called_unavailable,none,
 
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
-
-ERROR(unlabeled_parameter_following_variadic_parameter,none,
-      "a parameter following a variadic parameter requires a label", ())
-ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
-      "no parameters may follow a variadic parameter in a closure", ())
 
 ERROR(enum_element_empty_arglist,none,
       "enum element with associated values must have at least one "
@@ -1762,6 +1761,28 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
 WARNING(warn_attr_unsafe_removed,none,
         "'%0' attribute has been removed in favor of @preconcurrency",
         (StringRef))
+
+// _documentation
+ERROR(documentation_attr_expected_argument,none,
+      "@_documentation attribute expected 'visibility' or 'metadata' argument",
+      ())
+ERROR(documentation_attr_unknown_argument,none,
+      "unknown argument '%0', expected 'visibility' or 'metadata'",
+      (StringRef))
+ERROR(documentation_attr_expected_access_level,none,
+      "@_documentation attribute's 'visibility' argument expected an access level",
+      ())
+ERROR(documentation_attr_unknown_access_level,none,
+      "unknown visibility '%0', expected an access level keyword",
+      (StringRef))
+ERROR(documentation_attr_duplicate_visibility,none,
+      "cannot give more than one visibility to the same item", ())
+ERROR(documentation_attr_metadata_expected_text,none,
+      "@_documentation attribute's 'metadata' argument expected an identifier or "
+      "quoted string",
+      ())
+ERROR(documentation_attr_duplicate_metadata,none,
+      "cannot give more than one metadata argument to the same item", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

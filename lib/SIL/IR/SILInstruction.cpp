@@ -663,9 +663,8 @@ namespace {
     }
 
     bool visitIndexAddrInst(IndexAddrInst *RHS) {
-      // We have already compared the operands/types, so we should have equality
-      // at this point.
-      return true;
+      auto *lhs = cast<IndexAddrInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
@@ -772,7 +771,8 @@ namespace {
     }
 
     bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
-      return true;
+      auto *lhs = cast<AddressToPointerInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {

@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift 
+
+// https://github.com/apple/swift/issues/55666
+
 struct W<T> {}
 
 struct S<C1: Collection> {

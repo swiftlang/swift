@@ -381,3 +381,30 @@ do {
   // CHECK: in getter
   // CHECK-NEXT: yellow
 }
+
+do {
+  var test = ClassWithDesignatedInit(a: 42)
+
+  print(test.a)
+  // CHECK: in getter
+  // CHECK-NEXT: 42
+
+  print(test.b)
+  // CHECK: in getter
+  // CHECK-NEXT: [1, 2, 3]
+
+  test.a = 0
+  // CHECK: in setter => 0
+
+  test.b = [42]
+  // CHECK: in getter
+  // CHECK-NEXT: in setter => PropWrapperWithoutInit<Array<Int>>(value: [42])
+
+  print(test.a)
+  // CHECK: in getter
+  // CHECK-NEXT: 0
+
+  print(test.b)
+  // CHECK: in getter
+  // CHECK-NEXT: [42]
+}

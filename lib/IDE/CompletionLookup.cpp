@@ -755,8 +755,18 @@ void CompletionLookup::analyzeActorIsolation(
     }
     LLVM_FALLTHROUGH;
   case ActorIsolation::GlobalActor: {
-    auto contextIsolation =
-        getActorIsolationOfContext(const_cast<DeclContext *>(CurrDeclContext));
+    auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
+      // Prefer solution-specific actor-isolations and fall back to the one
+      // recorded in the AST.
+      auto isolation = ClosureActorIsolations.find(CE);
+      if (isolation != ClosureActorIsolations.end()) {
+        return isolation->second;
+      } else {
+        return CE->getActorIsolation();
+      }
+    };
+    auto contextIsolation = getActorIsolationOfContext(
+        const_cast<DeclContext *>(CurrDeclContext), getClosureActorIsolation);
     if (contextIsolation != isolation) {
       implicitlyAsync = true;
     }

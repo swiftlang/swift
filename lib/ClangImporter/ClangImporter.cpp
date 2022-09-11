@@ -1845,8 +1845,7 @@ static std::string getScalaNodeText(llvm::yaml::Node *N) {
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
-                                    llvm::VersionTuple version,
-                                    bool underlyingVersion) {
+                                    ModuleVersionInfo *versionInfo) {
   // Look up the top-level module to see if it exists.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
@@ -1889,10 +1888,10 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
     }
   }
 
-  if (version.empty())
+  if (!versionInfo)
     return true;
+
   assert(available);
-  assert(!version.empty());
   llvm::VersionTuple currentVersion;
   StringRef path = getClangASTContext().getSourceManager()
     .getFilename(clangModule->DefinitionLoc);
@@ -1935,16 +1934,10 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
     }
     break;
   }
-  // Diagnose unable to checking the current version.
-  if (currentVersion.empty()) {
-    Impl.diagnose(topModule.Loc, diag::cannot_find_project_version, "Clang",
-                  topModule.Item.str());
-    return true;
-  }
-  assert(!currentVersion.empty());
-  // Give a green light if the version on disk is greater or equal to the version
-  // specified in the canImport condition.
-  return currentVersion >= version;
+
+  versionInfo->setVersion(currentVersion,
+                          ModuleVersionSourceKind::ClangModuleTBD);
+  return true;
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
@@ -6188,7 +6181,9 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
+  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(
+      swiftDecl->getClangDecl()->getOwningModule());
+  ctx.lookupInModule(parentModule, name, results);
 
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),

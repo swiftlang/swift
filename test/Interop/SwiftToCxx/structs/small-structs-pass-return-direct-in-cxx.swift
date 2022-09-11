@@ -31,8 +31,8 @@ public struct StructDoubleAndFloat {
     var y: Float
 }
 
-// CHECK: SWIFT_EXTERN void $s7Structs25inoutStructDoubleAndFloatyyAA0cdeF0VzF(char * _Nonnull s) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructDoubleAndFloat(_:)
-// CHECK: SWIFT_EXTERN void $s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(char * _Nonnull s, struct swift_interop_stub_Structs_StructTwoI32 s2) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructOneI16AndOneStruct(_:_:)
+// CHECK: SWIFT_EXTERN void $s7Structs25inoutStructDoubleAndFloatyyAA0cdeF0VzF(void * _Nonnull s) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructDoubleAndFloat(_:)
+// CHECK: SWIFT_EXTERN void $s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(void * _Nonnull s, struct swift_interop_passStub_Structs_[[StructTwoI32:[0-9a-z_]+]] s2) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructOneI16AndOneStruct(_:_:)
 
 // CHECK: class StructDoubleAndFloat final {
 
@@ -113,22 +113,22 @@ public func inoutStructDoubleAndFloat(_ s: inout StructDoubleAndFloat) {
 }
 
 // CHECK: inline double getStructDoubleAndFloat_x(const StructDoubleAndFloat& x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::$s7Structs25getStructDoubleAndFloat_xySdAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_StructDoubleAndFloat(_impl::_impl_StructDoubleAndFloat::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs25getStructDoubleAndFloat_xySdAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_double_0_8_float_8_12(_impl::_impl_StructDoubleAndFloat::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline float getStructDoubleAndFloat_y(const StructDoubleAndFloat& x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::$s7Structs25getStructDoubleAndFloat_yySfAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_StructDoubleAndFloat(_impl::_impl_StructDoubleAndFloat::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs25getStructDoubleAndFloat_yySfAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_double_0_8_float_8_12(_impl::_impl_StructDoubleAndFloat::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline uint8_t getStructU16AndPointer_x(const StructU16AndPointer& x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::$s7Structs24getStructU16AndPointer_xys5UInt8VAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_StructU16AndPointer(_impl::_impl_StructU16AndPointer::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs24getStructU16AndPointer_xys5UInt8VAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_[[StructU16AndPointer:[0-9a-z_]+]](_impl::_impl_StructU16AndPointer::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline void * _Nonnull getStructU16AndPointer_y(const StructU16AndPointer& x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::$s7Structs24getStructU16AndPointer_yySvAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_StructU16AndPointer(_impl::_impl_StructU16AndPointer::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs24getStructU16AndPointer_yySvAA0cdeF0VF(_impl::swift_interop_passDirect_Structs_[[StructU16AndPointer]](_impl::_impl_StructU16AndPointer::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
@@ -138,69 +138,69 @@ public func inoutStructDoubleAndFloat(_ s: inout StructDoubleAndFloat) {
 
 
 // CHECK:      inline void inoutStructOneI16AndOneStruct(StructOneI16AndOneStruct& s, const StructTwoI32& s2) noexcept {
-// CHECK-NEXT:   return _impl::$s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(_impl::_impl_StructOneI16AndOneStruct::getOpaquePointer(s), _impl::swift_interop_passDirect_Structs_StructTwoI32(_impl::_impl_StructTwoI32::getOpaquePointer(s2)));
+// CHECK-NEXT:   return _impl::$s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(_impl::_impl_StructOneI16AndOneStruct::getOpaquePointer(s), _impl::swift_interop_passDirect_Structs_[[StructTwoI32]](_impl::_impl_StructTwoI32::getOpaquePointer(s2)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructOneI64 passThroughStructOneI64(const StructOneI64& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructOneI64::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructOneI64(result, _impl::$s7Structs23passThroughStructOneI64yAA0deF0VADF(_impl::swift_interop_passDirect_Structs_StructOneI64(_impl::_impl_StructOneI64::getOpaquePointer(x))));
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_uint64_t_0_8(result, _impl::$s7Structs23passThroughStructOneI64yAA0deF0VADF(_impl::swift_interop_passDirect_Structs_uint64_t_0_8(_impl::_impl_StructOneI64::getOpaquePointer(x))));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructTwoI32 passThroughStructTwoI32(int32_t i, const StructTwoI32& x, int32_t j) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructTwoI32::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructTwoI32(result, _impl::$s7Structs23passThroughStructTwoI32yAA0deF0Vs5Int32V_AdFtF(i, _impl::swift_interop_passDirect_Structs_StructTwoI32(_impl::_impl_StructTwoI32::getOpaquePointer(x)), j));
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructTwoI32]](result, _impl::$s7Structs23passThroughStructTwoI32yAA0deF0Vs5Int32V_AdFtF(i, _impl::swift_interop_passDirect_Structs_[[StructTwoI32]](_impl::_impl_StructTwoI32::getOpaquePointer(x)), j));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: inline void printStructOneI64(const StructOneI64& x) noexcept {
-// CHECK-NEXT:  return _impl::$s7Structs17printStructOneI64yyAA0cdE0VF(_impl::swift_interop_passDirect_Structs_StructOneI64(_impl::_impl_StructOneI64::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs17printStructOneI64yyAA0cdE0VF(_impl::swift_interop_passDirect_Structs_uint64_t_0_8(_impl::_impl_StructOneI64::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline void printStructStructTwoI32_and_OneI16AndOneStruct(const StructTwoI32& y, const StructOneI16AndOneStruct& x) noexcept {
-// CHECK-NEXT:  return _impl::$s7Structs011printStructc20TwoI32_and_OneI16AndgC0yyAA0cdE0V_AA0cghigC0VtF(_impl::swift_interop_passDirect_Structs_StructTwoI32(_impl::_impl_StructTwoI32::getOpaquePointer(y)), _impl::swift_interop_passDirect_Structs_StructOneI16AndOneStruct(_impl::_impl_StructOneI16AndOneStruct::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs011printStructc20TwoI32_and_OneI16AndgC0yyAA0cdE0V_AA0cghigC0VtF(_impl::swift_interop_passDirect_Structs_[[StructTwoI32]](_impl::_impl_StructTwoI32::getOpaquePointer(y)), _impl::swift_interop_passDirect_Structs_[[StructOneI16AndOneStruct:[0-9a-z_]+]](_impl::_impl_StructOneI16AndOneStruct::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline void printStructTwoI32(const StructTwoI32& x) noexcept {
-// CHECK-NEXT:  return _impl::$s7Structs17printStructTwoI32yyAA0cdE0VF(_impl::swift_interop_passDirect_Structs_StructTwoI32(_impl::_impl_StructTwoI32::getOpaquePointer(x)));
+// CHECK-NEXT:  return _impl::$s7Structs17printStructTwoI32yyAA0cdE0VF(_impl::swift_interop_passDirect_Structs_[[StructTwoI32]](_impl::_impl_StructTwoI32::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructDoubleAndFloat returnNewStructDoubleAndFloat(float y, double x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructDoubleAndFloat::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructDoubleAndFloat(result, _impl::$s7Structs29returnNewStructDoubleAndFloatyAA0defG0VSf_SdtF(y, x));
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_double_0_8_float_8_12(result, _impl::$s7Structs29returnNewStructDoubleAndFloatyAA0defG0VSf_SdtF(y, x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructOneI16AndOneStruct returnNewStructOneI16AndOneStruct() noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructOneI16AndOneStruct::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructOneI16AndOneStruct(result, _impl::$s7Structs024returnNewStructOneI16AndeD0AA0defgeD0VyF());
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructOneI16AndOneStruct]](result, _impl::$s7Structs024returnNewStructOneI16AndeD0AA0defgeD0VyF());
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructOneI64 returnNewStructOneI64() noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructOneI64::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructOneI64(result, _impl::$s7Structs21returnNewStructOneI64AA0deF0VyF());
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_uint64_t_0_8(result, _impl::$s7Structs21returnNewStructOneI64AA0deF0VyF());
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructTwoI32 returnNewStructTwoI32(int32_t x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructTwoI32::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructTwoI32(result, _impl::$s7Structs21returnNewStructTwoI32yAA0deF0Vs5Int32VF(x));
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructTwoI32]](result, _impl::$s7Structs21returnNewStructTwoI32yAA0deF0Vs5Int32VF(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
 // CHECK: inline StructU16AndPointer returnNewStructU16AndPointer(void * _Nonnull x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return _impl::_impl_StructU16AndPointer::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_StructU16AndPointer(result, _impl::$s7Structs28returnNewStructU16AndPointeryAA0defG0VSvF(x));
+// CHECK-NEXT:    _impl::swift_interop_returnDirect_Structs_[[StructU16AndPointer]](result, _impl::$s7Structs28returnNewStructU16AndPointeryAA0defG0VSvF(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }

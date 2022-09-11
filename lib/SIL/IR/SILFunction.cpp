@@ -186,6 +186,7 @@ void SILFunction::init(
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
+  this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
   this->HasOwnership = true,
