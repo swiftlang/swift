@@ -4,7 +4,12 @@ set(CMAKE_Swift_ARCHIVE_FINISH "")
 
 if (SWIFT_SWIFT_PARSER)
     add_library(ASTGen
-            Sources/ASTGen/ASTGen.swift)
+            Sources/ASTGen/ASTGen.swift
+            Sources/ASTGen/Decls.swift
+            Sources/ASTGen/Exprs.swift
+            Sources/ASTGen/Literals.swift
+            Sources/ASTGen/Misc.swift
+            Sources/ASTGen/Stmts.swift)
 
     target_link_libraries(ASTGen PUBLIC
             SwiftSyntax
