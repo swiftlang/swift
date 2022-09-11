@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-silgen
 
+// REQUIRES: rdar99800538
 // rdar://80395274 tracks getting this to pass with the requirement machine.
 // XFAIL: *
 
