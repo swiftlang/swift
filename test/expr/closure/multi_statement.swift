@@ -337,10 +337,9 @@ func test_unknown_refs_in_tilde_operator() {
   enum E {
   }
 
-  let _: (E) -> Void = {
+  let _: (E) -> Void = { // expected-error {{unable to infer closure type in the current context}}
     if case .test(unknown) = $0 {
-      // expected-error@-1 {{type 'E' has no member 'test'}}
-      // expected-error@-2 2 {{cannot find 'unknown' in scope}}
+      // expected-error@-1 2 {{cannot find 'unknown' in scope}}
     }
   }
 }
@@ -543,6 +542,26 @@ func test_conflicting_pattern_vars() {
            .b(let y, let x): // Ok
         _ = x
         _ = y
+      }
+    }
+  }
+}
+
+// rdar://91452726 - crash in MissingMemberFailure::diagnoseInLiteralCollectionContext
+struct Test {
+  struct ID {
+  }
+
+  enum E : Hashable, Equatable {
+  case id
+  }
+
+  var arr: [(ID, E)]
+
+  func test() {
+    _ = arr.map { v in
+      switch v {
+      case .id: return true // expected-error {{value of tuple type '(Test.ID, Test.E)' has no member 'id'}}
       }
     }
   }

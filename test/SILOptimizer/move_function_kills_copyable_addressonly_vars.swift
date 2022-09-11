@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil -o /dev/null
 
-// REQUIRES: optimized_stdlib
-
 import Swift
 
 //////////////////
@@ -38,14 +36,14 @@ public protocol SubP2 : P {}
 
 public func performMoveOnVarSingleBlock<T>(_ p: T) {
     var x = p
-    let _ = _move(x)
+    let _ = _move x
     x = p
     nonConsumingUse(x)
 }
 
 public func performMoveOnVarSingleBlockError<T>(_ p: T) {
     var x = p // expected-error {{'x' used after being moved}}
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
     nonConsumingUse(x) // expected-note {{use here}}
     x = p
     nonConsumingUse(x)
@@ -53,7 +51,7 @@ public func performMoveOnVarSingleBlockError<T>(_ p: T) {
 
 public func performMoveOnVarMultiBlock<T>(_ p: T) {
     var x = p
-    let _ = _move(x)
+    let _ = _move x
 
     while booleanValue {
         print("true")
@@ -69,7 +67,7 @@ public func performMoveOnVarMultiBlock<T>(_ p: T) {
 
 public func performMoveOnVarMultiBlockError1<T>(_ p: T) {
     var x = p // expected-error {{'x' used after being moved}}
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
 
     nonConsumingUse(x) // expected-note {{use here}}
 
@@ -93,7 +91,7 @@ public func performMoveOnVarMultiBlockError1<T>(_ p: T) {
 
 public func performMoveOnVarMultiBlockError2<T>(_ p: T) {
     var x = p // expected-error {{'x' used after being moved}}
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
 
     while booleanValue {
         print("true")
@@ -113,12 +111,12 @@ public func performMoveOnVarMultiBlockError2<T>(_ p: T) {
 }
 
 public func performMoveOnInOut<T>(_ p: inout T) { // expected-error {{'p' used after being moved}}
-    let buf = _move(p) // expected-note {{move here}}
+    let buf = _move p // expected-note {{move here}}
     let _ = buf
 } // expected-note {{use here}}
 
 public func performMoveOnInOut2<T>(_ p: inout T, _ p2: T) {
-    let buf = _move(p)
+    let buf = _move p
     let _ = buf
     p = p2
 }
@@ -127,18 +125,18 @@ struct S<T> {
     var buffer: T?
 
     mutating func appendNoError() {
-        let b = _move(self).buffer
+        let b = (_move self).buffer
         let maybeNewB = exchangeUse(b)
         self = .init(buffer: maybeNewB)
     }
 
     mutating func appendError() { // expected-error {{'self' used after being moved}}
-        let b = _move(self).buffer // expected-note {{move here}}
+        let b = (_move self).buffer // expected-note {{move here}}
         let _ = b
     } // expected-note {{use here}}
 
     mutating func appendThrowingNoError1(_ f: () throws -> ()) throws {
-        let b = _move(self).buffer
+        let b = (_move self).buffer
         let maybeNewB = exchangeUse(b)
         // We have to initialize self before we call try since otherwise we will
         // not initialize self along the throws path.
@@ -148,7 +146,7 @@ struct S<T> {
 
     mutating func appendThrowingNoError2(_ f: () throws -> ()) {
         do {
-            let b = _move(self).buffer
+            let b = (_move self).buffer
             try f()
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
@@ -162,7 +160,7 @@ struct S<T> {
     // inline or the catch block.
     mutating func appendThrowingNoError3(_ f: () throws -> ()) {
         do {
-            let b = _move(self).buffer
+            let b = (_move self).buffer
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
             try f()
@@ -171,7 +169,7 @@ struct S<T> {
     }
 
     mutating func appendThrowingError0(_ f: () throws -> ()) throws { // expected-error {{'self' used after being moved}}
-        let b = _move(self).buffer // expected-note {{move here}}
+        let b = (_move self).buffer // expected-note {{move here}}
         let maybeNewB = exchangeUse(b)
         try f() // expected-note {{use here}}
         self = .init(buffer: maybeNewB)
@@ -179,7 +177,7 @@ struct S<T> {
 
 
     mutating func appendThrowingError1(_ f: () throws -> ()) throws { // expected-error {{'self' used after being moved}}
-        let b = _move(self).buffer // expected-note {{move here}}
+        let b = (_move self).buffer // expected-note {{move here}}
         let maybeNewB = exchangeUse(b)
         let _ = maybeNewB
         try f() // expected-note {{use here}}
@@ -187,7 +185,7 @@ struct S<T> {
 
     mutating func appendThrowingError2(_ f: () throws -> ()) { // expected-error {{'self' used after being moved}}
         do {
-            let b = _move(self).buffer // expected-note {{move here}}
+            let b = (_move self).buffer // expected-note {{move here}}
             let _ = b
             try f()
         } catch {
@@ -197,7 +195,7 @@ struct S<T> {
 
     mutating func appendThrowingError3(_ f: () throws -> ()) { // expected-error {{'self' used after being moved}}
         do {
-            let b = _move(self).buffer // expected-note {{move here}}
+            let b = (_move self).buffer // expected-note {{move here}}
             try f()
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
@@ -207,7 +205,7 @@ struct S<T> {
 
     mutating func appendThrowingError4(_ f: () throws -> ()) { // expected-error {{'self' used after being moved}}
         do {
-            let b = _move(self).buffer // expected-note {{move here}}
+            let b = (_move self).buffer // expected-note {{move here}}
             let _ = b
             try f()
         } catch {
@@ -225,7 +223,7 @@ protocol DeferTestProtocol : P {
 extension DeferTestProtocol {
     mutating func deferTestSuccess1() {
         let selfType = type(of: self)
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = selfType.getP()
         }
@@ -235,9 +233,9 @@ extension DeferTestProtocol {
     // Make sure we can init/reinit self multiple times without error.
     mutating func deferTestSuccess2() {
         let selfType = type(of: self)
-        let _ = _move(self)
+        let _ = (_move self)
         self = selfType.getP()
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = selfType.getP()
         }
@@ -246,7 +244,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestSuccess3() {
         let selfType = type(of: self)
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = selfType.getP()
         }
@@ -259,10 +257,10 @@ extension DeferTestProtocol {
     // We do not support moving within a defer right now.
     mutating func deferTestFail1() {
         let selfType = type(of: self)
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = selfType.getP()
-            let _ = _move(self) // expected-error {{_move applied to value that the compiler does not support checking}}
+            let _ = (_move self) // expected-error {{_move applied to value that the compiler does not support checking}}
         }
         print("123")
     }
@@ -270,7 +268,7 @@ extension DeferTestProtocol {
     // We do not support moving within a defer right now.
     mutating func deferTestFail2() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             nonConsumingUse(k) // expected-note {{use here}}
             self = selfType.getP()
@@ -281,7 +279,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestFail3() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         nonConsumingUse(k) // expected-note {{use here}}
         defer {
             nonConsumingUse(k)
@@ -292,7 +290,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestFail4() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             consumingUse(k) // expected-note {{use here}}
             self = selfType.getP()
@@ -303,7 +301,7 @@ extension DeferTestProtocol {
     // TODO: We should definitely be erroring on consuming use I think.
     mutating func deferTestFail5() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         for _ in 0..<1024 {
             defer {
                 consumingUse(k)
@@ -319,7 +317,7 @@ extension DeferTestProtocol {
     //
     mutating func deferTestFail6() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         for _ in 0..<1024 {
             defer {
                 nonConsumingUse(k)
@@ -333,7 +331,7 @@ extension DeferTestProtocol {
     mutating func deferTestFail7() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
         for _ in 0..<1024 {
-            let _ = _move(self) // expected-note {{move here}}
+            let _ = (_move self) // expected-note {{move here}}
             defer {
                 nonConsumingUse(k) // expected-note {{use here}}
                 self = selfType.getP()
@@ -345,7 +343,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestFail8() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             if booleanValue {
                 nonConsumingUse(k) // expected-note {{use here}}
@@ -357,7 +355,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestFail9() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             if booleanValue {
                 nonConsumingUse(k) // expected-note {{use here}}
@@ -371,7 +369,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestFail10() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             for _ in 0..<1024 {
                 nonConsumingUse(k) // expected-note {{use here}}
@@ -383,7 +381,7 @@ extension DeferTestProtocol {
 
     mutating func deferTestFail11() { // expected-error {{'self' used after being moved}}
         let selfType = type(of: self)
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         if booleanValue {
             print("creating blocks")
         } else {
@@ -403,7 +401,7 @@ extension DeferTestProtocol {
         if booleanValue {
             print("creating blocks")
         } else {
-            let _ = _move(self) // expected-note {{move here}}
+            let _ = (_move self) // expected-note {{move here}}
             print("creating blocks2")
         }
 
@@ -421,7 +419,7 @@ extension DeferTestProtocol {
         if booleanValue {
             print("creating blocks")
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -437,7 +435,7 @@ extension DeferTestProtocol {
             print("creating blocks")
             self.doSomething()
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -455,28 +453,28 @@ extension DeferTestProtocol {
 public func castTest0<T : SubP1>(_ x: __owned T) -> P {
     var x2 = x  // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     return x2 as P // expected-note {{use here}}
 }
 
 public func castTest1<T : P>(_ x: __owned T) -> SubP1 {
     var x2 = x  // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     return x2 as! SubP1 // expected-note {{use here}}
 }
 
 public func castTest2<T : P>(_ x: __owned T) -> SubP1? {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     return x2 as? SubP1 // expected-note {{use here}}
 }
 
 public func castTestSwitch1<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     switch x2 {  // expected-note {{use here}}
     case let k as SubP1:
         print(k)
@@ -488,7 +486,7 @@ public func castTestSwitch1<T : P>(_ x : __owned T) {
 public func castTestSwitch2<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     switch x2 { // expected-note {{use here}}
     case let k as SubP1:
         print(k)
@@ -502,7 +500,7 @@ public func castTestSwitch2<T : P>(_ x : __owned T) {
 public func castTestSwitchInLoop<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
 
     for _ in 0..<1024 {
         switch x2 { // expected-note {{use here}}
@@ -517,7 +515,7 @@ public func castTestSwitchInLoop<T : P>(_ x : __owned T) {
 public func castTestIfLet<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     if case let k as SubP1 = x2 { // expected-note {{use here}}
         print(k)
     } else {
@@ -528,7 +526,7 @@ public func castTestIfLet<T : P>(_ x : __owned T) {
 public func castTestIfLetInLoop<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     for _ in 0..<1024 {
         if case let k as SubP1 = x2 { // expected-note {{use here}}
             print(k)
@@ -546,7 +544,7 @@ public enum EnumWithP<T> {
 public func castTestIfLet2<T : P>(_ x : __owned EnumWithP<T>) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     if case let .klass(k as SubP1) = x2 { // expected-note {{use here}}
         print(k)
     } else {
@@ -561,14 +559,14 @@ public func castTestIfLet2<T : P>(_ x : __owned EnumWithP<T>) {
 public func castAccess<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     let _ = x2.k // expected-note {{use here}}
 }
 
 public func castAccess2<T : P>(_ x : __owned T) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     let _ = x2.k.getOtherKlass() // expected-note {{use here}}
 }
 
@@ -580,7 +578,7 @@ public func castAccess2<T : P>(_ x : __owned T) {
 public func partialApplyTest<T : P>(_ x: __owned T) {
     var x2 = x
     x2 = x
-    let _ = _move(x2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    let _ = _move x2 // expected-error {{move applied to value that the compiler does not support checking}}
     let f = {
         print(x2)
     }
@@ -606,7 +604,7 @@ extension MiscTests {
         if booleanValue {
             print("creating blocks")
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -622,7 +620,7 @@ extension MiscTests {
             print("creating blocks")
             self.doSomething()
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -639,8 +637,8 @@ func multipleCapture1<T : P>(_ k: T) -> () {
     let kType = type(of: k)
     var k2 = k
     var k3 = k
-    let _ = _move(k2)
-    let _ = _move(k3)
+    let _ = _move k2
+    let _ = _move k3
     var k4 = k
     k4 = k
     defer {
@@ -656,8 +654,8 @@ func multipleCapture2<T : P>(_ k: T) -> () {
     var k2 = k // expected-error {{'k2' used after being moved}}
     k2 = k
     var k3 = k
-    let _ = _move(k2) // expected-note {{move here}}
-    let _ = _move(k3)
+    let _ = _move k2 // expected-note {{move here}}
+    let _ = _move k3
     var k4 = k
     k4 = k
     defer {
@@ -686,7 +684,23 @@ func reinitInPieces1<T : P>(_ k: ProtPair<T>) {
     var k2 = k
     k2 = k
 
-    let _ = _move(k2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    let _ = _move k2 // expected-error {{_move applied to value that the compiler does not support checking}}
     k2.lhs = selfType.getP()
     k2.rhs = selfType.getP()
+}
+
+////////////////////////
+// InOut and Use Test //
+////////////////////////
+
+func useValueAndInOut<T>(_ x: T, _ y: inout T) {}
+func useValueAndInOut<T>(_ x: inout T, _ y: T) {}
+
+func inoutAndUseTest<T>(_ x: T) {
+    var y = x // expected-error {{'y' used after being moved}}
+              // expected-error @-1 {{'y' used after being moved}}
+    useValueAndInOut(_move y, &y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
+    useValueAndInOut(&y, _move y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
 }

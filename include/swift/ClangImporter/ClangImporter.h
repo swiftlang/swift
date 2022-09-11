@@ -204,9 +204,11 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
+  ///
+  /// If a non-null \p versionInfo is provided, the module version will be
+  /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               llvm::VersionTuple version,
-                               bool underlyingVersion) override;
+                               ModuleVersionInfo *versionInfo) override;
 
   /// Import a module with the given module path.
   ///
@@ -485,6 +487,10 @@ public:
   Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                  DeclContext *dc) override;
 
+  Type importVarDeclType(const clang::VarDecl *clangDecl,
+                         VarDecl *swiftDecl,
+                         DeclContext *dc) override;
+
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash);
@@ -530,6 +536,9 @@ public:
 
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
+
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                  DeclContext *newContext) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.

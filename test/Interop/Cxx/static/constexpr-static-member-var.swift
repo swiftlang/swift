@@ -11,8 +11,4 @@ import StdlibUnittest
 
 var ConstexprStaticMemberVarTestSuite = TestSuite("ConstexprStaticMemberVarTestSuite")
 
-ConstexprStaticMemberVarTestSuite.test("constexpr-static-member") {
-  expectEqual(139, WithConstexprStaticMember.definedInline)
-}
-
 runAllTests()

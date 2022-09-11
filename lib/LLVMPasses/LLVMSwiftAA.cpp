@@ -75,6 +75,13 @@ void SwiftAAWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetLibraryInfoWrapperPass>();
 }
 
+AnalysisKey SwiftAA::Key;
+
+SwiftAAResult SwiftAA::run(llvm::Function &F,
+                           llvm::FunctionAnalysisManager &AM) {
+  return SwiftAAResult();
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//

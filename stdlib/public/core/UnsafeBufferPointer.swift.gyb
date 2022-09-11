@@ -742,19 +742,21 @@ extension Unsafe${Mutable}BufferPointer {
       return try body(.init(start: nil, count: 0))
     }
 
+    _debugPrecondition(
+      Int(bitPattern: .init(base)) & (MemoryLayout<T>.alignment-1) == 0,
+      "baseAddress must be a properly aligned pointer for types Element and T"
+    )
+
     let newCount: Int
     if MemoryLayout<T>.stride == MemoryLayout<Element>.stride {
       newCount = count
-      _debugPrecondition(
-        MemoryLayout<T>.alignment == MemoryLayout<Element>.alignment
-      )
     } else {
       newCount = count * MemoryLayout<Element>.stride / MemoryLayout<T>.stride
       _debugPrecondition(
-        Int(bitPattern: .init(base)) & (MemoryLayout<T>.alignment-1) == 0 &&
         MemoryLayout<T>.stride > MemoryLayout<Element>.stride
         ? MemoryLayout<T>.stride % MemoryLayout<Element>.stride == 0
-        : MemoryLayout<Element>.stride % MemoryLayout<T>.stride == 0
+        : MemoryLayout<Element>.stride % MemoryLayout<T>.stride == 0,
+        "Buffer must contain a whole number of Element instances"
       )
     }
     let binding = Builtin.bindMemory(base, newCount._builtinWordValue, T.self)

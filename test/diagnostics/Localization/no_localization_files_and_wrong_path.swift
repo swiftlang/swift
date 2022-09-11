@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -localization-path /Nonexistent_path -locale en
 
-// <unknown>:0: warning: cannot find translations for 'en' at '/Nonexistent_path/en.yaml': no such file
+// <unknown>:0: warning: cannot find translations for 'en' at '/Nonexistent_path/en.strings': no such file
 // <unknown>:0: warning: specified localization directory '/Nonexistent_path' does not exist, translation is disabled
 
 _ = "HI!

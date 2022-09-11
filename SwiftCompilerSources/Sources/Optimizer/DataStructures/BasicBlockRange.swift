@@ -78,8 +78,7 @@ struct BasicBlockRange : CustomStringConvertible, CustomReflectable {
 
   /// Insert a potential end block.
   mutating func insert(_ block: BasicBlock) {
-    if !wasInserted.contains(block) {
-      wasInserted.insert(block)
+    if wasInserted.insert(block) {
       inserted.append(block)
     }
     worklist.pushIfNotVisited(block)

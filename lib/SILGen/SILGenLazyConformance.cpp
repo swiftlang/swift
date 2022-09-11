@@ -21,6 +21,12 @@ using namespace swift;
 using namespace swift::Lowering;
 
 void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
+  // If the conformance is invalid, crash deterministically even in noassert
+  // builds.
+  if (conformanceRef.isInvalid()) {
+    llvm::report_fatal_error("Invalid conformance in type-checked AST");
+  }
+
   // We don't need to emit dependent conformances.
   if (conformanceRef.isAbstract())
     return;
@@ -31,16 +37,17 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
     conformance = inherited->getInheritedConformance();
 
+  // Emit any conformances implied by conditional requirements.
+  if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance)) {
+    useConformancesFromSubstitutions(specialized->getSubstitutionMap());
+    conformance = specialized->getGenericConformance();
+  }
+
   // Get the normal conformance. If we don't have one, this is a self
   // conformance, which we can ignore.
-  auto normal = dyn_cast<NormalProtocolConformance>(
-      conformance->getRootConformance());
+  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
   if (normal == nullptr)
     return;
-
-  // Emit any conformances implied by conditional requirements.
-  if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance))
-    useConformancesFromSubstitutions(specialized->getSubstitutionMap());
 
   // If this conformance was not synthesized by the ClangImporter, we're not
   // going to be emitting it lazily either, so we can avoid doing anything
@@ -327,7 +334,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
     for (auto *EED : ED->getAllElements()) {
       if (EED->hasAssociatedValues()) {
         useConformancesFromType(EED->getArgumentInterfaceType()
-                                   ->getCanonicalType(genericSig));
+                                   ->getReducedType(genericSig));
       }
     }
   }
@@ -335,13 +342,13 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
   if (isa<StructDecl>(NTD) || isa<ClassDecl>(NTD)) {
     for (auto *VD : NTD->getStoredProperties()) {
       useConformancesFromType(VD->getValueInterfaceType()
-                                ->getCanonicalType(genericSig));
+                                ->getReducedType(genericSig));
     }
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(NTD))
     if (auto superclass = CD->getSuperclass())
-      useConformancesFromType(superclass->getCanonicalType(genericSig));
+      useConformancesFromType(superclass->getReducedType(genericSig));
 
   if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
     for (auto reqt : PD->getRequirementSignature().getRequirements()) {

@@ -50,6 +50,25 @@ struct ReferenceMetaData {
       : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit) {}
 };
 
+/// Specifies how the initialization expression of a \c lazy variable should be
+/// walked by the ASTWalker.
+enum class LazyInitializerWalking {
+  /// No lazy initialization expressions will be walked.
+  None,
+
+  /// The lazy initialization expression will only be walked as a part of
+  /// the variable's pattern binding decl. This is the default behavior, and is
+  /// consistent with the initializer being syntactically part of the pattern
+  /// binding.
+  InPatternBinding,
+
+  /// The lazy initialization expression will only be walked as part of the
+  /// body of the synthesized accessor for the lazy variable. In such an
+  /// accessor, the expression is denoted by LazyInitializerExpr. This is mainly
+  /// useful for code emission.
+  InAccessor
+};
+
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
@@ -193,15 +212,13 @@ public:
   /// params in AbstractFunctionDecl and NominalTypeDecl.
   virtual bool shouldWalkIntoGenericParams() { return false; }
 
-  /// This method configures whether the walker should walk into the
-  /// initializers of lazy variables.  These initializers are semantically
-  /// different from other initializers in their context and so sometimes
-  /// should not be visited.
-  ///
-  /// Note that visiting the body of the lazy getter will find a
-  /// LazyInitializerExpr with the initializer as its sub-expression.
-  /// However, ASTWalker does not walk into LazyInitializerExprs on its own.
-  virtual bool shouldWalkIntoLazyInitializers() { return true; }
+  /// This method configures how the walker should walk the initializers of
+  /// lazy variables. These initializers are semantically different from other
+  /// initializers in their context and so sometimes should be visited as part
+  /// of the synthesized getter, or should not be visited at all.
+  virtual LazyInitializerWalking getLazyInitializerWalkingBehavior() {
+    return LazyInitializerWalking::InPatternBinding;
+  }
 
   /// This method configures whether the walker should visit the body of a
   /// closure that was checked separately from its enclosing expression.

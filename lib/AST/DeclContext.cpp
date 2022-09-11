@@ -237,6 +237,16 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
   return nullptr;
 }
 
+Decl *DeclContext::getTopmostDeclarationDeclContext() {
+  auto *dc = this;
+  Decl *topmost = nullptr;
+  while (auto *decl = dc->getInnermostDeclarationDeclContext()) {
+    topmost = decl;
+    dc = decl->getDeclContext();
+  }
+  return topmost;
+}
+
 DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
   auto dc = this;
   do {

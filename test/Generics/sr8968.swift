@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/51472
+
 public class OFMAttachment : NativeInserting {
 // expected-warning@-1 {{non-final class 'OFMAttachment' cannot safely conform to protocol 'NativeInserting', which requires that 'Self.SnapshotType.NativeType' is exactly equal to 'Self'; this is an error in Swift 6}}
     public typealias SnapshotType = Message.Attachment

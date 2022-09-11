@@ -28,7 +28,7 @@ func badParameter<T>(_ : @_typeSequence T) {} // expected-error {{attribute does
 func directAliases() {
   typealias Tuple<@_typeSequence Ts> = (Ts...)
 
-  typealias Many<T, U, V, @_typeSequence Ws> = Tuple<T, U, V, Ws>
+  typealias Many<T, U, V, @_typeSequence Ws> = Tuple<T, U, V, Ws... >
 
   let _: Many<Int, String, Double, Void, Void, Void, Void> = 42 // expected-error {{cannot convert value of type 'Int' to specified type}}
 }
@@ -64,23 +64,23 @@ func bindPrefixAndSuffix() {
 }
 
 func invalidPacks() {
-  func monovariadic1() -> (String...) {} // expected-error {{cannot create expansion with non-variadic type 'String'}}
-  func monovariadic2<T>() -> (T...) {} // expected-error 2 {{cannot create expansion with non-variadic type 'T'}}
-  func monovariadic3<T, U>() -> (T, U...) {} // expected-error {{cannot create a variadic tuple}}
+  func monovariadic1() -> (String...) {} // expected-error {{variadic expansion 'String' must contain at least one variadic generic parameter}}
+  func monovariadic2<T>() -> (T...) {} // expected-error {{variadic expansion 'T' must contain at least one variadic generic parameter}}
+  func monovariadic3<T, U>() -> (T, U...) {} // expected-error {{variadic expansion 'U' must contain at least one variadic generic parameter}}
 }
 
 func call() {
-  func multipleParameters<@_typeSequence T>(xs: T..., ys: T...) -> (T...) { return xs }
+  func multipleParameters<@_typeSequence T>(xs: T..., ys: T...) -> (T...) { return (_: xs) }
   // expected-note@-1 {{in call to function 'multipleParameters(xs:ys:)'}}
   _ = multipleParameters()
   // expected-error@-1 2 {{generic parameter 'T' could not be inferred}}
-  let x: (String) = multipleParameters(xs: "", ys: "")
+  let x: (_: String) = multipleParameters(xs: "", ys: "")
   let (one, two) = multipleParameters(xs: "", 5.0, ys: "", 5.0)
   multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
 
-  func multipleSequences<@_typeSequence T, @_typeSequence U>(xs: T..., ys: U...) -> (T...) { return ys }
+  func multipleSequences<@_typeSequence T, @_typeSequence U>(xs: T..., ys: U...) -> (T...) { return (_: ys) }
   // expected-note@-1 {{in call to function 'multipleSequences(xs:ys:)'}}
-  // expected-error@-2 {{cannot convert return expression of type 'U' to return type 'T'}}
+  // expected-error@-2 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
 
   _ = multipleSequences()
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}

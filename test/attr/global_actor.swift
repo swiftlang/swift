@@ -100,3 +100,38 @@ struct Container {
 extension SomeActor {
   @GA1 nonisolated func conflict1() { } // expected-error 3{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
 }
+
+
+// -----------------------------------------------------------------------
+// Access
+// -----------------------------------------------------------------------
+
+@globalActor
+private struct PrivateGA { // expected-note 2 {{type declared here}}
+  actor Actor {}
+  static let shared = Actor()
+}
+
+@globalActor
+internal struct InternalGA { // expected-note 1 {{type declared here}}
+  actor Actor {}
+  static let shared = Actor()
+}
+
+@globalActor
+public struct PublicGA {
+  public actor Actor {}
+  public static let shared = Actor()
+}
+
+@PrivateGA private struct PrivateStructPrivateGA {}
+@InternalGA private struct PrivateStructInternalGA {}
+@PublicGA private struct PrivateStructPublicGA {}
+
+@PrivateGA internal struct InternalStructPrivateGA {} // expected-error {{internal struct 'InternalStructPrivateGA' cannot have private global actor 'PrivateGA'}}
+@InternalGA internal struct InternalStructInternalGA {}
+@PublicGA internal struct InternalStructPublicGA {}
+
+@PrivateGA open class OpenClassPrivateGA {} // expected-error {{open class 'OpenClassPrivateGA' cannot have private global actor 'PrivateGA'}}
+@InternalGA open class OpenClassInternalGA {} // expected-error {{open class 'OpenClassInternalGA' cannot have internal global actor 'InternalGA'}}
+@PublicGA open class OpenClassPublicGA {}

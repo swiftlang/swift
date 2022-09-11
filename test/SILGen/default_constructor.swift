@@ -30,8 +30,7 @@ struct D {
 // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
-// CHECK: [[THISLIFE:%[^,]+]] = begin_borrow [lexical] [[THIS]]
-// CHECK: [[PB_THIS:%.*]] = project_box [[THISLIFE]]
+// CHECK: [[PB_THIS:%.*]] = project_box [[THIS]]
 // CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.i
 // CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.j
 // CHECK: [[INIT:%[0-9]+]] = function_ref @$s19default_constructor1DV1iSivpfi

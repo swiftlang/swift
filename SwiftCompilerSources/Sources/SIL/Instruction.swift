@@ -104,6 +104,9 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return SILInstruction_mayRelease(bridged)
   }
 
+  public func visitReferencedFunctions(_ cl: (Function) -> ()) {
+  }
+
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
@@ -139,6 +142,10 @@ public class SingleValueInstruction : Instruction, Value {
 
   fileprivate final override var resultCount: Int { 1 }
   fileprivate final override func getResult(index: Int) -> Value { self }
+
+  public static func ==(lhs: SingleValueInstruction, rhs: SingleValueInstruction) -> Bool {
+    lhs === rhs
+  }
 }
 
 public final class MultipleValueInstructionResult : Value {
@@ -314,13 +321,16 @@ final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 final public class BuiltinInst : SingleValueInstruction {
   // TODO: find a way to directly reuse the BuiltinValueKind enum
   public enum ID  {
-    case None
-    case DestroyArray
+    case none
+    case destroyArray
+    case stackAlloc
   }
-  public var id: ID? {
+
+  public var id: ID {
     switch BuiltinInst_getID(bridged) {
-      case DestroyArrayBuiltin: return .DestroyArray
-      default: return .None
+      case DestroyArrayBuiltin: return .destroyArray
+      case StackAllocBuiltin: return .stackAlloc
+      default: return .none
     }
   }
 }
@@ -334,13 +344,24 @@ final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {}
+class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {
+  public var needsStackProtection: Bool {
+    AddressToPointerInst_needsStackProtection(bridged) != 0
+  }
+}
 
 final public
 class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class IndexAddrInst : SingleValueInstruction {}
+class IndexAddrInst : SingleValueInstruction {
+  public var base: Value { operands[0].value }
+  public var index: Value { operands[1].value }
+  
+  public var needsStackProtection: Bool {
+    IndexAddrInst_needsStackProtection(bridged) != 0
+  }
+}
 
 final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
@@ -384,10 +405,23 @@ public class GlobalAccessInst : SingleValueInstruction {
   }
 }
 
-final public class FunctionRefInst : GlobalAccessInst {
+public class FunctionRefBaseInst : SingleValueInstruction {
   public var referencedFunction: Function {
-    FunctionRefInst_getReferencedFunction(bridged).function
+    FunctionRefBaseInst_getReferencedFunction(bridged).function
   }
+
+  public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
+    cl(referencedFunction)
+  }
+}
+
+final public class FunctionRefInst : FunctionRefBaseInst {
+}
+
+final public class DynamicFunctionRefInst : FunctionRefBaseInst {
+}
+
+final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 }
 
 final public class GlobalAddrInst : GlobalAccessInst {}
@@ -448,9 +482,29 @@ final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, Unary
 
 final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { RefElementAddrInst_fieldIndex(bridged) }
+
+  public var fieldIsLet: Bool { RefElementAddrInst_fieldIsLet(bridged) != 0 }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class KeyPathInst : SingleValueInstruction {
+  public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
+    var results = KeyPathFunctionResults()
+    for componentIdx in 0..<KeyPathInst_getNumComponents(bridged) {
+      KeyPathInst_getReferencedFunctions(bridged, componentIdx, &results)
+      let numFuncs = results.numFunctions
+      withUnsafePointer(to: &results) {
+        $0.withMemoryRebound(to: BridgedFunction.self, capacity: numFuncs) {
+          let functions = UnsafeBufferPointer(start: $0, count: numFuncs)
+          for idx in 0..<numFuncs {
+            cl(functions[idx].function)
+          }
+        }
+      }
+    }
+  }
+}
 
 final public
 class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
@@ -488,7 +542,49 @@ final public class BridgeObjectToRefInst : SingleValueInstruction,
 final public class BridgeObjectToWordInst : SingleValueInstruction,
                                            UnaryInstruction {}
 
-final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {}
+public enum AccessKind {
+  case initialize
+  case read
+  case modify
+  case deinitialize
+}
+
+extension BridgedAccessKind {
+  var kind: AccessKind {
+    switch self {
+    case AccessKind_Init:
+      return .initialize
+    case AccessKind_Read:
+      return .read
+    case AccessKind_Modify:
+      return .modify
+    case AccessKind_Deinit:
+      return .deinitialize
+    default:
+      fatalError("unsupported access kind")
+    }
+  }
+}
+
+
+// TODO: add support for begin_unpaired_access
+final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
+  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
+}
+
+public protocol ScopedInstruction {
+  associatedtype EndInstructions
+
+  var endInstructions: EndInstructions { get }
+}
+
+extension BeginAccessInst : ScopedInstruction {
+  public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndAccessInst?>>, EndAccessInst>
+
+  public var endInstructions: EndInstructions {
+    uses.lazy.compactMap({ $0.instruction as? EndAccessInst })
+  }
+}
 
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -543,6 +639,8 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
+final public
+class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
@@ -603,21 +701,26 @@ public class TermInst : Instruction {
   final public var successors: SuccessorArray {
     SuccessorArray(succArray: TermInst_getSuccessors(bridged))
   }
+  
+  public var isFunctionExiting: Bool { false }
 }
 
 final public class UnreachableInst : TermInst {
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class ThrowInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class YieldInst : TermInst {
 }
 
 final public class UnwindInst : TermInst {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class TryApplyInst : TermInst, FullApplySite {

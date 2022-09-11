@@ -61,16 +61,16 @@ bb2:
   return %2 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
+// CHECK-LABEL: sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error any Error) {
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
 // CHECK: bb{{.*}}:
-// CHECK:   [[ERR:%.*]] = alloc_existential_box $Error, $MyError
+// CHECK:   [[ERR:%.*]] = alloc_existential_box $any Error, $MyError
 // CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
-// CHECK:   throw [[ERR]] : $Error
+// CHECK:   throw [[ERR]] : $any Error
 // CHECK: bb{{.*}}:
 // CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
@@ -488,7 +488,7 @@ bb2:
   unwind
 }
 
-// CHECK-LABEL: sil [ossa] @begin_apply_caller : $@convention(method) (@guaranteed Klass) -> @error Error {
+// CHECK-LABEL: sil [ossa] @begin_apply_caller : $@convention(method) (@guaranteed Klass) -> @error any Error {
 // CHECK-NOT: begin_apply
 // CHECK: } // end sil function 'begin_apply_caller'
 sil [ossa] @begin_apply_caller : $@convention(method) (@guaranteed Klass) -> @error Error {
@@ -502,7 +502,7 @@ bb0(%0 : @guaranteed $Klass):
   return %19 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @begin_apply_caller_2 : $@convention(method) (@guaranteed Klass) -> @error Error {
+// CHECK-LABEL: sil [ossa] @begin_apply_caller_2 : $@convention(method) (@guaranteed Klass) -> @error any Error {
 // CHECK-NOT: begin_apply
 // CHECK: } // end sil function 'begin_apply_caller_2'
 sil [ossa] @begin_apply_caller_2 : $@convention(method) (@guaranteed Klass) -> @error Error {
@@ -516,7 +516,7 @@ bb0(%0 : @guaranteed $Klass):
   return %19 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @begin_apply_caller_3 : $@convention(method) (@guaranteed Klass) -> @error Error {
+// CHECK-LABEL: sil [ossa] @begin_apply_caller_3 : $@convention(method) (@guaranteed Klass) -> @error any Error {
 // CHECK-NOT: begin_apply
 // CHECK: } // end sil function 'begin_apply_caller_3'
 sil [ossa] @begin_apply_caller_3 : $@convention(method) (@guaranteed Klass) -> @error Error {
@@ -559,7 +559,7 @@ bb2:
 
 // Just make sure we actually inlined the begin_apply. We just want to make sure
 // we are not breaking ownership invariants by not properly borrowing %0.
-// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error Error {
+// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error any Error {
 // CHECK-NOT: begin_apply
 // CHECK: } // end sil function 'begin_apply_devirt_caller'
 sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error Error {
@@ -575,7 +575,7 @@ bb1:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error Error {
+// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error any Error {
 // CHECK-NOT: begin_apply
 // CHECK: } // end sil function 'begin_apply_devirt_caller_2'
 sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error Error {
@@ -591,7 +591,7 @@ bb1:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error Error {
+// CHECK-LABEL: sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error any Error {
 // CHECK-NOT: begin_apply
 // CHECK: } // end sil function 'begin_apply_devirt_caller_3'
 sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error Error {

@@ -63,16 +63,16 @@ func AddressOnly_cases(_ s: S) {
   _ = AddressOnly.nought
 
   // CHECK-NEXT:  [[METATYPE:%.*]] = metatype $@thin AddressOnly.Type
-  // CHECK-NEXT:  [[P_BUF:%.*]] = alloc_stack $P
+  // CHECK-NEXT:  [[P_BUF:%.*]] = alloc_stack $any P
   // CHECK-NEXT:  [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[P_BUF]]
   // CHECK-NEXT:  store %0 to [trivial] [[PAYLOAD_ADDR]]
   // CHECK-NEXT:  [[MERE:%.*]] = alloc_stack $AddressOnly
   // CHECK-NEXT:  [[PAYLOAD:%.*]] = init_enum_data_addr [[MERE]]
-  // CHECK-NEXT:  copy_addr [take] [[P_BUF]] to [initialization] [[PAYLOAD]] : $*P
+  // CHECK-NEXT:  copy_addr [take] [[P_BUF]] to [initialization] [[PAYLOAD]] : $*any P
   // CHECK-NEXT:  inject_enum_addr [[MERE]]
   // CHECK-NEXT:  destroy_addr [[MERE]]
   // CHECK-NEXT:  dealloc_stack [[MERE]]
-  // CHECK-NEXT:  dealloc_stack [[P_BUF]] : $*P
+  // CHECK-NEXT:  dealloc_stack [[P_BUF]] : $*any P
   _ = AddressOnly.mere(s)
 
   // Address-only enum vs loadable payload

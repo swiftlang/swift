@@ -141,7 +141,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
     }
     SanitizerKind kind = optKind.getValue();
 
-    // Support is determined by existance of the sanitizer library.
+    // Support is determined by existence of the sanitizer library.
     auto fileName = toFileName(kind);
     bool isShared = (kind != SanitizerKind::Fuzzer);
     bool sanitizerSupported = sanitizerRuntimeLibExists(fileName, isShared);

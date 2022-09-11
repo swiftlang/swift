@@ -40,6 +40,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalAlias.h"
@@ -556,7 +557,7 @@ static llvm::GlobalVariable *
 emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                StringRef name, StringRef section,
                llvm::GlobalValue::LinkageTypes linkage, llvm::Type *eltTy,
-               bool isConstant, bool asContiguousArray) {
+               bool isConstant, bool asContiguousArray, bool canBeStrippedByLinker = false) {
   // Do nothing if the list is empty.
   if (handles.empty()) return nullptr;
 
@@ -578,8 +579,12 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
       var->setSection(section);
       var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
       disableAddressSanitizer(IGM, var);
-      if (llvm::GlobalValue::isLocalLinkage(linkage))
-        IGM.addUsedGlobal(var);
+      if (llvm::GlobalValue::isLocalLinkage(linkage)) {
+        if (canBeStrippedByLinker)
+          IGM.addCompilerUsedGlobal(var);
+        else
+          IGM.addUsedGlobal(var);
+      }
 
       if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
         // Allow dead-stripping `var` (the runtime record from the global list)
@@ -616,8 +621,12 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
 
   // Mark the variable as used if doesn't have external linkage.
   // (Note that we'd specifically like to not put @llvm.used in itself.)
-  if (llvm::GlobalValue::isLocalLinkage(linkage))
-    IGM.addUsedGlobal(var);
+  if (llvm::GlobalValue::isLocalLinkage(linkage)) {
+    if (canBeStrippedByLinker)
+      IGM.addCompilerUsedGlobal(var);
+    else
+      IGM.addUsedGlobal(var);
+  }
   return var;
 }
 
@@ -927,6 +936,15 @@ static void markGlobalAsUsedBasedOnLinkage(IRGenModule &IGM, LinkInfo &link,
   // That mostly means we need to be good at not marking things external.
   if (link.isUsed())
     IGM.addUsedGlobal(global);
+  else if (!IGM.IRGen.Opts.shouldOptimize() &&
+           !IGM.IRGen.Opts.ConditionalRuntimeRecords &&
+           !IGM.IRGen.Opts.VirtualFunctionElimination &&
+           !IGM.IRGen.Opts.WitnessMethodElimination &&
+           !global->isDeclaration()) {
+    // llvm's pipeline has decide to run GlobalDCE as part of the O0 pipeline.
+    // Mark non public symbols as compiler used to counter act this.
+    IGM.addCompilerUsedGlobal(global);
+  }
 }
 
 bool LinkInfo::isUsed(IRLinkage IRL) {
@@ -960,6 +978,10 @@ void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
 /// This value must have a definition by the time the module is finalized.
 void IRGenModule::addCompilerUsedGlobal(llvm::GlobalValue *global) {
   LLVMCompilerUsed.push_back(global);
+}
+
+void IRGenModule::addGenericROData(llvm::Constant *RODataAddr) {
+  GenericRODatas.push_back(RODataAddr);
 }
 
 /// Add the given global value to the Objective-C class list.
@@ -1015,7 +1037,9 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
   assert(Section.substr(0, 2) == "__" && "expected the name to begin with __");
 
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("must know the object file format");
   case llvm::Triple::MachO:
@@ -1036,7 +1060,9 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
 void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
                                            ObjCLabelType Type) {
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("must know the object file format");
   case llvm::Triple::MachO:
@@ -1067,6 +1093,14 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
 
 void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
+    if (IRGen.Opts.EmitGenericRODatas) {
+      emitGlobalList(
+          *this, GenericRODatas, "generic_ro_datas",
+          GetObjCSectionName("__swift_rodatas", "regular"),
+          llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
+          /*asContiguousArray*/ true, /*canBeStrippedByLinker*/ true);
+    }
+
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
     emitGlobalList(
@@ -1643,7 +1677,9 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
 static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -1665,7 +1701,9 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
 static std::string getDynamicReplacementSomeSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -1905,6 +1943,7 @@ void IRGenerator::emitDynamicReplacements() {
       "\x01l_auto_dynamic_replacements_some", IGM.getPointerAlignment(),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
   autoReplVar2->setSection(getDynamicReplacementSomeSection(IGM));
+  IGM.addUsedGlobal(autoReplVar2);
 }
 
 void IRGenerator::emitEagerClassInitialization() {
@@ -2035,7 +2074,9 @@ void IRGenModule::emitVTableStubs() {
 static std::string getEntryPointSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
@@ -2221,15 +2262,15 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
 }
 
 static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
-  return cast<llvm::PointerType>(ptrTy)->getElementType() == objTy;
+  return cast<llvm::PointerType>(ptrTy)->getPointerElementType() == objTy;
 }
 
 /// Get or create an LLVM function with these linkage rules.
-llvm::Function *irgen::createFunction(IRGenModule &IGM,
-                                      LinkInfo &linkInfo,
+llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
                                       const Signature &signature,
                                       llvm::Function *insertBefore,
-                                      OptimizationMode FuncOptMode) {
+                                      OptimizationMode FuncOptMode,
+                                      StackProtectorMode stackProtect) {
   auto name = linkInfo.getName();
 
   llvm::Function *existing = IGM.Module.getFunction(name);
@@ -2260,8 +2301,8 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
                   linkInfo.getDLLStorage()})
       .to(fn, linkInfo.isForDefinition());
 
-  llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
+  llvm::AttrBuilder initialAttrs(IGM.getLLVMContext());
+  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode, stackProtect);
   // Merge initialAttrs with attrs.
   auto updatedAttrs = signature.getAttributes().addFnAttributes(
       IGM.getLLVMContext(), initialAttrs);
@@ -2412,6 +2453,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::MissingMember:
     llvm_unreachable("there are no global member placeholders");
 
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType made it to IRGen");
+
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
@@ -2466,9 +2510,23 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
+  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
   if (auto clangDecl = var->getClangDecl()) {
     auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
                                          forDefinition);
+
+    // Override the linkage computed by Clang if the decl is from another
+    // module that imported @_weakLinked.
+    //
+    // FIXME: We should be able to set the linkage unconditionally here but
+    //        some fixes are needed for Cxx interop.
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
+      auto varModule = var->getDecl()->getModuleContext();
+      if (getSwiftModule()->isImportedAsWeakLinked(varModule))
+        globalVar->setLinkage(link.getLinkage());
+    }
 
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
@@ -2482,7 +2540,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     return Address(addr, alignment);
   }
 
-  LinkEntity entity = LinkEntity::forSILGlobalVariable(var, *this);
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
 
   llvm::Type *storageType;
@@ -2528,7 +2585,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   auto gvar = Module.getGlobalVariable(link.getName(), /*allowInternal*/ true);
   if (gvar) {
     if (forDefinition)
@@ -3038,7 +3094,7 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   LinkInfo implLink = LinkInfo::get(*this, entity, ForDefinition);
   auto implFn =
       createFunction(*this, implLink, signature, nullptr /*insertBefore*/,
-                     f->getOptimizationMode());
+                     f->getOptimizationMode(), shouldEmitStackProtector(f));
   implFn->addFnAttr(llvm::Attribute::NoInline);
 
   IRGenFunction IGF(*this, implFn);
@@ -3110,7 +3166,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
 
   thunk->setCallingConv(llvm::CallingConv::C);
 
-  llvm::AttrBuilder attrBuilder;
+  llvm::AttrBuilder attrBuilder(IGM.getLLVMContext());
   IGM.constructInitialFnAttributes(attrBuilder);
   attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
   llvm::AttributeList attr = signature.getAttributes().addFnAttributes(
@@ -3145,6 +3201,12 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   subIGF.Builder.CreateRetVoid();
 
   return thunk;
+}
+
+StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
+  const SILOptions &opts = IRGen.SIL.getOptions();
+  return (opts.EnableStackProtection && f->needsStackProtection()) ?
+    StackProtectorMode::StackProtector : StackProtectorMode::NoStackProtector;
 }
 
 /// Find the entry point for a SIL function.
@@ -3197,6 +3259,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
   }
 
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   bool isDefinition = f->isDefinition();
   bool hasOrderNumber =
       isDefinition && !shouldCallPreviousImplementation;
@@ -3217,8 +3280,19 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (clangAddr) {
     fn = dyn_cast<llvm::Function>(clangAddr->stripPointerCasts());
 
-    // If we have a function, move it to the appropriate position.
     if (fn) {
+      if (!forDefinition) {
+        // Override the linkage computed by Clang if the decl is from another
+        // module that imported @_weakLinked.
+        //
+        // FIXME: We should be able to set the linkage unconditionally here but
+        //        some fixes are needed for Cxx interop.
+        if (auto *parentModule = f->getParentModule())
+          if (getSwiftModule()->isImportedAsWeakLinked(parentModule))
+            fn->setLinkage(link.getLinkage());
+      }
+
+      // If we have a function, move it to the appropriate position.
       if (hasOrderNumber) {
         auto &fnList = Module.getFunctionList();
         fnList.remove(fn);
@@ -3239,10 +3313,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
       getSignature(f->getLoweredFunctionType(), fpKind);
   addLLVMFunctionAttributes(f, signature);
 
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-
   fn = createFunction(*this, link, signature, insertBefore,
-                      f->getOptimizationMode());
+                      f->getOptimizationMode(), shouldEmitStackProtector(f));
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition
@@ -3354,7 +3426,7 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
 static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
                                          llvm::Type *newEltType) {
   auto ptrType = cast<llvm::PointerType>(ptr->getType());
-  if (ptrType->getElementType() == newEltType) {
+  if (ptrType->getPointerElementType() == newEltType) {
     return ptr;
   } else {
     auto newPtrType = newEltType->getPointerTo(ptrType->getAddressSpace());
@@ -3442,9 +3514,9 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     ? overrideDeclType
     : entity.getDefaultDeclarationType(*this);
   
-  auto &entry = GlobalVars[entity];
-  if (entry) {
-    auto existing = cast<llvm::GlobalValue>(entry);
+  auto existingGlobal = GlobalVars[entity];
+  if (existingGlobal) {
+    auto existing = cast<llvm::GlobalValue>(existingGlobal);
 
     // If we're looking to define something, we may need to replace a
     // forward declaration.
@@ -3464,12 +3536,12 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
       // Fall out to the case below, clearing the name so that
       // createVariable doesn't detect a collision.
-      entry->setName("");
+      existingGlobal->setName("");
 
     // Otherwise, we have a previous declaration or definition which
     // we need to ensure has the right type.
     } else {
-      return getElementBitCast(entry, defaultType);
+      return getElementBitCast(existingGlobal, defaultType);
     }
   }
 
@@ -3513,11 +3585,17 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     lazyInitializer->Create(var);
   }
 
+  if (lazyInitializer) {
+    // Protect against self-references that might've been created during
+    // the lazy emission.
+    existingGlobal = GlobalVars[entity];
+  }
+
   // If we have an existing entry, destroy it, replacing it with the
-  // new variable.
-  if (entry) {
-    auto existing = cast<llvm::GlobalValue>(entry);
-    auto castVar = llvm::ConstantExpr::getBitCast(var, entry->getType());
+  // new variable.  We only really have to do 
+  if (existingGlobal) {
+    auto existing = cast<llvm::GlobalValue>(existingGlobal);
+    auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
     existing->replaceAllUsesWith(castVar);
     existing->eraseFromParent();
   }
@@ -3540,7 +3618,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   }
 
   // Cache and return.
-  entry = var;
+  GlobalVars[entity] = var;
   return var;
 }
 
@@ -3875,7 +3953,9 @@ llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit protocols for "
                      "the selected object format.");
@@ -3973,7 +4053,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
@@ -4072,7 +4154,9 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
     break;
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit type metadata table for "
                      "the selected object format.");
@@ -4171,7 +4255,9 @@ void IRGenModule::emitAccessibleFunctions() {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit accessible functions for "
                      "the selected object format.");
@@ -4580,7 +4666,7 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   auto *ptrTy = cast<llvm::PointerType>(definition->getType());
   auto *alias = llvm::GlobalAlias::create(
-      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      ptrTy->getPointerElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), definition, &Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias);
@@ -5186,6 +5272,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
       llvm_unreachable("decl not allowed in type context");
+
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType made it to IRGen");
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:

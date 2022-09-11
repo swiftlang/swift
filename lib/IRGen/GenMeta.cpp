@@ -118,7 +118,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   disableAddressSanitizer(*this, var);
   
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::MachO:
@@ -406,7 +408,7 @@ void IRGenModule::addVTableTypeMetadata(
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
   }
 
-  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getValue();
+  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getKnownMinValue();
   setVCallVisibility(var, vis,
                      std::make_pair(minOffset, maxOffset + relptrSize));
 }
@@ -913,6 +915,10 @@ namespace {
         if (entry.getFunction().isAutoDiffDerivativeFunction())
           declRef = declRef.asAutoDiffDerivativeFunction(
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
+        if (entry.getFunction().isDistributedThunk()) {
+          flags = flags.withIsAsync(true);
+          declRef = declRef.asDistributed();
+        }
         addDiscriminator(flags, schema, declRef);
       }
 
@@ -2185,7 +2191,7 @@ namespace {
 
         auto *genericParam = O->getOpaqueGenericParams()[opaqueParamIdx];
         auto underlyingType =
-            Type(genericParam).subst(*unique)->getCanonicalType(sig);
+            Type(genericParam).subst(*unique)->getReducedType(sig);
         return IGM
             .getTypeRef(underlyingType, contextSig,
                         MangledTypeRefRole::Metadata)
@@ -2333,9 +2339,10 @@ namespace {
             for (unsigned condIndex : indices(conditions)) {
               const auto &condition = conditions[condIndex];
 
-              assert(condition.hasLowerEndpoint());
+              assert(condition.first.hasLowerEndpoint());
 
-              auto version = condition.getLowerEndpoint();
+              bool isUnavailability = condition.second;
+              auto version = condition.first.getLowerEndpoint();
               auto *major = getInt32Constant(version.getMajor());
               auto *minor = getInt32Constant(version.getMinor());
               auto *patch = getInt32Constant(version.getSubminor());
@@ -2347,6 +2354,13 @@ namespace {
 
               auto success = IGF.Builder.CreateICmpNE(
                   isAtLeast, llvm::Constant::getNullValue(IGM.Int32Ty));
+
+              if (isUnavailability) {
+                // Invert the result of "at least" check by xor'ing resulting
+                // boolean with `-1`.
+                success =
+                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+              }
 
               auto nextCondOrRet = condIndex == conditions.size() - 1
                                        ? returnTypeBB
@@ -2367,7 +2381,7 @@ namespace {
           auto universal = substitutionSet.back();
 
           assert(universal->getAvailability().size() == 1 &&
-                 universal->getAvailability()[0].isEmpty());
+                 universal->getAvailability()[0].first.isEmpty());
 
           IGF.Builder.CreateRet(
               getResultValue(IGF, genericEnv, universal->getSubstitutions()));
@@ -2438,7 +2452,7 @@ namespace {
         auto type =
             Type(O->getOpaqueGenericParams()[OpaqueParamIndex])
                 .subst(substitutions)
-                ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
+                ->getReducedType(O->getOpaqueInterfaceGenericSignature());
 
         type = genericEnv
                    ? genericEnv->mapTypeIntoContext(type)->getCanonicalType()
@@ -4031,6 +4045,8 @@ namespace {
       // Any bytes before this will be zeroed.  Currently we don't take
       // advantage of this.
       Size patternOffset = Size(0);
+      Size classROData = Size(0);
+      Size metaclassROData = Size(0);
 
       if (IGM.ObjCInterop) {
         // Add the metaclass object.
@@ -4045,13 +4061,27 @@ namespace {
           IGM.getOffsetInWords(patternOffset + roDataPoints.first));
         B.fillPlaceholderWithInt(*MetaclassRODataOffset, IGM.Int16Ty,
           IGM.getOffsetInWords(patternOffset + roDataPoints.second));
+        classROData = patternOffset + roDataPoints.first;
+        metaclassROData = patternOffset + roDataPoints.second;
       }
 
       auto patternSize = subB.getNextOffsetFromGlobal();
 
       auto global = subB.finishAndCreateGlobal("", IGM.getPointerAlignment(),
                                                /*constant*/ true);
+      if (IGM.ObjCInterop) {
+        auto getRODataAtOffset = [&] (Size offset) -> llvm::Constant * {
+          auto t0 = llvm::ConstantExpr::getBitCast(global, IGM.Int8PtrTy);
+          llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, offset.getValue())};
+          return llvm::ConstantExpr::getBitCast(
+            llvm::ConstantExpr::getInBoundsGetElementPtr(IGM.Int8Ty,
+                                                         t0, indices),
+            IGM.Int8PtrTy);
 
+        };
+        IGM.addGenericROData(getRODataAtOffset(classROData));
+        IGM.addGenericROData(getRODataAtOffset(metaclassROData));
+      }
       return { global, patternOffset, patternSize };
     }
 
@@ -4307,7 +4337,7 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   // Create the alias.
   auto *ptrTy = cast<llvm::PointerType>(metadata->getType());
   auto *alias = llvm::GlobalAlias::create(
-      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      ptrTy->getPointerElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
       link.getName(), metadata, &IGM.Module);
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias, link.isForDefinition());
@@ -5778,6 +5808,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
+  case KnownProtocolKind::CxxSequence:
+  case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
@@ -5871,6 +5903,9 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
     switch (auto kind = requirement.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::Layout:
       ++metadata.NumRequirements;
 
@@ -6139,7 +6174,7 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
     }
 
     CanGenericSignature reqSig =
-      IGM.Context.getOpenedArchetypeSignature(existentialType, genSig);
+      IGM.Context.getOpenedExistentialSignature(existentialType, genSig);
 
     CanType typeExpression;
     if (metatypeDepth > 0) {

@@ -372,6 +372,11 @@ Identifier NamedPattern::getBoundName() const {
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts,
                                    SourceLoc rp) {
+#ifndef NDEBUG
+  if (elts.size() == 1)
+    assert(!elts[0].getLabel().empty());
+#endif
+
   unsigned n = elts.size();
   void *buffer = C.Allocate(totalSizeToAlloc<TuplePatternElt>(n),
                             alignof(TuplePattern));
@@ -387,7 +392,7 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
-      elements[0].getPattern()->getBoundName().empty()) {
+      elements[0].getLabel().empty()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp);
   }

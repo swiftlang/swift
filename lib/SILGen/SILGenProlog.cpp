@@ -58,12 +58,15 @@ public:
   CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
   bool isNoImplicitCopy;
+  LifetimeAnnotation lifetimeAnnotation;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
                   CanSILFunctionType fnTy,
-                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy)
+                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy,
+                  LifetimeAnnotation lifetimeAnnotation)
       : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters),
-        isNoImplicitCopy(isNoImplicitCopy) {}
+        isNoImplicitCopy(isNoImplicitCopy),
+        lifetimeAnnotation(lifetimeAnnotation) {}
 
   ManagedValue visitType(CanType t, AbstractionPattern orig) {
     return visitType(t, orig, /*isInOut=*/false);
@@ -90,7 +93,8 @@ public:
     auto paramType =
         SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
-        paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy);
+        paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy,
+        lifetimeAnnotation);
 
     // This is a hack to deal with the fact that Self.Type comes in as a static
     // metatype, but we have to downcast it to a dynamic Self metatype to get
@@ -239,13 +243,14 @@ struct ArgumentInitHelper {
   unsigned getNumArgs() const { return ArgNo; }
 
   ManagedValue makeArgument(Type ty, bool isInOut, bool isNoImplicitCopy,
-                            SILBasicBlock *parent, SILLocation l) {
+                            LifetimeAnnotation lifetime, SILBasicBlock *parent,
+                            SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
     EmitBBArguments argEmitter(SGF, parent, l, f.getLoweredFunctionType(),
-                               parameters, isNoImplicitCopy);
+                               parameters, isNoImplicitCopy, lifetime);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     AbstractionPattern origTy = OrigFnType
@@ -256,14 +261,114 @@ struct ArgumentInitHelper {
     return argEmitter.visit(canTy, origTy);
   }
 
+  SILValue updateArgumentValueForBinding(ManagedValue argrv, SILLocation loc,
+                                         ParamDecl *pd, SILValue value,
+                                         const SILDebugVariable &varinfo) {
+    // If we do not need to support lexical lifetimes, just return value as the
+    // updated value.
+    if (!SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()))
+      return value;
+
+    // Look for the following annotations on the function argument:
+    // - @noImplicitCopy
+    // - @_eagerMove
+    // - @_lexical
+    auto isNoImplicitCopy = pd->isNoImplicitCopy();
+    auto lifetime = SGF.F.getLifetime(pd, value->getType());
+
+    // If we have a no implicit copy argument and the argument is trivial,
+    // we need to use copyable to move only to convert it to its move only
+    // form.
+    if (!isNoImplicitCopy) {
+      if (!value->getType().isMoveOnly()) {
+        // Follow the "normal path": perform a lexical borrow if the lifetime is
+        // lexical.
+        if (value->getOwnershipKind() == OwnershipKind::Owned) {
+          if (lifetime.isLexical()) {
+            value = SILValue(
+                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+          }
+        }
+        return value;
+      }
+
+      // At this point, we have a move only type.
+      if (value->getOwnershipKind() == OwnershipKind::Owned) {
+        value = SGF.B.createMoveValue(loc, argrv.forward(SGF),
+                                      /*isLexical*/ true);
+        value = SGF.B.createMarkMustCheckInst(
+            loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+        SGF.emitManagedRValueWithCleanup(value);
+        return value;
+      }
+
+      assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+      value = SGF.B.createCopyValue(loc, value);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getType().isTrivial(SGF.F)) {
+      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, value);
+      value = SGF.B.createMoveValue(loc, value, /*isLexical=*/true);
+
+      // If our argument was owned, we use no implicit copy. Otherwise, we
+      // use no copy.
+      auto kind = MarkMustCheckInst::CheckKind::NoCopy;
+      if (pd->isOwned())
+        kind = MarkMustCheckInst::CheckKind::NoImplicitCopy;
+      value = SGF.B.createMarkMustCheckInst(loc, value, kind);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      value = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, value);
+      value = SGF.B.createCopyValue(loc, value);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    if (value->getOwnershipKind() == OwnershipKind::Owned) {
+      // If we have an owned value, forward it into the mark_must_check to
+      // avoid an extra destroy_value.
+      value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(
+          loc, argrv.forward(SGF));
+      value = SGF.B.createMoveValue(loc, value, true /*is lexical*/);
+      value = SGF.B.createMarkMustCheckInst(
+          loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      SGF.emitManagedRValueWithCleanup(value);
+      return value;
+    }
+
+    return value;
+  }
+
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
   void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
     SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv =
-        makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(), parent, loc);
+    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+    bool isNoImplicitCopy = false;
+    if (pd->isSelfParameter()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
+        lifetimeAnnotation = afd->getLifetimeAnnotation();
+        isNoImplicitCopy = afd->isNoImplicitCopy();
+      }
+    } else {
+      lifetimeAnnotation = pd->getLifetimeAnnotation();
+      isNoImplicitCopy = pd->isNoImplicitCopy();
+    }
+
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
+                                      lifetimeAnnotation, parent, loc);
 
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -276,50 +381,15 @@ struct ArgumentInitHelper {
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
-      if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
-              SGF.getModule())) {
-        bool isNoImplicitCopy = false;
-        if (auto *arg = dyn_cast<SILFunctionArgument>(value))
-          isNoImplicitCopy = arg->isNoImplicitCopy();
-
-        // If we have a no implicit copy argument and the argument is trivial,
-        // we need to use copyable to move only to convert it to its move only
-        // form.
-        if (isNoImplicitCopy) {
-          bool originalValWasTrivial = false;
-          if (value->getType().isTrivial(SGF.F)) {
-            originalValWasTrivial = true;
-            value = SGF.B.createCopyableToMoveOnlyWrapperValue(loc, value);
-            SGF.emitManagedRValueWithCleanup(value);
-          }
-
-          if (value->getOwnershipKind() == OwnershipKind::Owned) {
-            value = SILValue(
-                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-            if (originalValWasTrivial)
-              value = SGF.B.createExplicitCopyValue(loc, value);
-            else
-              value = SGF.B.emitCopyValueOperation(loc, value);
-            if (!value->getType().isMoveOnlyWrapped())
-              value = SGF.B.createCopyableToMoveOnlyWrapperValue(loc, value);
-            value = SGF.B.createMarkMustCheckInst(
-                loc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
-            SGF.enterDestroyCleanup(value);
-          }
-        } else {
-          if (value->getOwnershipKind() == OwnershipKind::Owned) {
-            value = SILValue(
-                SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
-            SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
-          }
-        }
-      }
+      value = updateArgumentValueForBinding(argrv, loc, pd, value, varinfo);
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
         allocStack->setArgNo(ArgNo);
-        allocStack->setIsLexical();
+        if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
+                SGF.getModule()) &&
+            SGF.F.getLifetime(pd, value->getType()).isLexical())
+          allocStack->setIsLexical();
       } else {
         SGF.B.createDebugValueAddr(loc, value, varinfo);
       }
@@ -354,8 +424,9 @@ struct ArgumentInitHelper {
     Scope discardScope(SGF.Cleanups, CleanupLocation(PD));
 
     // Manage the parameter.
-    auto argrv = makeArgument(type, PD->isInOut(), PD->isNoImplicitCopy(),
-                              &*f.begin(), paramLoc);
+    auto argrv =
+        makeArgument(type, PD->isInOut(), PD->isNoImplicitCopy(),
+                     PD->getLifetimeAnnotation(), &*f.begin(), paramLoc);
 
     // Emit debug information for the argument.
     SILLocation loc(PD);
@@ -415,7 +486,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   // Local function to get the captured variable type within the capturing
   // context.
   auto getVarTypeInCaptureContext = [&]() -> Type {
-    auto interfaceType = VD->getInterfaceType()->getCanonicalType(
+    auto interfaceType = VD->getInterfaceType()->getReducedType(
         origGenericSig);
     return SGF.F.mapTypeIntoContext(interfaceType);
   };
@@ -548,19 +619,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                          capture, ++ArgNo);
   }
 
-  // Emit an unreachable instruction if a parameter type is
-  // uninhabited
-  if (paramList) {
-    for (auto *param : *paramList) {
-      if (param->getType()->isStructurallyUninhabited()) {
-        SILLocation unreachableLoc(param);
-        unreachableLoc.markAsPrologue();
-        B.createUnreachable(unreachableLoc);
-        break;
-      }
-    }
-  }
-
   // Whether the given declaration context is nested within an actor's
   // destructor.
   auto isInActorDestructor = [](DeclContext *dc) {
@@ -624,16 +682,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
-      // If this is an async function that has an isolated parameter, hop
-      // to it.
-      if (F.isAsync()) {
-        for (auto param : *funcDecl->getParameters()) {
-          if (param->isIsolated()) {
-            loadExpectedExecutorForLocalVar(param);
-            break;
-          }
-        }
-      }
       break;
 
     case ActorIsolation::ActorInstance: {
@@ -647,10 +695,19 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                 .getIsolatedParamCapture()) {
           loadExpectedExecutorForLocalVar(isolatedParam);
         } else {
-          assert(selfParam && "no self parameter for ActorInstance isolation");
           auto loc = RegularLocation::getAutoGeneratedLocation(F.getLocation());
-          ManagedValue selfArg = ManagedValue::forUnmanaged(F.getSelfArgument());
-          ExpectedExecutor = emitLoadActorExecutor(loc, selfArg);
+          ManagedValue actorArg;
+          if (actorIsolation.getActorInstanceParameter() == 0) {
+            assert(selfParam && "no self parameter for ActorInstance isolation");
+            auto selfArg = ManagedValue::forUnmanaged(F.getSelfArgument());
+            ExpectedExecutor = emitLoadActorExecutor(loc, selfArg);
+          } else {
+            unsigned isolatedParamIdx =
+                actorIsolation.getActorInstanceParameter() - 1;
+            auto param = funcDecl->getParameters()->get(isolatedParamIdx);
+            assert(param->isIsolated());
+            loadExpectedExecutorForLocalVar(param);
+          }
         }
       }
       break;
@@ -711,6 +768,21 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                     ExpectedExecutor);
     }
   }
+
+  // IMPORTANT: This block should be the last one in `emitProlog`, 
+  // since it terminates BB and no instructions should be insterted after it.
+  // Emit an unreachable instruction if a parameter type is
+  // uninhabited
+  if (paramList) {
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+        break;
+      }
+    }
+  }
 }
 
 SILValue SILGenFunction::emitMainExecutor(SILLocation loc) {
@@ -763,7 +835,7 @@ void SILGenFunction::emitPrologGlobalActorHop(SILLocation loc,
 }
 
 SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
-  CanType actorType = CanType(globalActor);
+  CanType actorType = globalActor->getCanonicalType();
   NominalTypeDecl *nominal = actorType->getNominalOrBoundGenericNominal();
   VarDecl *sharedInstanceDecl = nominal->getGlobalActorInstance();
   assert(sharedInstanceDecl && "no shared actor field in global actor");
@@ -797,6 +869,15 @@ SILValue SILGenFunction::emitLoadActorExecutor(SILLocation loc,
     actorV = actor.formalAccessBorrow(*this, loc).getValue();
   else
     actorV = actor.borrow(*this, loc).getValue();
+
+  // Open an existential actor type.
+  CanType actorType = actor.getType().getASTType();
+  if (actorType->isExistentialType()) {
+    actorType = OpenedArchetypeType::get(
+        actorType, F.getGenericSignature())->getCanonicalType();
+    SILType loweredActorType = getLoweredType(actorType);
+    actorV = B.createOpenExistentialRef(loc, actorV, loweredActorType);
+  }
 
   // For now, we just want to emit a hop_to_executor directly to the
   // actor; LowerHopToActor will add the emission logic necessary later.
@@ -852,7 +933,10 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
   if (!F.isAsync()) {
     llvm::report_fatal_error("Builtin.hopToActor must be in an async function");
   }
-  auto isolation = getActorIsolationOfContext(FunctionDC);
+  auto isolation =
+      getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
+        return CE->getActorIsolation();
+      });
   if (isolation != ActorIsolation::Independent
       && isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in independent
@@ -969,7 +1053,7 @@ uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
                                  Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
-  resultType = resultType->getCanonicalType(genericSig);
+  resultType = resultType->getReducedType(genericSig);
 
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()

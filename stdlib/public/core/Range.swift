@@ -229,6 +229,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   public var endIndex: Index { return upperBound }
 
   @inlinable
+  @inline(__always)
   public func index(after i: Index) -> Index {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 

@@ -180,7 +180,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
 static void computeExportContextBits(ASTContext &Ctx, Decl *D,
                                      bool *spi, bool *implicit, bool *deprecated,
                                      Optional<PlatformKind> *unavailablePlatformKind) {
-  if (D->isSPI())
+  if (D->isSPI() ||
+      D->isAvailableAsSPI())
     *spi = true;
 
   // Defer bodies are desugared to an implicit closure expression. We need to
@@ -1892,6 +1893,17 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 static void fixAvailabilityByAddingVersionCheck(
     ASTNode NodeToWrap, const VersionRange &RequiredRange,
     SourceRange ReferenceRange, ASTContext &Context) {
+  // If this is an implicit variable that wraps an expression,
+  // let's point to it's initializer. For example, result builder
+  // transform captures expressions into implicit variables.
+  if (auto *PB =
+          dyn_cast_or_null<PatternBindingDecl>(NodeToWrap.dyn_cast<Decl *>())) {
+    if (PB->isImplicit() && PB->getSingleVar()) {
+      if (auto *init = PB->getInit(0))
+        NodeToWrap = init;
+    }
+  }
+
   SourceRange RangeToWrap = NodeToWrap.getSourceRange();
   if (RangeToWrap.isInvalid())
     return;
@@ -3561,12 +3573,11 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   return false;
 }
 
-/// Diagnose uses of API annotated '@unavailableFromAsync' when used from
-/// asynchronous contexts.
-/// Returns true if a diagnostic was emitted, false otherwise.
+/// Diagnose misuses of API in asynchronous contexts.
+/// Returns true if a fatal diagnostic was emitted, false otherwise.
 static bool
-diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
-                                 const Expr *call, const ExportContext &Where) {
+diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
+                              const Expr *call, const ExportContext &Where) {
   // FIXME: I don't think this is right, but I don't understand the issue well
   //        enough to fix it properly. If the decl context is an abstract
   //        closure, we need it to have a type assigned to it before we can
@@ -3600,6 +3611,25 @@ diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
+
+  if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
+      assert(call && "No call calling async alternative function");
+      ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+
+      if (auto *accessor = dyn_cast<AccessorDecl>(asyncAlt)) {
+        SmallString<32> name;
+        llvm::raw_svector_ostream os(name);
+        accessor->printUserFacingName(os);
+        ctx.Diags.diagnose(asyncAlt->getLoc(),
+                           diag::descriptive_decl_declared_here, name);
+      } else {
+        ctx.Diags.diagnose(asyncAlt->getLoc(), diag::decl_declared_here,
+                           asyncAlt->getName());
+      }
+    }
+  }
+
   // @available(noasync) spelling
   if (const AvailableAttr *attr = D->getAttrs().getNoAsync(ctx)) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
@@ -3664,7 +3694,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
     return true;
 
-  if (diagnoseDeclUnavailableFromAsync(D, R, call, Where))
+  if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already

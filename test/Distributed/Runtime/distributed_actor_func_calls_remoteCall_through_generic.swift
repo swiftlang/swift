@@ -1,14 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// FIXME: rdar://96520492 Test fails on specific config: Tools Opt+Assert, Stdlib Opt+DebInfo+Assert, iOS_arm64e
-// UNSUPPORTED: CPU=arm64e
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib

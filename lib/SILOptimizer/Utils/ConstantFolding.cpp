@@ -1331,7 +1331,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
           Struct->getAllOperands(), std::back_inserter(Results),
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
-            auto ownershipKind = operandValue.getOwnershipKind();
+            auto ownershipKind = operandValue->getOwnershipKind();
 
             // First check if we are not compatible with guaranteed. This means
             // we would be Owned or Unowned. If so, return SILValue().
@@ -1365,7 +1365,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
           Tuple->getAllOperands(), std::back_inserter(Results),
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
-            auto ownershipKind = operandValue.getOwnershipKind();
+            auto ownershipKind = operandValue->getOwnershipKind();
 
             // First check if we are not compatible with guaranteed. This means
             // we would be Owned or Unowned. If so, return SILValue().

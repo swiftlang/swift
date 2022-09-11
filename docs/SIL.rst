@@ -1055,6 +1055,12 @@ the top-level `switch_enum`_.
 Cross-module references to this function should always use weak linking.
 ::
 
+  sil-function-attribute ::= '[stack_protection]'
+
+Stack protectors are inserted into this function to detect stack related
+buffer overflows.
+::
+
   sil-function-attribute ::= '[available' sil-version-tuple ']'
   sil-version-tuple ::= [0-9]+ ('.' [0-9]+)*
 
@@ -2570,6 +2576,224 @@ Consider the following legal SIL where we leak ``%0`` in blocks prefixed with
     return %1 : $Klass
   }
 
+Move Only Wrapped Types
+-----------------------
+
+Semantics
+~~~~~~~~~
+
+Today SIL supports values of move only wrapped type. Given a copyable type
+``$T``, the type ``$@moveOnly T`` is the move only wrapped variant of the
+type. This type is always non-trivial even if ``$T`` itself is trivial (see
+discussion below).  All move only wrapped types obey the invariant that they can
+be copied in Raw SIL but cannot be copied in Canonical SIL and later SIL
+stages. This ensures that once we are in Canonical SIL such values are "move
+only values" that are guaranteed to never be copied. This is enforced by:
+
+* Having SILGen emit copies as it normally does.
+
+* Use OSSA canonicalization to eliminate copies that aren't needed semantically
+  due to consuming uses of the value. This is implemented by the pass guaranteed
+  pass "MoveOnlyChecker". Emit errors on any of the consuming uses that we found
+  in said pass.
+
+Assuming that no errors are emitted, we can then conclude before we reach
+canonical SIL that the value was never copied and thus is a "move only value"
+even though the actual underlying wrapped type is copyable. As an example of
+this, consider the following Swift::
+
+  func doSomething(@_noImplicitCopy _ x: Klass) -> () { // expected-error {{'x' has guaranteed ownership but was consumed}}
+    x.doSomething()
+    let x2 = x // expected-note {{consuming use}}
+    x2.doSomething()
+  }
+
+which codegens to the following SIL::
+
+  sil hidden [ossa] @doSomething : $@convention(thin) (@guaranteed Klass) -> () {
+  bb0(%0 : @noImplicitCopy $Klass):
+    %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $@moveOnly Klass
+    %2 = copy_value %1 : $@moveOnly Klass
+    %3 = mark_must_check [no_copy] %2 : $@moveOnly Klass
+    debug_value %3 : $@moveOnly Klass, let, name "x", argno 1
+    %4 = begin_borrow %3 : $@moveOnly Klass
+    %5 = function_ref @$s4test5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
+    %6 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Klass
+    %7 = apply %5(%6) : $@convention(method) (@guaranteed Klass) -> ()
+    end_borrow %4 : $@moveOnly Klass
+    %9 = begin_borrow %3 : $@moveOnly Klass
+    %10 = copy_value %9 : $@moveOnly Klass
+    %11 = moveonlywrapper_to_copyable [owned] %10 : $@moveOnly Klass
+    %12 = begin_borrow [lexical] %11 : $Klass
+    debug_value %12 : $Klass, let, name "x2"
+    end_borrow %9 : $@moveOnly Klass
+    %15 = function_ref @$s4test5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
+    %16 = apply %15(%12) : $@convention(method) (@guaranteed Klass) -> ()
+    end_borrow %12 : $Klass
+    destroy_value %11 : $Klass
+    destroy_value %3 : $@moveOnly Klass
+    %20 = tuple ()
+    return %20 : $()
+  } // end sil function '$s4test11doSomethingyyAA5KlassCF'
+
+When the move only checker runs upon this SIL, it will see that the
+``moveonlywrapped_to_copyable [owned]`` is a transitive consuming use of ``%2``
+(ignoring copies) and that we have a non-consuming use later. So it will emit an
+error that we have a guaranteed parameter that is being consumed. If we remove
+the assignment to ``x2``, then after the move checker runs successfully we would
+get the following SIL::
+
+  sil hidden [ossa] @doSomething : $@convention(thin) (@guaranteed Klass) -> () {
+  bb0(%0 : @noImplicitCopy $Klass):
+    %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $Klass
+    debug_value %1 : $@moveOnly Klass, let, name "x", argno 1
+    %4 = begin_borrow %1 : $@moveOnly Klass
+    %5 = function_ref @$s4test5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
+    %6 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Klass
+    %7 = apply %5(%6) : $@convention(method) (@guaranteed Klass) -> ()
+    end_borrow %4 : $@moveOnly Klass
+    %20 = tuple ()
+    return %20 : $()
+  } // end sil function '$s4test11doSomethingyyAA5KlassCF'
+
+yielding SIL without any copies just as we wanted.
+
+At the ABI level, ``@moveOnly`` does not exist and thus never shows up in a
+SILFunctionType's parameters. Instead, we represent it only in the body of
+functions and on a function's internal SILArgument representation. This is since
+move only wrapped is intended to be a local power tool for controlling lifetimes
+rather than a viral type level annotation that would constrain the type system.
+
+As mentioned above trivial move only wrapped types are actually
+non-trivial. This is because in SIL ownership is tied directly to
+non-trivialness so unless we did that we could not track ownership
+accurately. This is loss of triviality is not an issue for most of the pipeline
+since we eliminate all move only wrapper types for trivial types during the
+guaranteed optimizations after we have run various ownership checkers but before
+we have run diagnostics for trivial types (e.x.: DiagnosticConstantPropagation).
+
+As an example in practice, consider the following Swift::
+
+  func doSomethingWithInt(@_noImplicitCopy _ x: Int) -> Int {
+    x + x
+  }
+
+Today this codegens to the following Swift::
+
+  sil hidden [ossa] @doSomethingWithInt : $@convention(thin) (Int) -> Int {
+  bb0(%0 : @noImplicitCopy $Int):
+    %1 = copyable_to_moveonlywrapper [owned] %0 : $Int
+    %2 = move_value [lexical] %1 : $@moveOnly Int
+    %3 = mark_must_check [no_implicit_copy] %2 : $@moveOnly Int
+    %5 = begin_borrow %3 : $@moveOnly Int
+    %6 = begin_borrow %3 : $@moveOnly Int
+    %7 = function_ref @addIntegers : $@convention(method) (Int, Int Int.Type) -> Int
+    %8 = moveonlywrapper_to_copyable [guaranteed] %5 : $@moveOnly Int
+    %9 = moveonlywrapper_to_copyable [guaranteed] %6 : $@moveOnly Int
+    %10 = apply %7(%8, %9) : $@convention(method) (Int, Int) -> Int
+    end_borrow %6 : $@moveOnly Int
+    end_borrow %5 : $@moveOnly Int
+    destroy_value %3 : $@moveOnly Int
+    return %10 : $Int
+  }
+
+once the checker has run, this becomes::
+
+  sil hidden [ossa] @doSomethingWithInt : $@convention(thin) (Int) -> Int {
+  bb0(%0 : @noImplicitCopy $Int):
+    %1 = copyable_to_moveonlywrapper [owned] %0 : $Int
+    %2 = move_value [lexical] %1 : $@moveOnly Int
+    %5 = begin_borrow %2 : $@moveOnly Int
+    %6 = begin_borrow %2 : $@moveOnly Int
+    %7 = function_ref @addIntegers : $@convention(method) (Int, Int Int.Type) -> Int
+    %8 = moveonlywrapper_to_copyable [guaranteed] %5 : $@moveOnly Int
+    %9 = moveonlywrapper_to_copyable [guaranteed] %6 : $@moveOnly Int
+    %10 = apply %7(%8, %9) : $@convention(method) (Int, Int) -> Int
+    end_borrow %6 : $@moveOnly Int
+    end_borrow %5 : $@moveOnly Int
+    return %10 : $Int
+  }
+
+and once we have run the move only wrapped type lowerer, we get the following
+SIL::
+
+  sil hidden [ossa] @doSomethingWithInt : $@convention(thin) (Int) -> Int {
+  bb0(%0 : @noImplicitCopy $Int):
+    %1 = function_ref @addIntegers : $@convention(method) (Int, Int) -> Int
+    %2 = apply %1(%0, %0) : $@convention(method) (Int, Int) -> Int
+    return %2 : $Int
+  }
+
+exactly what we wanted in the end.
+
+If we are given an owned argument or a let binding, we use a similar
+approach. Consider the following Swift::
+
+  func doSomethingWithKlass(_ x: Klass) -> Klass {
+    @_noImplicitCopy let value = x
+    let value2 = value
+    return value
+  }
+
+A hypothetical SILGen for this code is as follows::
+  
+  sil hidden [ossa] @$s4test20doSomethingWithKlassyAA0E0CADF : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
+  bb0(%0 : @guaranteed $Klass):
+    debug_value %0 : $Klass, let, name "x", argno 1
+    %3 = begin_borrow [lexical] %0 : $Klass
+    %4 = copy_value %3 : $Klass
+    %5 = copyable_to_moveonlywrapper [owned] %4 : $Klass
+    %6 = mark_must_check [no_implicit_copy] %5 : $@moveOnly Klass
+    debug_value %6 : $@moveOnly Klass, let, name "value"
+    %8 = begin_borrow %6 : $@moveOnly Klass
+    %9 = copy_value %8 : $@moveOnly Klass
+    %10 = moveonlywrapper_to_copyable [owned] %9 : $@moveOnly Klass
+    %11 = begin_borrow [lexical] %10 : $Klass
+    debug_value %11 : $Klass, let, name "value2"
+    end_borrow %8 : $@moveOnly Klass
+    %14 = begin_borrow %6 : $@moveOnly Klass
+    %15 = copy_value %14 : $@moveOnly Klass
+    end_borrow %14 : $@moveOnly Klass
+    end_borrow %11 : $Klass
+    destroy_value %10 : $Klass
+    destroy_value %6 : $@moveOnly Klass
+    end_borrow %3 : $Klass
+    %22 = moveonlywrapper_to_copyable [owned] %15 : $@moveOnly Klass
+    return %22 : $Klass
+  } // end sil function '$s4test20doSomethingWithKlassyAA0E0CADF'
+
+Notice above how the ``moveonlywrapper_to_copyable [owned]`` is used to escape
+the no implicit copy value. In fact, if one runs the following SILGen through
+sil-opt, one will see that we actually have an ownership violation due to the
+two uses of "value", one for initializing value2 and the other for the return
+value.
+
+Move Only Types
+---------------
+
+NOTE: This is experimental and is just an attempt to describe where the design
+is currently for others reading SIL today. It should not be interpreted as
+final.
+
+Currently there are two kinds of "move only types" in SIL: pure move only types
+that are always move only and move only wrapped types that are move only
+versions of copyable types. The invariant that values of Move Only type obey is
+that they can only be copied (e.x.: operand to a `copy_value`_, ``copy_addr [init]``) during the
+guaranteed passes when we are in Raw SIL. Once we are in non-Raw SIL though
+(i.e. Canonical and later SIL stages), a program is ill formed if one copies a
+move only type.
+
+The reason why we have this special rule for move only types is that this allows
+for SIL code generators to insert copies and then have a later guaranteed
+checker optimization pass recover the underlying move only semantics by
+reconstructing needed copies and removing unneeded copies using Ownership
+SSA. If any such copies are actually needed according to Ownership SSA, the
+checker pass emits a diagnostic stating that move semantics have been
+violated. If such a diagnostic is emitted then the checker pass transforms all
+copies on move only types to their explicit copy forms to ensure that once we
+leave the diagnostic passes and enter canonical SIL, our "copy" invariant is
+maintained.
+
 Runtime Failure
 ---------------
 
@@ -3680,6 +3904,22 @@ It is worth noting that a SIL DIExpression is similar to
 info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
 SIL DIExpression can have elements with various types, like AST nodes or strings.
 
+Profiling
+~~~~~~~~~
+
+increment_profiler_counter
+``````````````````````````
+::
+
+  sil-instruction ::= 'increment_profiler_counter' int-literal ',' string-literal ',' 'num_counters' int-literal ',' 'hash' int-literal
+
+  increment_profiler_counter 1, "$foo", num_counters 3, hash 0
+
+Increments a given profiler counter for a given PGO function name. This is
+lowered to the ``llvm.instrprof.increment`` LLVM intrinsic. This instruction
+is emitted when profiling is enabled, and enables features such as code coverage
+and profile-guided optimization.
+
 Accessing Memory
 ~~~~~~~~~~~~~~~~
 
@@ -4027,6 +4267,25 @@ operations::
 If ``T`` is a trivial type, then ``copy_addr`` is always equivalent to its
 take-initialization form.
 
+It is illegal in non-Raw SIL to apply ``copy_addr [init]`` to a value that is
+move only.
+
+explicit_copy_addr
+``````````````````
+::
+
+  sil-instruction ::= 'explicit_copy_addr' '[take]'? sil-value
+                        'to' '[initialization]'? sil-operand
+
+  explicit_copy_addr [take] %0 to [initialization] %1 : $*T
+  // %0 and %1 must be of the same $*T address type
+
+This instruction is exactly the same as `copy_addr`_ except that it has special
+behavior for move only types. Specifically, an `explicit_copy_addr`_ is viewed
+as a copy_addr that is allowed on values that are move only. This is only used
+by a move checker after it has emitted an error diagnostic to preserve the
+general ``copy_addr [init]`` ban in Canonical SIL on move only types.
+
 destroy_addr
 ````````````
 ::
@@ -4055,7 +4314,7 @@ index_addr
 ``````````
 ::
 
-  sil-instruction ::= 'index_addr' sil-operand ',' sil-operand
+  sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? sil-operand ',' sil-operand
 
   %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
   // %0 must be of an address type $*T
@@ -4070,6 +4329,9 @@ bytes within a value, using ``index_addr``. (``Int8`` address types have no
 special behavior in this regard, unlike ``char*`` or ``void*`` in C.) It is
 also undefined behavior to index out of bounds of an array, except to index
 the "past-the-end" address of the array.
+
+The ``stack_protection`` flag indicates that stack protection is done for
+the pointer origin.
 
 tail_addr
 `````````
@@ -4126,11 +4388,22 @@ bind_memory
 Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
 capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
 
-Produces a opaque token representing the previous memory state. For
-memory binding semantics, this state includes the type that the memory
-was previously bound to. The token cannot, however, be used to
-retrieve a metatype. It's value is only meaningful to the Swift
-runtime for typed pointer verification.
+Produces a opaque token representing the previous memory state for
+memory binding semantics. This abstract state includes the type that
+the memory was previously bound to along with the size of the affected
+memory region, which can be derived from ``%1``. The token cannot, for
+example, be used to retrieve a metatype. It only serves a purpose when
+used by ``rebind_memory``, which has no static type information. The
+token dynamically passes type information from the first bind_memory
+into a chain of rebind_memory operations.
+
+Example::
+
+  %_      = bind_memory %0   : $Builtin.RawPointer, %numT : $Builtin.Word to $T // holds type 'T'
+  %token0 = bind_memory %0   : $Builtin.RawPointer, %numU : $Builtin.Word to $U // holds type 'U'
+  %token1 = rebind_memory %0 : $Builtin.RawPointer, %token0 : $Builtin.Word  // holds type 'T'
+  %token2 = rebind_memory %0 : $Builtin.RawPointer, %token1 : $Builtin.Word  // holds type 'U'
+
 
 rebind_memory
 `````````````
@@ -4149,8 +4422,8 @@ This instruction's semantics are identical to ``bind_memory``, except
 that the types to which memory will be bound, and the extent of the
 memory region is unknown at compile time. Instead, the bound-types are
 represented by a token that was produced by a prior memory binding
-operation. ``%in_token`` must be the result of bind_memory or
-rebind_memory.
+operation. ``%in_token`` must be the result of ``bind_memory`` or
+``rebind_memory``.
 
 begin_access
 ````````````
@@ -4624,36 +4897,6 @@ swift closures to Objective C. A mandatory SIL pass will lower this instruction
 into a ``copy_block`` and a ``is_escaping``/``cond_fail``/``destroy_value`` at
 the end of the lifetime of the objective c closure parameter to check whether
 the sentinel closure was escaped.
-
-builtin "unsafeGuaranteed"
-``````````````````````````
-
-::
-
-  sil-instruction := 'builtin' '"unsafeGuaranteed"' '<' sil-type '>' '(' sil-operand')' ':' sil-type
-
-  %1 = builtin "unsafeGuaranteed"<T>(%0 : $T) : ($T, Builtin.Int1)
-  // $T must be of AnyObject type.
-
-Asserts that there exists another reference of the value ``%0`` for the scope
-delineated by the call of this builtin up to the first call of a ``builtin
-"unsafeGuaranteedEnd"`` instruction that uses the second element ``%1.1`` of the
-returned value. If no such instruction can be found nothing can be assumed. This
-assertion holds for uses of the first tuple element of the returned value
-``%1.0`` within this scope. The returned reference value equals the input
-``%0``.
-
-builtin "unsafeGuaranteedEnd"
-`````````````````````````````
-
-::
-
-  sil-instruction := 'builtin' '"unsafeGuaranteedEnd"' '(' sil-operand')'
-
-  %1 = builtin "unsafeGuaranteedEnd"(%0 : $Builtin.Int1)
-  // $T must be of AnyObject type.
-
-Ends the scope for the ``builtin "unsafeGuaranteed"`` instruction.
 
 Literals
 ~~~~~~~~
@@ -5365,6 +5608,8 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+It is illegal in non-Raw SIL to `copy_value`_ a value that is "move only".
+
 explicit_copy_value
 ```````````````````
 
@@ -5374,26 +5619,17 @@ explicit_copy_value
 
    %1 = explicit_copy_value %0 : $A
 
-Performs a copy of a loadable value as if by the value's type lowering and
-returns the copy. The returned copy semantically is a value that is completely
-independent of the operand. In terms of specific types:
-
-1. For trivial types, this is equivalent to just propagating through the trivial
-   value.
-2. For reference types, this is equivalent to performing a ``strong_retain``
-   operation and returning the reference.
-3. For ``@unowned`` types, this is equivalent to performing an
-   ``unowned_retain`` and returning the operand.
-4. For aggregate types, this is equivalent to recursively performing a
-   ``copy_value`` on its components, forming a new aggregate from the copied
-   components, and then returning the new aggregate.
-
-In ownership qualified functions, a ``explicit_copy_value`` produces a +1 value
-that must be consumed at most once along any path through the program.
-
-When move only variable checking is performed, ``explicit_copy_value`` is
+This is exactly the same instruction semantically as `copy_value`_ with the
+exception that when move only checking is performed, `explicit_copy_value`_ is
 treated as an explicit copy asked for by the user that should not be rewritten
 and should be treated as a non-consuming use.
+
+This is used for two things:
+
+1. Implementing a copy builtin for no implicit copy types.
+2. To enable the move checker, once it has emitted an error diagnostic, to still
+   produce valid Ownership SSA SIL at the end of the guaranteed optimization
+   pipeline when we enter the Canonical SIL stage.
 
 move_value
 ``````````
@@ -6331,7 +6567,7 @@ address_to_pointer
 ``````````````````
 ::
 
-  sil-instruction ::= 'address_to_pointer' sil-operand 'to' sil-type
+  sil-instruction ::= 'address_to_pointer' ('[' 'stack_protection' ']')? sil-operand 'to' sil-type
 
   %1 = address_to_pointer %0 : $*T to $Builtin.RawPointer
   // %0 must be of an address type $*T
@@ -6342,6 +6578,9 @@ Converting the result pointer back to an address of the same type will give
 an address equivalent to ``%0``. It is undefined behavior to cast the
 ``RawPointer`` to any address type other than its original address type or
 any `layout compatible types`_.
+
+The ``stack_protection`` flag indicates that stack protection is done for
+the pointer origin.
 
 pointer_to_address
 ``````````````````
@@ -7456,13 +7695,19 @@ mark_must_check
                       '[' sil-optimizer-analysis-marker ']'
 
   sil-optimizer-analysis-marker ::= 'no_implicit_copy'
+                                ::= 'no_copy'
 
 A canary value inserted by a SIL generating frontend to signal to the move
 checker to check a specific value.  Valid only in Raw SIL. The relevant checkers
 should remove the `mark_must_check`_ instruction after successfully running the
 relevant diagnostic. The idea here is that instead of needing to introduce
-multiple "flaging" instructions for the optimizer, we can just reuse this one
+multiple "flagging" instructions for the optimizer, we can just reuse this one
 instruction by varying the kind.
+
+If the sil optimizer analysis marker is ``no_implicit_copy`` then the move
+checker is told to check that the result of this instruction is consumed at most
+once. If the marker is ``no_copy``, then the move checker will validate that the
+result of this instruction is never consumed.
 
 No Implicit Copy and No Escape Value Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

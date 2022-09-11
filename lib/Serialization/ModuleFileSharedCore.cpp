@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFileSharedCore.h"
-#include "ModuleFileCoreTableInfo.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFileCoreTableInfo.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -282,9 +283,9 @@ static ValidationInfo validateControlBlock(
       }
       case 4:
         if (scratch[3] != 0) {
-          result.compatibilityVersion =
-            version::Version(blobData.substr(scratch[2]+1, scratch[3]),
-                             SourceLoc(), nullptr);
+          result.compatibilityVersion = *VersionParser::parseVersionString(
+              blobData.substr(scratch[2] + 1, scratch[3]), SourceLoc(),
+              nullptr);
         }
         LLVM_FALLTHROUGH;
       case 3:
@@ -359,7 +360,7 @@ static ValidationInfo validateControlBlock(
       StringRef moduleRevision = blobData;
       if (isCompilerTagged) {
         StringRef compilerRevision = forcedDebugRevision ?
-          forcedDebugRevision : version::getSwiftRevision();
+          forcedDebugRevision : version::getCurrentCompilerTag();
         if (moduleRevision != compilerRevision) {
           result.status = Status::RevisionIncompatible;
 
@@ -564,6 +565,8 @@ void ModuleFileSharedCore::fatal(llvm::Error error) const {
   llvm::raw_svector_ostream out(errorStr);
 
   out << "*** DESERIALIZATION FAILURE ***\n";
+  out << "*** If any module named here was modified in the SDK, please delete the ***\n";
+  out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
   outputDiagnosticInfo(out);
   out << "\n";
   if (error) {
@@ -838,6 +841,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(GenericSignatures, scratch);
+        break;
+      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(GenericEnvironments, scratch);
         break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());

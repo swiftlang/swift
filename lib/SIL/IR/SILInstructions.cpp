@@ -438,6 +438,22 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
       Substitutions(Subs) {
 }
 
+IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
+    SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
+    unsigned NumCounters, uint64_t PGOFuncHash, SILModule &M) {
+
+  auto PGOFuncNameLength = PGOFuncName.size();
+  auto Size = totalSizeToAlloc<char>(PGOFuncNameLength);
+  auto Buffer = M.allocateInst(Size, alignof(IncrementProfilerCounterInst));
+
+  auto *Inst = ::new (Buffer) IncrementProfilerCounterInst(
+      Loc, CounterIdx, PGOFuncNameLength, NumCounters, PGOFuncHash);
+
+  std::uninitialized_copy(PGOFuncName.begin(), PGOFuncName.end(),
+                          Inst->getTrailingObjects<char>());
+  return Inst;
+}
+
 InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
@@ -686,7 +702,7 @@ SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
 ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
     SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions) {
   if (DerivativeFunctions.empty())
-    return OriginalFunction.getOwnershipKind();
+    return OriginalFunction->getOwnershipKind();
   return mergeSILValueOwnership(
       {OriginalFunction, DerivativeFunctions[0], DerivativeFunctions[1]});
 }
@@ -1170,6 +1186,15 @@ CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
     sharedUInt8().CopyAddrInst.isTakeOfSrc = bool(isTakeOfSrc);
     sharedUInt8().CopyAddrInst.isInitializationOfDest =
       bool(isInitializationOfDest);
+  }
+
+  ExplicitCopyAddrInst::ExplicitCopyAddrInst(
+      SILDebugLocation Loc, SILValue SrcLValue, SILValue DestLValue,
+      IsTake_t isTakeOfSrc, IsInitialization_t isInitializationOfDest)
+      : InstructionBase(Loc), Operands(this, SrcLValue, DestLValue) {
+    sharedUInt8().ExplicitCopyAddrInst.isTakeOfSrc = bool(isTakeOfSrc);
+    sharedUInt8().ExplicitCopyAddrInst.isInitializationOfDest =
+        bool(isInitializationOfDest);
   }
 
 BindMemoryInst *
@@ -2740,7 +2765,7 @@ static void computeAggregateFirstLevelSubtypeInfo(
   Projection::getFirstLevelProjections(OpType, M, F.getTypeExpansionContext(),
                                        Projections);
 
-  auto OpOwnershipKind = Operand.getOwnershipKind();
+  auto OpOwnershipKind = Operand->getOwnershipKind();
   for (auto &P : Projections) {
     SILType ProjType = P.getType(OpType, M, F.getTypeExpansionContext());
     Types.emplace_back(ProjType);

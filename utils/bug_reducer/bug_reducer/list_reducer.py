@@ -92,7 +92,7 @@ class ListReducer(object):
             self._reset_progress()
             return False
 
-        assert(result == TESTRESULT_NOFAILURE)
+        assert result == TESTRESULT_NOFAILURE
         # The property does not hold. Some of the elements we removed must
         # be necessary to maintain the property.
         self.mid_top = mid
@@ -165,7 +165,7 @@ class ListReducer(object):
     def reduce_list(self):
         random.seed(0x6e5ea738)  # Seed the random number generator
         (result, self.target_list, kept) = self.run_test(self.target_list, [])
-        assert(result in TESTRESULTS)
+        assert result in TESTRESULTS
         (should_continue, result) = self._should_continue(result)
         if not should_continue:
             return result

@@ -768,3 +768,43 @@ bb3(%borrowphi : @guaranteed $Klass):
   %99 = tuple ()
   return %99 : $()
 }
+
+// CHECK: Error#: 0. Begin Error in Function: 'test_scope_end_order1'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %3 = begin_borrow %1 : $Klass                   // users: %5, %4
+// CHECK: Consuming User:   end_borrow %3 : $Klass                          // id: %5
+// CHECK: Non Consuming User:   end_borrow %4 : $*Klass                         // id: %6
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'test_scope_end_order1'
+sil [ossa] @test_scope_end_order1 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %stk = alloc_stack $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %ra = store_borrow %borrow to %stk : $*Klass
+  end_borrow %borrow : $Klass
+  end_borrow %ra : $*Klass
+  destroy_value %copy : $Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test_scope_end_order2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = load_borrow %0 : $*Klass                   // users: %4, %3
+// CHECK: Consuming User:   end_borrow %2 : $Klass                          // id: %4
+// CHECK: Non Consuming User:   end_borrow %3 : $*Klass                         // id: %5
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'test_scope_end_order2'
+sil [ossa] @test_scope_end_order2 : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %stk = alloc_stack $Klass
+  %borrow = load_borrow %0 : $*Klass
+  %ra = store_borrow %borrow to %stk : $*Klass
+  end_borrow %borrow : $Klass
+  end_borrow %ra : $*Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}

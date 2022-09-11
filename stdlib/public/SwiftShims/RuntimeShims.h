@@ -21,6 +21,7 @@
 #include "SwiftStdbool.h"
 #include "SwiftStddef.h"
 #include "SwiftStdint.h"
+#include "SwiftStdbool.h"
 #include "Visibility.h"
 
 #ifdef __cplusplus
@@ -61,6 +62,12 @@ int _swift_stdlib_putc_stderr(int C);
 
 SWIFT_RUNTIME_STDLIB_API
 __swift_size_t _swift_stdlib_getHardwareConcurrency(void);
+
+#ifdef __swift__
+/// Called by ReflectionMirror in stdlib through C-calling-convention
+SWIFT_RUNTIME_STDLIB_API
+__swift_bool swift_isClassType(const void *type);
+#endif
 
 /// Manually allocated memory is at least 16-byte aligned in Swift.
 ///

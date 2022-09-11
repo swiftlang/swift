@@ -1,9 +1,10 @@
 // REQUIRES: OS=macosx
+// UNSUPPORTED: CPU=arm64e
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/includes)
 
 // Build external Swift library/module to also check conformances to external protocols
-// RUN: %target-build-swift %S/Inputs/swiftmodules/testModB.swift -parse-as-library -emit-module -emit-library -module-name testModB -o %t/includes/testModB.o
+// RUN: %target-build-swift %S/Inputs/swiftmodules/testModB.swift -parse-as-library -target %target-cpu-apple-macosx10.15 -emit-module -emit-library -module-name testModB -o %t/includes/testModB.o
 
 // RUN: %target-build-swift %s -parse-as-library -target %target-cpu-apple-macosx10.15 -I %t/includes -emit-module -emit-library -module-name AssociatedTypeRequirements -o %t/AssociatedTypeRequirements %t/includes/testModB.o
 

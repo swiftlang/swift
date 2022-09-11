@@ -121,15 +121,6 @@ class DarwinPlatform(Platform):
         # The names match up with the xcrun SDK names.
         xcrun_sdk_name = self.name
 
-        # 32-bit iOS and iOS simulator are supported, but are not covered
-        # by the SDK settings. Handle this special case here.
-        if (xcrun_sdk_name == 'iphoneos' and
-           (arch == 'armv7' or arch == 'armv7s')):
-            return True
-
-        if (xcrun_sdk_name == 'iphonesimulator' and arch == 'i386'):
-            return True
-
         sdk_path = xcrun.sdk_path(sdk=xcrun_sdk_name, toolchain=toolchain)
         if not sdk_path:
             raise RuntimeError('Cannot find SDK path for %s' % xcrun_sdk_name)
@@ -214,6 +205,14 @@ class AndroidPlatform(Platform):
         return config_file
 
 
+class OpenBSDPlatform(Platform):
+    def cmake_options(self, args):
+        toolchain_file = os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
+        if not toolchain_file:
+            return ''
+        return f'-DCMAKE_TOOLCHAIN_FILE="${toolchain_file}"'
+
+
 class Target(object):
     """
     Abstract representation of a target Swift can run on.
@@ -234,14 +233,11 @@ class StdlibDeploymentTarget(object):
     OSX = DarwinPlatform("macosx", archs=["x86_64", "arm64"],
                          sdk_name="OSX")
 
-    iOS = DarwinPlatform("iphoneos", archs=["armv7", "armv7s", "arm64", "arm64e"],
+    iOS = DarwinPlatform("iphoneos", archs=["arm64", "arm64e"],
                          sdk_name="IOS")
-    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["i386", "x86_64", "arm64"],
+    iOSSimulator = DarwinPlatform("iphonesimulator", archs=["x86_64", "arm64"],
                                   sdk_name="IOS_SIMULATOR",
                                   is_simulator=True)
-
-    # Never build/test benchmarks on iOS armv7s.
-    iOS.armv7s.supports_benchmark = False
 
     AppleTV = DarwinPlatform("appletvos", archs=["arm64"],
                              sdk_name="TVOS")
@@ -277,7 +273,7 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
-    OpenBSD = Platform("openbsd", archs=["amd64"])
+    OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 

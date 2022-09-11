@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/53305
+
 struct Data {
   init<S: Sequence>(_: S) where S.Element == UInt8 {
   }

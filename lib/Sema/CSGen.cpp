@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "TypeCheckRegex.h"
 #include "TypeChecker.h"
@@ -868,7 +869,7 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getRawType(), elt.getName());
+          result.emplace_back(elt.getType(), elt.getName());
         return;
       }
       case TypeKind::Paren: {
@@ -890,6 +891,11 @@ namespace {
       // that member through the base returns a value convertible to the type
       // of this expression.
       auto baseTy = CS.getType(base);
+      if (isa<ErrorExpr>(base)) {
+        return CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::Member),
+            TVO_CanBindToHole);
+      }
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   TVO_CanBindToLValue | TVO_CanBindToNoEscape);
@@ -1068,19 +1074,11 @@ namespace {
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      if (!CS.isForCodeCompletion())
-        return nullptr;
+      CS.recordFix(
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(E)));
 
-      // For code completion, treat error expressions that don't contain
-      // the completion location itself as holes. If an ErrorExpr contains the
-      // code completion location, a fallback typecheck is called on the
-      // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
-      // independent of the wider expression containing the ErrorExpr, so
-      // there's no point attempting to produce a solution for it.
-      if (CS.containsCodeCompletionLoc(E))
-        return nullptr;
-
-      return PlaceholderType::get(CS.getASTContext(), E);
+      return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                   TVO_CanBindToHole);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1374,7 +1372,11 @@ namespace {
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, resCtx, genericOpener, placeholderHandler);
       if (result->hasError()) {
-        return Type();
+        CS.recordFix(
+            IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
+
+        return CS.createTypeVariable(CS.getConstraintLocator(repr),
+                                     TVO_CanBindToHole);
       }
       // Diagnose top-level usages of placeholder types.
       if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1600,7 +1602,11 @@ namespace {
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
-      
+
+      if (baseTy->isTypeVariableOrMember()) {
+        return baseTy;
+      }
+
       // We currently only support explicit specialization of generic types.
       // FIXME: We could support explicit function specialization.
       auto &de = CS.getASTContext().Diags;
@@ -1757,11 +1763,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-
-      auto &ctx = CS.getASTContext();
-      auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
-      auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
-      return ParenType::get(ctx, parenType, parenFlags);
+      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2160,6 +2162,8 @@ namespace {
 
           closureParams.push_back(param->toFunctionParam(externalType));
         }
+
+        checkVariadicParameters(paramList, closure);
       }
 
       auto extInfo = CS.closureEffects(closure);
@@ -2264,9 +2268,11 @@ namespace {
               ->getUnderlyingType();
         }
 
-        auto underlyingType =
-            getTypeForPattern(paren->getSubPattern(), locator,
-                              externalPatternType, bindPatternVarsOneWay);
+        auto *subPattern = paren->getSubPattern();
+        auto underlyingType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            externalPatternType, bindPatternVarsOneWay);
 
         if (!underlyingType)
           return Type();
@@ -2285,11 +2291,34 @@ namespace {
         return setType(type);
       }
       case PatternKind::Any: {
-        return setType(
-            externalPatternType
-                ? externalPatternType
-                : CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToNoEscape));
+        Type type;
+
+        // If this is a situation like `[let] _ = <expr>`, return
+        // initializer expression.
+        auto getInitializerExpr = [&locator]() -> Expr * {
+          auto last = locator.last();
+          if (!last)
+            return nullptr;
+
+          auto contextualTy = last->getAs<LocatorPathElt::ContextualType>();
+          return (contextualTy && contextualTy->isFor(CTP_Initialization))
+                     ? locator.trySimplifyToExpr()
+                     : nullptr;
+        };
+
+        // Always prefer a contextual type when it's available.
+        if (externalPatternType) {
+          type = externalPatternType;
+        } else if (auto *initializer = getInitializerExpr()) {
+          // For initialization always assume a type of initializer.
+          type = CS.getType(initializer)->getRValueType();
+        } else {
+          type = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      ConstraintLocator::AnyPatternDecl),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
+        }
+        return setType(type);
       }
 
       case PatternKind::Named: {
@@ -2322,8 +2351,10 @@ namespace {
         }
 
         if (!varType) {
-          varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                          TVO_CanBindToNoEscape);
+          varType = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      LocatorPathElt::NamedPatternDecl()),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
           // If this is either a `weak` declaration or capture e.g.
           // `weak var ...` or `[weak self]`. Let's wrap type variable
@@ -2668,7 +2699,9 @@ namespace {
           // and we're matching the type of that subpattern to the parameter
           // types.
           Type subPatternType = getTypeForPattern(
-              subPattern, locator, Type(), bindPatternVarsOneWay);
+              subPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+              Type(), bindPatternVarsOneWay);
 
           if (!subPatternType)
             return Type();
@@ -3517,6 +3550,26 @@ namespace {
       return tv;
     }
 
+    Type visitTypeJoinExpr(TypeJoinExpr *expr) {
+      auto *locator = CS.getConstraintLocator(expr);
+      SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
+      elements.reserve(expr->getNumElements());
+
+      for (auto *element : expr->getElements()) {
+        elements.emplace_back(CS.getType(element),
+                              CS.getConstraintLocator(element));
+      }
+
+      auto resultTy = CS.getType(expr->getVar());
+      // The type of a join expression is obtained by performing
+      // a "join-meet" operation on deduced types of its elements
+      // and the underlying variable.
+      auto joinedTy = CS.addJoinConstraint(locator, elements);
+
+      CS.addConstraint(ConstraintKind::Equal, resultTy, joinedTy, locator);
+      return resultTy;
+    }
+
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
                                                    ASTContext &Context) {
       auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());
@@ -4157,6 +4210,7 @@ bool ConstraintSystem::generateConstraints(
       print(log, expr);
       log << "\n";
       print(log);
+      log << "\n";
     }
 
     return false;

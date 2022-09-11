@@ -620,20 +620,14 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     // If the explicit protocol for the left-hand side is implied by
     // the explicit protocol for the right-hand side, the left-hand
     // side supersedes the right-hand side.
-    for (auto rhsProtocol : rhsExplicitProtocol->getAllProtocols()) {
-      if (rhsProtocol == lhsExplicitProtocol) {
-        return Ordering::Before;
-      }
-    }
+    if (rhsExplicitProtocol->inheritsFrom(lhsExplicitProtocol))
+      return Ordering::Before;
 
     // If the explicit protocol for the right-hand side is implied by
     // the explicit protocol for the left-hand side, the right-hand
     // side supersedes the left-hand side.
-    for (auto lhsProtocol : lhsExplicitProtocol->getAllProtocols()) {
-      if (lhsProtocol == rhsExplicitProtocol) {
-        return Ordering::After;
-      }
-    }
+    if (lhsExplicitProtocol->inheritsFrom(rhsExplicitProtocol))
+      return Ordering::After;
   }
 
   // Prefer the least conditional implier, which we approximate by seeing if one
@@ -880,13 +874,18 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     entry->Conformance =
         ctx.getInheritedConformance(type, inheritedConformance.getConcrete());
   } else {
-    // Create or find the normal conformance.
-    Type conformingType = conformingDC->getDeclaredInterfaceType();
+    // Protocols don't have conformance lookup tables. Self-conformance is
+    // handled directly in lookupConformance().
+    assert(!isa<ProtocolDecl>(conformingNominal));
+    assert(!isa<ProtocolDecl>(conformingDC->getSelfNominalTypeDecl()));
+    Type conformingType = conformingDC->getSelfInterfaceType();
+
     SourceLoc conformanceLoc
       = conformingNominal == conformingDC
           ? conformingNominal->getLoc()
           : cast<ExtensionDecl>(conformingDC)->getLoc();
 
+    // Create or find the normal conformance.
     auto normalConf =
         ctx.getConformance(conformingType, protocol, conformanceLoc,
                            conformingDC, ProtocolConformanceState::Incomplete,

@@ -735,7 +735,7 @@ SILValue EagerDispatch::emitArgumentConversion(
                                            LoadOwnershipQualifier::Take);
     } else {
       Val = Builder.emitLoadBorrowOperation(Loc, CastArg);
-      if (Val.getOwnershipKind() == OwnershipKind::Guaranteed)
+      if (Val->getOwnershipKind() == OwnershipKind::Guaranteed)
         ArgAtIndexNeedsEndBorrow.push_back(CallArgs.size());
     }
     CallArgs.push_back(Val);

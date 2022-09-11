@@ -194,6 +194,8 @@ protected:
     SHARED_FIELD(EndAccessInst, bool aborting);
     SHARED_FIELD(RefElementAddrInst, bool immutable);
     SHARED_FIELD(RefTailAddrInst, bool immutable);
+    SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
+    SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
     SHARED_FIELD(DestroyValueInst, bool poisonRefs);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
@@ -216,6 +218,10 @@ protected:
       numTailTypes: NumAllocRefTailTypesBits);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
+      isTakeOfSrc : 1,
+      isInitializationOfDest : 1);
+
+    SHARED_FIELD(ExplicitCopyAddrInst, uint8_t
       isTakeOfSrc : 1,
       isInitializationOfDest : 1);
 

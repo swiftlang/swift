@@ -32,13 +32,13 @@ func owl3() {
   Owl<Spoon>().eat(Mince(), with:Spoon())
 }
 
-// "Can't access associated types through class-constrained generic parameters"
-// (https://bugs.swift.org/browse/SR-726)
+// https://github.com/apple/swift/issues/43341
+// Can't access associated types through class-constrained generic parameters
 func spoon<S: Spoon>(_ s: S) {
   let _: S.Runcee?
 }
 
-// SR-4143
+// https://github.com/apple/swift/issues/46726
 
 protocol SameTypedDefault {
     associatedtype X
@@ -109,15 +109,15 @@ struct UsesSameTypedDefaultDerivedWithoutSatisfyingReqts: SameTypedDefaultDerive
     static var y: YType { return YType() }
 }
 
-// SR-12199
+// https://github.com/apple/swift/issues/54624
 
-protocol SR_12199_P1 {
+protocol P1_54624 {
   associatedtype Assoc // expected-note {{'Assoc' declared here}}
 }
 
-enum SR_12199_E {}
+enum E_54624 {}
 
-protocol SR_12199_P2: SR_12199_P1 where Assoc == SR_12199_E {
-  associatedtype Assoc: SR_12199_E // expected-error {{type 'Self.Assoc' constrained to non-protocol, non-class type 'SR_12199_E'}}
-  // expected-warning@-1 {{redeclaration of associated type 'Assoc' from protocol 'SR_12199_P1' is better expressed as a 'where' clause on the protocol}}
+protocol P2_54624: P1_54624 where Assoc == E_54624 {
+  associatedtype Assoc: E_54624 // expected-error {{type 'Self.Assoc' constrained to non-protocol, non-class type 'E_54624'}}
+  // expected-warning@-1 {{redeclaration of associated type 'Assoc' from protocol 'P1_54624' is better expressed as a 'where' clause on the protocol}}
 }

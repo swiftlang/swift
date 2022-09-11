@@ -75,34 +75,40 @@ func r22451001() -> AnyObject {}
 print(r22451001(5))  // expected-error {{argument passed to call that takes no arguments}}
 
 
-// SR-590 Passing two parameters to a function that takes one argument of type Any crashes the compiler
-// SR-1028: Segmentation Fault: 11 when superclass init takes parameter of type 'Any'
-func sr590(_ x: Any) {}  // expected-note {{'sr590' declared here}}
-sr590(3,4) // expected-error {{extra argument in call}}
-sr590() // expected-error {{missing argument for parameter #1 in call}}
-// Make sure calling with structural tuples still works.
-sr590(())
-sr590((1, 2))
+/// https://github.com/apple/swift/issues/43207
+/// Passing two parameters to a function that takes one argument of type `Any`
+/// crashes the compiler
+do {
+  func f(_ x: Any) {}  // expected-note {{'f' declared here}}
 
-// SR-2657: Poor diagnostics when function arguments should be '@escaping'.
-private class SR2657BlockClass<T> { // expected-note 4 {{generic parameters are always considered '@escaping'}}
-  let f: T
-  init(f: T) { self.f = f }
+  f(3,4) // expected-error {{extra argument in call}}
+  f() // expected-error {{missing argument for parameter #1 in call}}
+  // Make sure calling with structural tuples still works.
+  f(())
+  f((1, 2))
 }
 
-func takesAny(_: Any) {}
+/// https://github.com/apple/swift/issues/45262
+/// Poor diagnostics when function arguments should be `@escaping`
+func f_45262(block: () -> (), other: () -> Int) {
 
-func foo(block: () -> (), other: () -> Int) {
-  let _ = SR2657BlockClass(f: block)
+  class C<T> { // expected-note 4 {{generic parameters are always considered '@escaping'}}
+    let f: T
+    init(f: T) { self.f = f }
+  }
+
+  func takesAny(_: Any) {}
+
+  let _ = C(f: block)
   // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
-  let _ = SR2657BlockClass<()->()>(f: block)
+  let _ = C<()->()>(f: block)
   // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
-  let _: SR2657BlockClass<()->()> = SR2657BlockClass(f: block)
+  let _: C<()->()> = C(f: block)
   // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
-  let _: SR2657BlockClass<()->()> = SR2657BlockClass<()->()>(f: block)
+  let _: C<()->()> = C<()->()>(f: block)
   // expected-error@-1 {{converting non-escaping parameter 'block' to generic parameter 'T' may allow it to escape}}
-  _ = SR2657BlockClass<Any>(f: block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
-  _ = SR2657BlockClass<Any>(f: other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  _ = C<Any>(f: block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  _ = C<Any>(f: other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   takesAny(block)  // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   takesAny(other) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
 }
@@ -140,7 +146,8 @@ protocol Q {
   associatedtype U : P
 }
 
-func sr10811(_ fn: () -> Int) {
+// https://github.com/apple/swift/issues/53201
+func f_53201(_ fn: () -> Int) {
   struct S1 : P {
     typealias U = () -> Int
   }
@@ -246,8 +253,8 @@ func test_passing_noescape_function_ref_to_generic_parameter() {
   }
 }
 
-// SR-14784
-func SR14784<T>(_ fs: () -> T..., a _ : Int) -> T {
+// https://github.com/apple/swift/issues/57133
+func f_57133<T>(_ fs: () -> T..., a _ : Int) -> T {
   fs.first! // expected-error{{function produces expected type 'T'; did you mean to call it with '()'?}} {{11-11=()}}
 }
 
@@ -264,11 +271,14 @@ func testInvalidTupleImplosions() {
   tuplify(takesInout) // expected-error {{cannot convert value of type '(Int, inout String) -> ()' to expected argument type '(Int) -> Void'}}
 }
 
-// SR-15179 
-func SR15179<Ts>(_ fn: @escaping (Ts) -> Void) {} // expected-note {{in call to function 'SR15179'}}
-func fn1(x: Int..., y: Int...) {}
-SR15179(fn1) // expected-error {{cannot convert value of type '(Int..., Int...) -> ()' to expected argument type '(Ts) -> Void'}}
-// expected-error@-1{{generic parameter 'Ts' could not be inferred}}
+// https://github.com/apple/swift/issues/57502
+do {
+  func f<Ts>(_ fn: @escaping (Ts) -> Void) {} // expected-note {{in call to function 'f'}}
 
-func fn(_ x: inout Int, _ y: inout Int) {}
-SR15179(fn) // expected-error {{cannot convert value of type '(inout Int, inout Int) -> ()' to expected argument type '(Int) -> Void'}}
+  func g1(x: Int..., y: Int...) {}
+  f(g1) // expected-error {{cannot convert value of type '(Int..., Int...) -> ()' to expected argument type '(Ts) -> Void'}}
+  // expected-error@-1{{generic parameter 'Ts' could not be inferred}}
+
+  func g2(_ x: inout Int, _ y: inout Int) {}
+  f(g2) // expected-error {{cannot convert value of type '(inout Int, inout Int) -> ()' to expected argument type '(Int) -> Void'}}
+}

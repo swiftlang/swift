@@ -200,7 +200,6 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
   auto temporary = SGF.emitTemporaryAllocation(loc, getType());
   bool hadCleanup = hasCleanup();
 
-  // The temporary memory is +0 if the value was.
   if (hadCleanup) {
     SGF.B.emitStoreValueOperation(loc, forward(SGF), temporary,
                                   StoreOwnershipQualifier::Init);
@@ -218,9 +217,37 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
     return ManagedValue::forOwnedAddressRValue(
         temporary, SGF.enterDestroyCleanup(temporary));
   }
+  // The temporary memory is +0 if the value was.
   auto object = SGF.emitManagedBeginBorrow(loc, getValue());
-  SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
-  return ManagedValue::forBorrowedAddressRValue(temporary);
+  auto borrowedAddr =
+      SGF.emitManagedStoreBorrow(loc, object.getValue(), temporary);
+  return ManagedValue::forBorrowedAddressRValue(borrowedAddr.getValue());
+}
+
+ManagedValue ManagedValue::formallyMaterialize(SILGenFunction &SGF,
+                                               SILLocation loc) const {
+  auto temporary = SGF.emitTemporaryAllocation(loc, getType());
+  bool hadCleanup = hasCleanup();
+  auto &lowering = SGF.getTypeLowering(getType());
+
+  if (hadCleanup) {
+    SGF.B.emitStoreValueOperation(loc, forward(SGF), temporary,
+                                  StoreOwnershipQualifier::Init);
+
+    return ManagedValue::forOwnedAddressRValue(
+        temporary, SGF.enterDestroyCleanup(temporary));
+  }
+  if (lowering.isAddressOnly()) {
+    assert(!SGF.silConv.useLoweredAddresses());
+    auto copy = SGF.B.createCopyValue(loc, getValue());
+    SGF.B.emitStoreValueOperation(loc, copy, temporary,
+                                  StoreOwnershipQualifier::Init);
+    return ManagedValue::forOwnedAddressRValue(
+        temporary, SGF.enterDestroyCleanup(temporary));
+  }
+  auto object = SGF.emitFormalEvaluationManagedBeginBorrow(loc, getValue());
+  return SGF.emitFormalEvaluationManagedStoreBorrow(loc, object.getValue(),
+                                                    temporary);
 }
 
 void ManagedValue::print(raw_ostream &os) const {

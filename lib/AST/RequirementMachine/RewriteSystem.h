@@ -229,10 +229,15 @@ public:
 
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
-  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                  SourceLoc signatureLoc,
-                                  const PropertyMap &map,
-                                  TypeArrayView<GenericTypeParamType> genericParams);
+  void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                                SourceLoc signatureLoc,
+                                                const PropertyMap &map,
+                                                TypeArrayView<GenericTypeParamType> genericParams);
+
+  void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                              SourceLoc signatureLoc,
+                                              const PropertyMap &map,
+                                              TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
   struct CriticalPair {
@@ -357,9 +362,17 @@ private:
   /// minimization.
   std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
 
+  /// A 'recursive' rule is a concrete type or superclass rule where the right
+  /// hand side occurs as a prefix of one of its substitutions.
+  ///
+  /// Populated by computeRecursiveRules().
+  std::vector<unsigned> RecursiveRules;
+
   void propagateExplicitBits();
 
   void propagateRedundantRequirementIDs();
+
+  void computeRecursiveRules();
 
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;

@@ -314,6 +314,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndLifetimeInst:
@@ -335,6 +336,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:

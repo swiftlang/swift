@@ -22,6 +22,8 @@ struct PassContext {
 
   let _bridged: BridgedPassContext
 
+  var options: Options { Options(_bridged: _bridged) }
+
   func continueWithNextSubpassRun(for inst: Instruction? = nil) -> Bool {
     let bridgedInst = OptionalBridgedInstruction(obj: inst?.bridged.obj)
     return PassContext_continueWithNextSubpassRun(_bridged, bridgedInst) != 0
@@ -66,7 +68,7 @@ struct PassContext {
 
   func loadFunction(name: StaticString) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      PassContext_loadFunction(_bridged, BridgedStringRef(data: nameBuffer.baseAddress, length: nameBuffer.count)).function
+      PassContext_loadFunction(_bridged, llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)).function
     }
   }
 
@@ -117,8 +119,8 @@ struct PassContext {
   }
 
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
+    notifyFunctionDataChanged()
     function._modifyEffects(body)
-    // TODO: do we need to notify any changes?
   }
 
   //===--------------------------------------------------------------------===//
@@ -135,6 +137,10 @@ struct PassContext {
 
   fileprivate func notifyBranchesChanged() {
     PassContext_notifyChanges(_bridged, branchesChanged)
+  }
+
+  fileprivate func notifyFunctionDataChanged() {
+    PassContext_notifyChanges(_bridged, functionDataChanged)
   }
 }
 
@@ -153,18 +159,29 @@ extension Builder {
     self.init(insertAt: .before(insPnt), location: insPnt.location, passContext: context._bridged)
   }
 
+  /// Creates a builder which inserts _after_ `insPnt`, using a custom `location`.
+  init(after insPnt: Instruction, location: Location, _ context: PassContext) {
+    if let nextInst = insPnt.next {
+      self.init(insertAt: .before(nextInst), location: location, passContext: context._bridged)
+    } else {
+      self.init(insertAt: .atEndOf(insPnt.block), location: location, passContext: context._bridged)
+    }
+  }
+
   /// Creates a builder which inserts _after_ `insPnt`, using the location of `insPnt`.
   init(after insPnt: Instruction, _ context: PassContext) {
-    if let nextInst = insPnt.next {
-      self.init(insertAt: .before(nextInst), location: insPnt.location, passContext: context._bridged)
-    } else {
-      self.init(insertAt: .atEndOf(insPnt.block), location: insPnt.location, passContext: context._bridged)
-    }
+    self.init(after: insPnt, location: insPnt.location, context)
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
   init(atEndOf block: BasicBlock, location: Location, _ context: PassContext) {
     self.init(insertAt: .atEndOf(block), location: location, passContext: context._bridged)
+  }
+
+  /// Creates a builder which inserts at the begin of `block`, using a custom `location`.
+  init(atBeginOf block: BasicBlock, location: Location, _ context: PassContext) {
+    let firstInst = block.instructions.first!
+    self.init(insertAt: .before(firstInst), location: location, passContext: context._bridged)
   }
 
   /// Creates a builder which inserts at the begin of `block`, using the location of the first
@@ -221,5 +238,12 @@ extension RefCountingInst {
   func setAtomicity(isAtomic: Bool, _ context: PassContext) {
     context.notifyInstructionsChanged()
     RefCountingInst_setIsAtomic(bridged, isAtomic)
+  }
+}
+
+extension Function {
+  func set(needStackProtection: Bool, _ context: PassContext) {
+    context.notifyFunctionDataChanged()
+    SILFunction_setNeedStackProtection(bridged, needStackProtection ? 1 : 0)
   }
 }

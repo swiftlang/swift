@@ -213,10 +213,7 @@ private:
         if (origReq.getKind() != RequirementKind::Conformance) continue;
         auto origConformance = origConformances[i++];
 
-        auto optNewReq = origReq.subst(newSubs);
-        assert(optNewReq && "generalization substitution failed");
-        auto &newReq = *optNewReq;
-
+        auto newReq = origReq.subst(newSubs);
         addedRequirements.push_back(newReq);
 
         substConformances.insert({{newReq.getFirstType()->getCanonicalType(),

@@ -79,8 +79,9 @@ func basictest() {
   bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}{{13-15=}}
 }
 
-// <https://bugs.swift.org/browse/SR-3522>
-func testUnusedLiterals_SR3522() {
+// https://github.com/apple/swift/issues/46110
+// Test unused literals.
+do {
   42 // expected-warning {{integer literal is unused}}
   2.71828 // expected-warning {{floating-point literal is unused}}
   true // expected-warning {{boolean literal is unused}}
@@ -263,7 +264,6 @@ func test_lambda2() {
   { () -> protocol<Int> in
     // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
-    // expected-warning @-3 {{result of call to closure returning 'Int' is unused}}
     return 1
   }()
 }
@@ -429,7 +429,7 @@ var fl_r: Float = 0x1.0fp // expected-error {{expected a digit in floating point
 var fl_s: Float = 0x1.0fp+ // expected-error {{expected a digit in floating point exponent}}
 var fl_t: Float = 0x1.p // expected-error {{value of type 'Int' has no member 'p'}}
 var fl_u: Float = 0x1.p2 // expected-error {{value of type 'Int' has no member 'p2'}}
-var fl_v: Float = 0x1.p+ // expected-error {{'+' is not a postfix unary operator}}
+var fl_v: Float = 0x1.p+ // expected-error {{'+' is not a postfix unary operator}} expected-error {{value of type 'Int' has no member 'p'}}
 var fl_w: Float = 0x1.p+2 // expected-error {{value of type 'Int' has no member 'p'}}
 
 var if1: Double = 1.0 + 4  // integer literal ok as double.
@@ -900,7 +900,8 @@ func r22913570() {
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
-// SR-628 mixing lvalues and rvalues in tuple expression
+// https://github.com/apple/swift/issues/43245
+// Mixing lvalues and rvalues in tuple expression
 do {
   var x = 0
   var y = 1
@@ -912,8 +913,9 @@ do {
   x = (x,(3,y)).1.1
 }
 
-// SR-3439 subscript with pound expressions.
-Sr3439: do {
+// https://github.com/apple/swift/issues/46027
+// Subscripting with pound expressions
+do {
   class B {
     init() {}
     subscript(x: Int) -> Int { return x }

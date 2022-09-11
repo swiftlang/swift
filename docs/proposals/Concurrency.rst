@@ -46,17 +46,17 @@ multi-threaded program below.
 
 .. code-block:: swift
 
-    import Foundation
+  import Foundation
 
-    let queue = DispatchQueue.global(qos: .default)
+  let queue = DispatchQueue.global(qos: .default)
 
-    class Bird {}
-    var single = Bird()
+  class Bird {}
+  var single = Bird()
 
-    queue.async {
-      while true { single = Bird() }
-    }
+  queue.async {
     while true { single = Bird() }
+  }
+  while true { single = Bird() }
 
 This program crashes very quickly when it tries to deallocate an already
 deallocated class instance.  To understand the bug try to imagine two threads
@@ -223,13 +223,13 @@ be called by worker-threads.
 
 .. code-block:: swift
 
-    func logger(_ x : Int) {
+  func logger(_ x : Int) {
 
-      // I know what I'm doing!
-      issafe {
-        glob = x
-      }
+    // I know what I'm doing!
+    issafe {
+      glob = x
     }
+  }
 
 
 Most protocols in the standard library, like `Incrementable` and `Equatable` are
@@ -324,20 +324,20 @@ This is an example of a tiny concurrent program that uses Tasks and Streams.
 
 .. code-block:: swift
 
-    let input  = Stream<String>()
-    let output = Stream<String>()
+  let input  = Stream<String>()
+  let output = Stream<String>()
 
-    func echoServer(_ inp : Stream<String>,
-                    out : Stream<String>) {
-      while true { out.push(inp.pop()) }
-    }
+  func echoServer(_ inp : Stream<String>,
+                  out : Stream<String>) {
+    while true { out.push(inp.pop()) }
+  }
 
-    createTask((input, output), callback: echoServer)
+  createTask((input, output), callback: echoServer)
 
-    for val in ["hello","world"] {
-      input.push(val)
-      print(output.pop())
-    }
+  for val in ["hello","world"] {
+    input.push(val)
+    print(output.pop())
+  }
 
 The program above creates a server task that accepts an input stream and an
 output stream that allows it to communicate with the main thread. The compiler
@@ -352,20 +352,20 @@ declaration of the streams in the closure.
 
 .. code-block:: swift
 
-     let comm : _Endpoint<String, Int> = createTask {
-       var counter = 0
-       while true {
-         $0.pop()
-         $0.push(counter)
-         counter += 1
-       }
-     }
+  let comm : _Endpoint<String, Int> = createTask {
+    var counter = 0
+    while true {
+      $0.pop()
+      $0.push(counter)
+      counter += 1
+    }
+  }
 
-     // CHECK: 0, 1, 2,
-     for ss in ["","",""] {
-       comm.push(ss)
-       print("\(comm.pop()), ", terminator: "")
-     }
+  // CHECK: 0, 1, 2,
+  for ss in ["","",""] {
+    comm.push(ss)
+    print("\(comm.pop()), ", terminator: "")
+  }
 
 Stream utilities
 ----------------
@@ -403,19 +403,19 @@ Example of a concurrent program using Futures in Swift.
 
 .. code-block:: swift
 
-    func mergeSort<T : Comparable>(array: ArraySlice<T>) -> [T] {
+  func mergeSort<T : Comparable>(array: ArraySlice<T>) -> [T] {
 
-      if array.count <= 16  { return Array(array).sorted() }
+    if array.count <= 16  { return Array(array).sorted() }
 
-      let mid = array.count / 2
-      let left  = array[0..<mid]
-      let right = array[mid..<array.count]
+    let mid = array.count / 2
+    let left  = array[0..<mid]
+    let right = array[mid..<array.count]
 
-      let lf = async(left,  callback: mergeSort)
-      let lr = async(right, callback: mergeSort)
+    let lf = async(left,  callback: mergeSort)
+    let lr = async(right, callback: mergeSort)
 
-      return merge(lf.await(), lr.await())
-    }
+    return merge(lf.await(), lr.await())
+  }
 
 The program above uses async to execute two tasks that sorts the two halves of
 the array in parallel.  Notice that the arrays in the example above are not
@@ -428,21 +428,21 @@ Here is another example of async calls using trailing closures and enums.
 
 .. code-block:: swift
 
-     enum Shape {
-       case circle, oval, square, triangle
-     }
+  enum Shape {
+    case circle, oval, square, triangle
+  }
 
-     let res = async(Shape.oval) { (c: Shape) -> String in
-       switch c {
-         case .circle:   return "Circle"
-         case .oval:     return "Oval"
-         case .square:   return "Square"
-         case .triangle: return "Triangle"
-       }
-     }
+  let res = async(Shape.oval) { (c: Shape) -> String in
+    switch c {
+      case .circle:   return "Circle"
+      case .oval:     return "Oval"
+      case .square:   return "Square"
+      case .triangle: return "Triangle"
+    }
+  }
 
-     //CHECK: Shape: Oval
-     print("Shape: \(res.await())")
+  //CHECK: Shape: Oval
+  print("Shape: \(res.await())")
 
 Notice that the swift compiler infers that ``Shape`` and `String` can be sent
 between the threads.
@@ -520,11 +520,11 @@ thread-safe (explained in the previous section). For example:
 
 .. code-block:: swift
 
-    @_semantics("swift.concurrent.async")
-    // This annotation tells the compiler to verify the closure and the passed arguments at the call site.
-    public func async<RetTy, ArgsTy>(args: ArgsTy, callback: @escaping (ArgsTy) -> RetTy) -> Future<RetTy> {
-      return unsafeAsync(args, callback: callback)
-    }
+  @_semantics("swift.concurrent.async")
+  // This annotation tells the compiler to verify the closure and the passed arguments at the call site.
+  public func async<RetTy, ArgsTy>(args: ArgsTy, callback: @escaping (ArgsTy) -> RetTy) -> Future<RetTy> {
+    return unsafeAsync(args, callback: callback)
+  }
 
 Example of shared data structures
 ---------------------------------

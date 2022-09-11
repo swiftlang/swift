@@ -35,8 +35,10 @@ struct BasicBlockSet : CustomStringConvertible, CustomReflectable {
     BasicBlockSet_contains(bridged, block.bridged) != 0
   }
 
-  mutating func insert(_ block: BasicBlock) {
-    BasicBlockSet_insert(bridged, block.bridged)
+  /// Returns true if `block` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ block: BasicBlock) -> Bool {
+    BasicBlockSet_insert(bridged, block.bridged) != 0
   }
 
   mutating func erase(_ block: BasicBlock) {
@@ -80,8 +82,10 @@ struct ValueSet : CustomStringConvertible, CustomReflectable {
     NodeSet_containsValue(bridged, value.bridged) != 0
   }
 
-  mutating func insert(_ value: Value) {
-    NodeSet_insertValue(bridged, value.bridged)
+  /// Returns true if `value` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ value: Value) -> Bool {
+    NodeSet_insertValue(bridged, value.bridged) != 0
   }
 
   mutating func erase(_ value: Value) {
@@ -139,8 +143,10 @@ struct InstructionSet : CustomStringConvertible, CustomReflectable {
     NodeSet_containsInstruction(bridged, inst.bridged) != 0
   }
 
-  mutating func insert(_ inst: Instruction) {
-    NodeSet_insertInstruction(bridged, inst.bridged)
+  /// Returns true if `inst` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ inst: Instruction) -> Bool {
+    NodeSet_insertInstruction(bridged, inst.bridged) != 0
   }
 
   mutating func erase(_ inst: Instruction) {
@@ -150,11 +156,9 @@ struct InstructionSet : CustomStringConvertible, CustomReflectable {
   var description: String {
     let function = NodeSet_getFunction(bridged).function
     var d = "{\n"
-    for block in function.blocks {
-      for inst in block.instructions {
-        if contains(inst) {
-          d += inst.description
-        }
+    for inst in function.instructions {
+      if contains(inst) {
+        d += inst.description
       }
     }
     d += "}\n"

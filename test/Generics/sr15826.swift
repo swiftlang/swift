@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/58100
+
 protocol AProtocol {
   associatedtype B: BProtocol where B.A == Self
 }

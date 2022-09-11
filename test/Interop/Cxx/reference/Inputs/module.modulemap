@@ -7,3 +7,9 @@ module Closures {
   header "closures.h"
   requires cplusplus
 }
+
+module ConstRefParameter {
+  header "const-ref-parameter.h"
+  requires objc
+  requires cplusplus
+}

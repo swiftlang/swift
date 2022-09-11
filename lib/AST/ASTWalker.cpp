@@ -195,18 +195,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
       else
         return true;
-      if (PBD->getInit(idx) &&
-          !isPropertyWrapperBackingProperty &&
-          (!PBD->isInitializerSubsumed(idx) ||
-           Walker.shouldWalkIntoLazyInitializers())) {
-#ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
-#endif
-        if (Expr *E2 = doIt(PBD->getInit(idx)))
-          PBD->setInit(idx, E2);
-        else
-          return true;
+
+      if (!PBD->getInit(idx) || isPropertyWrapperBackingProperty)
+        continue;
+
+      if (PBD->isInitializerSubsumed(idx) &&
+          Walker.getLazyInitializerWalkingBehavior() !=
+              LazyInitializerWalking::InPatternBinding) {
+        break;
       }
+
+#ifndef NDEBUG
+      PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
+#endif
+      if (Expr *E2 = doIt(PBD->getInit(idx)))
+        PBD->setInit(idx, E2);
+      else
+        return true;
     }
     return false;
   }
@@ -284,6 +289,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into", NTD);
+#endif
 
     bool WalkGenerics = visitGenericParamListIfNeeded(NTD);
 
@@ -1070,7 +1078,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitLazyInitializerExpr(LazyInitializerExpr *E) {
-    // Initializer is totally opaque for most visitation purposes.
+    // The initializer is opaque unless we specifically want to visit it as part
+    // of the accessor body.
+    if (Walker.getLazyInitializerWalkingBehavior() !=
+        LazyInitializerWalking::InAccessor) {
+      return E;
+    }
+    auto *sub = doIt(E->getSubExpr());
+    if (!sub)
+      return nullptr;
+
+    E->setSubExpr(sub);
     return E;
   }
 
@@ -1185,6 +1203,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitRegexLiteralExpr(RegexLiteralExpr *E) {
+    return E;
+  }
+
+  Expr *visitTypeJoinExpr(TypeJoinExpr *E) {
+    if (auto *newVar = dyn_cast<DeclRefExpr>(doIt(E->getVar()))) {
+      E->setVar(newVar);
+    } else {
+      return nullptr;
+    }
+
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
+      if (auto *origElt = E->getElement(i)) {
+        if (Expr *Elt = doIt(origElt))
+          E->setElement(i, Elt);
+        else
+          return nullptr;
+      }
+    }
+
     return E;
   }
 
@@ -1841,6 +1878,9 @@ bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
 
 bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
   return doIt(T->getBase());
+}
+bool Traversal::visitPackExpansionTypeRepr(PackExpansionTypeRepr *T) {
+  return doIt(T->getPatternType());
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {

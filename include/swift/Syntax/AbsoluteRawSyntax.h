@@ -395,9 +395,18 @@ public:
 
   void reset() { Storage = AbsoluteRawSyntax(nullptr); }
 
+  bool has_value() const { return !Storage.isNull(); }
   bool hasValue() const { return !Storage.isNull(); }
 
+  AbsoluteRawSyntax &value() & {
+    assert(hasValue());
+    return Storage;
+  }
   AbsoluteRawSyntax &getValue() & {
+    assert(hasValue());
+    return Storage;
+  }
+  AbsoluteRawSyntax const &value() const & {
     assert(hasValue());
     return Storage;
   }
@@ -406,6 +415,10 @@ public:
     return Storage;
   }
 #if LLVM_HAS_RVALUE_REFERENCE_THIS
+  AbsoluteRawSyntax &&value() &&noexcept {
+    assert(hasValue());
+    return std::move(Storage);
+  }
   AbsoluteRawSyntax &&getValue() &&noexcept {
     assert(hasValue());
     return std::move(Storage);

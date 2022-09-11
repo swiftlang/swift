@@ -1945,6 +1945,16 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreInvalidResultBuilderBody(cs, locator);
 }
 
+bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+}
+
+IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidASTNode(cs, locator);
+}
+
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
                                            bool asNote) const {
   MissingContextualTypeForNil failure(solution, getLocator());
@@ -1992,6 +2002,20 @@ IgnoreResultBuilderWithReturnStmts::create(ConstraintSystem &cs, Type builderTy,
                                            ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreResultBuilderWithReturnStmts(cs, builderTy, locator);
+}
+
+bool IgnoreUnresolvedPatternVar::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  // Not being able to infer the type of a pattern should already have been
+  // diagnosed on the pattern's initializer or as a structural issue of the AST.
+  return true;
+}
+
+IgnoreUnresolvedPatternVar *
+IgnoreUnresolvedPatternVar::create(ConstraintSystem &cs, Pattern *pattern,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreUnresolvedPatternVar(cs, pattern, locator);
 }
 
 bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
@@ -2389,6 +2413,9 @@ bool AddExplicitExistentialCoercion::isRequired(
                                   ArrayRef<Requirement> requirements) {
       for (const auto &req : requirements) {
         switch (req.getKind()) {
+        case RequirementKind::SameCount:
+          llvm_unreachable("Same-count requirement not supported here");
+
         case RequirementKind::Superclass:
         case RequirementKind::Conformance:
         case RequirementKind::Layout: {
@@ -2422,6 +2449,9 @@ bool AddExplicitExistentialCoercion::isRequired(
         auto requirementSig = protocol->getRequirementSignature();
         for (const auto &req : requirementSig.getRequirements()) {
           switch (req.getKind()) {
+          case RequirementKind::SameCount:
+            llvm_unreachable("Same-count requirement not supported here");
+
           case RequirementKind::Conformance:
           case RequirementKind::Layout:
           case RequirementKind::Superclass: {

@@ -229,7 +229,7 @@ protected:
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
     auto &log = llvm::errs();
-    return indent ? log.indent(CS.solverState->depth * 2) : log;
+    return indent ? log.indent(CS.solverState->getCurrentIndent()) : log;
   }
 };
 
@@ -466,11 +466,29 @@ private:
     // to preliminary modify constraint system or log anything.
     if (IsSingle)
       return;
-
-    if (CS.isDebugMode())
-      getDebugLogger() << "(solving component #" << Index << '\n';
-
+    
+    if (CS.isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "(solving component #" << Index << '\n';
+    }
+    
     ComponentScope = std::make_unique<Scope>(*this);
+    
+    if (CS.isDebugMode()) {
+      auto &log = getDebugLogger();
+      log << "Type variables in scope = "
+          << "[";
+      auto typeVars = CS.getTypeVariables();
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+      interleave(typeVars, [&](TypeVariableType *typeVar) {
+                   Type(typeVar).print(log, PO);
+                 },
+                 [&] {
+                   log << ", ";
+                 });
+      log << "]" << '\n';
+    }
 
     // If this component has orphaned constraint attached,
     // let's return it to the graph.
@@ -519,7 +537,7 @@ public:
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "(attempting ";
-        choice->print(log, &CS.getASTContext().SourceMgr);
+        choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent() + 2);
         log << '\n';
       }
 
@@ -527,6 +545,13 @@ public:
         auto scope = std::make_unique<Scope>(CS);
         if (attempt(*choice)) {
           ActiveChoice.emplace(std::move(scope), *choice);
+
+          if (CS.isDebugMode()) {
+            auto &log = llvm::errs();
+            auto &CG = CS.getConstraintGraph();
+            CG.dumpActiveScopeChanges(log, CS.solverState->getCurrentIndent());
+          }
+          
           return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
@@ -702,10 +727,11 @@ private:
     // non-generic score indicates that there were no forced
     // unwrappings of optional(s), no unavailable overload
     // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
+    // and there are no non-trivial user or function conversions.
     auto &score = BestNonGenericScore->Data;
     return (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-            score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0);
+            score[SK_Fix] == 0 && score[SK_UserConversion] == 0 &&
+            score[SK_FunctionConversion] == 0);
   }
 
   /// Attempt to apply given disjunction choice to constraint system.

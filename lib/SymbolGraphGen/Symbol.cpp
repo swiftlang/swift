@@ -19,6 +19,7 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/SourceManager.h"
@@ -367,7 +368,7 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
     return {};
 
   // Map from the base type into the this declaration's innermost type context,
-  // or if we're dealing with an extention rather than a member, into its
+  // or if we're dealing with an extension rather than a member, into its
   // extended nominal (the extension's own requirements shouldn't be considered
   // in the substitution).
   swift::DeclContext *DC;
@@ -450,6 +451,12 @@ void Symbol::serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const {
 
 void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
   OS.attribute("accessLevel", getAccessLevelSpelling(VD->getFormalAccess()));
+}
+
+void Symbol::serializeMetadataMixin(llvm::json::OStream &OS) const {
+  StringRef Category = documentationMetadataForDecl(VD);
+  if (!Category.empty())
+    OS.attribute("metadata", Category);
 }
 
 void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
@@ -592,6 +599,7 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeDeclarationFragmentMixin(OS);
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
+    serializeMetadataMixin(OS);
     serializeLocationMixin(OS);
     serializeSPIMixin(OS);
   });

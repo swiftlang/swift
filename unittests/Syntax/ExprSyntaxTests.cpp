@@ -14,8 +14,10 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
   {
     auto LiteralToken = Factory.makeIntegerLiteral("100", "", "");
     auto Sign = Factory.makePrefixOperator("-", "", "");
+    auto IntegerLiteral =
+        Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, LiteralToken);
     auto Literal = Factory.makePrefixOperatorExpr(
-        Sign, Factory.makeIntegerLiteralExpr(LiteralToken));
+        /*UnexpectedNodes=*/None, Sign, /*UnexpectedNodes=*/None, IntegerLiteral);
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -26,7 +28,8 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
   {
     auto LiteralToken = Factory.makeIntegerLiteral("1_000", "", "");
     auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "", Arena);
-    auto Literal = Factory.makeIntegerLiteralExpr(LiteralToken);
+    auto Literal =
+        Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, LiteralToken);
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -34,11 +37,13 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "1_000");
   }
   {
+    auto IntLiteral = Factory.makeIntegerLiteral("0", "", "    ");
+    auto IntLiteralExpr =
+        Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, IntLiteral);
     auto Literal = Factory.makeBlankPrefixOperatorExpr()
                        .withOperatorToken(TokenSyntax::missingToken(
                            tok::oper_prefix, "", Arena))
-                       .withPostfixExpression(Factory.makeIntegerLiteralExpr(
-                           Factory.makeIntegerLiteral("0", "", "    ")));
+                       .withPostfixExpression(IntLiteralExpr);
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -48,8 +53,10 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
   {
     auto LiteralToken = Factory.makeIntegerLiteral("1_000_000_000_000", "", "");
     auto PlusSign = Factory.makePrefixOperator("+", "", "");
+    auto IntLiteralExpr =
+        Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, LiteralToken);
     auto OneThousand = Factory.makePrefixOperatorExpr(
-        PlusSign, Factory.makeIntegerLiteralExpr(LiteralToken));
+        /*UnexpectedNodes=*/None, PlusSign, /*UnexpectedNodes=*/None, IntLiteralExpr);
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -66,8 +73,10 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
   {
     auto Array = Factory.makeIdentifier("Array", "", "");
     auto Int = Factory.makeIdentifier("Int", "", "");
-    auto IntType = Factory.makeSimpleTypeIdentifier(Int, None);
-    auto GenericArg = Factory.makeGenericArgument(IntType, None);
+    auto IntType = Factory.makeSimpleTypeIdentifier(
+        /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, None);
+    auto GenericArg = Factory.makeGenericArgument(
+        /*UnexpectedNodes=*/None, IntType, /*UnexpectedNodes=*/None, None);
     GenericArgumentClauseSyntaxBuilder ArgBuilder(Arena);
     ArgBuilder.useLeftAngleBracket(Factory.makeLeftAngleToken("", ""))
         .useRightAngleBracket(Factory.makeRightAngleToken("", ""))
@@ -75,7 +84,8 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
 
     auto GenericArgs = ArgBuilder.build();
 
-    auto Ref = Factory.makeSymbolicReferenceExpr(Array, GenericArgs);
+    auto Ref = Factory.makeSymbolicReferenceExpr(
+        /*UnexpectedNodes=*/None, Array, /*UnexpectedNodes=*/None, GenericArgs);
 
     ASSERT_EQ(Ref.getIdentifier().getRaw(), Array.getRaw());
 
@@ -97,8 +107,10 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
   SyntaxFactory Factory(Arena);
   auto Array = Factory.makeIdentifier("Array", "", "");
   auto Int = Factory.makeIdentifier("Int", "", "");
-  auto IntType = Factory.makeSimpleTypeIdentifier(Int, None);
-  auto GenericArg = Factory.makeGenericArgument(IntType, None);
+  auto IntType = Factory.makeSimpleTypeIdentifier(/*UnexpectedNodes=*/None, Int,
+                                                  /*UnexpectedNodes=*/None, None);
+  auto GenericArg = Factory.makeGenericArgument(/*UnexpectedNodes=*/None, IntType,
+                                                /*UnexpectedNodes=*/None, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder(Arena);
   ArgBuilder.useLeftAngleBracket(Factory.makeLeftAngleToken("", ""))
       .useRightAngleBracket(Factory.makeRightAngleToken("", ""))
@@ -118,14 +130,20 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto BlankArgs = Factory.makeBlankGenericArgumentClause();
 
-    Factory.makeSymbolicReferenceExpr(Foo, BlankArgs).print(OS);
+    Factory
+        .makeSymbolicReferenceExpr(/*UnexpectedNodes=*/None, Foo,
+                                   /*UnexpectedNodes=*/None, BlankArgs)
+        .print(OS);
     EXPECT_EQ(OS.str().str(), "foo");
   }
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    Factory.makeSymbolicReferenceExpr(Array, GenericArgs).print(OS);
+    Factory
+        .makeSymbolicReferenceExpr(/*UnexpectedNodes=*/None, Array,
+                                   /*UnexpectedNodes=*/None, GenericArgs)
+        .print(OS);
     ASSERT_EQ(OS.str().str(), "Array<Int>");
   }
 }
@@ -135,8 +153,10 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprWithAPIs) {
   SyntaxFactory Factory(Arena);
   auto Array = Factory.makeIdentifier("Array", "", "");
   auto Int = Factory.makeIdentifier("Int", "", "");
-  auto IntType = Factory.makeSimpleTypeIdentifier(Int, None);
-  auto GenericArg = Factory.makeGenericArgument(IntType, None);
+  auto IntType = Factory.makeSimpleTypeIdentifier(/*UnexpectedNodes=*/None, Int,
+                                                  /*UnexpectedNodes=*/None, None);
+  auto GenericArg = Factory.makeGenericArgument(/*UnexpectedNodes=*/None, IntType,
+                                                /*UnexpectedNodes=*/None, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder(Arena);
   ArgBuilder.useLeftAngleBracket(Factory.makeLeftAngleToken("", ""))
       .useRightAngleBracket(Factory.makeRightAngleToken("", ""))
@@ -176,11 +196,14 @@ TEST(ExprSyntaxTests, TupleExprElementGetAPIs) {
   auto X = Factory.makeIdentifier("x", "", "");
   auto Foo = Factory.makeIdentifier("foo", "", "");
   auto Colon = Factory.makeColonToken("", " ");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto Comma = Factory.makeCommaToken("", " ");
 
   {
-    auto Arg = Factory.makeTupleExprElement(X, Colon, SymbolicRef, Comma);
+    auto Arg = Factory.makeTupleExprElement(
+        /*UnexpectedNodes=*/None, X, /*UnexpectedNodes=*/None, Colon,
+        /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, Comma);
 
     ASSERT_EQ(X.getRaw(), Arg.getLabel()->getRaw());
     ASSERT_EQ(Colon.getRaw(), Arg.getColon()->getRaw());
@@ -203,7 +226,8 @@ TEST(ExprSyntaxTests, TupleExprElementMakeAPIs) {
   auto X = Factory.makeIdentifier("x", "", "");
   auto Foo = Factory.makeIdentifier("foo", "", "");
   auto Colon = Factory.makeColonToken("", " ");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto Comma = Factory.makeCommaToken("", " ");
 
   {
@@ -223,7 +247,11 @@ TEST(ExprSyntaxTests, TupleExprElementMakeAPIs) {
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    Factory.makeTupleExprElement(X, Colon, SymbolicRef, Comma).print(OS);
+    Factory
+        .makeTupleExprElement(/*UnexpectedNodes=*/None, X, /*UnexpectedNodes=*/None,
+                              Colon, /*UnexpectedNodes=*/None, SymbolicRef,
+                              /*UnexpectedNodes=*/None, Comma)
+        .print(OS);
     ASSERT_EQ(OS.str().str(), "x: foo, ");
   }
 }
@@ -234,7 +262,8 @@ TEST(ExprSyntaxTests, TupleExprElementWithAPIs) {
   auto X = Factory.makeIdentifier("x", "", "");
   auto Foo = Factory.makeIdentifier("foo", "", "");
   auto Colon = Factory.makeColonToken("", " ");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto Comma = Factory.makeCommaToken("", " ");
 
   {
@@ -260,11 +289,14 @@ TupleExprElementListSyntax getFullArgumentList(const RC<SyntaxArena> &Arena) {
   auto Z = Factory.makeIdentifier("z", "", "");
   auto Foo = Factory.makeIdentifier("foo", "", "");
   auto Colon = Factory.makeColonToken("", " ");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto Comma = Factory.makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 
-  auto Arg = Factory.makeTupleExprElement(X, Colon, SymbolicRef, Comma);
+  auto Arg = Factory.makeTupleExprElement(
+      /*UnexpectedNodes=*/None, X, /*UnexpectedNodes=*/None, Colon,
+      /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, Comma);
 
   return Factory.makeBlankTupleExprElementList()
       .appending(Arg)
@@ -280,18 +312,24 @@ getLabellessArgumentList(const RC<SyntaxArena> &Arena) {
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
   auto TwoDigits = Factory.makeIntegerLiteral("2", "", "");
   auto ThreeDigits = Factory.makeIntegerLiteral("3", "", "");
-  auto One = Factory.makeIntegerLiteralExpr(OneDigits);
+  auto One = Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
   auto NoLabel = TokenSyntax::missingToken(tok::identifier, "", Arena);
   auto NoColon = TokenSyntax::missingToken(tok::colon, ":", Arena);
   auto Comma = Factory.makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
-  auto Two = Factory.makeIntegerLiteralExpr(TwoDigits);
-  auto Three = Factory.makeIntegerLiteralExpr(ThreeDigits);
+  auto Two = Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, TwoDigits);
+  auto Three =
+      Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, ThreeDigits);
 
-  auto OneArg = Factory.makeTupleExprElement(NoLabel, NoColon, One, Comma);
-  auto TwoArg = Factory.makeTupleExprElement(NoLabel, NoColon, Two, Comma);
-  auto ThreeArg =
-      Factory.makeTupleExprElement(NoLabel, NoColon, Three, NoComma);
+  auto OneArg = Factory.makeTupleExprElement(
+      /*UnexpectedNodes=*/None, NoLabel, /*UnexpectedNodes=*/None, NoColon,
+      /*UnexpectedNodes=*/None, One, /*UnexpectedNodes=*/None, Comma);
+  auto TwoArg = Factory.makeTupleExprElement(
+      /*UnexpectedNodes=*/None, NoLabel, /*UnexpectedNodes=*/None, NoColon,
+      /*UnexpectedNodes=*/None, Two, /*UnexpectedNodes=*/None, Comma);
+  auto ThreeArg = Factory.makeTupleExprElement(
+      /*UnexpectedNodes=*/None, NoLabel, /*UnexpectedNodes=*/None, NoColon,
+      /*UnexpectedNodes=*/None, Three, /*UnexpectedNodes=*/None, NoComma);
 
   return Factory.makeBlankTupleExprElementList()
       .appending(OneArg)
@@ -309,11 +347,14 @@ TEST(ExprSyntaxTests, TupleExprElementListGetAPIs) {
   auto Z = Factory.makeIdentifier("z", "", "");
   auto Foo = Factory.makeIdentifier("foo", "", "");
   auto Colon = Factory.makeColonToken("", " ");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto Comma = Factory.makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 
-  auto Arg = Factory.makeTupleExprElement(X, Colon, SymbolicRef, Comma);
+  auto Arg = Factory.makeTupleExprElement(
+      /*UnexpectedNodes=*/None, X, /*UnexpectedNodes=*/None, Colon,
+      /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, Comma);
 
   auto ArgList = Factory.makeBlankTupleExprElementList()
                      .appending(Arg)
@@ -369,11 +410,14 @@ TEST(ExprSyntaxTests, TupleExprElementListMakeAPIs) {
     auto Z = Factory.makeIdentifier("z", "", "");
     auto Foo = Factory.makeIdentifier("foo", "", "");
     auto Colon = Factory.makeColonToken("", " ");
-    auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+    auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+        /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
     auto Comma = Factory.makeCommaToken("", " ");
     auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 
-    auto Arg = Factory.makeTupleExprElement(X, Colon, SymbolicRef, Comma);
+    auto Arg = Factory.makeTupleExprElement(
+        /*UnexpectedNodes=*/None, X, /*UnexpectedNodes=*/None, Colon,
+        /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, Comma);
 
     std::vector<TupleExprElementSyntax> Args {
       Arg, Arg.withLabel(Y), Arg.withLabel(Z).withTrailingComma(NoComma)
@@ -406,13 +450,17 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
   SyntaxFactory Factory(Arena);
   auto Foo = Factory.makeIdentifier("foo", "", "");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto LeftParen = Factory.makeLeftParenToken("", "");
   auto ArgList = getFullArgumentList(Arena);
   auto RightParen = Factory.makeRightParenToken("", "");
 
-  auto Call = Factory.makeFunctionCallExpr(SymbolicRef, LeftParen, ArgList,
-                                           RightParen, None, None);
+  auto Call = Factory.makeFunctionCallExpr(
+      /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, LeftParen,
+      /*UnexpectedNodes=*/None, ArgList,
+      /*UnexpectedNodes=*/None, RightParen, /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None);
 
   {
     auto GottenExpression1 = Call.getCalledExpression();
@@ -442,14 +490,18 @@ TEST(ExprSyntaxTests, FunctionCallExprMakeAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
   SyntaxFactory Factory(Arena);
   auto Foo = Factory.makeIdentifier("foo", "", "");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto LeftParen = Factory.makeLeftParenToken("", "");
   auto ArgList = getFullArgumentList(Arena);
   auto RightParen = Factory.makeRightParenToken("", "");
 
   {
-    auto Call = Factory.makeFunctionCallExpr(SymbolicRef, LeftParen, ArgList,
-                                             RightParen, None, None);
+    auto Call = Factory.makeFunctionCallExpr(
+        /*UnexpectedNodes=*/None, SymbolicRef, /*UnexpectedNodes=*/None, LeftParen,
+        /*UnexpectedNodes=*/None, ArgList,
+        /*UnexpectedNodes=*/None, RightParen, /*UnexpectedNodes=*/None, None,
+        /*UnexpectedNodes=*/None, None);
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Call.print(OS);
@@ -468,7 +520,8 @@ TEST(ExprSyntaxTests, FunctionCallExprWithAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
   SyntaxFactory Factory(Arena);
   auto Foo = Factory.makeIdentifier("foo", "", "");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
   auto LeftParen = Factory.makeLeftParenToken("", "");
   auto ArgList = getFullArgumentList(Arena);
   auto RightParen = Factory.makeRightParenToken("", "");
@@ -524,13 +577,14 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
   auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
   auto TwoDigits = Factory.makeIntegerLiteral("2", "", "");
   auto ThreeDigits = Factory.makeIntegerLiteral("3", "", "");
-  auto One = Factory.makeIntegerLiteralExpr(OneDigits);
+  auto One = Factory.makeIntegerLiteralExpr(/*UnexpectedNodes=*/None, OneDigits);
   auto NoLabel = TokenSyntax::missingToken(tok::identifier, "", Arena);
   auto NoColon = TokenSyntax::missingToken(tok::colon, ":", Arena);
   auto Comma = Factory.makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
   auto Foo = Factory.makeIdentifier("foo", "", "");
-  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(
+      /*UnexpectedNodes=*/None, Foo, /*UnexpectedNodes=*/None, None);
 
   {
     llvm::SmallString<64> Scratch;
@@ -540,7 +594,9 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
     ASSERT_EQ(OS.str().str(), "foo()");
   }
 
-  auto OneArg = Factory.makeTupleExprElement(NoLabel, NoColon, One, Comma);
+  auto OneArg = Factory.makeTupleExprElement(
+      /*UnexpectedNodes=*/None, NoLabel, /*UnexpectedNodes=*/None, NoColon,
+      /*UnexpectedNodes=*/None, One, /*UnexpectedNodes=*/None, Comma);
   {
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);

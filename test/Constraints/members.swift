@@ -329,7 +329,8 @@ let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' 
 
 
 
-// SR-650: REGRESSION: Assertion failed: (baseTy && "Couldn't find appropriate context"), function getMemberSubstitutions
+// https://github.com/apple/swift/issues/43267
+// REGRESSION: Assertion failed: (baseTy && "Couldn't find appropriate context"), function getMemberSubstitutions
 enum SomeErrorType {
   case StandaloneError
   case UnderlyingError(String)
@@ -341,15 +342,17 @@ enum SomeErrorType {
   }
 }
 
-// SR-2193: QoI: better diagnostic when a decl exists, but is not a type
-
-enum SR_2193_Error: Error {
-  case Boom
-}
-
+// https://github.com/apple/swift/issues/44801
+// QoI: Better diagnostic when a decl exists, but is not a type
 do {
-  throw SR_2193_Error.Boom
-} catch let e as SR_2193_Error.Boom { // expected-error {{enum case 'Boom' is not a member type of 'SR_2193_Error'}}
+  enum E: Error {
+    case Boom
+  }
+
+  do {
+    throw E.Boom
+  } catch let e as E.Boom { // expected-error {{enum case 'Boom' is not a member type of 'E'}}
+  }
 }
 
 // rdar://problem/25341015
@@ -450,8 +453,9 @@ func rdar33914444() {
   // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'; did you mean 'e'?}}
 }
 
-// SR-5324: Better diagnostic when instance member of outer type is referenced from nested type
-
+// https://github.com/apple/swift/issues/47898
+// Better diagnostic when instance member of outer type is referenced from
+// nested type
 struct Outer {
   var outer: Int
 
@@ -645,15 +649,18 @@ func rdar_50467583_and_50909555() {
   }
 }
 
-// SR-9396 (rdar://problem/46427500) - Nonsensical error message related to constrained extensions
-struct SR_9396<A, B> {}
+// rdar://problem/46427500
+// https://github.com/apple/swift/issues/51862
+// Nonsensical error message related to constrained extensions
 
-extension SR_9396 where A == Bool {  // expected-note {{where 'A' = 'Int'}}
+struct S_51862<A, B> {}
+
+extension S_51862 where A == Bool {  // expected-note {{where 'A' = 'Int'}}
   func foo() {}
 }
 
-func test_sr_9396(_ s: SR_9396<Int, Double>) {
-  s.foo() // expected-error {{referencing instance method 'foo()' on 'SR_9396' requires the types 'Int' and 'Bool' be equivalent}}
+func test_51862(_ s: S_51862<Int, Double>) {
+  s.foo() // expected-error {{referencing instance method 'foo()' on 'S_51862' requires the types 'Int' and 'Bool' be equivalent}}
 }
 
 // rdar://problem/34770265 - Better diagnostic needed for constrained extension method call
@@ -672,7 +679,7 @@ func test_34770265(_ dict: [Int: Int]) {
   // expected-error@-1 {{referencing instance method 'rdar_34770265_val()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
 }
 
-// SR-12672
+// https://github.com/apple/swift/issues/55116
 _ = [.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
 let _ : [Any] = [.e] // expected-error {{type 'Any' has no member 'e'}}
 _ = [1 :.e] // expected-error {{reference to member 'e' cannot be resolved without a contextual type}}
@@ -681,9 +688,9 @@ let _ : [Int: Any] = [1 : .e] // expected-error {{type 'Any' has no member 'e'}}
 let _ : (Int, Any) = (1, .e) // expected-error {{type 'Any' has no member 'e'}}
 _ = (1, .e) // expected-error {{cannot infer contextual base in reference to member 'e'}}
 
-// SR-13359
+// https://github.com/apple/swift/issues/55799
 typealias Pair = (Int, Int)
-func testSR13359(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: Int, b: Int)) {
+func test_55799(_ pair: (Int, Int), _ alias: Pair, _ void: Void, labeled: (a: Int, b: Int)) {
   _ = pair[0] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; did you mean to use '.0'?}} {{11-14=.0}}
   _ = pair[1] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; did you mean to use '.1'?}} {{11-14=.1}}
   _ = pair[2] // expected-error {{cannot access element using subscript for tuple type '(Int, Int)'; use '.' notation instead}} {{none}}
@@ -743,14 +750,15 @@ func rdar55369704() {
   }
 }
 
-// SR-14533
-struct SR14533 {
-  var xs: [Int] 
-}
-
-func fSR14533(_ s: SR14533) {
-  for (x1, x2) in zip(s.xs, s.ys) {
-    // expected-error@-1{{value of type 'SR14533' has no member 'ys'}}
+// https://github.com/apple/swift/issues/56885
+do {
+  struct S {
+    var xs: [Int] // expected-note {{'xs' declared here}}
+  }
+  func f(_ s: S) {
+    for (x1, x2) in zip(s.xs, s.ys) {
+      // expected-error@-1 {{value of type 'S' has no member 'ys'; did you mean 'xs'?}}
+    }
   }
 }
 

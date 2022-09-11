@@ -92,7 +92,7 @@ sil [serialized] @guaranteed_use : $@convention(thin) (@guaranteed Builtin.Nativ
 
 sil [serialized] @owned_return : $@convention(thin) () -> (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int32>)
 
-sil [serialized] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+sil [serialized] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
 
 /////////////////
 // Basic Tests //
@@ -405,7 +405,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   return %1 : $()
 }
 
-sil @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error Error {
+sil @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error any Error {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = tuple ()
   return %1 : $()
@@ -2125,18 +2125,18 @@ bb0:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [serialized] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error any Error {
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK: bb1
 // CHECK: strong_release
 // CHECK: bb2
 // CHECK: strong_release
-sil [serialized] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+sil [serialized] @try_apply_test_1 : $@convention(thin) (Builtin.NativeObject) -> @error any Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
-  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error, normal bb1, error bb2
 
 bb1(%2 : $()):
   strong_release %0 : $Builtin.NativeObject
@@ -2147,7 +2147,7 @@ bb2(%3 : $Error):
   throw %3 : $Error
 }
 
-// CHECK-LABEL: sil [serialized] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error any Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -2155,13 +2155,13 @@ bb2(%3 : $Error):
 // CHECK: strong_release
 // CHECK: bb2(
 // CHECK: strong_release
-sil [serialized] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+sil [serialized] @try_apply_test_2 : $@convention(thin) (Builtin.NativeObject) -> @error any Error {
 bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   %1 = function_ref @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
-  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
+  %2 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+  try_apply %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error, normal bb1, error bb2
 
 bb1(%3 : $()):
   strong_release %0 : $Builtin.NativeObject
@@ -2176,16 +2176,16 @@ bb2(%4 : $Error):
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
 // CHECK_LABEL: } // end sil function '$try_apply_test_3'
-sil hidden [noinline] @$try_apply_test_3 : $@convention(thin) () -> @error Error {
+sil hidden [noinline] @$try_apply_test_3 : $@convention(thin) () -> @error any Error {
 bb0:
   %box = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   %proj = project_box %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
-  %funcref = function_ref @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error Error
+  %funcref = function_ref @guaranteed_box_throwing_use : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error any Error
   br bb1
 
 bb1:
   strong_retain %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
-  try_apply %funcref (%box) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error Error, normal bbs, error bbe
+  try_apply %funcref (%box) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> @error any Error, normal bbs, error bbe
 
 bbs(%s : $()):
   strong_release %box : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>

@@ -855,7 +855,8 @@ public:
   /// Print constraint placed on type and constraint properties.
   ///
   /// \c skipLocator skips printing of locators.
-  void print(llvm::raw_ostream &Out, SourceManager *sm, bool skipLocator = false) const;
+  void print(llvm::raw_ostream &Out, SourceManager *sm, unsigned indent = 0,
+             bool skipLocator = false) const;
 
   SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
 

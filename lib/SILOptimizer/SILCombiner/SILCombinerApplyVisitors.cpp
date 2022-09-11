@@ -398,7 +398,8 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType ptrType = SILType::getRawPointerType(Builder.getASTContext());
     SILValue offsetPtr;
     projector->project(KeyPathProjector::AccessType::Get, [&](SILValue addr) {
-      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType);
+      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType,
+                                          /*needsStackProtection=*/ false);
     });
 
     // The result of the _storedInlineOffset call should be Optional<Int>. If

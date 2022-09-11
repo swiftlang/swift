@@ -232,7 +232,8 @@ func test_56221372() -> some P {
   })
 }
 
-struct SR11440 {
+// https://github.com/apple/swift/issues/53841
+struct S_53841 {
   typealias ReturnsTuple<T> = () -> (T, T)
   subscript<T, U>(@TupleBuilder x: ReturnsTuple<T>) -> (ReturnsTuple<U>) -> Void { //expected-note {{in call to 'subscript(_:)'}}
     return { _ in }
@@ -261,8 +262,9 @@ struct SR11440 {
 
 func acceptInt(_: Int, _: () -> Void) { }
 
-// SR-11350 crash due to improper recontextualization.
-func erroneousSR11350(x: Int) {
+// https://github.com/apple/swift/issues/53751
+// Crash due to improper recontextualization.
+func erroneous_53751(x: Int) {
   tuplify(true) { b in
     17
     x + 25
@@ -853,5 +855,42 @@ func test_invalid_result_is_diagnosed() {
   @MyBuilder
   func test() -> S<String> { // expected-error {{cannot convert result builder result type 'S<Int>' to return type 'S<String>}}
     S<Int>()
+  }
+}
+
+func test_associated_values_dont_block_solver_when_unresolved() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  struct Value {
+    enum Kind {
+      case a(String)
+      case b
+    }
+
+    var kind: Kind
+  }
+
+  struct Container {
+    var prop: Value? = nil
+  }
+
+  struct TestWithAny {
+    var container: Container
+
+    @Builder var body: String {
+      let v = container.prop.kind // expected-error {{value of optional type 'Value?' must be unwrapped to refer to member 'kind' of wrapped base type 'Value'}}
+      // expected-note@-1 {{chain the optional using '?' to access member 'kind' only for non-'nil' base values}}
+      // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+      switch v.kind { // expected-error {{value of type 'Value.Kind' has no member 'kind'}}
+      case .a(_): "a"
+      case .b: "b"
+      }
+    }
   }
 }

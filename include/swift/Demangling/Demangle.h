@@ -23,8 +23,10 @@
 #include "swift/Demangling/NamespaceMacros.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
+
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 

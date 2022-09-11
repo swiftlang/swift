@@ -3,11 +3,11 @@
 
 // CHECK-LABEL: // coverage_while.eoo() -> ()
 func eoo() {
-  // CHECK: int_instrprof_increment
+  // CHECK: increment_profiler_counter
   var x : Int32 = 0
 
   repeat {
-    // CHECK: int_instrprof_increment
+    // CHECK: increment_profiler_counter
     // CHECK: sadd_with_overflow_Int32
     x += 1
     // CHECK: cmp_slt_Int32

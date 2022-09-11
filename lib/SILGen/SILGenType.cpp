@@ -707,10 +707,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
        !requirement.getFuncDecl()->isDistributed() &&
        witnessRef.hasDecl() && witnessRef.getFuncDecl() &&
        witnessRef.getFuncDecl()->isDistributed());
-  // We only need to use thunks when we go cross-actor:
-  shouldUseDistributedThunkWitness = shouldUseDistributedThunkWitness &&
-                                     getActorIsolation(requirement.getDecl()) !=
-                                         getActorIsolation(witness.getDecl());
   if (shouldUseDistributedThunkWitness) {
     auto thunkDeclRef = SILDeclRef(
         witnessRef.getFuncDecl()->getDistributedThunk(),
@@ -723,18 +719,16 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Mapping from the requirement's generic signature to the witness
   // thunk's generic signature.
-  auto reqtSubMap = witness.getRequirementToSyntheticSubs();
+  auto reqtSubMap = witness.getRequirementToWitnessThunkSubs();
 
   // The generic environment for the witness thunk.
-  auto *genericEnv = witness.getSyntheticEnvironment();
-  CanGenericSignature genericSig;
-  if (genericEnv)
-    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
+  auto *genericEnv = witness.getWitnessThunkSignature().getGenericEnvironment();
+  auto genericSig = witness.getWitnessThunkSignature().getCanonicalSignature();
 
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-      ->getCanonicalType(genericSig));
+      ->getReducedType(genericSig));
 
   // Generic signatures where all parameters are concrete are lowered away
   // at the SILFunctionType level.

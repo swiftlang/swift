@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -warn-redundant-requirements
 
+// https://github.com/apple/swift/issues/57264
+
 protocol P {
   associatedtype A
   associatedtype AS: Q where AS.B == A

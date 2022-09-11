@@ -49,7 +49,7 @@ struct ConformingStruct : Proto {
 }
 
 // CHECK-LABEL: sil [ossa] @test_existential :
-// CHECK:      bb0(%0 : $*Proto, %1 : $*ConformingStruct):
+// CHECK:      bb0(%0 : $*any Proto, %1 : $*ConformingStruct):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_existential_addr %0
 // CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
 // CHECK-NOT:    copy_addr
@@ -162,8 +162,8 @@ struct StructWithEnum : Proto {
 }
 
 // CHECK-LABEL: sil [ossa] @move_projections :
-// CHECK:      bb0(%0 : $*Proto, %1 : $*Any):
-// CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*Proto, $StructWithEnum
+// CHECK:      bb0(%0 : $*any Proto, %1 : $*Any):
+// CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*any Proto, $StructWithEnum
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
 // CHECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
 // CHECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt

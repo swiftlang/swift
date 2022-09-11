@@ -19,7 +19,7 @@ using namespace swift;
 //                            Bridging C functions
 //===----------------------------------------------------------------------===//
 
-void OStream_write(BridgedOStream os, BridgedStringRef str) {
+void OStream_write(BridgedOStream os, StringRef str) {
   static_cast<raw_ostream *>(os.streamAddr)
-      ->write((const char *)(str.data), str.length);
+      ->write(str.data(), str.size());
 }

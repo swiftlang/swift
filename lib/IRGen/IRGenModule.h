@@ -22,6 +22,7 @@
 #include "SwiftTargetInfo.h"
 #include "TypeLayout.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -32,8 +33,8 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/SuccessorMap.h"
 #include "swift/IRGen/ValueWitness.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/RuntimeEffect.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -93,6 +94,7 @@ namespace swift {
   class BraceStmt;
   class CanType;
   class GeneratedModule;
+  struct GenericRequirement;
   class LinkLibrary;
   class SILFunction;
   class IRGenOptions;
@@ -152,7 +154,6 @@ namespace irgen {
   class Signature;
   class StructMetadataLayout;
   struct SymbolicMangling;
-  struct GenericRequirement;
   class TypeConverter;
   class TypeInfo;
   enum class TypeMetadataAddress;
@@ -776,7 +777,7 @@ public:
 
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
   RuntimeEffect effectOfRuntimeFuncs = RuntimeEffect::NoEffect;
-  llvm::SmallVector<const char *> emittedRuntimeFuncs;
+  SmallVector<const char *> emittedRuntimeFuncs;
 
   void registerRuntimeEffect(ArrayRef<RuntimeEffect> realtime,
                              const char *funcName);
@@ -837,6 +838,7 @@ public:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
     case ReferenceCounting::None:
+    case ReferenceCounting::Custom:
       return true;
 
     case ReferenceCounting::Bridge:
@@ -1079,6 +1081,7 @@ public:
 
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
+  void addGenericROData(llvm::Constant *addr);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
@@ -1197,6 +1200,8 @@ private:
   /// Metadata nodes for autolinking info.
   SmallVector<LinkLibrary, 32> AutolinkEntries;
 
+  // List of ro_data_t referenced from generic class patterns.
+  SmallVector<llvm::WeakTrackingVH, 4> GenericRODatas;
   /// List of Objective-C classes, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCClasses;
   /// List of Objective-C classes that require nonlazy realization, bitcast to
@@ -1258,7 +1263,7 @@ private:
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
-  llvm::SmallVector<llvm::MDNode *> UsedConditionals;
+  SmallVector<llvm::MDNode *> UsedConditionals;
   void emitUsedConditionals();
 
   void emitGlobalLists();
@@ -1437,12 +1442,14 @@ public:
   /// invalid.
   bool finalize();
 
-  void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
-                                    OptimizationMode FuncOptMode =
-                                      OptimizationMode::NotSet);
+  void constructInitialFnAttributes(
+      llvm::AttrBuilder &Attrs,
+      OptimizationMode FuncOptMode = OptimizationMode::NotSet,
+      StackProtectorMode stackProtect = StackProtectorMode::NoStackProtector);
   void setHasNoFramePointer(llvm::AttrBuilder &Attrs);
   void setHasNoFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
+  StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
@@ -1754,6 +1761,11 @@ public:
 
   /// Emit a resilient class stub.
   llvm::Constant *emitObjCResilientClassStub(ClassDecl *D, bool isPublic);
+
+  /// Runs additional lowering logic on the given SIL function to ensure that
+  /// the SIL function is correctly lowered even if the lowering passes do not
+  /// run on the SIL module that owns this function.
+  void lowerSILFunction(SILFunction *f);
 
 private:
   llvm::Constant *

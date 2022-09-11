@@ -578,7 +578,7 @@ struct MyInt {
 // CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
 // CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK: bb2({{.*}}):
+// CHECK: bb2:
 // CHECK:   apply [[MM]]([[ARRAY]]
 // CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: } // end sil function 'hoist_projections'
@@ -587,10 +587,10 @@ bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   br bb1
 
 bb1:
-  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
-  br bb3(%2 : $*Container)
+  br bb3
 
-bb3(%3: $*Container):
+bb3:
+  %3 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
   %4 = struct_element_addr %3 : $*Container, #Container.array
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
@@ -613,7 +613,7 @@ bb2:
 // CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
 // CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK: bb2({{.*}}):
+// CHECK: bb2:
 // CHECK:   apply [[MM]]([[ARRAY]]
 // CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: } // end sil function 'hoist_non_unary_projections'
@@ -623,10 +623,10 @@ bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   br bb1
 
 bb1:
-  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
-  br bb2(%2 : $*Container)
+  br bb2
 
-bb2(%3: $*Container):
+bb2:
+  %3 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
   %3i = index_addr %3 : $*Container, %i : $Builtin.Int32
   %4 = struct_element_addr %3i : $*Container, #Container.array
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
@@ -649,7 +649,7 @@ bb3:
 // CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
 // CHECK:   apply [[EM]]([[ARRAY]]
 // CHECK: bb1:
-// CHECK: bb2({{.*}}):
+// CHECK: bb2:
 // CHECK:   apply [[MM]]([[ARRAY]]
 // CHECK:   apply [[EM]]
 // CHECK: } // end sil function 'hoist_projections2'
@@ -658,11 +658,11 @@ bb0(%0 : $*ContainerContainer, %1 : $*Builtin.Int1):
   br bb1
 
 bb1:
-  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
-  %3 = struct_element_addr %2 : $*Container, #Container.array
-  br bb3(%3 : $*MyArray<MyStruct>)
+  br bb3
 
-bb3(%4 : $*MyArray<MyStruct>):
+bb3:
+  %2 = struct_element_addr %0 : $*ContainerContainer, #ContainerContainer.container
+  %4 = struct_element_addr %2 : $*Container, #Container.array
   %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %6 = apply %5(%4) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
   %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()

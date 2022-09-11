@@ -22,8 +22,9 @@ struct SimpleStruct : Codable {
   }
 }
 
-// SR-13137 Ensure unqualified lookup installs CodingKeys regardless of the
-// order of primaries.
+// https://github.com/apple/swift/issues/55584
+// Ensure unqualified lookup installs CodingKeys regardless of the order
+// of primaries.
 struct A: Codable {
   var property: String
   static let propertyName = CodingKeys.property.stringValue

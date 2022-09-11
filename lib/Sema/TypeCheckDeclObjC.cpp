@@ -37,6 +37,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyObjCMembers:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
   case ObjCReason::ExplicitlyIBSegueAction:
@@ -71,6 +72,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyObjCMembers:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
   case ObjCReason::ExplicitlyIBSegueAction:
@@ -128,6 +130,7 @@ void ObjCReason::describe(const Decl *D) const {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyObjCMembers:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
   case ObjCReason::ExplicitlyIBSegueAction:
@@ -2269,7 +2272,7 @@ namespace {
       // location within that source file.
       SourceFile *lhsSF = lhs->getDeclContext()->getParentSourceFile();
       SourceFile *rhsSF = rhs->getDeclContext()->getParentSourceFile();
-      if (lhsSF == rhsSF) {
+      if (lhsSF && lhsSF == rhsSF) {
         // If only one location is valid, the valid location comes first.
         if (lhs->getLoc().isValid() != rhs->getLoc().isValid()) {
           return lhs->getLoc().isValid();
@@ -2445,11 +2448,26 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   auto methods = conflict.typeDecl->lookupDirect(conflict.selector,
                                                  conflict.isInstanceMethod);
 
+  // Find async alternatives for each.
+  llvm::SmallDenseMap<AbstractFunctionDecl *, AbstractFunctionDecl *>
+    asyncAlternatives;
+  for (auto method : methods) {
+    if (isa<ProtocolDecl>(method->getDeclContext())) {
+      if (auto alt = method->getAsyncAlternative())
+        asyncAlternatives[method] = alt;
+    }
+  }
+
   // Erase any invalid or stub declarations. We don't want to complain about
   // them, because we might already have complained about redeclarations
   // based on Swift matching.
-  llvm::erase_if(methods, [](AbstractFunctionDecl *afd) -> bool {
+  llvm::erase_if(methods,
+                 [&asyncAlternatives](AbstractFunctionDecl *afd) -> bool {
     if (afd->isInvalid())
+      return true;
+
+    // If there is an async alternative, remove this entry.
+    if (asyncAlternatives.count(afd))
       return true;
 
     if (auto ad = dyn_cast<AccessorDecl>(afd))
@@ -2459,6 +2477,7 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
       if (ctor->hasStubImplementation())
         return true;
     }
+
     return false;
   });
 

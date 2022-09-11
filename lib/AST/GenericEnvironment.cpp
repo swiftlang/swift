@@ -26,7 +26,7 @@ using namespace swift;
 size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<OpaqueTypeDecl *>) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::OpenedExistential:
     return 0;
 
@@ -38,7 +38,7 @@ size_t GenericEnvironment::numTrailingObjects(
 size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<SubstitutionMap>) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::OpenedExistential:
     return 0;
 
@@ -50,7 +50,7 @@ size_t GenericEnvironment::numTrailingObjects(
 size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<OpenedGenericEnvironmentData>) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::Opaque:
     return 0;
 
@@ -104,8 +104,14 @@ UUID GenericEnvironment::getOpenedExistentialUUID() const {
   return getTrailingObjects<OpenedGenericEnvironmentData>()->uuid;
 }
 
+GenericSignature
+GenericEnvironment::getOpenedExistentialParentSignature() const {
+  assert(getKind() == Kind::OpenedExistential);
+  return getTrailingObjects<OpenedGenericEnvironmentData>()->parentSig;
+}
+
 GenericEnvironment::GenericEnvironment(GenericSignature signature)
-  : SignatureAndKind(signature, Kind::Normal)
+  : SignatureAndKind(signature, Kind::Primary)
 {
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -113,11 +119,12 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature)
 }
 
 GenericEnvironment::GenericEnvironment(
-    GenericSignature signature, Type existential, UUID uuid)
+    GenericSignature signature,
+    Type existential, GenericSignature parentSig, UUID uuid)
   : SignatureAndKind(signature, Kind::OpenedExistential)
 {
   new (getTrailingObjects<OpenedGenericEnvironmentData>())
-    OpenedGenericEnvironmentData{ existential, uuid };
+    OpenedGenericEnvironmentData{ existential, parentSig, uuid };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -209,7 +216,7 @@ struct SubstituteOuterFromSubstitutionMap {
 
 Type GenericEnvironment::maybeApplyOpaqueTypeSubstitutions(Type type) const {
   switch (getKind()) {
-  case Kind::Normal:
+  case Kind::Primary:
   case Kind::OpenedExistential:
     return type;
 
@@ -273,15 +280,6 @@ auto GenericEnvironment::getOrCreateNestedTypeStorage() -> NestedTypeStorage & {
   return *nestedTypeStorage;
 }
 
-static Type stripBoundDependentMemberTypes(Type t) {
-  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
-    return DependentMemberType::get(
-      stripBoundDependentMemberTypes(depMemTy->getBase()),
-      depMemTy->getName());
-  }
-
-  return t;
-}
 Type
 GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto genericSig = getGenericSignature();
@@ -292,7 +290,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   /// Substitute a type for the purpose of requirements.
   auto substForRequirements = [&](Type type) {
     switch (getKind()) {
-    case Kind::Normal:
+    case Kind::Primary:
     case Kind::OpenedExistential:
       if (type->hasTypeParameter()) {
         return mapTypeIntoContext(type, conformanceLookupFn);
@@ -315,12 +313,11 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // First, write an ErrorType to the location where this type is cached,
   // to catch re-entrant lookups that might arise from an invalid generic
   // signature (eg, <X where X == Array<X>>).
-  CanDependentMemberType nestedDependentMemberType;
+  CanDependentMemberType nestedType;
   GenericTypeParamType *genericParam = nullptr;
   if (auto depMemTy = requirements.anchor->getAs<DependentMemberType>()) {
-    nestedDependentMemberType = cast<DependentMemberType>(
-        stripBoundDependentMemberTypes(depMemTy)->getCanonicalType());
-    auto &entry = getOrCreateNestedTypeStorage()[nestedDependentMemberType];
+    nestedType = cast<DependentMemberType>(depMemTy->getCanonicalType());
+    auto &entry = getOrCreateNestedTypeStorage()[nestedType];
     if (entry)
       return entry;
 
@@ -342,13 +339,15 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
 
   Type result;
 
-  if (requirements.anchor->getRootGenericParam()->isTypeSequence()) {
+  auto rootGP = requirements.anchor->getRootGenericParam();
+  if (rootGP->isTypeSequence()) {
+    assert(getKind() == Kind::Primary);
     result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
                                         requirements.protos, superclass,
                                         requirements.layout);
   } else {
     switch (getKind()) {
-    case Kind::Normal:
+    case Kind::Primary:
       result = PrimaryArchetypeType::getNew(ctx, this, requirements.anchor,
                                             requirements.protos, superclass,
                                             requirements.layout);
@@ -384,7 +383,6 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       // If the anchor type isn't rooted in a generic parameter that
       // represents an opaque declaration, then apply the outer substitutions.
       // It would be incorrect to build an opaque type archetype here.
-      auto rootGP = requirements.anchor->getRootGenericParam();
       unsigned opaqueDepth =
           getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
       if (rootGP->getDepth() < opaqueDepth) {
@@ -403,7 +401,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   if (genericParam)
     addMapping(genericParam, result);
   else
-    getOrCreateNestedTypeStorage()[nestedDependentMemberType] = result;
+    getOrCreateNestedTypeStorage()[nestedType] = result;
 
   return result;
 }

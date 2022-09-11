@@ -787,6 +787,7 @@ public:
         return true;
       break;
 
+    case SyntaxNodeKind::Operator:
     case SyntaxNodeKind::DollarIdent:
     case SyntaxNodeKind::Integer:
     case SyntaxNodeKind::Floating:

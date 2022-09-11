@@ -1350,7 +1350,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
   auto ownershipRange =
       makeTransformRange(llvm::make_range(Values.begin(), Values.end()),
                          [](std::pair<SILBasicBlock *, SILValue> v) {
-                           return v.second.getOwnershipKind();
+                           return v.second->getOwnershipKind();
                          });
 
   auto mergedOwnershipKind = ValueOwnershipKind::merge(ownershipRange);

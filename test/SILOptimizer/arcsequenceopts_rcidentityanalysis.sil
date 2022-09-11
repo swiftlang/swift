@@ -617,9 +617,9 @@ bb0(%0 : $Builtin.NativeObject, %1 : $(Builtin.Int32, Builtin.NativeObject, Buil
 sil @strip_off_initopen_existential_ref : $@convention(thin) (C) -> () {
 bb0(%0 : $C):
   %1 = init_existential_ref %0 : $C : $C, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233") AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233", AnyObject) Self
   strong_retain %0 : $C
-  release_value %2 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233") AnyObject
+  release_value %2 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233", AnyObject) Self
   %3 = tuple()
   return %3 : $()
 }

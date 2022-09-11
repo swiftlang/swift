@@ -309,9 +309,10 @@ class DeducePropertyParams {
   let badSet: Set = ["Hello"]
 }
 
-// SR-69
-struct A {}
-func foo() {
+// https://github.com/apple/swift/issues/42691
+do {
+    struct A {}
+
     for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
     let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}

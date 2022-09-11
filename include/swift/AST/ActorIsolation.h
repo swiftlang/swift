@@ -30,6 +30,19 @@ class VarDecl;
 class NominalTypeDecl;
 class SubstitutionMap;
 class AbstractFunctionDecl;
+class AbstractClosureExpr;
+class ClosureActorIsolation;
+
+/// Trampoline for AbstractClosureExpr::getActorIsolation.
+ClosureActorIsolation
+__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
+
+/// Returns a function reference to \c __AbstractClosureExpr_getActorIsolation.
+/// This is needed so we can use it as a default argument for
+/// \c getActorIsolationOfContext without knowing the layout of
+/// \c ClosureActorIsolation.
+llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+_getRef__AbstractClosureExpr_getActorIsolation();
 
 /// Determine whether the given types are (canonically) equal, declared here
 /// to avoid having to include Types.h.
@@ -74,14 +87,17 @@ private:
     Type globalActor;
     void *pointer;
   };
-  uint8_t kind : 3;
-  uint8_t isolatedByPreconcurrency : 1;
+  unsigned kind : 3;
+  unsigned isolatedByPreconcurrency : 1;
+  unsigned parameterIndex : 28;
 
-  ActorIsolation(Kind kind, NominalTypeDecl *actor)
-      : actor(actor), kind(kind), isolatedByPreconcurrency(false) { }
+  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex)
+      : actor(actor), kind(kind), isolatedByPreconcurrency(false),
+        parameterIndex(parameterIndex) { }
 
   ActorIsolation(Kind kind, Type globalActor)
-      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false) { }
+      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
+        parameterIndex(0) { }
 
 public:
   static ActorIsolation forUnspecified() {
@@ -92,8 +108,13 @@ public:
     return ActorIsolation(Independent, nullptr);
   }
 
-  static ActorIsolation forActorInstance(NominalTypeDecl *actor) {
-    return ActorIsolation(ActorInstance, actor);
+  static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
+    return ActorIsolation(ActorInstance, actor, 0);
+  }
+
+  static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
+                                                  unsigned parameterIndex) {
+    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
@@ -108,6 +129,14 @@ public:
   bool isUnspecified() const { return kind == Unspecified; }
   
   bool isIndependent() const { return kind == Independent; }
+
+  /// Retrieve the parameter to which actor-instance isolation applies.
+  ///
+  /// Parameter 0 is `self`.
+  unsigned getActorInstanceParameter() const {
+    assert(getKind() == ActorInstance);
+    return parameterIndex;
+  }
 
   bool isActorIsolated() const {
     switch (getKind()) {
@@ -169,7 +198,7 @@ public:
       return true;
 
     case ActorInstance:
-      return lhs.actor == rhs.actor;
+      return lhs.actor == rhs.actor && lhs.parameterIndex == rhs.parameterIndex;
 
     case GlobalActor:
     case GlobalActorUnsafe:
@@ -183,7 +212,9 @@ public:
   }
 
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
-    return llvm::hash_combine(state.kind, state.pointer);
+    return llvm::hash_combine(
+        state.kind, state.pointer, state.isolatedByPreconcurrency,
+        state.parameterIndex);
   }
 };
 
@@ -191,7 +222,15 @@ public:
 ActorIsolation getActorIsolation(ValueDecl *value);
 
 /// Determine how the given declaration context is isolated.
-ActorIsolation getActorIsolationOfContext(DeclContext *dc);
+/// \p getClosureActorIsolation allows the specification of actor isolation for
+/// closures that haven't been saved been saved to the AST yet. This is useful
+/// for solver-based code completion which doesn't modify the AST but stores the
+/// actor isolation of closures in the constraint system solution.
+ActorIsolation getActorIsolationOfContext(
+    DeclContext *dc,
+    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+        getClosureActorIsolation =
+            _getRef__AbstractClosureExpr_getActorIsolation());
 
 /// Check if both the value, and context are isolated to the same actor.
 bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);

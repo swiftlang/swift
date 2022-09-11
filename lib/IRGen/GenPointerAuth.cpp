@@ -39,7 +39,7 @@ getPointerAuthPair(IRGenFunction &IGF, const PointerAuthInfo &authInfo) {
   auto key = llvm::ConstantInt::get(IGF.IGM.Int32Ty, authInfo.getKey());
   llvm::Value *discriminator = authInfo.getDiscriminator();
   if (discriminator->getType()->isPointerTy()) {
-    discriminator = IGF.Builder.CreatePtrToInt(discriminator, IGF.IGM.IntPtrTy);
+    discriminator = IGF.Builder.CreatePtrToInt(discriminator, IGF.IGM.Int64Ty);
   }
   return { key, discriminator };
 }
@@ -47,23 +47,19 @@ getPointerAuthPair(IRGenFunction &IGF, const PointerAuthInfo &authInfo) {
 llvm::Value *irgen::emitPointerAuthBlend(IRGenFunction &IGF,
                                          llvm::Value *address,
                                          llvm::Value *other) {
-  address = IGF.Builder.CreatePtrToInt(address, IGF.IGM.IntPtrTy);
-  auto intrinsic =
-    llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                    llvm::Intrinsic::ptrauth_blend,
-                                    { IGF.IGM.IntPtrTy });
+  address = IGF.Builder.CreatePtrToInt(address, IGF.IGM.Int64Ty);
+  auto intrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_blend);
   return IGF.Builder.CreateCall(intrinsic, {address, other});
 }
 
 llvm::Value *irgen::emitPointerAuthStrip(IRGenFunction &IGF,
                                           llvm::Value *fnPtr,
                                           unsigned Key) {
-  auto fnVal = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.IntPtrTy);
+  auto fnVal = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.Int64Ty);
   auto keyArg = llvm::ConstantInt::get(IGF.IGM.Int32Ty, Key);
-  auto intrinsic =
-    llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                    llvm::Intrinsic::ptrauth_strip,
-                                    { IGF.IGM.IntPtrTy });
+  auto intrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_strip);
   auto strippedPtr = IGF.Builder.CreateCall(intrinsic, {fnVal, keyArg});
   return IGF.Builder.CreateIntToPtr(strippedPtr, fnPtr->getType());
 }
@@ -96,15 +92,13 @@ llvm::Value *irgen::emitPointerAuthResign(IRGenFunction &IGF,
 
   // Otherwise, auth and resign it.
   auto origTy = fnPtr->getType();
-  fnPtr = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.IntPtrTy);
+  fnPtr = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.Int64Ty);
 
   auto oldPair = getPointerAuthPair(IGF, oldAuthInfo);
   auto newPair = getPointerAuthPair(IGF, newAuthInfo);
 
-  auto intrinsic =
-    llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                    llvm::Intrinsic::ptrauth_resign,
-                                    { IGF.IGM.IntPtrTy });
+  auto intrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_resign);
   llvm::Value *args[] = {
     fnPtr, oldPair.first, oldPair.second, newPair.first, newPair.second
   };
@@ -115,14 +109,12 @@ llvm::Value *irgen::emitPointerAuthResign(IRGenFunction &IGF,
 llvm::Value *irgen::emitPointerAuthAuth(IRGenFunction &IGF, llvm::Value *fnPtr,
                                         const PointerAuthInfo &oldAuthInfo) {
   auto origTy = fnPtr->getType();
-  fnPtr = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.IntPtrTy);
+  fnPtr = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.Int64Ty);
 
   auto oldPair = getPointerAuthPair(IGF, oldAuthInfo);
 
-  auto intrinsic =
-    llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                    llvm::Intrinsic::ptrauth_auth,
-                                    { IGF.IGM.IntPtrTy });
+  auto intrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_auth);
   llvm::Value *args[] = {
     fnPtr, oldPair.first, oldPair.second
   };
@@ -151,14 +143,12 @@ llvm::Value *irgen::emitPointerAuthSign(IRGenFunction &IGF, llvm::Value *fnPtr,
   }
 
   auto origTy = fnPtr->getType();
-  fnPtr = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.IntPtrTy);
+  fnPtr = IGF.Builder.CreatePtrToInt(fnPtr, IGF.IGM.Int64Ty);
 
   auto newPair = getPointerAuthPair(IGF, newAuthInfo);
 
-  auto intrinsic =
-    llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                    llvm::Intrinsic::ptrauth_sign,
-                                    { IGF.IGM.IntPtrTy });
+  auto intrinsic = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ptrauth_sign);
   llvm::Value *args[] = {
     fnPtr, newPair.first, newPair.second
   };
@@ -247,7 +237,7 @@ PointerAuthInfo PointerAuthInfo::emit(IRGenFunction &IGF,
       discriminator = emitPointerAuthBlend(IGF, storageAddress, discriminator);
     } else {
       discriminator =
-        IGF.Builder.CreatePtrToInt(storageAddress, IGF.IGM.IntPtrTy);
+          IGF.Builder.CreatePtrToInt(storageAddress, IGF.IGM.Int64Ty);
     }
   }
 
@@ -261,7 +251,7 @@ PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
   assert(schema);
   switch (schema.getOtherDiscrimination()) {
   case PointerAuthSchema::Discrimination::None:
-    return llvm::ConstantInt::get(IGM.IntPtrTy, 0);
+    return llvm::ConstantInt::get(IGM.Int64Ty, 0);
 
   case PointerAuthSchema::Discrimination::Decl:
     return entity.getDeclDiscriminator(IGM);
@@ -270,7 +260,7 @@ PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
     return entity.getTypeDiscriminator(IGM);
 
   case PointerAuthSchema::Discrimination::Constant:
-    return llvm::ConstantInt::get(IGM.IntPtrTy,
+    return llvm::ConstantInt::get(IGM.Int64Ty,
                                   schema.getConstantDiscrimination());
   }
   llvm_unreachable("bad kind");
@@ -279,7 +269,7 @@ PointerAuthInfo::getOtherDiscriminator(IRGenModule &IGM,
 static llvm::ConstantInt *getDiscriminatorForHash(IRGenModule &IGM,
                                                   uint64_t rawHash) {
   uint16_t reducedHash = (rawHash % 0xFFFF) + 1;
-  return IGM.getSize(Size(reducedHash));
+  return llvm::ConstantInt::get(IGM.Int64Ty, reducedHash);
 }
 
 static llvm::ConstantInt *getDiscriminatorForString(IRGenModule &IGM,
@@ -348,7 +338,8 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
       llvm_unreachable("bad kind");
     };
     auto specialKind = Storage.get<Special>(StoredKind);
-    return IGM.getSize(Size(getSpecialDiscriminator(specialKind)));
+    return llvm::ConstantInt::get(IGM.Int64Ty,
+                                  getSpecialDiscriminator(specialKind));
   }
 
   case Kind::ValueWitness: {
@@ -368,7 +359,8 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
       llvm_unreachable("bad kind");
     };
     auto witness = Storage.get<ValueWitness>(StoredKind);
-    return IGM.getSize(Size(getValueWitnessDiscriminator(witness)));
+    return llvm::ConstantInt::get(IGM.Int64Ty,
+                                  getValueWitnessDiscriminator(witness));
   }
 
   case Kind::AssociatedType: {
@@ -700,5 +692,5 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
     return add(pointer);
 
   addSignedPointer(pointer, schema.getKey(), schema.isAddressDiscriminated(),
-                   llvm::ConstantInt::get(IGM().IntPtrTy, otherDiscriminator));
+                   llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
 }

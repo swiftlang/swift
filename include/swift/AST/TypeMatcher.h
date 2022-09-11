@@ -125,10 +125,10 @@ class TypeMatcher {
           const auto &firstElt = firstTuple->getElements()[i];
           const auto &secondElt = secondTuple->getElements()[i];
 
-          if (firstElt.getName() != secondElt.getName() ||
-              firstElt.isVararg() != secondElt.isVararg())
+          if (firstElt.getName() != secondElt.getName()) {
             return mismatch(firstTuple.getPointer(), secondTuple,
                             sugaredFirstType);
+          }
 
           // Recurse on the tuple elements.
           if (!this->visit(firstTuple.getElementType(i), secondElt.getType(),

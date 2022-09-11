@@ -31,28 +31,38 @@ Type InheritedTypeRequest::evaluate(
     unsigned index, TypeResolutionStage stage) const {
   // Figure out how to resolve types.
   DeclContext *dc;
+  TypeResolverContext context;
+
   if (auto typeDecl = decl.dyn_cast<const TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = (DeclContext *)nominal;
+      context = TypeResolverContext::Inherited;
     } else {
       dc = typeDecl->getDeclContext();
+      if (isa<GenericTypeParamDecl>(typeDecl))
+        context = TypeResolverContext::GenericParameterInherited;
+      else {
+        assert(isa<AssociatedTypeDecl>(typeDecl));
+        context = TypeResolverContext::AssociatedTypeInherited;
+      }
     }
   } else {
     dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+    context = TypeResolverContext::Inherited;
   }
 
   Optional<TypeResolution> resolution;
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution =
-        TypeResolution::forStructural(dc, TypeResolverContext::Inherited,
+        TypeResolution::forStructural(dc, context,
                                       /*unboundTyOpener*/ nullptr,
                                       /*placeholderHandler*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution =
-        TypeResolution::forInterface(dc, TypeResolverContext::Inherited,
+        TypeResolution::forInterface(dc, context,
                                      /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr);
     break;
@@ -287,16 +297,13 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
           continue;
 
         // Substitute Self and associated type witnesses into the
-        // result builder type. Then, map all type parameters from
-        // the conforming type into context. We don't want type
-        // parameters to appear in the result builder type, because
-        // the result builder type will only be used inside the body
-        // of this decl; it's not part of the interface type.
+        // result builder type. Type parameters will be mapped
+        // into context when applying the result builder to the
+        // function body in the constraint system.
         auto subs = SubstitutionMap::getProtocolSubstitutions(
             protocol, dc->getSelfInterfaceType(),
             ProtocolConformanceRef(conformance));
-        Type subResultBuilderType = dc->mapTypeIntoContext(
-            resultBuilderType.subst(subs));
+        Type subResultBuilderType = resultBuilderType.subst(subs);
 
         matches.push_back(
             Match::forConformance(

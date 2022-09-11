@@ -14,11 +14,11 @@ func callsTakesError<U : Error>(_ error: U) {
   takesError(error)
 }
 
-// CHECK-LABEL: sil hidden @$s26specialize_self_conforming5test1yys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
-// CHECK: [[TEMP:%.*]] = alloc_stack $Error
+// CHECK-LABEL: sil hidden @$s26specialize_self_conforming5test1yys5Error_pF : $@convention(thin) (@guaranteed any Error) -> () {
+// CHECK: [[TEMP:%.*]] = alloc_stack $any Error
 // CHECK: store %0 to [[TEMP]]
 // CHECK: [[FN:%.*]] = function_ref @$s26specialize_self_conforming10takesErroryyxs0E0RzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[FN]]<Error>([[TEMP]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[FN]]<any Error>([[TEMP]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
 // CHECK: dealloc_stack [[TEMP]]
 // CHECK: return
 
@@ -37,11 +37,11 @@ func callsTakesErrorWithError<U>(_ error: Error, _ value : U) {
   takesError(error)
 }
 
-// CHECK-LABEL: sil hidden @$s26specialize_self_conforming5test2yys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
-// CHECK: [[TEMP:%.*]] = alloc_stack $Error
+// CHECK-LABEL: sil hidden @$s26specialize_self_conforming5test2yys5Error_pF : $@convention(thin) (@guaranteed any Error) -> () {
+// CHECK: [[TEMP:%.*]] = alloc_stack $any Error
 // CHECK: store %0 to [[TEMP]]
 // CHECK: [[FN:%.*]] = function_ref @$s26specialize_self_conforming10takesErroryyxs0E0RzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[FN]]<Error>([[TEMP]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[FN]]<any Error>([[TEMP]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> ()
 // CHECK: dealloc_stack [[TEMP]]
 // CHECK: return
 
@@ -63,11 +63,11 @@ func callsTakesErrorAndValueWithError<U>(_ error: Error, _ value : U) {
   takesErrorAndValue(error, value)
 }
 
-// CHECK-LABEL: sil hidden @$s26specialize_self_conforming5test3yys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
-// CHECK: [[TEMP:%.*]] = alloc_stack $Error
+// CHECK-LABEL: sil hidden @$s26specialize_self_conforming5test3yys5Error_pF : $@convention(thin) (@guaranteed any Error) -> () {
+// CHECK: [[TEMP:%.*]] = alloc_stack $any Error
 // CHECK: store %0 to [[TEMP]]
 // CHECK: [[FN:%.*]] = function_ref @$s26specialize_self_conforming18takesErrorAndValueyyx_q_ts0E0Rzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Error> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
-// CHECK: apply [[FN]]<Error, Int>([[TEMP]], {{%.*}}) :
+// CHECK: apply [[FN]]<any Error, Int>([[TEMP]], {{%.*}}) :
 // CHECK: dealloc_stack [[TEMP]]
 // CHECK: return
 

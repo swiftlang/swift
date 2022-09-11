@@ -49,7 +49,6 @@ entry(%p : $*τ_0_0):
   unreachable
 }
 
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingPTA"(
 sil hidden @reabstract_context : $@async @convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %6 = alloc_stack $C
@@ -119,7 +118,6 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_forwarder_parameter(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA.{{[0-9]+}}"(
 sil public @bind_polymorphic_param_from_forwarder_parameter : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>

@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil -o /dev/null
 
-// REQUIRES: optimized_stdlib
-
 import Swift
 
 //////////////////
@@ -32,14 +30,14 @@ func exchangeUse(_ k: Klass) -> Klass { k }
 
 public func performMoveOnVarSingleBlock(_ p: Klass) {
     var x = p
-    let _ = _move(x)
+    let _ = _move x
     x = p
     nonConsumingUse(x)
 }
 
 public func performMoveOnVarSingleBlockError(_ p: Klass) {
     var x = p // expected-error {{'x' used after being moved}}
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
     nonConsumingUse(x) // expected-note {{use here}}
     x = p
     nonConsumingUse(x)
@@ -47,7 +45,7 @@ public func performMoveOnVarSingleBlockError(_ p: Klass) {
 
 public func performMoveOnVarMultiBlock(_ p: Klass) {
     var x = p
-    let _ = _move(x)
+    let _ = _move x
 
     while booleanValue {
         print("true")
@@ -63,7 +61,7 @@ public func performMoveOnVarMultiBlock(_ p: Klass) {
 
 public func performMoveOnVarMultiBlockError1(_ p: Klass) {
     var x = p // expected-error {{'x' used after being moved}}
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
 
     nonConsumingUse(x) // expected-note {{use here}}
 
@@ -87,7 +85,7 @@ public func performMoveOnVarMultiBlockError1(_ p: Klass) {
 
 public func performMoveOnVarMultiBlockError2(_ p: Klass) {
     var x = p // expected-error {{'x' used after being moved}}
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
 
     while booleanValue {
         print("true")
@@ -111,7 +109,7 @@ public func performMoveConditionalReinitalization(_ p: Klass) {
 
     if booleanValue {
         nonConsumingUse(x)
-        let _ = _move(x)
+        let _ = _move x
         x = p
         nonConsumingUse(x)
     } else {
@@ -126,7 +124,7 @@ public func performMoveConditionalReinitalization2(_ p: Klass) {
 
     if booleanValue {
         nonConsumingUse(x)
-        let _ = _move(x) // expected-note {{move here}}
+        let _ = _move x // expected-note {{move here}}
         nonConsumingUse(x) // expected-note {{use here}}
         x = p
         nonConsumingUse(x)
@@ -143,12 +141,12 @@ public func performMoveConditionalReinitalization3(_ p: Klass, _ p2: Klass, _ p3
 
     if booleanValue {
         nonConsumingUse(x)
-        let _ = _move(x)   // expected-note {{move here}}
+        let _ = _move x   // expected-note {{move here}}
         nonConsumingUse(x) // expected-note {{use here}}
         nonConsumingUse(x) // We only emit for the first one.
         x = p2
         nonConsumingUse(x)
-        let _ = _move(x)   // expected-note {{move here}}
+        let _ = _move x   // expected-note {{move here}}
         nonConsumingUse(x) // expected-note {{use here}}
     } else {
         nonConsumingUse(x)
@@ -164,7 +162,7 @@ public func performMoveOnLaterDefinedInit(_ p: Klass) {
     do {
         x = p
     }
-    let _ = _move(x) // expected-note {{move here}}
+    let _ = _move x // expected-note {{move here}}
     nonConsumingUse(x) // expected-note {{use here}}
 }
 
@@ -174,16 +172,16 @@ public func performMoveOnLaterDefinedInit2(_ p: Klass) {
         x = p
     }
     nonConsumingUse(x)
-    let _ = _move(x)
+    let _ = _move x
 }
 
 public func performMoveOnInOut(_ p: inout Klass) { // expected-error {{'p' used after being moved}}
-    let buf = _move(p) // expected-note {{move here}}
+    let buf = _move p // expected-note {{move here}}
     let _ = buf
 } // expected-note {{use here}}
 
 public func performMoveOnInOut2(_ p: inout Klass, _ p2: Klass) {
-    let buf = _move(p)
+    let buf = _move p
     p = p2
     let _ = buf
 }
@@ -193,18 +191,18 @@ struct S {
     var buffer: Klass?
 
     mutating func appendNoError() {
-        let b = _move(self).buffer!
+        let b = (_move self).buffer!
         let maybeNewB = exchangeUse(b)
         self = .init(buffer: maybeNewB)
     }
 
     mutating func appendError() { // expected-error {{'self' used after being moved}}
-        let b = _move(self).buffer // expected-note {{move here}}
+        let b = (_move self).buffer // expected-note {{move here}}
         let _ = b
     } // expected-note {{use here}}
 
     mutating func appendThrowingNoError1(_ f: () throws -> ()) throws {
-        let b = _move(self).buffer!
+        let b = (_move self).buffer!
         let maybeNewB = exchangeUse(b)
         // We have to initialize self before we call try since otherwise we will
         // not initialize self along the throws path.
@@ -214,7 +212,7 @@ struct S {
 
     mutating func appendThrowingNoError2(_ f: () throws -> ()) {
         do {
-            let b = _move(self).buffer!
+            let b = (_move self).buffer!
             try f()
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
@@ -228,7 +226,7 @@ struct S {
     // inline or the catch block.
     mutating func appendThrowingNoError3(_ f: () throws -> ()) {
         do {
-            let b = _move(self).buffer!
+            let b = (_move self).buffer!
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
             try f()
@@ -237,7 +235,7 @@ struct S {
     }
 
     mutating func appendThrowingError0(_ f: () throws -> ()) throws { // expected-error {{'self' used after being moved}}
-        let b = _move(self).buffer! // expected-note {{move here}}
+        let b = (_move self).buffer! // expected-note {{move here}}
         let maybeNewB = exchangeUse(b)
         try f() // expected-note {{use here}}
         self = .init(buffer: maybeNewB)
@@ -245,7 +243,7 @@ struct S {
 
 
     mutating func appendThrowingError1(_ f: () throws -> ()) throws { // expected-error {{'self' used after being moved}}
-        let b = _move(self).buffer! // expected-note {{move here}}
+        let b = (_move self).buffer! // expected-note {{move here}}
         let maybeNewB = exchangeUse(b)
         let _ = maybeNewB
         try f() // expected-note {{use here}}
@@ -253,7 +251,7 @@ struct S {
 
     mutating func appendThrowingError2(_ f: () throws -> ()) { // expected-error {{'self' used after being moved}}
         do {
-            let b = _move(self).buffer // expected-note {{move here}}
+            let b = (_move self).buffer // expected-note {{move here}}
             let _ = b
             try f()
         } catch {
@@ -263,7 +261,7 @@ struct S {
 
     mutating func appendThrowingError3(_ f: () throws -> ()) { // expected-error {{'self' used after being moved}}
         do {
-            let b = _move(self).buffer! // expected-note {{move here}}
+            let b = (_move self).buffer! // expected-note {{move here}}
             try f()
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
@@ -273,7 +271,7 @@ struct S {
 
     mutating func appendThrowingError4(_ f: () throws -> ()) { // expected-error {{'self' used after being moved}}
         do {
-            let b = _move(self).buffer // expected-note {{move here}}
+            let b = (_move self).buffer // expected-note {{move here}}
             let _ = b
             try f()
         } catch {
@@ -287,7 +285,7 @@ struct S {
 
 extension KlassWrapper {
     mutating func deferTestSuccess1() {
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = KlassWrapper(k: Klass())
         }
@@ -296,9 +294,9 @@ extension KlassWrapper {
 
     // Make sure we can init/reinit self multiple times without error.
     mutating func deferTestSuccess2() {
-        let _ = _move(self)
+        let _ = (_move self)
         self = KlassWrapper(k: Klass())
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = KlassWrapper(k: Klass())
         }
@@ -306,7 +304,7 @@ extension KlassWrapper {
     }
 
     mutating func deferTestSuccess3() {
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = KlassWrapper(k: Klass())
         }
@@ -318,17 +316,17 @@ extension KlassWrapper {
 
     // We do not support moving within a defer right now.
     mutating func deferTestFail1() {
-        let _ = _move(self)
+        let _ = (_move self)
         defer {
             self = KlassWrapper(k: Klass())
-            let _ = _move(self) // expected-error {{_move applied to value that the compiler does not support checking}}
+            let _ = (_move self) // expected-error {{_move applied to value that the compiler does not support checking}}
         }
         print("123")
     }
 
     // We do not support moving within a defer right now.
     mutating func deferTestFail2() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             nonConsumingUse(k) // expected-note {{use here}}
             self = KlassWrapper(k: Klass())
@@ -338,7 +336,7 @@ extension KlassWrapper {
 
 
     mutating func deferTestFail3() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         nonConsumingUse(k) // expected-note {{use here}}
         defer {
             nonConsumingUse(k)
@@ -348,7 +346,7 @@ extension KlassWrapper {
     }
 
     mutating func deferTestFail4() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             consumingUse(k) // expected-note {{use here}}
             self = KlassWrapper(k: Klass())
@@ -358,7 +356,7 @@ extension KlassWrapper {
 
     // TODO: We should definitely be erroring on consuming use I think.
     mutating func deferTestFail5() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         for _ in 0..<1024 {
             defer {
                 consumingUse(k)
@@ -373,7 +371,7 @@ extension KlassWrapper {
     // scope use.
     //
     mutating func deferTestFail6() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         for _ in 0..<1024 {
             defer {
                 nonConsumingUse(k)
@@ -386,7 +384,7 @@ extension KlassWrapper {
 
     mutating func deferTestFail7() { // expected-error {{'self' used after being moved}}
         for _ in 0..<1024 {
-            let _ = _move(self) // expected-note {{move here}}
+            let _ = (_move self) // expected-note {{move here}}
             defer {
                 nonConsumingUse(k) // expected-note {{use here}}
                 self = KlassWrapper(k: Klass())
@@ -397,7 +395,7 @@ extension KlassWrapper {
     }
 
     mutating func deferTestFail8() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             if booleanValue {
                 nonConsumingUse(k) // expected-note {{use here}}
@@ -408,7 +406,7 @@ extension KlassWrapper {
     }
 
     mutating func deferTestFail9() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             if booleanValue {
                 nonConsumingUse(k) // expected-note {{use here}}
@@ -421,7 +419,7 @@ extension KlassWrapper {
     }
 
     mutating func deferTestFail10() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         defer {
             for _ in 0..<1024 {
                 nonConsumingUse(k) // expected-note {{use here}}
@@ -432,7 +430,7 @@ extension KlassWrapper {
     }
 
     mutating func deferTestFail11() { // expected-error {{'self' used after being moved}}
-        let _ = _move(self) // expected-note {{move here}}
+        let _ = (_move self) // expected-note {{move here}}
         if booleanValue {
             print("creating blocks")
         } else {
@@ -451,7 +449,7 @@ extension KlassWrapper {
         if booleanValue {
             print("creating blocks")
         } else {
-            let _ = _move(self) // expected-note {{move here}}
+            let _ = (_move self) // expected-note {{move here}}
             print("creating blocks2")
         }
 
@@ -468,7 +466,7 @@ extension KlassWrapper {
         if booleanValue {
             print("creating blocks")
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -483,7 +481,7 @@ extension KlassWrapper {
             print("creating blocks")
             self.doSomething()
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -501,28 +499,28 @@ extension KlassWrapper {
 public func castTest0(_ x: __owned SubKlass1) -> Klass {
     var x2 = x  // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     return x2 as Klass // expected-note {{use here}}
 }
 
 public func castTest1(_ x: __owned Klass) -> SubKlass1 {
     var x2 = x  // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     return x2 as! SubKlass1 // expected-note {{use here}}
 }
 
 public func castTest2(_ x: __owned Klass) -> SubKlass1? {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     return x2 as? SubKlass1 // expected-note {{use here}}
 }
 
 public func castTestSwitch1(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     switch x2 {  // expected-note {{use here}}
     case let k as SubKlass1:
         print(k)
@@ -534,7 +532,7 @@ public func castTestSwitch1(_ x : __owned Klass) {
 public func castTestSwitch2(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     switch x2 { // expected-note {{use here}}
     case let k as SubKlass1:
         print(k)
@@ -548,7 +546,7 @@ public func castTestSwitch2(_ x : __owned Klass) {
 public func castTestSwitchInLoop(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
 
     for _ in 0..<1024 {
         switch x2 { // expected-note {{use here}}
@@ -563,7 +561,7 @@ public func castTestSwitchInLoop(_ x : __owned Klass) {
 public func castTestIfLet(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     if case let k as SubKlass1 = x2 { // expected-note {{use here}}
         print(k)
     } else {
@@ -574,7 +572,7 @@ public func castTestIfLet(_ x : __owned Klass) {
 public func castTestIfLetInLoop(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     for _ in 0..<1024 {
         if case let k as SubKlass1 = x2 { // expected-note {{use here}}
             print(k)
@@ -592,7 +590,7 @@ public enum EnumWithKlass {
 public func castTestIfLet2(_ x : __owned EnumWithKlass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     if case let .klass(k as SubKlass1) = x2 { // expected-note {{use here}}
         print(k)
     } else {
@@ -607,14 +605,14 @@ public func castTestIfLet2(_ x : __owned EnumWithKlass) {
 public func castAccess(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     let _ = x2.k // expected-note {{use here}}
 }
 
 public func castAccess2(_ x : __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     let _ = x2.k!.getOtherKlass() // expected-note {{use here}}
 }
 
@@ -626,7 +624,7 @@ public func castAccess2(_ x : __owned Klass) {
 public func partialApplyTest(_ x: __owned Klass) {
     var x2 = x // expected-error {{'x2' used after being moved}}
     x2 = x
-    let _ = _move(x2) // expected-note {{move here}}
+    let _ = _move x2 // expected-note {{move here}}
     let f = { // expected-note {{use here}}
         print(x2)
     }
@@ -651,7 +649,7 @@ extension KlassWrapper {
         if booleanValue {
             print("creating blocks")
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -666,7 +664,7 @@ extension KlassWrapper {
             print("creating blocks")
             self.doSomething()
         } else {
-            let _ = _move(self)
+            let _ = (_move self)
             print("creating blocks2")
         }
 
@@ -682,8 +680,8 @@ extension KlassWrapper {
 func multipleCapture1(_ k: Klass) -> () {
     var k2 = k
     var k3 = k
-    let _ = _move(k2)
-    let _ = _move(k3)
+    let _ = _move k2
+    let _ = _move k3
     var k4 = k
     k4 = k
     defer {
@@ -698,8 +696,8 @@ func multipleCapture2(_ k: Klass) -> () {
     var k2 = k // expected-error {{'k2' used after being moved}}
     k2 = k
     var k3 = k
-    let _ = _move(k2) // expected-note {{move here}}
-    let _ = _move(k3)
+    let _ = _move k2 // expected-note {{move here}}
+    let _ = _move k3
     var k4 = k
     k4 = k
     defer {
@@ -727,7 +725,23 @@ func reinitInPieces1(_ k: KlassPair) {
     var k2 = k
     k2 = k
 
-    let _ = _move(k2) // expected-error {{_move applied to value that the compiler does not support checking}}
+    let _ = _move k2 // expected-error {{_move applied to value that the compiler does not support checking}}
     k2.lhs = Klass()
     k2.rhs = Klass()
+}
+
+////////////////////////
+// InOut and Use Test //
+////////////////////////
+
+func useValueAndInOut(_ x: Klass, _ y: inout Klass) {}
+func useValueAndInOut(_ x: inout Klass, _ y: Klass) {}
+
+func inoutAndUseTest(_ x: Klass) {
+    var y = x // expected-error {{'y' used after being moved}}
+              // expected-error @-1 {{'y' used after being moved}}
+    useValueAndInOut(_move y, &y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
+    useValueAndInOut(&y, _move y) // expected-note {{use here}}
+                                  // expected-note @-1 {{move here}}
 }

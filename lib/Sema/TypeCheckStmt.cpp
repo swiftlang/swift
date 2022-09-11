@@ -229,8 +229,7 @@ static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
   auto optionSetType = dyn_cast_or_null<ProtocolDecl>(Ctx.getOptionSetDecl());
   if (!optionSetType)
     return;
-  SmallVector<ProtocolConformance *, 4> conformances;
-  if (!(optionSetType && NTD->lookupConformance(optionSetType, conformances)))
+  if (!module->lookupConformance(ResultType, optionSetType))
     return;
 
   auto *CE = dyn_cast<CallExpr>(E);
@@ -1227,34 +1226,8 @@ static bool isDiscardableType(Type type) {
 }
 
 static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
-  const auto getLiteralDescription = [](LiteralExpr *LE) -> StringRef {
-    switch (LE->getKind()) {
-    case ExprKind::IntegerLiteral: return "integer";
-    case ExprKind::FloatLiteral: return "floating-point";
-    case ExprKind::BooleanLiteral: return "boolean";
-    case ExprKind::StringLiteral: return "string";
-    case ExprKind::InterpolatedStringLiteral: return "string";
-    case ExprKind::RegexLiteral: return "regular expression";
-    case ExprKind::MagicIdentifierLiteral:
-      return MagicIdentifierLiteralExpr::getKindString(
-          cast<MagicIdentifierLiteralExpr>(LE)->getKind());
-    case ExprKind::NilLiteral: return "nil";
-    case ExprKind::ObjectLiteral: return "object";
-
-    // Define an unreachable case for all non-literal expressions.
-    // This way, if a new literal is added in the future, the compiler
-    // will warn that a case is missing from this switch.
-#define LITERAL_EXPR(Id, Parent)
-#define EXPR(Id, Parent) case ExprKind::Id:
-#include "swift/AST/ExprNodes.def"
-      llvm_unreachable("Not a literal expression");
-    }
-
-    llvm_unreachable("Unhandled ExprKind in switch.");
-  };
-
   Ctx.Diags.diagnose(LE->getLoc(), diag::expression_unused_literal,
-                     getLiteralDescription(LE))
+                     LE->getLiteralKindDescription())
     .highlight(LE->getSourceRange());
 }
 
@@ -1412,6 +1385,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         fn = FVE->getSubExpr();
       } else if (auto dotSyntaxRef = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
         fn = dotSyntaxRef->getRHS();
+      } else if (auto fnConvExpr = dyn_cast<FunctionConversionExpr>(fn)) {
+        fn = fnConvExpr->getSubExpr();
       } else {
         break;
       }
@@ -2013,7 +1988,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       // isolation checked before nested ones are being checked by the way
       // TypeCheckASTNodeAtLocRequest is called multiple times, as described
       // above.
-      auto ActorIsolation = determineClosureActorIsolation(CE);
+      auto ActorIsolation = determineClosureActorIsolation(
+          CE, __Expr_getType, __AbstractClosureExpr_getActorIsolation);
       CE->setActorIsolation(ActorIsolation);
       if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
         return false;
@@ -2138,7 +2114,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   TypeChecker::computeCaptures(AFD);
   if (!AFD->getDeclContext()->isLocalContext()) {
     checkFunctionActorIsolation(AFD);
-    checkFunctionAsyncUsage(AFD);
     TypeChecker::checkFunctionEffects(AFD);
   }
 

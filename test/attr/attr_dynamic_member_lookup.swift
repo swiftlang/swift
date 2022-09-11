@@ -362,9 +362,10 @@ func testConcreteGenericType2(a: SettableGeneric2<Int>) -> Int? {
   return a.dfsdffff
 }
 
-// SR-8077 test case.
-// `subscript(dynamicMember:)` works as a `@dynamicMemberLookup` protocol
-// requirement.
+/// https://github.com/apple/swift/issues/50610
+/// `subscript(dynamicMember:)` works as a `@dynamicMemberLookup` protocol
+/// requirement
+
 @dynamicMemberLookup
 protocol GenericProtocol {
   associatedtype S: ExpressibleByStringLiteral
@@ -688,68 +689,76 @@ func invalid_refs_through_dynamic_lookup() {
   }
 }
 
-// SR-10597
+// https://github.com/apple/swift/issues/52997
 
-final class SR10597 {
-}
+final class C1_52997 {}
 
 @dynamicMemberLookup
-struct SR10597_W<T> {
+struct S1_52997<T> {
   var obj: T
   init(_ obj: T) { self.obj = obj }
   subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
     return obj[keyPath: member]
   }
-  var wooo: SR10597 { SR10597() } // expected-note {{declared here}}
+  var wooo: C1_52997 { C1_52997() } // expected-note {{declared here}}
+}
+do {
+  _ = S1_52997<C1_52997>(C1_52997()).wooooo
+  // expected-error@-1 {{value of type 'S1_52997<C1_52997>' has no dynamic member 'wooooo' using key path from root type 'C1_52997'; did you mean 'wooo'?}}
+  _ = S1_52997<C1_52997>(C1_52997()).bla
+  // expected-error@-1 {{value of type 'S1_52997<C1_52997>' has no dynamic member 'bla' using key path from root type 'C1_52997'}}
 }
 
-_ = SR10597_W<SR10597>(SR10597()).wooooo // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'wooooo' using key path from root type 'SR10597'; did you mean 'wooo'?}}
-_ = SR10597_W<SR10597>(SR10597()).bla // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'bla' using key path from root type 'SR10597'}}
-
-final class SR10597_1 {
-    var woo: Int? // expected-note 2 {{'woo' declared here}}
+final class C2_52997 {
+  var woo: Int? // expected-note 2 {{'woo' declared here}}
 }
 
 @dynamicMemberLookup
-struct SR10597_1_W<T> {
+struct S2_52997<T> {
   var obj: T
   init(_ obj: T) { self.obj = obj }
   subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
     return obj[keyPath: member]
   }
 }
+do {
+  _ = S2_52997<C2_52997>(C2_52997()).wooo
+  // expected-error@-1 {{value of type 'S2_52997<C2_52997>' has no dynamic member 'wooo' using key path from root type 'C2_52997'; did you mean 'woo'?}}
+  _ = S2_52997<C2_52997>(C2_52997()).bla
+  // expected-error@-1 {{value of type 'S2_52997<C2_52997>' has no dynamic member 'bla' using key path from root type 'C2_52997'}}
+}
 
-_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'wooo' using key path from root type 'SR10597_1'; did you mean 'woo'?}}
-_ = SR10597_1_W<SR10597_1>(SR10597_1()).bla // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'bla' using key path from root type 'SR10597_1'}}
-
-// SR-10557
+// https://github.com/apple/swift/issues/52957
 
 @dynamicMemberLookup
-struct SR_10557_S {
-  subscript(dynamicMember: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+struct S1_52957 {
+  subscript(dynamicMember: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S1_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}}{{13-13=dynamicMember }}
     fatalError()
   }
 }
 
 @dynamicMemberLookup
-struct SR_10557_S1 {
-  subscript(foo bar: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+struct S2_52957 {
+  subscript(foo bar: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
     fatalError()
   }
 
-  subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'S2_52957' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}} {{13-13=dynamicMember }}
     fatalError()
   }
 }
 
+// https://github.com/apple/swift/issues/54292
+
 @dynamicMemberLookup
-struct SR11877 {
+struct S_54292 {
   subscript(dynamicMember member: Substring) -> Int { 0 }
 }
-
-_ = \SR11877.okay
+do {
+  _ = \S_54292.okay
+}
 
 func test_infinite_self_recursion() {
   @dynamicMemberLookup
@@ -788,37 +797,39 @@ func test_combination_of_keypath_and_string_lookups() {
   }
 }
 
-// SR-12626
+// https://github.com/apple/swift/issues/55070
+
 @dynamicMemberLookup
-struct SR12626 {
+struct S_55070 {
   var i: Int
 
-  subscript(dynamicMember member: KeyPath<SR12626, Int>) -> Int {
+  subscript(dynamicMember member: KeyPath<S_55070, Int>) -> Int {
     get { self[keyPath: member] }
     set { self[keyPath: member] = newValue } // expected-error {{cannot assign through subscript: 'member' is a read-only key path}}
   }
 }
 
-// SR-12245
-public struct SR12425_S {}
+// https://github.com/apple/swift/issues/54864
+
+public struct S1_54864 {}
 
 @dynamicMemberLookup
-public struct SR12425_R {}
+public struct S2_54864 {}
 
-internal var rightStructInstance: SR12425_R = SR12425_R()
+internal var s2_54864_instance: S2_54864 = S2_54864()
 
-public extension SR12425_R {
-  subscript<T>(dynamicMember member: WritableKeyPath<SR12425_S, T>) -> T {
-      get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
-      set { rightStructInstance[keyPath: member] = newValue } // expected-error {{key path with root type 'SR12425_S' cannot be applied to a base of type 'SR12425_R'}}
+public extension S2_54864 {
+  subscript<T>(dynamicMember member: WritableKeyPath<S1_54864, T>) -> T {
+      get { s2_54864_instance[keyPath: member] } // expected-error {{key path with root type 'S1_54864' cannot be applied to a base of type 'S2_54864'}}
+      set { s2_54864_instance[keyPath: member] = newValue } // expected-error {{key path with root type 'S1_54864' cannot be applied to a base of type 'S2_54864'}}
   }
 }
 
 @dynamicMemberLookup
-public struct SR12425_R1 {}
+public struct S3_54864 {}
 
-public extension SR12425_R1 {
-  subscript<T>(dynamicMember member: KeyPath<SR12425_R1, T>) -> T {
-    get { rightStructInstance[keyPath: member] } // expected-error {{key path with root type 'SR12425_R1' cannot be applied to a base of type 'SR12425_R'}}
+public extension S3_54864 {
+  subscript<T>(dynamicMember member: KeyPath<S3_54864, T>) -> T {
+    get { s2_54864_instance[keyPath: member] } // expected-error {{key path with root type 'S3_54864' cannot be applied to a base of type 'S2_54864'}}
   }
 }

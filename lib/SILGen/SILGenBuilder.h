@@ -190,12 +190,13 @@ public:
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
 
   using SILBuilder::createStoreBorrow;
-  void createStoreBorrow(SILLocation loc, ManagedValue value, SILValue address);
+  ManagedValue createStoreBorrow(SILLocation loc, ManagedValue value,
+                                 SILValue address);
 
   /// Create a store_borrow if we have a non-trivial value and a store [trivial]
   /// otherwise.
-  void createStoreBorrowOrTrivial(SILLocation loc, ManagedValue value,
-                                  SILValue address);
+  ManagedValue createStoreBorrowOrTrivial(SILLocation loc, ManagedValue value,
+                                          SILValue address);
 
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
@@ -225,8 +226,9 @@ public:
 
   /// Create a SILArgument for an input parameter. Asserts if used to create a
   /// function argument for an out parameter.
-  ManagedValue createInputFunctionArgument(SILType type, ValueDecl *decl,
-                                           bool isNoImplicitCopy = false);
+  ManagedValue createInputFunctionArgument(
+      SILType type, ValueDecl *decl, bool isNoImplicitCopy = false,
+      LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out
@@ -416,12 +418,14 @@ public:
   createGuaranteedMoveOnlyWrapperToCopyableValue(SILLocation loc,
                                                  ManagedValue value);
 
-  using SILBuilder::createCopyableToMoveOnlyWrapperValue;
-  /// Create a copyable_to_moveonlywrapper. This expects a +1 value and returns
-  /// a +1 value. Semantically though the two things are different entities so
-  /// we are not forwarding ownership in the sense of the word.
-  ManagedValue createCopyableToMoveOnlyWrapperValue(SILLocation loc,
-                                                    ManagedValue value);
+  using SILBuilder::createOwnedCopyableToMoveOnlyWrapperValue;
+  ManagedValue createOwnedCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                         ManagedValue value);
+
+  using SILBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue;
+  ManagedValue
+  createGuaranteedCopyableToMoveOnlyWrapperValue(SILLocation loc,
+                                                 ManagedValue value);
 
   using SILBuilder::createMarkMustCheckInst;
   ManagedValue createMarkMustCheckInst(SILLocation loc, ManagedValue value,

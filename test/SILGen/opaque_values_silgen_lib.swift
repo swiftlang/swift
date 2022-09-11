@@ -157,12 +157,12 @@ func f010_PAndS_cases() {
 // Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // implicit closure #2 (Swift.EmptyP, Swift.String) -> Swift.PAndSEnum in implicit closure #1 (Swift.PAndSEnum.Type) -> (Swift.EmptyP, Swift.String) -> Swift.PAndSEnum in Swift.f010_PAndS_cases() -> ()
-// CHECK-LABEL: sil private [ossa] @$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
-// HECK: bb0([[ARG0:%.*]] : @guaranteed $EmptyP, [[ARG1:%.*]] : @guaranteed $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
+// CHECK-LABEL: sil private [ossa] @$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed any EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
+// HECK: bb0([[ARG0:%.*]] : @guaranteed $any EmptyP, [[ARG1:%.*]] : @guaranteed $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
 // HECK:   [[COPY0:%.*]] = copy_value [[ARG0]]
 // HECK:   [[COPY1:%.*]] = copy_value [[ARG1]]
-// HECK:   [[RTUPLE:%.*]] = tuple ([[COPY0]] : $EmptyP, [[COPY1]] : $String)
-// HECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt, [[RTUPLE]] : $(EmptyP, String)
+// HECK:   [[RTUPLE:%.*]] = tuple ([[COPY0]] : $any EmptyP, [[COPY1]] : $String)
+// HECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt, [[RTUPLE]] : $(any EmptyP, String)
 // HECK:   return [[RETVAL]] : $PAndSEnum
 // CHECK-LABEL: } // end sil function '$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_'
 
@@ -299,12 +299,12 @@ func f070_materializeSelf<T: FooP>(t: T) where T: AnyObject {
 
 // Test open existential with opaque values
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss8f080_bar1pBi64_s1P_p_tF : $@convention(thin) (@in_guaranteed P) -> Builtin.Int64 {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $P):
-// HECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $P to $@opened
+// CHECK-LABEL: sil hidden [ossa] @$ss8f080_bar1pBi64_s1P_p_tF : $@convention(thin) (@in_guaranteed any P) -> Builtin.Int64 {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any P):
+// HECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $any P to $@opened
 // HECK:   [[WITNESS_FUNC:%.*]] = witness_method $@opened
 // HECK:   [[RESULT:%.*]] = apply [[WITNESS_FUNC]]<{{.*}}>([[OPENED_ARG]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Builtin.Int64
-// CHECK-NOT:   destroy_value [[ARG]] : $P
+// CHECK-NOT:   destroy_value [[ARG]] : $any P
 // HECK:   return [[RESULT]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function '$ss8f080_bar1pBi64_s1P_p_tF'
 func f080_bar(p: P) -> Builtin.Int64 {
@@ -415,12 +415,12 @@ func f170_force_convert<T>() -> T {
 
 // Tests supporting function for f190_return_foo_var - cast and return of protocol
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f180_return_foos4FooP_pyF : $@convention(thin) () -> @out FooP {
+// CHECK-LABEL: sil hidden [ossa] @$ss15f180_return_foos4FooP_pyF : $@convention(thin) () -> @out any FooP {
 // CHECK: bb0:
 // HECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Builtin.Int64Literal, 42
 // HECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Builtin.Int64Literal, @thin Builtin.Int64.Type) -> Builtin.Int64
-// HECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Builtin.Int64 to $FooP
-// HECK:   return [[INT_CAST]] : $FooP
+// HECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Builtin.Int64 to $any FooP
+// HECK:   return [[INT_CAST]] : $any FooP
 // CHECK-LABEL: } // end sil function '$ss15f180_return_foos4FooP_pyF'
 func f180_return_foo() -> FooP {
   return Int64(42) as! FooP
@@ -429,12 +429,12 @@ var foo_var : FooP = f180_return_foo()
 
 // Tests return of global variables by doing a load of copy
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss19f190_return_foo_vars4FooP_pyF : $@convention(thin) () -> @out FooP {
+// CHECK-LABEL: sil hidden [ossa] @$ss19f190_return_foo_vars4FooP_pyF : $@convention(thin) () -> @out any FooP {
 // CHECK: bb0:
-// HECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*FooP
-// HECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*FooP
-// HECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[READ]] : $*FooP
-// HECK:   return [[LOAD_GLOBAL]] : $FooP
+// HECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*any FooP
+// HECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*any FooP
+// HECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[READ]] : $*any FooP
+// HECK:   return [[LOAD_GLOBAL]] : $any FooP
 // CHECK-LABEL: } // end sil function '$ss19f190_return_foo_vars4FooP_pyF'
 func f190_return_foo_var() -> FooP {
   return foo_var
@@ -462,15 +462,15 @@ func f200_use_foo_var() {
 
 // Tests composition erasure of opaque existentials + copy into of opaques
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f210_compErasureys5Error_psAB_s4FooPpF : $@convention(thin) (@in_guaranteed Error & FooP) -> @owned Error {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error & FooP):
-// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_value [[ARG]] : $Error & FooP to $@opened({{.*}}) Error & FooP
-// HECK:   [[EXIST_BOX:%.*]] = alloc_existential_box $Error, $@opened({{.*}}) Error & FooP
-// HECK:   [[PROJ_BOX:%.*]] = project_existential_box $@opened({{.*}}) Error & FooP in [[EXIST_BOX]]
-// HECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPAQUE_ARG]] : $@opened({{.*}}) Error & FooP
-// HECK:   store [[COPY_OPAQUE]] to [init] [[PROJ_BOX]] : $*@opened({{.*}}) Error & FooP
-// CHECK-NOT:   destroy_value [[ARG]] : $Error & FooP
-// HECK:   return [[EXIST_BOX]] : $Error
+// CHECK-LABEL: sil hidden [ossa] @$ss16f210_compErasureys5Error_psAB_s4FooPpF : $@convention(thin) (@in_guaranteed any Error & FooP) -> @owned any Error {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error & FooP):
+// HECK:   [[OPAQUE_ARG:%.*]] = open_existential_value [[ARG]] : $any Error & FooP to $@opened({{.*}}, any Error) Self & FooP
+// HECK:   [[EXIST_BOX:%.*]] = alloc_existential_box $any Error, $@opened({{.*}}, any Error) Self & FooP
+// HECK:   [[PROJ_BOX:%.*]] = project_existential_box $@opened({{.*}}, any Error) Self & FooP in [[EXIST_BOX]]
+// HECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPAQUE_ARG]] : $@opened({{.*}}, any Error) Self & FooP
+// HECK:   store [[COPY_OPAQUE]] to [init] [[PROJ_BOX]] : $*@opened({{.*}}, any Error) Self & FooP
+// CHECK-NOT:   destroy_value [[ARG]] : $any Error & FooP
+// HECK:   return [[EXIST_BOX]] : $any Error
 // CHECK-LABEL: } // end sil function '$ss16f210_compErasureys5Error_psAB_s4FooPpF'
 func f210_compErasure(_ x: FooP & Error) -> Error {
   return x
@@ -561,10 +561,10 @@ func f270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
 
 // Tests conversion between existential types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f280_convExistTrivialyys0D6StructVs1P_pcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed P) -> TrivialStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed P) -> TrivialStruct):
+// CHECK-LABEL: sil hidden [ossa] @$ss21f280_convExistTrivialyys0D6StructVs1P_pcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed any P) -> TrivialStruct):
 // HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// HECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in_guaranteed P2, @guaranteed @callee_guaranteed (@in_guaranteed P) -> TrivialStruct) -> @out P2
+// HECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in_guaranteed P2, @guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> @out P2
 // HECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (@in_guaranteed P2) -> @out P2
 // CHECK-NOT:   destroy_value [[ARG]]
 // HECK:   return %{{.*}} : $()
@@ -575,26 +575,26 @@ func f280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
 
 // part of f280_convExistTrivial: conversion between existential types - reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR : $@convention(thin) (@in_guaranteed P2, @guaranteed @callee_guaranteed (@in_guaranteed P) -> TrivialStruct) -> @out P2 {
-// CHECK: bb0([[ARG0:%.*]] : @guaranteed $P2, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed P) -> TrivialStruct):
-// HECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $P2 to $@opened({{.*}}) P2
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR : $@convention(thin) (@in_guaranteed any P2, @guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> @out any P2 {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $any P2, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed any P) -> TrivialStruct):
+// HECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $any P2 to $@opened({{.*}}, any P2) Self
 // HECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
-// HECK:   [[INIT_P:%.*]] = init_existential_value [[COPIED_VAL]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
+// HECK:   [[INIT_P:%.*]] = init_existential_value [[COPIED_VAL]] : $@opened({{.*}}, any P2) Self, $@opened({{.*}}, any P2) Self, $any P
 // HECK:   [[BORROWED_INIT_P:%.*]] = begin_borrow [[INIT_P]]
-// HECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_INIT_P]]) : $@callee_guaranteed (@in_guaranteed P) -> TrivialStruct
-// HECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
+// HECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_INIT_P]]) : $@callee_guaranteed (@in_guaranteed any P) -> TrivialStruct
+// HECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $any P2
 // HECK:   end_borrow [[BORROWED_INIT_P]]
 // CHECK-NOT:   destroy_value [[ARG0]]
-// HECK:   return [[RETVAL]] : $P2
+// HECK:   return [[RETVAL]] : $any P2
 // CHECK-LABEL: } // end sil function '$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR'
 
 // Tests conversion between existential types - optionals case
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f290_convOptExistTrivyys13TrivialStructVs1P_pSgcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct) -> () {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct):
+// CHECK-LABEL: sil hidden [ossa] @$ss21f290_convOptExistTrivyys13TrivialStructVs1P_pSgcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct):
 // HECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// HECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct) -> @out P2
-// HECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (Optional<TrivialStruct>) -> @out P2
+// HECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> @out any P2
+// HECK:   destroy_value [[PAPPLY]] : $@callee_guaranteed (Optional<TrivialStruct>) -> @out any P2
 // CHECK-NOT:   destroy_value [[ARG]]
 // HECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$ss21f290_convOptExistTrivyys13TrivialStructVs1P_pSgcF'
@@ -604,21 +604,21 @@ func f290_convOptExistTriv(_ s: @escaping (P?) -> TrivialStruct) {
 
 // part of f290_convOptExistTriv: conversion between existential types - reabstraction thunk - optionals case
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct) -> @out P2 {
-// CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct):
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> @out any P2 {
+// CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct):
 // HECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // HECK: bb1:
-// HECK:   [[ONONE:%.*]] = enum $Optional<P>, #Optional.none!enumelt
-// HECK:   br bb3([[ONONE]] : $Optional<P>)
+// HECK:   [[ONONE:%.*]] = enum $Optional<any P>, #Optional.none!enumelt
+// HECK:   br bb3([[ONONE]] : $Optional<any P>)
 // HECK: bb2([[OSOME:%.*]] : $TrivialStruct):
-// HECK:   [[INIT_S:%.*]] = init_existential_value [[OSOME]] : $TrivialStruct, $TrivialStruct, $P
-// HECK:   [[ENUM_S:%.*]] = enum $Optional<P>, #Optional.some!enumelt, [[INIT_S]] : $P
-// HECK:   br bb3([[ENUM_S]] : $Optional<P>)
-// HECK: bb3([[OPT_S:%.*]] : $Optional<P>):
+// HECK:   [[INIT_S:%.*]] = init_existential_value [[OSOME]] : $TrivialStruct, $TrivialStruct, $any P
+// HECK:   [[ENUM_S:%.*]] = enum $Optional<any P>, #Optional.some!enumelt, [[INIT_S]] : $any P
+// HECK:   br bb3([[ENUM_S]] : $Optional<any P>)
+// HECK: bb3([[OPT_S:%.*]] : $Optional<any P>):
 // HECK:   [[BORROWED_OPT_S:%.*]] = begin_borrow [[OPT_S]]
-// HECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_OPT_S]]) : $@callee_guaranteed (@in_guaranteed Optional<P>) -> TrivialStruct
-// HECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
-// HECK:   return [[RETVAL]] : $P2
+// HECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_OPT_S]]) : $@callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct
+// HECK:   [[RETVAL:%.*]] = init_existential_value [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $any P2
+// HECK:   return [[RETVAL]] : $any P2
 // CHECK-LABEL: } // end sil function '$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR'
 
 // Tests corner-case: reabstraction of an empty tuple to any
@@ -835,11 +835,11 @@ func f390_addrCallResult<T>(_ f: (() -> T)?) {
 
 // Tests reabstraction / partial apply of protocols under opaque value mode
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f400_maybeCloneP1cys8Clonable_p_tF : $@convention(thin) (@in_guaranteed Clonable) -> () {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Clonable):
-// HECK:   [[OPEN_ARG:%.*]] = open_existential_value [[ARG]] : $Clonable
-// HECK:   [[APPLY_OPAQUE:%.*]] = apply %{{.*}}<@opened({{.*}}) Clonable>([[OPEN_ARG]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out Optional<τ_0_0>
-// HECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<@opened({{.*}}) Clonable>([[APPLY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
+// CHECK-LABEL: sil hidden [ossa] @$ss16f400_maybeCloneP1cys8Clonable_p_tF : $@convention(thin) (@in_guaranteed any Clonable) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Clonable):
+// HECK:   [[OPEN_ARG:%.*]] = open_existential_value [[ARG]] : $any Clonable
+// HECK:   [[APPLY_OPAQUE:%.*]] = apply %{{.*}}<@opened({{.*}}, any Clonable) Self>([[OPEN_ARG]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed () -> @out Optional<τ_0_0>
+// HECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}<@opened({{.*}}, any Clonable) Self>([[APPLY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@guaranteed @callee_guaranteed () -> @out Optional<τ_0_0>) -> @out Optional<any Clonable>
 // CHECK-NOT:   destroy_value [[ARG]]
 // HECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$ss16f400_maybeCloneP1cys8Clonable_p_tF'
@@ -855,7 +855,7 @@ func f400_maybeCloneP(c: Clonable) {
 // HECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*SubscriptableGet
 // HECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGet to $*@opened
 // HECK:   [[GET_OPAQUE:%.*]] = load [copy] [[OPEN_ARG]] : $*@opened
-// HECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}) SubscriptableGet>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method: SubscriptableGet) <τ_0_0 where τ_0_0 : SubscriptableGet> (Builtin.Int64, @in_guaranteed τ_0_0) -> Builtin.Int64
+// HECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}, SubscriptableGet) Self>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method: SubscriptableGet) <τ_0_0 where τ_0_0 : SubscriptableGet> (Builtin.Int64, @in_guaranteed τ_0_0) -> Builtin.Int64
 // HECK:   destroy_value [[GET_OPAQUE]]
 // HECK:   return [[RETVAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function '$ss20f410_globalRvalueGetyBi64_Bi64_F'
@@ -871,7 +871,7 @@ func f410_globalRvalueGet(_ i : Builtin.Int64) -> Builtin.Int64 {
 // HECK:   [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*SubscriptableGetSet
 // HECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGetSet to $*@opened
 // HECK:   [[GET_OPAQUE:%.*]] = load [copy] [[OPEN_ARG]] : $*@opened
-// HECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}) SubscriptableGetSet>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method: SubscriptableGetSet) <τ_0_0 where τ_0_0 : SubscriptableGetSet> (Builtin.Int64, @in_guaranteed τ_0_0) -> Builtin.Int64
+// HECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}, SubscriptableGetSet) Self>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method: SubscriptableGetSet) <τ_0_0 where τ_0_0 : SubscriptableGetSet> (Builtin.Int64, @in_guaranteed τ_0_0) -> Builtin.Int64
 // HECK:   destroy_value [[GET_OPAQUE]]
 // HECK:   return [[RETVAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function '$ss20f420_globalLvalueGetyBi64_SgBi64_F'
@@ -948,7 +948,7 @@ func f440_cleanupEmission<T>(_ x: T) {
 // CHECK-objc: [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
 // CHECK-objc: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
 // CHECK-objc: [[F:%.*]] = function_ref @$sf27_bridgeAnythingToObjectiveCyyXlxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
-// CHECK-objc: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-objc: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}", Any) Self>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
 // CHECK-objc: destroy_value [[SRC]] : $Any
 // CHECK-objc: destroy_value %0 : $Any
 // CHECK-objc: return [[RET]] : $AnyObject
@@ -962,12 +962,12 @@ func f470_nativeToC(fromAny any: Any) -> AnyObject {
 
 // Test emitOpenExistential.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss13f480_getError04someC0yps0C0_p_tF : $@convention(thin) (@guaranteed Error) -> @out Any {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// HECK: [[VAL:%.*]] = open_existential_box_value [[ARG]] : $Error to $@opened("{{.*}}") Error
-// HECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened("{{.*}}") Error
-// HECK: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened("{{.*}}") Error, $@opened("{{.*}}") Error, $Any
-// CHECK-NOT: destroy_value [[ARG]] : $Error
+// CHECK-LABEL: sil hidden [ossa] @$ss13f480_getError04someC0yps0C0_p_tF : $@convention(thin) (@guaranteed any Error) -> @out Any {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
+// HECK: [[VAL:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened("{{.*}}", any Error) Self
+// HECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened("{{.*}}", any Error) Self
+// HECK: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened("{{.*}}", any Error) Self, $@opened("{{.*}}", any Error) Self, $Any
+// CHECK-NOT: destroy_value [[ARG]] : $any Error
 // HECK: return [[ANY]] : $Any
 // CHECK-LABEL: } // end sil function '$ss13f480_getError04someC0yps0C0_p_tF'
 func f480_getError(someError: Error) -> Any {
@@ -976,17 +976,17 @@ func f480_getError(someError: Error) -> Any {
 
 // Test visitBindOptionalExpr
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f500_getAnyHashys1P_pSgs14ConvertibleToP_pSgF : $@convention(thin) (@in_guaranteed Optional<ConvertibleToP>) -> @out Optional<P> {
-// CHECK: bb0(%0 : @guaranteed $Optional<ConvertibleToP>):
-// HECK: [[COPY:%.*]] = copy_value [[ARG]] : $Optional<ConvertibleToP>
-// HECK: [[DATA:%.*]] = unchecked_enum_data [[COPY]] : $Optional<ConvertibleToP>, #Optional.some!enumelt
-// HECK: [[BORROW_DATA:%.*]] = begin_borrow [[DATA]] : $ConvertibleToP
-// HECK: [[VAL:%.*]] = open_existential_value [[BORROW_DATA]] : $ConvertibleToP to $@opened("{{.*}}") ConvertibleToP
-// HECK: [[WT:%.*]] = witness_method $@opened("{{.*}}") ConvertibleToP, #ConvertibleToP.asP : <Self where Self : ConvertibleToP> (Self) -> () -> P, [[VAL]] : $@opened("{{.*}}") ConvertibleToP : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
-// HECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}") ConvertibleToP>([[VAL]]) : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out P
-// HECK: [[ENUM:%.*]] = enum $Optional<P>, #Optional.some!enumelt, [[AS_P]] : $P
-// HECK: destroy_value [[DATA]] : $ConvertibleToP
-// HECK: br bb{{.*}}([[ENUM]] : $Optional<P>)
+// CHECK-LABEL: sil hidden [ossa] @$ss15f500_getAnyHashys1P_pSgs14ConvertibleToP_pSgF : $@convention(thin) (@in_guaranteed Optional<any ConvertibleToP>) -> @out Optional<any P> {
+// CHECK: bb0(%0 : @guaranteed $Optional<any ConvertibleToP>):
+// HECK: [[COPY:%.*]] = copy_value [[ARG]] : $Optional<any ConvertibleToP>
+// HECK: [[DATA:%.*]] = unchecked_enum_data [[COPY]] : $Optional<any ConvertibleToP>, #Optional.some!enumelt
+// HECK: [[BORROW_DATA:%.*]] = begin_borrow [[DATA]] : $any ConvertibleToP
+// HECK: [[VAL:%.*]] = open_existential_value [[BORROW_DATA]] : $any ConvertibleToP to $@opened("{{.*}}", any ConvertibleToP) Self
+// HECK: [[WT:%.*]] = witness_method $@opened("{{.*}}", any ConvertibleToP) Self, #ConvertibleToP.asP : <Self where Self : ConvertibleToP> (Self) -> () -> P, [[VAL]] : $@opened("{{.*}}", any ConvertibleToP) Self : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out any P
+// HECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}", any ConvertibleToP) Self>([[VAL]]) : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out any P
+// HECK: [[ENUM:%.*]] = enum $Optional<any P>, #Optional.some!enumelt, [[AS_P]] : $any P
+// HECK: destroy_value [[DATA]] : $any ConvertibleToP
+// HECK: br bb{{.*}}([[ENUM]] : $Optional<any P>)
 // HECK: } // end sil function '$ss15f500_getAnyHashys1P_pSgs14ConvertibleToP_pSgF'
 func f500_getAnyHash(_ value: ConvertibleToP?) -> P? {
   return value?.asP()
@@ -1058,20 +1058,20 @@ public func f530_assignToVar() {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil [ossa] @$ss16f540_takeDecoder4fromBi1_s0C0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
-// CHECK: bb0(%0 : @guaranteed $Decoder):
-// HECK:  [[OPENED:%.*]] = open_existential_value %0 : $Decoder to $@opened("{{.*}}") Decoder
-// HECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
-// HECK:  try_apply [[WT]]<@opened("{{.*}}") Decoder>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error), normal bb2, error bb1
+// CHECK-LABEL: sil [ossa] @$ss16f540_takeDecoder4fromBi1_s0C0_p_tKF : $@convention(thin) (@in_guaranteed any Decoder) -> (Builtin.Int1, @error any Error) {
+// CHECK: bb0(%0 : @guaranteed $any Decoder):
+// HECK:  [[OPENED:%.*]] = open_existential_value %0 : $any Decoder to $@opened("{{.*}}", any Decoder) Self
+// HECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}", any Decoder) Self, #Decoder.unkeyedContainer : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}", any Decoder) Self : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error any Error)
+// HECK:  try_apply [[WT]]<@opened("{{.*}}", any Decoder) Self>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error any Error), normal bb2, error bb1
 //
-// CHECK:bb{{.*}}([[RET1:%.*]] : @owned $UnkeyedDecodingContainer):
-// HECK:  [[BORROW2:%.*]] = begin_borrow [lexical] [[RET1]] : $UnkeyedDecodingContainer
-// HECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $UnkeyedDecodingContainer to $@opened("{{.*}}") UnkeyedDecodingContainer
-// HECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// HECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}") UnkeyedDecodingContainer>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// HECK:  end_borrow [[BORROW2]] : $UnkeyedDecodingContainer
-// HECK:  destroy_value [[RET1]] : $UnkeyedDecodingContainer
-// CHECK-NOT:  destroy_value %0 : $Decoder
+// CHECK:bb{{.*}}([[RET1:%.*]] : @owned $any UnkeyedDecodingContainer):
+// HECK:  [[BORROW2:%.*]] = begin_borrow [lexical] [[RET1]] : $any UnkeyedDecodingContainer
+// HECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $any UnkeyedDecodingContainer to $@opened("{{.*}}", any UnkeyedDecodingContainer) Self
+// HECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}", any UnkeyedDecodingContainer) Self, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}", UnkeyedDecodingContainer) Self : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// HECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}", any UnkeyedDecodingContainer) Self>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// HECK:  end_borrow [[BORROW2]] : $any UnkeyedDecodingContainer
+// HECK:  destroy_value [[RET1]] : $any UnkeyedDecodingContainer
+// CHECK-NOT:  destroy_value %0 : $any Decoder
 // HECK:  return [[RET2]] : $Builtin.Int1
 // CHECK-LABEL: } // end sil function '$ss16f540_takeDecoder4fromBi1_s0C0_p_tKF'
 public func f540_takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {

@@ -5,7 +5,6 @@
 // XFAIL: OS=windows-msvc
 
 import StdlibUnittest
-import CxxShim
 import Functions
 
 var FunctionsTestSuite = TestSuite("Calling functions in base classes")

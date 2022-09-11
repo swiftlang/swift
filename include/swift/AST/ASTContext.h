@@ -66,6 +66,7 @@ namespace swift {
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class BuiltinTupleDecl;
   class ClangModuleLoader;
   class ClangNode;
   class ClangTypeConverter;
@@ -105,6 +106,7 @@ namespace swift {
   class NormalProtocolConformance;
   class OpaqueTypeDecl;
   class InheritedProtocolConformance;
+  class RootProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class BuiltinConformanceKind;
@@ -952,7 +954,7 @@ public:
   const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
-  
+
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
@@ -988,7 +990,8 @@ public:
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool cacheOnly = false);
+      bool cacheOnly = false,
+      llvm::Optional<std::pair<std::string, swift::ModuleDependenciesKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   Optional<ModuleDependencies> getSwiftModuleDependencies(
@@ -1245,7 +1248,7 @@ public:
   /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
-                            ProtocolConformance *generic,
+                            RootProtocolConformance *generic,
                             SubstitutionMap substitutions);
 
   /// Produce an inherited conformance, for subclasses of a type
@@ -1254,7 +1257,7 @@ public:
   /// \param type The type for which we are retrieving the conformance.
   ///
   /// \param inherited The inherited conformance.
-  InheritedProtocolConformance *
+  ProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// Get the lazy data for the given declaration.
@@ -1324,6 +1327,10 @@ public:
   bool isRecursivelyConstructingRequirementMachine(
       const ProtocolDecl *proto);
 
+  /// Retrieve a generic parameter list with a single parameter named `Self`.
+  /// This is for parsing @opened archetypes in textual SIL.
+  GenericParamList *getSelfGenericParamList(DeclContext *dc) const;
+
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
@@ -1338,11 +1345,24 @@ public:
   /// particular, the opened archetype signature does not have requirements for
   /// conformances inherited from superclass constraints while existential
   /// values do.
-  CanGenericSignature getOpenedArchetypeSignature(Type type,
-                                                  GenericSignature parentSig);
+  CanGenericSignature getOpenedExistentialSignature(Type type,
+                                                    GenericSignature parentSig);
+
+  /// Get a generic signature where the generic parameter τ_d_i represents
+  /// the element of the pack generic parameter τ_d_i… in \p baseGenericSig.
+  ///
+  /// This drops the @_typeSequence attribute from each generic parameter,
+  /// and converts same-element requirements to same-type requirements.
+  CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);
+
+  GenericSignature
+  getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
+                              const NominalTypeDecl *derivedNominal,
+                              GenericSignature baseGenericSig,
+                              const GenericParamList *derivedParams);
 
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisfied by derived method
@@ -1401,6 +1421,13 @@ public:
   /// Find `decodeNextArgument<T>(type: T.Type) -> T` method associated with
   /// invocation decoder of the given distributed actor.
   FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
+
+  /// The special Builtin.TheTupleType, which parents tuple extensions and
+  /// conformances.
+  BuiltinTupleDecl *getBuiltinTupleDecl();
+
+  /// The declared interface type of Builtin.TheTupleType.
+  BuiltinTupleType *getBuiltinTupleType();
 
 private:
   friend Decl;

@@ -190,14 +190,14 @@ sil @protocols : $@convention(thin) (@in LogicValue, @thin Bool.Type) -> Bool {
 bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %2 = alloc_box ${ var LogicValue }
   %2a = project_box %2 : ${ var LogicValue }, 0
-// CHECK:  %2 = alloc_stack $LogicValue
+// CHECK:  %2 = alloc_stack $any LogicValue
   copy_addr [take] %0 to [initialization] %2a : $*LogicValue
-  %6 = open_existential_addr mutable_access %2a : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue
-  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") LogicValue, #LogicValue.getLogicValue, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000") LogicValue : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
-  %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000") LogicValue>(%6) : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
+  %6 = open_existential_addr mutable_access %2a : $*LogicValue to $*@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self
+  %7 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self, #LogicValue.getLogicValue, %6 : $*@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
+  %8 = apply %7<@opened("01234567-89ab-cdef-0123-000000000000", LogicValue) Self>(%6) : $@convention(witness_method: LogicValue) <T: LogicValue> (@in_guaranteed T) -> Bool
   strong_release %2 : ${ var LogicValue }
-// CHECK:  destroy_addr %2 : $*LogicValue
-// CHECK-NEXT:  dealloc_stack %2 : $*LogicValue
+// CHECK:  destroy_addr %2 : $*any LogicValue
+// CHECK-NEXT:  dealloc_stack %2 : $*any LogicValue
 // CHECK-NEXT:  return
   return %8 : $Bool
 }
@@ -752,10 +752,10 @@ class ThrowDerivedClass : ThrowBaseClass {
   //final init(failBeforeFullInitialization: Int) throws
 }
 
-sil @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error Error)
-sil @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error)
+sil @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error any Error)
+sil @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error)
 
-sil hidden @try_apply_during_chaining_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+sil hidden @try_apply_during_chaining_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error) {
 // %0                                             // users: %11, %5
 // %1                                             // user: %7
 bb0(%0 : $Int, %1 : $ThrowDerivedClass):
@@ -764,13 +764,13 @@ bb0(%0 : $Int, %1 : $ThrowDerivedClass):
   %4 = project_box %3 : ${ var ThrowDerivedClass }, 0
   store %1 to %4 : $*ThrowDerivedClass
   %8 = load %4 : $*ThrowDerivedClass
-  %9 = function_ref @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error)
-  %10 = function_ref @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error Error)
-  try_apply %10(%0) : $@convention(thin) (Int) -> (Int, @error Error), normal bb1, error bb3
+  %9 = function_ref @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error)
+  %10 = function_ref @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error any Error)
+  try_apply %10(%0) : $@convention(thin) (Int) -> (Int, @error any Error), normal bb1, error bb3
 
 // %12                                            // user: %13
 bb1(%12 : $Int):                                  // Preds: bb0
-  try_apply %9(%12, %8) : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error), normal bb2, error bb4
+  try_apply %9(%12, %8) : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error), normal bb2, error bb4
 
 // %14                                            // user: %15
 bb2(%14 : $ThrowDerivedClass):                    // Preds: bb1
@@ -1175,14 +1175,14 @@ bb0(%0: ${ var Int }):
   return %v : $()
 }
 
-// CHECK-LABEL: sil private @testPAUsedByTryApply : $@convention(method) (@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error) -> () {
+// CHECK-LABEL: sil private @testPAUsedByTryApply : $@convention(method) (@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error) -> () {
 // CHECK-LABEL: } // end sil function 'testPAUsedByTryApply'
-sil private @testPAUsedByTryApply : $@convention(method) (@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error) -> () {
-bb0(%0: $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error):
+sil private @testPAUsedByTryApply : $@convention(method) (@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error) -> () {
+bb0(%0: $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error):
   %box = alloc_box ${ var Int }, var
   %closure = function_ref @testPAUsedByTryApplyClosure : $@convention(thin) (@guaranteed { var Int }) -> ()
   %pa = partial_apply [callee_guaranteed] %closure(%box) : $@convention(thin) (@guaranteed { var Int }) -> ()
-  try_apply %0(%pa) : $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error Error, normal bb2, error bb3
+  try_apply %0(%pa) : $@callee_guaranteed (@guaranteed @callee_guaranteed () -> ()) -> @error any Error, normal bb2, error bb3
 
 bb2(%result : $()):
   br bb4

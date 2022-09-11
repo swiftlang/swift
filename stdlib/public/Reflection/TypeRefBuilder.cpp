@@ -221,26 +221,71 @@ void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
   if (ProcessedReflectionInfoIndexes.contains(Index))
     return;
 
+  llvm::SmallVector<std::string, 0> Names;
   const auto &Info = ReflectionInfos[Index];
   for (auto FD : Info.Field) {
-    if (!FD->hasMangledTypeName())
-      continue;
-    auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
-    if (auto NormalizedName = normalizeReflectionName(CandidateMangledName)) {
-      FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
+    if (FD->hasMangledTypeName()) {
+      auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
+      if (auto NormalizedName = normalizeReflectionName(CandidateMangledName)) {
+        if (ExternalTypeRefCache)
+          Names.push_back(*NormalizedName);
+        FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
+      }
+    } else if (ExternalTypeRefCache) {
+      // Mark the lack of a mangled name for this field descriptor with an empty
+      // string.
+      Names.push_back("");
     }
   }
+
+  if (ExternalTypeRefCache)
+    ExternalTypeRefCache->cacheFieldDescriptors(Index, Info.Field, Names);
 
   ProcessedReflectionInfoIndexes.insert(Index);
 }
 
 llvm::Optional<RemoteRef<FieldDescriptor>>
-TypeRefBuilder::findFieldDescriptorAtIndex(size_t Index,
-                                           const std::string &MangledName) {
+TypeRefBuilder::findFieldDescriptorAtIndex(
+    size_t Index, const std::string &MangledName) {
   populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
   auto Found = FieldTypeInfoCache.find(MangledName);
   if (Found != FieldTypeInfoCache.end()) {
     return Found->second;
+  }
+  return llvm::None;
+}
+
+llvm::Optional<RemoteRef<FieldDescriptor>>
+TypeRefBuilder::getFieldDescriptorFromExternalCache(
+    const std::string &MangledName) {
+  if (!ExternalTypeRefCache)
+    return llvm::None;
+
+  if (auto Locator = ExternalTypeRefCache->getFieldDescriptorLocator(MangledName)) {
+    if (Locator->InfoID >= ReflectionInfos.size())
+      return llvm::None;
+
+    auto &Field = ReflectionInfos[Locator->InfoID].Field;
+    auto Addr = Field.startAddress().getAddressData() + Locator->Offset;
+
+    // Validate that we've got the correct field descriptor offset by parsing
+    // the mangled name for that specific offset and making sure it's the one
+    // we're looking for.
+    for (auto FD : Field) {
+      if (FD.getAddressData() == Addr) {
+        if (!FD->hasMangledTypeName())
+          break;
+        auto CandidateMangledName = readTypeRef(FD, FD->MangledTypeName);
+        if (auto NormalizedName =
+                normalizeReflectionName(CandidateMangledName)) {
+          FieldTypeInfoCache[std::move(*NormalizedName)] = FD;
+          break;
+        }
+      }
+    }
+    auto Found = FieldTypeInfoCache.find(MangledName);
+    if (Found != FieldTypeInfoCache.end())
+      return Found->second;
   }
   return llvm::None;
 }
@@ -263,23 +308,37 @@ RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   if (Found != FieldTypeInfoCache.end())
     return Found->second;
 
+  if (auto FD = getFieldDescriptorFromExternalCache(*MangledName))
+    return *FD;
+
   // Heuristic: find the outermost Module node available, and try to parse the
   // ReflectionInfos with a matching name first.
   auto ModuleName = FindOutermostModuleName(Node);
   // If we couldn't find a module name or the type is imported (__C module) we
   // don't any useful information on which image to look for the type.
-  if (ModuleName && ModuleName != llvm::StringRef("__C"))
-    for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+  if (ModuleName && !ModuleName->equals("__C")) {
+    for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
+      // If the external cache already has the contents of this reflection info,
+      // and the previous lookup in the cache failed, then the field descriptor
+      // we're looking for isn't in this reflection info.
+      if (ExternalTypeRefCache &&
+          ExternalTypeRefCache->isReflectionInfoCached(i))
+        continue;
       if (llvm::is_contained(ReflectionInfos[i].PotentialModuleNames,
                              ModuleName))
         if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
           return *FD;
+    }
+  }
 
   // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
   // until we find the field descriptor we're looking for.
-  for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
+    if (ExternalTypeRefCache && ExternalTypeRefCache->isReflectionInfoCached(i))
+      continue;
     if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
       return *FD;
+  }
 
   return nullptr;
 }

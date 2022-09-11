@@ -72,11 +72,6 @@
 #endif
 #endif
 
-#ifndef BRIDGED_SINGLE_VALUE_INST
-#define BRIDGED_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
-#endif
-
 /// DYNAMICCAST_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 ///
 /// A SINGLE_VALUE_INST that is a cast instruction. ID is a member of
@@ -87,7 +82,7 @@
   DYNAMICCAST_INST(ID, TEXTUALNAME)
 #else
 #define DYNAMICCAST_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  BRIDGED_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+  SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 #endif
 
@@ -160,18 +155,13 @@
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 
-#ifndef BRIDGED_NON_VALUE_INST
-#define BRIDGED_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
-#endif
-
 #ifndef DYNAMICCAST_NON_VALUE_INST
 #ifdef DYNAMICCAST_INST
 #define DYNAMICCAST_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   DYNAMICCAST_INST(ID, NAME)
 #else
 #define DYNAMICCAST_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  BRIDGED_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+  NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 #endif
 
@@ -180,7 +170,7 @@
 ///   ID is a member of TerminatorKind and the name of a subclass of TermInst.
 #ifndef TERMINATOR
 #define TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
-  BRIDGED_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+  NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 
 /// DYNAMICCAST_TERMINATOR(ID, TEXTUAL_NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
@@ -316,20 +306,20 @@ ABSTRACT_NODE(SILInstruction, SILNode)
 ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // Allocation instructions.
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
-    BRIDGED_SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
+    SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
+    SINGLE_VALUE_INST(AllocRefInst, alloc_ref,
                               AllocationInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
+    SINGLE_VALUE_INST(AllocRefDynamicInst, alloc_ref_dynamic,
                               AllocationInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(AllocBoxInst, alloc_box,
+    SINGLE_VALUE_INST(AllocBoxInst, alloc_box,
                               AllocationInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(AllocExistentialBoxInst, alloc_existential_box,
+    SINGLE_VALUE_INST(AllocExistentialBoxInst, alloc_existential_box,
                               AllocationInst, MayWrite, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(AllocationInst, AllocStackInst, AllocExistentialBoxInst)
 
   ABSTRACT_SINGLE_VALUE_INST(IndexingInst, SingleValueInstruction)
-    BRIDGED_SINGLE_VALUE_INST(IndexAddrInst, index_addr,
+    SINGLE_VALUE_INST(IndexAddrInst, index_addr,
                               IndexingInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(TailAddrInst, tail_addr,
                       IndexingInst, None, DoesNotRelease)
@@ -339,49 +329,49 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   // Literals
   ABSTRACT_SINGLE_VALUE_INST(LiteralInst, SingleValueInstruction)
-    BRIDGED_SINGLE_VALUE_INST(FunctionRefInst, function_ref,
+    SINGLE_VALUE_INST(FunctionRefInst, function_ref,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(DynamicFunctionRefInst, dynamic_function_ref,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(PreviousDynamicFunctionRefInst, prev_dynamic_function_ref,
                       LiteralInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(GlobalAddrInst, global_addr,
+    SINGLE_VALUE_INST(GlobalAddrInst, global_addr,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(BaseAddrForOffsetInst, base_addr_for_offset,
                       LiteralInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(GlobalValueInst, global_value,
+    SINGLE_VALUE_INST(GlobalValueInst, global_value,
                       LiteralInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(IntegerLiteralInst, integer_literal,
+    SINGLE_VALUE_INST(IntegerLiteralInst, integer_literal,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(FloatLiteralInst, float_literal,
                       LiteralInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(StringLiteralInst, string_literal,
+    SINGLE_VALUE_INST(StringLiteralInst, string_literal,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
-    BRIDGED_SINGLE_VALUE_INST(ClassMethodInst, class_method,
+    SINGLE_VALUE_INST(ClassMethodInst, class_method,
                               MethodInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(SuperMethodInst, super_method,
+    SINGLE_VALUE_INST(SuperMethodInst, super_method,
                               MethodInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
+    SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
                               MethodInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
+    SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
                               MethodInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
+    SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
                               MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(MethodInst, ClassMethodInst, WitnessMethodInst)
 
   // Conversions
   ABSTRACT_SINGLE_VALUE_INST(ConversionInst, SingleValueInstruction)
-    BRIDGED_SINGLE_VALUE_INST(UpcastInst, upcast,
+    SINGLE_VALUE_INST(UpcastInst, upcast,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
+    SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
+    SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
+    SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedAddrCastInst, unchecked_addr_cast,
                       ConversionInst, None, DoesNotRelease)
@@ -393,7 +383,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToRawPointerInst, ref_to_raw_pointer,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
+    SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
                       ConversionInst, None, DoesNotRelease)
 #define LOADABLE_REF_STORAGE(Name, name, ...) \
     SINGLE_VALUE_INST(RefTo##Name##Inst, ref_to_##name, \
@@ -401,25 +391,25 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     SINGLE_VALUE_INST(Name##ToRefInst, name##_to_ref, \
                       ConversionInst, None, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
-    BRIDGED_SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
+    SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
+    SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
+    SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
+    SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
+    SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ThickToObjCMetatypeInst, thick_to_objc_metatype,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCToThickMetatypeInst, objc_to_thick_metatype,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(ObjCMetatypeToObjectInst, objc_metatype_to_object,
+    SINGLE_VALUE_INST(ObjCMetatypeToObjectInst, objc_metatype_to_object,
                       ConversionInst, None, DoesNotRelease)
-    BRIDGED_SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
+    SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
                       ConversionInst, None, DoesNotRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
@@ -436,11 +426,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, MayRead, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
 
-  BRIDGED_SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
+  SINGLE_VALUE_INST(ClassifyBridgeObjectInst, classify_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
+  SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
+  SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
@@ -448,7 +438,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   // A copy_value's retain semantics are fully encapsulated in OSSA
   // invariants. It has no side effects relative to other OSSA values.
-  BRIDGED_SINGLE_VALUE_INST(CopyValueInst, copy_value,
+  SINGLE_VALUE_INST(CopyValueInst, copy_value,
                             SingleValueInstruction, None, DoesNotRelease)
   // A copy_value instruction that was explicitly asked for by the user. Left
   // alone by OSSA optimizations.
@@ -474,7 +464,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(MarkMustCheckInst, mark_must_check,
                     SingleValueInstruction, None, DoesNotRelease)
   // Convert a $T to $@moveOnly T. This is the method that one uses to convert a
-  // trivial value to a non-trivial move only value.
+  // trivial value to a non-trivial move only value. Ownership is fixed at construction by
+  // frontend to express specific semantics: guaranteed for guaranteed function arguments
+  // and owned for assignment/owned function arguments.
   SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperValueInst, copyable_to_moveonlywrapper,
                     SingleValueInstruction, None, DoesNotRelease)
   // Convert a $@moveOnly T to $T. Ownership is fixed at construction by
@@ -496,51 +488,51 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(IsUniqueInst, is_unique,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  BRIDGED_SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
+  SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
                             SingleValueInstruction, None, DoesNotRelease)
 
   SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
                     SingleValueInstruction, MayRead, DoesNotRelease)
 
   // Accessing memory
-  BRIDGED_SINGLE_VALUE_INST(LoadInst, load,
+  SINGLE_VALUE_INST(LoadInst, load,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(LoadBorrowInst, load_borrow,
+  SINGLE_VALUE_INST(LoadBorrowInst, load_borrow,
                     SingleValueInstruction, MayRead, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(BeginBorrowInst, begin_borrow,
+  SINGLE_VALUE_INST(BeginBorrowInst, begin_borrow,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(StoreBorrowInst, store_borrow,
                     SILInstruction, MayWrite, DoesNotRelease)
   // begin_access may trap. Trapping is unordered with respect to memory access,
   // and with respect to other traps, but it is still conservatively considered
   // a side effect.
-  BRIDGED_SINGLE_VALUE_INST(BeginAccessInst, begin_access,
+  SINGLE_VALUE_INST(BeginAccessInst, begin_access,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  BRIDGED_SINGLE_VALUE_INST(Load##Name##Inst, load_##name, \
+  SINGLE_VALUE_INST(Load##Name##Inst, load_##name, \
                     SingleValueInstruction, MayRead, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(MarkUninitializedInst, mark_uninitialized,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(ProjectBoxInst, project_box,
+  SINGLE_VALUE_INST(ProjectBoxInst, project_box,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ProjectExistentialBoxInst, project_existential_box,
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Function Application
-  BRIDGED_SINGLE_VALUE_INST(ApplyInst, apply,
+  SINGLE_VALUE_INST(ApplyInst, apply,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  BRIDGED_SINGLE_VALUE_INST(BuiltinInst, builtin,
+  SINGLE_VALUE_INST(BuiltinInst, builtin,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  BRIDGED_SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
+  SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // Metatypes
   SINGLE_VALUE_INST(MetatypeInst, metatype,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(ValueMetatypeInst, value_metatype,
+  SINGLE_VALUE_INST(ValueMetatypeInst, value_metatype,
                     SingleValueInstruction, MayRead, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(ExistentialMetatypeInst, existential_metatype,
+  SINGLE_VALUE_INST(ExistentialMetatypeInst, existential_metatype,
                     SingleValueInstruction, MayRead, DoesNotRelease)
   SINGLE_VALUE_INST(ObjCProtocolInst, objc_protocol,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -548,31 +540,31 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // Aggregate Types
   SINGLE_VALUE_INST(ObjectInst, object,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(TupleInst, tuple,
+  SINGLE_VALUE_INST(TupleInst, tuple,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(TupleExtractInst, tuple_extract,
+  SINGLE_VALUE_INST(TupleExtractInst, tuple_extract,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(TupleElementAddrInst, tuple_element_addr,
+  SINGLE_VALUE_INST(TupleElementAddrInst, tuple_element_addr,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(StructInst, struct,
+  SINGLE_VALUE_INST(StructInst, struct,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(StructExtractInst, struct_extract,
+  SINGLE_VALUE_INST(StructExtractInst, struct_extract,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(StructElementAddrInst, struct_element_addr,
+  SINGLE_VALUE_INST(StructElementAddrInst, struct_element_addr,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(RefElementAddrInst, ref_element_addr,
+  SINGLE_VALUE_INST(RefElementAddrInst, ref_element_addr,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(RefTailAddrInst, ref_tail_addr,
+  SINGLE_VALUE_INST(RefTailAddrInst, ref_tail_addr,
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Enums
-  BRIDGED_SINGLE_VALUE_INST(EnumInst, enum,
+  SINGLE_VALUE_INST(EnumInst, enum,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(UncheckedEnumDataInst, unchecked_enum_data,
+  SINGLE_VALUE_INST(UncheckedEnumDataInst, unchecked_enum_data,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(InitEnumDataAddrInst, init_enum_data_addr,
+  SINGLE_VALUE_INST(InitEnumDataAddrInst, init_enum_data_addr,
                     SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
+  SINGLE_VALUE_INST(UncheckedTakeEnumDataAddrInst, unchecked_take_enum_data_addr,
                     SingleValueInstruction, MayWrite, DoesNotRelease)
   SINGLE_VALUE_INST(SelectEnumInst, select_enum,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -582,25 +574,25 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Protocol and Protocol Composition Types
-  BRIDGED_SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,
+  SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,
                             SingleValueInstruction, MayWrite, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(InitExistentialValueInst, init_existential_value,
+  SINGLE_VALUE_INST(InitExistentialValueInst, init_existential_value,
                             SingleValueInstruction, MayWrite, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(OpenExistentialAddrInst, open_existential_addr,
+  SINGLE_VALUE_INST(OpenExistentialAddrInst, open_existential_addr,
                             SingleValueInstruction, MayRead, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(InitExistentialRefInst, init_existential_ref,
+  SINGLE_VALUE_INST(InitExistentialRefInst, init_existential_ref,
                             SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(OpenExistentialRefInst, open_existential_ref,
+  SINGLE_VALUE_INST(OpenExistentialRefInst, open_existential_ref,
                             SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(InitExistentialMetatypeInst, init_existential_metatype,
+  SINGLE_VALUE_INST(InitExistentialMetatypeInst, init_existential_metatype,
                             SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(OpenExistentialMetatypeInst, open_existential_metatype,
+  SINGLE_VALUE_INST(OpenExistentialMetatypeInst, open_existential_metatype,
                             SingleValueInstruction, None, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(OpenExistentialBoxInst, open_existential_box,
+  SINGLE_VALUE_INST(OpenExistentialBoxInst, open_existential_box,
                             SingleValueInstruction, MayRead, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(OpenExistentialValueInst, open_existential_value,
+  SINGLE_VALUE_INST(OpenExistentialValueInst, open_existential_value,
                             SingleValueInstruction, MayRead, DoesNotRelease)
-  BRIDGED_SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
+  SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
                             SingleValueInstruction, MayRead, DoesNotRelease)
 
   // Blocks
@@ -692,11 +684,11 @@ ABSTRACT_INST(TermInst, SILInstruction)
 
 // Deallocation instructions.
 ABSTRACT_INST(DeallocationInst, SILInstruction)
-  BRIDGED_NON_VALUE_INST(DeallocStackInst, dealloc_stack,
+  NON_VALUE_INST(DeallocStackInst, dealloc_stack,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
-  BRIDGED_NON_VALUE_INST(DeallocStackRefInst, dealloc_stack_ref,
+  NON_VALUE_INST(DeallocStackRefInst, dealloc_stack_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
-  BRIDGED_NON_VALUE_INST(DeallocRefInst, dealloc_ref,
+  NON_VALUE_INST(DeallocRefInst, dealloc_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(DeallocPartialRefInst, dealloc_partial_ref,
                  DeallocationInst, MayHaveSideEffects, DoesNotRelease)
@@ -708,9 +700,9 @@ ABSTRACT_INST(DeallocationInst, SILInstruction)
 
 // Reference Counting
 ABSTRACT_INST(RefCountingInst, SILInstruction)
-  BRIDGED_NON_VALUE_INST(StrongRetainInst, strong_retain,
+  NON_VALUE_INST(StrongRetainInst, strong_retain,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-  BRIDGED_NON_VALUE_INST(StrongReleaseInst, strong_release,
+  NON_VALUE_INST(StrongReleaseInst, strong_release,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
   NON_VALUE_INST(UnmanagedRetainValueInst, unmanaged_retain_value,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
@@ -726,15 +718,15 @@ ABSTRACT_INST(RefCountingInst, SILInstruction)
   NON_VALUE_INST(Name##ReleaseInst, name##_release, \
                  RefCountingInst, MayHaveSideEffects, MayRelease)
 #include "swift/AST/ReferenceStorage.def"
-  BRIDGED_NON_VALUE_INST(RetainValueInst, retain_value,
+  NON_VALUE_INST(RetainValueInst, retain_value,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(RetainValueAddrInst, retain_value_addr,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-  BRIDGED_NON_VALUE_INST(ReleaseValueInst, release_value,
+  NON_VALUE_INST(ReleaseValueInst, release_value,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
   NON_VALUE_INST(ReleaseValueAddrInst, release_value_addr,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
-  BRIDGED_NON_VALUE_INST(SetDeallocatingInst, set_deallocating,
+  NON_VALUE_INST(SetDeallocatingInst, set_deallocating,
                  RefCountingInst, MayHaveSideEffects,
        DoesNotRelease)
   NON_VALUE_INST(AutoreleaseValueInst, autorelease_value,
@@ -743,27 +735,27 @@ ABSTRACT_INST(RefCountingInst, SILInstruction)
   INST_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
 
 // FIXME: Is MayHaveSideEffects appropriate?
-BRIDGED_NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
+NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
 NON_VALUE_INST(HopToExecutorInst, hop_to_executor,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
-BRIDGED_NON_VALUE_INST(DestroyValueInst, destroy_value,
+NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
-BRIDGED_NON_VALUE_INST(EndBorrowInst, end_borrow,
+NON_VALUE_INST(EndBorrowInst, end_borrow,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 // end_access is considered to have side effects because it modifies runtime
 // state outside of the memory modified by the access that is visible to
 // Swift. This "side effect" only needs to creates a dependency on begin_access
 // instructions.
-BRIDGED_NON_VALUE_INST(EndAccessInst, end_access,
+NON_VALUE_INST(EndAccessInst, end_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(BeginUnpairedAccessInst, begin_unpaired_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(EndUnpairedAccessInst, end_unpaired_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-BRIDGED_NON_VALUE_INST(StoreInst, store,
+NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
@@ -771,19 +763,21 @@ NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)
-BRIDGED_NON_VALUE_INST(DebugValueInst, debug_value,
+NON_VALUE_INST(DebugValueInst, debug_value,
                SILInstruction, None, DoesNotRelease)
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  BRIDGED_NON_VALUE_INST(Store##Name##Inst, store_##name, \
+  NON_VALUE_INST(Store##Name##Inst, store_##name, \
                  SILInstruction, MayWrite, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
-BRIDGED_NON_VALUE_INST(CopyAddrInst, copy_addr,
+NON_VALUE_INST(CopyAddrInst, copy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
-BRIDGED_NON_VALUE_INST(DestroyAddrInst, destroy_addr,
+NON_VALUE_INST(ExplicitCopyAddrInst, explicit_copy_addr,
+               SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(DestroyAddrInst, destroy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndLifetimeInst, end_lifetime,
                SILInstruction, MayHaveSideEffects, MayRelease)
-BRIDGED_NON_VALUE_INST(InjectEnumAddrInst, inject_enum_addr,
+NON_VALUE_INST(InjectEnumAddrInst, inject_enum_addr,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(DeinitExistentialAddrInst, deinit_existential_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
@@ -803,10 +797,13 @@ NON_VALUE_INST(AbortApplyInst, abort_apply,
 
 // Runtime failure
 // FIXME: Special MemBehavior for runtime failure?
-BRIDGED_NON_VALUE_INST(CondFailInst, cond_fail,
+NON_VALUE_INST(CondFailInst, cond_fail,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 
-NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
+NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
+               SILInstruction, MayReadWrite, DoesNotRelease)
+
+NODE_RANGE(NonValueInstruction, UnreachableInst, IncrementProfilerCounterInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
@@ -841,14 +838,12 @@ NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)
 #undef DYNAMICCAST_TERMINATOR
 #undef TERMINATOR
 #undef NON_VALUE_INST
-#undef BRIDGED_NON_VALUE_INST
 #undef DYNAMICCAST_NON_VALUE_INST
 #undef MULTIPLE_VALUE_INST_RESULT
 #undef MULTIPLE_VALUE_INST
 #undef DYNAMICCAST_SINGLE_VALUE_INST
 #undef DYNAMICCAST_INST
 #undef SINGLE_VALUE_INST
-#undef BRIDGED_SINGLE_VALUE_INST
 #undef FULL_INST
 #undef INST
 #undef ARGUMENT

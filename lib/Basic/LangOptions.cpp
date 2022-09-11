@@ -29,6 +29,10 @@
 
 using namespace swift;
 
+LangOptions::LangOptions() {
+  // Note: Introduce default-on language options here.
+}
+
 struct SupportedConditionalValue {
   StringRef value;
 
@@ -240,7 +244,7 @@ bool LangOptions::hasFeature(Feature feature) const {
 }
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
-  if (auto feature = getFutureFeature(featureName))
+  if (auto feature = getUpcomingFeature(featureName))
     return hasFeature(*feature);
 
   if (auto feature = getExperimentalFeature(featureName))
@@ -260,11 +264,12 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     llvm::raw_svector_ostream osx(osxBuf);
     osx << llvm::Triple::getOSTypeName(llvm::Triple::MacOSX);
 
-    unsigned major, minor, micro;
-    triple.getMacOSXVersion(major, minor, micro);
-    osx << major << "." << minor;
-    if (micro != 0)
-      osx << "." << micro;
+    llvm::VersionTuple OSVersion;
+    triple.getMacOSXVersion(OSVersion);
+
+    osx << OSVersion.getMajor() << "." << OSVersion.getMinor().getValueOr(0);
+    if (auto Subminor = OSVersion.getSubminor())
+      osx << "." << *Subminor;
 
     triple.setOSName(osx.str());
   }
@@ -434,10 +439,10 @@ bool swift::isSuppressibleFeature(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Optional<Feature> swift::getFutureFeature(llvm::StringRef name) {
+llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<Optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define FUTURE_FEATURE(FeatureName, SENumber, Version) \
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                    .Default(None);
@@ -455,7 +460,7 @@ llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
 llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define FUTURE_FEATURE(FeatureName, SENumber, Version) \
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
   default: return None;

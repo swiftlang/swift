@@ -90,6 +90,7 @@ EXPECTED_DEFAULTS = {
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_early_swift_driver': True,
+    'build_early_swiftsyntax': False,
     'build_swiftsyntax': False,
     'build_libparser_only': False,
     'build_skstresstester': False,
@@ -133,6 +134,7 @@ EXPECTED_DEFAULTS = {
     'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
+    'infer_cross_compile_hosts_on_darwin': False,
     'darwin_deployment_version_ios':
         defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
     'darwin_deployment_version_osx':
@@ -244,7 +246,6 @@ EXPECTED_DEFAULTS = {
     'test_cygwin': False,
     'test_freebsd': False,
     'test_ios': False,
-    'test_ios_32bit_simulator': False,
     'test_watchos_32bit_simulator': False,
     'test_ios_host': False,
     'test_ios_simulator': False,
@@ -517,6 +518,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swift-driver', dest='build_swift_driver'),
+    SetTrueOption('--early-swiftsyntax', dest='build_early_swiftsyntax'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
     SetTrueOption('--build-libparser-only', dest='build_libparser_only'),
     SetTrueOption('--skstresstester', dest='build_skstresstester'),
@@ -641,8 +643,6 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-cygwin', dest='test_cygwin'),
     DisableOption('--skip-test-freebsd', dest='test_freebsd'),
     DisableOption('--skip-test-ios', dest='test_ios'),
-    DisableOption('--skip-test-ios-32bit-simulator',
-                  dest='test_ios_32bit_simulator'),
     DisableOption('--skip-test-watchos-32bit-simulator',
                   dest='test_watchos_32bit_simulator'),
     DisableOption('--skip-test-ios-host', dest='test_ios_host'),
@@ -735,6 +735,7 @@ EXPECTED_OPTIONS = [
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 
     AppendOption('--cross-compile-hosts'),
+    SetTrueOption('--infer-cross-compile-hosts-on-darwin'),
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
     AppendOption('--test-paths'),

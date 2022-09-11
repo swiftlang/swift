@@ -72,7 +72,8 @@ struct BadConcreteNestedConforms: NestedConforms {
 }
 
 
-// SR4693:
+// https://github.com/apple/swift/issues/47270
+
 protocol P1 {}
 struct X: P1 {}
 struct Y<T: P1> {}

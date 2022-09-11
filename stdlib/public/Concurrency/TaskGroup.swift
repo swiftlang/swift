@@ -65,6 +65,7 @@ import Swift
 /// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
+@_unsafeInheritExecutor
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -99,14 +100,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// you can use a `for`-`await`-`in` loop:
 ///
 ///     var sum = 0
-///     for await result in group {
+///     for try await result in group {
 ///         sum += result
 ///     }
 ///
 /// If you need more control or only a few results,
 /// you can call `next()` directly:
 ///
-///     guard let first = await group.next() else {
+///     guard let first = try await group.next() else {
 ///         group.cancelAll()
 ///         return 0
 ///     }
@@ -157,6 +158,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// or to let the group rethrow the error.
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
+@_unsafeInheritExecutor
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -236,11 +238,19 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: true
+    )
+#else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true
     )
+#endif
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -270,12 +280,19 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       // the group is cancelled and is not accepting any new work
       return false
     }
-
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false
+    )
+#else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false
     )
+#endif
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -578,7 +595,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
-  ///     for await try value in group {
+  ///     for try await value in group {
   ///         collected += value
   ///     }
   ///
@@ -632,8 +649,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     guard let result = await group.nextResult() else {
   ///         return  // No task to wait on, which won't happen in this example.
   ///     }
-  ///     
-  ///     switch result { 
+  ///
+  ///     switch result {
   ///     case .success(let value): print(value)
   ///     case .failure(let error): print("Failure: \(error)")
   ///     }
@@ -808,15 +825,15 @@ extension ThrowingTaskGroup: AsyncSequence {
   ///     group.addTask { 1 }
   ///     group.addTask { throw SomeError }
   ///     group.addTask { 2 }
-  ///     
-  ///     do { 
+  ///
+  ///     do {
   ///         // Assuming the child tasks complete in order, this prints "1"
   ///         // and then throws an error.
   ///         for try await r in group { print(r) }
   ///     } catch {
   ///         // Resolve the error.
   ///     }
-  ///     
+  ///
   ///     // Assuming the child tasks complete in order, this prints "2".
   ///     for try await r in group { print(r) }
   ///
@@ -845,7 +862,7 @@ extension ThrowingTaskGroup: AsyncSequence {
     /// this iterator is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
-    /// see `ThrowingTaskGroup.next()` 
+    /// see `ThrowingTaskGroup.next()`
     ///
     /// - Throws: The error thrown by the next child task that completes.
     ///

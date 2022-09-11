@@ -53,7 +53,7 @@ class Symbol {
                          SourceManager &SourceMgr,
                          llvm::json::OStream &OS) const;
 
-  void serializeRange(size_t InitialIdentation,
+  void serializeRange(size_t InitialIndentation,
                       SourceRange Range, SourceManager &SourceMgr,
                       llvm::json::OStream &OS) const;
 
@@ -71,6 +71,8 @@ class Symbol {
   void serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const;
 
   void serializeAccessLevelMixin(llvm::json::OStream &OS) const;
+
+  void serializeMetadataMixin(llvm::json::OStream &OS) const;
 
   void serializeLocationMixin(llvm::json::OStream &OS) const;
 
@@ -101,7 +103,7 @@ public:
     return SynthesizedBaseTypeDecl;
   }
 
-  /// Reteive the path components associated with this symbol, from outermost
+  /// Retrieve the path components associated with this symbol, from outermost
   /// to innermost (this symbol).
   void getPathComponents(SmallVectorImpl<PathComponent> &Components) const;
 

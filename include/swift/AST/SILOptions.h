@@ -128,6 +128,9 @@ public:
   /// Enables experimental performance annotations.
   bool EnablePerformanceAnnotations = false;
 
+  /// Enables the emission of stack protectors in functions.
+  bool EnableStackProtection = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 

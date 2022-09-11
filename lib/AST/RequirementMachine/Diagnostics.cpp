@@ -137,6 +137,26 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::RecursiveRequirement: {
+      auto requirement = error.requirement;
+
+      if (requirement.hasError())
+        break;
+
+      assert(requirement.getKind() == RequirementKind::SameType ||
+             requirement.getKind() == RequirementKind::Superclass);
+
+      ctx.Diags.diagnose(loc,
+                         (requirement.getKind() == RequirementKind::SameType ?
+                          diag::recursive_same_type_constraint :
+                          diag::recursive_superclass_constraint),
+                         requirement.getFirstType(),
+                         requirement.getSecondType());
+
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::RedundantRequirement: {
       // We only emit redundant requirement warnings if the user passed
       // the -warn-redundant-requirements frontend flag.
@@ -148,6 +168,9 @@ bool swift::rewriting::diagnoseRequirementErrors(
         break;
 
       switch (requirement.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
+
       case RequirementKind::SameType:
         ctx.Diags.diagnose(loc, diag::redundant_same_type_to_concrete,
                            requirement.getFirstType(),
@@ -390,7 +413,7 @@ getRequirementForDiagnostics(Type subject, Symbol property,
   }
 }
 
-void RewriteSystem::computeConflictDiagnostics(
+void RewriteSystem::computeConflictingRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
     const PropertyMap &propertyMap,
     TypeArrayView<GenericTypeParamType> genericParams) {
@@ -427,11 +450,30 @@ void RewriteSystem::computeConflictDiagnostics(
   }
 }
 
+void RewriteSystem::computeRecursiveRequirementDiagnostics(
+    SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc,
+    const PropertyMap &propertyMap,
+    TypeArrayView<GenericTypeParamType> genericParams) {
+  for (unsigned ruleID : RecursiveRules) {
+    const auto &rule = getRule(ruleID);
+
+    assert(isInMinimizationDomain(rule.getRHS()[0].getRootProtocol()));
+
+    Type subjectType = propertyMap.getTypeForTerm(rule.getRHS(), genericParams);
+    errors.push_back(RequirementError::forRecursiveRequirement(
+        getRequirementForDiagnostics(subjectType, *rule.isPropertyRule(),
+                                     propertyMap, genericParams, MutableTerm()),
+        signatureLoc));
+  }
+}
+
 void RequirementMachine::computeRequirementDiagnostics(
     SmallVectorImpl<RequirementError> &errors, SourceLoc signatureLoc) {
   System.computeRedundantRequirementDiagnostics(errors);
-  System.computeConflictDiagnostics(errors, signatureLoc, Map,
-                                    getGenericParams());
+  System.computeConflictingRequirementDiagnostics(errors, signatureLoc, Map,
+                                                  getGenericParams());
+  System.computeRecursiveRequirementDiagnostics(errors, signatureLoc, Map,
+                                                getGenericParams());
 }
 
 std::string RequirementMachine::getRuleAsStringForDiagnostics(

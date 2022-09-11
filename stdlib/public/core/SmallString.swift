@@ -221,7 +221,7 @@ extension _SmallString {
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift.withUnsafeBytes(of: &raw) {
+    return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
       let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
@@ -353,13 +353,22 @@ extension _SmallString {
   //
   @_effects(readonly) // @opaque
   @usableFromInline // testable
-  internal init(taggedCocoa cocoa: AnyObject) {
+  internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
+    var success = true
     self.withMutableCapacity {
-      let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _internalInvariant(len != nil && len! <= _SmallString.capacity,
-        "Internal invariant violated: large tagged NSStrings")
-      return len._unsafelyUnwrappedUnchecked
+      /*
+       For regular NSTaggedPointerStrings we will always succeed here, but
+       tagged NSLocalizedStrings may not fit in a SmallString
+       */
+      if let len = _bridgeTagged(cocoa, intoUTF8: $0) {
+        return len
+      }
+      success = false
+      return 0
+    }
+    if !success {
+      return nil
     }
     self._invariantCheck()
   }

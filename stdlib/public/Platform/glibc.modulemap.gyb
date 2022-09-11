@@ -51,7 +51,7 @@ module SwiftGlibc [system] {
 
 % if CMAKE_SDK != "WASI" and CMAKE_SDK != "ANDROID":
 module CUUID [system] {
-  header "${GLIBC_INCLUDE_PATH}/uuid/uuid.h"
+  header "uuid/uuid.h"
   link "uuid"
   export *
 }

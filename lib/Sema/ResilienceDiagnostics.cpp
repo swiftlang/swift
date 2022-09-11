@@ -84,8 +84,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
-  // FIXME: Conditionalize this once we have a new language mode.
-  if (isa<TypeAliasDecl>(DC))
+  if (isa<TypeAliasDecl>(DC) && !Context.isSwiftVersionAtLeast(6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
@@ -107,20 +106,57 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   return (downgradeToWarning == DowngradeToWarning::No);
 }
 
-bool
-TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
-                                          const ValueDecl *D,
-                                          const ExportContext &where) {
-  // Accessors cannot have exportability that's different than the storage,
-  // so skip them for now.
-  if (isa<AccessorDecl>(D))
+static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
+                                                  const TypeAliasDecl *TAD,
+                                                  const ExportContext &where) {
+  assert(where.mustOnlyReferenceExportedDecls());
+
+  auto *D = TAD->getUnderlyingType()->getAnyNominal();
+  if (!D)
     return false;
 
-  if (!where.mustOnlyReferenceExportedDecls())
+  auto ignoredDowngradeToWarning = DowngradeToWarning::No;
+  auto originKind =
+      getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
+  if (originKind == DisallowedOriginKind::None)
     return false;
 
   auto definingModule = D->getModuleContext();
+  ASTContext &ctx = definingModule->getASTContext();
+  auto fragileKind = where.getFragileFunctionKind();
 
+  if (fragileKind.kind == FragileFunctionKind::None) {
+    auto reason = where.getExportabilityReason();
+    ctx.Diags
+        .diagnose(loc, diag::typealias_desugars_to_type_from_hidden_module,
+                  TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
+                  static_cast<unsigned>(*reason), definingModule->getName(),
+                  static_cast<unsigned>(originKind))
+        .warnUntilSwiftVersion(6);
+  } else {
+    ctx.Diags
+        .diagnose(loc,
+                  diag::inlinable_typealias_desugars_to_type_from_hidden_module,
+                  TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
+                  fragileKind.getSelector(), definingModule->getName(),
+                  static_cast<unsigned>(originKind))
+        .warnUntilSwiftVersion(6);
+  }
+  D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+
+  if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+      !ctx.LangOpts.isSwiftVersionAtLeast(6))
+    ctx.Diags.diagnose(loc, diag::missing_import_inserted,
+                       definingModule->getName());
+
+  return true;
+}
+
+static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
+                                              const ExportContext &where) {
+  assert(where.mustOnlyReferenceExportedDecls());
+
+  auto definingModule = D->getModuleContext();
   auto downgradeToWarning = DowngradeToWarning::No;
 
   auto originKind = getDisallowedOriginKind(
@@ -159,8 +195,35 @@ TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
                        D->getDescriptiveKind(), D->getName(),
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind));
+
+    if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+        downgradeToWarning == DowngradeToWarning::Yes)
+      ctx.Diags.diagnose(loc, diag::missing_import_inserted,
+                         definingModule->getName());
   }
+
   return true;
+}
+
+bool TypeChecker::diagnoseDeclRefExportability(SourceLoc loc,
+                                               const ValueDecl *D,
+                                               const ExportContext &where) {
+  // Accessors cannot have exportability that's different than the storage,
+  // so skip them for now.
+  if (isa<AccessorDecl>(D))
+    return false;
+
+  if (!where.mustOnlyReferenceExportedDecls())
+    return false;
+
+  if (diagnoseValueDeclRefExportability(loc, D, where))
+    return true;
+
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(D))
+    if (diagnoseTypeAliasDeclRefExportability(loc, TAD, where))
+      return true;
+
+  return false;
 }
 
 bool
@@ -189,8 +252,14 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      static_cast<unsigned>(*reason),
                      M->getName(),
                      static_cast<unsigned>(originKind))
-      .warnUntilSwiftVersionIf(useConformanceAvailabilityErrorsOption &&
-                               !ctx.LangOpts.EnableConformanceAvailabilityErrors,
+      .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
+                                !ctx.LangOpts.EnableConformanceAvailabilityErrors) ||
+                               originKind == DisallowedOriginKind::ImplicitlyImported,
                                6);
+
+    if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+        !ctx.LangOpts.isSwiftVersionAtLeast(6))
+      ctx.Diags.diagnose(loc, diag::missing_import_inserted,
+                         M->getName());
   return true;
 }

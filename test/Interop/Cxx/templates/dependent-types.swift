@@ -58,7 +58,8 @@ DependentTypesTestSuite.test("Takes const ref and returns dependent type.") {
   expectEqual(m.getValue(), 42)
 }
 
-// We still have some problems calling methods on Windows: SR-13129 and rdar://88391102
+// We still have some problems calling methods on Windows
+// (https://github.com/apple/swift/issues/55575 and rdar://88391102).
 #if !os(Windows)
 DependentTypesTestSuite.test("Function template methods") {
   let m = M<Int>(value: 42)

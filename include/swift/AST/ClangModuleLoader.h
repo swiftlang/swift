@@ -33,6 +33,7 @@ namespace swift {
 
 class ConcreteDeclRef;
 class Decl;
+class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
 class SwiftLookupTable;
@@ -184,6 +185,11 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Imports a clang decl from a base class, cloning it for \param newContext
+  /// if it wasn't cloned for this specific context before.
+  virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                          DeclContext *newContext) = 0;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   virtual void diagnoseTopLevelValue(const DeclName &name) = 0;
@@ -261,6 +267,10 @@ public:
 
   virtual Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) = 0;
+
+  virtual Type importVarDeclType(const clang::VarDecl *clangDecl,
+                                 VarDecl *swiftDecl,
+                                 DeclContext *dc) = 0;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

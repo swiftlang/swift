@@ -7,6 +7,8 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  ModulePassContext.swift
+  Options.swift
   Passes.swift
   PassContext.swift
   PassRegistration.swift)

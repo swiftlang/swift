@@ -22,7 +22,9 @@
 #define DEBUG_TYPE "sil-move-only-type-eliminator"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -86,6 +88,14 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     SILBuilderWithScope b(si);
     b.emitStoreValueOperation(si->getLoc(), si->getSrc(), si->getDest(),
                               StoreOwnershipQualifier::Trivial);
+    SmallVector<EndBorrowInst *, 4> endBorrows;
+    for (auto *ebi : si->getUsersOfType<EndBorrowInst>()) {
+      endBorrows.push_back(ebi);
+    }
+    for (auto *ebi : endBorrows) {
+      eraseFromParent(ebi);
+    }
+    si->replaceAllUsesWith(si->getDest());
     return eraseFromParent(si);
   }
 
@@ -108,6 +118,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     return eraseFromParent(inst);                                              \
   }
   RAUW_IF_TRIVIAL_RESULT(CopyValue)
+  RAUW_IF_TRIVIAL_RESULT(MoveValue)
   RAUW_IF_TRIVIAL_RESULT(ExplicitCopyValue)
   RAUW_IF_TRIVIAL_RESULT(BeginBorrow)
 #undef RAUW_IF_TRIVIAL_RESULT
@@ -172,18 +183,71 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(DestroyAddr)
   NO_UPDATE_NEEDED(DeallocStack)
   NO_UPDATE_NEEDED(Branch)
-  NO_UPDATE_NEEDED(UncheckedAddrCast)
   NO_UPDATE_NEEDED(RefElementAddr)
-  NO_UPDATE_NEEDED(Upcast)
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(Object)
   NO_UPDATE_NEEDED(OpenExistentialRef)
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(RefToBridgeObject)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
-  NO_UPDATE_NEEDED(UnconditionalCheckedCast)
   NO_UPDATE_NEEDED(ClassMethod)
 #undef NO_UPDATE_NEEDED
+
+  bool eliminateIdentityCast(SingleValueInstruction *svi) {
+    if (svi->getOperand(0)->getType() != svi->getType())
+      return false;
+    svi->replaceAllUsesWith(svi->getOperand(0));
+    eraseFromParent(svi);
+    return true;
+  }
+
+#define ELIMINATE_POTENTIAL_IDENTITY_CAST(NAME) \
+  bool visit##NAME##Inst(NAME##Inst *cast) { \
+    return eliminateIdentityCast(cast); \
+  }
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(Upcast)
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedAddrCast)
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(UnconditionalCheckedCast)
+#undef ELIMINATE_POTENTIAL_IDENTITY_CAST
+  // We handle apply sites by just inserting a convert_function that converts
+  // the original function type into a function type without move only. This is
+  // safe since adding/removing moveonlywrapped types is ABI neutral.
+  bool visitApplySite(ApplySite ai) {
+    auto eliminateMoveOnlyWrapped = [&](TypeBase *type) -> Optional<Type> {
+      if (auto *moveType = dyn_cast<SILMoveOnlyWrappedType>(type))
+        return moveType->getInnerType();
+      return None;
+    };
+
+    // First fix up the callee.
+    auto origCalleeType = ai.getOrigCalleeType();
+    auto newOrigCalleeType =
+        origCalleeType.transformRec(eliminateMoveOnlyWrapped)
+            ->getCanonicalType();
+    auto newOrigCalleeSILType =
+        SILType::getPrimitiveObjectType(newOrigCalleeType);
+    SILBuilderWithScope b(*ai);
+    auto *newCallee = b.createConvertFunction(
+        ai->getLoc(), ai.getCallee(), newOrigCalleeSILType,
+        false /*without actually escaping*/);
+    ai.setCallee(newCallee);
+
+    // Then fix up the subst function type.
+    auto newSubstType = ai.getSubstCalleeType()
+                            .transformRec(eliminateMoveOnlyWrapped)
+                            ->getCanonicalType();
+    ai.setSubstCalleeType(cast<SILFunctionType>(newSubstType));
+    return true;
+  }
+
+  bool visitApplyInst(ApplyInst *ai) { return visitApplySite({ai}); }
+  bool visitTryApplyInst(TryApplyInst *tai) { return visitApplySite({tai}); }
+  bool visitBeginApplyInst(BeginApplyInst *bai) {
+    return visitApplySite({bai});
+  }
+  bool visitPartialApplyInst(PartialApplyInst *pai) {
+    return visitApplySite({pai});
+  }
 };
 
 } // namespace
@@ -213,28 +277,24 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
   SmallSetVector<SILInstruction *, 8> touchedInsts;
 
   for (auto &bb : *fn) {
-    // We should (today) never have move only function arguments. Instead we
-    // convert them in the prologue block.
-    if (&bb != &fn->front()) {
-      for (auto *arg : bb.getArguments()) {
-        if (!arg->getType().isMoveOnlyWrapped())
-          continue;
+    for (auto *arg : bb.getArguments()) {
+      if (!arg->getType().isMoveOnlyWrapped())
+        continue;
 
-        // If we are looking at trivial only, skip non-trivial function args.
-        if (trivialOnly &&
-            !arg->getType().removingMoveOnlyWrapper().isTrivial(*fn))
-          continue;
+      // If we are looking at trivial only, skip non-trivial function args.
+      if (trivialOnly &&
+          !arg->getType().removingMoveOnlyWrapper().isTrivial(*fn))
+        continue;
 
-        arg->unsafelyEliminateMoveOnlyWrapper();
+      arg->unsafelyEliminateMoveOnlyWrapper();
 
-        // If our new type is trivial, convert the arguments ownership to
-        // None. Otherwise, preserve the ownership kind of the argument.
-        if (arg->getType().isTrivial(*fn))
-          arg->setOwnershipKind(OwnershipKind::None);
-        touchedArgs.insert(arg);
-        for (auto *use : arg->getNonTypeDependentUses())
-          touchedInsts.insert(use->getUser());
-      }
+      // If our new type is trivial, convert the arguments ownership to
+      // None. Otherwise, preserve the ownership kind of the argument.
+      if (arg->getType().isTrivial(*fn))
+        arg->setOwnershipKind(OwnershipKind::None);
+      touchedArgs.insert(arg);
+      for (auto *use : arg->getNonTypeDependentUses())
+        touchedInsts.insert(use->getUser());
     }
 
     for (auto &ii : bb) {

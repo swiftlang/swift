@@ -897,10 +897,14 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
         if (addAllOperandsToWorklist(mvi)) {
           continue;
         }
+      } else if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(inst)) {
+        if (addAllOperandsToWorklist(c)) {
+          continue;
+        }
       }
     }
 
-    if (value.getOwnershipKind() == OwnershipKind::Guaranteed)
+    if (value->getOwnershipKind() == OwnershipKind::Guaranteed)
       roots.push_back(value);
   }
 }
@@ -1408,6 +1412,10 @@ void swift::visitProductLeafAccessPathNodes(
     } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
       if (decl->isResilient(tec.getContext()->getParentModule(),
                             tec.getResilienceExpansion())) {
+        visitor(AccessPath::PathNode(node), silType);
+        continue;
+      }
+      if (decl->isCxxNonTrivial()) {
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
@@ -1931,6 +1939,11 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
       return true;
     }
   }
+  if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser())) {
+    if (use->get() == sbi->getDest()) {
+      pushUsers(sbi, dfs);
+    }
+  }
   if (isa<EndBorrowInst>(use->getUser())) {
     return true;
   }
@@ -2099,6 +2112,7 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
   case SILInstructionKind::InjectEnumAddrInst:
     return visitor.visitStore(use);
 
+  case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::CopyAddrInst:
     if (operIdx == CopyLikeInstruction::Dest) {
       return visitor.visitStore(use);
@@ -2135,6 +2149,10 @@ bool swift::memInstMustInitialize(Operand *memOper) {
 
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);
+    return CAI->getDest() == address && CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && CAI->isInitializationOfDest();
   }
   case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
@@ -2442,7 +2460,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       return;
 
     // These effect both operands.
-    case BuiltinValueKind::Move:
     case BuiltinValueKind::Copy:
       visitor(&builtin->getAllOperands()[1]);
       return;
@@ -2475,11 +2492,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::Unreachable:
     case BuiltinValueKind::CondUnreachable:
     case BuiltinValueKind::DestroyArray:
-    case BuiltinValueKind::UnsafeGuaranteed:
-    case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
-    case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
@@ -2587,6 +2601,11 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
     return;
 
+  case SILInstructionKind::ExplicitCopyAddrInst:
+    visitor(&I->getAllOperands()[ExplicitCopyAddrInst::Src]);
+    visitor(&I->getAllOperands()[ExplicitCopyAddrInst::Dest]);
+    return;
+
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Src]);
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Dest]);
@@ -2671,6 +2690,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::UncheckedRefCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:

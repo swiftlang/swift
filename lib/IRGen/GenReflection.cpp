@@ -357,7 +357,7 @@ IRGenModule::getTypeRef(CanType type, CanGenericSignature sig,
 std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
-  return getTypeRef(type->getCanonicalType(genericSig),
+  return getTypeRef(type->getReducedType(genericSig),
                     genericSig.getCanonicalSignature(), role);
 }
 
@@ -554,7 +554,7 @@ protected:
   void addTypeRef(Type type, GenericSignature genericSig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
-    addTypeRef(type->getCanonicalType(genericSig),
+    addTypeRef(type->getReducedType(genericSig),
                genericSig.getCanonicalSignature(), role);
   }
 
@@ -1351,7 +1351,9 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   SmallString<50> SectionName;
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::DXContainer:
   case llvm::Triple::GOFF:
+  case llvm::Triple::SPIRV:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::XCOFF:

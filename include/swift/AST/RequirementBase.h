@@ -36,8 +36,11 @@ enum class RequirementKind : unsigned {
   /// A layout bound T : L, where T is a type that depends on a generic
   /// parameter and L is some layout specification that should bound T.
   Layout,
+  /// A same-count requirement T.count == U.count, where T and U are pack
+  /// parameters.
+  SameCount
 
-  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
+  // Note: there is code that packs this enum in a 3-bit bitfield.  Audit users
   // when adding enumerators.
 };
 
@@ -102,6 +105,7 @@ public:
         hash_value(requirement.FirstTypeAndKind.getOpaqueValue());
     llvm::hash_code second;
     switch (requirement.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
@@ -123,6 +127,7 @@ public:
       return false;
 
     switch (lhs.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:

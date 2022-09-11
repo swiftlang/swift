@@ -106,8 +106,11 @@ ValueBase::getDefiningInstructionResult() {
 }
 
 bool ValueBase::isLexical() const {
-  if (auto *argument = dyn_cast<SILFunctionArgument>(this))
-    return argument->getOwnershipKind() == OwnershipKind::Owned;
+  if (auto *argument = dyn_cast<SILFunctionArgument>(this)) {
+    // TODO: Recognize guaranteed arguments as lexical too.
+    return argument->getOwnershipKind() == OwnershipKind::Owned &&
+           argument->getLifetime().isLexical();
+  }
   if (auto *bbi = dyn_cast<BeginBorrowInst>(this))
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
@@ -343,7 +346,7 @@ bool Operand::canAcceptKind(ValueOwnershipKind kind,
 }
 
 bool Operand::satisfiesConstraints(SILModuleConventions *silConv) const {
-  return canAcceptKind(get().getOwnershipKind(), silConv);
+  return canAcceptKind(get()->getOwnershipKind(), silConv);
 }
 
 bool Operand::isLifetimeEnding() const {
@@ -361,14 +364,14 @@ bool Operand::isLifetimeEnding() const {
   // isLifetimeEnding() as false even if the constraint itself has a constraint
   // that says a value is LifetimeEnding. If we have a value that has a
   // non-OwnershipKind::None ownership then we just return true as expected.
-  return get().getOwnershipKind() != OwnershipKind::None;
+  return get()->getOwnershipKind() != OwnershipKind::None;
 }
 
 bool Operand::isConsuming() const {
   if (!getOwnershipConstraint().isConsuming())
     return false;
 
-  return get().getOwnershipKind() != OwnershipKind::None;
+  return get()->getOwnershipKind() != OwnershipKind::None;
 }
 
 void Operand::dump() const { print(llvm::dbgs()); }

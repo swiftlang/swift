@@ -93,21 +93,6 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
   return %2 : $()
 }
 
-// Address Arguments may alias if they are arguments to a BB besides the first.
-//
-// FIXME: Once we support looking through PHIs, we will allow for must alias here.
-//
-// CHECK-LABEL: @address_args_may_alias_in_non_first_bb
-// CHECK-NOT: NoAlias
-sil @address_args_may_alias_in_non_first_bb : $@convention(thin) (@inout Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject):
-  br bb1(%0 : $*Builtin.NativeObject, %0 : $*Builtin.NativeObject)
-
-bb1(%1 : $*Builtin.NativeObject, %2 : $*Builtin.NativeObject):
-  %3 = tuple()
-  return %3 : $()
-}
-
 // Assume that inout arguments alias to preserve memory safety.
 //
 // CHECK-LABEL: @inout_args_may_not_alias
@@ -646,19 +631,19 @@ struct S : P {
 
 // CHECK-LABEL: @init_existential_addr
 // CHECK:      PAIR #3.
-// CHECK-NEXT:   %0 = argument of bb0 : $P
-// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %0 = argument of bb0 : $any P
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*any P, $S
 // CHECK-NEXT: NoAlias
 // CHECK:      PAIR #12.
-// CHECK-NEXT:   %2 = alloc_stack $P
-// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %2 = alloc_stack $any P
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*any P, $S
 // CHECK-NEXT: MayAlias
 // CHECK:      PAIR #13.
-// CHECK-NEXT:   %2 = alloc_stack $P
+// CHECK-NEXT:   %2 = alloc_stack $any P
 // CHECK-NEXT:   %4 = struct_element_addr %3 : $*S, #S.i
 // CHECK-NEXT: MayAlias
 // CHECK:      PAIR #16.
-// CHECK-NEXT:   %3 = init_existential_addr %2 : $*P, $S
+// CHECK-NEXT:   %3 = init_existential_addr %2 : $*any P, $S
 // CHECK-NEXT:   %4 = struct_element_addr %3 : $*S, #S.i
 // CHECK-NEXT: PartialAlias
 sil @init_existential_addr : $@convention(thin) (P) -> () {

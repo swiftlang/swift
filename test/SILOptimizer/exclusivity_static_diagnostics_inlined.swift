@@ -21,10 +21,10 @@ struct Some : SomeP {
 // existential.
 //
 // INLINE-LABEL: $s5Onone16testNestedAccessyyF
-// INLINE: [[OUTER:%.*]] = begin_access [modify] [static] %0 : $*SomeP
-// INLINE: [[INNERREAD:%.*]] = begin_access [read] [static] [[OUTER]] : $*SomeP
-// INLINE: [[INNERMOD:%.*]] = begin_access [modify] [static] [[OUTER]] : $*SomeP
-// INLINE: %{{.*}} = open_existential_addr mutable_access [[INNERMOD]] : $*SomeP to $*@opened("{{.*}}") SomeP
+// INLINE: [[OUTER:%.*]] = begin_access [modify] [static] %0 : $*any SomeP
+// INLINE: [[INNERREAD:%.*]] = begin_access [read] [static] [[OUTER]] : $*any SomeP
+// INLINE: [[INNERMOD:%.*]] = begin_access [modify] [static] [[OUTER]] : $*any SomeP
+// INLINE: %{{.*}} = open_existential_addr mutable_access [[INNERMOD]] : $*any SomeP to $*@opened("{{.*}}", any SomeP) Self
 //
 public func testNestedAccess() {
   var s: SomeP = Some()

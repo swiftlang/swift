@@ -18,7 +18,7 @@ struct DerivedFromAll : HasOneField, DerivedWithOneField {
 
 // Non trivial types:
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
   NonTrivial() {}
   ~NonTrivial() {}
 };
@@ -33,14 +33,16 @@ struct NonTrivialDerivedWithOneField : NonTrivialHasThreeFields {
   int d = 4;
 };
 
-struct NonTrivialHasOneField {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivialHasOneField {
   NonTrivialHasOneField() {}
   ~NonTrivialHasOneField() {}
 
   int e = 5;
 };
 
-struct NonTrivialDerivedFromAll : NonTrivialHasOneField, NonTrivialDerivedWithOneField {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivialDerivedFromAll
+    : NonTrivialHasOneField,
+      NonTrivialDerivedWithOneField {
   int f = 6;
 };
 

@@ -465,7 +465,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
-    SmallVector<ValueDecl *, 2> localDecls;
     ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
                                LookupName.getFullName(), Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
@@ -1724,17 +1723,14 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
       // If the tuple element has a label, propagate it.
       elt.Type = eltTE->getTypeRepr();
-      Identifier name = TE->getElementName(EltNo);
-      if (!name.empty()) {
-        elt.Name = name;
-        elt.NameLoc = TE->getElementNameLoc(EltNo);
-      }
+      elt.Name = TE->getElementName(EltNo);
+      elt.NameLoc = TE->getElementNameLoc(EltNo);
 
       Elts.push_back(elt);
       ++EltNo;
     }
     auto *NewTypeRepr = TupleTypeRepr::create(
-        getASTContext(), Elts, TE->getSourceRange(), SourceLoc(), Elts.size());
+        getASTContext(), Elts, TE->getSourceRange());
     return new (getASTContext()) TypeExpr(NewTypeRepr);
   }
   
@@ -1777,10 +1773,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       if (!TE) return nullptr;
       
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
-      if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       while (TRE->isParenType()) {
         TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElementType(0));
-        if (!TRE || TRE->getEllipsisLoc().isValid()) return nullptr;
       }
 
       assert(TRE->getElements().size() == 2);

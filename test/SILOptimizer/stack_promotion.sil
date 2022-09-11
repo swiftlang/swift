@@ -1110,12 +1110,12 @@ bb0(%0 : $XX):
   return %1 : $XX
 }
 
-// CHECK-LABEL: sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
+// CHECK-LABEL: sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error any Error) {
 // CHECK:        alloc_ref [stack] $XX
 // CHECK:        try_apply
 // CHECK:      bb1(%{{.*}} : $XX):
 // CHECK-NEXT:   dealloc_stack_ref
-// CHECK:      bb2(%{{.*}}: $Error):
+// CHECK:      bb2(%{{.*}}: $any Error):
 // CHECK-NEXT:   dealloc_stack_ref
 // CHECK-LABEL: } // end sil function 'testUsedByTryApply'
 sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {

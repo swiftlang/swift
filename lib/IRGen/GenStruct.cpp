@@ -1472,7 +1472,7 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
-  llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
+  llvm::Type *storageType = IGM.OpaquePtrTy->getPointerElementType();
   return new ResilientStructTypeInfo(storageType, abiAccessible);
 }
 

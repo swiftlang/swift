@@ -391,19 +391,21 @@ func rdar60501780() {
   func foo(_: [String: NSObject]) {}
 
   func bar(_ v: String) {
-    foo(["": "", "": v as NSString])
+    foo(["a": "", "b": v as NSString])
   }
 }
 
-// SR-15161
-func SR15161_as(e: Error?) {
-  let _ = e as? NSError // Ok
-}
+// https://github.com/apple/swift/issues/57484
+do {
+  func as1(e: Error?) {
+    let _ = e as? NSError // Ok
+  }
 
-func SR15161_is(e: Error?) {
-  _ = e is NSError // expected-warning{{checking a value with optional type '(any Error)?' against type 'NSError' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
-}
+  func as2(e: Error?) {
+    let _ = e as! NSError // expected-warning{{forced cast from '(any Error)?' to 'NSError' only unwraps and bridges; did you mean to use '!' with 'as'?}}
+  }
 
-func SR15161_as_1(e: Error?) {
-  let _ = e as! NSError // expected-warning{{forced cast from '(any Error)?' to 'NSError' only unwraps and bridges; did you mean to use '!' with 'as'?}}
+  func is1(e: Error?) {
+    _ = e is NSError // expected-warning{{checking a value with optional type '(any Error)?' against type 'NSError' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+  }
 }

@@ -18,6 +18,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -448,11 +449,24 @@ void
 SymbolGraph::recordConformanceRelationships(Symbol S) {
   const auto VD = S.getSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto *Conformance : NTD->getAllConformances()) {
-      recordEdge(Symbol(this, VD, nullptr),
-        Symbol(this, Conformance->getProtocol(), nullptr),
-        RelationshipKind::ConformsTo(),
-        dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+    if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+      PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+        if (inherited != PD) {
+          recordEdge(Symbol(this, VD, nullptr),
+            Symbol(this, inherited, nullptr),
+            RelationshipKind::ConformsTo(),
+            nullptr);
+        }
+
+        return TypeWalker::Action::Continue;
+      });
+    } else {
+      for (const auto *Conformance : NTD->getAllConformances()) {
+        recordEdge(Symbol(this, VD, nullptr),
+          Symbol(this, Conformance->getProtocol(), nullptr),
+          RelationshipKind::ConformsTo(),
+          dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+      }
     }
   }
 }
@@ -574,56 +588,6 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, Options);
 }
 
-namespace {
-
-/// Returns the first satisfied protocol requirement for the given decl.
-const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
-  auto reqs = VD->getSatisfiedProtocolRequirements();
-
-  if (!reqs.empty())
-    return reqs.front();
-  else
-    return nullptr;
-}
-
-/// Returns the protocol that the given decl is a requirement or conformance of, if any.
-const ProtocolDecl *getSourceProtocol(const Decl *D) {
-  const auto *DC = D->getDeclContext();
-
-  // First check to see whether it's declared directly in the protocol decl
-  if (const auto *P = dyn_cast<ProtocolDecl>(DC))
-    return P;
-
-  // Next look at whether it's an extension on a protocol
-  if (const auto *Extension = dyn_cast<ExtensionDecl>(DC)) {
-    if (const auto *ExtendedProtocol = Extension->getExtendedProtocolDecl()) {
-      return ExtendedProtocol;
-    }
-  }
-
-  // Then check to see whether it's an implementation of a protocol requirement
-  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (const auto *Requirement = getProtocolRequirement(VD)) {
-      if (const auto *P = dyn_cast<ProtocolDecl>(Requirement->getDeclContext())) {
-        return P;
-      }
-    }
-  }
-
-  // If all those didn't work, there's no protocol to fetch
-  return nullptr;
-}
-
-/// Returns whether the given decl is from a protocol, and that protocol has an underscored name.
-bool isFromUnderscoredProtocol(const Decl *D) {
-  if (const auto *P = getSourceProtocol(D))
-    return P->hasUnderscoredNaming();
-
-  return false;
-}
-
-}
-
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
                                       bool IgnoreContext) const {
   // Don't record unconditionally private declarations
@@ -631,8 +595,14 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     return true;
   }
 
+  // If the decl has a `@_documentation(visibility: <access>)` attribute, override any other heuristic
+  auto DocVisibility = documentationVisibilityForDecl(D);
+  if (DocVisibility) {
+    return Walker.Options.MinimumAccessLevel > (*DocVisibility);
+  }
+
   // Don't record effectively internal declarations if specified
-  if (D->hasUnderscoredNaming() || isFromUnderscoredProtocol(D)) {
+  if (D->hasUnderscoredNaming()) {
     // Some implicit decls from Clang with underscored names sneak in, so throw those out
     if (const auto *clangD = D->getClangDecl()) {
       if (clangD->isImplicit())
@@ -676,6 +646,13 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     }
 
     // Special cases below.
+
+    // Symbols from exported-imported modules should only be included if they
+    // were originally public.
+    if (Walker.isFromExportedImportedModule(D) &&
+        VD->getFormalAccess() < AccessLevel::Public) {
+      return true;
+    }
 
     auto BaseName = VD->getBaseName().userFacingName();
 

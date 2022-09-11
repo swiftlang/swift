@@ -346,7 +346,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (Tok.is(tok::pound_if)) {
+    if (Tok.is(tok::pound_if) && !isStartOfSwiftDecl()) {
       auto IfConfigResult = parseIfConfig(
         [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
           parseBraceItems(Elements, Kind, IsActive
@@ -389,6 +389,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     IsAtStartOfLineOrPreviousHadSemi,
+                    /*IfConfigsAreDeclAttrs=*/true,
                     [&](Decl *D) {
                       TmpDecls.push_back(D);
 
@@ -524,21 +525,23 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 ParserResult<Stmt> Parser::parseStmt() {
   AssertParserMadeProgressBeforeLeavingScopeRAII apmp(*this);
 
+  // If this is a label on a loop/switch statement, consume it and pass it into
+  // parsing logic below.
+  SyntaxParsingContext LabelContext(SyntaxContext, SyntaxKind::LabeledStmt);
+  LabeledStmtInfo LabelInfo;
+  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
+                                      /*diagnoseDollarPrefix=*/true);
+    consumeToken(tok::colon);
+  } else {
+    LabelContext.setTransparent();
+  }
+
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxContextKind::Stmt);
 
   // Note that we're parsing a statement.
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
-  
-  LabeledStmtInfo LabelInfo;
-  
-  // If this is a label on a loop/switch statement, consume it and pass it into
-  // parsing logic below.
-  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
-                                      /*diagnoseDollarPrefix=*/true);
-    consumeToken(tok::colon);
-  }
 
   SourceLoc tryLoc;
   (void)consumeIf(tok::kw_try, tryLoc);
@@ -2292,14 +2295,23 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     diagnose(LBraceLoc, diag::expected_foreach_container);
     Container = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
   } else if (Tok.is(tok::code_complete)) {
-    Container =
-        makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
-    Container.setHasCodeCompletionAndIsError();
-    Status |= Container;
-    if (CodeCompletion)
-      CodeCompletion->completeForEachSequenceBeginning(
-          cast<CodeCompletionExpr>(Container.get()));
-    consumeToken(tok::code_complete);
+    // If there is no "in" keyword, suggest it. Otherwise, complete the
+    // sequence.
+    if (InLoc.isInvalid()) {
+      if (CodeCompletion)
+        CodeCompletion->completeForEachInKeyword();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    } else {
+      Container =
+          makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
+      Container.setHasCodeCompletionAndIsError();
+      Status |= Container;
+      if (CodeCompletion)
+        CodeCompletion->completeForEachSequenceBeginning(
+            cast<CodeCompletionExpr>(Container.get()));
+      consumeToken(tok::code_complete);
+    }
   } else {
     Container = parseExprBasic(diag::expected_foreach_container);
     Status |= Container;

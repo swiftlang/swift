@@ -18,12 +18,19 @@
 #ifndef SWIFT_TYPECHECKING_TYPECHECKDECL_H
 #define SWIFT_TYPECHECKING_TYPECHECKDECL_H
 
+#include "swift/Basic/LLVM.h"
+
 namespace swift {
 
 class ASTContext;
 class DeclContext;
 class ValueDecl;
 class Pattern;
+class ConstructorDecl;
+class EnumDecl;
+class SourceFile;
+class PrecedenceGroupDecl;
+class ParameterList;
 
 /// Walks up the override chain for \p CD until it finds an initializer that is
 /// required and non-implicit. If no such initializer exists, returns the
@@ -57,6 +64,8 @@ Optional<AutomaticEnumValueKind> computeAutomaticEnumValueKind(EnumDecl *ED);
 void validatePrecedenceGroup(PrecedenceGroupDecl *PGD);
 
 void diagnoseAttrsAddedByAccessNote(SourceFile &SF);
+
+void checkVariadicParameters(ParameterList *params, DeclContext *dc);
 
 }
 

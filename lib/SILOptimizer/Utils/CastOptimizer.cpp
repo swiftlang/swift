@@ -1354,7 +1354,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *Trap = Builder.createBuiltinTrap(Loc);
+    auto *Trap = Builder.createUnconditionalFail(Loc, "failed cast");
     Inst->replaceAllUsesWithUndef();
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
@@ -1366,7 +1366,7 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     deleteInstructionsAfterUnreachable(UnreachableInst, Trap);
 
     willFailAction();
-    return Trap;
+    return nullptr;
   }
 
   if (Feasibility == DynamicCastFeasibility::WillSucceed) {
@@ -1546,7 +1546,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    auto *TrapI = Builder.createBuiltinTrap(Loc);
+    auto *TrapI = Builder.createUnconditionalFail(Loc, "failed cast");
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(TrapI->getIterator()));
     auto *UnreachableInst =

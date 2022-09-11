@@ -1367,17 +1367,17 @@ exit(%sub_out : @owned $D):
     return %sub_out : $D
 }
 
-// CHECK-LABEL: sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error any Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[CALLEE_ERROR_OWNED:%[^,]+]] = function_ref @callee_error_owned
-// CHECK:         try_apply [[CALLEE_ERROR_OWNED]]([[LIFETIME_OWNED]]) : $@convention(thin) (@owned C) -> @error Error, normal [[REGULAR_BLOCK:bb[^,]+]], error [[THROW_BLOCK:bb[0-9]+]]
+// CHECK:         try_apply [[CALLEE_ERROR_OWNED]]([[LIFETIME_OWNED]]) : $@convention(thin) (@owned C) -> @error any Error, normal [[REGULAR_BLOCK:bb[^,]+]], error [[THROW_BLOCK:bb[0-9]+]]
 // CHECK:       [[REGULAR_BLOCK]]({{%[^,]+}} : $()):
 // CHECK:         br [[EXIT:bb[0-9]+]]
-// CHECK:       [[THROW_BLOCK]]([[ERROR:%[^,]+]] : @owned $Error):
+// CHECK:       [[THROW_BLOCK]]([[ERROR:%[^,]+]] : @owned $any Error):
 // CHECK:         destroy_value [[ERROR]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:

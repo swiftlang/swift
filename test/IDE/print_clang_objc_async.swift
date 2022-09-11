@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=ObjCConcurrency -function-definitions=false -enable-experimental-concurrency > %t/ObjCConcurrency.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=ObjCConcurrency -function-definitions=false -enable-experimental-concurrency -enable-experimental-feature SendableCompletionHandlers > %t/ObjCConcurrency.printed.txt
 // RUN: %FileCheck -input-file %t/ObjCConcurrency.printed.txt %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
 import _Concurrency
 
 // CHECK-LABEL: class SlowServer : NSObject, ServiceProvider {

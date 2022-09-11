@@ -335,6 +335,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_summary_path);
   auto abiDescriptorOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_abi_descriptor_path);
+  auto constValuesOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_const_values_path);
   auto moduleSemanticInfoOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_semantic_info_path);
   auto optRecordOutput = getSupplementaryFilenamesFromArguments(
@@ -367,6 +369,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
     sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
+    sop.ConstValuesOutputPath = (*constValuesOutput)[i];
     sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
     sop.YAMLOptRecordPath = (*optRecordOutput)[i];
     sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
@@ -426,6 +429,12 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_SwiftDeps, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  auto constValuesOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_const_values,
+      pathsFromArguments.ConstValuesOutputPath,
+      file_types::TY_ConstValues, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
   auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
       OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
       file_types::TY_SerializedDiagnostics, "",
@@ -470,7 +479,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
 
   // There is no non-path form of -emit-abi-descriptor-path
   auto ABIDescriptorOutputPath = pathsFromArguments.ABIDescriptorOutputPath;
+  // There is no non-path form of -emit-module-semantic-info-path
   auto ModuleSemanticInfoOutputPath = pathsFromArguments.ModuleSemanticInfoOutputPath;
+
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
@@ -506,6 +517,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
   sop.ABIDescriptorOutputPath = ABIDescriptorOutputPath;
+  sop.ConstValuesOutputPath = constValuesOutputPath;
   sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;
   sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
@@ -594,6 +606,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_YAMLOptRecord, paths.YAMLOptRecordPath},
       {file_types::TY_BitstreamOptRecord, paths.BitstreamOptRecordPath},
       {file_types::TY_SwiftABIDescriptor, paths.ABIDescriptorOutputPath},
+      {file_types::TY_ConstValues, paths.ConstValuesOutputPath}
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {

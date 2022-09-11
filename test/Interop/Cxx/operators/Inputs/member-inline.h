@@ -40,7 +40,7 @@ struct LoadableBoolWrapper {
   }
 };
 
-struct AddressOnlyIntWrapper {
+struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {
   int value;
 
   AddressOnlyIntWrapper(int value) : value(value) {}
@@ -112,7 +112,7 @@ public:
   };
 };
 
-struct ReadOnlyIntArray {
+struct __attribute__((swift_attr("import_owned"))) ReadOnlyIntArray {
 private:
   int values[5] = { 1, 2, 3, 4, 5 };
 
@@ -174,7 +174,7 @@ struct TemplatedArray {
 };
 typedef TemplatedArray<double> TemplatedDoubleArray;
 
-struct TemplatedSubscriptArray {
+struct __attribute__((swift_attr("import_unsafe"))) TemplatedSubscriptArray {
   int *ptr;
 
   template<class T>
@@ -195,7 +195,7 @@ private:
   int values[3] = { 1, 2, 3 };
 };
 
-struct NonTrivialIntArrayByVal {
+struct __attribute__((swift_attr("import_owned"))) NonTrivialIntArrayByVal {
   NonTrivialIntArrayByVal(int first) { values[0] = first; }
   NonTrivialIntArrayByVal(const NonTrivialIntArrayByVal &other) {
     for (int i = 0; i < 5; i++)
@@ -237,7 +237,8 @@ struct TemplatedByVal {
   }
 };
 
-struct TemplatedOperatorArrayByVal {
+struct __attribute__((swift_attr("import_unsafe")))
+TemplatedOperatorArrayByVal {
   int *ptr;
   template<class T> T operator[](T i) { return ptr[i]; }
   template <class T>
@@ -246,7 +247,7 @@ struct TemplatedOperatorArrayByVal {
   }
 };
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_owned"))) NonTrivial {
   char *Str;
   long long a;
   short b;
@@ -278,7 +279,7 @@ private:
   int a = 64;
 };
 
-struct RefToPtr {
+struct __attribute__((swift_attr("import_unsafe"))) RefToPtr {
   RefToPtr() { b = &a; }
   int *&operator[](int x) { return b; }
 private:
@@ -286,7 +287,7 @@ private:
   int *b = nullptr;
 };
 
-struct PtrToPtr {
+struct __attribute__((swift_attr("import_unsafe"))) PtrToPtr {
   PtrToPtr() { b = &a; }
   int **operator[](int x) { return &b; }
 private:

@@ -593,13 +593,13 @@ bb0:
   %4 = end_cow_mutation %3 : $Derived
   %5 = upcast %4 : $Derived to $X
   %6 = init_existential_ref %5 : $X : $X, $ClassP
-  %7 = open_existential_ref %6 : $ClassP to $@opened("53729A20-8747-11EB-82C4-D0817AD9985D") ClassP 
+  %7 = open_existential_ref %6 : $ClassP to $@opened("53729A20-8747-11EB-82C4-D0817AD9985D", ClassP) Self 
 
   (%8,%9) = begin_cow_mutation %1 : $Derived
   %10 = end_cow_mutation %9 : $Derived
   %11 = upcast %10 : $Derived to $X
   %12 = init_existential_ref %11 : $X : $X, $ClassP
-  %13 = open_existential_ref %12 : $ClassP to $@opened("12345678-8747-11EB-82C4-D0817AD9985D") ClassP 
+  %13 = open_existential_ref %12 : $ClassP to $@opened("12345678-8747-11EB-82C4-D0817AD9985D", ClassP) Self 
 
   return %6 : $ClassP
 }
@@ -1238,5 +1238,26 @@ bb0:
   strong_release %7 : $Z
   %14 = tuple ()
   return %14 : $()
+}
+
+// CHECK-LABEL: Escape information for test_destroyArray:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: End function test_destroyArray
+sil @test_destroyArray : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Z
+  %2 = ref_element_addr %1 : $Z, #Z.y
+  store %0 to %2 : $*Y
+  %4 = alloc_stack $Z
+  store %1 to %4 : $*Z
+  %6 = metatype $@thick Z.Type
+  %7 = address_to_pointer %4 : $*Z to $Builtin.RawPointer
+  %8 = integer_literal $Builtin.Word, 1
+  %9 = builtin "destroyArray"<Z>(%6 : $@thick Z.Type, %7 : $Builtin.RawPointer, %8 : $Builtin.Word) : $()
+  dealloc_stack %4 : $*Z
+  %11 = tuple ()
+  return %11 : $()
 }
 

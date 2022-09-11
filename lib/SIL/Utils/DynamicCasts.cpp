@@ -950,7 +950,7 @@ namespace {
     SILValue getOwnedScalar(Source source, const TypeLowering &srcTL) {
       assert(!source.isAddress());
       auto value = source.Value;
-      if (value.getOwnershipKind() == OwnershipKind::Guaranteed)
+      if (value->getOwnershipKind() == OwnershipKind::Guaranteed)
         value = B.emitCopyValueOperation(Loc, value);
       return value;
     }
@@ -1455,7 +1455,7 @@ void swift::emitIndirectConditionalCastWithScalar(
     // checked_cast_br.
     if (B.hasOwnership()) {
       failValue = scalarFailBB->createPhiArgument(srcValue->getType(),
-                                                  srcValue.getOwnershipKind());
+                                                  srcValue->getOwnershipKind());
     }
 
     switch (consumption) {

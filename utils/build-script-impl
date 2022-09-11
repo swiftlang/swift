@@ -293,15 +293,6 @@ for component in ${components[@]} ; do
   )
 done
 
-function log_event() {
-    build_script_log_path=${BUILD_DIR}/.build_script_log
-    event_type=$1
-    event_command=$2
-    evnet_duration=$3
-
-    build_event="{\"event\":\"${event_type}\", \"command\":\"${event_command}\", \"duration\":\"${evnet_duration}\"}"
-    echo "${build_event}" >> ${build_script_log_path}
-}
 
 # Centralized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
@@ -314,11 +305,9 @@ function call() {
 
     SECONDS=0
     if [[ ! ${DRY_RUN} ]]; then
-        log_event "start" "$(quoted_print "$@")" "${SECONDS}"
         { set -x; } 2>/dev/null
         "$@"
         { set +x; } 2>/dev/null
-        log_event "finish" "$(quoted_print "$@")" "${SECONDS}"
     fi
 }
 
@@ -476,11 +465,8 @@ function verify_host_is_supported() {
       | macosx-x86_64           \
       | macosx-arm64            \
       | macosx-arm64e           \
-      | iphonesimulator-i386    \
       | iphonesimulator-x86_64  \
       | iphonesimulator-arm64   \
-      | iphoneos-armv7          \
-      | iphoneos-armv7s         \
       | iphoneos-arm64          \
       | iphoneos-arm64e         \
       | appletvsimulator-x86_64 \
@@ -608,13 +594,6 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_ARCH="arm64e"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
-                iphonesimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
-                    llvm_target_arch="X86"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
-                    cmake_osx_deployment_target=""
-                    ;;
                 iphonesimulator-x86_64)
                     SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}-simulator"
                     llvm_target_arch="X86"
@@ -636,20 +615,6 @@ function set_build_options_for_host() {
                         -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                     )
-                    ;;
-                iphoneos-armv7)
-                    SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="ARM"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS"
-                    cmake_osx_deployment_target=""
-                    ;;
-                iphoneos-armv7s)
-                    SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    llvm_target_arch="ARM"
-
-                    SWIFT_HOST_VARIANT_SDK="IOS"
-                    cmake_osx_deployment_target=""
                     ;;
                 iphoneos-arm64)
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
@@ -770,7 +735,6 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
-                -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
@@ -1117,7 +1081,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1266,9 +1230,10 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
-LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
 LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
+SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
 # We cannot currently apply the normal rules of skipping here for LLVM. Even if
 # we are skipping building LLVM, we still need to at least build a few tools
@@ -1640,6 +1605,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 -DCMAKE_BUILD_WITH_INSTALL_RPATH="1"
             )
         fi
+
+        if [[ "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
+            llvm_cmake_options=(
+                "${llvm_cmake_options[@]}"
+                -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
+            )
+        fi
     fi
 
     llvm_cmake_options=(
@@ -1895,8 +1867,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             libcxx)
-                build_targets=()
+                build_targets=(cxx)
                 cmake_options=(
+                    -DLLVM_ENABLE_RUNTIMES="libcxx" -DLIBCXX_INSTALL_LIBRARY=OFF
                     "${cmake_options[@]}"
                     "${llvm_cmake_options[@]}"
                 )
@@ -1918,6 +1891,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                         -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
+                    )
+                fi
+
+                if [[ $(is_cross_tools_host ${host}) && "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
                     )
                 fi
 
@@ -2042,6 +2022,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
                     "${swift_cmake_options[@]}"
                 )
 

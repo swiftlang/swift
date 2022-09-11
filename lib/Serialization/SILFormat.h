@@ -154,6 +154,7 @@ namespace sil_block {
     SIL_INST_LINEAR_FUNCTION,
     SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
     SIL_INST_LINEAR_FUNCTION_EXTRACT,
+    SIL_INST_INCREMENT_PROFILER_COUNTER,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -287,6 +288,7 @@ namespace sil_block {
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
+                     ModuleIDField, // Parent ModuleDecl *
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize and argument effects attributes
                      // followed by generic param list, if any
@@ -505,6 +507,14 @@ namespace sil_block {
     SILTypeCategoryField,
     ValueIDField,
     BCFixed<1> // extractee
+  >;
+
+  using SILInstIncrementProfilerCounterLayout = BCRecordLayout<
+    SIL_INST_INCREMENT_PROFILER_COUNTER,
+    IdentifierIDField,       // PGO func name
+    IdentifierIDField,       // PGO func hash
+    BCVBR<8>,                // counter index
+    BCVBR<8>                 // num counters
   >;
 }
 

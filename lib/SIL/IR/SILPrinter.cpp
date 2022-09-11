@@ -28,6 +28,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -157,6 +158,7 @@ struct SILValuePrinterInfo {
   SILType Type;
   Optional<ValueOwnershipKind> OwnershipKind;
   bool IsNoImplicitCopy = false;
+  LifetimeAnnotation Lifetime = LifetimeAnnotation::None;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -165,12 +167,14 @@ struct SILValuePrinterInfo {
                       ValueOwnershipKind OwnershipKind)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
   SILValuePrinterInfo(ID ValueID, SILType Type,
-                      ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy)
+                      ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
+                      LifetimeAnnotation Lifetime)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
-        IsNoImplicitCopy(IsNoImplicitCopy) {}
-  SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy)
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
+  SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
+                      LifetimeAnnotation Lifetime)
       : ValueID(ValueID), Type(Type), OwnershipKind(),
-        IsNoImplicitCopy(IsNoImplicitCopy) {}
+        IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -639,6 +643,16 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     *this << " : ";
     if (i.IsNoImplicitCopy)
       *this << "@noImplicitCopy ";
+    switch (i.Lifetime) {
+    case LifetimeAnnotation::EagerMove:
+      *this << "@_eagerMove ";
+      break;
+    case LifetimeAnnotation::None:
+      break;
+    case LifetimeAnnotation::Lexical:
+      *this << "@_lexical ";
+      break;
+    }
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
@@ -672,14 +686,15 @@ public:
     return {Ctx.getID(V), V ? V->getType() : SILType()};
   }
   SILValuePrinterInfo getIDAndType(SILFunctionArgument *arg) {
-    return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy()};
+    return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy(),
+            arg->getLifetimeAnnotation()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
-    return {Ctx.getID(V), V ? V->getType() : SILType(), V.getOwnershipKind()};
+    return {Ctx.getID(V), V ? V->getType() : SILType(), V->getOwnershipKind()};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
-            arg->isNoImplicitCopy()};
+            arg->isNoImplicitCopy(), arg->getLifetimeAnnotation()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -1644,7 +1659,7 @@ public:
     if (!op)
       return;
 
-    if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
+    if (inst->getForwardingOwnershipKind() != op->getOwnershipKind()) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }
   }
@@ -1749,6 +1764,15 @@ public:
     *this << getIDAndType(CI->getDest());
   }
 
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *CI) {
+    if (CI->isTakeOfSrc())
+      *this << "[take] ";
+    *this << Ctx.getID(CI->getSrc()) << " to ";
+    if (CI->isInitializationOfDest())
+      *this << "[initialization] ";
+    *this << getIDAndType(CI->getDest());
+  }
+
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *CI) {
     *this << Ctx.getID(CI->getSrc()) << " to ";
     *this << getIDAndType(CI->getDest());
@@ -1812,7 +1836,7 @@ public:
   void visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *UOCI) {
     *this << getIDAndType(UOCI->getOperand()) << ", "
-          << "@" << UOCI->getOperand().getOwnershipKind() << " to "
+          << "@" << UOCI->getOperand()->getOwnershipKind() << " to "
           << "@" << UOCI->getConversionOwnershipKind();
   }
 
@@ -1831,6 +1855,7 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
+    *this << (CI->needsStackProtection() ? "[stack_protection] " : "");
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
@@ -1936,12 +1961,23 @@ public:
     case CheckKind::NoImplicitCopy:
       *this << "[no_implicit_copy] ";
       break;
+    case CheckKind::NoCopy:
+      *this << "[no_copy] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }
 
   void visitCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *I) {
+    switch (I->getInitialKind()) {
+    case CopyableToMoveOnlyWrapperValueInst::Owned:
+      *this << "[owned] ";
+      break;
+    case CopyableToMoveOnlyWrapperValueInst::Guaranteed:
+      *this << "[guaranteed] ";
+      break;
+    }
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2005,7 +2041,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg()) {
+      if (Elt.hasName()) {
         SimpleType = false;
         break;
       }
@@ -2324,9 +2360,17 @@ public:
     *this << getIDAndType(FI->getOperand()) << ", "
           << QuotedString(FI->getMessage());
   }
-  
+
+  void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *IPCI) {
+    *this << IPCI->getCounterIndex() << ", "
+          << QuotedString(IPCI->getPGOFuncName()) << ", "
+          << "num_counters " << IPCI->getNumCounters() << ", "
+          << "hash " << IPCI->getPGOFuncHash();
+  }
+
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    *this << getIDAndType(IAI->getBase()) << ", "
+    *this << (IAI->needsStackProtection() ? "[stack_protection] " : "")
+          << getIDAndType(IAI->getBase()) << ", "
           << getIDAndType(IAI->getIndex());
   }
 
@@ -3081,6 +3125,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // form, print [ossa].
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
+
+  if (needsStackProtection())
+    OS << "[stack_protection] ";
 
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
   printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);
@@ -4047,6 +4094,7 @@ PrintOptions PrintOptions::printSIL(const SILPrintContext *ctx) {
   result.PrintInSILBody = true;
   result.PreferTypeRepr = false;
   result.PrintIfConfig = false;
+  result.PrintExplicitAny = true;
   result.OpaqueReturnTypePrinting =
      OpaqueReturnTypePrintingMode::StableReference;
   if (ctx && ctx->printFullConvention())

@@ -8,15 +8,16 @@ enum {
   VarConstant2
 } global;
 
-typedef struct SR2511 {
-    int x;
+// NB: The order of fields here is important.
+typedef struct Struct {
+    int firstField;
 
     enum {
-      SR2511A = 0, SR2511B, SR2511C
-    } y;
+      NestedConstant1 = 0, NestedConstant2, NestedConstant3
+    } adhocAnonEnumField;
 
-    int z;
-} SR2511;
+    int lastField;
+} Struct;
 
 #if __OBJC__
 enum : unsigned short {

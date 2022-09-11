@@ -168,9 +168,11 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
+  ///
+  /// If a non-null \p versionInfo is provided, the module version will be
+  /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               llvm::VersionTuple version,
-                               bool underlyingVersion) override;
+                               ModuleVersionInfo *versionInfo) override;
 
   /// Import a module with the given module path.
   ///
@@ -287,8 +289,9 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
-                       bool underlyingVersion) override;
+  bool canImportModule(ImportPath::Module named,
+                       ModuleVersionInfo *versionInfo) override;
+
   ModuleDecl *
   loadModule(SourceLoc importLoc,
              ImportPath::Module path) override;

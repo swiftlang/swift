@@ -31,5 +31,37 @@ int main() {
   auto largeStructAdded = largeStructDoubled.added(largeStruct);
   largeStructAdded.dump();
 // CHECK-NEXT: -3, 6, -300, 126, 201, -30303
+
+  {
+    auto classValue = createClassWithMethods(42);
+    classValue.dump();
+// CHECK-NEXT: ClassWithMethods 42;
+    auto classValueRef = classValue.sameRet();
+    auto classValueOther = classValue.deepCopy(2);
+    classValue.mutate();
+    classValue.dump();
+    classValueRef.dump();
+    classValueOther.dump();
+  }
+// CHECK-NEXT: ClassWithMethods -42;
+// CHECK-NEXT: ClassWithMethods -42;
+// CHECK-NEXT: ClassWithMethods 44;
+// CHECK-NEXT: ClassWithMethods 44 deinit
+// CHECK-NEXT: ClassWithMethods -42 deinit
+
+  auto classWithStruct = createPassStructInClassMethod();
+  {
+    auto largeStruct = classWithStruct.retStruct(-11);
+    largeStruct.dump();
+// CHECK-NEXT: PassStructInClassMethod.retStruct -11;
+// CHECK-NEXT: 1, 2, 3, 4, 5, 6
+  }
+  classWithStruct.updateStruct(-578, largeStruct);
+  {
+    auto largeStruct = classWithStruct.retStruct(2);
+    largeStruct.dump();
+// CHECK-NEXT: PassStructInClassMethod.retStruct 2;
+// CHECK-NEXT: -578, 2, -100, 42, 67, -10101
+  }
   return 0;
 }

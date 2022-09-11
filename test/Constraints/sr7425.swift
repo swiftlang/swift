@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
+// https://github.com/apple/swift/issues/49968
+
 protocol X {
   var foo: Int { get }
   var bar: Int { get }

@@ -429,8 +429,7 @@ public:
 #endif
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
 protected:
@@ -2710,8 +2709,7 @@ struct TargetContextDescriptor {
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
 private:
@@ -2976,8 +2974,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -4449,8 +4446,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 };
 

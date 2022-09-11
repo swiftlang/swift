@@ -366,6 +366,9 @@ class Product(object):
 
         return toolchain_file
 
+    def get_openbsd_toolchain_file(self):
+        return os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
+
     def common_cross_c_flags(self, platform, arch):
         cross_flags = []
 

@@ -329,4 +329,4 @@ case (_?)?: break // expected-warning {{case is already handled by previous patt
 let (responseObject: Int?) = op1
 // expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
-// expected-error @-3 {{type of expression is ambiguous without more context}}
+// expected-error @-3 {{cannot convert value of type 'Int?' to specified type '(responseObject: _)'}}

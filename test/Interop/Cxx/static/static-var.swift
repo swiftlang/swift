@@ -47,10 +47,6 @@ StaticVarTestSuite.test("static-const-int-init") {
   expectEqual(128, staticConstInit)
 }
 
-StaticVarTestSuite.test("static-constexpr-int") {
-  expectEqual(32, staticConstexpr)
-}
-
 StaticVarTestSuite.test("static-non-trivial") {
   expectEqual(1024, staticNonTrivial.val)
 }
@@ -73,10 +69,6 @@ StaticVarTestSuite.test("static-non-trivial-write-from-swift") {
 
 StaticVarTestSuite.test("static-const-non-trivial") {
   expectEqual(2048, staticConstNonTrivial.val)
-}
-
-StaticVarTestSuite.test("static-constexpr-non-trivial") {
-  expectEqual(8192, staticConstexprNonTrivial.val)
 }
 
 runAllTests()

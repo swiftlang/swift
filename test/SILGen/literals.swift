@@ -218,21 +218,21 @@ struct NestedLValuePath {
 
 protocol WrapsSelfInArray {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s8literals16WrapsSelfInArrayPAAE04wrapdE0AA05TakesE7LiteralCyAaB_pGyF : $@convention(method) <Self where Self : WrapsSelfInArray> (@inout Self) -> @owned TakesArrayLiteral<WrapsSelfInArray>
+// CHECK-LABEL: sil hidden [ossa] @$s8literals16WrapsSelfInArrayPAAE04wrapdE0AA05TakesE7LiteralCyAaB_pGyF : $@convention(method) <Self where Self : WrapsSelfInArray> (@inout Self) -> @owned TakesArrayLiteral<any WrapsSelfInArray>
 // CHECK: [[ARRAY_LENGTH:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
-// CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<WrapsSelfInArray>([[ARRAY_LENGTH]])
+// CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<any WrapsSelfInArray>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Self
-// CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER]] : $*WrapsSelfInArray, $Self
+// CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER]] : $*any WrapsSelfInArray, $Self
 // CHECK: copy_addr [[ACCESS]] to [initialization] [[EXISTENTIAL]] : $*Self
 // CHECK: end_access [[ACCESS]] : $*Self
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
-// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<WrapsSelfInArray>([[ARR]])
-// CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<WrapsSelfInArray>.Type
-// CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<WrapsSelfInArray>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
-// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<WrapsSelfInArray>([[FIN_ARR]], [[METATYPE]])
+// CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<any WrapsSelfInArray>([[ARR]])
+// CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<any WrapsSelfInArray>.Type
+// CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesArrayLiteral<any WrapsSelfInArray>.Type, #TakesArrayLiteral.init!allocator : <Element> (TakesArrayLiteral<Element>.Type) -> (Element...) -> TakesArrayLiteral<Element>, $@convention(method)
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<any WrapsSelfInArray>([[FIN_ARR]], [[METATYPE]])
 // CHECK: return [[RESULT]]
 extension WrapsSelfInArray {
   mutating func wrapInArray() -> TakesArrayLiteral<WrapsSelfInArray> {
@@ -247,7 +247,7 @@ protocol FooProtocol {
 func makeThrowing<T : FooProtocol>() throws -> T { return T() }
 func makeBasic<T : FooProtocol>() -> T { return T() }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8literals15throwingElementSayxGyKAA11FooProtocolRzlF : $@convention(thin) <T where T : FooProtocol> () -> (@owned Array<T>, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s8literals15throwingElementSayxGyKAA11FooProtocolRzlF : $@convention(thin) <T where T : FooProtocol> () -> (@owned Array<T>, @error any Error)
 // CHECK: [[ARRAY_LENGTH:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<T>([[ARRAY_LENGTH]])
@@ -265,11 +265,11 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<T>([[ARR]])
 // CHECK: return [[FIN_ARR]]
 
-// CHECK: bb2([[ERR:%.*]] : @owned $Error):
+// CHECK: bb2([[ERR:%.*]] : @owned $any Error):
 // CHECK: destroy_addr [[POINTER]] : $*T
 // CHECK: [[DEALLOC:%.*]] = function_ref @$ss29_deallocateUninitializedArrayyySayxGnlF
 // CHECK: [[TMP:%.*]] = apply [[DEALLOC]]<T>([[ARR]])
-// CHECK: throw [[ERR]] : $Error
+// CHECK: throw [[ERR]] : $any Error
 func throwingElement<T : FooProtocol>() throws -> [T] {
   return try [makeBasic(), makeThrowing()]
 }

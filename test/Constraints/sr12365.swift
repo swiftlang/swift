@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
+// https://github.com/apple/swift/issues/54799
+
 public protocol MyProtocol {}
 
 public struct MyProtocolImpl: MyProtocol {}

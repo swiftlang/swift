@@ -188,6 +188,10 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::Protocol:
     // Nominal types are referenced by name.
     return cast<NominalTypeDecl>(decl)->getName().str();
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("Should never appear in source file");
+
   case DeclKind::Extension:
     // FIXME: We ought to provide an identifier for extensions so we can
     // register type body fingerprints for them.

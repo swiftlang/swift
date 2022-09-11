@@ -335,7 +335,7 @@ updateSSA(SILModule &M, SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.initialize(OrigValue->getType(), OrigValue.getOwnershipKind());
+    SSAUp.initialize(OrigValue->getType(), OrigValue->getOwnershipKind());
     SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);

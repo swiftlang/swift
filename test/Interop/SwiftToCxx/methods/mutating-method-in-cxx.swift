@@ -52,8 +52,8 @@ public struct SmallStruct {
 // CHECK: SWIFT_EXTERN void $s7Methods11LargeStructV6doubleyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // double()
 // CHECK: SWIFT_EXTERN void $s7Methods11LargeStructV5scaleyACSi_SitF(SWIFT_INDIRECT_RESULT void * _Nonnull, ptrdiff_t x, ptrdiff_t y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // scale(_:_:)
 
-// CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV4dumpyyF(struct swift_interop_stub_Methods_SmallStruct _self) SWIFT_NOEXCEPT SWIFT_CALL; // dump()
-// CHECK: SWIFT_EXTERN struct swift_interop_stub_Methods_SmallStruct $s7Methods11SmallStructV5scaleyACSfF(float y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // scale(_:)
+// CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV4dumpyyF(struct swift_interop_passStub_Methods_float_0_4 _self) SWIFT_NOEXCEPT SWIFT_CALL; // dump()
+// CHECK: SWIFT_EXTERN struct swift_interop_returnStub_Methods_float_0_4 $s7Methods11SmallStructV5scaleyACSfF(float y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // scale(_:)
 // CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV6invertyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // invert()
 
 // CHECK: class LargeStruct final {
@@ -63,36 +63,12 @@ public struct SmallStruct {
 // CHECK-NEXT:   inline LargeStruct scale(swift::Int x, swift::Int y);
 // CHECK-NEXT: private
 
-// CHECK:        inline void LargeStruct::dump() const {
-// CHECK-NEXT:   return _impl::$s7Methods11LargeStructV4dumpyyF(_getOpaquePointer());
-// CHECK-NEXT:   }
-// CHECK-NEXT:   inline void LargeStruct::double_() {
-// CHECK-NEXT:   return _impl::$s7Methods11LargeStructV6doubleyyF(_getOpaquePointer());
-// CHECK-NEXT:   }
-// CHECK-NEXT:   inline LargeStruct LargeStruct::scale(swift::Int x, swift::Int y) {
-// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
-// CHECK-NEXT:     _impl::$s7Methods11LargeStructV5scaleyACSi_SitF(result, x, y, _getOpaquePointer());
-// CHECK-NEXT:   });
-// CHECK-NEXT:   }
-
 // CHECK: class SmallStruct final {
 // CHECK:   inline SmallStruct(SmallStruct &&) = default;
 // CHECK-NEXT:   inline void dump() const;
 // CHECK-NEXT:   inline SmallStruct scale(float y);
 // CHECK-NEXT:   inline void invert();
 // CHECK-NEXT: private:
-
-// CHECK:        inline void SmallStruct::dump() const {
-// CHECK-NEXT:   return _impl::$s7Methods11SmallStructV4dumpyyF(_impl::swift_interop_passDirect_Methods_SmallStruct(_getOpaquePointer()));
-// CHECK-NEXT:   }
-// CHECK-NEXT:   inline SmallStruct SmallStruct::scale(float y) {
-// CHECK-NEXT:   return _impl::_impl_SmallStruct::returnNewValue([&](char * _Nonnull result) {
-// CHECK-NEXT:     _impl::swift_interop_returnDirect_Methods_SmallStruct(result, _impl::$s7Methods11SmallStructV5scaleyACSfF(y, _getOpaquePointer()));
-// CHECK-NEXT:   });
-// CHECK-NEXT:   }
-// CHECK-NEXT:   inline void SmallStruct::invert() {
-// CHECK-NEXT:   return _impl::$s7Methods11SmallStructV6invertyyF(_getOpaquePointer());
-// CHECK-NEXT:   }
 
 
 public func createLargeStruct() -> LargeStruct {
@@ -102,3 +78,27 @@ public func createLargeStruct() -> LargeStruct {
 public func createSmallStruct(x: Float) -> SmallStruct {
     return SmallStruct(x: x)
 }
+
+// CHECK:        inline void LargeStruct::dump() const {
+// CHECK-NEXT:   return _impl::$s7Methods11LargeStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline void LargeStruct::double_() {
+// CHECK-NEXT:   return _impl::$s7Methods11LargeStructV6doubleyyF(_getOpaquePointer());
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline LargeStruct LargeStruct::scale(swift::Int x, swift::Int y) {
+// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     _impl::$s7Methods11LargeStructV5scaleyACSi_SitF(result, x, y, _getOpaquePointer());
+// CHECK-NEXT:   });
+// CHECK-NEXT:   }
+
+// CHECK:        inline void SmallStruct::dump() const {
+// CHECK-NEXT:   return _impl::$s7Methods11SmallStructV4dumpyyF(_impl::swift_interop_passDirect_Methods_float_0_4(_getOpaquePointer()));
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline SmallStruct SmallStruct::scale(float y) {
+// CHECK-NEXT:   return _impl::_impl_SmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:     _impl::swift_interop_returnDirect_Methods_float_0_4(result, _impl::$s7Methods11SmallStructV5scaleyACSfF(y, _getOpaquePointer()));
+// CHECK-NEXT:   });
+// CHECK-NEXT:   }
+// CHECK-NEXT:   inline void SmallStruct::invert() {
+// CHECK-NEXT:   return _impl::$s7Methods11SmallStructV6invertyyF(_getOpaquePointer());
+// CHECK-NEXT:   }

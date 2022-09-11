@@ -24,7 +24,7 @@ class ProductPipeline(object):
        This class is meant to just be state.
     """
     def __init__(self, should_run_epilogue_operations, identity, is_impl):
-        assert(isinstance(identity, int))
+        assert isinstance(identity, int)
         self.identity = identity
         self.products = []
         self.is_impl = is_impl
@@ -95,16 +95,16 @@ class ProductPipelineListBuilder(object):
 
     def add_product(self, product_cls, is_enabled):
         """Add a non-impl product to the current pipeline begin constructed"""
-        assert(self.current_pipeline is not None)
-        assert(not self.is_current_pipeline_impl)
-        assert(not product_cls.is_build_script_impl_product())
+        assert self.current_pipeline is not None
+        assert not self.is_current_pipeline_impl
+        assert not product_cls.is_build_script_impl_product()
         self.current_pipeline.append(product_cls, is_enabled)
 
     def add_impl_product(self, product_cls, is_enabled):
         """Add a non-impl product to the current pipeline begin constructed"""
-        assert(self.current_pipeline is not None)
-        assert(self.is_current_pipeline_impl)
-        assert(product_cls.is_build_script_impl_product())
+        assert self.current_pipeline is not None
+        assert self.is_current_pipeline_impl
+        assert product_cls.is_build_script_impl_product()
         self.current_pipeline.append(product_cls, is_enabled)
 
     def infer(self):
@@ -120,7 +120,7 @@ class ProductPipelineListBuilder(object):
             for pipeline_i in range(len(pipeline)):
                 (p, is_enabled) = pipeline[pipeline_i]
                 # Make sure p has not been added multiple times to the builder.
-                assert(p not in products_to_generation_index)
+                assert p not in products_to_generation_index
                 products_to_generation_index[p] = (i, pipeline_i)
                 if is_enabled:
                     final_pipeline.append(p)
@@ -133,8 +133,8 @@ class ProductPipelineListBuilder(object):
             # our product are from our generation or earlier. If we find such a
             # dependency error.
             for (p, is_enabled) in pipeline:
-                assert(all(d in products_to_generation_index for d in
-                           p.get_dependencies()))
+                assert (all(d in products_to_generation_index for d in
+                            p.get_dependencies()))
 
         for i in range(len(inferred_pipeline_list)):
             pipeline = inferred_pipeline_list[i]
@@ -166,7 +166,7 @@ class ProductPipelineListBuilder(object):
                 (gen_offset, index) = products_to_generation_index[p]
                 # If we are from an earlier generation, our position in the
                 # inferred pipeline list may be None. Initialize it now.
-                assert(gen_offset <= i)
+                assert gen_offset <= i
                 inferred_pipeline_list[gen_offset][index] = p
 
         filtered_results = []

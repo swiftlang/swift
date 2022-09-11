@@ -554,8 +554,8 @@ bb3(%35 : $IndirectEnum):
 
 // Make sure we do not move the retain_value in the throw block.
 //
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error) {
-// CHECK: function_ref @$s41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error)
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error any Error) {
+// CHECK: function_ref @$s41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error any Error)
 // CHECK: bb1
 // CHECK-NOT: retain_value
 // CHECK: bb2
@@ -864,13 +864,13 @@ bb0(%0 : $goo):
 //========================================
 // @owned => @guaranteed with error result
 
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error any Error) {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: return [[NORMRET]]
-// CHECK: bb2([[THROW:%[0-9]+]] : $Error):
+// CHECK: bb2([[THROW:%[0-9]+]] : $any Error):
 // CHECK-NEXT: release_value
 // CHECK-NEXT: throw [[THROW]]
 sil [serialized] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error Error) {
@@ -912,12 +912,12 @@ bb2:
   throw undef : $Error
 }
 
-// CHECK-LABEL: sil [serialized] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil [serialized] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error any Error) {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
-// CHECK: bb2([[THROW:%[0-9]+]] : $Error):
+// CHECK: bb2([[THROW:%[0-9]+]] : $any Error):
 // CHECK-NEXT: release_value
 sil [serialized] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error Error) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Int):
@@ -936,7 +936,7 @@ bb2(%a2 : $Error):
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
-// CHECK: bb2([[THROW:%[0-9]+]] : $Error):
+// CHECK: bb2([[THROW:%[0-9]+]] : $any Error):
 // CHECK-NEXT: release_value
 sil [serialized] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $Int):
@@ -950,7 +950,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Int):
 
 sil @test_dealloc_partial_ref_callee : $@convention(thin) () -> ((), @error Error)
 
-// CHECK-LABEL: sil hidden @test_dealloc_partial_ref : $@convention(thin) (@owned foo) -> (@owned foo, @error Error) {
+// CHECK-LABEL: sil hidden @test_dealloc_partial_ref : $@convention(thin) (@owned foo) -> (@owned foo, @error any Error) {
 // CHECK-NOT: @guaranteed
 // CHECK:     function_ref @test_dealloc_partial_ref_callee   
 // CHECK-NOT: @guaranteed
@@ -1826,7 +1826,7 @@ bb0(%0 : $*T):
 // CHECK-NOT: retain_value
 // CHECK: return
 
-// CHECK-LABEL: @$s41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error) {
+// CHECK-LABEL: @$s41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error any Error) {
 // CHECK: bb2
 // CHECK: retain_value
 // CHECK: throw
@@ -1851,7 +1851,7 @@ bb0(%0 : $*T):
 // CHECK-LABEL: sil private @$s31private_dead_arg_with_callsitesTf4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0(
 
-// CHECK-LABEL: sil shared [serialized] @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil shared [serialized] @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error any Error) {
 // CHECK-NOT: release
 // CHECK: throw
 

@@ -21,3 +21,15 @@ struct X: P {
   // CHECK: function_ref @$s4test1XV1fySSSgSi_SStF : $@convention(method) (Int, @guaranteed String, X) -> @owned Optional<String>
   func f(_: Int, _: String) -> String? { nil }
 }
+
+protocol P2 {
+  init() async
+}
+
+actor A: P2 {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4test1ACAA2P2A2aDPxyYacfCTW
+  // CHECK-NOT: hop_to_executor
+  // CHECK: function_ref @$s4test1ACACycfC : $@convention(method) (@thick A.Type) -> @owned A // user: %3
+  // CHECK-NEXT: apply
+  // CHECK: return
+}

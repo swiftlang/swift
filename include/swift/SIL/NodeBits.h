@@ -43,6 +43,7 @@ class NodeBitfield : public SILBitfield<NodeBitfield, SILNode> {
   template <class, class> friend class SILBitfield;
 
   NodeBitfield *insertInto(SILFunction *function) {
+    assert(function && "NodeBitField constructed with a null function");
     NodeBitfield *oldParent = function->newestAliveNodeBitfield;
     function->newestAliveNodeBitfield = this;
     return oldParent;

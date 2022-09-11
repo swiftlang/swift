@@ -1,62 +1,50 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -profile-generate %s | %FileCheck %s
 
 // CHECK: sil hidden [ossa] @[[F_EMPTY:.*empty.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_EMPTY]]"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 1
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
+// CHECK: increment_profiler_counter 0, "{{.*}}instrprof_basic.swift:[[F_EMPTY]]", num_counters 1, hash
 func empty() {
-  // CHECK-NOT: builtin "int_instrprof_increment"
+  // CHECK-NOT: increment_profiler_counter
 }
 
 // CHECK: sil hidden [ossa] @[[F_BASIC:.*basic.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_BASIC]]"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 6
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
+// CHECK: increment_profiler_counter 0, "{{.*}}instrprof_basic.swift:[[F_BASIC]]", num_counters 6, hash
 func basic(a : Int32) {
 
-  // CHECK: builtin "int_instrprof_increment"
+  // CHECK: increment_profiler_counter
   if a == 0 {
   }
 
-  // CHECK: builtin "int_instrprof_increment"
+  // CHECK: increment_profiler_counter
   if a != 0 {
   } else {
   }
 
-  // CHECK: builtin "int_instrprof_increment"
+  // CHECK: increment_profiler_counter
   while a == 0 {
   }
 
-  // CHECK: builtin "int_instrprof_increment"
+  // CHECK: increment_profiler_counter
   for i in 0 ..< a {
   }
 
-  // CHECK: builtin "int_instrprof_increment"
+  // CHECK: increment_profiler_counter
   for i in 1...a {
   }
 
-  // CHECK-NOT: builtin "int_instrprof_increment"
+  // CHECK-NOT: increment_profiler_counter
 }
 
 // CHECK: sil hidden [ossa] @[[F_THROWING_NOP:.*throwing_nop.*]] :
 func throwing_nop() throws {}
 // CHECK: sil hidden [ossa] @[[F_EXCEPTIONS:.*exceptions.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_EXCEPTIONS]]"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 2
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
+// CHECK: increment_profiler_counter 0, "{{.*}}instrprof_basic.swift:[[F_EXCEPTIONS]]", num_counters 2, hash
 func exceptions() {
   do {
     try throwing_nop()
   } catch {
-    // CHECK: builtin "int_instrprof_increment"
+    // CHECK: increment_profiler_counter
     return
   }
 
-  // CHECK-NOT: builtin "int_instrprof_increment"
+  // CHECK-NOT: increment_profiler_counter
 }

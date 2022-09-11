@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
@@ -70,8 +71,7 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
 }
 
 bool SourceLoader::canImportModule(ImportPath::Module path,
-                                   llvm::VersionTuple version,
-                                   bool underlyingVersion) {
+                                   ModuleVersionInfo *versionInfo) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -89,6 +89,7 @@ bool SourceLoader::canImportModule(ImportPath::Module path,
 
     return false;
   }
+
   return true;
 }
 
@@ -148,4 +149,12 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
                                   unsigned previousGeneration) {
   // Type-checking the source automatically loads all extensions; there's
   // nothing to do here.
+}
+
+Optional<ModuleDependencies>
+SourceLoader::getModuleDependencies(StringRef moduleName,
+                                    ModuleDependenciesCache &cache,
+                                    InterfaceSubContextDelegate &delegate) {
+  // FIXME: Implement?
+  return None;
 }

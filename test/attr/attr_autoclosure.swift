@@ -207,14 +207,17 @@ func rdar_20591571() {
   }
 }
 
-// rdar://problem/30906031 - [SR-4188]: withoutActuallyEscaping doesn't accept an @autoclosure argument
+/// rdar://problem/30906031 [https://github.com/apple/swift/issues/46771]
+/// `withoutActuallyEscaping` doesn't accept an @autoclosure argument
+
 func rdar_30906031(in arr: [Int], fn: @autoclosure () -> Int) -> Bool {
   return withoutActuallyEscaping(fn) { escapableF in // Ok
     arr.lazy.filter { $0 >= escapableF() }.isEmpty
   }
 }
 
-// SR-2688
+// https://github.com/apple/swift/issues/45293
+
 class Foo {
   typealias FooClosure = () -> String
   func fooFunction(closure: @autoclosure FooClosure) {} // ok
@@ -282,19 +285,22 @@ func test_autoclosure_with_generic_argument_mismatch() {
   foo(S<String>()) // expected-error {{cannot convert value of type 'S<String>' to expected argument type 'S<Int>'}}
 }
 
-// SR-11934
-func sr_11934(_ x: @autoclosure String...) {} // expected-error {{'@autoclosure' must not be used on variadic parameters}}
+// https://github.com/apple/swift/issues/54353
 
-// SR-11938
-let sr_11938_1: Array<@autoclosure String> = [] // expected-error {{'@autoclosure' may only be used on parameters}}
-func sr_11938_2() -> @autoclosure String { "" } // expected-error {{'@autoclosure' may only be used on parameters}}
-func sr_11938_3(_ x: [@autoclosure String]) {} // expected-error {{'@autoclosure' may only be used on parameters}}
+func f_54353(_ x: @autoclosure String...) {} // expected-error {{'@autoclosure' must not be used on variadic parameters}}
 
-protocol SR_11938_P {}
-struct SR_11938_S : @autoclosure SR_11938_P {} // expected-error {{'@autoclosure' may only be used on parameters}}
+// https://github.com/apple/swift/issues/54357
 
-// SR-9178
-func bar<T>(_ x: @autoclosure T) {} // expected-error 1{{@autoclosure attribute only applies to function types}}
+let _: Array<@autoclosure String> = [] // expected-error {{'@autoclosure' may only be used on parameters}}
+func f1_54357() -> @autoclosure String {} // expected-error {{'@autoclosure' may only be used on parameters}}
+func f2_54357(_ x: [@autoclosure String]) {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+protocol P_54357 {}
+struct S_54357 : @autoclosure P_54357 {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+// https://github.com/apple/swift/issues/51669
+
+func f_51669<T>(_ x: @autoclosure T) {} // expected-error 1{{@autoclosure attribute only applies to function types}}
 
 func test_autoclosure_type_in_parens() {
   let _: (@autoclosure (() -> Void)) -> Void = { _ in } // Ok

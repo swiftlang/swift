@@ -7,9 +7,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// Enable with rdar://81617749
-// UNSUPPORTED: CPU=i386 && OS=watchos
-
 // rdar://82123254
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

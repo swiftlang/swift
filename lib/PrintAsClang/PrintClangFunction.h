@@ -13,9 +13,13 @@
 #ifndef SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 #define SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 
+#include "OutputLanguageMode.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -24,13 +28,35 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class AccessorDecl;
+class AnyFunctionType;
 class FuncDecl;
 class ModuleDecl;
 class NominalTypeDecl;
+class LoweredFunctionSignature;
 class ParamDecl;
 class ParameterList;
 class PrimitiveTypeMapping;
 class SwiftToClangInteropContext;
+class DeclAndTypePrinter;
+
+struct ClangRepresentation {
+  enum Kind { representable, unsupported };
+
+  ClangRepresentation(Kind kind) : kind(kind) {}
+
+  /// Returns true if the given Swift node is unsupported in Clang in any
+  /// language mode.
+  bool isUnsupported() const { return kind == unsupported; }
+
+  const ClangRepresentation &merge(ClangRepresentation other) {
+    if (kind != unsupported)
+      kind = other.kind;
+    return *this;
+  }
+
+private:
+  Kind kind;
+};
 
 /// Responsible for printing a Swift function decl or type in C or C++ mode, to
 /// be included in a Swift module's generated clang header.
@@ -38,9 +64,10 @@ class DeclAndTypeClangFunctionPrinter {
 public:
   DeclAndTypeClangFunctionPrinter(raw_ostream &os, raw_ostream &cPrologueOS,
                                   PrimitiveTypeMapping &typeMapping,
-                                  SwiftToClangInteropContext &interopContext)
+                                  SwiftToClangInteropContext &interopContext,
+                                  DeclAndTypePrinter &declPrinter)
       : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
-        interopContext(interopContext) {}
+        interopContext(interopContext), declPrinter(declPrinter) {}
 
   /// What kind of function signature should be emitted for the given Swift
   /// function.
@@ -51,60 +78,77 @@ public:
     CxxInlineThunk
   };
 
-  /// Information about any additional parameters.
-  struct AdditionalParam {
-    enum class Role { Self, Error };
-
-    Role role;
-    Type type;
-    // Should self be passed indirectly?
-    bool isIndirect = false;
-  };
-
   /// Optional modifiers that can be applied to function signature.
   struct FunctionSignatureModifiers {
     /// Additional qualifier to add before the function's name.
-    const NominalTypeDecl *qualifierContext;
+    const NominalTypeDecl *qualifierContext = nullptr;
+    bool isStatic = false;
+    bool isInline = false;
+    bool isConst = false;
 
-    FunctionSignatureModifiers() : qualifierContext(nullptr) {}
+    FunctionSignatureModifiers() {}
   };
 
   /// Print the C function declaration or the C++ function thunk that
   /// corresponds to the given function declaration.
-  void printFunctionSignature(const AbstractFunctionDecl *FD, StringRef name,
-                              Type resultTy, FunctionSignatureKind kind,
-                              ArrayRef<AdditionalParam> additionalParams = {},
-                              FunctionSignatureModifiers modifiers = {});
-
-  /// Print the use of the C++ function thunk parameter as it's passed to the C
-  /// function declaration.
-  void printCxxToCFunctionParameterUse(const ParamDecl *param, StringRef name);
+  ///
+  /// \return value describing in which Clang language mode the function is
+  /// supported, if any.
+  ClangRepresentation printFunctionSignature(
+      const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
+      StringRef name, Type resultTy, FunctionSignatureKind kind,
+      FunctionSignatureModifiers modifiers = {});
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(StringRef swiftSymbolName,
+  void printCxxThunkBody(const AbstractFunctionDecl *FD,
+                         const LoweredFunctionSignature &signature,
+                         StringRef swiftSymbolName,
                          const ModuleDecl *moduleContext, Type resultTy,
-                         const ParameterList *params,
-                         ArrayRef<AdditionalParam> additionalParams = {},
-                         bool hasThrows = false);
+                         const ParameterList *params, bool hasThrows = false,
+                         const AnyFunctionType *funcType = nullptr);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
   void printCxxMethod(const NominalTypeDecl *typeDeclContext,
-                      const AbstractFunctionDecl *FD, StringRef swiftSymbolName,
-                      Type resultTy, bool isDefinition);
+                      const AbstractFunctionDecl *FD,
+                      const LoweredFunctionSignature &signature,
+                      StringRef swiftSymbolName, Type resultTy,
+                      bool isDefinition);
 
   /// Print the C++ getter/setter method signature.
   void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
                                       const AccessorDecl *accessor,
+                                      const LoweredFunctionSignature &signature,
                                       StringRef swiftSymbolName, Type resultTy,
                                       bool isDefinition);
 
+  /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
+  ClangRepresentation
+  printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
+                               ModuleDecl *moduleContext,
+                               OutputLanguageMode outputLang);
+
+  using PrinterTy =
+      llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;
+
+  /// Print generated C++ helper function
+  void printCustomCxxFunction(const SmallVector<Type> &neededTypes,
+                              PrinterTy retTypeAndNamePrinter,
+                              PrinterTy paramPrinter, bool isConstFunc,
+                              PrinterTy bodyPrinter, ModuleDecl *emittedModule,
+                              raw_ostream &outOfLineOS);
+
 private:
-  void printCxxToCFunctionParameterUse(
-      Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
-      bool isIndirect = false,
-      llvm::Optional<AdditionalParam::Role> paramRole = None);
+  void printCxxToCFunctionParameterUse(Type type, StringRef name,
+                                       const ModuleDecl *moduleContext,
+                                       bool isInOut, bool isIndirect,
+                                       std::string directTypeEncoding,
+                                       bool isSelf);
+
+  // Print out the full type specifier that refers to the
+  // _impl::_impl_<typename> C++ class for the given Swift type.
+  void printTypeImplTypeSpecifier(Type type, const ModuleDecl *moduleContext);
 
   bool hasKnownOptionalNullableCxxMapping(Type type);
 
@@ -112,6 +156,7 @@ private:
   raw_ostream &cPrologueOS;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
+  DeclAndTypePrinter &declPrinter;
 };
 
 } // end namespace swift

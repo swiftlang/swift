@@ -85,22 +85,22 @@ bb0(%0 : $B, %1 : $C):
 // and not C's foo method.
 sil hidden [noinline] @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int64 {
 bb0(%0 : $A & P, %1 : $A & P):
-  %2 = open_existential_ref %0 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  %3 = unchecked_ref_cast %1 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  %2 = open_existential_ref %0 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self
+  %3 = unchecked_ref_cast %1 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self
 
-  %5 = alloc_stack $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  store %2 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  %5 = alloc_stack $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self
+  store %2 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self
   
   // We want to make sure that we picked up on the FIRST store and not the second one.
   // class C's foo method is named "bar" whereas class B's foo method is named "foo".
   // We want to make sure that we call a function named "foo" not "bar".
   // CHECK: [[FN:%[0-9]+]] = function_ref @${{.*}}foo{{.*}} : $@convention(thin) () -> Int64
-  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo : <Self where Self : P> (Self) -> () -> Int64, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int64, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   // CHECK: apply [[FN]]
-  %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   
-  store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self
+  dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B", A & P) Self
   return %8 : $Int64
 // CHECK-LABEL: end sil function {{.*}}impl{{.*}}
 } // end sil function 'impl'

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/54555
+
 // CHECK: sr12120.(file).Swappable1@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[Swappable1]Swapped.[Swappable1]Swapped, Self.[Swappable1]B == Self.[Swappable1]Swapped.[Swappable1]A, Self.[Swappable1]Swapped : Swappable1>
 protocol Swappable1 {

@@ -339,6 +339,9 @@ public:
   /// A file containing modules we should perform batch scanning.
   std::string BatchScanInputFilePath;
 
+  /// A file containing a list of protocols whose conformances require const value extraction.
+  std::string ConstGatherProtocolListFilePath;
+
   /// Debug path mappings to apply to serialized search paths. These are
   /// specified in LLDB from the target.source-map entries.
   PathRemapper SearchPathRemapper;

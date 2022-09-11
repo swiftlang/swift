@@ -29,7 +29,7 @@ class FashionPolice {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s14metatype_casts30anyObjectToExistentialMetatype{{[_0-9a-zA-Z]*}}F
 func anyObjectToExistentialMetatype(o: AnyObject) -> Emergency.Type? {
-  // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to Emergency.Type in {{%.*}}
+  // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to any Emergency.Type in {{%.*}}
   return o as? Emergency.Type
 }
 

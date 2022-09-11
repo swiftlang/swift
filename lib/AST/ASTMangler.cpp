@@ -822,6 +822,11 @@ std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
   AllowNamelessEntities = true;
   OptimizeProtocolNames = false;
 
+  // Local types are not ABI anyway. To avoid problems with the ASTDemangler,
+  // don't respect @_originallyDefinedIn here, since we don't respect it
+  // when mangling DWARF types for debug info.
+  RespectOriginallyDefinedIn = false;
+
   if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
     appendAnyGenericType(GTD);
   } else {
@@ -1325,7 +1330,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::Struct:
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct: {
+    case TypeKind::BoundGenericStruct:
+    case TypeKind::BuiltinTuple: {
       GenericTypeDecl *Decl;
       if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer()))
         Decl = typeAlias->getDecl();
@@ -2468,6 +2474,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     return;
   }
 
+  if (nominal && isa<BuiltinTupleDecl>(nominal))
+    return appendOperator("BT");
+
   appendContextOf(decl);
 
   // Always use Clang names for imported Clang declarations, unless they don't
@@ -2549,6 +2558,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     case DeclKind::Struct:
       appendOperator("V");
       break;
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("Not implemented");
     }
   }
 
@@ -2744,8 +2755,7 @@ void ASTMangler::appendTypeList(Type listTy, GenericSignature sig,
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      assert(field.getParameterFlags().isNone());
-      appendTypeListElement(field.getName(), field.getRawType(),
+      appendTypeListElement(field.getName(), field.getType(),
                             ParameterTypeFlags(),
                             sig, forDecl);
       appendListSeparator(firstField);
@@ -2858,8 +2868,10 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
 
   switch (reqt.getKind()) {
-  case RequirementKind::Layout: {
-  } break;
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::Layout:
+    break;
   case RequirementKind::Conformance: {
     // If we don't allow marker protocols but we have one here, skip it.
     if (!AllowMarkerProtocols &&
@@ -2872,12 +2884,15 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   case RequirementKind::SameType: {
     Type SecondTy = reqt.getSecondType();
     appendType(SecondTy->getCanonicalType(), sig);
-  } break;
+    break;
+  }
   }
 
   if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
     if (tryMangleTypeSubstitution(DT, sig)) {
       switch (reqt.getKind()) {
+        case RequirementKind::SameCount:
+          llvm_unreachable("Same-count requirement not supported here");
         case RequirementKind::Conformance:
           return appendOperator("RQ");
         case RequirementKind::Layout:
@@ -2897,6 +2912,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     addTypeSubstitution(DT, sig);
     assert(gpBase);
     switch (reqt.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
       case RequirementKind::Conformance:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
                                              gpBase, lhsBaseIsProtocolSelf);
@@ -2916,6 +2933,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   }
   GenericTypeParamType *gpBase = FirstTy->castTo<GenericTypeParamType>();
   switch (reqt.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
     case RequirementKind::Conformance:
       return appendOpWithGenericParamIndex("R", gpBase);
     case RequirementKind::Layout:
@@ -3353,9 +3372,9 @@ void ASTMangler::appendProtocolConformanceRef(
 }
 
 /// Retrieve the index of the conformance requirement indicated by the
-/// conformance access path entry within the given set of requirements.
+/// conformance path entry within the given set of requirements.
 static unsigned conformanceRequirementIndex(
-                                      const ConformanceAccessPath::Entry &entry,
+                                      const ConformancePath::Entry &entry,
                                       ArrayRef<Requirement> requirements) {
   unsigned result = 0;
   for (const auto &req : requirements) {
@@ -3373,7 +3392,7 @@ static unsigned conformanceRequirementIndex(
 }
 
 void ASTMangler::appendDependentProtocolConformance(
-                                            const ConformanceAccessPath &path,
+                                            const ConformancePath &path,
                                             GenericSignature sig) {
   ProtocolDecl *currentProtocol = nullptr;
   for (const auto &entry : path) {
@@ -3437,19 +3456,19 @@ void ASTMangler::appendAnyProtocolConformance(
 
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
-    auto path = genericSig->getConformanceAccessPath(conformingType,
-                                                     conformance.getAbstract());
+    auto path = genericSig->getConformancePath(conformingType,
+                                               conformance.getAbstract());
     appendDependentProtocolConformance(path, genericSig);
   } else if (auto opaqueType = conformingType->getAs<OpaqueTypeArchetypeType>()) {
     GenericSignature opaqueSignature =
         opaqueType->getDecl()->getOpaqueInterfaceGenericSignature();
-    ConformanceAccessPath conformanceAccessPath =
-        opaqueSignature->getConformanceAccessPath(
+    ConformancePath conformancePath =
+        opaqueSignature->getConformancePath(
           opaqueType->getInterfaceType(),
           conformance.getAbstract());
 
-    // Append the conformance access path with the signature of the opaque type.
-    appendDependentProtocolConformance(conformanceAccessPath, opaqueSignature);
+    // Append the conformance path with the signature of the opaque type.
+    appendDependentProtocolConformance(conformancePath, opaqueSignature);
     appendType(conformingType, genericSig);
     appendOperator("HO");
   } else {
@@ -3475,6 +3494,8 @@ void ASTMangler::appendConcreteProtocolConformance(
   bool firstRequirement = true;
   for (const auto &conditionalReq : conformance->getConditionalRequirements()) {
     switch (conditionalReq.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
     case RequirementKind::Layout:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
@@ -3484,7 +3505,7 @@ void ASTMangler::appendConcreteProtocolConformance(
       auto type = conditionalReq.getFirstType();
       if (type->hasArchetype())
         type = type->mapTypeOutOfContext();
-      CanType canType = type->getCanonicalType(sig);
+      CanType canType = type->getReducedType(sig);
       auto proto = conditionalReq.getProtocolDecl();
       
       ProtocolConformanceRef conformance;
@@ -3624,6 +3645,8 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
   bool firstRequirement = true;
   for (const auto &reqt : requirements) {
     switch (reqt.getKind()) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
     case RequirementKind::Layout:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:

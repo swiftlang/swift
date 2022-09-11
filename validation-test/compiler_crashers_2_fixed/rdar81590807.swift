@@ -11,7 +11,7 @@
 // UNSUPPORTED: swift_test_mode_optimize_size
 
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=ios
+// REQUIRES: objc_interop
 
 // rdar://82123254
 // UNSUPPORTED: use_os_stdlib

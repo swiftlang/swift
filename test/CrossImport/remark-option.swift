@@ -4,6 +4,7 @@
 // RUN: %target-typecheck-verify-swift -enable-cross-import-overlays -Rcross-import -I %t/include -I %t/lib/swift -F %t/Frameworks
 
 import DeclaringLibrary
-// FIXME: Similarly to horrible.swift, ideally we would emit this remark on DeclaringLibrary
-// decl, since the cross-import overlay actually belongs to the DeclaringLibrary. (SR-12223)
+// FIXME: Similarly to horrible.swift, ideally we would emit this remark on
+// DeclaringLibrary decl, since the cross-import overlay actually belongs to
+// the DeclaringLibrary. (https://github.com/apple/swift/issues/54649)
 import BystandingLibrary // expected-remark {{import of 'DeclaringLibrary' and 'BystandingLibrary' triggered a cross-import of '_OverlayLibrary'}}

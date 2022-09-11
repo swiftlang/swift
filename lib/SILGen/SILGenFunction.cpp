@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -319,18 +320,29 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // let declarations.
       auto &tl = getTypeLowering(valueType);
       SILValue Val = Entry.value;
+      bool eliminateMoveOnlyWrapper =
+          Val->getType().isMoveOnlyWrapped() &&
+          !vd->getInterfaceType()->is<SILMoveOnlyWrappedType>();
 
       if (!Val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
         if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
           auto guaranteed = ManagedValue::forUnmanaged(Val).borrow(*this, loc);
+          if (eliminateMoveOnlyWrapper)
+            guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
+                loc, guaranteed);
           capturedArgs.push_back(guaranteed);
           break;
         }
-      
-        // Just retain a by-val let.
+
+        // Just copy a by-val let.
         Val = B.emitCopyValueOperation(loc, Val);
+        // If we need to unwrap a moveonlywrapped value, do so now but in an
+        // owned way to ensure that the partial apply is viewed as a semantic
+        // use of the value.
+        if (eliminateMoveOnlyWrapper)
+          Val = B.createOwnedMoveOnlyWrapperToCopyableValue(loc, Val);
       } else {
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
@@ -969,6 +981,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
+  auto *const topLevelValue = value;
   auto *dc = function.getDecl()->getInnermostDeclContext();
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
@@ -1022,8 +1035,12 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
-  if (EmitProfilerIncrement)
-    emitProfilerIncrement(value);
+  if (EmitProfilerIncrement) {
+    // Emit a profiler increment for the top-level value, not looking through
+    // any function conversions. This is necessary as the counter would have
+    // been recorded for this expression, not the sub-expression.
+    emitProfilerIncrement(topLevelValue);
+  }
   prepareEpilog(interfaceType, false, CleanupLocation(Loc));
 
   {
@@ -1147,30 +1164,15 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
   if (!SP->hasRegionCounters() || !getModule().getOptions().UseProfile.empty())
     return;
 
-  auto &C = B.getASTContext();
   const auto &RegionCounterMap = SP->getRegionCounterMap();
   auto CounterIt = RegionCounterMap.find(N);
 
-  // TODO: Assert that this cannot happen (rdar://42792053).
-  if (CounterIt == RegionCounterMap.end())
-    return;
+  assert(CounterIt != RegionCounterMap.end() &&
+         "cannot increment non-existent counter");
 
-  auto Int32Ty = getLoweredType(BuiltinIntegerType::get(32, C));
-  auto Int64Ty = getLoweredType(BuiltinIntegerType::get(64, C));
-
-  SILLocation Loc = getLocation(N);
-  SILValue Args[] = {
-      // The intrinsic must refer to the function profiling name var, which is
-      // inaccessible during SILGen. Rely on irgen to rewrite the function name.
-      B.createStringLiteral(Loc, SP->getPGOFuncName(),
-                            StringLiteralInst::Encoding::UTF8),
-      B.createIntegerLiteral(Loc, Int64Ty, SP->getPGOFuncHash()),
-      B.createIntegerLiteral(Loc, Int32Ty, SP->getNumRegionCounters()),
-      B.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
-  B.createBuiltin(
-      Loc,
-      C.getIdentifier(getBuiltinName(BuiltinValueKind::IntInstrprofIncrement)),
-      SGM.Types.getEmptyTupleType(), {}, Args);
+  B.createIncrementProfilerCounter(
+      getLocation(N), CounterIt->second, SP->getPGOFuncName(),
+      SP->getNumRegionCounters(), SP->getPGOFuncHash());
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {

@@ -33,3 +33,6 @@
 // PARSE_NO_PRIVATE_INTERFACE: error: this mode does not support emitting module interface files{{$}}
 // RUN: not %target-swift-frontend -emit-silgen -emit-private-module-interface-path %t %s 2>&1 | %FileCheck -check-prefix=SILGEN_NO_PRIVATE_INTERFACE %s
 // SILGEN_NO_PRIVATE_INTERFACE: error: this mode does not support emitting module interface files{{$}}
+
+// RUN: not %target-swift-frontend -parse -emit-const-values-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_CONST_VALUES %s
+// PARSE_NO_CONST_VALUES: error: this mode does not support emitting extracted const values{{$}}

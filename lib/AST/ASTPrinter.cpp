@@ -26,6 +26,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -239,6 +240,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (!isPublicOrUsableFromInline(req.getSecondType()))
               return false;
             break;
+          case RequirementKind::SameCount:
           case RequirementKind::Layout:
             break;
           }
@@ -1413,6 +1415,8 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   bool inWhereClause;
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirements not supported here");
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
   case RequirementKind::Superclass: {
@@ -1504,7 +1508,8 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
     return getDepthOfType(req.getFirstType());
 
   case RequirementKind::Superclass:
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
+  case RequirementKind::SameCount: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
     unsigned secondDepth = getDepthOfType(req.getSecondType());
@@ -1678,6 +1683,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
+          if (param->isTypeSequence())
+            Printer.printAttrName("@_typeSequence ");
+
           if (!subMap.empty()) {
             printType(substParam(param));
           } else if (auto *GP = param->getDecl()) {
@@ -1748,6 +1756,9 @@ void PrintAST::printSingleDepthOfGenericSignature(
         // We only print the second part of a requirement in the "inherited"
         // clause.
         switch (req.getKind()) {
+        case RequirementKind::SameCount:
+          llvm_unreachable("Same-count requirement not supported here");
+
         case RequirementKind::Layout:
           req.getLayoutConstraint()->print(Printer, Options);
           break;
@@ -1776,6 +1787,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   printTransformedType(req.getFirstType());
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    Printer << ".count == ";
+    printTransformedType(req.getSecondType());
+    Printer << ".count";
+    return;
   case RequirementKind::Layout:
     Printer << " : ";
     req.getLayoutConstraint()->print(Printer, Options);
@@ -2310,10 +2326,12 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
         AddMembers(Ext);
     }
     if (Options.PrintExtensionFromConformingProtocols) {
-      for (auto Conf : NTD->getAllConformances()) {
-        for (auto Ext : Conf->getProtocol()->getExtensions()) {
-          if (Options.printExtensionContentAsMembers(Ext))
-            AddMembers(Ext);
+      if (!isa<ProtocolDecl>(NTD)) {
+        for (auto Conf : NTD->getAllConformances()) {
+          for (auto Ext : Conf->getProtocol()->getExtensions()) {
+            if (Options.printExtensionContentAsMembers(Ext))
+              AddMembers(Ext);
+          }
         }
       }
     }
@@ -2899,13 +2917,11 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinMove(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }
+
+static bool usesFeatureBuiltinUnprotectedAddressOf(Decl *) { return false; }
 
 static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -2914,6 +2930,18 @@ static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
         return true;
     }
   }
+  return false;
+}
+
+static bool usesFeatureTypeWrappers(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TypeWrapperAttr>();
+}
+
+static bool usesFeatureParserRoundTrip(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureParserValidation(Decl *decl) {
   return false;
 }
 
@@ -2976,6 +3004,10 @@ static bool usesFeaturePrimaryAssociatedTypes2(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSendableCompletionHandlers(Decl *decl) {
+  return false;
+}
+
 static void suppressingFeaturePrimaryAssociatedTypes2(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   bool originalPrintPrimaryAssociatedTypes = options.PrintPrimaryAssociatedTypes;
@@ -3002,6 +3034,10 @@ static bool usesFeatureNoAsyncAvailability(Decl *decl) {
 }
 
 static bool usesFeatureConciseMagicFile(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
@@ -3033,7 +3069,15 @@ static bool usesFeatureOneWayClosureParameters(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureResultBuilderASTTransform(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureTypeWitnessSystemInference(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureOpaqueTypeErasure(Decl *decl) {
   return false;
 }
 
@@ -3456,6 +3500,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
+    if (decl->isTypeSequence())
+      Printer.printAttrName("@_typeSequence ");
     Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
   });
 
@@ -3627,6 +3673,11 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
                        Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
+
+void PrintAST::visitBuiltinTupleDecl(BuiltinTupleDecl *decl) {
+  llvm_unreachable("Not implemented");
+}
+
 static bool isStructOrClassContext(DeclContext *dc) {
   auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
@@ -3796,13 +3847,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
   }
 
-  // If the parameter is variadic, we will print the "..." after it, but we have
-  // to strip off the added array type.
-  if (param->isVariadic() && TheTypeLoc.getType()) {
-    if (auto *BGT = TheTypeLoc.getType()->getAs<BoundGenericType>())
-      TheTypeLoc.setType(BGT->getGenericArgs()[0]);
-  }
-
   {
     Printer.printStructurePre(PrintStructureKind::FunctionParameterType);
     SWIFT_DEFER {
@@ -3817,9 +3861,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
     printTypeLocForImplicitlyUnwrappedOptional(
       TheTypeLoc, param->isImplicitlyUnwrappedOptional());
-
-    if (param->isVariadic())
-      Printer << "...";
   }
 
   if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
@@ -4513,6 +4554,11 @@ void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitMoveExpr(MoveExpr *expr) {
+  Printer << "move ";
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitInOutExpr(InOutExpr *expr) {
   visit(expr->getSubExpr());
 }
@@ -4541,6 +4587,9 @@ void PrintAST::visitPackExpr(PackExpr *expr) {
 }
 
 void PrintAST::visitReifyPackExpr(ReifyPackExpr *expr) {
+}
+
+void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
 }
 
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
@@ -4761,6 +4810,9 @@ void PrintAST::visitConstructorRefCallExpr(ConstructorRefCallExpr *expr) {
       printType(funcType->getResult());
     }
   }
+}
+
+void PrintAST::visitABISafeConversionExpr(ABISafeConversionExpr *expr) {
 }
 
 void PrintAST::visitFunctionConversionExpr(FunctionConversionExpr *expr) {
@@ -5490,8 +5542,6 @@ public:
 
   void visitParenType(ParenType *T) {
     Printer << "(";
-    printParameterFlags(Printer, Options, T->getParameterFlags(),
-                        /*escaping*/ false);
     visit(T->getUnderlyingType()->getInOutObjectType());
     Printer << ")";
   }
@@ -5510,9 +5560,8 @@ public:
   }
 
   void visitPackExpansionType(PackExpansionType *T) {
-    Printer << "(";
     visit(T->getPatternType());
-    Printer << "..." << ")";
+    Printer << "...";
   }
 
   void visitTupleType(TupleType *T) {
@@ -5526,7 +5575,7 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
-      Type EltType = TD.getRawType();
+      Type EltType = TD.getType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
       SWIFT_DEFER {
@@ -5536,15 +5585,12 @@ public:
       if (TD.hasName()) {
         Printer.printName(TD.getName(), PrintNameContext::TupleElement);
         Printer << ": ";
+      } else if (e == 1 && !EltType->is<PackExpansionType>()) {
+        // Unlabeled one-element tuples always print the empty label to
+        // distinguish them from the older syntax for ParenType.
+        Printer << "_: ";
       }
-      if (TD.isVararg()) {
-        visit(TD.getVarargBaseTy());
-        Printer << "...";
-      } else {
-        printParameterFlags(Printer, Options, TD.getParameterFlags(),
-                            /*escaping*/ false);
-        visit(EltType);
-      }
+      visit(EltType);
     }
     Printer << ")";
   }
@@ -6290,6 +6336,10 @@ public:
     }
   }
 
+  void visitBuiltinTupleType(BuiltinTupleType *T) {
+    printQualifiedType(T);
+  }
+
   void visitLValueType(LValueType *T) {
     Printer << "@lvalue ";
     visit(T->getObjectType());
@@ -6301,14 +6351,25 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
-    if (auto parent = T->getParent()) {
-      printArchetypeCommon(T);
-      return;
-    }
+    if (Options.PrintForSIL) {
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\", ";
+      visit(T->getGenericEnvironment()->getOpenedExistentialType());
+      Printer << ") ";
 
-    if (Options.PrintForSIL)
-      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-    visit(T->getExistentialType());
+      llvm::DenseMap<CanType, Identifier> newAlternativeTypeNames;
+
+      auto interfaceTy = T->getInterfaceType();
+      auto selfTy = interfaceTy->getRootGenericParam();
+      auto &ctx = selfTy->getASTContext();
+      newAlternativeTypeNames[selfTy->getCanonicalType()] = ctx.Id_Self;
+
+      PrintOptions subOptions = Options;
+      subOptions.AlternativeTypeNames = &newAlternativeTypeNames;
+      TypePrinter sub(Printer, subOptions);
+      sub.visit(interfaceTy);
+    } else {
+      visit(T->getExistentialType());
+    }
   }
 
   void printDependentMember(DependentMemberType *T) {
@@ -6577,14 +6638,6 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   }
 }
 
-void LayoutConstraint::dump() const {
-  if (!*this) {
-    llvm::errs() << "(null)\n";
-    return;
-  }
-  getPointer()->print(llvm::errs());
-}
-
 void GenericSignatureImpl::print(raw_ostream &OS, PrintOptions PO) const {
   GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(OS, PO);
 }
@@ -6606,43 +6659,6 @@ void GenericSignature::print(ASTPrinter &Printer,
   PrintAST(Printer, Opts).printGenericSignature(*this,
                                                 PrintAST::PrintParams |
                                                 PrintAST::PrintRequirements);
-}
-
-void GenericSignature::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
-void Requirement::dump() const {
-  dump(llvm::errs());
-  llvm::errs() << '\n';
-}
-void Requirement::dump(raw_ostream &out) const {
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-    out << "conforms_to: ";
-    break;
-  case RequirementKind::Layout:
-    out << "layout: ";
-    break;
-  case RequirementKind::Superclass:
-    out << "superclass: ";
-    break;
-  case RequirementKind::SameType:
-    out << "same_type: ";
-    break;
-  }
-
-  PrintOptions opts;
-  opts.ProtocolQualifiedDependentMemberTypes = true;
-
-  getFirstType().print(out, opts);
-  out << " ";
-
-  if (getKind() != RequirementKind::Layout && getSecondType())
-    getSecondType().print(out, opts);
-  else if (getLayoutConstraint())
-    out << getLayoutConstraint();
 }
 
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
@@ -6701,10 +6717,6 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
   llvm_unreachable("bad checked cast name");
 }
 
-void SILParameterInfo::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
 void SILParameterInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
@@ -6733,10 +6745,6 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   llvm_unreachable("bad result convention");
 }
 
-void SILResultInfo::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
 void SILResultInfo::print(raw_ostream &OS, const PrintOptions &Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
@@ -7001,11 +7009,6 @@ swift::getInheritedForPrinting(
 //  Generic param list printing.
 //===----------------------------------------------------------------------===//
 
-void RequirementRepr::dump() const {
-  print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
 void RequirementRepr::print(raw_ostream &out) const {
   StreamPrinter printer(out);
   print(printer);
@@ -7046,11 +7049,6 @@ void RequirementRepr::print(ASTPrinter &out) const {
     }
     break;
   }
-}
-
-void GenericParamList::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
 }
 
 void GenericParamList::print(raw_ostream &out, const PrintOptions &PO) const {

@@ -667,7 +667,9 @@ struct Blah {
     }
 }
 
-@MainActor
+typealias FancyActor = MainActor // helps cover rdar://96309577
+
+@FancyActor
 func getTemperature() -> Int { return 0 }
 
 @MainActor

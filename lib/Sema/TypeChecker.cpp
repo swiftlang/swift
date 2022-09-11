@@ -183,15 +183,6 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-/// Bind the given extension to the given nominal type.
-static void bindExtensionToNominal(ExtensionDecl *ext,
-                                   NominalTypeDecl *nominal) {
-  if (ext->alreadyBoundToNominal())
-    return;
-
-  nominal->addExtension(ext);
-}
-
 void swift::bindExtensions(ModuleDecl &mod) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
@@ -199,7 +190,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
     if (auto nominal = ext->computeExtendedNominal()) {
-      bindExtensionToNominal(ext, nominal);
+      nominal->addExtension(ext);
       return true;
     }
 
@@ -338,11 +329,15 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   diagnoseUnnecessaryPreconcurrencyImports(*SF);
 
-  // Check to see if there's any inconsistent @_implementationOnly imports.
+  // Check to see if there are any inconsistent imports.
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentImplementationOnlyImportsRequest{SF->getParentModule()},
       {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
+      CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
@@ -379,6 +374,44 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   }
 }
 
+void swift::loadDerivativeConfigurations(SourceFile &SF) {
+  if (!isDifferentiableProgrammingEnabled(SF))
+    return;
+
+  auto &Ctx = SF.getASTContext();
+  FrontendStatsTracer tracer(Ctx.Stats,
+                             "load-derivative-configurations");
+
+  class DerivativeFinder : public ASTWalker {
+  public:
+    DerivativeFinder() {}
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+        for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
+          // Resolve derivative function configurations from `@derivative`
+          // attributes by type-checking them.
+          (void)derAttr->getOriginalFunction(D->getASTContext());
+        }
+      }
+
+      return true;
+    }
+  };
+
+  switch (SF.Kind) {
+  case SourceFileKind::Library:
+  case SourceFileKind::Main: {
+    DerivativeFinder finder;
+    SF.walkContext(finder);
+    return;
+  }
+  case SourceFileKind::SIL:
+  case SourceFileKind::Interface:
+    return;
+  }
+}
+
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
   auto &ctx = SF.getASTContext();
   // Return true if `AdditiveArithmetic` derived conformances are explicitly
@@ -393,7 +426,7 @@ bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {
 
 Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
                                   bool isSILMode, bool isSILType,
-                                  GenericEnvironment *GenericEnv,
+                                  GenericSignature GenericSig,
                                   GenericParamList *GenericParams,
                                   DeclContext *DC, bool ProduceDiagnostics) {
   TypeResolutionOptions options = None;
@@ -407,7 +440,7 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
     suppression.emplace(Ctx.Diags);
 
   return TypeResolution::forInterface(
-             DC, GenericEnv, options,
+             DC, GenericSig, options,
              [](auto unboundTy) {
                // FIXME: Don't let unbound generic types escape type resolution.
                // For now, just return the unbound generic type.
@@ -443,7 +476,7 @@ namespace {
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericEnvironment *
+GenericSignature
 swift::handleSILGenericParams(GenericParamList *genericParams,
                               DeclContext *DC) {
   if (genericParams == nullptr)
@@ -471,10 +504,8 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, /*allowConcreteGenericParams=*/true};
-  auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,
-                               GenericSignatureWithError()).getPointer();
-
-  return sig.getGenericEnvironment();
+  return evaluateOrDefault(DC->getASTContext().evaluator, request,
+                           GenericSignatureWithError()).getPointer();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

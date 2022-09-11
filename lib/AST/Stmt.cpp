@@ -156,6 +156,30 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
+SourceLoc BraceStmt::getStartLoc() const {
+  if (LBLoc) {
+    return LBLoc;
+  }
+  for (auto elt : getElements()) {
+    if (auto loc = elt.getStartLoc()) {
+      return loc;
+    }
+  }
+  return SourceLoc();
+}
+
+SourceLoc BraceStmt::getEndLoc() const {
+  if (RBLoc) {
+    return RBLoc;
+  }
+  for (auto elt : llvm::reverse(getElements())) {
+    if (auto loc = elt.getEndLoc()) {
+      return loc;
+    }
+  }
+  return SourceLoc();
+}
+
 ASTNode BraceStmt::findAsyncNode() {
   // TODO: Statements don't track their ASTContext/evaluator, so I am not making
   // this a request. It probably should be a request at some point.
@@ -499,6 +523,24 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
+}
+
+DoStmt *DoStmt::createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                               ArrayRef<ASTNode> body) {
+  return new (C) DoStmt(labelInfo, /*doLoc=*/SourceLoc(),
+                        BraceStmt::createImplicit(C, body),
+                        /*implicit=*/true);
+}
+
+SourceLoc DoStmt::getStartLoc() const {
+  if (auto LabelOrDoLoc = getLabelLocOrKeywordLoc(DoLoc)) {
+    return LabelOrDoLoc;
+  }
+  return Body->getStartLoc();
+}
+
+SourceLoc DoStmt::getEndLoc() const {
+  return Body->getEndLoc();
 }
 
 namespace {

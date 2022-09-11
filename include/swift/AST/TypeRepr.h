@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -34,7 +35,6 @@
 namespace swift {
   class ASTWalker;
   class DeclContext;
-  class GenericEnvironment;
   class IdentTypeRepr;
   class TupleTypeRepr;
   class TypeDecl;
@@ -73,10 +73,7 @@ protected:
     Warned : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+32,
-    /// Whether this tuple has '...' and its position.
-    HasEllipsis : 1,
-    : NumPadBits,
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 32,
     /// The number of elements contained.
     NumElements : 32
   );
@@ -492,14 +489,14 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // The generic params / environment / substitutions fields are only used
+  // The generic params / signature / substitutions fields are only used
   // in SIL mode, which is the only time we can have polymorphic and
   // substituted function values.
   GenericParamList *GenericParams;
-  GenericEnvironment *GenericEnv;
+  GenericSignature GenericSig;
   ArrayRef<TypeRepr *> InvocationSubs;
   GenericParamList *PatternGenericParams;
-  GenericEnvironment *PatternGenericEnv;
+  GenericSignature PatternGenericSig;
   ArrayRef<TypeRepr *> PatternSubs;
 
   TupleTypeRepr *ArgsTy;
@@ -516,22 +513,22 @@ public:
                    ArrayRef<TypeRepr *> patternSubs = {},
                    ArrayRef<TypeRepr *> invocationSubs = {})
     : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams), GenericEnv(nullptr),
+      GenericParams(genericParams),
       InvocationSubs(invocationSubs),
-      PatternGenericParams(patternGenericParams), PatternGenericEnv(nullptr),
+      PatternGenericParams(patternGenericParams),
       PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
-  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  GenericSignature getGenericSignature() const { return GenericSig; }
 
   GenericParamList *getPatternGenericParams() const {
     return PatternGenericParams;
   }
-  GenericEnvironment *getPatternGenericEnvironment() const {
-    return PatternGenericEnv;
+  GenericSignature getPatternGenericSignature() const {
+    return PatternGenericSig;
   }
 
   ArrayRef<TypeRepr*> getPatternSubstitutions() const { return PatternSubs; }
@@ -539,14 +536,14 @@ public:
     return InvocationSubs;
   }
 
-  void setPatternGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert(PatternGenericEnv == nullptr);
-    PatternGenericEnv = genericEnv;
+  void setPatternGenericSignature(GenericSignature genericSig) {
+    assert(!PatternGenericSig);
+    PatternGenericSig = genericSig;
   }
 
-  void setGenericEnvironment(GenericEnvironment *genericEnv) {
-    assert(GenericEnv == nullptr);
-    GenericEnv = genericEnv;
+  void setGenericSignature(GenericSignature genericSig) {
+    assert(!GenericSig);
+    GenericSig = genericSig;
   }
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
@@ -708,6 +705,45 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
+/// A pack expansion 'T...' with a pattern 'T'.
+///
+/// Can appear in the following positions:
+/// - The type of a parameter declaration in a function declaration
+/// - The type of a parameter in a function type
+/// - The element of a tuple
+///
+/// In the first two cases, it also spells an old-style variadic parameter
+/// desugaring to an array type. The two meanings are distinguished by the
+/// presence of at least one pack type parameter in the pack expansion
+/// pattern.
+///
+/// In the third case, tuples cannot contain an old-style variadic element,
+/// so the pack expansion must be a real variadic pack expansion.
+class PackExpansionTypeRepr final : public TypeRepr {
+  TypeRepr *Pattern;
+  SourceLoc EllipsisLoc;
+
+public:
+  PackExpansionTypeRepr(TypeRepr *Pattern, SourceLoc EllipsisLoc)
+    : TypeRepr(TypeReprKind::PackExpansion), Pattern(Pattern),
+      EllipsisLoc(EllipsisLoc) {}
+
+  TypeRepr *getPatternType() const { return Pattern; }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::PackExpansion;
+  }
+  static bool classof(const PackExpansionTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Pattern->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
+  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A tuple type.
 /// \code
 ///   (Foo, Bar)
@@ -715,10 +751,8 @@ struct TupleTypeReprElement {
 ///   (_ x: Foo)
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
-    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
-                                  Located<unsigned>> {
+    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement> {
   friend TrailingObjects;
-  typedef Located<unsigned> SourceLocAndIdx;
 
   SourceRange Parens;
   
@@ -726,8 +760,7 @@ class TupleTypeRepr final : public TypeRepr,
     return Bits.TupleTypeRepr.NumElements;
   }
 
-  TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
-                SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
+  TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements, SourceRange Parens);
 
 public:
   unsigned getNumElements() const { return Bits.TupleTypeRepr.NumElements; }
@@ -783,47 +816,15 @@ public:
 
   SourceRange getParens() const { return Parens; }
 
-  bool hasEllipsis() const {
-    return Bits.TupleTypeRepr.HasEllipsis;
-  }
-
-  SourceLoc getEllipsisLoc() const {
-    return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].Loc : SourceLoc();
-  }
-
-  unsigned getEllipsisIndex() const {
-    return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].Item :
-        Bits.TupleTypeRepr.NumElements;
-  }
-
-  void removeEllipsis() {
-    if (hasEllipsis()) {
-      Bits.TupleTypeRepr.HasEllipsis = false;
-      getTrailingObjects<SourceLocAndIdx>()[0] = {
-        getNumElements(),
-        SourceLoc()
-      };
-    }
-  }
-
   bool isParenType() const {
     return Bits.TupleTypeRepr.NumElements == 1 &&
            getElementNameLoc(0).isInvalid() &&
-           !hasEllipsis();
+           !isa<PackExpansionTypeRepr>(getElementType(0));
   }
 
   static TupleTypeRepr *create(const ASTContext &C,
                                ArrayRef<TupleTypeReprElement> Elements,
-                               SourceRange Parens,
-                               SourceLoc Ellipsis, unsigned EllipsisIdx);
-  static TupleTypeRepr *create(const ASTContext &C,
-                               ArrayRef<TupleTypeReprElement> Elements,
-                               SourceRange Parens) {
-    return create(C, Elements, Parens,
-                  SourceLoc(), Elements.size());
-  }
+                               SourceRange Parens);
   static TupleTypeRepr *createEmpty(const ASTContext &C, SourceRange Parens);
 
   static bool classof(const TypeRepr *T) {
@@ -1239,7 +1240,7 @@ class SILBoxTypeRepr final : public TypeRepr,
                                   SILBoxTypeReprField, TypeRepr *> {
   friend TrailingObjects;
   GenericParamList *GenericParams;
-  GenericEnvironment *GenericEnv = nullptr;
+  GenericSignature GenericSig;
 
   SourceLoc LBraceLoc, RBraceLoc;
   SourceLoc ArgLAngleLoc, ArgRAngleLoc;
@@ -1280,9 +1281,9 @@ public:
                       SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
                       SourceLoc ArgRAngleLoc);
   
-  void setGenericEnvironment(GenericEnvironment *Env) {
-    assert(!GenericEnv);
-    GenericEnv = Env;
+  void setGenericSignature(GenericSignature Sig) {
+    assert(!GenericSig);
+    GenericSig = Sig;
   }
   
   ArrayRef<Field> getFields() const {
@@ -1297,8 +1298,8 @@ public:
   GenericParamList *getGenericParams() const {
     return GenericParams;
   }
-  GenericEnvironment *getGenericEnvironment() const {
-    return GenericEnv;
+  GenericSignature getGenericSignature() const {
+    return GenericSig;
   }
 
   SourceLoc getLBraceLoc() const { return LBraceLoc; }
@@ -1339,6 +1340,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::PackExpansion:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:

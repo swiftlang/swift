@@ -479,6 +479,10 @@ void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
   for (auto conformance : IDC->getLocalConformances(
                             ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
+    if (Opts.PublicSymbolsOnly &&
+        getDeclLinkage(protocol) != FormalLinkage::PublicUnique)
+      continue;
+
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
     if (!needsWTable)
@@ -1050,6 +1054,8 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
     return false;
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
   llvm_unreachable("covered switch");
 }

@@ -89,26 +89,23 @@ somekeywords1(x: 1, y: 2, z: 3) // expected-error{{extraneous argument label 'x:
 somekeywords1(1, 2, 3) // expected-error{{missing argument labels 'y:z:' in call}}{{18-18=y: }}{{21-21=z: }}
 somekeywords1(x: 1, 2, z: 3) // expected-error{{incorrect argument labels in call (have 'x:_:z:', expected '_:y:z:')}}{{15-18=}}{{21-21=y: }}
 
-// SR-2242: poor diagnostic when argument label is omitted
+// https://github.com/apple/swift/issues/44849
+// Poor diagnostic when argument label is omitted
+do {
+  func f(x: Int, _ y: Int) {}
+  func f(a: Int, x: Int, _ y: Int) {}
 
-func r27212391(x: Int, _ y: Int) {
-  let _: Int = x + y
+  f(3, 5)             // expected-error {{missing argument label 'x:' in call}}
+  f(3, y: 5)          // expected-error {{incorrect argument labels in call (have '_:y:', expected 'x:_:')}}
+  f(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}} {{5-5=x: 5, }} {{6-12=}}
+  f(y: 3, x: 5)       // expected-error {{incorrect argument labels in call (have 'y:x:', expected 'x:_:')}} {{5-6=x}} {{11-14=}}
+  f(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
+  f(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
+  f(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
+  f(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
+  f(a: 1, y: 3, x: 5) // expected-error {{incorrect argument labels in call (have 'a:y:x:', expected 'a:x:_:')}}
+  f(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{11-11=x: 5, }} {{12-18=}}
 }
-
-func r27212391(a: Int, x: Int, _ y: Int) {
-  let _: Int = a + x + y
-}
-
-r27212391(3, 5)             // expected-error {{missing argument label 'x:' in call}}
-r27212391(3, y: 5)          // expected-error {{incorrect argument labels in call (have '_:y:', expected 'x:_:')}}
-r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}} {{11-11=x: 5, }} {{12-18=}}
-r27212391(y: 3, x: 5)       // expected-error {{incorrect argument labels in call (have 'y:x:', expected 'x:_:')}} {{11-12=x}} {{17-20=}}
-r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
-r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
-r27212391(a: 1, 3, y: 5)    // expected-error {{incorrect argument labels in call (have 'a:_:y:', expected 'a:x:_:')}}
-r27212391(1, x: 3, y: 5)    // expected-error {{incorrect argument labels in call (have '_:x:y:', expected 'a:x:_:')}}
-r27212391(a: 1, y: 3, x: 5) // expected-error {{incorrect argument labels in call (have 'a:y:x:', expected 'a:x:_:')}}
-r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}} {{17-17=x: 5, }} {{18-24=}}
 
 // -------------------------------------------
 // Out-of-order keywords
@@ -1718,8 +1715,10 @@ struct DiagnoseAllLabels {
   }
 }
 
-// SR-13135: Type inference regression in Swift 5.3 - can't infer a type of @autoclosure result.
-func sr13135() {
+/// https://github.com/apple/swift/issues/55581
+/// Type inference regression in Swift 5.3 - can't infer a type of
+/// `@autoclosure` result
+do {
   struct Foo {
     var bar: [Int] = []
   }
@@ -1734,12 +1733,13 @@ func sr13135() {
   foo(Foo().bar, [baz])
 }
 
-// SR-13240
-func twoargs(_ x: String, _ y: String) {}
+// https://github.com/apple/swift/issues/55681
+do {
+  func twoargs(_ x: String, _ y: String) {}
 
-func test() {
   let x = 1
-  twoargs(x, x) // expected-error 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  twoargs(x, x)
+  // expected-error@-1 2 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 }
 
 infix operator ---
@@ -1801,4 +1801,12 @@ do {
   myAssertionFailure(x != nil, "error")
   // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
   // expected-error@-2 {{missing argument label 'file:' in call}}
+}
+
+// https://github.com/apple/swift/issues/60436
+func test_extraneous_argument_with_inout() {
+  func test(_: Int) {}
+
+  var x: Int = 0
+  test(42, &x) // expected-error {{extra argument in call}}
 }

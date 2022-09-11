@@ -186,7 +186,9 @@ void Parser::performCodeCompletionSecondPassImpl(
     ContextChange CC(*this, DC);
 
     parseDecl(ParseDeclOptions(info.Flags),
-              /*IsAtStartOfLineOrPreviousHadSemi=*/true, [&](Decl *D) {
+              /*IsAtStartOfLineOrPreviousHadSemi=*/true,
+              /*IfConfigsAreDeclAttrs=*/false,
+              [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
                   NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
@@ -766,7 +768,7 @@ void Parser::skipUntilDeclRBrace() {
   while (Tok.isNot(tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif,
                    tok::code_complete) &&
-         !isStartOfSwiftDecl())
+         !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false))
     skipSingle();
 }
 
@@ -776,7 +778,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
     bool hasDelimiter = Tok.getLoc() == startLoc || consumeIf(tok::comma);
     bool possibleDeclStartsLine = Tok.isAtStartOfLine();
     
-    if (isStartOfSwiftDecl()) {
+    if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
       
       // Could have encountered something like `_ var:` 
       // or `let foo:` or `var:`
@@ -806,7 +808,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif) &&
-         !isStartOfSwiftDecl()) {
+         !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
     skipSingle();
   }
 }

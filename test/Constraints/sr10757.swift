@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-10757
+// https://github.com/apple/swift/issues/53147
 
 struct Parser<A> {
   let run: (inout Substring) -> A?

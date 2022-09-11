@@ -200,6 +200,14 @@ public class PartialKeyPath<Root>: AnyKeyPath { }
 internal enum KeyPathKind { case readOnly, value, reference }
 
 /// A key path from a specific root type to a specific resulting value type.
+///
+/// The most common way to make an instance of this type
+/// is by using a key-path expression like `\SomeClass.someProperty`.
+/// For more information,
+/// see [Key-Path Expressions][keypath] in *[The Swift Programming Language][tspl]*.
+///
+/// [keypath]: https://docs.swift.org/swift-book/ReferenceManual/Expressions.html#ID563
+/// [tspl]: https://docs.swift.org/swift-book/
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   @usableFromInline
   internal final override class var _rootAndValueType: (
@@ -1943,7 +1951,9 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
       keyPath: _unsafeUncheckedDowncast(keyPath,
         to: ReferenceWritableKeyPath<Root, Value>.self))
   }
-  return keyPath._projectMutableAddress(from: &root)
+  return _withUnprotectedUnsafePointer(to: &root) {
+    keyPath._projectMutableAddress(from: $0)
+  }
 }
 
 // The release that ends the access scope is guaranteed to happen
@@ -1972,7 +1982,9 @@ func _setAtWritableKeyPath<Root, Value>(
       value: value)
   }
   // TODO: we should be able to do this more efficiently than projecting.
-  let (addr, owner) = keyPath._projectMutableAddress(from: &root)
+  let (addr, owner) = _withUnprotectedUnsafePointer(to: &root) {
+    keyPath._projectMutableAddress(from: $0)
+  }
   addr.pointee = value
   _fixLifetime(owner)
   // FIXME: this needs a deallocation barrier to ensure that the
@@ -3269,7 +3281,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     _internalInvariant(_isPOD(T.self))
     let size = MemoryLayout<T>.size
     let (baseAddress, misalign) = adjustDestForAlignment(of: T.self)
-    withUnsafeBytes(of: value) {
+    _withUnprotectedUnsafeBytes(of: value) {
       _memcpy(dest: baseAddress, src: $0.baseAddress.unsafelyUnwrapped,
               size: UInt(size))
     }

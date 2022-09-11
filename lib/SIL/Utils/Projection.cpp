@@ -272,7 +272,9 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
         SILType::getBuiltinIntegerType(64, B.getModule().getASTContext());
     auto IntLiteralIndex =
         B.createIntegerLiteral(Loc, IntLiteralTy, getIndex());
-    return B.createIndexAddr(Loc, Base, IntLiteralIndex);
+    return B.createIndexAddr(Loc, Base, IntLiteralIndex,
+        // TODO: do we need to be conservative here?
+        /*needsStackProtection=*/ true);
   }
   case ProjectionKind::Enum:
     return B.createUncheckedTakeEnumDataAddr(Loc, Base,

@@ -59,15 +59,15 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-NOT: alloc_box
 // CHECK: [[STK:%.*]] = alloc_stack $Int64, var, name "x"
 // CHECK-LABEL: } // end sil function '$testtryapply'
-sil [noinline] @$testtryapply : $@convention(thin) () -> @error Error {
+sil [noinline] @$testtryapply : $@convention(thin) () -> @error any Error {
 bb0:
   %1 = alloc_box ${ var Int64 }, var, name "x"
   %2 = project_box %1 : ${ var Int64 }, 0
   %3 = integer_literal $Builtin.Int64, 0
   %4 = struct $Int64 (%3 : $Builtin.Int64)
   store %4 to %2 : $*Int64
-  %6 = function_ref @$testtryapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error
-  try_apply %6(%1) : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error, normal bb1, error bb2
+  %6 = function_ref @$testtryapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> @error any Error
+  try_apply %6(%1) : $@convention(thin) (@guaranteed { var Int64 }) -> @error any Error, normal bb1, error bb2
 bb1(%8 : $()):
   strong_release %1 : ${ var Int64 }
   %10 = tuple ()
@@ -77,7 +77,7 @@ bb2(%12 : $Error):
   throw %12 : $Error
 }
 
-sil private [noinline] @$testtryapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error {
+sil private [noinline] @$testtryapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> @error any Error {
 bb0(%0 : ${ var Int64 }):
   %2 = project_box %0 : ${ var Int64 }, 0
   %4 = begin_access [read] [dynamic] %2 : $*Int64
@@ -92,11 +92,11 @@ bb0(%0 : ${ var Int64 }):
   return %12 : $()
 }
 
-sil private [noinline] @$testtryapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error {
+sil private [noinline] @$testtryapplybas : $@convention(thin) (@guaranteed { var Int64 }) -> @error any Error {
 bb0(%0 : ${ var Int64 }):
   %2 = project_box %0 : ${ var Int64 }, 0
-  %4 = function_ref @$testtryapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error
-  try_apply %4(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> @error Error, normal bb1, error bb2
+  %4 = function_ref @$testtryapplybar : $@convention(thin) (@guaranteed { var Int64 }) -> @error any Error
+  try_apply %4(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> @error any Error, normal bb1, error bb2
 bb1(%6 : $()):
   %7 = tuple ()
   return %7 : $()

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/small-enums-pass-return-in-cxx.swift -typecheck -module-name Enums -clang-header-expose-public-decls -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %S/small-enums-pass-return-in-cxx.swift -typecheck -module-name Enums -enable-experimental-cxx-interop -emit-clang-header-path %t/enums.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-enums-execution.o
 // RUN: %target-interop-build-swift %S/small-enums-pass-return-in-cxx.swift -o %t/swift-enums-execution -Xlinker %t/swift-enums-execution.o -module-name Enums -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -9,7 +9,6 @@
 // RUN: %target-run %t/swift-enums-execution | %FileCheck %s
 
 // REQUIRES: executable_test
-// UNSUPPORTED: CPU=arm64e
 
 #include <cassert>
 #include <cstddef>

@@ -22,6 +22,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -77,6 +78,7 @@ static bool isValidVersion(const version::Version &Version,
 }
 
 static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
+                                              SourceManager &SM,
                                               DiagnosticEngine *D,
                                               bool &underlyingVersion) {
   llvm::VersionTuple result;
@@ -99,16 +101,37 @@ static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
     return result;
   }
   StringRef verText;
-  if (auto *nle = dyn_cast<NumberLiteralExpr>(subE)) {
-    verText = nle->getDigitsText();
-  } else if (auto *sle= dyn_cast<StringLiteralExpr>(subE)) {
+  if (auto *sle = dyn_cast<StringLiteralExpr>(subE)) {
     verText = sle->getValue();
+  } else {
+    // Use the raw text for every non-string-literal expression. Versions with
+    // just two components are parsed as number literals, but versions with more
+    // components are parsed as unresolved dot expressions.
+    verText = extractExprSource(SM, subE);
   }
-  if (verText.empty())
+
+  if (verText.empty()) {
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_empty_version, label.str());
+    }
     return result;
+  }
+
+  // VersionTuple supports a maximum of 4 components.
+  ssize_t excessComponents = verText.count('.') - 3;
+  if (excessComponents > 0) {
+    do {
+      verText = verText.rsplit('.').first;
+    } while (--excessComponents > 0);
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_version_too_many_components,
+                  verText);
+    }
+  }
+
   if (result.tryParse(verText)) {
     if (D) {
-      D->diagnose(subE->getLoc(), diag::canimport_version, verText);
+      D->diagnose(subE->getLoc(), diag::canimport_invalid_version, verText);
     }
   }
   return result;
@@ -122,16 +145,19 @@ static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
   if (auto *unary = args->getUnlabeledUnaryExpr())
     return unary;
 
+  // canImport() has an optional second parameter.
   if (kindName == "canImport") {
-    bool underlyingVersion;
-    if (D) {
-      // Diagnose canImport syntax
-      (void)getCanImportVersion(args, D, underlyingVersion);
-    }
     return args->getExpr(0);
   }
   return nullptr;
 }
+
+/// Returns \c true if the condition is a version check.
+static bool isVersionIfConfigCondition(Expr *Condition);
+
+/// Evaluate the condition.
+/// \c true if success, \c false if failed.
+static bool evaluateIfConfigCondition(Expr *Condition, ASTContext &Context);
 
 /// The condition validator.
 class ValidateIfConfigCondition :
@@ -202,7 +228,7 @@ class ValidateIfConfigCondition :
 
     // We will definitely be consuming at least one operator.
     // Pull out the prospective RHS and slice off the first two elements.
-    Expr *RHS = validate(S[1]);
+    Expr *RHS = S[1];
     S = S.slice(2);
 
     while (true) {
@@ -226,7 +252,7 @@ class ValidateIfConfigCondition :
 
       OpName = NextOpName;
       Op = S[0];
-      RHS = validate(S[1]);
+      RHS = S[1];
       S = S.slice(2);
     }
 
@@ -290,8 +316,8 @@ public:
           return nullptr;
         }
 
-        auto Val = version::Version::parseCompilerVersionString(
-            SLE->getValue(), SLE->getLoc(), &D);
+        auto Val = VersionParser::parseCompilerVersionString(SLE->getValue(),
+                                                             SLE->getLoc(), &D);
         if (!Val.hasValue())
           return nullptr;
         return E;
@@ -313,7 +339,7 @@ public:
         return nullptr;
       }
       auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
-      auto Val = version::Version::parseVersionString(
+      auto Val = VersionParser::parseVersionString(
           versionString, PUE->getOperand()->getStartLoc(), &D);
       if (!Val.hasValue())
         return nullptr;
@@ -321,11 +347,38 @@ public:
     }
 
     if (*KindName == "canImport") {
+      if (!E->getArgs()->isUnary()) {
+        bool underlyingVersion;
+        // Diagnose canImport(_:_version:) syntax.
+        (void)getCanImportVersion(E->getArgs(), Ctx.SourceMgr, &D,
+                                  underlyingVersion);
+      }
+
       if (!isModulePath(Arg)) {
         D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
                    "module name");
         return nullptr;
       }
+      return E;
+    }
+
+    if (*KindName == "hasFeature") {
+      if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
+        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+                   "feature name");
+        return nullptr;
+      }
+
+      return E;
+    }
+
+    if (*KindName == "hasAttribute") {
+      if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
+        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+                   "attribute name");
+        return nullptr;
+      }
+
       return E;
     }
 
@@ -416,14 +469,37 @@ public:
     return E;
   }
 
+  Expr *visitBinaryExpr(BinaryExpr *E) {
+    auto OpName = getDeclRefStr(E->getFn(), DeclRefKind::BinaryOperator);
+    if (auto lhs = validate(E->getLHS())) {
+      // If the left-hand side is a versioned condition, skip evaluation of
+      // the right-hand side if it won't ever affect the result.
+      if (OpName && isVersionIfConfigCondition(lhs)) {
+        assert(*OpName == "&&" || *OpName == "||");
+        bool isLHSTrue = evaluateIfConfigCondition(lhs, Ctx);
+        if (isLHSTrue && *OpName == "||")
+          return lhs;
+        if (!isLHSTrue && *OpName == "&&")
+          return lhs;
+      }
+
+      E->getArgs()->setExpr(0, lhs);
+    }
+
+    if (auto rhs = validate(E->getRHS()))
+      E->getArgs()->setExpr(1, rhs);
+
+    return E;
+  }
+
   // Fold sequence expression for non-Swift3 mode.
   Expr *visitSequenceExpr(SequenceExpr *E) {
     ArrayRef<Expr*> Elts = E->getElements();
-    Expr *foldedExpr = validate(Elts[0]);
+    Expr *foldedExpr = Elts[0];
     Elts = Elts.slice(1);
     foldedExpr = foldSequence(foldedExpr, Elts);
     assert(Elts.empty());
-    return foldedExpr;
+    return validate(foldedExpr);
   }
 
   // Other expression types are unsupported.
@@ -484,6 +560,7 @@ public:
     bool isKnownFeature = llvm::StringSwitch<bool>(Name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
         .Case("$" #FeatureName, Option)
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #include "swift/Basic/Features.def"
         .Default(false);
 
@@ -498,24 +575,25 @@ public:
     auto *Arg = getSingleSubExp(E->getArgs(), KindName, nullptr);
     if (KindName == "_compiler_version" && isa<StringLiteralExpr>(Arg)) {
       auto Str = cast<StringLiteralExpr>(Arg)->getValue();
-      auto Val = version::Version::parseCompilerVersionString(
-          Str, SourceLoc(), nullptr).getValue();
-      auto thisVersion = version::Version::getCurrentCompilerVersion();
+      auto Val =
+          VersionParser::parseCompilerVersionString(Str, SourceLoc(), nullptr)
+              .getValue();
+      auto thisVersion = version::getCurrentCompilerVersion();
       return thisVersion >= Val;
     } else if ((KindName == "swift") || (KindName == "compiler") ||
                (KindName == "_compiler_version")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto PrefixName = getDeclRefStr(PUE->getFn());
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
-      auto Val = version::Version::parseVersionString(
-          Str, SourceLoc(), nullptr).getValue();
+      auto Val = VersionParser::parseVersionString(Str, SourceLoc(), nullptr)
+                     .getValue();
       version::Version thisVersion;
       if (KindName == "swift") {
         thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
       } else if (KindName == "compiler") {
         thisVersion = version::Version::getCurrentLanguageVersion();
       } else if (KindName == "_compiler_version") {
-        thisVersion = version::Version::getCurrentCompilerVersion();
+        thisVersion = version::getCurrentCompilerVersion();
       } else {
         llvm_unreachable("unsupported version conditional");
       }
@@ -525,11 +603,18 @@ public:
       bool underlyingModule = false;
       llvm::VersionTuple version;
       if (!E->getArgs()->isUnlabeledUnary()) {
-        version = getCanImportVersion(E->getArgs(), nullptr, underlyingModule);
+        version = getCanImportVersion(E->getArgs(), Ctx.SourceMgr, nullptr,
+                                      underlyingModule);
       }
       ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
                                           Arg->getStartLoc());
       return Ctx.canImportModule(builder.get(), version, underlyingModule);
+    } else if (KindName == "hasFeature") {
+      auto featureName = getDeclRefStr(Arg);
+      return Ctx.LangOpts.hasFeature(featureName);
+    } else if (KindName == "hasAttribute") {
+      auto attributeName = getDeclRefStr(Arg);
+      return hasAttribute(Ctx.LangOpts, attributeName);
     }
 
     auto Val = getDeclRefStr(Arg);
@@ -594,7 +679,6 @@ public:
   bool visitExpr(Expr *E) { return false; }
 };
 
-/// Returns \c true if the condition is a version check.
 static bool isVersionIfConfigCondition(Expr *Condition) {
   return IsVersionIfConfigCondition().visit(Condition);
 }
@@ -688,12 +772,15 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
 /// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-ParserResult<IfConfigDecl> Parser::parseIfConfig(
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
+template<typename Result>
+Result Parser::parseIfConfigRaw(
+    llvm::function_ref<void(SourceLoc clauseLoc, Expr *condition,
+                            bool isActive, IfConfigElementsRole role)>
+      parseElements,
+    llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
   assert(Tok.is(tok::pound_if));
   SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
 
-  SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
@@ -748,18 +835,30 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     // clause unless we're doing a parse-only pass.
     if (isElse) {
       isActive = !foundActive && shouldEvaluate;
-      if (SyntaxContext->isEnabled())
+      if (SyntaxContext->isEnabled()) {
+        // Because we use the same libSyntax node for #elseif and #else, we need
+        // to disambiguate whether a postfix expression is the condition of
+        // #elseif or a postfix expression of the #else body.
+        // To do this, push three empty syntax nodes onto the stack.
+        //  - First one for unexpected nodes between the #else keyword and the
+        //    condition
+        //  - One for the condition itself (whcih doesn't exist)
+        //  - And finally one for the unexpected nodes between the condition and
+        //    the elements
         SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
+      }
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
-      ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
+      ParserResult<Expr> result = parseExprSequence(diag::expected_expr,
                                                       /*isBasic*/true,
                                                       /*isForDirective*/true);
-      if (Result.hasCodeCompletion())
+      if (result.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
-      if (Result.isNull())
+      if (result.isNull())
         return makeParserError();
-      Condition = Result.get();
+      Condition = result.get();
       if (validateIfConfigCondition(Condition, Context, Diags)) {
         // Error in the condition;
         isActive = false;
@@ -791,7 +890,6 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     }
 
     // Parse elements
-    SmallVector<ASTNode, 16> Elements;
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
     // Disable updating the interface hash inside inactive blocks.
@@ -800,21 +898,21 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       T.emplace(CurrentTokenHash, None);
 
     if (isActive || !isVersionCondition) {
-      parseElements(Elements, isActive);
+      parseElements(
+          ClauseLoc, Condition, isActive, IfConfigElementsRole::Normal);
     } else if (SyntaxContext->isEnabled()) {
       // We shouldn't skip code if we are building syntax tree.
       // The parser will keep running and we just discard the AST part.
       DiagnosticSuppression suppression(Context.Diags);
-      SmallVector<ASTNode, 16> droppedElements;
-      parseElements(droppedElements, false);
+      parseElements(
+          ClauseLoc, Condition, isActive, IfConfigElementsRole::SyntaxOnly);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();
       DT.abort();
+      parseElements(
+          ClauseLoc, Condition, isActive, IfConfigElementsRole::Skipped);
     }
-
-    Clauses.emplace_back(ClauseLoc, Condition,
-                         Context.AllocateCopy(Elements), isActive);
 
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
@@ -827,8 +925,93 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
-  auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                         Context.AllocateCopy(Clauses),
-                                         EndLoc, HadMissingEnd);
-  return makeParserResult(ICD);
+  return finish(EndLoc, HadMissingEnd);
+}
+
+/// Parse and populate a #if ... #endif directive.
+/// Delegate callback function to parse elements in the blocks.
+ParserResult<IfConfigDecl> Parser::parseIfConfig(
+    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
+  SmallVector<IfConfigClause, 4> clauses;
+  return parseIfConfigRaw<ParserResult<IfConfigDecl>>(
+      [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
+          IfConfigElementsRole role) {
+        SmallVector<ASTNode, 16> elements;
+        if (role != IfConfigElementsRole::Skipped)
+          parseElements(elements, isActive);
+        if (role == IfConfigElementsRole::SyntaxOnly)
+          elements.clear();
+
+        clauses.emplace_back(
+            clauseLoc, condition, Context.AllocateCopy(elements), isActive);
+      }, [&](SourceLoc endLoc, bool hadMissingEnd) {
+        auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
+                                               Context.AllocateCopy(clauses),
+                                               endLoc, hadMissingEnd);
+        return makeParserResult(ICD);
+      });
+}
+
+ParserStatus Parser::parseIfConfigDeclAttributes(
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
+    PatternBindingInitializer *initContext) {
+  ParserStatus status = makeParserSuccess();
+  return parseIfConfigRaw<ParserStatus>(
+      [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
+          IfConfigElementsRole role) {
+        if (isActive) {
+          status |= parseDeclAttributeList(
+              attributes, ifConfigsAreDeclAttrs, initContext);
+        } else if (role != IfConfigElementsRole::Skipped) {
+          DeclAttributes skippedAttributes;
+          PatternBindingInitializer *skippedInitContext = nullptr;
+          status |= parseDeclAttributeList(
+              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+        }
+      },
+      [&](SourceLoc endLoc, bool hadMissingEnd) {
+        return status;
+      });
+}
+
+bool Parser::skipIfConfigOfAttributes(bool &sawAnyAttributes) {
+  assert(Tok.is(tok::pound_if));
+  while (true) {
+    // #if / #else / #elseif
+    consumeToken();
+
+    // <expression>
+    skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
+
+    while (true) {
+      if (Tok.is(tok::at_sign)) {
+        sawAnyAttributes = true;
+        skipAnyAttribute();
+        continue;
+      }
+
+      if (Tok.is(tok::pound_if)) {
+        skipIfConfigOfAttributes(sawAnyAttributes);
+        continue;
+      }
+
+      break;
+    }
+
+    if (Tok.isNot(tok::pound_elseif, tok::pound_else))
+      break;
+  }
+
+  // If we ran out of tokens, say we consumed the rest.
+  if (Tok.is(tok::eof))
+    return true;
+
+  return Tok.isAtStartOfLine() && consumeIf(tok::pound_endif);
+}
+
+bool Parser::ifConfigContainsOnlyAttributes() {
+  assert(Tok.is(tok::pound_if));
+  bool sawAnyAttributes = false;
+  BacktrackingScope backtrack(*this);
+  return skipIfConfigOfAttributes(sawAnyAttributes) && sawAnyAttributes;
 }

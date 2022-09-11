@@ -13,10 +13,12 @@
 #ifndef SWIFT_SIL_SILARGUMENT_H
 #define SWIFT_SIL_SILARGUMENT_H
 
+#include "swift/AST/LifetimeAnnotation.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/SIL/Lifetime.h"
 #include "swift/SIL/SILArgumentConvention.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILFunctionConventions.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
 
@@ -112,8 +114,6 @@ public:
     return node->getKind() >= SILNodeKind::First_SILArgument &&
            node->getKind() <= SILNodeKind::Last_SILArgument;
   }
-
-  bool isNoImplicitCopy() const;
 
   unsigned getIndex() const;
 
@@ -274,6 +274,13 @@ public:
   /// If visitor returns false, iteration is stopped and we return false.
   bool visitIncomingPhiOperands(function_ref<bool(Operand *)> visitor) const;
 
+  /// Visit incoming phi operands and the argument into which they are incoming;
+  /// if an operand's value is itself a phi, visit that phi's operands.
+  ///
+  /// Returns false when called on a non-phi and when the visitor returns false.
+  bool visitTransitiveIncomingPhiOperands(
+      function_ref<bool(SILPhiArgument *, Operand *)> visitor);
+
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
   /// stored in OutArray.
@@ -322,14 +329,17 @@ class SILFunctionArgument : public SILArgument {
   friend class SILBasicBlock;
 
   bool noImplicitCopy = false;
+  LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
 
-  SILFunctionArgument(SILBasicBlock *parentBlock, SILType type,
-                      ValueOwnershipKind ownershipKind,
-                      const ValueDecl *decl = nullptr,
-                      bool isNoImplicitCopy = false)
+  SILFunctionArgument(
+      SILBasicBlock *parentBlock, SILType type,
+      ValueOwnershipKind ownershipKind, const ValueDecl *decl = nullptr,
+      bool isNoImplicitCopy = false,
+      LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl),
-        noImplicitCopy(isNoImplicitCopy) {}
+        noImplicitCopy(isNoImplicitCopy),
+        lifetimeAnnotation(lifetimeAnnotation) {}
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceFunctionArg.
   explicit SILFunctionArgument(SILType type, ValueOwnershipKind ownershipKind,
@@ -341,6 +351,20 @@ public:
   bool isNoImplicitCopy() const { return noImplicitCopy; }
 
   void setNoImplicitCopy(bool newValue) { noImplicitCopy = newValue; }
+
+  LifetimeAnnotation getLifetimeAnnotation() const {
+    return lifetimeAnnotation;
+  }
+
+  void setLifetimeAnnotation(LifetimeAnnotation newValue) {
+    lifetimeAnnotation = newValue;
+  }
+
+  Lifetime getLifetime() const {
+    return getType()
+        .getLifetime(*getFunction())
+        .getLifetimeForAnnotatedValue(getLifetimeAnnotation());
+  }
 
   bool isIndirectResult() const;
 
@@ -399,12 +423,6 @@ inline SILPhiArgument *SILArgument::isTerminatorResult(SILValue value) {
       return arg;
   }
   return nullptr;
-}
-
-inline bool SILArgument::isNoImplicitCopy() const {
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(this))
-    return fArg->isNoImplicitCopy();
-  return false;
 }
 
 inline bool SILArgument::isTerminatorResult() const {

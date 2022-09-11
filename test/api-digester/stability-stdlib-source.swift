@@ -1,6 +1,6 @@
 // REQUIRES: OS=macosx
 
-// SR-13362
+// https://github.com/apple/swift/issues/55803
 // This currently fails on non-Intel architectures due to no baseline being
 // available and it is not possible to filter across architectures in the
 // output.

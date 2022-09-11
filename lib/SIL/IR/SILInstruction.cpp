@@ -77,12 +77,21 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   // If transferring instructions within the same basic block, no reason to
   // update their parent pointers.
   SILBasicBlock *ThisParent = getContainingBlock();
-  if (ThisParent == L2.getContainingBlock()) return;
+  SILBasicBlock *l2Block = L2.getContainingBlock();
+  if (ThisParent == l2Block) return;
+  
+  bool differentFunctions = (ThisParent->getFunction() != l2Block->getFunction());
 
   // Update the parent fields in the instructions.
   for (; first != last; ++first) {
     SWIFT_FUNC_STAT_NAMED("sil");
     first->ParentBB = ThisParent;
+    if (differentFunctions) {
+      for (SILValue result : first->getResults()) {
+        result->resetBitfields();
+      }
+      first->asSILNode()->resetBitfields();
+    }
   }
 }
 
@@ -654,9 +663,8 @@ namespace {
     }
 
     bool visitIndexAddrInst(IndexAddrInst *RHS) {
-      // We have already compared the operands/types, so we should have equality
-      // at this point.
-      return true;
+      auto *lhs = cast<IndexAddrInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
@@ -763,7 +771,8 @@ namespace {
     }
 
     bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
-      return true;
+      auto *lhs = cast<AddressToPointerInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {

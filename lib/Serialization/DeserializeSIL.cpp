@@ -519,6 +519,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   (void)kind;
 
   DeclID clangNodeOwnerID;
+  ModuleID parentModuleID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
@@ -538,7 +539,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, isDistributed, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangNodeOwnerID, SemanticsIDs);
+      genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   if (funcTyID == 0) {
     MF->fatal("SILFunction typeID is 0");
@@ -661,7 +662,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
-    fn->setAlwaysWeakImported(isWeakImported);
+    fn->setIsAlwaysWeakImported(isWeakImported);
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
 
@@ -703,11 +704,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setWasDeserializedCanonical();
 
   fn->setBare(IsBare);
-  const SILDebugScope *DS = fn->getDebugScope();
-  if (!DS) {
-    DS = new (SILMod) SILDebugScope(loc, fn);
+  if (!fn->getDebugScope()) {
+    const SILDebugScope *DS = new (SILMod) SILDebugScope(loc, fn);
     fn->setDebugScope(DS);
   }
+
+  // If we don't already have a DeclContext to use to find a parent module,
+  // attempt to deserialize a parent module reference directly.
+  if (!fn->getDeclContext() && parentModuleID)
+    fn->setParentModule(MF->getModule(parentModuleID));
 
   // Read and instantiate the specialize attributes.
   bool shouldAddSpecAttrs = fn->getSpecializeAttrs().empty();
@@ -941,6 +946,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
       bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
       fArg->setNoImplicitCopy(isNoImplicitCopy);
+      auto lifetime = (LifetimeAnnotation::Case)((Args[I + 1] >> 17) & 0x3);
+      fArg->setLifetimeAnnotation(lifetime);
       Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
@@ -1243,6 +1250,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
+  case SIL_INST_INCREMENT_PROFILER_COUNTER:
+    SILInstIncrementProfilerCounterLayout::readRecord(scratch, ValID, ValID2,
+                                                      Attr, Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::IncrementProfilerCounterInst;
+    break;
   }
 
   // FIXME: validate
@@ -1353,7 +1365,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(BridgeObjectToRef)
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
-  ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
   ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
@@ -1364,6 +1375,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
 
+  case SILInstructionKind::AddressToPointerInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createAddressToPointer(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        /*needsStackProtection=*/ Attr != 0);
+    break;
+  }
   case SILInstructionKind::ProjectBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -1769,7 +1791,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
-                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        /*needsStackProtection=*/ Attr != 0);
     break;
   }
   case SILInstructionKind::TailAddrInst: {
@@ -1791,6 +1814,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
+  case SILInstructionKind::IncrementProfilerCounterInst: {
+    auto PGOFuncName = MF->getIdentifierText(ValID);
+    auto PGOHashStr = MF->getIdentifierText(ValID2);
+
+    uint64_t PGOHash;
+    auto HadError = PGOHashStr.getAsInteger(/*radix*/ 10, PGOHash);
+    assert(!HadError && "Failed to deserialize PGO hash");
+    (void)HadError;
+
+    ResultInst = Builder.createIncrementProfilerCounter(
+        Loc, /*CounterIdx*/ Attr, PGOFuncName, /*NumCounters*/ Attr2, PGOHash);
     break;
   }
   case SILInstructionKind::IntegerLiteralInst: {
@@ -2050,10 +2086,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst: {
     auto Ty = MF->getType(TyID);
-    auto *MVI = Builder.createCopyableToMoveOnlyWrapperValue(
-        Loc,
-        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
-    ResultInst = MVI;
+    bool isOwned = bool(Attr);
+    if (isOwned)
+      ResultInst = Builder.createOwnedCopyableToMoveOnlyWrapperValue(
+          Loc, getLocalValue(ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    else
+      ResultInst = Builder.createGuaranteedCopyableToMoveOnlyWrapperValue(
+          Loc, getLocalValue(ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
 
@@ -2162,6 +2203,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool isInit = (Attr & 0x2) > 0;
     bool isTake = (Attr & 0x1) > 0;
     ResultInst = Builder.createCopyAddr(
+        Loc, getLocalValue(ValID, addrType), getLocalValue(ValID2, addrType),
+        IsTake_t(isTake), IsInitialization_t(isInit));
+    break;
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    bool isInit = (Attr & 0x2) > 0;
+    bool isTake = (Attr & 0x1) > 0;
+    ResultInst = Builder.createExplicitCopyAddr(
         Loc, getLocalValue(ValID, addrType), getLocalValue(ValID2, addrType),
         IsTake_t(isTake), IsInitialization_t(isInit));
     break;
@@ -2997,6 +3048,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   // TODO: If this results in any noticeable performance problems, Cache the
   // linkage to avoid re-reading it from the bitcode each time?
   DeclID clangOwnerID;
+  ModuleID parentModuleID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
   IdentifierID usedAdHocWitnessFunctionID;
@@ -3016,7 +3068,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, isDistributed, funcTyID,
       replacedFunctionID, usedAdHocWitnessFunctionID,
-      genericSigID, clangOwnerID, SemanticsIDs);
+      genericSigID, clangOwnerID, parentModuleID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

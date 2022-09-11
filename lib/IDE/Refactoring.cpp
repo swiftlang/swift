@@ -3309,6 +3309,18 @@ bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   return false;
 }
 
+/// If \p NTD is a protocol, return all the protocols it inherits from. If it's
+/// a type, return all the protocols it conforms to.
+static SmallVector<ProtocolDecl *, 2> getAllProtocols(NominalTypeDecl *NTD) {
+  if (auto Proto = dyn_cast<ProtocolDecl>(NTD)) {
+    return SmallVector<ProtocolDecl *, 2>(
+        Proto->getInheritedProtocols().begin(),
+        Proto->getInheritedProtocols().end());
+  } else {
+    return NTD->getAllProtocols();
+  }
+}
+
 class AddEquatableContext {
 
   /// Declaration context
@@ -3366,19 +3378,23 @@ class AddEquatableContext {
   std::vector<VarDecl *> getUserAccessibleProperties();
 
 public:
+  AddEquatableContext(NominalTypeDecl *Decl)
+      : DC(Decl), Adopter(Decl->getDeclaredType()),
+        StartLoc(Decl->getBraces().Start),
+        ProtocolsLocations(Decl->getInherited()),
+        Protocols(getAllProtocols(Decl)),
+        ProtInsertStartLoc(Decl->getNameLoc()),
+        StoredProperties(Decl->getStoredProperties()),
+        Range(Decl->getMembers()){};
 
-  AddEquatableContext(NominalTypeDecl *Decl) : DC(Decl),
-  Adopter(Decl->getDeclaredType()), StartLoc(Decl->getBraces().Start),
-  ProtocolsLocations(Decl->getInherited()),
-  Protocols(Decl->getAllProtocols()), ProtInsertStartLoc(Decl->getNameLoc()),
-  StoredProperties(Decl->getStoredProperties()), Range(Decl->getMembers()) {};
-
-  AddEquatableContext(ExtensionDecl *Decl) : DC(Decl),
-  Adopter(Decl->getExtendedType()), StartLoc(Decl->getBraces().Start),
-  ProtocolsLocations(Decl->getInherited()),
-  Protocols(Decl->getExtendedNominal()->getAllProtocols()),
-  ProtInsertStartLoc(Decl->getExtendedTypeRepr()->getEndLoc()),
-  StoredProperties(Decl->getExtendedNominal()->getStoredProperties()), Range(Decl->getMembers()) {};
+  AddEquatableContext(ExtensionDecl *Decl)
+      : DC(Decl), Adopter(Decl->getExtendedType()),
+        StartLoc(Decl->getBraces().Start),
+        ProtocolsLocations(Decl->getInherited()),
+        Protocols(getAllProtocols(Decl->getExtendedNominal())),
+        ProtInsertStartLoc(Decl->getExtendedTypeRepr()->getEndLoc()),
+        StoredProperties(Decl->getExtendedNominal()->getStoredProperties()),
+        Range(Decl->getMembers()){};
 
   AddEquatableContext() : DC(nullptr), Adopter(), ProtocolsLocations(),
   Protocols(), StoredProperties(), Range(nullptr, nullptr) {};
@@ -3583,11 +3599,11 @@ class AddCodableContext {
 public:
   AddCodableContext(NominalTypeDecl *Decl)
       : DC(Decl), StartLoc(Decl->getBraces().Start),
-        Protocols(Decl->getAllProtocols()), Range(Decl->getMembers()){};
+        Protocols(getAllProtocols(Decl)), Range(Decl->getMembers()){};
 
   AddCodableContext(ExtensionDecl *Decl)
       : DC(Decl), StartLoc(Decl->getBraces().Start),
-        Protocols(Decl->getExtendedNominal()->getAllProtocols()),
+        Protocols(getAllProtocols(Decl->getExtendedNominal())),
         Range(Decl->getMembers()){};
 
   AddCodableContext() : DC(nullptr), Protocols(), Range(nullptr, nullptr){};

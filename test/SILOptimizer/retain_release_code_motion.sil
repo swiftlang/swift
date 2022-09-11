@@ -319,7 +319,7 @@ bb3:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [serialized] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error Error {
+// CHECK-LABEL: sil [serialized] @try_apply_blocks_release_hoisting : $@convention(thin) (Builtin.NativeObject) -> @error any Error {
 // CHECK: bb0(
 // CHECK: strong_retain
 // CHECK: try_apply
@@ -842,9 +842,9 @@ bb3(%24 : $Optional<fuzz>):
   return %24 : $Optional<fuzz>
 }
 
-// CHECK-LABEL: sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P>
+// CHECK-LABEL: sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<any P>
 // CHECK:    checked_cast_br %0
-// CHECK:    enum $Optional<P>, #Optional.some!enumelt
+// CHECK:    enum $Optional<any P>, #Optional.some!enumelt
 // CHECK:    strong_retain %0
 // CHECK-NOT: release
 // CHECK:  } // end sil function 'moveOverClassToExistentialCast'
@@ -866,7 +866,7 @@ bb3(%24 : $Optional<P>):
   return %24 : $Optional<P>
 }
 
-// CHECK-LABEL: sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<P>
+// CHECK-LABEL: sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<any P>
 // CHECK:    strong_retain %0
 // CHECK:    checked_cast_br %0
 // CHECK:  } // end sil function 'dontMoveOverExistentialToExistentialCast'

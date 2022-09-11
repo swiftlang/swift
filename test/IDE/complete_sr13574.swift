@@ -1,6 +1,8 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE | %FileCheck %s --check-prefix=OVERRIDE
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER | %FileCheck %s --check-prefix=MEMBER
 
+// https://github.com/apple/swift/issues/56012
+
 class Root {
     func onRoot() {}
 }

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "XMLValidator.h"
 #include "ModuleAPIDiff.h"
+#include "XMLValidator.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
@@ -27,35 +27,37 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
-#include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
+#include "swift/Markup/Markup.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Markup/Markup.h"
-#include "swift/Config.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -64,7 +66,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ManagedStatic.h"
 #include <system_error>
 
 #include <algorithm>
@@ -827,6 +828,11 @@ static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
     llvm::cl::init(false));
 
 static llvm::cl::list<std::string>
+  EnableExperimentalFeatures("enable-experimental-feature",
+                             llvm::cl::desc("Enable an experimental feature"),
+                             llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
 
@@ -1082,11 +1088,10 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
       });
 }
 
-static void
-printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
-                               llvm::raw_ostream &OS, bool IncludeKeywords,
-                               bool IncludeComments, bool IncludeSourceText,
-                               bool PrintAnnotatedDescription) {
+static void printCodeCompletionResultsImpl(
+    ArrayRef<CodeCompletionResult *> Results, llvm::raw_ostream &OS,
+    bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
+    bool PrintAnnotatedDescription, const ASTContext &Ctx) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
     if (!IncludeKeywords &&
@@ -1129,10 +1134,13 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
       OS << "; comment=" << comment;
     }
 
-    if (Result->getDiagnosticSeverity() !=
+    SmallString<256> Scratch;
+    auto DiagSeverityAndMessage =
+        Result->getDiagnosticSeverityAndMessage(Scratch, Ctx);
+    if (DiagSeverityAndMessage.first !=
         CodeCompletionDiagnosticSeverity::None) {
       OS << "; diagnostics=" << comment;
-      switch (Result->getDiagnosticSeverity()) {
+      switch (DiagSeverityAndMessage.first) {
       case CodeCompletionDiagnosticSeverity::Error:
         OS << "error";
         break;
@@ -1148,7 +1156,8 @@ printCodeCompletionResultsImpl(ArrayRef<CodeCompletionResult *> Results,
       case CodeCompletionDiagnosticSeverity::None:
         llvm_unreachable("none");
       }
-      OS << ":" << Result->getDiagnosticMessage();
+      SmallString<256> Scratch;
+      OS << ":" << DiagSeverityAndMessage.second;
     }
 
     OS << "\n";
@@ -1164,7 +1173,8 @@ static int printCodeCompletionResults(
       CancellableResult, [&](CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
-            IncludeComments, IncludeSourceText, PrintAnnotatedDescription);
+            IncludeComments, IncludeSourceText, PrintAnnotatedDescription,
+            Result.Info.compilerInstance->getASTContext());
         return 0;
       });
 }
@@ -1540,10 +1550,11 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           case CancellableResultKind::Success: {
             wasASTContextReused =
                 Result->Info.completionContext->ReusingASTContext;
-            printCodeCompletionResultsImpl(Result->ResultSink.Results, OS,
-                                           IncludeKeywords, IncludeComments,
-                                           IncludeSourceText,
-                                           CodeCompletionAnnotateResults);
+            printCodeCompletionResultsImpl(
+                Result->ResultSink.Results, OS, IncludeKeywords,
+                IncludeComments, IncludeSourceText,
+                CodeCompletionAnnotateResults,
+                Result->Info.compilerInstance->getASTContext());
             break;
           }
           case CancellableResultKind::Failure:
@@ -1816,6 +1827,7 @@ public:
     case SyntaxNodeKind::Keyword: Id = "kw"; break;
     // Skip identifier.
     case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Operator: return;
     case SyntaxNodeKind::DollarIdent: Id = "dollar"; break;
     case SyntaxNodeKind::Integer: Id = "int"; break;
     case SyntaxNodeKind::Floating: Id = "float"; break;
@@ -1847,6 +1859,7 @@ public:
     case SyntaxNodeKind::Keyword: Col = llvm::raw_ostream::MAGENTA; break;
     // Skip identifier.
     case SyntaxNodeKind::Identifier: return;
+    case SyntaxNodeKind::Operator: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::DollarIdent: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::Integer: Col = llvm::raw_ostream::BLUE; break;
     case SyntaxNodeKind::Floating: Col = llvm::raw_ostream::BLUE; break;
@@ -4222,14 +4235,16 @@ int main(int argc, char *argv[]) {
             *contextFreeResult, SemanticContextKind::OtherModule,
             CodeCompletionFlair(),
             /*numBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-            /*USRTypeContext=*/nullptr, ContextualNotRecommendedReason::None,
-            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
+            /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+            ContextualNotRecommendedReason::None);
         contextualResults.push_back(contextualResult);
       }
+      auto CompInstance = std::make_unique<CompilerInstance>();
       printCodeCompletionResultsImpl(
           contextualResults, llvm::outs(), options::CodeCompletionKeywords,
           options::CodeCompletionComments, options::CodeCompletionSourceText,
-          options::CodeCompletionAnnotateResults);
+          options::CodeCompletionAnnotateResults,
+          CompInstance->getASTContext());
     }
 
     return 0;
@@ -4321,15 +4336,20 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;
   }
 
+  for (const auto &featureArg : options::EnableExperimentalFeatures) {
+    if (auto feature = getExperimentalFeature(featureArg)) {
+      InitInvok.getLangOptions().Features.insert(*feature);
+    }
+  }
+
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
     // Honor the *last* -swift-version specified.
     const auto &LastSwiftVersion =
       options::SwiftVersion[options::SwiftVersion.size()-1];
-    if (auto swiftVersion =
-          version::Version::parseVersionString(LastSwiftVersion,
-                                               SourceLoc(), nullptr)) {
+    if (auto swiftVersion = VersionParser::parseVersionString(
+            LastSwiftVersion, SourceLoc(), nullptr)) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }

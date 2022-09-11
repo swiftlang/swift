@@ -108,6 +108,10 @@ public:
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
 
+  /// If building a module from interface, ignore compiler flags
+  /// specified in the swiftinterface.
+  bool ExplicitInterfaceBuild = false;
+
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 
@@ -472,6 +476,7 @@ private:
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
   static bool canActionEmitABIDescriptor(ActionType);
+  static bool canActionEmitConstValues(ActionType);
   static bool canActionEmitModuleSemanticInfo(ActionType);
 
 public:

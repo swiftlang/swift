@@ -22,6 +22,7 @@ set(sources
   UnicodeData.h
   Visibility.h
   _SwiftConcurrency.h
+  _SwiftCxxInteroperability.h
   _SwiftDistributed.h
 
   module.modulemap

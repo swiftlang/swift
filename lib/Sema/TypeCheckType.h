@@ -67,12 +67,24 @@ enum class TypeResolutionFlags : uint16_t {
   /// Needed to enforce that \c any P<some Q> does not resolve to a
   /// parameterized existential with an opaque type constraint.
   DisallowOpaqueTypes = 1 << 9,
+
+  /// We are in a `@preconcurrency` declaration.
+  Preconcurrency = 1 << 10,
 };
 
 /// Type resolution contexts that require special handling.
 enum class TypeResolverContext : uint8_t {
   /// No special type handling is required.
   None,
+
+  /// Whether we are checking generic arguments of a bound generic type.
+  GenericArgument,
+
+  /// Whether we are checking generic arguments of a parameterized protocol type.
+  ProtocolGenericArgument,
+
+  /// Whether we are checking a tuple element type.
+  TupleElement,
 
   /// Whether we are checking the parameter list of a function.
   AbstractFunctionDecl,
@@ -94,8 +106,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is an 'inout' function input.
   InoutFunctionInput,
 
-  /// Whether we are in the result type of a function, including multi-level
-  /// tuple return values. See also: TypeResolutionFlags::Direct
+  /// Whether we are in the result type of a function.
   FunctionResult,
 
   /// Whether this is a pattern binding entry.
@@ -151,8 +162,14 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is the type of an editor placeholder.
   EditorPlaceholderExpr,
 
-  /// Whether this is an "inherited" type.
+  /// Whether this is an inheritance clause of a concrete type.
   Inherited,
+
+  /// Whether this is an inheritance clause of a generic parameter.
+  GenericParameterInherited,
+
+  /// Whether this is an inheritance clause of an associated type.
+  AssociatedTypeInherited,
 
   /// Whether this is a custom attribute.
   CustomAttr
@@ -224,6 +241,9 @@ public:
     case Context::ClosureExpr:
       return true;
     case Context::None:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::TupleElement:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::InoutFunctionInput:
@@ -242,6 +262,8 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
       return false;
     }
@@ -253,6 +275,8 @@ public:
   bool isConstraintImplicitExistential() const {
     switch (context) {
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
@@ -261,6 +285,9 @@ public:
     case Context::MetatypeBase:
       return false;
     case Context::None:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::TupleElement:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
@@ -283,25 +310,31 @@ public:
     }
   }
 
-  /// Whether parameterized protocol types are supported in this context.
-  bool isParameterizedProtocolSupported() const {
+  /// Whether pack expansion types are supported in this context.
+  bool isPackExpansionSupported() const {
     switch (context) {
+    case Context::FunctionInput:
+    case Context::TupleElement:
+    case Context::GenericArgument:
+      return true;
+
+    case Context::None:
+    case Context::ProtocolGenericArgument:
     case Context::Inherited:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
     case Context::GenericRequirement:
     case Context::ExistentialConstraint:
     case Context::MetatypeBase:
-      return true;
-    case Context::None:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
     case Context::PatternBindingDecl:
     case Context::EditorPlaceholderExpr:
     case Context::ClosureExpr:
-    case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::InoutFunctionInput:
     case Context::FunctionResult:
@@ -309,6 +342,47 @@ public:
     case Context::EnumElementDecl:
     case Context::EnumPatternPayload:
     case Context::SameTypeRequirement:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in a `where` clause, generic parameter
+  /// declaration inheritance clause, or associated type inheritance clause.
+  bool isGenericRequirement() const {
+    switch (base) {
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
+      return true;
+
+    case Context::None:
+    case Context::Inherited:
+    case Context::FunctionInput:
+    case Context::TupleElement:
+    case Context::GenericArgument:
+    case Context::ProtocolGenericArgument:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::EnumPatternPayload:
     case Context::ProtocolMetatypeBase:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
@@ -400,8 +474,7 @@ class TypeResolution {
   HandlePlaceholderTypeReprFn placeholderHandler;
 
 private:
-  /// The generic environment used to map to archetypes.
-  GenericEnvironment *genericEnv;
+  GenericSignature genericSig;
 
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
@@ -409,8 +482,7 @@ private:
                  HandlePlaceholderTypeReprFn placeholderHandler)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
-        placeholderHandler(placeholderHandler),
-        genericEnv(nullptr) {}
+        placeholderHandler(placeholderHandler) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -431,7 +503,7 @@ public:
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution
-  forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+  forInterface(DeclContext *dc, GenericSignature genericSig,
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler);
@@ -447,7 +519,7 @@ public:
                         GenericParamList *silParams = nullptr);
 
   static Type resolveContextualType(
-      TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+      TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
       TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
       HandlePlaceholderTypeReprFn placeholderHandler,
       GenericParamList *silParams = nullptr);

@@ -1603,6 +1603,7 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
 
   // Simply pass-thru the incoming address.
   case SILInstructionKind::MarkUninitializedInst:
+  case SILInstructionKind::MarkMustCheckInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
     return true;
@@ -1691,6 +1692,10 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     if (isAccessStorageIdentityCast(svi))
       return asImpl().visitStorageCast(svi, &svi->getAllOperands()[0],
                                        AccessStorageCast::Identity);
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(svi))
+      return asImpl().visitStorageCast(
+          svi, &sbi->getAllOperands()[CopyLikeInstruction::Dest],
+          AccessStorageCast::Identity);
   }
   switch (sourceAddr->getKind()) {
   default:

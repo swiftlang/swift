@@ -498,7 +498,14 @@ namespace namelookup {
 /// Add semantic members to \p type before attempting a semantic lookup.
 void installSemanticMembersIfNeeded(Type type, DeclNameRef name);
 
+/// Extracts directly referenced nominal type decls from a given type, asserting
+/// if the type does not contain any references to a nominal.
 void extractDirectlyReferencedNominalTypes(
+    Type type, SmallVectorImpl<NominalTypeDecl *> &decls);
+
+/// Extracts directly referenced nominal type decls from a given type, or leaves
+/// the vector empty if the type does not contain any references to a nominal.
+void tryExtractDirectlyReferencedNominalTypes(
     Type type, SmallVectorImpl<NominalTypeDecl *> &decls);
 
 /// Once name lookup has gathered a set of results, perform any necessary

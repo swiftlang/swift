@@ -73,7 +73,8 @@ DependencyScanningTool::getDependencies(
   auto Instance = std::move(*InstanceOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(*SharedCache);
+  ModuleDependenciesCache cache(*SharedCache,
+                                Instance->getMainModule()->getNameStr());
   // Execute the scanning action, retrieving the in-memory result
   auto DependenciesOrErr = performModuleScan(*Instance.get(), cache);
   if (DependenciesOrErr.getError())
@@ -113,7 +114,8 @@ DependencyScanningTool::getDependencies(
   auto Instance = std::move(*InstanceOrErr);
 
   // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(*SharedCache);
+  ModuleDependenciesCache cache(*SharedCache,
+                                Instance->getMainModule()->getNameStr());
   auto BatchScanResults = performBatchModuleScan(
       *Instance.get(), cache, VersionedPCMInstanceCacheCache.get(),
       Saver, BatchInput);
@@ -160,13 +162,13 @@ DependencyScanningTool::initScannerForAction(
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
 DependencyScanningTool::initCompilerInstanceForScan(
-    ArrayRef<const char *> Command) {
+    ArrayRef<const char *> CommandArgs) {
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&PDC);
 
   // Basic error checking on the arguments
-  if (Command.empty()) {
+  if (CommandArgs.empty()) {
     Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
     return std::make_error_code(std::errc::invalid_argument);
   }
@@ -180,16 +182,7 @@ DependencyScanningTool::initCompilerInstanceForScan(
   // We must do so because LLVM options parsing is done using a managed
   // static `GlobalParser`.
   llvm::cl::ResetAllOptionOccurrences();
-
-  // Parse arguments.
-  std::string CommandString;
-  for (const auto *c : Command) {
-    CommandString.append(c);
-    CommandString.append(" ");
-  }
-  SmallVector<const char *, 4> Args;
-  llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
-  if (Invocation.parseArgs(Args, Instance->getDiags())) {
+  if (Invocation.parseArgs(CommandArgs, Instance->getDiags())) {
     return std::make_error_code(std::errc::invalid_argument);
   }
 

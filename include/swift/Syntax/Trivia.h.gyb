@@ -365,7 +365,7 @@ private:
       return Text.startswith("///");
     case TriviaKind::DocBlockComment:
       return Text.startswith("/**") && Text.endswith("*/");
-    case TriviaKind::GarbageText:
+    case TriviaKind::UnexpectedText:
     case TriviaKind::Shebang:
       return !Text.empty();
 % for trivia in TRIVIAS:

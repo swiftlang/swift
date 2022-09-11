@@ -312,7 +312,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       F->setClangNodeOwner(decl);
 
     F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
-    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
+    F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();

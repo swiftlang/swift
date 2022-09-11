@@ -38,6 +38,13 @@
       key.usr: "s:Sf",
       key.line: 1,
       key.column: 23
+    },
+    {
+      key.kind: source.lang.swift.ref.function.constructor,
+      key.usr: "s:Sa12arrayLiteralSayxGxd_tcfc",
+      key.line: 1,
+      key.column: 32,
+      key.is_implicit: 1
     }
   ]
 }

@@ -385,7 +385,7 @@ bad(%15 : @owned $Error):
 // CHECK:         try_apply undef() : {{.*}}, normal [[GOOD:bb[0-9]+]], error [[BAD:bb[0-9]+]]
 // CHECK:       [[GOOD]]({{%[^,]+}} : $()):
 // CHECK:         destroy_value [[INSTANCE]]
-// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $Error):
+// CHECK:       [[BAD]]([[ERROR:%[^,]+]] : @owned $any Error):
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         throw [[ERROR]]
 // CHECK-LABEL: } // end sil function 'dont_hoist_over_try_apply_barrier'

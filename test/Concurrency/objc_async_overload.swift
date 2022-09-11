@@ -1,13 +1,17 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -typecheck -verify -import-objc-header %S/Inputs/Delegate.h %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -typecheck -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-
+// REQUIRES: asserts
 
 // overload resolution should pick sync version in a sync context
 func syncContext() {
   let r = Request()
   let d = Delegate()
-  d.makeRequest1(r) // NOTE: this use to trigger an overload resolution error, see SR-13760
+
+  // https://github.com/apple/swift/issues/56157
+  // This use to trigger an overload resolution error.
+  d.makeRequest1(r)
+
   d.makeRequest2(r)
   d.makeRequest3(r)
 }
@@ -58,5 +62,4 @@ extension Delegate {
 
 extension Delegate {
   @objc public func makeRequest(fromSwift: Request, completionHandler: (() -> Void)?) {}
-  // expected-warning@-1 {{method 'makeRequest(fromSwift:completionHandler:)' with Objective-C selector 'makeRequestFromSwift:completionHandler:' conflicts with method 'makeRequest(fromSwift:)' with the same Objective-C selector; this is an error in Swift 6}}
 }

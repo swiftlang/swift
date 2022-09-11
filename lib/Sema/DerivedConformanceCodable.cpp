@@ -897,8 +897,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
     auto *method = UnresolvedDeclRefExpr::createImplicit(C, C.Id_superEncoder);
 
     // container.superEncoder()
-    auto *superEncoderRef =
-        DotSyntaxCallExpr::create(C, containerExpr, SourceLoc(), method);
+    auto *superEncoderRef = DotSyntaxCallExpr::create(
+        C, method, SourceLoc(), Argument::unlabeled(containerExpr));
 
     // encode(to:) expr
     auto *encodeDeclRef = new (C) DeclRefExpr(ConcreteDeclRef(encodeDecl),
@@ -909,8 +909,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                           SourceLoc(), /*Implicit=*/true);
 
     // super.encode(to:)
-    auto *encodeCall =
-        DotSyntaxCallExpr::create(C, superRef, SourceLoc(), encodeDeclRef);
+    auto *encodeCall = DotSyntaxCallExpr::create(C, encodeDeclRef, SourceLoc(),
+                                                 Argument::unlabeled(superRef));
 
     // super.encode(to: container.superEncoder())
     auto *args = ArgumentList::forImplicitSingle(C, C.Id_to, superEncoderRef);

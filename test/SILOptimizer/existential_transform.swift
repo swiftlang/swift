@@ -175,7 +175,7 @@ internal class K : P {
 // CHECK: bb0(%0 : $P):
 // CHECK: debug_value
 // CHECK: [[O1:%.*]] = open_existential_ref
-// CHECK: witness_method $@opened("{{.*}}") P, #P.foo : <Self where Self : P> (Self) -> () -> Int, [[O1]] : $@opened("{{.*}}") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+// CHECK: witness_method $@opened("{{.*}}", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int, [[O1]] : $@opened("{{.*}}", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
 // CHECK: apply
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform18do_not_optimize_cp1aSiAA1P_p_tF'
@@ -199,7 +199,7 @@ internal class KK : PP {
 // CHECK: debug_value {{.*}} expr op_deref
 // CHECK: load
 // CHECK: [[O1:%.*]] = open_existential_ref
-// CHECK:  witness_method $@opened("{{.*}}") PP, #PP.foo : <Self where Self : PP> (Self) -> () -> Int, %3 : $@opened("{{.*}}PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int 
+// CHECK:  witness_method $@opened("{{.*}}", PP) Self, #PP.foo : <Self where Self : PP> (Self) -> () -> Int, %3 : $@opened("{{.*}}PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int 
 // CHECK: apply
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform13wrap_inout_cp1aSiAA2PP_pz_tF'

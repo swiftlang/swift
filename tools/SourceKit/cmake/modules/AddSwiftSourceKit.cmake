@@ -20,6 +20,16 @@ endfunction()
 
 function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
   set(RPATH_LIST)
+
+  # If we are linking in the Swift Swift parser, we at least need host tools
+  # to do it.
+  set(ASKD_BOOTSTRAPPING_MODE ${BOOTSTRAPPING_MODE})
+  if (NOT ASKD_BOOTSTRAPPING_MODE)
+    if (SWIFT_SWIFT_PARSER)
+      set(ASKD_BOOTSTRAPPING_MODE HOSTTOOLS)
+    endif()
+  endif()
+
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
 
     # Lists of rpaths that we are going to add to our executables.
@@ -31,9 +41,9 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
     # If we found a swift compiler and are going to use swift code in swift
     # host side tools but link with clang, add the appropriate -L paths so we
     # find all of the necessary swift libraries on Darwin.
-    if (HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
+    if (HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
 
-      if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+      if(ASKD_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         # Add in the toolchain directory so we can grab compatibility libraries
         get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
         get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
@@ -45,15 +55,13 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+      elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
 
         # Intentinally don't add the lib dir of the cross-compiled compiler, so that
         # the stdlib is not picked up from there, but from the SDK.
         # This requires to explicitly add all the needed compatibility libraries. We
         # can take them from the current build.
-        set(vsuffix "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-        set(conctarget "swiftCompatibilityConcurrency${vsuffix}")
-        target_link_libraries(${target} PUBLIC ${conctarget})
+        target_link_libraries(${target} PUBLIC HostCompatibilityLibs)
 
         # Add the SDK directory for the host platform.
         target_link_directories(${target} PRIVATE "${sdk_dir}")
@@ -61,7 +69,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
         # Add the SDK directory for the host platform.
         target_link_directories(${target} PRIVATE "${sdk_dir}")
 
@@ -72,7 +80,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+      elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
         # At build time link against the built swift libraries from the
         # previous bootstrapping stage.
         get_bootstrapping_swift_lib_dir(bs_lib_dir "")
@@ -87,7 +95,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
         list(APPEND RPATH_LIST "@loader_path/${relative_rtlib_path}")
       else()
-        message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
+        message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
       endif()
 
       # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
@@ -106,11 +114,11 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
       set_property(TARGET ${target} APPEND_STRING PROPERTY
                    LINK_FLAGS " -lobjc ")
 
-    endif() # HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE
+    endif() # HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE
 
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-    if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
+    if(${ASKD_BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
       # At build time and and run time, link against the swift libraries in the
       # installed host toolchain.
       get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
@@ -121,14 +129,14 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
-      if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+      if(ASKD_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         list(APPEND RPATH_LIST "${host_lib_dir}")
       else()
         file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
         list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
       endif()
 
-    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+    elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       get_bootstrapping_swift_lib_dir(bs_lib_dir "")
       target_link_directories(${target} PRIVATE ${bs_lib_dir})
       target_link_libraries(${target} PRIVATE ${swiftrt})
@@ -139,10 +147,10 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
       file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
 
-    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-      message(FATAL_ERROR "BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
+    elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      message(FATAL_ERROR "ASKD_BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
     else()
-      message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
+      message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
     endif()
   endif()
   set(RPATH_LIST ${RPATH_LIST} PARENT_SCOPE)

@@ -224,6 +224,11 @@ protocol Other1 {
     key.length: 1
   },
   {
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 229,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "String",
     key.usr: "s:SS",

@@ -113,7 +113,7 @@ func testSharedOwnedOpaque(_ s: C, o: C) {
 
 // Make sure that when we generate the reabstraction thunk from Klass -> P, we
 // pass off the value at +1.
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s10reabstract1P_pIegg_xIegg_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0, @guaranteed @callee_guaranteed (@guaranteed P) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s10reabstract1P_pIegg_xIegg_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0, @guaranteed @callee_guaranteed (@guaranteed any P) -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $τ_0_0,
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[EXISTENTIAL:%.*]] = init_existential_ref [[ARG_COPY]]

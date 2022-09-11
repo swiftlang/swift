@@ -22,6 +22,7 @@
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 
 #include "llvm/Support/MemoryBuffer.h"
@@ -784,8 +785,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
   if (!swiftVersion.empty()) {
-    auto swiftVer = version::Version::parseVersionString(swiftVersion,
-                                                         SourceLoc(), nullptr);
+    auto swiftVer =
+        VersionParser::parseVersionString(swiftVersion, SourceLoc(), nullptr);
     if (swiftVer.hasValue())
       Invocation.getLangOptions().EffectiveLanguageVersion =
           swiftVer.getValue();

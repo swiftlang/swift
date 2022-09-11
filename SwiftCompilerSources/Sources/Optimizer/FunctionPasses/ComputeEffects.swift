@@ -12,9 +12,6 @@
 
 import SIL
 
-fileprivate typealias Selection = ArgumentEffect.Selection
-fileprivate typealias Path = ArgumentEffect.Path
-
 /// Computes effects for function arguments.
 ///
 /// For example, if an argument does not escape, adds a non-escaping effect,
@@ -34,7 +31,7 @@ let computeEffects = FunctionPass(name: "compute-effects", {
   var argsWithDefinedEffects = getArgIndicesWithDefinedEffects(of: function)
 
   struct IgnoreRecursiveCallVisitor : EscapeInfoVisitor {
-    func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
+    func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       return isOperandOfRecursiveCall(operand) ? .ignore : .continueWalk
     }
   }
@@ -50,18 +47,17 @@ let computeEffects = FunctionPass(name: "compute-effects", {
     if argsWithDefinedEffects.contains(arg.index) { continue }
     
     // First check: is the argument (or a projected value of it) escaping at all?
-    if !escapeInfo.isEscapingWhenWalkingDown(object: arg, path: Path(.anything)) {
-      let selectedArg = Selection(arg, pathPattern: Path(.anything))
-      newEffects.push(ArgumentEffect(.notEscaping, selectedArg: selectedArg))
+    if !escapeInfo.isEscapingWhenWalkingDown(object: arg, path: SmallProjectionPath(.anything)) {
+      newEffects.push(ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: SmallProjectionPath(.anything)))
       continue
     }
   
     // Now compute effects for two important cases:
     //   * the argument itself + any value projections, and...
-    if addArgEffects(context: context, arg, argPath: Path(), to: &newEffects, returnInst) {
+    if addArgEffects(arg, argPath: SmallProjectionPath(), to: &newEffects, returnInst, context) {
       //   * single class indirections
-      _ = addArgEffects(context: context, arg, argPath: Path(.anyValueFields).push(.anyClassField),
-                        to: &newEffects, returnInst)
+      _ = addArgEffects(arg, argPath: SmallProjectionPath(.anyValueFields).push(.anyClassField),
+                        to: &newEffects, returnInst, context)
     }
   }
 
@@ -75,34 +71,35 @@ let computeEffects = FunctionPass(name: "compute-effects", {
 
 /// Returns true if an argument effect was added.
 private
-func addArgEffects(context: PassContext, _ arg: FunctionArgument, argPath ap: Path,
+func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
                    to newEffects: inout Stack<ArgumentEffect>,
-                   _ returnInst: ReturnInst?) -> Bool {
+                   _ returnInst: ReturnInst?, _ context: PassContext) -> Bool {
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
   
   struct ArgEffectsVisitor : EscapeInfoVisitor {
-    init(toSelection: Selection?, returnInst: ReturnInst?) {
-      self.toSelection = toSelection
-      self.returnInst = returnInst
+    enum EscapeDestination {
+      case notSet
+      case toReturn(SmallProjectionPath)
+      case toArgument(Int, SmallProjectionPath) // argument index, path
     }
+    var result = EscapeDestination.notSet
     
-    var toSelection: Selection?
-    var returnInst: ReturnInst?
-    
-    mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
-      if operand.instruction == returnInst {
+    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+      if operand.instruction is ReturnInst {
         // The argument escapes to the function return
-        if state.followStores {
+        if path.followStores {
           // The escaping path must not introduce a followStores.
           return .abort
         }
-        if let ta = toSelection {
-          if ta.value != .returnValue { return .abort }
-          toSelection = Selection(.returnValue, pathPattern: path.merge(with: ta.pathPattern))
-        } else {
-          toSelection = Selection(.returnValue, pathPattern: path)
+        switch result {
+          case .notSet:
+            result = .toReturn(path.projectionPath)
+          case .toReturn(let oldPath):
+            result = .toReturn(oldPath.merge(with: path.projectionPath))
+          case .toArgument:
+            return .abort
         }
         return .ignore
       }
@@ -112,47 +109,54 @@ func addArgEffects(context: PassContext, _ arg: FunctionArgument, argPath ap: Pa
       return .continueWalk
     }
     
-    mutating func visitDef(def: Value, path: Path, state: State) -> DefResult {
+    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
       guard let destArg = def as? FunctionArgument else {
         return .continueWalkUp
       }
       // The argument escapes to another argument (e.g. an out or inout argument)
-      if state.followStores {
+      if path.followStores {
         // The escaping path must not introduce a followStores.
         return .abort
       }
       let argIdx = destArg.index
-      if let ta = toSelection {
-        if ta.value != .argument(argIdx) { return .abort }
-        toSelection = Selection(.argument(argIdx), pathPattern: path.merge(with: ta.pathPattern))
-      } else {
-        toSelection = Selection(.argument(argIdx), pathPattern: path)
+      switch result {
+        case .notSet:
+          result = .toArgument(argIdx, path.projectionPath)
+        case .toArgument(let oldArgIdx, let oldPath) where oldArgIdx == argIdx:
+          result = .toArgument(argIdx, oldPath.merge(with: path.projectionPath))
+        default:
+          return .abort
       }
       return .walkDown
     }
   }
   
-  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: ArgEffectsVisitor(toSelection: nil, returnInst: returnInst))
+  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: ArgEffectsVisitor())
   if walker.isEscapingWhenWalkingDown(object: arg, path: argPath) {
     return false
   }
   
-  let toSelection = walker.visitor.toSelection
-  let fromSelection = Selection(arg, pathPattern: argPath)
-
-  guard let toSelection = toSelection else {
-    newEffects.push(ArgumentEffect(.notEscaping, selectedArg: fromSelection))
-    return true
-  }
-  
   // If the function never returns, the argument can not escape to another arg/return.
-  guard let returnInst = returnInst else {
+  guard let returnInst = arg.function.returnInstruction else {
     return false
   }
 
-  let exclusive = isExclusiveEscape(context: context, fromArgument: arg, fromPath: argPath, to: toSelection, returnInst)
-
-  newEffects.push(ArgumentEffect(.escaping(toSelection, exclusive), selectedArg: fromSelection))
+  let effect: ArgumentEffect
+  switch walker.visitor.result {
+  case .notSet:
+    effect = ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: argPath)
+  case .toReturn(let toPath):
+    let exclusive = isExclusiveEscapeToReturn(fromArgument: arg, fromPath: argPath,
+                                              toPath: toPath, returnInst: returnInst, context)
+    effect = ArgumentEffect(.escapingToReturn(toPath, exclusive),
+                            argumentIndex: arg.index, pathPattern: argPath)
+  case .toArgument(let toArgIdx, let toPath):
+    let exclusive = isExclusiveEscapeToArgument(fromArgument: arg, fromPath: argPath,
+                                                toArgumentIndex: toArgIdx, toPath: toPath, context)
+    effect = ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+                            argumentIndex: arg.index, pathPattern: argPath)
+  }
+  newEffects.push(effect)
   return true
 }
 
@@ -163,17 +167,13 @@ private func getArgIndicesWithDefinedEffects(of function: Function) -> Set<Int> 
   for effect in function.effects.argumentEffects {
     if effect.isDerived { continue }
 
-    if case .argument(let argIdx) = effect.selectedArg.value {
-      argsWithDefinedEffects.insert(argIdx)
-    }
+    argsWithDefinedEffects.insert(effect.argumentIndex)
 
     switch effect.kind {
-    case .notEscaping:
+    case .notEscaping, .escapingToReturn:
       break
-    case .escaping(let to, _):
-      if case .argument(let toArgIdx) = to.value {
-        argsWithDefinedEffects.insert(toArgIdx)
-      }
+    case .escapingToArgument(let toArgIdx, _, _):
+      argsWithDefinedEffects.insert(toArgIdx)
     }
   }
   return argsWithDefinedEffects
@@ -197,70 +197,64 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
 /// there are no other arguments or escape points than `fromArgument`. Also, the
 /// path at the `fromArgument` must match with `fromPath`.
 private
-func isExclusiveEscape(context: PassContext, fromArgument: Argument, fromPath: Path, to toSelection: Selection,
-                       _ returnInst: ReturnInst) -> Bool {
-  switch toSelection.value {
-  
-  // argument -> return
-  case .returnValue:
-    struct IsExclusiveReturnEscapeVisitor : EscapeInfoVisitor {
-      let fromArgument: Argument
-      let toSelection: Selection
-      let returnInst: ReturnInst
-      let fromPath: Path
-      
-      mutating func visitUse(operand: Operand, path: Path, state: State) -> UseResult {
-        if operand.instruction == returnInst {
-          if state.followStores { return .abort }
-          if path.matches(pattern: toSelection.pathPattern) {
-            return .ignore
-          }
-          return .abort
-        }
-        return .continueWalk
-      }
-      
-      mutating func visitDef(def: Value, path: Path, state: State) -> DefResult {
-        guard let arg = def as? FunctionArgument else {
-          return .continueWalkUp
-        }
-        if state.followStores { return .abort }
-        if arg == fromArgument && path.matches(pattern: fromPath) {
-          return .walkDown
+func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjectionPath,
+                               toPath: SmallProjectionPath,
+                               returnInst: ReturnInst, _ context: PassContext) -> Bool {
+  struct IsExclusiveReturnEscapeVisitor : EscapeInfoVisitor {
+    let fromArgument: Argument
+    let fromPath: SmallProjectionPath
+    let toPath: SmallProjectionPath
+    
+    mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+      if operand.instruction is ReturnInst {
+        if path.followStores { return .abort }
+        if path.projectionPath.matches(pattern: toPath) {
+          return .ignore
         }
         return .abort
       }
+      return .continueWalk
     }
-    let visitor = IsExclusiveReturnEscapeVisitor(fromArgument: fromArgument, toSelection: toSelection, returnInst: returnInst, fromPath: fromPath)
-    var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: visitor)
-    if walker.isEscaping(object: returnInst.operand, path: toSelection.pathPattern) {
-      return false
-    }
-  // argument -> argument
-  case .argument(let toArgIdx):
-    struct IsExclusiveArgumentEscapeVisitor : EscapeInfoVisitor {
-      let fromArgument: Argument
-      let fromPath: Path
-      let toSelection: Selection
-      let toArg: FunctionArgument
-      
-      mutating func visitDef(def: Value, path: Path, state: State) -> DefResult {
-        guard let arg = def as? FunctionArgument else {
-          return .continueWalkUp
-        }
-        if state.followStores { return .abort }
-        if arg == fromArgument && path.matches(pattern: fromPath) { return .walkDown }
-        if arg == toArg && path.matches(pattern: toSelection.pathPattern) { return .walkDown }
-        return .abort
+    
+    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
+      guard let arg = def as? FunctionArgument else {
+        return .continueWalkUp
       }
-    }
-    let toArg = returnInst.function.arguments[toArgIdx]
-    let visitor = IsExclusiveArgumentEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath, toSelection: toSelection, toArg: toArg)
-    var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: visitor)
-    if walker.isEscaping(object: toArg, path: toSelection.pathPattern) {
-      return false
+      if path.followStores { return .abort }
+      if arg == fromArgument && path.projectionPath.matches(pattern: fromPath) {
+        return .walkDown
+      }
+      return .abort
     }
   }
-  return true
+  let visitor = IsExclusiveReturnEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath, toPath: toPath)
+  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: visitor)
+  return !walker.isEscaping(object: returnInst.operand, path: toPath)
+}
+
+private
+func isExclusiveEscapeToArgument(fromArgument: Argument, fromPath: SmallProjectionPath,
+                                 toArgumentIndex: Int, toPath: SmallProjectionPath, _ context: PassContext) -> Bool {
+  struct IsExclusiveArgumentEscapeVisitor : EscapeInfoVisitor {
+    let fromArgument: Argument
+    let fromPath: SmallProjectionPath
+    let toArgumentIndex: Int
+    let toPath: SmallProjectionPath
+    
+    mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
+      guard let arg = def as? FunctionArgument else {
+        return .continueWalkUp
+      }
+      if path.followStores { return .abort }
+      if arg == fromArgument && path.projectionPath.matches(pattern: fromPath) { return .walkDown }
+      if arg.index == toArgumentIndex && path.projectionPath.matches(pattern: toPath) { return .walkDown }
+      return .abort
+    }
+  }
+  let visitor = IsExclusiveArgumentEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath,
+                                                 toArgumentIndex: toArgumentIndex, toPath: toPath)
+  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: visitor)
+  let toArg = fromArgument.function.arguments[toArgumentIndex]
+  return !walker.isEscaping(object: toArg, path: toPath)
 }
 

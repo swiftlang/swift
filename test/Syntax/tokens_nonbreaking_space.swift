@@ -15,30 +15,30 @@ let cZ=Z3
 // CHECK-LABEL: 4:7
 // CHECK-NEXT:(Token equal
 // CHECK-NEXT: (text="=")
-// CHECK-NEXT: (trivia garbageText \302\240))
+// CHECK-NEXT: (trivia unexpectedText \302\240))
 
 // CHECK-LABEL: 4:10
 // CHECK-NEXT:(Token integer_literal
 // CHECK-NEXT: (text="3")
-// CHECK-NEXT: (trivia garbageText \302\240)
+// CHECK-NEXT: (trivia unexpectedText \302\240)
 // CHECK-NEXT: (trivia space 1))
 
 // CHECK-LABEL: 5:5
 // CHECK-NEXT:(Token identifier
 // CHECK-NEXT: (text="b")
-// CHECK-NEXT: (trivia garbageText \302\240))
+// CHECK-NEXT: (trivia unexpectedText \302\240))
 
 // CHECK-LABEL: 5:10
 // CHECK-NEXT:(Token integer_literal
 // CHECK-NEXT: (text="3")
-// CHECK-NEXT: (trivia garbageText \302\240)
+// CHECK-NEXT: (trivia unexpectedText \302\240)
 
 // CHECK-LABEL: 6:5
 // CHECK-NEXT:(Token identifier
 // CHECK-NEXT: (text="c")
-// CHECK-NEXT: (trivia garbageText \302\240))
+// CHECK-NEXT: (trivia unexpectedText \302\240))
 
 // CHECK-LABEL: 6:8
 // CHECK-NEXT:(Token equal
 // CHECK-NEXT: (text="=")
-// CHECK-NEXT: (trivia garbageText \302\240))
+// CHECK-NEXT: (trivia unexpectedText \302\240))

@@ -18,6 +18,7 @@
 #ifndef SWIFT_REFLECTION_TYPEREFBUILDER_H
 #define SWIFT_REFLECTION_TYPEREFBUILDER_H
 
+#include "swift/Remote/ExternalTypeRefCache.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
@@ -425,6 +426,8 @@ private:
 
   TypeConverter TC;
   MetadataSourceBuilder MSB;
+
+  remote::ExternalTypeRefCache *ExternalTypeRefCache = nullptr;
 
 #define TYPEREF(Id, Parent) \
   std::unordered_map<TypeRefID, const Id##TypeRef *, \
@@ -915,10 +918,17 @@ public:
   /// Parsing reflection metadata
   ///
 
-  void addReflectionInfo(ReflectionInfo I) {
+  /// Add the ReflectionInfo and return a unique ID for the reflection image
+  /// added. Since we only add reflection infos, the ID can be its index.
+  /// We return a uint32_t since it's extremely unlikely we'll run out of
+  /// indexes.
+  uint32_t addReflectionInfo(ReflectionInfo I) {
     ReflectionInfos.push_back(I);
+    auto InfoID = ReflectionInfos.size() - 1;
+    assert(InfoID <= UINT32_MAX && "ReflectionInfo ID overflow");
+    return InfoID;
   }
-  
+
   const std::vector<ReflectionInfo> &getReflectionInfos() {
     return ReflectionInfos;
   }
@@ -942,6 +952,9 @@ private:
   void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
   llvm::Optional<RemoteRef<FieldDescriptor>>
   findFieldDescriptorAtIndex(size_t Index, const std::string &MangledName);
+
+  llvm::Optional<RemoteRef<FieldDescriptor>>
+  getFieldDescriptorFromExternalCache(const std::string &MangledName);
 
 public:
   RemoteRef<char> readTypeRef(uint64_t remoteAddr);
@@ -983,8 +996,9 @@ private:
 
 public:
   template<typename Runtime>
-  TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader)
-    : TC(*this),
+  TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
+                 remote::ExternalTypeRefCache *externalCache = nullptr)
+      : TC(*this), ExternalTypeRefCache(externalCache),
       PointerSize(sizeof(typename Runtime::StoredPointer)),
       TypeRefDemangler(
       [this, &reader](RemoteRef<char> string, bool useOpaqueTypeSymbolicReferences) -> Demangle::Node * {

@@ -40,6 +40,10 @@ ERROR(error_experimental_feature_not_available, none,
       "experimental feature '%0' cannot be enabled in a production compiler",
       (StringRef))
 
+ERROR(error_upcoming_feature_on_by_default, none,
+      "upcoming feature '%0' is already enabled as of Swift version %1",
+      (StringRef, unsigned))
+
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi' or 'other'", (StringRef))
@@ -95,6 +99,8 @@ WARNING(warning_cannot_find_locale_file,none,
       "cannot find translations for '%0' at '%1': no such file", (StringRef, StringRef))
 WARNING(warning_cannot_multithread_batch_mode,none,
       "ignoring -num-threads argument; cannot multithread batch mode", ())
+ERROR(error_cannot_explicit_interface_build_in_mode,none,
+      "'-explicit-interface-module-build' only supported when building a module from interface ('-compile-module-from-interface')'", ())
 ERROR(error_unsupported_option_argument,none,
       "unsupported argument '%1' to option '%0'", (StringRef, StringRef))
 ERROR(error_immediate_mode_missing_stdlib,none,
@@ -139,6 +145,8 @@ ERROR(error_mode_cannot_emit_symbol_graph,none,
       "this mode does not support emitting symbol graph files", ())
 ERROR(error_mode_cannot_emit_abi_descriptor,none,
       "this mode does not support emitting ABI descriptor", ())
+ERROR(error_mode_cannot_emit_const_values,none,
+      "this mode does not support emitting extracted const values", ())
 ERROR(error_mode_cannot_emit_module_semantic_info,none,
       "this mode does not support emitting module semantic info", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
@@ -299,8 +307,16 @@ ERROR(batch_scan_input_file_missing,none,
       "cannot open batch dependencies scan input file from %0",
       (StringRef))
 
+ERROR(const_extract_protocol_list_input_file_missing,none,
+      "cannot open constant extraction protocol list input file from %0",
+      (StringRef))
+
 ERROR(batch_scan_input_file_corrupted,none,
       "batch dependencies scan input file from %0 is malformed",
+      (StringRef))
+
+ERROR(const_extract_protocol_list_input_file_corrupted,none,
+      "constant extraction protocol list input file from %0 is malformed",
       (StringRef))
 
 ERROR(unknown_platform_name, none,

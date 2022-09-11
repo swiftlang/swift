@@ -948,6 +948,22 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.TypeName = copyAndClearString(Allocator, Buffer);
 
+  // ParameterizedProtocolType should always be wrapped in ExistentialType and
+  // cannot be mangled on its own.
+  // But ParameterizedProtocolType can currently occur in 'typealias'
+  // declarations. rdar://99176683
+  // To avoid crashing in USR generation, return an error for now.
+  if (auto Ty = DInfo.VD->getInterfaceType()) {
+    while (auto MetaTy = Ty->getAs<MetatypeType>()) {
+      Ty = MetaTy->getInstanceType();
+    }
+    if (Ty && Ty->getCanonicalType()->is<ParameterizedProtocolType>()) {
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "Cannot mangle USR for ParameterizedProtocolType without 'any'.");
+    }
+  }
+
   SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
   Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
 
@@ -1270,7 +1286,7 @@ static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
   auto *VD = CursorInfo.ValueD;
 
   // If the given name is not a function name, and the cursor points to
-  // a contructor call, we use the type declaration instead of the init
+  // a constructor call, we use the type declaration instead of the init
   // declaration to translate the name.
   if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
     if (auto *TD = CursorInfo.CtorTyRef) {
@@ -1620,6 +1636,10 @@ static void computeDiagnostics(
       auto &DiagConsumer = AstUnit->getEditorDiagConsumer();
       auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
       Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<DiagnosticsResult>::cancelled());
     }
   };
 

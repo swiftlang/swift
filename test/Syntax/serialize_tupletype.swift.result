@@ -1,15 +1,20 @@
 {
   "kind": "SourceFile",
   "layout": [
+    null,
     {
       "kind": "CodeBlockItemList",
       "layout": [
         {
           "kind": "CodeBlockItem",
           "layout": [
+            null,
             {
               "kind": "TypealiasDecl",
               "layout": [
+                null,
+                null,
+                null,
                 null,
                 null,
                 {
@@ -20,6 +25,7 @@
                   "trailingTrivia": " ",
                   "presence": "Present"
                 },
+                null,
                 {
                   "tokenKind": {
                     "kind": "identifier",
@@ -30,9 +36,12 @@
                   "presence": "Present"
                 },
                 null,
+                null,
+                null,
                 {
                   "kind": "TypeInitializerClause",
                   "layout": [
+                    null,
                     {
                       "tokenKind": {
                         "kind": "equal"
@@ -41,9 +50,11 @@
                       "trailingTrivia": " ",
                       "presence": "Present"
                     },
+                    null,
                     {
                       "kind": "TupleType",
                       "layout": [
+                        null,
                         {
                           "tokenKind": {
                             "kind": "l_paren"
@@ -52,12 +63,15 @@
                           "trailingTrivia": "",
                           "presence": "Present"
                         },
+                        null,
                         {
                           "kind": "TupleTypeElementList",
                           "layout": [
                             {
                               "kind": "TupleTypeElement",
                               "layout": [
+                                null,
+                                null,
                                 null,
                                 {
                                   "tokenKind": {
@@ -67,6 +81,7 @@
                                   "trailingTrivia": " ",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "tokenKind": {
                                     "kind": "identifier",
@@ -76,6 +91,7 @@
                                   "trailingTrivia": "",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "tokenKind": {
                                     "kind": "colon"
@@ -84,9 +100,11 @@
                                   "trailingTrivia": " ",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
+                                    null,
                                     {
                                       "tokenKind": {
                                         "kind": "identifier",
@@ -96,10 +114,14 @@
                                       "trailingTrivia": "",
                                       "presence": "Present"
                                     },
+                                    null,
                                     null
                                   ],
                                   "presence": "Present"
                                 },
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 {
@@ -117,6 +139,8 @@
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
+                                null,
+                                null,
                                 {
                                   "tokenKind": {
                                     "kind": "kw__"
@@ -126,6 +150,8 @@
                                   "presence": "Present"
                                 },
                                 null,
+                                null,
+                                null,
                                 {
                                   "tokenKind": {
                                     "kind": "colon"
@@ -134,9 +160,11 @@
                                   "trailingTrivia": " ",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
+                                    null,
                                     {
                                       "tokenKind": {
                                         "kind": "identifier",
@@ -146,10 +174,14 @@
                                       "trailingTrivia": "",
                                       "presence": "Present"
                                     },
+                                    null,
                                     null
                                   ],
                                   "presence": "Present"
                                 },
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 null
@@ -159,6 +191,7 @@
                           ],
                           "presence": "Present"
                         },
+                        null,
                         {
                           "tokenKind": {
                             "kind": "r_paren"
@@ -173,10 +206,13 @@
                   ],
                   "presence": "Present"
                 },
+                null,
                 null
               ],
               "presence": "Present"
             },
+            null,
+            null,
             null,
             null
           ],
@@ -185,6 +221,7 @@
       ],
       "presence": "Present"
     },
+    null,
     {
       "tokenKind": {
         "kind": "eof",

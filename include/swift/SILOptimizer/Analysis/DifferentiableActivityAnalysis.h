@@ -135,7 +135,7 @@ private:
     auto type = value->getType().getASTType();
     // Remap archetypes in the derivative generic signature, if it exists.
     if (type->hasArchetype()) {
-      type = derivativeGenericSignature.getCanonicalTypeInContext(
+      type = derivativeGenericSignature.getReducedType(
           type->mapTypeOutOfContext());
     }
     // Look up conformance in the current module.

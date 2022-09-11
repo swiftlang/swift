@@ -1595,6 +1595,39 @@ public:
     return std::move(*applyCallee);
   }
 
+  /// \returns true if the conversion is from an async function to
+  /// the same type but with a global actor added. For example this:
+  ///     () async -> ()  ==>  @MainActor () async -> ()
+  /// will return true. In all other cases, returns false.
+  static bool addsGlobalActorToAsyncFn(FunctionConversionExpr *fce) {
+    CanType oldTy = fce->getSubExpr()->getType()->getCanonicalType();
+    CanType newTy = fce->getType()->getCanonicalType();
+
+    if (auto oldFnTy = dyn_cast<AnyFunctionType>(oldTy)) {
+      if (auto newFnTy = dyn_cast<AnyFunctionType>(newTy)) {
+        // old type MUST be async
+        if (!oldFnTy->hasEffect(EffectKind::Async))
+          return false;
+
+        // old type MUST NOT have a global actor
+        if (oldFnTy->hasGlobalActor())
+          return false;
+
+        // new type MUST have a global actor
+        if (!newFnTy->hasGlobalActor())
+          return false;
+
+        // see if adding the global actor to the old type yields the new type.
+        auto globalActor = newFnTy->getGlobalActor();
+        auto addedActor = oldFnTy->getExtInfo().withGlobalActor(globalActor);
+
+        return oldFnTy->withExtInfo(addedActor) == newFnTy;
+      }
+    }
+
+    return false;
+  }
+
   /// Ignore parentheses and implicit conversions.
   static Expr *ignoreParensAndImpConversions(Expr *expr) {
     while (true) {
@@ -1608,7 +1641,16 @@ public:
       // works given that we check the result for certain forms.
       if (auto eval = dyn_cast<OptionalEvaluationExpr>(expr)) {
         if (auto inject = dyn_cast<InjectIntoOptionalExpr>(eval->getSubExpr())) {
-          if (auto bind = dyn_cast<BindOptionalExpr>(inject->getSubExpr())) {
+
+          auto nextSubExpr = inject->getSubExpr();
+
+          // skip over a specific, known no-op function conversion, if it exists
+          if (auto funcConv = dyn_cast<FunctionConversionExpr>(nextSubExpr)) {
+            if (addsGlobalActorToAsyncFn(funcConv))
+              nextSubExpr = funcConv->getSubExpr();
+          }
+
+          if (auto bind = dyn_cast<BindOptionalExpr>(nextSubExpr)) {
             if (bind->getDepth() == 0)
               return bind->getSubExpr();
           }
@@ -1811,9 +1853,13 @@ static void emitRawApply(SILGenFunction &SGF,
   // Gather the arguments.
   for (auto i : indices(args)) {
     SILValue argValue;
+    auto inputTy =
+        substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
+
     if (inputParams[i].isConsumed()) {
       argValue = args[i].forward(SGF);
-      if (argValue->getType().isMoveOnlyWrapped()) {
+      if (argValue->getType().isMoveOnlyWrapped() &&
+          !inputTy.isMoveOnlyWrapped()) {
         argValue =
             SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, argValue);
       }
@@ -1826,26 +1872,30 @@ static void emitRawApply(SILGenFunction &SGF,
       // will error. At this point we just want to make sure that the emitted
       // types line up.
       if (arg.getType().isMoveOnlyWrapped()) {
-        // We need to borrow so that we can convert from $@moveOnly T -> $T. Use
-        // a formal access borrow to ensure that we have tight scopes like we do
-        // when we borrow fn.
-        if (!arg.isPlusZero())
-          arg = arg.formalAccessBorrow(SGF, loc);
-        arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+        if (!inputTy.isMoveOnlyWrapped()) {
+          // We need to borrow so that we can convert from $@moveOnly T -> $T.
+          // Use a formal access borrow to ensure that we have tight scopes like
+          // we do when we borrow fn.
+          if (!arg.isPlusZero())
+            arg = arg.formalAccessBorrow(SGF, loc);
+
+          arg = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, arg);
+        }
       }
 
       argValue = arg.getValue();
     }
 
 #ifndef NDEBUG
-    auto inputTy =
-        substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
     if (argValue->getType() != inputTy) {
       auto &out = llvm::errs();
       out << "TYPE MISMATCH IN ARGUMENT " << i << " OF APPLY AT ";
       printSILLocationDescription(out, loc, SGF.getASTContext());
       out << "  argument value: ";
       argValue->print(out);
+      out << "  argument type: ";
+      argValue->getType().print(out);
+      out << "\n";
       out << "  parameter type: ";
       inputTy.print(out);
       out << "\n";
@@ -3606,9 +3656,10 @@ public:
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      auto *bbi = cast<BeginBorrowInst>(theBox);
-      SGF.B.createEndBorrow(l, bbi);
-      theBox = bbi->getOperand();
+      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+        SGF.B.createEndBorrow(l, bbi);
+        theBox = bbi->getOperand();
+      }
     }
     SGF.B.createDeallocBox(l, theBox);
   }
@@ -3835,7 +3886,7 @@ class CallEmission {
 
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
-  Optional<ImplicitActorHopTarget> implicitActorHopTarget;
+  Optional<ActorIsolation> implicitActorHopTarget;
   bool implicitlyThrows;
 
 public:
@@ -3886,7 +3937,7 @@ public:
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
   void setImplicitlyAsync(
-      Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+      Optional<ActorIsolation> implicitActorHopTarget) {
     this->implicitActorHopTarget = implicitActorHopTarget;
   }
 
@@ -4178,8 +4229,13 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                 resultFnType, argVals,
                                 std::move(*callSite).forward());
 
-    auto payloadTy = AnyFunctionType::composeTuple(SGF.getASTContext(),
-                                                   resultFnType->getParams());
+    // We need to implode a tuple rvalue for enum construction. This is
+    // essentially an implosion of the internal arguments of a pseudo case
+    // constructor, so we can drop the parameter flags.
+    auto payloadTy = AnyFunctionType::composeTuple(
+        SGF.getASTContext(), resultFnType->getParams(),
+        ParameterFlagHandling::IgnoreNonEmpty);
+
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
     payload = ArgumentSource(uncurriedLoc, std::move(arg));
     formalResultType = cast<FunctionType>(formalResultType).getResult();
@@ -4517,7 +4573,7 @@ RValue SILGenFunction::emitApply(
     ArrayRef<ManagedValue> args,
     const CalleeTypeInfo &calleeTypeInfo,
     ApplyOptions options, SGFContext evalContext,
-    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+    Optional<ActorIsolation> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -4616,18 +4672,24 @@ RValue SILGenFunction::emitApply(
 
     SILValue executor;
     switch (*implicitActorHopTarget) {
-    case ImplicitActorHopTarget::InstanceSelf:
-      executor = emitLoadActorExecutor(loc, args.back());
+    case ActorIsolation::ActorInstance:
+      if (unsigned paramIndex =
+              implicitActorHopTarget->getActorInstanceParameter()) {
+        executor = emitLoadActorExecutor(loc, args[paramIndex-1]);
+      } else {
+        executor = emitLoadActorExecutor(loc, args.back());
+      }
       break;
 
-    case ImplicitActorHopTarget::GlobalActor:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       executor = emitLoadGlobalActorExecutor(
           implicitActorHopTarget->getGlobalActor());
       break;
 
-    case ImplicitActorHopTarget::IsolatedParameter:
-      executor = emitLoadActorExecutor(
-          loc, args[implicitActorHopTarget->getIsolatedParameterIndex()]);
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+      llvm_unreachable("Not isolated");
       break;
     }
 
@@ -5667,7 +5729,11 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
     assert(!selfParam.isIndirectMutating() &&
            "passing unmaterialized r-value as inout argument");
 
-    base = base.materialize(SGF, loc);
+    base = base.formallyMaterialize(SGF, loc);
+    auto shouldTake = IsTake_t(base.hasCleanup());
+    base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
+                                    SGF.getTypeLowering(baseLoweredType),
+                                    SGFContext(), shouldTake);
   }
 
   return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
@@ -5837,7 +5903,7 @@ RValue SILGenFunction::emitGetAccessor(
     PreparedArguments &&subscriptIndices,
     SGFContext c,
     bool isOnSelfParameter,
-    Optional<ImplicitActorHopTarget> implicitActorHopTarget) {
+    Optional<ActorIsolation> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -6151,7 +6217,7 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
   
   // Load and reabstract the value if needed.
   auto genericSig = F.getLoweredFunctionType()->getInvocationGenericSignature();
-  auto substVarTy = var->getType()->getCanonicalType(genericSig);
+  auto substVarTy = var->getType()->getReducedType(genericSig);
   auto substAbstraction = AbstractionPattern(genericSig, substVarTy);
   return emitLoad(loc, visitor.varAddr, substAbstraction, substVarTy,
                   getTypeLowering(substAbstraction, substVarTy),

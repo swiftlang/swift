@@ -24,8 +24,8 @@
 using namespace swift::diag;
 using namespace swift::unittests;
 
-TEST_F(LocalizationTest, TestYAMLSerialization) {
-  YAMLLocalizationProducer yaml(YAMLPath);
+TEST_F(LocalizationTest, TestStringsSerialization) {
+  StringsLocalizationProducer strings(DiagsPath);
 
   auto dbFile = createTemporaryFile("en", "db");
 
@@ -33,9 +33,10 @@ TEST_F(LocalizationTest, TestYAMLSerialization) {
   {
     SerializedLocalizationWriter writer;
 
-    yaml.forEachAvailable([&writer](swift::DiagID id, llvm::StringRef translation) {
-                            writer.insert(id, translation);
-                          });
+    strings.forEachAvailable(
+        [&writer](swift::DiagID id, llvm::StringRef translation) {
+          writer.insert(id, translation);
+        });
 
     ASSERT_FALSE(writer.emit(dbFile));
   }
@@ -45,9 +46,10 @@ TEST_F(LocalizationTest, TestYAMLSerialization) {
   ASSERT_TRUE(dbContent);
 
   SerializedLocalizationProducer db(std::move(dbContent.get()));
-  yaml.forEachAvailable([&db](swift::DiagID id, llvm::StringRef translation) {
-    ASSERT_EQ(translation, db.getMessageOr(id, "<no-fallback>"));
-  });
+  strings.forEachAvailable(
+      [&db](swift::DiagID id, llvm::StringRef translation) {
+        ASSERT_EQ(translation, db.getMessageOr(id, "<no-fallback>"));
+      });
 }
 
 TEST_F(LocalizationTest, TestSerializationOfEmptyFile) {
@@ -55,7 +57,7 @@ TEST_F(LocalizationTest, TestSerializationOfEmptyFile) {
   SerializedLocalizationWriter writer;
   ASSERT_FALSE(writer.emit(dbFile));
 
-  YAMLLocalizationProducer yaml(YAMLPath);
+  StringsLocalizationProducer strings(DiagsPath);
 
   // Reading of the empty `db` file should always return default message.
   {
@@ -63,7 +65,8 @@ TEST_F(LocalizationTest, TestSerializationOfEmptyFile) {
     ASSERT_TRUE(dbContent);
 
     SerializedLocalizationProducer db(std::move(dbContent.get()));
-    yaml.forEachAvailable([&db](swift::DiagID id, llvm::StringRef translation) {
+    strings.forEachAvailable([&db](swift::DiagID id,
+                                   llvm::StringRef translation) {
       ASSERT_EQ("<<<default-fallback>>>",
                 db.getMessageOr(id, "<<<default-fallback>>>"));
     });
@@ -80,16 +83,17 @@ TEST_F(LocalizationTest, TestSerializationWithGaps) {
     includedMessages.flip(position);
   }
 
-  YAMLLocalizationProducer yaml(YAMLPath);
+  StringsLocalizationProducer strings(DiagsPath);
   auto dbFile = createTemporaryFile("en", "db");
 
   {
     SerializedLocalizationWriter writer;
 
-    yaml.forEachAvailable([&](swift::DiagID id, llvm::StringRef translation) {
-      if (includedMessages.test((unsigned)id))
-        writer.insert(id, translation);
-    });
+    strings.forEachAvailable(
+        [&](swift::DiagID id, llvm::StringRef translation) {
+          if (includedMessages.test((unsigned)id))
+            writer.insert(id, translation);
+        });
 
     ASSERT_FALSE(writer.emit(dbFile));
   }
@@ -100,7 +104,8 @@ TEST_F(LocalizationTest, TestSerializationWithGaps) {
     ASSERT_TRUE(dbContent);
 
     SerializedLocalizationProducer db(std::move(dbContent.get()));
-    yaml.forEachAvailable([&](swift::DiagID id, llvm::StringRef translation) {
+    strings.forEachAvailable([&](swift::DiagID id,
+                                 llvm::StringRef translation) {
       auto position = (unsigned)id;
 
       std::string expectedMessage = includedMessages.test(position)

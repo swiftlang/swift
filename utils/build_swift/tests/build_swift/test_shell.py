@@ -115,7 +115,7 @@ class TestHelpers(unittest.TestCase):
 
         mock_stream.write.assert_called_with(
             '>>> {}\n'.format(shell.quote(test_command)))
-        assert(mock_stream.flush.called)
+        assert mock_stream.flush.called
 
     @utils.requires_module('unittest.mock')
     def test_echo_command_custom_prefix(self):
@@ -124,7 +124,7 @@ class TestHelpers(unittest.TestCase):
         shell._echo_command('ls', mock_stream, prefix='$ ')
 
         mock_stream.write.assert_called_with('$ ls\n')
-        assert(mock_stream.flush.called)
+        assert mock_stream.flush.called
 
     # -------------------------------------------------------------------------
     # _normalize_args

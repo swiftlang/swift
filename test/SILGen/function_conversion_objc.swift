@@ -26,10 +26,10 @@ func convExistentialMetatypeToObject(_ f: @escaping (NSBurrito) -> NSBurrito.Typ
   let _: (NSBurrito) -> AnyObject = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pAaB_pXmTIeggd_AaB_pyXlIeggo_TR : $@convention(thin) (@guaranteed NSBurrito, @guaranteed @callee_guaranteed (@guaranteed NSBurrito) -> @thick NSBurrito.Type) -> @owned AnyObject
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pAaB_pXmTIeggd_AaB_pyXlIeggo_TR : $@convention(thin) (@guaranteed any NSBurrito, @guaranteed @callee_guaranteed (@guaranteed any NSBurrito) -> @thick any NSBurrito.Type) -> @owned AnyObject
 // CHECK:         apply %1(%0)
-// CHECK:         thick_to_objc_metatype {{.*}} : $@thick NSBurrito.Type to $@objc_metatype NSBurrito.Type
-// CHECK:         objc_existential_metatype_to_object {{.*}} : $@objc_metatype NSBurrito.Type to $AnyObject
+// CHECK:         thick_to_objc_metatype {{.*}} : $@thick any NSBurrito.Type to $@objc_metatype any NSBurrito.Type
+// CHECK:         objc_existential_metatype_to_object {{.*}} : $@objc_metatype any NSBurrito.Type to $AnyObject
 // CHECK:         return
 
 // CHECK-LABEL: sil hidden [ossa] @$s24function_conversion_objc28convProtocolMetatypeToObjectyyAA9NSBurrito_pmycF
@@ -39,8 +39,8 @@ func convProtocolMetatypeToObject(_ f: @escaping () -> NSBurrito.Protocol) {
   let _: () -> Protocol = f
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pXMtIegd_So8ProtocolCIego_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @thin NSBurrito.Protocol) -> @owned Protocol
-// CHECK:         apply %0() : $@callee_guaranteed () -> @thin NSBurrito.Protocol
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24function_conversion_objc9NSBurrito_pXMtIegd_So8ProtocolCIego_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @thin (any NSBurrito).Type) -> @owned Protocol
+// CHECK:         apply %0() : $@callee_guaranteed () -> @thin (any NSBurrito).Type
 // CHECK:         objc_protocol #NSBurrito : $Protocol
 // CHECK:         copy_value
 // CHECK:         return

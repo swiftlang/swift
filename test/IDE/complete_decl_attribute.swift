@@ -117,6 +117,7 @@ actor MyGlobalActor {
 // KEYWORD3-NEXT:             Keyword/None:                       resultBuilder[#Class Attribute#]; name=resultBuilder
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
+// KEYWORD3-NEXT:             Keyword/None:                       typeWrapper[#Class Attribute#]; name=typeWrapper
 // KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
@@ -135,6 +136,7 @@ actor MyGlobalActor {
 // KEYWORD4-NEXT:             Keyword/None:                       resultBuilder[#Enum Attribute#]; name=resultBuilder
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
+// KEYWORD4-NEXT:             Keyword/None:                       typeWrapper[#Enum Attribute#]; name=typeWrapper
 // KEYWORD4-NEXT:             End completions
 
 
@@ -150,6 +152,7 @@ actor MyGlobalActor {
 // KEYWORD5-NEXT:             Keyword/None:                       resultBuilder[#Struct Attribute#]; name=resultBuilder
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
+// KEYWORD5-NEXT:             Keyword/None:                       typeWrapper[#Struct Attribute#]; name=typeWrapper
 // KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
@@ -305,6 +308,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
 // ON_MEMBER_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
+// ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
@@ -374,6 +378,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // KEYWORD_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
 // KEYWORD_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
+// KEYWORD_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper

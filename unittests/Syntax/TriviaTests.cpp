@@ -52,7 +52,7 @@ TEST(TriviaTests, Empty) {
   ASSERT_DEATH({
     llvm::SmallString<1> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    Trivia::garbageText("").print(OS);
+    Trivia::unexpectedText("").print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }, "");
 #endif
@@ -163,7 +163,7 @@ TEST(TriviaTests, Contains) {
   ASSERT_FALSE(Trivia().contains(TriviaKind::DocBlockComment));
   ASSERT_FALSE(Trivia().contains(TriviaKind::DocLineComment));
   ASSERT_FALSE(Trivia().contains(TriviaKind::Formfeed));
-  ASSERT_FALSE(Trivia().contains(TriviaKind::GarbageText));
+  ASSERT_FALSE(Trivia().contains(TriviaKind::UnexpectedText));
   ASSERT_FALSE(Trivia().contains(TriviaKind::LineComment));
   ASSERT_FALSE(Trivia().contains(TriviaKind::Newline));
   ASSERT_FALSE(Trivia().contains(TriviaKind::Space));

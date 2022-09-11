@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-8767: a number of related problems with unqualified lookup of
-// associated type names.
+// https://github.com/apple/swift/issues/51275
+// A number of related problems with unqualified lookup of associated
+// type names.
 
 
 // #1

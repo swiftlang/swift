@@ -353,9 +353,10 @@ bb0(%0 : @guaranteed $S):
   debug_value %0 : $S, let, name "self", argno 1
   %2 = alloc_stack $S
   %3 = store_borrow %0 to %2 : $*S
-  %4 = load_borrow %2 : $*S
+  %4 = load_borrow %3 : $*S
   fix_lifetime %4 : $S
   end_borrow %4 : $S
+  end_borrow %3 : $*S
   dealloc_stack %2 : $*S
   %8 = tuple ()
   return %8 : $()

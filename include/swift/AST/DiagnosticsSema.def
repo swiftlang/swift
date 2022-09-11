@@ -256,15 +256,15 @@ ERROR(cannot_pass_rvalue_inout,none,
 ERROR(cannot_provide_default_value_inout,none,
       "cannot provide default value to inout parameter %0", (Identifier))
 
-ERROR(cannot_call_with_params, none,
-      "cannot invoke %select{|initializer for type }2'%0' with an argument list"
-      " of type '%1'", (StringRef, StringRef, bool))
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
+      (StringRef, Type))
+
+ERROR(no_overloads_have_result_type_conformance,none,
+      "no '%0' overloads produce result type that conforms to %1",
       (StringRef, Type))
 
 ERROR(no_candidates_match_argument_type,none,
@@ -557,6 +557,10 @@ ERROR(cannot_convert_subscript_assign_nil,none,
 
 NOTE(cannot_convert_candidate_result_to_contextual_type,none,
      "%0 produces %1, not the expected contextual result type %2",
+     (DeclName, Type, Type))
+
+NOTE(overload_result_type_does_not_conform,none,
+     "result type %1 of %0 does not conform to %2",
      (DeclName, Type, Type))
 
 // for ... in expression
@@ -861,6 +865,15 @@ NOTE(invalid_redecl_implicit_wrapper,none,
      "%select{projected value|backing storage}1",
      (DeclName, bool))
 
+ERROR(protocol_extension_in_where_clause,none,
+      "%0 was defined in extension of protocol %1 and cannot be referenced "
+      "from a %select{'where' clause|generic parameter inheritance clause|"
+      "associated type inheritance clause}2",
+      (Identifier, Identifier, unsigned))
+NOTE(protocol_extension_in_where_clause_note,none,
+     "consider moving %0 into the definition of protocol %1",
+     (Identifier, Identifier))
+
 ERROR(ambiguous_type_base,none,
       "%0 is ambiguous for type lookup in this context", (DeclNameRef))
 ERROR(invalid_member_type,none,
@@ -974,6 +987,10 @@ REMARK(cross_import_added,none,
 
 REMARK(module_loaded,none,
        "loaded module at %0",
+       (StringRef))
+       
+REMARK(explicit_interface_build_skipped,none,
+       "Skipped rebuilding module at %0 - up-to-date",
        (StringRef))
 
 WARNING(cannot_find_project_version,none,
@@ -1162,6 +1179,9 @@ NOTE(unwrap_iuo_initializer,none,
 NOTE(unwrap_with_guard,none,
      "short-circuit using 'guard' to exit this function early "
      "if the optional value contains 'nil'", ())
+NOTE(perform_optional_chain_on_function_type, none,
+     "use optional chaining to call this value of function type when optional "
+     "is non-'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclNameRef, Type))
@@ -1476,6 +1496,14 @@ ERROR(cdecl_empty_name,none,
 ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
 
+ERROR(expose_only_non_other_attr,none,
+      "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
+ERROR(expose_inside_unexposed_decl,none,
+      "@_expose attribute cannot be applied inside of unexposed declaration %0", (DeclName))
+ERROR(expose_invalid_name_pattern_init,none,
+      "invalid declaration name '%0' specified in an @_expose attribute; "
+      "exposed initializer name must start with 'init'", (StringRef))
+
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
 ERROR(attr_decl_async,none,
@@ -1624,9 +1652,21 @@ ERROR(originally_definedin_must_not_before_available_version,none,
       "symbols are moved to the current module before they were available in "
       "the OSs", ())
 
+WARNING(spi_preferred_over_spi_available,none,
+        "symbols that are @_spi_available on all platforms should use @_spi "
+        "instead", ())
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
+
+// Dependency Scanning
+ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+NOTE(dependency_as_imported_by_main_module,none,
+     "a dependency of main module '%0'", (StringRef))
+NOTE(dependency_as_imported_by, none,
+     "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
@@ -1889,6 +1929,9 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         "'@_spi' import of %0 will not include any SPI symbols; "
         "%0 was built from the public interface at %1",
         (DeclName, StringRef))
+ERROR(spi_only_imports_not_enabled, none,
+      "'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'",
+      ())
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -1921,7 +1964,7 @@ NOTE(extension_stored_property_fixit,none,
      "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
-      (Identifier))
+      (Type))
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot have an inheritance clause",
       (Identifier))
@@ -1937,6 +1980,8 @@ ERROR(invalid_nominal_extension,none,
       (Type, Type))
 NOTE(invalid_nominal_extension_rewrite,none,
      "did you mean to extend %0 instead?", (Type))
+ERROR(synthesized_nominal_extension,none,
+      "cannot extend synthesized type %0", (Type))
 
 // Protocols
 ERROR(type_does_not_conform,none,
@@ -2337,10 +2382,10 @@ NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
 NOTE(protocol_witness_missing_requirement,none,
      "candidate would match if %0 %select{conformed to|subclassed|"
-     "was the same type as}2 %1", (Type, Type, unsigned))
+     "was the same type as|%error|%error}2 %1", (Type, Type, unsigned))
 NOTE(protocol_type_witness_missing_requirement,none,
      "candidate would match if the conformance required that %0 "
-     "%select{conformed to|subclassed|was the same type as}2 %1",
+     "%select{conformed to|subclassed|was the same type as|%error|%error}2 %1",
      (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
@@ -2462,11 +2507,13 @@ WARNING(append_interpolation_access_control,none,
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
-      "associated type %0 can only be used with a concrete type or "
-      "generic parameter base", (DeclNameRef))
+      "cannot access associated type %0 from %1; use a concrete type or "
+      "generic parameter base instead",
+      (DeclNameRef, Type))
 ERROR(typealias_outside_of_protocol,none,
-      "type alias %0 can only be used with a concrete type or "
-      "generic parameter base", (DeclNameRef))
+      "cannot access type alias %0 from %1; use a concrete type or "
+      "generic parameter base instead",
+      (DeclNameRef, Type))
 
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
@@ -2505,6 +2552,10 @@ ERROR(recursive_generic_signature,none,
       "%0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_generic_signature_extension,none,
       "extension of %0 %1 has self-referential generic requirements", (DescriptiveDeclKind, DeclBaseName))
+ERROR(recursive_same_type_constraint,none,
+      "same-type constraint %0 == %1 is recursive", (Type, Type))
+ERROR(recursive_superclass_constraint,none,
+      "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
@@ -2907,6 +2958,7 @@ ERROR(decl_from_hidden_module,none,
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
@@ -2915,9 +2967,21 @@ WARNING(decl_from_hidden_module_warn,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
-      "<<ERROR>>|<<ERROR>>|"
+      "<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+ERROR(typealias_desugars_to_type_from_hidden_module,none,
+      "%0 aliases '%1.%2' and cannot be used %select{here|"
+      "as property wrapper here|"
+      "as result builder here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}3 "
+      "because %select{%4 has been imported as implementation-only|"
+      "it is an SPI imported from %4|"
+      "<<ERROR>>|"
+      "%4 was imported for SPI only|"
+      "%4 was not imported by this file}5",
+      (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
       "as result builder here|"
@@ -2926,6 +2990,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
@@ -2959,6 +3024,13 @@ ERROR(implementation_only_override_without_attr,none,
 ERROR(implementation_only_override_import_without_attr,none,
       "override of %0 imported as implementation-only must be declared "
       "'@_implementationOnly'", (DescriptiveDeclKind))
+
+ERROR(import_attr_conflict,none,
+      "%0 inconsistently imported with %1",
+      (Identifier, DeclAttribute))
+NOTE(import_attr_conflict_here,none,
+     "imported with %0 here",
+     (DeclAttribute))
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
@@ -3181,6 +3253,12 @@ ERROR(reasync_without_async_parameter,none,
 
 ERROR(inherits_executor_without_async,none,
       "non-async functions cannot inherit an executor", ())
+
+ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
+      (DeclAttribute))
+ERROR(eagermove_and_lexical_combined,none,
+      "@_eagerMove and @_lexical attributes are alternate styles of lifetimes "
+      "and can't be combined", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
@@ -3754,7 +3832,11 @@ ERROR(should_use_empty_dictionary_literal,none,
 // Dictionary literals
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
-
+WARNING(duplicated_literal_keys_in_dictionary_literal, none,
+        "dictionary literal of type %0 has duplicate entries for %1 literal key%select{ %3|}2",
+        (Type, StringRef, bool, StringRef))
+NOTE(duplicated_key_declared_here, none, 
+     "duplicate key declared here", ())
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,none,
@@ -4747,7 +4829,7 @@ ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
 ERROR(redundant_any_in_existential,none,
-       "redundant 'any' has no effect on existential type %0",
+       "redundant 'any' in type %0",
        (Type))
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
@@ -4771,6 +4853,9 @@ ERROR(nonisolated_local_var,none,
       ())
 ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
+      ())
+ERROR(nonisolated_wrapped_property,none,
+      "'nonisolated' is not supported on properties with property wrappers",
       ())
 
 ERROR(actor_instance_property_wrapper,none,
@@ -4848,6 +4933,14 @@ ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
 ERROR(global_actor_top_level_var,none,
       "top-level code variables cannot have a global actor", ())
+ERROR(global_actor_access,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 "
+      "cannot have %select{private|fileprivate|internal|%error|%error}3 "
+      "global actor %4",
+      (AccessLevel, DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(global_actor_not_usable_from_inline,none,
+      "global actor for %0 %1 must be '@usableFromInline' or public",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
@@ -4949,14 +5042,25 @@ ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
-ERROR(tuple_ellipsis,none,
-      "cannot create a variadic tuple", ())
+ERROR(expansion_not_allowed,none,
+      "variadic expansion %0 cannot appear outside of a function parameter list, "
+      "function result, tuple element or generic argument list", (Type))
 ERROR(expansion_not_variadic,none,
-      "cannot create expansion with non-variadic type %0", (Type))
+      "variadic expansion %0 must contain at least one variadic generic parameter", (Type))
 ERROR(tuple_duplicate_label,none,
       "cannot create a tuple with a duplicate element label", ())
+ERROR(multiple_ellipsis_in_tuple,none,
+      "only a single element can be variadic", ())
+
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
+ERROR(unlabeled_parameter_following_variadic_parameter,none,
+      "a parameter following a variadic parameter requires a label", ())
+ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
+      "no parameters may follow a variadic parameter in a closure", ())
+
+ERROR(parameter_vararg_default,none,
+      "variadic parameter cannot have a default value", ())
 
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
@@ -5073,14 +5177,12 @@ ERROR(differentiable_function_type_no_differentiability_parameters,
       (/*isLinear*/ bool))
 
 // SIL
-ERROR(opened_non_protocol,none,
-      "@opened cannot be applied to non-protocol type %0", (Type))
-ERROR(sil_function_ellipsis,PointsToFirstBadToken,
-      "SIL function types cannot be variadic", ())
+ERROR(opened_bad_constraint_type,none,
+      "@opened constraint type %0 is not a protocol or protocol composition", (Type))
+ERROR(opened_bad_interface_type,none,
+      "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
-ERROR(sil_function_output_label,PointsToFirstBadToken,
-      "SIL function types cannot have labeled results", ())
 ERROR(sil_non_coro_yields,PointsToFirstBadToken,
       "non-coroutine SIL function types cannot have @yield results", ())
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
@@ -5202,7 +5304,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "
@@ -5795,15 +5897,29 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "because %select{%3 was imported implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
-      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|"
+      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4"
       "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
+
+ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
+      none, "%0 aliases '%1.%2' and cannot be used in " FRAGILE_FUNC_KIND "3 "
+      "because %select{%4 has been imported as implementation-only|"
+      "it is an SPI imported from %4|"
+      "<<ERROR>>|"
+      "%4 was imported for SPI only|"
+      "%4 was not imported by this file}5",
+      (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
+
+NOTE(missing_import_inserted,
+     none, "The missing import of module %0 will be added implicitly",
+     (Identifier))
 
 ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
@@ -6399,6 +6515,52 @@ ERROR(concurrency_task_to_thread_model_global_actor,none,
 ERROR(concurrency_task_to_thread_model_global_actor_annotation,none,
       "annotating a type with a global actor %0 is not permitted within %1",
       (TypeRepr*, StringRef))
+
+ERROR(moveOnly_not_allowed_here,none,
+      "'moveOnly' may only be applied to classes, structs, and enums", ())
+ERROR(move_expression_not_passed_lvalue,none,
+      "'move' can only be applied to lvalues", ())
+
+//------------------------------------------------------------------------------
+// MARK: Type Wrappers
+//------------------------------------------------------------------------------
+
+ERROR(type_wrappers_are_experimental,none,
+      "type wrappers are an experimental feature", ())
+
+ERROR(type_wrapper_attribute_not_allowed_here,none,
+      "type wrapper attribute %0 can only be applied to a class, struct",
+      (Identifier))
+
+ERROR(type_wrapper_requires_a_single_generic_param,none,
+      "type wrapper has to declare a single generic parameter "
+      "for underlying storage type", ())
+
+ERROR(cannot_use_multiple_type_wrappers,none,
+      "type %0 cannot use more than one type wrapper", ())
+
+ERROR(type_wrapper_requires_memberwise_init,none,
+      "type wrapper type %0 does not contain a required initializer"
+      " - init(memberwise:)",
+      (DeclName))
+
+ERROR(type_wrapper_requires_subscript,none,
+      "type wrapper type %0 does not contain a required subscript"
+      " - subscript(storedKeyPath:)",
+      (DeclName))
+
+ERROR(type_wrapper_failable_init,none,
+      "type wrapper initializer %0 cannot be failable", (DeclName))
+
+ERROR(type_wrapper_invalid_subscript_param_type, none,
+      "type wrapper subscript expects a key path parameter type (got: %0)",
+      (Type))
+
+ERROR(type_wrapper_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing type wrapper type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

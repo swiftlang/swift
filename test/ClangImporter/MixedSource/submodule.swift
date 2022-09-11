@@ -3,7 +3,8 @@
 @_exported import Mixed
 @_exported import Mixed.Submodule
 
-// SR-12265: Make sure we can perform a scoped import on a submodule in a mixed
+// https://github.com/apple/swift/issues/54693
+// Make sure we can perform a scoped import on a submodule in a mixed
 // source target.
 import func Mixed.Submodule.fromSubmodule
 

@@ -6,7 +6,7 @@
 //
 // The latter generic signature does not have a conformance requirement T : P,
 // but the superclass bound C<U> of T conforms to P concretely; make sure that
-// the requirement machine's getCanonicalTypeInContext() can handle this.
+// the requirement machine's getReducedType() can handle this.
 public protocol P {
   associatedtype T
 }

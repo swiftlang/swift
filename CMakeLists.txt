@@ -455,6 +455,15 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 #
+#  Compatibility library deployment versions
+#
+
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+
+#
 # User-configurable debugging options.
 #
 
@@ -614,6 +623,11 @@ if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
 endif()
 
+# Make sure we know where swift-syntax is because we need it to build the parser.
+if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
+  message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
+endif()
+
 # Use dispatch as the system scheduler by default.
 # For convenience, we set this to false when concurrency is disabled.
 set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
@@ -741,7 +755,7 @@ elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   else()
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
-elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_SWIFT_PARSER)
   # We are building using a pre-installed host toolchain but not bootstrapping
   # the Swift modules. This happens when building using 'build-tooling-libs'
   # where we haven't built a new Swift compiler. Use the Swift compiler from the
@@ -853,6 +867,13 @@ if(XCODE)
   # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
 endif()
+
+# When we have the early SwiftSyntax build, we can include its parser.
+if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
+  set(SWIFT_SWIFT_PARSER TRUE)
+  include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
+endif()
+
 
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
@@ -1060,6 +1081,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
+  message(STATUS "  Swift parser:   ${SWIFT_SWIFT_PARSER}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1154,6 +1176,7 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
+  set(SWIFT_STDLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlib")
   # Some of the things below depend on the threading library
   add_subdirectory(stdlib/public/Threading)
 

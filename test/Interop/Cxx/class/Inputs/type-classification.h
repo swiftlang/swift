@@ -14,7 +14,7 @@ struct StructWithAdditionalConstructor {
   StructWithAdditionalConstructor(int parameter) {}
 };
 
-struct StructWithCopyConstructor {
+struct __attribute__((swift_attr("import_unsafe"))) StructWithCopyConstructor {
   StructWithCopyConstructor(const StructWithCopyConstructor &) {}
 };
 
@@ -59,7 +59,7 @@ struct StructWithSubobjectMoveConstructor {
   StructWithMoveConstructor subobject;
 };
 
-struct StructWithCopyAssignment {
+struct __attribute__((swift_attr("import_unsafe"))) StructWithCopyAssignment {
   StructWithCopyAssignment &operator=(const StructWithCopyAssignment &);
 };
 
@@ -79,7 +79,7 @@ struct StructWithSubobjectMoveAssignment {
   StructWithMoveAssignment subobject;
 };
 
-struct StructWithDestructor {
+struct __attribute__((swift_attr("import_unsafe"))) StructWithDestructor {
   ~StructWithDestructor() {}
 };
 
@@ -166,7 +166,8 @@ struct StructDeletedDestructor {
   ~StructDeletedDestructor() = delete;
 };
 
-struct StructWithCopyConstructorAndValue {
+struct __attribute__((swift_attr("import_owned")))
+StructWithCopyConstructorAndValue {
   int value;
   StructWithCopyConstructorAndValue() : value(0) {}
   StructWithCopyConstructorAndValue(int value) : value(value) {}
@@ -179,7 +180,8 @@ struct StructWithSubobjectCopyConstructorAndValue {
   StructWithCopyConstructorAndValue member;
 };
 
-struct StructWithCopyConstructorAndSubobjectCopyConstructorAndValue {
+struct __attribute__((swift_attr("import_owned")))
+StructWithCopyConstructorAndSubobjectCopyConstructorAndValue {
   StructWithCopyConstructorAndValue member;
   StructWithCopyConstructorAndSubobjectCopyConstructorAndValue(
       StructWithCopyConstructorAndValue member)

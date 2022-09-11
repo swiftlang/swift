@@ -471,7 +471,8 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
             !descriptors[i].Flags.isAsync(),
-            /*allowNull*/ false); // Don't allow NULL for Obj-C classes
+            /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
+                                 // might be proven unused and null'ed)
       }
     }
 
@@ -1336,7 +1337,16 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
     if (!flags.isEscaping()) {
       Data.ValueWitnesses = &VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);
     } else {
-      Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
+      switch (key.getDifferentiabilityKind().Value) {
+      case FunctionMetadataDifferentiabilityKind::Reverse:
+        Data.ValueWitnesses = &VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING);
+        break;
+      default:
+        assert(false && "unsupported function witness");
+      case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+        Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
+        break;
+      }
     }
     break;
 

@@ -13,7 +13,6 @@
 #ifndef SWIFT_SEMA_SOURCELOADER_H
 #define SWIFT_SEMA_SOURCELOADER_H
 
-#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 
 namespace swift {
@@ -57,9 +56,11 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
+  ///
+  /// If a non-null \p versionInfo is provided, the module version will be
+  /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               llvm::VersionTuple version,
-                               bool underlyingVersion) override;
+                               ModuleVersionInfo *versionInfo) override;
 
   /// Import a module with the given module path.
   ///
@@ -94,14 +95,10 @@ public:
     // Parsing populates the Objective-C method tables.
   }
 
-  Optional<ModuleDependencies> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate) override {
-    // FIXME: Implement?
-    return None;
-  }
+  Optional<ModuleDependencies>
+  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
+                        InterfaceSubContextDelegate &delegate) override;
 };
-
 }
 
 #endif

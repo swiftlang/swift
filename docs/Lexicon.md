@@ -49,7 +49,7 @@ thunk helpers" sometimes seen in Swift backtraces come from.)
 
 Broadly, an "access path" is a list of "accesses" which must be chained together
 to compute some output from an input. For instance, the generics system has a
-type called a `ConformanceAccessPath` which explains how to, for example,
+type called a `ConformancePath` which explains how to, for example,
 walk from `T: Collection` to `T: Sequence` to `T.Iterator: IteratorProtocol`.
 There are several different kinds of "access path" in different parts of the compiler,
 but they all follow this basic theme.
@@ -574,11 +574,11 @@ for flow-sensitive diagnostics, optimization, and LLVM IR generation.
 
 ## SR
 
-An issue reported on [bugs.swift.org](https://bugs.swift.org). A
-backronym for "Swift Report"; really the name is derived from LLVM's
-idiomatic use of "PR" ("Problem Report") for its bugs. We didn't go with
-"PR" for Swift because we wanted to be able to unambiguously reference
-LLVM bugs.
+An issue that was originally reported on the now-retired Jira instance that used
+to be located at [bugs.swift.org](https://bugs.swift.org). A backronym for
+"Swift Report"; really the name is derived from LLVM's idiomatic use of "PR"
+("Problem Report") for its bugs. We didn't go with "PR" for Swift because we
+wanted to be able to unambiguously reference LLVM bugs.
 
 ## stdlib
 

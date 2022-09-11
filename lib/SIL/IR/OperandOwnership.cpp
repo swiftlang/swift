@@ -59,7 +59,7 @@ public:
   SILValue getValue() const { return op.get(); }
 
   ValueOwnershipKind getOwnershipKind() const {
-    return op.get().getOwnershipKind();
+    return op.get()->getOwnershipKind();
   }
 
   unsigned getOperandIndex() const { return op.getOperandNumber(); }
@@ -119,6 +119,7 @@ SHOULD_NEVER_VISIT_INST(ReleaseValue)
 SHOULD_NEVER_VISIT_INST(ReleaseValueAddr)
 SHOULD_NEVER_VISIT_INST(StrongRelease)
 SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
+SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -147,6 +148,7 @@ OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)
 OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, ExplicitCopyAddr)
 OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
@@ -256,7 +258,6 @@ OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
 
 // TODO: Should this be a forwarding consume.
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
-OPERAND_OWNERSHIP(DestroyingConsume, CopyableToMoveOnlyWrapperValue)
 
 // Instructions that move an owned value.
 OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
@@ -330,6 +331,7 @@ FORWARDING_OWNERSHIP(DifferentiableFunction)
 FORWARDING_OWNERSHIP(LinearFunction)
 FORWARDING_OWNERSHIP(MarkMustCheck)
 FORWARDING_OWNERSHIP(MoveOnlyWrapperToCopyableValue)
+FORWARDING_OWNERSHIP(CopyableToMoveOnlyWrapperValue)
 #undef FORWARDING_OWNERSHIP
 
 // Arbitrary value casts are forwarding instructions that are also allowed to
@@ -783,7 +785,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, USubOver)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UToSCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Unreachable)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnsafeGuaranteedEnd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Xor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericXor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZExt)
@@ -794,8 +795,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Move)
 BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
@@ -805,7 +804,6 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
-BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;

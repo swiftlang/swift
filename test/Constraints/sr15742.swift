@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 
-// https://bugs.swift.org/browse/SR-15742
+// https://github.com/apple/swift/issues/58019
 
 func fetch() {
   // CHECK: open_existential_expr implicit type='Void'

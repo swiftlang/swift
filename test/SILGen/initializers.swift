@@ -232,7 +232,7 @@ struct ThrowStruct {
   // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11ThrowStructV0A0ACSgyt_tcfC
   // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin ThrowStruct.Type):
   // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$s21failable_initializers11ThrowStructV6throwsACyt_tKcfC
-  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned ThrowStruct, @error Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned ThrowStruct, @error any Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB]]([[RESULT:%[0-9]+]] : @owned $ThrowStruct):
   // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[RESULT]]
@@ -260,13 +260,13 @@ struct ThrowStruct {
   // CHECK: bb6([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb7([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK: bb7([[ERR:%[0-9]+]] : @owned $any Error):
   // CHECK-NEXT: destroy_value [[ERR]]
   // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[NIL]] : $Optional<ThrowStruct>)
   //
-  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
-  // CHECK-NEXT: br bb7([[ERR]] : $Error)
+  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
+  // CHECK-NEXT: br bb7([[ERR]] : $any Error)
   // CHECK-NEXT: }
   init?(failable: ()) {
     try? self.init(throws: ())
@@ -275,7 +275,7 @@ struct ThrowStruct {
   // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11ThrowStructV9failable2ACSgyt_tcfC
   // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin ThrowStruct.Type):
   // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$s21failable_initializers11ThrowStructV0A9AndThrowsACSgyt_tKcfC
-  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error any Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK: [[SELECT:%[0-9]+]] = select_enum [[OPT_RESULT]]
@@ -299,11 +299,11 @@ struct ThrowStruct {
   // CHECK: bb5([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb6([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK: bb6([[ERR:%[0-9]+]] : @owned $any Error):
   // CHECK: unreachable
   //
-  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
-  // CHECK-NEXT: br bb6([[ERR]] : $Error)
+  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
+  // CHECK-NEXT: br bb6([[ERR]] : $any Error)
   // CHECK-NEXT: }
   init?(failable2: ()) {
     try! self.init(failableAndThrows: ())
@@ -316,7 +316,7 @@ struct ThrowStruct {
   // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers11ThrowStructV9failable4ACSgyt_tcfC
   // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin ThrowStruct.Type):
   // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$s21failable_initializers11ThrowStructV0A9AndThrowsACSgyt_tKcfC
-  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error any Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum {{.*}}, #Optional.some!enumelt, [[OPT_RESULT]]
@@ -354,13 +354,13 @@ struct ThrowStruct {
   // CHECK: bb9([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb10([[ERR:%[0-9]+]] : @owned $Error):
+  // CHECK: bb10([[ERR:%[0-9]+]] : @owned $any Error):
   // CHECK-NEXT: destroy_value [[ERR]]
   // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<ThrowStruct>>, #Optional.none!enumelt
   // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<ThrowStruct>>)
   //
-  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $Error):
-  // CHECK-NEXT: br bb10([[ERR]] : $Error)
+  // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
+  // CHECK-NEXT: br bb10([[ERR]] : $any Error)
   // CHECK-NEXT: }
   init?(failable4: ()) {
     try? self.init(failableAndThrows: ())
@@ -733,7 +733,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 
   // ---- Delegating to super
 
-  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -752,7 +752,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // Now we perform the unwrap.
   // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin)
-  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // CHECK: [[NORMAL_BB]](
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
@@ -767,7 +767,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   //
   // Finally the error BB. We do not touch self since self is still in the
   // box implying that destroying MARK_UNINIT will destroy it for us.
-  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   throw [[ERROR]]
   // CHECK: } // end sil function '$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegationACSi_tKcfc'
@@ -776,7 +776,7 @@ class ThrowDerivedClass : ThrowBaseClass {
     super.init(noFail: ())
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC41delegatingFailDuringDelegationArgEmissionACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC41delegatingFailDuringDelegationArgEmissionACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -797,7 +797,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
   // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin)
-  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Now we emit the call to the initializer. Notice how we return self back to
   // its memory locatio nbefore any other work is done.
@@ -816,7 +816,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // 1. Store self back into the "conceptually" uninitialized box.
   // 2. destroy the box.
   // 3. Perform the rethrow.
-  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK:   [[SELF:%.*]] = unchecked_ref_cast [[BASE_SELF]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[SELF]] to [init] [[PROJ]]
   // CHECK:   destroy_value [[MARK_UNINIT]]
@@ -826,7 +826,7 @@ class ThrowDerivedClass : ThrowBaseClass {
     super.init(noFail: try unwrap(delegatingFailDuringDelegationArgEmission))
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC34delegatingFailDuringDelegationCallACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -839,7 +839,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[BASE_SELF:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
   // CHECK:   [[INIT_FN:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassCACyKcfc : $@convention(method)
-  // CHECK:   try_apply [[INIT_FN]]([[BASE_SELF]]) : $@convention(method) (@owned ThrowBaseClass) -> (@owned ThrowBaseClass, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK:   try_apply [[INIT_FN]]([[BASE_SELF]]) : $@convention(method) (@owned ThrowBaseClass) -> (@owned ThrowBaseClass, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Insert the return statement into the normal block...
   // CHECK: [[NORMAL_BB]]([[BASE_SELF_INIT:%.*]] : @owned $ThrowBaseClass):
@@ -850,7 +850,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   return [[RESULT]]
   //
   // ... and destroy the box in the error block.
-  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT:   end_borrow [[LIFETIME]]
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
@@ -859,7 +859,7 @@ class ThrowDerivedClass : ThrowBaseClass {
     try super.init()
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC29delegatingFailAfterDelegationACSi_tKcfc : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error) {
   // CHECK: bb0(
   // First initialize.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
@@ -877,8 +877,8 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   store [[NEW_SELF_CAST]] to [init] [[PROJ]]
   //
   // Finally perform the unwrap.
-  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
-  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error any Error)
+  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // Insert the return statement into the normal block...
   // CHECK: [[NORMAL_BB]](
@@ -887,7 +887,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   return [[RESULT]]
   //
   // ... and destroy the box in the error block.
-  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT:   end_borrow [[LIFETIME]]
   // CHECK-NEXT:   destroy_value [[MARK_UNINIT]]
   // CHECK-NEXT:   throw [[ERROR]]
@@ -897,7 +897,7 @@ class ThrowDerivedClass : ThrowBaseClass {
     try unwrap(delegatingFailAfterDelegation)
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc : $@convention(method) (Int, Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+  // CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers17ThrowDerivedClassC30delegatingFailBeforeDelegation0fg6DuringI11ArgEmissionACSi_SitKcfc : $@convention(method) (Int, Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error any Error) {
   // Create our box.
   // CHECK:   [[REF:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARK_UNINIT:%.*]] = mark_uninitialized [derivedself] [[REF]] : ${ var ThrowDerivedClass }
@@ -905,15 +905,15 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[PROJ:%.*]] = project_box [[MARK_UNINIT_LIFETIME]]
   //
   // Perform the unwrap.
-  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
-  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[UNWRAP_NORMAL_BB:bb[0-9]+]], error [[UNWRAP_ERROR_BB:bb[0-9]+]]
+  // CHECK:   [[UNWRAP_FN:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error any Error)
+  // CHECK:   try_apply [[UNWRAP_FN]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[UNWRAP_NORMAL_BB:bb[0-9]+]], error [[UNWRAP_ERROR_BB:bb[0-9]+]]
   //
   // Now we begin argument emission where we perform another unwrap.
   // CHECK: [[UNWRAP_NORMAL_BB]](
   // CHECK:   [[SELF:%.*]] = load [take] [[PROJ]]
   // CHECK:   [[SELF_CAST:%.*]] = upcast [[SELF]] : $ThrowDerivedClass to $ThrowBaseClass
-  // CHECK:   [[UNWRAP_FN2:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error Error)
-  // CHECK:   try_apply [[UNWRAP_FN2]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[UNWRAP_NORMAL_BB2:bb[0-9]+]], error [[UNWRAP_ERROR_BB2:bb[0-9]+]]
+  // CHECK:   [[UNWRAP_FN2:%.*]] = function_ref @$s21failable_initializers6unwrapyS2iKF : $@convention(thin) (Int) -> (Int, @error any Error)
+  // CHECK:   try_apply [[UNWRAP_FN2]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[UNWRAP_NORMAL_BB2:bb[0-9]+]], error [[UNWRAP_ERROR_BB2:bb[0-9]+]]
   //
   // Then since this example has a
   // CHECK: [[UNWRAP_NORMAL_BB2]]([[INT:%.*]] : $Int):
@@ -927,15 +927,15 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   return [[RESULT]]
   //
   // ... and destroy the box in the error block.
-  // CHECK: [[UNWRAP_ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[UNWRAP_ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK:   br [[ERROR_JOIN:bb[0-9]+]]([[ERROR]]
   //
-  // CHECK: [[UNWRAP_ERROR_BB2]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[UNWRAP_ERROR_BB2]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK:   [[SELF_CASTED_BACK:%.*]] = unchecked_ref_cast [[SELF_CAST]] : $ThrowBaseClass to $ThrowDerivedClass
   // CHECK:   store [[SELF_CASTED_BACK]] to [init] [[PROJ]]
   // CHECK:   br [[ERROR_JOIN]]([[ERROR]]
   //
-  // CHECK: [[ERROR_JOIN]]([[ERROR_PHI:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_JOIN]]([[ERROR_PHI:%.*]] : @owned $any Error):
   // CHECK:   end_borrow [[MARK_UNINIT_LIFETIME]]
   // CHECK:   destroy_value [[MARK_UNINIT]]
   // CHECK:   throw [[ERROR_PHI]]
@@ -1040,7 +1040,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[SELF_LIFETIME]]
-  // CHECK:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
+  // CHECK:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[SUCC_BB1:bb[0-9]+]], error [[ERROR_BB1:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB1]](
   // CHECK:   try_apply {{.*}}({{.*}}, [[SELF_META]]) : {{.*}}, normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
@@ -1052,13 +1052,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
   //
-  // CHECK: [[ERROR_BB1]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB1]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT: br [[THROWING_BB:bb[0-9]+]]([[ERROR]]
   //
-  // CHECK: [[ERROR_BB2]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB2]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT: br [[THROWING_BB]]([[ERROR]]
   //
-  // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]
@@ -1083,7 +1083,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT:   assign [[NEW_SELF]] to [[PB_BOX]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   function_ref @
-  // CHECK-NEXT:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
+  // CHECK-NEXT:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB2]](
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
@@ -1091,13 +1091,13 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: return [[RESULT]]
   //
-  // CHECK: [[ERROR_BB1]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB1]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT: br [[THROWING_BB:bb[0-9]+]]([[ERROR]]
   //
-  // CHECK: [[ERROR_BB2]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[ERROR_BB2]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT: br [[THROWING_BB]]([[ERROR]]
   //
-  // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $Error):
+  // CHECK: [[THROWING_BB]]([[ERROR:%.*]] : @owned $any Error):
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT: throw [[ERROR]]

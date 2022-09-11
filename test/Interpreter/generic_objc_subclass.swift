@@ -234,8 +234,9 @@ fixedB.third = 17
 // CHECK: (101, 0, 0, 0, 16, [19, 84], 17)
 print(fixedG())
 
-// Problem with field alignment in direct generic subclass of NSObject -
-// <https://bugs.swift.org/browse/SR-2586>
+// https://github.com/apple/swift/issues/45191
+// Problem with field alignment in direct generic subclass of 'NSObject'.
+
 public class PandorasBox<T>: NSObject {
     final public var value: T
 

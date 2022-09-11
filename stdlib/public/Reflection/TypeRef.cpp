@@ -314,6 +314,12 @@ public:
   void visitTypeRefRequirement(const TypeRefRequirement &req) {
     printHeader("requirement ");
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
+      printRec(req.getFirstType());
+      stream << ".count == ";
+      printRec(req.getSecondType());
+      stream << ".count";
+      break;
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       printRec(req.getFirstType());
@@ -892,25 +898,24 @@ public:
 
   Demangle::NodePointer visitTypeRefRequirement(const TypeRefRequirement &req) {
     switch (req.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
+    case RequirementKind::SameCount: {
+      // Not implemented.
+      return nullptr;
+    }
+    case RequirementKind::Conformance: {
+      auto r = Dem.createNode(Node::Kind::DependentGenericConformanceRequirement);
+      r->addChild(visit(req.getFirstType()), Dem);
+      r->addChild(visit(req.getSecondType()), Dem);
+      return r;
+    }
+    case RequirementKind::Superclass: {
+      auto r = Dem.createNode(Node::Kind::DependentGenericConformanceRequirement);
+      r->addChild(visit(req.getFirstType()), Dem);
+      r->addChild(visit(req.getSecondType()), Dem);
+      return r;
+    }
     case RequirementKind::SameType: {
-      Node::Kind kind;
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-        kind = Node::Kind::DependentGenericConformanceRequirement;
-        break;
-      case RequirementKind::Superclass:
-        // A DependentGenericSuperclasseRequirement kind seems to be missing.
-        kind = Node::Kind::DependentGenericConformanceRequirement;
-        break;
-      case RequirementKind::SameType:
-        kind = Node::Kind::DependentGenericSameTypeRequirement;
-        break;
-      default:
-        llvm_unreachable("Unhandled requirement kind");
-      }
-      auto r = Dem.createNode(kind);
+      auto r = Dem.createNode(Node::Kind::DependentGenericSameTypeRequirement);
       r->addChild(visit(req.getFirstType()), Dem);
       r->addChild(visit(req.getSecondType()), Dem);
       return r;
@@ -1299,6 +1304,7 @@ public:
       return None;
 
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {

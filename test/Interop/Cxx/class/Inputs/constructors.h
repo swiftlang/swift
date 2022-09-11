@@ -63,7 +63,8 @@ struct TemplatedConstructorWithExtraArg {
   TemplatedConstructorWithExtraArg(T value, U other) { }
 };
 
-struct HasUserProvidedCopyConstructor {
+struct __attribute__((swift_attr("import_unsafe")))
+HasUserProvidedCopyConstructor {
   int numCopies;
   HasUserProvidedCopyConstructor(int numCopies = 0) : numCopies(numCopies) {}
   HasUserProvidedCopyConstructor(const HasUserProvidedCopyConstructor &other)

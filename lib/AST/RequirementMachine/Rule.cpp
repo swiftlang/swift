@@ -286,4 +286,6 @@ void Rule::dump(llvm::raw_ostream &out) const {
     out << " [redundant]";
   if (Conflicting)
     out << " [conflicting]";
+  if (Recursive)
+    out << " [recursive]";
 }

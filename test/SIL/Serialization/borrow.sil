@@ -56,8 +56,8 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
   end_borrow %2 : $Builtin.NativeObject
 
   %3 = alloc_stack $Builtin.NativeObject
-  store_borrow %1 to %3 : $*Builtin.NativeObject
-  end_borrow %3 : $*Builtin.NativeObject
+  %sb = store_borrow %1 to %3 : $*Builtin.NativeObject
+  end_borrow %sb : $*Builtin.NativeObject
   dealloc_stack %3 : $*Builtin.NativeObject
   destroy_addr %0 : $*Builtin.NativeObject
   %4 = tuple()

@@ -76,7 +76,7 @@ This status table describes which of the following C++ language features can be 
 | Typedefs / Type aliases                     | Yes    |
 | Global Variables                            | Yes    |
 | Namespaces                                  | Yes    |
-| Inline Namespaces                           | Yes, with some known issues (https://bugs.swift.org/browse/SR-15956) |
+| Inline Namespaces                           | Yes, with some known issues ([#58217](https://github.com/apple/swift/issues/58217)) |
 | Exceptions                                  | No  |
 | Fields                                      | Yes |
 | Member functions                            | Yes. Some value category overloads aren't imported |
@@ -120,7 +120,7 @@ This status table describes which of the following C++ standard library features
 ## Known Issues
 
 ### Inline Namespaces
-- https://bugs.swift.org/browse/SR-15956: Swift's typechecker currently doesn't allow calling a function from an inline namespace when it's referenced through the parent namespace. Example of a test that fails: https://github.com/apple/swift/blob/main/test/Interop/Cxx/namespace/inline-namespace-function-call-broken.swift 
+- [#58217](https://github.com/apple/swift/issues/58217): Swift's typechecker currently doesn't allow calling a function from an inline namespace when it's referenced through the parent namespace. Example of a test that fails: https://github.com/apple/swift/blob/main/test/Interop/Cxx/namespace/inline-namespace-function-call-broken.swift
 
 
 ## Swift to C++ Interoperability Status
@@ -140,7 +140,7 @@ This status table describes which of the following Swift language features have 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
 | Top-level `@_cdecl` functions  | Yes                                                      |
-| Top-level Swift functions      | Partially, only with primitive and Swift struct types    |
+| Top-level Swift functions      | Partially, only with primitive and Swift struct and enum types. Class, protocol, and SIMD types are not supported.    |
 | `inout` parameters             | Yes                                                      |
 | Variadic parameters            | No                                                       |
 | Multiple return values         | No                                                       |
@@ -154,17 +154,56 @@ This status table describes which of the following Swift language features have 
 | Copy and destroy semantics     | Yes                                                      |
 | Initializers                   | Partially, as static `init` methods. No failable support |
 
+**Enums**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Fixed layout enums           | Yes                                                      |
+| Resilient / opaque enums     | Yes                                                      |
+| Copy and destroy semantics   | Yes                                                      |
+| Creation                     | Yes                                                      |
+| Enums with associated values | Partially: only support structs and enums                |
+| Enums with raw values        | No                                                       |
+| Indirect enums               | No                                                       |
+
+**Class types**
+
+| **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
+|--------------------------------|----------------------------------------------------------|
+| Class reference values         | Yes                                                      |
+| ARC semantics                  | Yes (C++ copy constructor,assignment operator, destructor perform ARC operations)  |
+| Initializers                   | No |
+
 **Methods**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Instance methods               | Yes, for structs only                                    |
+| Instance methods               | Yes                                                      |
 | Static methods                 | No                                                       |
 
 **Properties**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Getter accessors               | Yes, via `get<name>`. For structs only                   |
-| Setter accessors               | No                                                       |
+| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name                         |
+| Setter accessors               | Yes, via `set<name>`                                     |
 | Mutation accessors             | No                                                       |
+
+**Generics**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Generic functions            | Partially, only without generic constraints              |
+| Generic methods              | Partially, only without generic constraints              |
+| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
+| Generic `enum` types         | No |
+| Generic `class` types        | No |
+
+### Swift standard library
+
+This status table describes which of the following Swift standard library APIs have some experimental support for using them in C++.
+
+| **Swift Library Type**     | **Can be used from C++** |
+|--------------------------------|----------------------------------------------------------|
+| `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++   |
+| `Array<T>`   | Can be used as a type in C++. APIs in extensions are not exposed to C++   |

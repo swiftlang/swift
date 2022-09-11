@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -142,19 +142,56 @@ func defaultToAny(i: Int, s: String) {
   // expected-error@-1{{empty collection literal requires an explicit type}}
   let _: Int = a5 // expected-error{{value of type '[Any]'}}
 
+  let _: [Any] = []
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: [Any] = [1, [2, [3]]]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+
+  func f1() -> [Any] {
+    []
+  }
   
   let _: [Any?] = [1, "a", nil, 3.5]
   let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
   let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
   let _: [Any?] = [1, [2, [3]]]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: [Any?] = [1, nil, [2, nil, [3]]]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
 
   let a6 = [B(), C()]
   let _: Int = a6 // expected-error{{value of type '[A]'}}
+  
+  let a7: some Collection = [1, "Swift"]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}} {{41-41= as [Any]}}
+  let _: (any Sequence)? = [1, "Swift"]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  let _: any Sequence = [1, nil, "Swift"]
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
+  let _ = [1, true, ([], 1)]
+  // expected-error@-1 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  // expected-warning@-2 {{empty collection literal requires an explicit type}}
+  let _ = true ? [] : []
+  // expected-warning@-1{{empty collection literal requires an explicit type}}
+  let _ = (true, ([1, "Swift"]))
+  //expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  let _ = ([1, true])
+  //expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+
+  func f2<T>(_: [T]) {}
+
+  func f3<T>() -> [T]? {}
+
+  f2([])
+  // expected-warning@-1{{empty collection literal requires an explicit type}}
+  f2([1, nil, ""])
+  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
+  _ = f3() ?? []
+  // expected-warning@-1{{empty collection literal requires an explicit type}}
 }
 
 func noInferAny(iob: inout B, ioc: inout C) {
@@ -318,12 +355,15 @@ let routerFruit = Company(
   ]
 )
 
-// Infer [[Int]] for SR3786aa.
-// FIXME: As noted in SR-3786, this was the behavior in Swift 3, but
-//        it seems like the wrong choice and is less by design than by
-//        accident.
-let SR3786a: [Int] = [1, 2, 3]
-let SR3786aa = [SR3786a.reversed(), SR3786a]
+// https://github.com/apple/swift/issues/46371
+do {
+  let x: [Int] = [1, 2, 3]
+
+  // Infer '[[Int]]'.
+  // FIXME: As noted in the issue, this was the behavior in Swift 3, but
+  // it seems like the wrong choice and is less by design than by accident.
+  let _ = [x.reversed(), x]
+}
 
 // Conditional conformance
 protocol P { }
@@ -344,19 +384,19 @@ func testConditional(i: Int, s: String) {
 }
 
 
-// SR-8385
-enum SR8385: ExpressibleByStringLiteral {
-  case text(String)
-  init(stringLiteral value: String) {
-    self = .text(value)
+// https://github.com/apple/swift/issues/50912
+do {
+  enum Enum: ExpressibleByStringLiteral {
+    case text(String)
+    init(stringLiteral value: String) {
+      self = .text(value)
+    }
   }
-}
 
-func testSR8385() {
-  let _: [SR8385] = [SR8385("hello")]
-  let _: [SR8385] = [.text("hello")]
-  let _: [SR8385] = ["hello", SR8385.text("world")]
-  let _: [SR8385] = ["hello", .text("world")]
+  let _: [Enum] = [Enum("hello")]
+  let _: [Enum] = [.text("hello")]
+  let _: [Enum] = ["hello", Enum.text("world")]
+  let _: [Enum] = ["hello", .text("world")]
 }
 
 struct TestMultipleOverloadedInits {

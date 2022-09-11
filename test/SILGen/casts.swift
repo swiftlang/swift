@@ -77,11 +77,11 @@ protocol P {}
 struct S : P {}
 
 // CHECK: sil hidden [ossa] @$s5casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[IN:%.*]] : $*P):
-// CHECK:   [[COPY:%.*]] = alloc_stack $P
+// CHECK: bb0([[IN:%.*]] : $*any P):
+// CHECK:   [[COPY:%.*]] = alloc_stack $any P
 // CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]
 // CHECK:   [[TMP:%.*]] = alloc_stack $S
-// CHECK:   checked_cast_addr_br take_always P in [[COPY]] : $*P to S in [[TMP]] : $*S, bb1, bb2
+// CHECK:   checked_cast_addr_br take_always any P in [[COPY]] : $*any P to S in [[TMP]] : $*S, bb1, bb2
 //   Success block.
 // CHECK: bb1:
 // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*S

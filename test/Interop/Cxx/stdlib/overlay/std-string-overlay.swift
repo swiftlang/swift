@@ -16,6 +16,9 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   let cxx2 = std.string("something123")
   let swift2 = String(cxxString: cxx2)
   expectEqual(swift2, "something123")
+
+  let cxx3: std.string = "literal"
+  expectEqual(cxx3.size(), 7)
 }
 
 extension std.string.const_iterator: UnsafeCxxInputIterator {
@@ -24,10 +27,10 @@ extension std.string.const_iterator: UnsafeCxxInputIterator {
                         rhs: std.string.const_iterator) -> Bool {
 #if os(Linux)
     // In libstdc++, `base()` returns UnsafePointer<Optional<UnsafePointer<CChar>>>.
-    return lhs.base().pointee == rhs.base().pointee
+    return lhs.__baseUnsafe().pointee == rhs.__baseUnsafe().pointee
 #else
     // In libc++, `base()` returns UnsafePointer<CChar>.
-    return lhs.base() == rhs.base()
+    return lhs.__baseUnsafe() == rhs.__baseUnsafe()
 #endif
   }
 }

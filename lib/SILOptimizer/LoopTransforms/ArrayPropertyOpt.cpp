@@ -53,18 +53,19 @@
 #define DEBUG_TYPE "array-property-opt"
 
 #include "ArrayOpt.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -84,6 +85,8 @@ class ArrayPropertiesAnalysis {
   SILLoop *Loop;
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
+
+  SinkAddressProjections sinkProj;
 
   llvm::DenseMap<SILFunction *, uint32_t> InstCountCache;
   llvm::SmallSet<SILValue, 16> HoistableArray;
@@ -168,12 +171,17 @@ public:
 
     bool FoundHoistable = false;
     uint32_t LoopInstCount = 0;
+
     for (auto *BB : Loop->getBlocks()) {
       for (auto &Inst : *BB) {
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
         if (!Loop->canDuplicate(&Inst))
           return false;
+
+        if (!sinkProj.analyzeAddressProjections(&Inst)) {
+          return false;
+        }
 
         ArraySemanticsCall ArrayPropsInst(&Inst, "array.props", true);
         if (!ArrayPropsInst)
@@ -519,7 +527,7 @@ protected:
       return;
 
     // Update SSA form.
-    SSAUp.initialize(V->getType(), V.getOwnershipKind());
+    SSAUp.initialize(V->getType(), V->getOwnershipKind());
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
@@ -536,10 +544,15 @@ protected:
       for (auto *arg : origBB->getArguments())
         updateSSAForValue(origBB, arg, SSAUp);
 
+      SinkAddressProjections sinkProj;
       // Update outside used instruction values.
       for (auto &inst : *origBB) {
-        for (auto result : inst.getResults())
+        for (auto result : inst.getResults()) {
+          bool success = sinkProj.analyzeAddressProjections(&inst);
+          assert(success);
+          sinkProj.cloneProjections();
           updateSSAForValue(origBB, result, SSAUp);
+        }
       }
     }
   }

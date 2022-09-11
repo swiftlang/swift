@@ -725,8 +725,10 @@ ERROR(noimplicitcopy_used_on_generic_or_existential, none,
       "binding or a nominal type containing such typed things", ())
 
 // move only checker diagnostics
-ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
+ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
+ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
+      "'%0' has guaranteed ownership but was consumed", (StringRef))
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
 ERROR(sil_moveonlychecker_not_understand_mark_move, none,

@@ -286,9 +286,9 @@ func test_isa_2(_ p: P) {
 
 
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations10test_isa_2{{[_0-9a-zA-Z]*}}F
-  // CHECK: alloc_stack $(P, Int), loc "{{.*}}":[[@LINE-10]]:10
-  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 0, loc "{{.*}}":[[@LINE-11]]:10
-  // CHECK: tuple_element_addr{{.*}} $*(P, Int), 1, loc "{{.*}}":[[@LINE-12]]:10
+  // CHECK: alloc_stack $(any P, Int), loc "{{.*}}":[[@LINE-10]]:10
+  // CHECK: tuple_element_addr{{.*}} $*(any P, Int), 0, loc "{{.*}}":[[@LINE-11]]:10
+  // CHECK: tuple_element_addr{{.*}} $*(any P, Int), 1, loc "{{.*}}":[[@LINE-12]]:10
   // CHECK: load {{.*}}, loc "{{.*}}":[[@LINE-12]]:8
   //
   // CHECK: checked_cast_addr_br {{.*}}, loc "{{.*}}":[[@LINE-14]]:9

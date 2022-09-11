@@ -53,5 +53,11 @@ int main() {
 // CHECK-NEXT: create RefCountedClass 1
 // CHECK-NEXT: destroy RefCountedClass 1
 // CHECK-NEXT: destroy RefCountedClass 0
+
+  auto propsInClass = createPropsInClass(-1234);
+  assert(propsInClass.getStoredInt() == -1234);
+  assert(propsInClass.getComputedInt() == -1235);
+  auto smallStructFromClass = propsInClass.getSmallStruct();
+  assert(smallStructFromClass.getX() == 1234);
   return 0;
 }

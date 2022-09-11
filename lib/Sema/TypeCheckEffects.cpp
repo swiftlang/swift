@@ -724,12 +724,6 @@ public:
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
 
-  // Indicates if `classifyApply` will attempt to classify SelfApplyExpr
-  // because that should be done only in certain contexts like when infering
-  // if "async let" implicit auto closure wrapping initialize expression can
-  // throw.
-  bool ClassifySelfApplyExpr = false;
-
   DeclContext *getPolymorphicEffectDeclContext(EffectKind kind) const {
     switch (kind) {
     case EffectKind::Throws: return RethrowsDC;
@@ -758,20 +752,6 @@ public:
 
     if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
       assert(!E->isImplicitlyAsync());
-
-      if (ClassifySelfApplyExpr) {
-        // Do not consider throw properties in SelfAssignExpr with an implicit
-        // conversion base.
-        if (isa<ImplicitConversionExpr>(SAE->getBase()))
-          return Classification();
-
-        auto fnType = E->getType()->getAs<AnyFunctionType>();
-        if (fnType && fnType->isThrowing()) {
-          return Classification::forUnconditional(
-              EffectKind::Throws, PotentialEffectReason::forApply());
-        }
-      }
-      return Classification();
     }
 
     auto type = E->getFn()->getType();
@@ -779,17 +759,22 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    // If the function doesn't have any effects, we're done here.
+    auto fnRef = AbstractFunction::getAppliedFn(E);
+    auto conformances = fnRef.getSubstitutions().getConformances();
+    const auto hasAnyConformances = !conformances.empty();
+
+    // If the function doesn't have any effects or conformances, we're done
+    // here.
     if (!fnType->isThrowing() &&
         !E->implicitlyThrows() &&
         !fnType->isAsync() &&
-        !E->isImplicitlyAsync()) {
+        !E->isImplicitlyAsync() &&
+        !hasAnyConformances) {
       return Classification();
     }
 
     // Decompose the application.
     auto *args = E->getArgs();
-    auto fnRef = AbstractFunction::getAppliedFn(E);
 
     // If any of the arguments didn't type check, fail.
     for (auto arg : *args) {
@@ -2983,7 +2968,6 @@ void TypeChecker::checkPropertyWrapperEffects(
 
 bool TypeChecker::canThrow(Expr *expr) {
   ApplyClassifier classifier;
-  classifier.ClassifySelfApplyExpr = true;
-  return (classifier.classifyExpr(expr, EffectKind::Throws) ==
-          ConditionalEffectKind::Always);
+  auto effect = classifier.classifyExpr(expr, EffectKind::Throws);
+  return (effect != ConditionalEffectKind::None);
 }

@@ -16,8 +16,8 @@ sil @getKlass : $@convention(thin) () -> @owned Klass
 
 // Verify that checked-cast jump-threading kicks in and generates verifiable SIL.
 //
-// CHECK: Condition is the same if reached over {{.*}} parent @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned OtherKlass }
-// CHECK-NEXT: bb3(%{{.*}} : $OtherKlass):
+// CHECK: Condition is the same if reached over {{.*}} parent @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned any OtherKlass }
+// CHECK-NEXT: bb3(%{{.*}} : $any OtherKlass):
 // CHECK-NEXT:   br bb5(%{{.*}} : $Klass)
 sil shared @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned OtherKlass {
 bb0(%0 : $Klass):

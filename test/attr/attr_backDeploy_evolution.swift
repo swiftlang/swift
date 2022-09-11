@@ -32,6 +32,10 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
+// The deployment targets and availability versions hardcoded into this test
+// aren't compatible with the environment of the back deployment CI bots.
+// UNSUPPORTED: back_deployment_runtime
+
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)

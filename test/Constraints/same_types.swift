@@ -367,7 +367,7 @@ func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
   where PPP & P3 == T.Assoc { } // Ok, equivalent to T.Assoc == PPP & P3
 
 // CHECK-LABEL: same_types.(file).testSameTypeCommutativity6@
-// CHECK-NEXT: Generic signature: <U, T where T : P1>
+// CHECK-NEXT: Generic signature: <U, T where T : P1, T.[P1]Assoc == <<error type>>>
 func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
   where U & P3 == T.Assoc { } // Equivalent to T.Assoc == U & P3
 // expected-error@-1 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}

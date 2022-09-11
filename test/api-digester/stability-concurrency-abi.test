@@ -39,7 +39,7 @@
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
-// SR-13362
+// https://github.com/apple/swift/issues/55803
 // We currently only have a baseline for Intel CPUs on macOS.
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
