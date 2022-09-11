@@ -17,12 +17,15 @@ extension UnsafePointer {
   }
 }
 
+// TODO: :(
+var declContext: UnsafeMutableRawPointer! = nil
+
 struct ASTGenVisitor: SyntaxTransformVisitor {
   let ctx: UnsafeMutableRawPointer
   let base: UnsafePointer<CChar>
 
   // TOOD: we need to be up updating this.
-  var declContext: UnsafeMutableRawPointer
+//  var declContext: UnsafeMutableRawPointer
   
   // TODO: this some how messes up the witness table when I uncomment it locally :/
 //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
@@ -56,6 +59,48 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
     }
     
     return out
+  }
+  
+  public func visit(_ node: MemberDeclListItemSyntax) -> UnsafeMutableRawPointer {
+    visit(Syntax(node.decl))
+  }
+  
+  public func visit(_ node: StructDeclSyntax) -> UnsafeMutableRawPointer {
+    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+    var nameText = node.identifier.text
+    let name = nameText.withUTF8 { buf in
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+    }
+    
+    let out = StructDecl_create(ctx, loc, name, loc, declContext)
+    let oldDeclContext = declContext
+    declContext = out.declContext
+    defer { declContext = oldDeclContext }
+
+    node.members.members.map(self.visit).withBridgedArrayRef { ref in
+      NominalTypeDecl_setMembers(out.nominalDecl, ref)
+    }
+    
+    return out.decl
+  }
+  
+  public func visit(_ node: ClassDeclSyntax) -> UnsafeMutableRawPointer {
+    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+    var nameText = node.identifier.text
+    let name = nameText.withUTF8 { buf in
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+    }
+
+    let out = ClassDecl_create(ctx, loc, name, loc, declContext)
+    let oldDeclContext = declContext
+    declContext = out.declContext
+    defer { declContext = oldDeclContext }
+
+    node.members.members.map(self.visit).withBridgedArrayRef { ref in
+      NominalTypeDecl_setMembers(out.nominalDecl, ref)
+    }
+    
+    return out.decl
   }
   
   public func visit(_ node: ClosureExprSyntax) -> UnsafeMutableRawPointer {
@@ -267,14 +312,15 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 
 @_cdecl("parseTopLevelSwift")
 public func parseTopLevelSwift(
-    buffer: UnsafePointer<CChar>, declContext: UnsafeMutableRawPointer,
+    buffer: UnsafePointer<CChar>, dc: UnsafeMutableRawPointer,
     ctx: UnsafeMutableRawPointer,
     outputContext: UnsafeMutableRawPointer,
     callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
   let syntax = try! Parser.parse(source: String(cString: buffer))
   dump(syntax)
-  ASTGenVisitor(ctx: ctx, base: buffer, declContext: declContext)
+  declContext = dc
+  ASTGenVisitor(ctx: ctx, base: buffer)
     .visit(syntax)
     .forEach { callback($0, outputContext) }
 }

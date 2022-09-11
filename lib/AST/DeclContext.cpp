@@ -882,7 +882,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
 
 void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
                                             bool insertAtHead) const {
-  assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
+//  assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
   assert(!member->NextDecl && "Already added to a container");
 
 #ifndef NDEBUG

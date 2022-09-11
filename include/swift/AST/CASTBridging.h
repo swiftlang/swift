@@ -128,7 +128,20 @@ void *UnresolvedDotExpr_create(void *ctx, void *base, void *dotLoc, const char *
 
 void *ClosureExpr_create(void *ctx, void *body, void *dc);
 
-    void TopLevelCodeDecl_dump(void *);
+void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members);
+
+struct DeclContextAndDecl {
+  void *declContext;
+  void *nominalDecl;
+  void *decl;
+};
+
+struct DeclContextAndDecl StructDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
+                        void *dc);
+struct DeclContextAndDecl ClassDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
+                       void *dc);
+
+void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);
 void Decl_dump(void *);
 void Stmt_dump(void *);
