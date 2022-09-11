@@ -3255,7 +3255,7 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
       case Node::Kind::Subscript: {
         std::string subscriptText = "subscript(";
         std::vector<std::string> argumentTypeNames;
-        // Multiple arguments case
+        // Multiple arguments case
         NodePointer argList = matchSequenceOfKinds(
             child, {
                        std::make_pair(Node::Kind::Type, 2),
