@@ -211,6 +211,36 @@ void *ClosureExpr_create(void *ctx, void *body, void *dc) {
   return (Expr *)out;
 }
 
+void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
+  auto declMembers = getArrayRef<Decl *>(members);
+  for (auto m : declMembers)
+    ((NominalTypeDecl *)decl)->addMember(m);
+}
+
+DeclContextAndDecl StructDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
+                        void *dc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto *out = new (Context) StructDecl(SourceLoc(), // *(SourceLoc *)&loc,
+                                       Identifier::getFromOpaquePointer((void *)name),
+                                       SourceLoc(), // *(SourceLoc *)&nameLoc,
+                                       {}, nullptr,
+                                       (DeclContext *)dc);
+  out->setImplicit(); // TODO: remove this.
+  return {(DeclContext *)out, (NominalTypeDecl *)out, (Decl *)out};
+}
+
+DeclContextAndDecl ClassDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
+                       void *dc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto *out = new (Context) ClassDecl(SourceLoc(), // *(SourceLoc *)&loc,
+                                      Identifier::getFromOpaquePointer((void *)name),
+                                      SourceLoc(), // *(SourceLoc *)&nameLoc,
+                                      {}, nullptr,
+                                      (DeclContext *)dc, false);
+  out->setImplicit(); // TODO: remove this.
+  return {(DeclContext *)out, (NominalTypeDecl *)out, (Decl *)out};
+}
+
 void TopLevelCodeDecl_dump(void *decl) { ((TopLevelCodeDecl *)decl)->dump(); }
 
 void Expr_dump(void *expr) { ((Expr *)expr)->dump(); }
