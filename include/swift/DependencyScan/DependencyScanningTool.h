@@ -23,6 +23,28 @@
 
 namespace swift {
 namespace dependencies {
+class DependencyScanningTool;
+
+/// Diagnostic consumer that simply collects the diagnostics emitted so-far
+class DependencyScannerDiagnosticCollectingConsumer : public DiagnosticConsumer {
+public:
+  friend DependencyScanningTool;
+  DependencyScannerDiagnosticCollectingConsumer() {}
+  void reset() { Diagnostics.clear(); }
+private:
+  struct ScannerDiagnosticInfo {
+    std::string Message;
+    llvm::SourceMgr::DiagKind Severity;
+  };
+  
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override;
+  ScannerDiagnosticInfo convertDiagnosticInfo(SourceManager &SM,
+                                              const DiagnosticInfo &Info);
+  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
+  std::vector<ScannerDiagnosticInfo> Diagnostics;
+};
+
 
 /// Given a set of arguments to a print-target-info frontend tool query, produce the
 /// JSON target info.
@@ -68,6 +90,10 @@ public:
   bool loadCache(llvm::StringRef path);
   /// Discard the tool's current `SharedCache` and start anew.
   void resetCache();
+  
+  const std::vector<DependencyScannerDiagnosticCollectingConsumer::ScannerDiagnosticInfo>& getDiagnostics() const { return CDC.Diagnostics; }
+  /// Discared the collection of diagnostics encountered so far.
+  void resetDiagnostics();
 
 private:
   /// Using the specified invocation command, initialize the scanner instance
@@ -88,8 +114,8 @@ private:
   /// command-line options specified in the batch scan input entry.
   std::unique_ptr<CompilerArgInstanceCacheMap> VersionedPCMInstanceCacheCache;
 
-  /// A shared consumer that, for now, just prints the encountered diagnostics.
-  PrintingDiagnosticConsumer PDC;
+  /// A shared consumer that accumulates encountered diagnostics.
+  DependencyScannerDiagnosticCollectingConsumer CDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };
