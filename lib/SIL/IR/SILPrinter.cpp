@@ -3050,36 +3050,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   else if (getEffectsKind() == EffectsKind::ReleaseNone)
     OS << "[releasenone] ";
 
-  llvm::SmallVector<int, 8> definedEscapesIndices;
-  llvm::SmallVector<int, 8> escapesIndices;
-  visitArgEffects([&](int effectIdx, bool isDerived, ArgEffectKind kind) {
-    if (kind == ArgEffectKind::Escape) {
-      if (isDerived) {
-        escapesIndices.push_back(effectIdx);
-      } else {
-        definedEscapesIndices.push_back(effectIdx);
-      }
-    }
-  });
-  if (!definedEscapesIndices.empty()) {
-    OS << "[defined_escapes ";
-    for (int effectIdx : definedEscapesIndices) {
-      if (effectIdx > 0)
-        OS << ", ";
-      writeEffect(OS, effectIdx);
-    }
-    OS << "] ";
-  }
-  if (!escapesIndices.empty()) {
-    OS << "[escapes ";
-    for (int effectIdx : escapesIndices) {
-      if (effectIdx > 0)
-        OS << ", ";
-      writeEffect(OS, effectIdx);
-    }
-    OS << "] ";
-  }
-
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
@@ -3137,9 +3107,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
       OS << " !function_entry_count(" << eCount.getValue() << ")";
     }
     OS << " {\n";
+    
+    writeEffects(OS);
 
     SILPrinter(PrintCtx, sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames)
         .print(this);
+    OS << "} // end sil function '" << getName() << '\'';
+  } else if (hasArgumentEffects()) {
+    OS << " {\n";
+    writeEffects(OS);
     OS << "} // end sil function '" << getName() << '\'';
   }
 

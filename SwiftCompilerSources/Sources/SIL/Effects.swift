@@ -16,22 +16,22 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
   public typealias Path = SmallProjectionPath
 
   public enum Kind {
-    /// The selected argument value does not escape.
+    /// The argument value does not escape.
     ///
     /// Syntax examples:
-    ///    !%0       // argument 0 does not escape
-    ///    !%0.**    // argument 0 and all transitively contained values do not escape
+    ///    [%0: noescape]      // argument 0 does not escape
+    ///    [%0: noescape **]   // argument 0 and all transitively contained values do not escape
     ///
     case notEscaping
     
-    /// The selected argument value escapes to the specified selection (= first payload).
+    /// The argument value escapes to the function return value.
     ///
     /// Syntax examples:
-    ///    %0.s1 => %r   // field 2 of argument 0 exclusively escapes via return.
-    ///    %0.s1 -> %1   // field 2 of argument 0 - and other values - escape to argument 1.
+    ///    [%0: escape s1 => %r]   // field 2 of argument 0 exclusively escapes via return.
+    ///    [%0: escape s1 -> %r]   // field 2 of argument 0 - and other values - escape via return
     ///
-    /// The "exclusive" flag (= second payload) is true if only the selected argument escapes
-    /// to the specified selection, but nothing else escapes to it.
+    /// The "exclusive" flag (= second payload) is true if only the argument escapes,
+    /// but nothing else escapes to the return value.
     /// For example, "exclusive" is true for the following function:
     ///
     ///   @_effect(escaping c => return)
@@ -46,6 +46,14 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
     ///
     case escapingToReturn(Path, Bool)         // toPath, exclusive
 
+    /// Like `escapingToReturn`, but the argument escapes to another argument.
+    ///
+    /// Example: The argument effects of
+    ///   func argToArgEscape(_ r: inout Class, _ c: Class) { r = c }
+    ///
+    /// would be
+    ///    [%1: escape => %0]   // Argument 1 escapes to argument 0
+    ///
     case escapingToArgument(Int, Path, Bool)  // toArgumentIndex, toPath, exclusive
   }
 
@@ -111,19 +119,26 @@ public struct ArgumentEffect : CustomStringConvertible, CustomReflectable {
     return argumentIndex == rhsArgIdx && rhsPath.matches(pattern: pathPattern)
   }
 
-  public var description: String {
-    let selectedArg = "%\(argumentIndex)" + (pathPattern.isEmpty ? "" : ".\(pathPattern)")
+  public var headerDescription: String {
+    "%\(argumentIndex)\(isDerived ? "" : "!"): "
+  }
 
+  public var bodyDescription: String {
+    let patternStr = pathPattern.isEmpty ? "" : " \(pathPattern)"
     switch kind {
       case .notEscaping:
-        return "!\(selectedArg)"
+        return "noescape\(patternStr)"
       case .escapingToReturn(let toPath, let exclusive):
-        let pathStr = (toPath.isEmpty ? "" : ".\(toPath)")
-        return "\(selectedArg) \(exclusive ? "=>" : "->") %r\(pathStr)"
+        let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
+        return "escape\(patternStr) \(exclusive ? "=>" : "->") %r\(toPathStr)"
       case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
-        let pathStr = (toPath.isEmpty ? "" : ".\(toPath)")
-        return "\(selectedArg) \(exclusive ? "=>" : "->") %\(toArgIdx)\(pathStr)"
+        let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
+        return "escape\(patternStr) \(exclusive ? "=>" : "->") %\(toArgIdx)\(toPathStr)"
     }
+  }
+
+  public var description: String {
+    headerDescription + bodyDescription
   }
 
   public var customMirror: Mirror { Mirror(self, children: []) }
@@ -164,8 +179,27 @@ public struct FunctionEffects : CustomStringConvertible, CustomReflectable {
     argumentEffects = argumentEffects.filter { !$0.isDerived }
   }
 
+  public var argumentEffectsDescription: String {
+    var currentArgIdx = -1
+    var currentIsDerived = false
+    var result = ""
+    for effect in argumentEffects {
+      if effect.argumentIndex != currentArgIdx ||  effect.isDerived != currentIsDerived {
+        if currentArgIdx >= 0 { result += "]\n" }
+        result += "[\(effect.headerDescription)"
+        currentArgIdx = effect.argumentIndex
+        currentIsDerived = effect.isDerived
+      } else {
+        result += ", "
+      }
+      result += effect.bodyDescription
+    }
+    if currentArgIdx >= 0 { result += "]\n" }
+    return result
+  }
+
   public var description: String {
-    return "[" + argumentEffects.map { $0.description }.joined(separator: ", ") + "]"
+    return argumentEffectsDescription
   }
   
   public var customMirror: Mirror { Mirror(self, children: []) }
@@ -237,24 +271,37 @@ extension StringParser {
     return ArgumentEffect.Path()
   }
 
-  mutating func parseEffectFromSIL(for function: Function, isDerived: Bool) throws -> ArgumentEffect {
-    if consume("!") {
-      let argIdx = try parseArgumentIndexFromSIL()
-      let path = try parsePathPatternFromSIL()
-      return ArgumentEffect(.notEscaping, argumentIndex: argIdx, pathPattern: path, isDerived: isDerived)
+  mutating func parseEffectsFromSIL(to effects: inout FunctionEffects) throws {
+    let argumentIndex = try parseArgumentIndexFromSIL()
+    let isDerived = !consume("!")
+    if !consume(":") {
+      try throwError("expected ':'")
     }
-    let fromArgIdx = try parseArgumentIndexFromSIL()
-    let fromPath = try parsePathPatternFromSIL()
-    let exclusive = try parseEscapingArrow()
-    if consume("%r") {
-      let toPath = try parsePathPatternFromSIL()
-      return ArgumentEffect(.escapingToReturn(toPath, exclusive),
-                            argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: isDerived)
+    repeat {
+      let effect = try parseEffectFromSIL(argumentIndex: argumentIndex, isDerived: isDerived)
+      effects.argumentEffects.append(effect)
+    } while consume(",")
+  }
+
+  mutating func parseEffectFromSIL(argumentIndex: Int, isDerived: Bool) throws -> ArgumentEffect {
+    if consume("noescape") {
+      let path = try parseProjectionPathFromSIL()
+      return ArgumentEffect(.notEscaping, argumentIndex: argumentIndex, pathPattern: path, isDerived: isDerived)
     }
-    let toArgIdx = try parseArgumentIndexFromSIL()
-    let toPath = try parsePathPatternFromSIL()
-    return ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
-                          argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: isDerived)
+    if consume("escape") {
+      let fromPath = try parseProjectionPathFromSIL()
+      let exclusive = try parseEscapingArrow()
+      if consume("%r") {
+        let toPath = consume(".") ? try parseProjectionPathFromSIL() : ArgumentEffect.Path()
+        return ArgumentEffect(.escapingToReturn(toPath, exclusive),
+                              argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
+      }
+      let toArgIdx = try parseArgumentIndexFromSIL()
+      let toPath = consume(".") ? try parseProjectionPathFromSIL() : ArgumentEffect.Path()
+      return ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+                            argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
+    }
+    try throwError("unknown effect")
   }
 
   mutating func parseArgumentIndexFromSIL() throws -> Int {
@@ -265,13 +312,6 @@ extension StringParser {
       try throwError("expected argument index")
     }
     try throwError("expected parameter")
-  }
-
-  mutating func parsePathPatternFromSIL() throws -> ArgumentEffect.Path {
-    if consume(".") {
-      return try parseProjectionPathFromSIL()
-    }
-    return ArgumentEffect.Path()
   }
 
   private mutating func parseEscapingArrow() throws -> Bool {
