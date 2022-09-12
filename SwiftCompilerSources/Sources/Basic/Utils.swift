@@ -50,15 +50,6 @@ extension llvm.StringRef {
 }
 
 extension String {
-  /// Underscored to avoid name collision with Swift LLVM Bindings.
-  /// To be replaced with a bindings call once bindings are a dependency.
-  public func _withStringRef<T>(_ c: (llvm.StringRef) -> T) -> T {
-    var str = self
-    return str.withUTF8 { buffer in
-      return c(llvm.StringRef(buffer.baseAddress, buffer.count))
-    }
-  }
-
   /// Underscored to avoid name collision with the std overlay.
   /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
   public init(_cxxString s: std.string) {

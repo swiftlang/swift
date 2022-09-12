@@ -21,6 +21,10 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/${CMAKE_CFG_INTDIR}/bin")
+  swift_create_post_build_symlink(swift-frontend-bootstrapping0
+    SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+    DESTINATION "swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping0/${CMAKE_CFG_INTDIR}/bin")
 
   # Bootstrapping - level 1
 
@@ -34,11 +38,16 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
                           swiftDriverTool
+                          ${SWIFT_LLVM_BINDINGS_MODULES}
                           swiftCompilerModules-bootstrapping1)
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/${CMAKE_CFG_INTDIR}/bin")
+  swift_create_post_build_symlink(swift-frontend-bootstrapping1
+    SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
+    DESTINATION "swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/${CMAKE_CFG_INTDIR}/bin")
 endif()
 

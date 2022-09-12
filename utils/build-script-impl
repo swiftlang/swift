@@ -2333,6 +2333,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                     -DLLDB_SWIFTC:PATH=${SWIFTC_BIN}
                     -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                    -DLLDB_SWIFT_LLVM_BINDINGS_LIBS:PATH="${swift_build_dir}/SwiftCompilerSources/swift-llvm-bindings/lib"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
