@@ -4342,6 +4342,7 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
   for (const auto &condElement : condition) {
     switch (condElement.getKind()) {
     case StmtConditionElement::CK_Availability:
+    case StmtConditionElement::CK_HasSymbol:
       // Nothing to do here.
       continue;
 

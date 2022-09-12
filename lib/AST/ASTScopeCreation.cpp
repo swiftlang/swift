@@ -1172,6 +1172,7 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
   for (auto &sec : stmt->getCond()) {
     switch (sec.getKind()) {
     case StmtConditionElement::CK_Availability:
+    case StmtConditionElement::CK_HasSymbol:
       break;
     case StmtConditionElement::CK_Boolean:
       scopeCreator.addToScopeTree(sec.getBoolean(), insertionPoint);

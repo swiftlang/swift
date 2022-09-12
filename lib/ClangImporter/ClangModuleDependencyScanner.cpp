@@ -333,8 +333,25 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, *importHackFile);
-  std::string workingDir =
-      ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  // The Swift compiler does not have a concept of a working directory.
+  // It is instead handled by the Swift driver by resolving relative paths
+  // according to the driver's notion of a working directory. On the other hand,
+  // Clang does have a concept working directory which may be specified on this
+  // Clang invocation with '-working-directory'. If so, it is crucial that we use
+  // this directory as an argument to the Clang scanner invocation below.
+  std::string workingDir;
+  auto clangWorkingDirPos = std::find(commandLineArgs.rbegin(),
+                                      commandLineArgs.rend(),
+                                      "-working-directory");
+  if (clangWorkingDirPos == commandLineArgs.rend())
+    workingDir = ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  else {
+    if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
+      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error, "Missing '-working-directory' argument");
+      return None;
+    }
+    workingDir = *(clangWorkingDirPos - 1);
+  }
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
       commandLineArgs, workingDir, clangImpl->alreadySeen);

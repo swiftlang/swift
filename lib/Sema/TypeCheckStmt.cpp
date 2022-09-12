@@ -422,6 +422,8 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
                                                 bool &isFalsable,
                                                 DeclContext *dc) {
   auto &Context = dc->getASTContext();
+
+  // Typecheck a #available or #unavailable condition.
   if (elt.getKind() == StmtConditionElement::CK_Availability) {
     isFalsable = true;
 
@@ -441,6 +443,20 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
               break;
             }
     }
+
+    return false;
+  }
+
+  // Typecheck a #_hasSymbol condition.
+  if (elt.getKind() == StmtConditionElement::CK_HasSymbol) {
+    auto Info = elt.getHasSymbolInfo();
+    auto E = Info->getSymbolExpr();
+    if (E) {
+      // FIXME: Implement #_hasSymbol typechecking.
+      (void)TypeChecker::typeCheckExpression(E, dc);
+      Info->setSymbolExpr(E);
+    }
+    isFalsable = true;
 
     return false;
   }

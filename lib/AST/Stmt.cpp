@@ -392,6 +392,8 @@ SourceRange StmtConditionElement::getSourceRange() const {
     return getBoolean()->getSourceRange();
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getSourceRange();
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
     SourceLoc Start;
     if (IntroducerLoc.isValid())
@@ -410,6 +412,15 @@ SourceRange StmtConditionElement::getSourceRange() const {
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
+PoundHasSymbolInfo *PoundHasSymbolInfo::create(ASTContext &Ctx,
+                                               SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
+                                               Expr *SymbolExpr,
+                                               SourceLoc RParenLoc) {
+  return new (Ctx)
+      PoundHasSymbolInfo(PoundLoc, LParenLoc, SymbolExpr, RParenLoc);
+}
+
 SourceLoc StmtConditionElement::getStartLoc() const {
   switch (getKind()) {
   case StmtConditionElement::CK_Boolean:
@@ -418,6 +429,8 @@ SourceLoc StmtConditionElement::getStartLoc() const {
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().Start;
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getStartLoc();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -431,6 +444,8 @@ SourceLoc StmtConditionElement::getEndLoc() const {
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().End;
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getEndLoc();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");

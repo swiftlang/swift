@@ -390,6 +390,39 @@ public:
   bool isUnavailability() const { return _isUnavailability; }
 };
 
+/// An expression that guards execution based on whether the symbols for the
+/// declaration identified by the given expression are non-null at run-time, e.g.
+///
+///   if #_hasSymbol(foo(_:)) { foo(42) }
+///
+class PoundHasSymbolInfo final : public ASTAllocated<PoundHasSymbolInfo> {
+  Expr *SymbolExpr;
+
+  SourceLoc PoundLoc;
+  SourceLoc LParenLoc;
+  SourceLoc RParenLoc;
+
+  PoundHasSymbolInfo(SourceLoc PoundLoc, SourceLoc LParenLoc, Expr *SymbolExpr,
+                     SourceLoc RParenLoc)
+      : SymbolExpr(SymbolExpr), PoundLoc(PoundLoc), LParenLoc(LParenLoc),
+        RParenLoc(RParenLoc){};
+
+public:
+  static PoundHasSymbolInfo *create(ASTContext &Ctx, SourceLoc PoundLoc,
+                                    SourceLoc LParenLoc, Expr *SymbolExpr,
+                                    SourceLoc RParenLoc);
+
+  Expr *getSymbolExpr() const { return SymbolExpr; }
+  void setSymbolExpr(Expr *E) { SymbolExpr = E; }
+
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
+  SourceLoc getStartLoc() const { return PoundLoc; }
+  SourceLoc getEndLoc() const { return RParenLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(getStartLoc(), getEndLoc());
+  }
+};
 
 /// This represents an entry in an "if" or "while" condition.  Pattern bindings
 /// can bind any number of names in the pattern binding decl, and may have an
@@ -414,20 +447,21 @@ class alignas(1 << PatternAlignInBits) StmtConditionElement {
   /// to this as an 'implicit' pattern.
   Pattern *ThePattern = nullptr;
 
-  /// This is either the boolean condition, the initializer for a pattern
-  /// binding, or the #available information.
-  llvm::PointerUnion<PoundAvailableInfo*, Expr *> CondInitOrAvailable;
+  /// This is either the boolean condition, the #available information, or
+  /// the #_hasSymbol information.
+  llvm::PointerUnion<Expr *, PoundAvailableInfo *, PoundHasSymbolInfo *>
+      Condition;
 
 public:
   StmtConditionElement() {}
-  StmtConditionElement(SourceLoc IntroducerLoc, Pattern *ThePattern,
-                       Expr *Init)
-    : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern),
-      CondInitOrAvailable(Init) {}
-  StmtConditionElement(Expr *cond) : CondInitOrAvailable(cond) {}
+  StmtConditionElement(SourceLoc IntroducerLoc, Pattern *ThePattern, Expr *Init)
+      : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern), Condition(Init) {}
+  StmtConditionElement(Expr *cond) : Condition(cond) {}
 
-  StmtConditionElement(PoundAvailableInfo *Info) : CondInitOrAvailable(Info) {}
-  
+  StmtConditionElement(PoundAvailableInfo *Info) : Condition(Info) {}
+
+  StmtConditionElement(PoundHasSymbolInfo *Info) : Condition(Info) {}
+
   SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
   void setIntroducerLoc(SourceLoc loc) { IntroducerLoc = loc; }
 
@@ -435,26 +469,33 @@ public:
   enum ConditionKind {
     CK_Boolean,
     CK_PatternBinding,
-    CK_Availability
+    CK_Availability,
+    CK_HasSymbol,
   };
 
   ConditionKind getKind() const {
-    if (ThePattern) return CK_PatternBinding;
-    return CondInitOrAvailable.is<Expr*>() ? CK_Boolean : CK_Availability;
+    if (ThePattern)
+      return CK_PatternBinding;
+    if (Condition.is<Expr *>())
+      return CK_Boolean;
+    if (Condition.is<PoundAvailableInfo *>())
+      return CK_Availability;
+    assert(Condition.is<PoundHasSymbolInfo *>());
+    return CK_HasSymbol;
   }
 
   /// Boolean Condition Accessors.
   Expr *getBooleanOrNull() const {
-    return getKind() == CK_Boolean ? CondInitOrAvailable.get<Expr*>() : nullptr;
+    return getKind() == CK_Boolean ? Condition.get<Expr *>() : nullptr;
   }
 
   Expr *getBoolean() const {
     assert(getKind() == CK_Boolean && "Not a condition");
-    return CondInitOrAvailable.get<Expr*>();
+    return Condition.get<Expr *>();
   }
   void setBoolean(Expr *E) {
     assert(getKind() == CK_Boolean && "Not a condition");
-    CondInitOrAvailable = E;
+    Condition = E;
   }
 
   /// Pattern Binding Accessors.
@@ -474,22 +515,33 @@ public:
 
   Expr *getInitializer() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    return CondInitOrAvailable.get<Expr*>();
+    return Condition.get<Expr *>();
   }
   void setInitializer(Expr *E) {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    CondInitOrAvailable = E;
+    Condition = E;
   }
   
   // Availability Accessors
   PoundAvailableInfo *getAvailability() const {
     assert(getKind() == CK_Availability && "Not an #available condition");
-    return CondInitOrAvailable.get<PoundAvailableInfo*>();
+    return Condition.get<PoundAvailableInfo *>();
   }
 
   void setAvailability(PoundAvailableInfo *Info) {
     assert(getKind() == CK_Availability && "Not an #available condition");
-    CondInitOrAvailable = Info;
+    Condition = Info;
+  }
+
+  // #_hasSymbol Accessors
+  PoundHasSymbolInfo *getHasSymbolInfo() const {
+    assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
+    return Condition.get<PoundHasSymbolInfo *>();
+  }
+
+  void setHasSymbolInfo(PoundHasSymbolInfo *Info) {
+    assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
+    Condition = Info;
   }
 
   SourceLoc getStartLoc() const;
