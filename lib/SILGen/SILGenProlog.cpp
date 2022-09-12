@@ -272,7 +272,7 @@ struct ArgumentInitHelper {
     // Look for the following annotations on the function argument:
     // - @noImplicitCopy
     // - @_eagerMove
-    // - @_lexical
+    // - @_noEagerMove
     auto isNoImplicitCopy = pd->isNoImplicitCopy();
     auto lifetime = SGF.F.getLifetime(pd, value->getType());
 

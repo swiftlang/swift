@@ -9,35 +9,35 @@ enum E {}
 @_eagerMove // expected-error {{'@_eagerMove' attribute cannot be applied to this declaration}}
 typealias EagerTuple = (C, C)
 
-func foo(@_lexical @_eagerMove _ e: E) {} // expected-error {{@_eagerMove and @_lexical attributes are alternate styles of lifetimes and can't be combined}}
+func foo(@_noEagerMove @_eagerMove _ e: E) {} // expected-error {{@_eagerMove and @_noEagerMove attributes are alternate styles of lifetimes and can't be combined}}
 
-func bar(@_lexical _ s: S) {} // okay
+func bar(@_noEagerMove _ s: S) {} // okay
 
 func baz(@_eagerMove _ c: C) {} // okay
 
 @_eagerMove // expected-error {{@_eagerMove is only valid on methods}}
 func bazzoo(_ c: C) {}
 
-@_lexical // expected-error {{@_lexical is only valid on methods}}
+@_noEagerMove // expected-error {{@_noEagerMove is only valid on methods}}
 func bazzoozoo(_ c: C) {}
 
 extension C {
   @_eagerMove
   func pazzoo() {}
 
-  @_lexical
+  @_noEagerMove
   func pazzoozoo() {}
 }
 
 struct S2 {
   @_eagerMove let c: C // okay
-  @_lexical let e: E // okay
+  @_noEagerMove let e: E // okay
 }
 
 func foo() {
-  @_lexical let s1 = S()
+  @_noEagerMove let s1 = S()
   @_eagerMove var s2 = S()
-  @_lexical @_eagerMove let s3 = S() // expected-error {{@_eagerMove and @_lexical attributes are alternate styles of lifetimes and can't be combined}}
+  @_noEagerMove @_eagerMove let s3 = S() // expected-error {{@_eagerMove and @_noEagerMove attributes are alternate styles of lifetimes and can't be combined}}
   _ = s1
   s2 = S()
   _ = s2
