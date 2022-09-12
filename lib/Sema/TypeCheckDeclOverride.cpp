@@ -1620,7 +1620,7 @@ namespace  {
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
 
     UNINTERESTING_ATTR(EagerMove)
-    UNINTERESTING_ATTR(Lexical)
+    UNINTERESTING_ATTR(NoEagerMove)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

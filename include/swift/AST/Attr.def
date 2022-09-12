@@ -675,7 +675,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
-SIMPLE_DECL_ATTR(_lexical, Lexical,
+SIMPLE_DECL_ATTR(_noEagerMove, NoEagerMove,
   UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove |

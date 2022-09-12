@@ -3251,7 +3251,7 @@ ERROR(inherits_executor_without_async,none,
 ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
       (DeclAttribute))
 ERROR(eagermove_and_lexical_combined,none,
-      "@_eagerMove and @_lexical attributes are alternate styles of lifetimes "
+      "@_eagerMove and @_noEagerMove attributes are alternate styles of lifetimes "
       "and can't be combined", ())
 
 ERROR(autoclosure_function_type,none,

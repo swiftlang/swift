@@ -324,7 +324,7 @@ public:
 
   bool visitLifetimeAttr(DeclAttribute *attr);
   void visitEagerMoveAttr(EagerMoveAttr *attr);
-  void visitLexicalAttr(LexicalAttr *attr);
+  void visitNoEagerMoveAttr(NoEagerMoveAttr *attr);
 
   void visitCompilerInitializedAttr(CompilerInitializedAttr *attr);
 
@@ -6519,10 +6519,10 @@ void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
     return;
 }
 
-void AttributeChecker::visitLexicalAttr(LexicalAttr *attr) {
+void AttributeChecker::visitNoEagerMoveAttr(NoEagerMoveAttr *attr) {
   if (visitLifetimeAttr(attr))
     return;
-  // @_lexical and @_eagerMove are opposites and can't be combined.
+  // @_noEagerMove and @_eagerMove are opposites and can't be combined.
   if (D->getAttrs().hasAttribute<EagerMoveAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::eagermove_and_lexical_combined);
     return;
