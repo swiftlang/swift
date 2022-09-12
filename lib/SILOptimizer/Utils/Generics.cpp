@@ -2141,8 +2141,13 @@ static SILValue fixSpecializedReturnType(SILValue returnVal, SILType returnType,
                                  Builder.getModule())) {
     newReturnVal = Builder.createUncheckedRefCast(Loc, returnVal, returnType);
   } else {
-    newReturnVal =
-        Builder.createUncheckedBitwiseCast(Loc, returnVal, returnType);
+    if (Builder.hasOwnership()) {
+      newReturnVal =
+          Builder.createUncheckedValueCast(Loc, returnVal, returnType);
+    } else {
+      newReturnVal =
+          Builder.createUncheckedBitwiseCast(Loc, returnVal, returnType);
+    }
   }
 
   return newReturnVal;
@@ -2191,8 +2196,13 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
                                     Builder.getModule())) {
               InputValue = Builder.createUncheckedRefCast(Loc, InputValue, argTy);
             } else {
-              InputValue =
-                  Builder.createUncheckedBitwiseCast(Loc, InputValue, argTy);
+              if (Builder.hasOwnership()) {
+                InputValue =
+                    Builder.createUncheckedValueCast(Loc, InputValue, argTy);
+              } else {
+                InputValue =
+                    Builder.createUncheckedBitwiseCast(Loc, InputValue, argTy);
+              }
             }
           }
           converted = true;
@@ -2234,8 +2244,13 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
                                   Builder.getModule())) {
             InputValue = Builder.createUncheckedRefCast(Loc, InputValue, argTy);
           } else {
-            InputValue =
-                Builder.createUncheckedBitwiseCast(Loc, InputValue, argTy);
+            if (Builder.hasOwnership()) {
+                InputValue =
+                    Builder.createUncheckedValueCast(Loc, InputValue, argTy);
+            } else {
+              InputValue =
+                  Builder.createUncheckedBitwiseCast(Loc, InputValue, argTy);
+            }
           }
         }
         converted = true;
