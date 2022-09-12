@@ -1031,18 +1031,16 @@ public:
     EffectsKindAttr = unsigned(E);
   }
   
-  enum class ArgEffectKind {
-    Unknown,
-    Escape
-  };
-  
   std::pair<const char *, int>  parseEffects(StringRef attrs, bool fromSIL,
-                                             bool isDerived,
+                                             int argumentIndex, bool isDerived,
                                              ArrayRef<StringRef> paramNames);
   void writeEffect(llvm::raw_ostream &OS, int effectIdx) const;
+  void writeEffects(llvm::raw_ostream &OS) const {
+    writeEffect(OS, -1);
+  }
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
-  void visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const;
+  void visitArgEffects(std::function<void(int, int, bool)> c) const;
 
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
