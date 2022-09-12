@@ -659,14 +659,21 @@ void UnboundImport::validateRestrictedImport(ASTContext &ctx) {
   DeclAttrKind attrToRemove = conflicts[0] == ImportFlags::ImplementationOnly?
                                       DAK_Exported : DAK_ImplementationOnly;
 
-  auto flagName = [](ImportFlags flag) {
+  // More dense enum with some cases of ImportFlags,
+  // used by import_restriction_conflict.
+  enum class ImportFlagForDiag : uint8_t {
+    ImplementationOnly,
+    SPIOnly,
+    Exported
+  };
+  auto flagToDiag = [](ImportFlags flag) {
     switch (flag) {
       case ImportFlags::ImplementationOnly:
-        return "implementation-only";
+        return ImportFlagForDiag::ImplementationOnly;
       case ImportFlags::SPIOnly:
-        return "SPI only";
+        return ImportFlagForDiag::SPIOnly;
       case ImportFlags::Exported:
-        return "exported";
+        return ImportFlagForDiag::Exported;
       default:
         llvm_unreachable("Unexpected ImportFlag");
     }
@@ -676,8 +683,8 @@ void UnboundImport::validateRestrictedImport(ASTContext &ctx) {
   auto diag = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                                  diag::import_restriction_conflict,
                                  import.module.getModulePath().front().Item,
-                                 flagName(conflicts[0]),
-                                 flagName(conflicts[1]));
+                                 (uint8_t)flagToDiag(conflicts[0]),
+                                 (uint8_t)flagToDiag(conflicts[1]));
 
   auto *ID = getImportDecl().getPtrOrNull();
   if (!ID) return;
