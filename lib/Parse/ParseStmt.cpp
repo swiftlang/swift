@@ -1469,6 +1469,33 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
   return Status;
 }
 
+// #_hasSymbol(...)
+ParserResult<PoundHasSymbolInfo> Parser::parseStmtConditionPoundHasSymbol() {
+  SyntaxParsingContext ConditionCtxt(SyntaxContext,
+                                     SyntaxKind::HasSymbolCondition);
+  SourceLoc PoundLoc = consumeToken(tok::pound__hasSymbol);
+
+  if (!Tok.isFollowingLParen()) {
+    diagnose(Tok, diag::has_symbol_expected_lparen);
+    return makeParserError();
+  }
+
+  SourceLoc LParenLoc = consumeToken(tok::l_paren);
+  ParserStatus status = makeParserSuccess();
+
+  auto ExprResult = parseExprBasic(diag::has_symbol_expected_expr);
+  status |= ExprResult;
+
+  SourceLoc RParenLoc;
+  if (parseMatchingToken(tok::r_paren, RParenLoc,
+                         diag::has_symbol_expected_rparen, LParenLoc))
+    status.setIsParseError();
+
+  auto *result = PoundHasSymbolInfo::create(
+      Context, PoundLoc, LParenLoc, ExprResult.getPtrOrNull(), RParenLoc);
+  return makeParserResult(status, result);
+}
+
 ParserStatus
 Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
                                   Diag<> DefaultID, StmtKind ParentKind,
@@ -1487,6 +1514,18 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   // Parse a leading #available/#unavailable condition if present.
   if (Tok.isAny(tok::pound_available, tok::pound_unavailable)) {
     auto res = parseStmtConditionPoundAvailable();
+    if (res.isNull() || res.hasCodeCompletion()) {
+      Status |= res;
+      return Status;
+    }
+    BindingKindStr = StringRef();
+    result.push_back({res.get()});
+    return Status;
+  }
+
+  // Parse a leading #_hasSymbol condition if present.
+  if (Tok.is(tok::pound__hasSymbol)) {
+    auto res = parseStmtConditionPoundHasSymbol();
     if (res.isNull() || res.hasCodeCompletion()) {
       Status |= res;
       return Status;
@@ -1691,6 +1730,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 ///     expr-basic
 ///     ('var' | 'let' | 'case') pattern '=' expr-basic
 ///     '#available' '(' availability-spec (',' availability-spec)* ')'
+///     '#_hasSymbol' '(' expr ')'
 ///
 /// The use of expr-basic here disallows trailing closures, which are
 /// problematic given the curly braces around the if/while body.

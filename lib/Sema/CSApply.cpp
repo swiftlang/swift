@@ -8915,6 +8915,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     for (auto &condElement : *stmtCondition) {
       switch (condElement.getKind()) {
       case StmtConditionElement::CK_Availability:
+      case StmtConditionElement::CK_HasSymbol:
         continue;
 
       case StmtConditionElement::CK_Boolean: {

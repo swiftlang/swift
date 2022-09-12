@@ -1340,7 +1340,9 @@ public:
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
-      case StmtConditionElement::CK_Availability: break;
+      case StmtConditionElement::CK_Availability:
+      case StmtConditionElement::CK_HasSymbol:
+        break;
       case StmtConditionElement::CK_Boolean: {
         auto E = elt.getBoolean();
         // Walk an expression condition normally.
