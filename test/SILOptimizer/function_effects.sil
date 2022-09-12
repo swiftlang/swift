@@ -56,7 +56,11 @@ sil_global @globalY : $Y
 sil [ossa] @unknown_function : $@convention(thin) (@owned X) -> ()
 sil [ossa] @unknown_function_y : $@convention(thin) (@owned Y) -> ()
 
-// CHECK-LABEL: sil [escapes %1.v** => %3.v**, !%2, %2.c*.v** -> %r.v**, !%3] [ossa] @test_basic
+// CHECK-LABEL: sil [ossa] @test_basic
+// CHECK-NEXT:  [%1: escape v** => %3.v**]
+// CHECK-NEXT:  [%2: noescape, escape c*.v** -> %r.v**]
+// CHECK-NEXT:  [%3: noescape]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_basic : $@convention(thin) (@owned X, @guaranteed Str, @guaranteed Z, @inout X) -> @owned Y {
 bb0(%0 : @owned $X, %1 : @guaranteed $Str, %2 : @guaranteed $Z, %3 : $*X):
   // %0 escapes to global
@@ -75,20 +79,28 @@ bb0(%0 : @owned $X, %1 : @guaranteed $Str, %2 : @guaranteed $Z, %3 : $*X):
   return %9 : $Y
 }
 
-// CHECK-LABEL: sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @simple_forwarding
+// CHECK-LABEL: sil @simple_forwarding
+// CHECK-NEXT:  [%0: escape => %r, escape c*.v** => %r.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @simple_forwarding : $@convention(thin) (@owned Z) -> @owned Z {
 bb0(%0 : $Z):
   return %0 : $Z
 }
 
-// CHECK-LABEL: sil [escapes %0.v** => %r.v**, %0.v**.c*.v** => %r.v**.c*.v**] @forwarding_struct_element
+// CHECK-LABEL: sil @forwarding_struct_element
+// CHECK-NEXT:  [%0: escape v** => %r.v**, escape v**.c*.v** => %r.v**.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @forwarding_struct_element : $@convention(thin) (@owned Str) -> @owned X {
 bb0(%0 : $Str):
   %1 = struct_extract %0 : $Str, #Str.a
   return %1 : $X
 }
 
-// CHECK-LABEL: sil [escapes %0 => %r.s1.0, %0.c*.v** => %r.s1.0.c*.v**, %1 => %r.s1.1, %1.c*.v** => %r.s1.1.c*.v**, %2 => %r.s0, %2.c*.v** => %r.s0.c*.v**]  @forwarding_in_struct
+// CHECK-LABEL: sil @forwarding_in_struct
+// CHECK-NEXT:  [%0: escape => %r.s1.0, escape c*.v** => %r.s1.0.c*.v**]
+// CHECK-NEXT:  [%1: escape => %r.s1.1, escape c*.v** => %r.s1.1.c*.v**]
+// CHECK-NEXT:  [%2: escape => %r.s0, escape c*.v** => %r.s0.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @forwarding_in_struct : $@convention(thin) (@owned X, @owned X, @owned X) -> @owned Str {
 bb0(%0 : $X, %1 : $X, %2: $X):
   %3 = tuple (%0 : $X, %1 : $X)
@@ -96,7 +108,9 @@ bb0(%0 : $X, %1 : $X, %2: $X):
   return %4 : $Str
 }
 
-// CHECK-LABEL: sil [escapes %0 -> %r.v**, %0.c*.v** -> %r.v**.c*.v**] @forwarding_same_arg_in_struct
+// CHECK-LABEL: sil @forwarding_same_arg_in_struct
+// CHECK-NEXT:  [%0: escape -> %r.v**, escape c*.v** -> %r.v**.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @forwarding_same_arg_in_struct : $@convention(thin) (@owned X) -> @owned Str {
 bb0(%0 : $X):
   %1 = tuple (%0 : $X, %0 : $X)
@@ -104,7 +118,9 @@ bb0(%0 : $X):
   return %2 : $Str
 }
 
-// CHECK-LABEL: sil [escapes !%0] [ossa] @test_escaping_content
+// CHECK-LABEL: sil [ossa] @test_escaping_content
+// CHECK-NEXT:  [%0: noescape]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_escaping_content : $@convention(thin) (@guaranteed Z) -> () {
 bb0(%0 : @guaranteed $Z):
   %1 = ref_element_addr %0 : $Z, #Z.y
@@ -115,8 +131,11 @@ bb0(%0 : @guaranteed $Z):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [escapes !%0.**] @not_escaping_argument
+// CHECK-LABEL: sil @not_escaping_argument
+// CHECK-NEXT:  [%0!: noescape **]
+// CHECK-NEXT:  {{^[^[]}}
 sil @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> () {
+[%0!: noescape **]
 bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.y
   %2 = global_addr @globalY : $*Y
@@ -126,14 +145,19 @@ bb0(%0 : $Z):
   return %4 : $()
 }
 
-// CHECK-LABEL: sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_from_inout
+// CHECK-LABEL: sil @load_from_inout
+// CHECK-NEXT:  [%0: escape -> %r, escape c*.v** -> %r.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @load_from_inout : $@convention(thin) (@inout Y) -> @owned Y {
 bb0(%0 : $*Y):
   %2 = load %0 : $*Y
   return %2 : $Y
 }
 
-// CHECK-LABEL: sil [escapes !%0, %0.c*.v** -> %r.v**, !%1] [ossa] @followstore_implies_non_exclusive
+// CHECK-LABEL: sil [ossa] @followstore_implies_non_exclusive
+// CHECK-NEXT:  [%0: noescape, escape c*.v** -> %r.v**]
+// CHECK-NEXT:  [%1: noescape]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @followstore_implies_non_exclusive : $@convention(thin) (@guaranteed Z, @owned Y) -> @owned Y {
 bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
   %2 = ref_element_addr %0 : $Z, #Z.y
@@ -142,7 +166,10 @@ bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
   return %3 : $Y
 }
 
-// CHECK-LABEL: sil [escapes !%0, %0.c*.v** -> %r.v**, %1 -> %r] [ossa] @test_not_exclusive_escaping_through_phi
+// CHECK-LABEL: sil [ossa] @test_not_exclusive_escaping_through_phi
+// CHECK-NEXT:  [%0: noescape, escape c*.v** -> %r.v**]
+// CHECK-NEXT:  [%1: escape -> %r]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_not_exclusive_escaping_through_phi : $@convention(thin) (@guaranteed Z, @owned Y) -> @owned Y {
 bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
   cond_br undef, bb1, bb2
@@ -158,7 +185,9 @@ bb3(%7: @owned $Y):
   return %7 : $Y
 }
 
-// CHECK-LABEL: sil [escapes !%0, %0.c*.v** -> %r.v**] [ossa] @test_not_exclusive_through_store
+// CHECK-LABEL: sil [ossa] @test_not_exclusive_through_store
+// CHECK-NEXT:  [%0: noescape, escape c*.v** -> %r.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_not_exclusive_through_store : $@convention(thin) (@guaranteed Z, @owned Y) -> @owned Y {
 bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
   %2 = ref_element_addr %0 : $Z, #Z.y
@@ -167,9 +196,13 @@ bb0(%0 : @guaranteed $Z, %1 : @owned $Y):
   return %3 : $Y
 }
 
-sil [escapes %0.v** => %0.v**] [ossa] @self_arg_callee : $@convention(thin) (@inout Str) -> ()
+sil [ossa] @self_arg_callee : $@convention(thin) (@inout Str) -> () {
+[%0: escape v** => %0.v**] 
+}
 
-// CHECK-LABEL: sil [escapes %0.v** => %0.v**] [ossa] @test_self_arg_escape
+// CHECK-LABEL: sil [ossa] @test_self_arg_escape
+// CHECK-NEXT:  [%0: escape v** => %0.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_self_arg_escape : $@convention(thin) (@inout Str) -> () {
 bb0(%0 : $*Str):
   %1 = function_ref @self_arg_callee : $@convention(thin) (@inout Str) -> ()
@@ -178,7 +211,9 @@ bb0(%0 : $*Str):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil [escapes %0.v** => %0.s1.0.v**] [ossa] @test_self_arg_escape_with_copy
+// CHECK-LABEL: sil [ossa] @test_self_arg_escape_with_copy
+// CHECK-NEXT:  [%0: escape v** => %0.s1.0.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_self_arg_escape_with_copy : $@convention(thin) (@inout Str) -> () {
 bb0(%0 : $*Str):
   %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -189,7 +224,9 @@ bb0(%0 : $*Str):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [escapes %0.v** => %0.v**] [ossa] @test_self_arg_escape_with_bidirectional_copy
+// CHECK-LABEL: sil [ossa] @test_self_arg_escape_with_bidirectional_copy
+// CHECK-NEXT:  [%0: escape v** => %0.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_self_arg_escape_with_bidirectional_copy : $@convention(thin) (@inout Str) -> () {
 bb0(%0 : $*Str):
   %1 = struct_element_addr %0 : $*Str, #Str.a
@@ -201,7 +238,10 @@ bb0(%0 : $*Str):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil [escapes !%0.**, !%1, %1.c*.v** => %0.v**] [ossa] @test_content_to_arg_addr
+// CHECK-LABEL: sil [ossa] @test_content_to_arg_addr
+// CHECK-NEXT:  [%0: noescape **]
+// CHECK-NEXT:  [%1: noescape, escape c*.v** => %0.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @test_content_to_arg_addr : $@convention(thin) (@guaranteed Y) -> @out Str {
 bb0(%0 : $*Str, %1 : @guaranteed $Y):
   %2 = ref_element_addr %1 : $Y, #Y.s
@@ -212,21 +252,27 @@ bb0(%0 : $*Str, %1 : @guaranteed $Y):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [escapes %0.v** => %r.v**, %0.v**.c*.v** => %r.v**.c*.v**] @escaping_pointer
+// CHECK-LABEL: sil @escaping_pointer
+// CHECK-NEXT:  [%0: escape v** => %r.v**, escape v**.c*.v** => %r.v**.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @escaping_pointer : $@convention(thin) (PointerAndInt) -> UnsafeMutablePointer<Int> {
 bb0(%0 : $PointerAndInt):
   %1 = struct_extract %0 : $PointerAndInt, #PointerAndInt.p
   return %1 : $UnsafeMutablePointer<Int>
 }
 
-// CHECK-LABEL: sil [escapes !%0.**] @not_escaping_int
+// CHECK-LABEL: sil @not_escaping_int
+// CHECK-NEXT:  [%0: noescape **]
+// CHECK-NEXT:  {{^[^[]}}
 sil @not_escaping_int : $@convention(thin) (PointerAndInt) -> Int {
 bb0(%0 : $PointerAndInt):
   %1 = struct_extract %0 : $PointerAndInt, #PointerAndInt.i
   return %1 : $Int
 }
 
-// CHECK-LABEL: sil [escapes !%0.**] @test_simple_recursion
+// CHECK-LABEL: sil @test_simple_recursion
+// CHECK-NEXT:  [%0: noescape **]
+// CHECK-NEXT:  {{^[^[]}}
 sil @test_simple_recursion : $@convention(thin) (@guaranteed Y) -> () {
 bb0(%0 : $Y):
   cond_br undef, bb1, bb2
@@ -244,7 +290,8 @@ bb3:
   return %5 : $() 
 }
 
-// CHECK-LABEL: sil @test_recursion_with_escaping_param
+// CHECK-LABEL: sil @test_recursion_with_escaping_param : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> Y {
+// CHECK-NEXT:  {{^[^[]}}
 sil @test_recursion_with_escaping_param : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> Y {
 bb0(%0 : $Y, %1 : $Y):
   cond_br undef, bb1, bb2
@@ -261,7 +308,9 @@ bb3(%5 : $Y):
   return %5 : $Y
 }
 
-// CHECK-LABEL: [escapes !%0.**] @inout_class_argument
+// CHECK-LABEL: sil @inout_class_argument
+// CHECK-NEXT:  [%0: noescape **]
+// CHECK-NEXT:  {{^[^[]}}
 sil @inout_class_argument : $@convention(thin) (@inout X) -> () {
 bb0(%0 : $*X):
   %1 = alloc_ref $X
@@ -270,7 +319,9 @@ bb0(%0 : $*X):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_and_store_to_inout
+// CHECK-LABEL: sil @load_and_store_to_inout
+// CHECK-NEXT:  [%0: escape -> %r, escape c*.v** -> %r.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @load_and_store_to_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z {
 bb0(%0 : $*Z, %1 : $Y):
   %2 = load %0 : $*Z
@@ -279,7 +330,9 @@ bb0(%0 : $*Z, %1 : $Y):
   return %2 : $Z
 }
 
-// CHECK-LABEL: sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @store_to_content
+// CHECK-LABEL: sil @store_to_content
+// CHECK-NEXT:  [%0: escape => %r, escape c*.v** => %r.c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @store_to_content : $@convention(thin) (@owned Z, @guaranteed Y) -> @owned Z {
 bb0(%0 : $Z, %1 : $Y):
   %2 = ref_element_addr %0 : $Z, #Z.y
@@ -287,14 +340,18 @@ bb0(%0 : $Z, %1 : $Y):
   return %0 : $Z
 }
 
-// CHECK-LABEL: sil [escapes !%1.**] @non_returning_function
+// CHECK-LABEL: sil @non_returning_function
+// CHECK-NEXT:  [%1: noescape **]
+// CHECK-NEXT:  {{^[^[]}}
 sil @non_returning_function : $@convention(thin) (Str, @inout Str) -> () {
 bb0(%0 : $Str, %1 : $*Str):
   store %0 to %1 : $*Str
   unreachable
 }
 
-// CHECK-LABEL: sil [escapes !%0] @followStore_introducing1
+// CHECK-LABEL: sil @followStore_introducing1
+// CHECK-NEXT:  [%0: noescape]
+// CHECK-NEXT:  {{^[^[]}}
 sil @followStore_introducing1 : $@convention(thin) (@guaranteed Z) -> @owned Y {
 bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.y
@@ -304,7 +361,9 @@ bb0(%0 : $Z):
   return %4 : $Y
 }
 
-// CHECK-LABEL: sil [escapes !%0.**] @followStore_introducing2
+// CHECK-LABEL: sil @followStore_introducing2
+// CHECK-NEXT:  [%0: noescape **]
+// CHECK-NEXT:  {{^[^[]}}
 sil @followStore_introducing2 : $@convention(thin) (@inout Z, @guaranteed Y) -> () {
 bb0(%0 : $*Z, %1 : $Y):
   %2 = load %0 : $*Z

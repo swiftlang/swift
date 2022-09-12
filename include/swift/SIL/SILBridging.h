@@ -217,9 +217,9 @@ typedef enum {
 #include "swift/AST/Builtins.def"
 } BridgedBuiltinID;
 
-enum {
-  EffectsFlagEscape = 0x1,
-  EffectsFlagDerived = 0x2
+struct BridgedEffectInfo {
+  SwiftInt argumentIndex;
+  bool isDerived;
 };
 
 void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
@@ -231,17 +231,17 @@ typedef void (* _Nonnull FunctionWriteFn)(BridgedFunction,
                                           BridgedOStream, SwiftInt);
 typedef BridgedParsingError (*_Nonnull FunctionParseFn)(BridgedFunction,
                                                         llvm::StringRef,
-                                                        SwiftInt, SwiftInt,
+                                                        SwiftInt, SwiftInt, SwiftInt,
                                                         BridgedArrayRef);
 typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
                                                     BridgedFunction);
-typedef SwiftInt (* _Nonnull FunctionGetEffectFlagsFn)(BridgedFunction, SwiftInt);
+typedef BridgedEffectInfo (* _Nonnull FunctionGetEffectInfoFn)(BridgedFunction, SwiftInt);
 
 void Function_register(SwiftMetatype metatype,
             FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectFlagsFn hasEffectsFn);
+            FunctionGetEffectInfoFn effectInfoFn);
 
 SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
                                                 OptionalBridgedInstruction inst);

@@ -482,7 +482,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
   F.visitArgEffects(
-    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+    [&](int effectIdx, int argumentIndex, bool isDerived) {
       if (isDerived && resilience == ResilienceStrategy::Resilient)
         return;
       numAttrs++;
@@ -512,7 +512,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
-    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+    [&](int effectIdx, int argumentIndex, bool isDerived) {
       if (isDerived && resilience == ResilienceStrategy::Resilient)
         return;
 
@@ -524,7 +524,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
 
       SILArgEffectsAttrLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, effectsStrID, (unsigned)isDerived);
+          Out, ScratchRecord, abbrCode,
+          effectsStrID, (unsigned)argumentIndex, (unsigned)isDerived);
     });
 
   if (NoBody)
