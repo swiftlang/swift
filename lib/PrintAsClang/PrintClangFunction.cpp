@@ -109,6 +109,13 @@ public:
     ClangSyntaxPrinter(os).printNominalClangTypeReference(typeDecl);
   }
 
+  static void
+  printGenericReturnScaffold(raw_ostream &os, StringRef templateParamName,
+                             llvm::function_ref<void(StringRef)> bodyOfReturn) {
+    printReturnScaffold(nullptr, os, templateParamName, templateParamName,
+                        bodyOfReturn);
+  }
+
   void printReturnScaffold(raw_ostream &os,
                            llvm::function_ref<void(StringRef)> bodyOfReturn) {
     std::string fullQualifiedType;
@@ -119,14 +126,22 @@ public:
       llvm::raw_string_ostream unqualTypeNameOS(typeName);
       unqualTypeNameOS << cast<clang::NamedDecl>(typeDecl)->getName();
     }
+    printReturnScaffold(typeDecl, os, fullQualifiedType, typeName,
+                        bodyOfReturn);
+  }
+
+private:
+  static void
+  printReturnScaffold(const clang::Decl *typeDecl, raw_ostream &os,
+                      StringRef fullQualifiedType, StringRef typeName,
+                      llvm::function_ref<void(StringRef)> bodyOfReturn) {
     os << "alignas(alignof(" << fullQualifiedType << ")) char storage[sizeof("
        << fullQualifiedType << ")];\n";
     os << "auto * _Nonnull storageObjectPtr = reinterpret_cast<"
        << fullQualifiedType << " *>(storage);\n";
     bodyOfReturn("storage");
     os << ";\n";
-    auto *cxxRecord = cast<clang::CXXRecordDecl>(typeDecl);
-    if (cxxRecord->isTrivial()) {
+    if (typeDecl && cast<clang::CXXRecordDecl>(typeDecl)->isTrivial()) {
       // Trivial object can be just copied and not destroyed.
       os << "return *storageObjectPtr;\n";
       return;
@@ -136,7 +151,6 @@ public:
     os << "return result;\n";
   }
 
-private:
   const clang::Decl *typeDecl;
 };
 
@@ -999,6 +1013,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
          << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
       printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
       os << ";\n  });\n";
+      os << "  } else if constexpr (::swift::"
+         << cxx_synthesis::getCxxImplNamespaceName()
+         << "::isSwiftBridgedCxxRecord<" << resultTyName << ">) {\n";
+      ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
+                                                   printCallToCFunc);
       os << "  } else {\n";
       os << "  " << resultTyName << " returnValue;\n";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));

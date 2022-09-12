@@ -304,7 +304,8 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: return ::swift::_impl::implClassFor<T_0_1>::type::returnNewValue([&](void * _Nonnull returnValue) {
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV1yq_vg(returnValue, swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: });
-// CHECK-NEXT: } else {
+// CHECK-NEXT:   } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_1>) {
+// CHECK: } else {
 // CHECK-NEXT: T_0_1 returnValue;
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV1yq_vg(reinterpret_cast<void *>(&returnValue), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: return returnValue;
@@ -345,7 +346,8 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: return ::swift::_impl::implClassFor<T_1_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(returnValue, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: });
-// CHECK-NEXT: } else {
+// CHECK-NEXT: } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_1_0>) {
+// CHECK:      } else {
 // CHECK-NEXT: T_1_0 returnValue;
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: return returnValue;
