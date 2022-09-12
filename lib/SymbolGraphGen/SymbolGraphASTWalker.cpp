@@ -48,11 +48,13 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
 SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
   auto *M = D->getModuleContext();
   const auto *DC = D->getDeclContext();
+  SmallVector<const NominalTypeDecl *, 2> ParentTypes = {};
   const Decl *ExtendedNominal = nullptr;
   while (DC) {
     M = DC->getParentModule();
     if (const auto *NTD = dyn_cast_or_null<NominalTypeDecl>(DC->getAsDecl())) {
       DC = NTD->getDeclContext();
+      ParentTypes.push_back(NTD);
     } else if (const auto *Ext = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
       DC = Ext->getExtendedNominal()->getDeclContext();
       if (!ExtendedNominal)
@@ -77,9 +79,8 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     return &MainGraph;
   }
 
-  if (ExtendedNominal && isFromExportedImportedModule(ExtendedNominal)) {
-    return &MainGraph;
-  } else if (!ExtendedNominal && isConsideredExportedImported(D)) {
+  // If this type is the child of a type which was re-exported in a qualified export, use the main graph.
+  if (llvm::any_of(ParentTypes, [&](const NominalTypeDecl *NTD){ return isQualifiedExportedImport(NTD); })) {
     return &MainGraph;
   }
   
@@ -255,22 +256,10 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 }
 
 bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
-  // First check the decl itself to see if it was directly re-exported.
-  if (isFromExportedImportedModule(D))
-    return true;
-
-  const auto *DC = D->getDeclContext();
-
-  // Next, see if the decl is a child symbol of another decl that was re-exported.
-  if (DC) {
-    if (const auto *VD = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
-      if (isFromExportedImportedModule(VD))
-        return true;
-    }
-  }
-
-  // Finally, check to see if this decl is an extension of something else that was re-exported.
+  // Check to see if this decl is an extension of something else that was re-exported.
+  // Do this first in case there's a chain of extensions that leads somewhere that's not a re-export.
   // FIXME: this considers synthesized members of extensions to be valid
+  const auto *DC = D->getDeclContext();
   const Decl *ExtendedNominal = nullptr;
   while (DC && !ExtendedNominal) {
     if (const auto *ED = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
@@ -280,9 +269,22 @@ bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
     }
   }
 
-  if (ExtendedNominal && isFromExportedImportedModule(ExtendedNominal)) {
+  if (ExtendedNominal && isConsideredExportedImported(ExtendedNominal)) {
     return true;
   }
+
+  // Check to see if the decl is a child symbol of another decl that was re-exported.
+  DC = D->getDeclContext();
+  if (DC) {
+    if (const auto *VD = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
+      if (isConsideredExportedImported(VD))
+        return true;
+    }
+  }
+
+  // Check the decl itself to see if it was directly re-exported.
+  if (isFromExportedImportedModule(D) || isQualifiedExportedImport(D))
+    return true;
 
   // If none of the other checks passed, this wasn't from a re-export.
   return false;
