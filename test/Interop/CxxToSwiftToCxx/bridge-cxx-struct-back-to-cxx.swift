@@ -71,6 +71,15 @@ public func retTrivial() -> Trivial {
     return Trivial()
 }
 
+public func takeNonTrivial2(_ x: ns.NonTrivialTemplate<ns.TrivialinNS>) {
+}
+
+public func takeTrivial(_ x: Trivial) {
+}
+
+public func takeTrivialInout(_ x: inout Trivial) {
+}
+
 // CHECK: #if __has_feature(objc_modules)
 // CHECK: #if __has_feature(objc_modules)
 // CHECK-NEXT: #if __has_warning("-Watimport-in-framework-header")
@@ -120,3 +129,14 @@ public func retTrivial() -> Trivial {
 // CHECK-NEXT: return *storageObjectPtr;
 // CHECK-NEXT: }
 
+// CHECK: inline void takeNonTrivial2(const ns::NonTrivialTemplate<ns::TrivialinNS>& x) noexcept {
+// CHECK-NEXT:   return _impl::$s8UseCxxTy15takeNonTrivial2yySo2nsO02__b18TemplateInstN2ns18e7TrivialH20INS_11TrivialinNSEEEVF(swift::_impl::getOpaquePointer(x));
+// CHECK-NEXT: }
+
+// CHECK: inline void takeTrivial(const Trivial& x) noexcept {
+// CHECK-NEXT:   return _impl::$s8UseCxxTy11takeTrivialyySo0E0VF(_impl::swift_interop_passDirect_UseCxxTy_uint32_t_0_4(reinterpret_cast<const char *>(swift::_impl::getOpaquePointer(x))));
+// CHECK-NEXT: }
+
+// CHECK: inline void takeTrivialInout(Trivial& x) noexcept {
+// CHECK-NEXT:   return _impl::$s8UseCxxTy16takeTrivialInoutyySo0E0VzF(swift::_impl::getOpaquePointer(x));
+// CHECK-NEXT: }

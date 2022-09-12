@@ -310,7 +310,12 @@ public:
       ClangTypeHandler handler(decl->getClangDecl());
       if (!handler.isRepresentable())
         return ClangRepresentation::unsupported;
+      if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
+          !isInOutParam)
+        os << "const ";
       handler.printTypeName(os);
+      if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+        os << '&';
       return ClangRepresentation::representable;
     }
 
@@ -859,11 +864,22 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
         if (!directTypeEncoding.empty())
           os << cxx_synthesis::getCxxImplNamespaceName()
              << "::swift_interop_passDirect_" << directTypeEncoding << '(';
-        ClangValueTypePrinter(os, cPrologueOS, interopContext)
-            .printParameterCxxToCUseScaffold(
-                moduleContext,
-                [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
-                namePrinter, isSelf);
+        if (decl->hasClangNode()) {
+            if (!directTypeEncoding.empty())
+                os << "reinterpret_cast<const char *>(";
+            os << "swift::" << cxx_synthesis::getCxxImplNamespaceName()
+               << "::getOpaquePointer(";
+            namePrinter();
+            os << ')';
+            if (!directTypeEncoding.empty())
+                os << ')';
+        } else {
+            ClangValueTypePrinter(os, cPrologueOS, interopContext)
+                .printParameterCxxToCUseScaffold(
+                                                 moduleContext,
+                                                 [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
+                                                 namePrinter, isSelf);
+        }
         if (!directTypeEncoding.empty())
           os << ')';
         return;
