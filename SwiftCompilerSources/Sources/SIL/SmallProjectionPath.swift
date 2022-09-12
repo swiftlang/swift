@@ -471,7 +471,7 @@ extension StringParser {
 
   mutating func parseProjectionPathFromSIL() throws -> SmallProjectionPath {
     var entries: [(SmallProjectionPath.FieldKind, Int)] = []
-    repeat {
+    while true {
       if consume("**") {
         entries.append((.anything, 0))
       } else if consume("c*") {
@@ -497,12 +497,10 @@ extension StringParser {
         entries.append((.structField, idx))
       } else if let tupleElemIdx = consumeInt() {
         entries.append((.tupleField, tupleElemIdx))
-      } else {
-        try throwError("expected selection path component")
+      } else if !consume(".") {
+        return try createPath(from: entries)
       }
-    } while consume(".")
- 
-    return try createPath(from: entries)
+    }
   }
 
   private func createPath(from entries: [(SmallProjectionPath.FieldKind, Int)]) throws -> SmallProjectionPath {
