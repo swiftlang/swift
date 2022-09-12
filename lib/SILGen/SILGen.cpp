@@ -1172,24 +1172,20 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
 /// Emit a function now, if it's externally usable or has been referenced in
 /// the current TU, or remember how to emit it later if not.
-static void emitOrDelayFunction(SILGenModule &SGM,
-                                SILDeclRef constant,
-                                bool forceEmission = false) {
+static void emitOrDelayFunction(SILGenModule &SGM, SILDeclRef constant) {
   assert(!constant.isThunk());
   assert(!constant.isClangImported());
 
   auto emitAfter = SGM.lastEmittedFunction;
 
-  SILFunction *f = nullptr;
-
   // Implicit decls may be delayed if they can't be used externally.
   auto linkage = constant.getLinkage(ForDefinition);
-  bool mayDelay = !forceEmission &&
-             (!constant.hasUserWrittenCode() &&
-              !constant.isDynamicallyReplaceable() &&
-              !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
+  bool mayDelay = !constant.hasUserWrittenCode() &&
+                  !constant.isDynamicallyReplaceable() &&
+                  !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule());
 
   // Avoid emitting a delayable definition if it hasn't already been referenced.
+  SILFunction *f = nullptr;
   if (mayDelay)
     f = SGM.getEmittedFunction(constant, ForDefinition);
   else
@@ -1443,12 +1439,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   emitAbstractFuncDecl(fd);
 
-  if (fd->hasBody()) {
-    SILDeclRef constant(decl);
-    bool ForCoverageMapping = doesASTRequireProfiling(M, fd, constant);
-    emitOrDelayFunction(*this, constant,
-                        /*forceEmission=*/ForCoverageMapping);
-  }
+  if (fd->hasBody())
+    emitOrDelayFunction(*this, SILDeclRef(decl));
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
