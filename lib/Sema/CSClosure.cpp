@@ -109,7 +109,7 @@ public:
           CS.setType(var, computeProjectedValueType(wrappedVar, wrapperType));
         } else {
           // _<name> is the wrapper var
-          CS.setType(var, computeWrappedValueType(wrappedVar, wrapperType));
+          CS.setType(var, wrapperType);
         }
 
         return {true, expr};

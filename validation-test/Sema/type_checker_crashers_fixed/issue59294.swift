@@ -74,7 +74,7 @@ class Test {
       if $value.returnValue() > 0 {
         test {
           return $value.returnValue() == $0 &&
-                 _value == $0
+                 _value.wrappedValue == $0
         }
       }
       return false
@@ -84,7 +84,7 @@ class Test {
       @WrapperValue var value = $0
 
       test {
-        if _value != $0 { // Ok
+        if _value.wrappedValue != $0 { // Ok
           $value.printValue()
         }
       }
@@ -99,7 +99,8 @@ class Test {
       if true {
         @OuterWrapper @WrapperValue var value = $0
         if true {
-          let _: Bool = _value == $0
+          let _: OuterWrapper<WrapperValue<Bool>> = _value
+          let _ = _value.wrappedValue.wrappedValue == $0
           let _: OuterWrapper<WrapperValue<Bool>> = $value
           let _: Bool = value
         }
