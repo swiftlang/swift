@@ -28,8 +28,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclTemplate.h"
-#include "clang/AST/NestedNameSpecifier.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -108,26 +106,7 @@ public:
   }
 
   void printTypeName(raw_ostream &os) const {
-    auto &clangCtx = typeDecl->getASTContext();
-    clang::PrintingPolicy pp(clangCtx.getLangOpts());
-    const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
-        clangCtx, clangCtx.getTranslationUnitDecl(),
-        typeDecl->getLexicalDeclContext());
-    if (NS)
-      NS->print(os, pp);
-    assert(cast<clang::NamedDecl>(typeDecl)->getDeclName().isIdentifier());
-    os << cast<clang::NamedDecl>(typeDecl)->getName();
-    if (auto *ctd =
-            dyn_cast<clang::ClassTemplateSpecializationDecl>(typeDecl)) {
-      if (ctd->getTemplateArgs().size()) {
-        os << '<';
-        llvm::interleaveComma(ctd->getTemplateArgs().asArray(), os,
-                              [&](const clang::TemplateArgument &arg) {
-                                arg.print(pp, os, /*IncludeType=*/true);
-                              });
-        os << '>';
-      }
-    }
+    ClangSyntaxPrinter(os).printNominalClangTypeReference(typeDecl);
   }
 
   void printReturnScaffold(raw_ostream &os,
@@ -316,6 +295,7 @@ public:
       handler.printTypeName(os);
       if (typeUseKind == FunctionSignatureTypeUse::ParamType)
         os << '&';
+      interopContext.recordEmittedClangTypeDecl(decl);
       return ClangRepresentation::representable;
     }
 

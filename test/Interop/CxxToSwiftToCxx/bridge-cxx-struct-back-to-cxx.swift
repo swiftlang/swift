@@ -140,3 +140,33 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK: inline void takeTrivialInout(Trivial& x) noexcept {
 // CHECK-NEXT:   return _impl::$s8UseCxxTy16takeTrivialInoutyySo0E0VzF(swift::_impl::getOpaquePointer(x));
 // CHECK-NEXT: }
+
+// CHECK: } // end namespace
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace _impl {
+// CHECK-EMPTY:
+// CHECK-NEXT: // Type metadata accessor for __CxxTemplateInstN2ns18NonTrivialTemplateIiEE
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC4IiEEVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-EMPTY:
+// CHECK-EMPTY:
+// CHECK-NEXT: } // namespace _impl
+// CHECK-EMPTY:
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<ns::NonTrivialTemplate<int>> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplate<int>> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return _impl::$sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC4IiEEVMa(0)._0;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isSwiftBridgedCxxRecord<ns::NonTrivialTemplate<int>> = true;
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace UseCxxTy {

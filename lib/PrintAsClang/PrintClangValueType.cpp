@@ -406,7 +406,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 
   printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
-                         typeMetadataFuncGenericParams);
+                         typeMetadataFuncGenericParams,
+                         typeDecl->getModuleContext());
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
@@ -456,14 +457,38 @@ void ClangValueTypePrinter::printValueTypeReturnScaffold(
   os << "  });\n";
 }
 
+void ClangValueTypePrinter::printClangTypeSwiftGenericTraits(
+    raw_ostream &os, const NominalTypeDecl *typeDecl,
+    const ModuleDecl *moduleContext) {
+  assert(typeDecl->hasClangNode());
+  // Do not reference unspecialized templates.
+  if (isa<clang::ClassTemplateDecl>(typeDecl->getClangDecl()))
+    return;
+  auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
+      typeDecl->getDeclaredType()->getCanonicalType());
+  std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString();
+  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
+                         /*typeMetadataFuncRequirements=*/{}, moduleContext);
+}
+
 void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     StringRef typeMetadataFuncName,
-    ArrayRef<GenericRequirement> typeMetadataFuncRequirements) {
+    ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
+    const ModuleDecl *moduleContext) {
   ClangSyntaxPrinter printer(os);
   // FIXME: avoid popping out of the module's namespace here.
   os << "} // end namespace \n\n";
   os << "namespace swift {\n";
+
+  if (typeDecl->hasClangNode()) {
+    /// Print a reference to the type metadata fucntion for a C++ type.
+    ClangSyntaxPrinter(os).printNamespace(
+        cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &os) {
+          ClangSyntaxPrinter(os).printCTypeMetadataTypeFunction(
+              typeDecl, typeMetadataFuncName, typeMetadataFuncRequirements);
+        });
+  }
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
@@ -471,9 +496,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     // FIXME: generic type support.
     os << "template<>\n";
     os << "static inline const constexpr bool isUsableInGenericContext<";
-    printer.printBaseName(typeDecl->getModuleContext());
-    os << "::";
-    printer.printBaseName(typeDecl);
+    printer.printNominalTypeReference(typeDecl,
+                                      /*moduleContext=*/nullptr);
     os << "> = true;\n";
   }
   if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl))
@@ -484,8 +508,11 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "> {\n";
   os << "  static inline void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
-  printer.printBaseName(typeDecl->getModuleContext());
-  os << "::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  if (!typeDecl->hasClangNode()) {
+    printer.printBaseName(typeDecl->getModuleContext());
+    os << "::";
+  }
+  os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   ClangSyntaxPrinter(os).printSwiftTypeMetadataAccessFunctionCall(
       typeMetadataFuncName, typeMetadataFuncRequirements);
   os << "._0;\n";
@@ -493,7 +520,15 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
 
-  if (!isa<ClassDecl>(typeDecl) && typeMetadataFuncRequirements.empty()) {
+  if (typeDecl->hasClangNode()) {
+    os << "template<>\n";
+    os << "static inline const constexpr bool isSwiftBridgedCxxRecord<";
+    printer.printNominalClangTypeReference(typeDecl->getClangDecl());
+    os << "> = true;\n";
+  }
+
+  if (!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode() &&
+      typeMetadataFuncRequirements.empty()) {
     // FIXME: generic support.
     os << "template<>\n";
     os << "static inline const constexpr bool isValueType<";
@@ -512,7 +547,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
 
   // FIXME: generic support.
-  if (typeMetadataFuncRequirements.empty()) {
+  if (!typeDecl->hasClangNode() && typeMetadataFuncRequirements.empty()) {
     os << "template<>\n";
     os << "struct implClassFor<";
     printer.printBaseName(typeDecl->getModuleContext());
@@ -528,6 +563,6 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
   os << "\nnamespace ";
-  printer.printBaseName(typeDecl->getModuleContext());
+  printer.printBaseName(moduleContext);
   os << " {\n";
 }
