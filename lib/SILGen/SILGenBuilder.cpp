@@ -946,7 +946,8 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
 ManagedValue
 SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
                                        MarkMustCheckInst::CheckKind kind) {
-  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  assert((value.isPlusOne(SGF) || value.isLValue()) &&
+         "Argument must be at +1 or be an inout!");
   CleanupCloner cloner(*this, value);
   auto *mdi = SILBuilder::createMarkMustCheckInst(
       loc, value.forward(getSILGenFunction()), kind);

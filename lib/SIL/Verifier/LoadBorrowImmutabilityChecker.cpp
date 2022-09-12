@@ -169,6 +169,17 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     }
     return true;
 
+  case SILInstructionKind::ExplicitCopyAddrInst:
+    if (cast<ExplicitCopyAddrInst>(user)->getDest() == op->get()) {
+      writeAccumulator.push_back(op);
+      return true;
+    }
+    // This operand is the copy source. Check if it is taken.
+    if (cast<ExplicitCopyAddrInst>(user)->isTakeOfSrc()) {
+      writeAccumulator.push_back(op);
+    }
+    return true;
+
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
     if (cast<MarkUnresolvedMoveAddrInst>(user)->getDest() == op->get()) {
       writeAccumulator.push_back(op);
