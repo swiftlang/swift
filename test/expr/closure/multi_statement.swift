@@ -566,3 +566,22 @@ struct Test {
     }
   }
 }
+
+https://github.com/apple/swift/issues/61017
+do {
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+
+    init(wrappedValue: Int) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  class Test {
+    let bar: () -> Void = {
+      @Wrapper var wrapped = 1
+      let wrapper: Wrapper = _wrapped // Ok
+    }
+  }
+}
