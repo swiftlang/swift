@@ -376,6 +376,11 @@ public:
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
+    if (Addr->getType().isMoveOnly()) {
+      // TODO: Handle no implicit copy here.
+      Addr = SGF.B.createMarkMustCheckInst(
+          decl, Addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
@@ -591,9 +592,16 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   for (auto LastRelease : FinalReleases) {
     SILBuilderWithScope Builder(LastRelease);
     if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
+      // If we have a mark_must_check use of our stack box, we want to destroy
+      // that.
+      SILValue valueToDestroy = StackBox;
+      if (auto *mmci = StackBox->getSingleUserOfType<MarkMustCheckInst>()) {
+        valueToDestroy = mmci;
+      }
+
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
-      Builder.emitDestroyAddrAndFold(Loc, StackBox);
+      Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
     }
     Builder.createDeallocStack(Loc, ASI);
   }

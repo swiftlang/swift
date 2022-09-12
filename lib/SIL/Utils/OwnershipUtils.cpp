@@ -936,7 +936,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
-        isa<UncheckedAddrCastInst>(user)) {
+        isa<UncheckedAddrCastInst>(user) || isa<MarkMustCheckInst>(user)) {
       transitiveResultUses(op);
       continue;
     }

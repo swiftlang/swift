@@ -556,9 +556,141 @@ struct PrunedLivenessBoundary {
                ArrayRef<SILBasicBlock *> postDomBlocks);
 };
 
+//===----------------------------------------------------------------------===//
+//                      Field Sensitive Pruned Liveness
+//===----------------------------------------------------------------------===//
+
 /// Given a type T and a descendent field F in T's type tree, then the
 /// sub-element number of F is the first leaf element of the type tree in its
 /// linearized representation.
+///
+/// Linearized Representation of Structs/Tuples
+/// -------------------------------------------
+///
+/// For structs/tuples, the linearized representation is just an array with one
+/// element for each leaf element. Thus if we have a struct of the following
+/// sort:
+///
+/// ```
+/// struct Pair {
+///   var lhs: Int
+///   var rhs: Int
+/// }
+///
+/// struct MyStruct {
+///   var firstField: Int
+///   var pairField: Pair
+///   var tupleField: (Int, Int)
+/// }
+/// ```
+///
+/// the linearized representation of MyStruct's type tree leaves would be:
+///
+/// ```
+/// [firstField, pairField.lhs, pairField.rhs, tupleField.0, tupleField.1]
+/// ```
+///
+/// So if one had an uninitialized myStruct and initialized pairField, one would
+/// get the following bit set of liveness:
+///
+/// ```
+/// [0, 1, 1, 0, 0]
+/// ```
+///
+/// Linearized Representation of Enums
+/// ----------------------------------
+///
+/// Since enums are sum types, an enum can require different numbers of bits in
+/// its linearized representation depending on the payload of the case that the
+/// enum is initialized to. To work around this problem in our representation,
+/// we always store enough bits for the max sized payload of all cases of the
+/// enum and add an additional last bit for the discriminator. Any extra bits
+/// that may be needed (e.x.: we are processing a enum case with a smaller
+/// payload) are always assumed to be set to the same value that the
+/// discriminator bit is set to. This representation allows us to track liveness
+/// trading off the ability to determine information about the actual case that
+/// we are tracking. Since we just care about liveness, this is a trade off that
+/// we are willing to make since our goal (computing liveness) is still solved.
+///
+/// With the above paragraph in mind, an example of the bit layout of an enum
+/// looks as follows:
+///
+/// ```
+/// [ PAYLOAD BITS | EXTRA_TOP_LEVEL_BITS | DISCRIMINATOR_BIT ]
+/// ```
+///
+/// Notice how placing the discriminator bit last ensures that separately the
+/// payload and the extra top level bits/discriminator bit are both contiguous
+/// in the representation. This ensures that we can test both that the payload
+/// is live and separately that the discriminator/extra top level bits are live
+/// with a single contiguous range of bits. This is important since field
+/// sensitive liveness can only compute liveness for contiguous ranges of bits.
+///
+/// Lets look at some examples, starting with E:
+///
+/// ```
+/// enum E {
+/// case firstCase
+/// case secondCase(Int)
+/// case thirdCase(Pair)
+/// }
+/// ```
+///
+/// The linearized representation of E would be three slots since the payload
+/// with the largest linearized representation is Pair:
+///
+///            ----- |E| --------
+///           /                  \
+///          /                    \
+///         v                      v
+///      | Pair |          | Discriminator |
+///       /    \
+///      /      \
+///     /        \
+///    v          v
+/// | LHS |    | RHS |
+///
+/// This in term would mean the following potential bit representations given
+/// various cases/states of deinitialization of the payload.
+///
+/// ```
+/// firstCase inited:            [1, 1, 1]
+/// firstCase deinited:          [0, 0, 0]
+///
+/// secondCase inited:           [1, 1, 1]
+/// secondCase payload deinited: [0, 1, 1]
+/// secondCase deinited:         [0, 0, 0]
+///
+/// thirdCase inited:            [1, 1, 1]
+/// thirdCase payload deinited:  [0, 0, 1]
+/// thirdCase deinited:          [0, 0, 0]
+/// ```
+///
+/// Now lets consider an enum without any payload cases. Given such an enum:
+///
+/// ```
+/// enum E2 {
+/// case firstCase
+/// case secondCase
+/// case thirdCase
+/// }
+/// ```
+///
+/// we would only use a single bit in our linearized representation, just for
+/// the discriminator value.
+///
+/// Enums and Partial Initialization
+/// --------------------------------
+///
+/// One property of our representation of structs and tuples is that a code
+/// generator can reinitialize a struct/tuple completely just by re-initializing
+/// each of its sub-types individually. This is not possible for enums in our
+/// representation since if one just took the leaf nodes for the payload, one
+/// would not update the bit for the enum case itself and any additional spare
+/// bits. Luckily for us, this is actually impossible to do in SIL since it is
+/// impossible to dynamically change the payload of an enum without destroying
+/// the original enum and its payload since that would be a verifier caught
+/// leak.
 struct SubElementNumber {
   unsigned number;
 

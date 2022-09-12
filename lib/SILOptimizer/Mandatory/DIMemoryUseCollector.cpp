@@ -747,6 +747,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    // Look through mark_must_check. To us, it is not interesting.
+    if (auto *mmi = dyn_cast<MarkMustCheckInst>(User)) {
+      collectUses(mmi, BaseEltNo);
+      continue;
+    }
+
     // Loads are a use of the value.
     if (isa<LoadInst>(User)) {
       addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
@@ -1585,6 +1591,12 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // Look through begin_access
     if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
       collectDelegatingInitUses(TheMemory, UseInfo, BAI);
+      continue;
+    }
+
+    // Look through mark_must_check.
+    if (auto *MMCI = dyn_cast<MarkMustCheckInst>(User)) {
+      collectDelegatingInitUses(TheMemory, UseInfo, MMCI);
       continue;
     }
 
