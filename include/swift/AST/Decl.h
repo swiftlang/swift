@@ -990,7 +990,7 @@ public:
     auto &attrs = getAttrs();
     if (attrs.hasAttribute<EagerMoveAttr>())
       return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<LexicalAttr>())
+    if (attrs.hasAttribute<NoEagerMoveAttr>())
       return LifetimeAnnotation::Lexical;
     return LifetimeAnnotation::None;
   }

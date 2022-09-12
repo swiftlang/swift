@@ -29,7 +29,7 @@ namespace swift {
 ///
 /// 1) None: No annotation has been applied.
 /// 2) EagerMove: The @_eagerMove attribute has been applied.
-/// 3) Lexical: The @_lexical attribute has been applied.
+/// 3) NoEagerMove: The @_noEagerMove attribute has been applied.
 struct LifetimeAnnotation {
   enum Case : uint8_t {
     None,
