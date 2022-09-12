@@ -1254,10 +1254,10 @@ private:
   visitAggregateLeaves(Lowering::AbstractionPattern origType, Type substType,
                        TypeExpansionContext context,
                        std::function<bool(Type, Lowering::AbstractionPattern,
-                                          TaggedUnion<ValueDecl *, unsigned>)>
+                                          ValueDecl *, Optional<unsigned>)>
                            isLeafAggregate,
                        std::function<bool(Type, Lowering::AbstractionPattern,
-                                          TaggedUnion<ValueDecl *, unsigned>)>
+                                          ValueDecl *, Optional<unsigned>)>
                            visit);
 #endif
 };

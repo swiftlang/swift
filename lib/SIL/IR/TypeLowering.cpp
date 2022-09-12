@@ -2439,83 +2439,74 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 bool TypeConverter::visitAggregateLeaves(
     Lowering::AbstractionPattern origType, Type substType,
     TypeExpansionContext context,
-    std::function<bool(Type, Lowering::AbstractionPattern,
-                       TaggedUnion<ValueDecl *, unsigned>)>
+    std::function<bool(Type, Lowering::AbstractionPattern, ValueDecl *,
+                       Optional<unsigned>)>
         isLeafAggregate,
-    std::function<bool(Type, Lowering::AbstractionPattern,
-                       TaggedUnion<ValueDecl *, unsigned>)>
+    std::function<bool(Type, Lowering::AbstractionPattern, ValueDecl *,
+                       Optional<unsigned>)>
         visit) {
   llvm::SmallSet<std::tuple<TypeBase *, ValueDecl *, unsigned>, 16> visited;
   llvm::SmallVector<
       std::tuple<TypeBase *, AbstractionPattern, ValueDecl *, unsigned>, 16>
       worklist;
-  auto insertIntoWorklist =
-      [&visited, &worklist](Type substTy, AbstractionPattern origTy,
-                            TaggedUnion<ValueDecl *, unsigned> either) -> bool {
-    ValueDecl *field;
-    unsigned index;
-    if (either.isa<ValueDecl *>()) {
-      field = either.get<ValueDecl *>();
-      index = UINT_MAX;
-    } else {
-      field = nullptr;
-      index = either.get<unsigned>();
-    }
+  auto insertIntoWorklist = [&visited,
+                             &worklist](Type substTy, AbstractionPattern origTy,
+                                        ValueDecl *field,
+                                        Optional<unsigned> maybeIndex) -> bool {
+    unsigned index = maybeIndex.getValueOr(UINT_MAX);
     if (!visited.insert({substTy.getPointer(), field, index}).second)
       return false;
     worklist.push_back({substTy.getPointer(), origTy, field, index});
     return true;
   };
-  auto popFromWorklist =
-      [&worklist]() -> std::tuple<Type, AbstractionPattern,
-                                  TaggedUnion<ValueDecl *, unsigned>> {
+  auto popFromWorklist = [&worklist]()
+      -> std::tuple<Type, AbstractionPattern, ValueDecl *, Optional<unsigned>> {
     TypeBase *ty;
     AbstractionPattern origTy = AbstractionPattern::getOpaque();
-    TaggedUnion<ValueDecl *, unsigned> either((ValueDecl *)nullptr);
     ValueDecl *field;
-    unsigned index = 0;
+    unsigned index;
     std::tie(ty, origTy, field, index) = worklist.pop_back_val();
-    if (index != UINT_MAX) {
-      either = TaggedUnion<ValueDecl *, unsigned>(index);
-    } else {
-      either = TaggedUnion<ValueDecl *, unsigned>(field);
-    }
-    return {ty->getCanonicalType(), origTy, either};
+    Optional<unsigned> maybeIndex;
+    if (index != UINT_MAX)
+      maybeIndex = {index};
+    return {ty->getCanonicalType(), origTy, field, index};
   };
   auto isAggregate = [](Type ty) {
     return ty->is<TupleType>() || ty->getEnumOrBoundGenericEnum() ||
            ty->getStructOrBoundGenericStruct();
   };
-  insertIntoWorklist(substType, origType, (ValueDecl *)nullptr);
+  insertIntoWorklist(substType, origType, nullptr, llvm::None);
   while (!worklist.empty()) {
     Type ty;
     AbstractionPattern origTy = AbstractionPattern::getOpaque();
-    TaggedUnion<ValueDecl *, unsigned> path((ValueDecl *)nullptr);
-    std::tie(ty, origTy, path) = popFromWorklist();
-    if (isAggregate(ty) && !isLeafAggregate(ty, origTy, path)) {
+    ValueDecl *field;
+    Optional<unsigned> index;
+    std::tie(ty, origTy, field, index) = popFromWorklist();
+    if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
       if (auto tupleTy = ty->getAs<TupleType>()) {
-        for (unsigned index = 0, num = tupleTy->getNumElements(); index < num;
-             ++index) {
-          auto origElementTy = origTy.getTupleElementType(index);
+        for (unsigned tupleIndex = 0, num = tupleTy->getNumElements();
+             tupleIndex < num; ++tupleIndex) {
+          auto origElementTy = origTy.getTupleElementType(tupleIndex);
           auto substElementTy =
-              tupleTy->getElementType(index)->getCanonicalType();
+              tupleTy->getElementType(tupleIndex)->getCanonicalType();
           substElementTy =
               computeLoweredRValueType(context, origElementTy, substElementTy);
-          insertIntoWorklist(substElementTy, origElementTy,
-                             TaggedUnion<ValueDecl *, unsigned>(index));
+          insertIntoWorklist(substElementTy, origElementTy, nullptr,
+                             tupleIndex);
         }
       } else if (auto *decl = ty->getStructOrBoundGenericStruct()) {
-        for (auto *field : decl->getStoredProperties()) {
+        for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap(&M, decl);
           auto substFieldTy =
-              field->getInterfaceType().subst(subMap)->getCanonicalType();
-          auto sig = field->getDeclContext()->getGenericSignatureOfContext();
-          auto interfaceTy = field->getInterfaceType()->getReducedType(sig);
+              structField->getInterfaceType().subst(subMap)->getCanonicalType();
+          auto sig =
+              structField->getDeclContext()->getGenericSignatureOfContext();
+          auto interfaceTy =
+              structField->getInterfaceType()->getReducedType(sig);
           auto origFieldType =
-              origTy.unsafeGetSubstFieldType(field, interfaceTy);
-          insertIntoWorklist(substFieldTy, origFieldType,
-                             TaggedUnion<ValueDecl *, unsigned>(
-                                 static_cast<ValueDecl *>(field)));
+              origTy.unsafeGetSubstFieldType(structField, interfaceTy);
+          insertIntoWorklist(substFieldTy, origFieldType, structField,
+                             llvm::None);
         }
       } else if (auto *decl = ty->getEnumOrBoundGenericEnum()) {
         auto subMap = ty->getContextSubstitutionMap(&M, decl);
@@ -2532,9 +2523,8 @@ bool TypeConverter::visitAggregateLeaves(
               element, element->getArgumentInterfaceType()->getReducedType(
                            decl->getGenericSignature()));
 
-          insertIntoWorklist(substElementType, origElementTy,
-                             TaggedUnion<ValueDecl *, unsigned>(
-                                 static_cast<ValueDecl *>(element)));
+          insertIntoWorklist(substElementType, origElementTy, element,
+                             llvm::None);
         }
       } else {
         llvm_unreachable("unknown aggregate kind!");
@@ -2543,7 +2533,7 @@ bool TypeConverter::visitAggregateLeaves(
     }
 
     // This type is a leaf.  Visit it.
-    auto success = visit(ty, origTy, path);
+    auto success = visit(ty, origTy, field, index);
     if (!success)
       return false;
   }
@@ -2567,26 +2557,23 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
     bool hasNoNontrivialLexicalLeaf = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeaf=*/
-        [&](auto ty, auto origTy, auto either) -> bool {
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
           // The field's type is an aggregate.  Treat it as a leaf if it
           // has a lifetime annotation.
 
           // If it's a field of a tuple or the top-level type, there's no value
           // decl on which to look for an attribute.  It's a leaf iff the type
           // has a lifetime annotation.
-          if (either.template isa<unsigned>() ||
-              either.template get<ValueDecl *>() == nullptr)
+          if (index || !field)
             return getLifetimeAnnotation(ty).isSome();
 
           // It's a field of a struct or an enum.  It's a leaf if the type
           // or the var decl has a lifetime annotation.
-          return either.template get<ValueDecl *>()
-                     ->getLifetimeAnnotation()
-                     .isSome() ||
+          return field->getLifetimeAnnotation().isSome() ||
                  getLifetimeAnnotation(ty);
         },
         /*visit=*/
-        [&](auto ty, auto origTy, auto either) -> bool {
+        [&](auto ty, auto origTy, auto *field, auto index) -> bool {
           // Look at each leaf: if it is non-trivial, verify that it is
           // attributed @_eagerMove.
 
@@ -2605,8 +2592,7 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
           // not lexical.  The leaf must be annotated @_eagerMove.
           // Otherwise, the whole type would be lexical.
 
-          if (either.template isa<unsigned>() ||
-              either.template get<ValueDecl *>() == nullptr) {
+          if (index || !field) {
             // There is no field decl that might be annotated @_eagerMove.  The
             // field is @_eagerMove iff its type is annotated @_eagerMove.
             return getLifetimeAnnotation(ty) == LifetimeAnnotation::EagerMove;
@@ -2615,7 +2601,7 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
           // The field is non-trivial and the whole type is non-lexical.
           // That's fine as long as the field or its type is annotated
           // @_eagerMove.
-          return either.template get<ValueDecl *>()->getLifetimeAnnotation() ==
+          return field->getLifetimeAnnotation() ==
                      LifetimeAnnotation::EagerMove ||
                  getLifetimeAnnotation(ty) == LifetimeAnnotation::EagerMove;
         });
