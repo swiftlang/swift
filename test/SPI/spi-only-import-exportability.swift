@@ -118,6 +118,7 @@ public func publicInlinableUser() {
 
     let p: PublicType = PublicType()
     p.spiOnlyExtensionMethod() // expected-error {{instance method 'spiOnlyExtensionMethod()' cannot be used in an '@inlinable' function because 'SPIOnlyImportedLib' was imported for SPI only}}
+    conformanceUse(p) // expected-error{{cannot use conformance of 'PublicType' to 'PublicProtocol' here; 'SPIOnlyImportedLib' was imported for SPI only}}
 }
 #endif
 
@@ -131,6 +132,7 @@ public func spiInlinableUser() {
 
     let p: PublicType = PublicType()
     p.spiOnlyExtensionMethod()
+    conformanceUse(p)
 }
 
 public func implementationDetailsUser() {
@@ -142,6 +144,7 @@ public func implementationDetailsUser() {
 
     let p: PublicType = PublicType()
     p.spiOnlyExtensionMethod()
+    conformanceUse(p)
 }
 
 public struct ClientStruct {
