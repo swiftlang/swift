@@ -284,6 +284,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::OpaqueVarType;
      return DescriptiveDeclKind::OpaqueResultType;
    }
+
+   case DeclKind::BuiltinTuple:
+     llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
 #undef TRIVIAL_KIND
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -481,6 +484,9 @@ bool Decl::isInvalid() const {
       return true;
     return AD->getStorage()->isInvalid();
   }
+
+  case DeclKind::BuiltinTuple:
+    return false;
   }
 
   llvm_unreachable("Unknown decl kind");
@@ -515,6 +521,9 @@ void Decl::setInvalid() {
   case DeclKind::EnumElement:
     cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
     return;
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
 
   llvm_unreachable("Unknown decl kind");
@@ -1180,6 +1189,9 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::EnumElement:
   case DeclKind::Param:
     llvm_unreachable("not a top-level ValueDecl");
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not end up here");
 
   case DeclKind::Protocol:
     return ImportKind::Protocol;
@@ -2639,6 +2651,9 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Module:
     // Modules are never instance members.
     return false;
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
   llvm_unreachable("bad DeclKind");
 }
@@ -4299,6 +4314,10 @@ enum class DeclTypeKind : unsigned {
 
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
+
+  // Special case the Builtin.TheTupleType singleton.
+  if (isa<BuiltinTupleDecl>(decl))
+    return ctx.getBuiltinTupleType();
 
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
@@ -6966,17 +6985,46 @@ Type DeclContext::getSelfTypeInContext() const {
   return getDeclaredTypeInContext();
 }
 
+TupleType *BuiltinTupleDecl::getTupleSelfType() const {
+  if (TupleSelfType)
+    return TupleSelfType;
+
+  auto &ctx = getASTContext();
+
+  // Get the generic parameter type 'Elements'.
+  auto paramType = getGenericParams()->getParams()[0]
+      ->getDeclaredInterfaceType();
+
+  // Build the pack expansion type 'Elements...'.
+  Type packExpansionType = PackExpansionType::get(paramType, paramType);
+
+  // Build the one-element tuple type '(Elements...)'.
+  SmallVector<TupleTypeElt, 1> elts;
+  elts.push_back(packExpansionType);
+
+  const_cast<BuiltinTupleDecl *>(this)->TupleSelfType =
+      TupleType::get(elts, ctx);
+
+  return TupleSelfType;
+}
+
 /// Retrieve the interface type of 'self' for the given context.
 Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
-  // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl()) {
-    auto selfType = getProtocolSelfType();
-    if (!selfType)
-      return ErrorType::get(getASTContext());
-    return selfType;
+  if (auto *nominalDecl = getSelfNominalTypeDecl()) {
+    if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
+      return builtinTupleDecl->getTupleSelfType();
+
+    // For a protocol or extension thereof, the type is 'Self'.
+    if (isa<ProtocolDecl>(nominalDecl)) {
+      auto selfType = getProtocolSelfType();
+      if (!selfType)
+        return ErrorType::get(getASTContext());
+      return selfType;
+    }
   }
+
   return getDeclaredInterfaceType();
 }
 
@@ -9456,3 +9504,8 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
 bool ActorIsolation::isDistributedActor() const {
   return getKind() == ActorInstance && getActor()->isDistributedActor();
 }
+
+BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name,
+                                   DeclContext *Parent)
+  : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
+                    ArrayRef<InheritedEntry>(), nullptr) {}

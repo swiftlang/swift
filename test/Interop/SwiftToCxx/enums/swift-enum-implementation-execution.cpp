@@ -6,7 +6,7 @@
 // RUN: %target-interop-build-swift %S/swift-enum-implementation.swift -o %t/swift-enums-execution -Xlinker %t/swift-enums-execution.o -module-name Enums -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/swift-enums-execution
-// RUN: %target-run %t/swift-enums-execution
+// RUN: %target-run %t/swift-enums-execution | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -73,5 +73,17 @@ int main() {
         auto e = E::foobar();
         assert(switchTest(e) == 5);
     }
+
+    {
+        auto e = E::init();
+        assert(switchTest(e) == 5);
+    }
+
+    {
+        auto e = E::init();
+        assert(e.getTen() == 10);
+        e.printSelf();
+    }
+// CHECK: self
     return  0;
 }

@@ -487,6 +487,10 @@ public:
   Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                  DeclContext *dc) override;
 
+  Type importVarDeclType(const clang::VarDecl *clangDecl,
+                         VarDecl *swiftDecl,
+                         DeclContext *dc) override;
+
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash);

@@ -186,7 +186,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         let effect = argEffects[idx]
         var flags = 0
         switch effect.kind {
-          case .notEscaping, .escaping:
+          case .notEscaping, .escapingToArgument, .escapingToReturn:
             flags |= Int(EffectsFlagEscape)
         }
         if effect.isDerived {

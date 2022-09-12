@@ -2453,6 +2453,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::MissingMember:
     llvm_unreachable("there are no global member placeholders");
 
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType made it to IRGen");
+
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
@@ -5275,6 +5278,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
       llvm_unreachable("decl not allowed in type context");
+
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType made it to IRGen");
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:

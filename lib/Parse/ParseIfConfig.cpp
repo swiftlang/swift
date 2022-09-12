@@ -22,6 +22,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -315,8 +316,8 @@ public:
           return nullptr;
         }
 
-        auto Val = version::Version::parseCompilerVersionString(
-            SLE->getValue(), SLE->getLoc(), &D);
+        auto Val = VersionParser::parseCompilerVersionString(SLE->getValue(),
+                                                             SLE->getLoc(), &D);
         if (!Val.hasValue())
           return nullptr;
         return E;
@@ -338,7 +339,7 @@ public:
         return nullptr;
       }
       auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
-      auto Val = version::Version::parseVersionString(
+      auto Val = VersionParser::parseVersionString(
           versionString, PUE->getOperand()->getStartLoc(), &D);
       if (!Val.hasValue())
         return nullptr;
@@ -574,24 +575,25 @@ public:
     auto *Arg = getSingleSubExp(E->getArgs(), KindName, nullptr);
     if (KindName == "_compiler_version" && isa<StringLiteralExpr>(Arg)) {
       auto Str = cast<StringLiteralExpr>(Arg)->getValue();
-      auto Val = version::Version::parseCompilerVersionString(
-          Str, SourceLoc(), nullptr).getValue();
-      auto thisVersion = version::Version::getCurrentCompilerVersion();
+      auto Val =
+          VersionParser::parseCompilerVersionString(Str, SourceLoc(), nullptr)
+              .getValue();
+      auto thisVersion = version::getCurrentCompilerVersion();
       return thisVersion >= Val;
     } else if ((KindName == "swift") || (KindName == "compiler") ||
                (KindName == "_compiler_version")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto PrefixName = getDeclRefStr(PUE->getFn());
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getOperand());
-      auto Val = version::Version::parseVersionString(
-          Str, SourceLoc(), nullptr).getValue();
+      auto Val = VersionParser::parseVersionString(Str, SourceLoc(), nullptr)
+                     .getValue();
       version::Version thisVersion;
       if (KindName == "swift") {
         thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
       } else if (KindName == "compiler") {
         thisVersion = version::Version::getCurrentLanguageVersion();
       } else if (KindName == "_compiler_version") {
-        thisVersion = version::Version::getCurrentCompilerVersion();
+        thisVersion = version::getCurrentCompilerVersion();
       } else {
         llvm_unreachable("unsupported version conditional");
       }

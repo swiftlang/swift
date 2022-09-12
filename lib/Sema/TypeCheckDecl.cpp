@@ -2298,6 +2298,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
+  case DeclKind::BuiltinTuple:
     llvm_unreachable("should not get here");
     return Type();
 
@@ -2365,6 +2366,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
+
+    if (auto clangDecl = VD->getClangDecl()) {
+      auto clangVarDecl = cast<clang::VarDecl>(clangDecl);
+
+      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(
+          clangVarDecl, VD, VD->getDeclContext());
+    }
+
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
       return ErrorType::get(Context);

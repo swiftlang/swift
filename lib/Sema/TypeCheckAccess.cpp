@@ -486,6 +486,9 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+
+  UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
+
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1107,6 +1110,7 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1548,8 +1552,13 @@ swift::getDisallowedOriginKind(const Decl *decl,
   if (howImported != RestrictedImportKind::None) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
-    if (where.isSPI())
+    if (where.isSPI() &&
+        where.getFragileFunctionKind().kind == FragileFunctionKind::None &&
+        !SF->getASTContext().LangOpts.EnableSPIOnlyImports)
       downgradeToWarning = DowngradeToWarning::Yes;
+
+    if (where.isSPI() && howImported == RestrictedImportKind::SPIOnly)
+      return DisallowedOriginKind::None;
 
     // Before Swift 6, implicit imports were not reported unless an
     // implementation-only import was also present. Downgrade to a warning
@@ -1599,9 +1608,16 @@ swift::getDisallowedOriginKind(const Decl *decl,
     }
 
     // Restrictively imported, cannot be reexported.
-    if (howImported == RestrictedImportKind::Implicit)
+    switch (howImported) {
+    case RestrictedImportKind::Implicit:
       return DisallowedOriginKind::ImplicitlyImported;
-    return DisallowedOriginKind::ImplementationOnly;
+    case RestrictedImportKind::SPIOnly:
+      return DisallowedOriginKind::SPIOnly;
+    case RestrictedImportKind::ImplementationOnly:
+      return DisallowedOriginKind::ImplementationOnly;
+    default:
+      llvm_unreachable("RestrictedImportKind isn't handled");
+    }
   } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
     if (decl->isAvailableAsSPI() && !decl->isSPI()) {
       // Allowing unavailable context to use @_spi_available decls.

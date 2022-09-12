@@ -593,7 +593,7 @@ public:
       }
     }
 
-    if (!TopLevel && !HighPerformance) {
+    if (!TopLevel && !HighPerformance && !BS->isImplicit()) {
       Elements.insert(Elements.begin(), *buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), *buildScopeExit(BS->getSourceRange()));
     }

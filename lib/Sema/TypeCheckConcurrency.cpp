@@ -3459,6 +3459,9 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::Var:
     return value->isInstanceMember() ? MemberIsolationPropagation::AnyIsolation
                                      : MemberIsolationPropagation::GlobalActor;
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
 }
 
@@ -5079,6 +5082,9 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Func:
   case DeclKind::Subscript:
     return false;
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
 }
 

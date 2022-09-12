@@ -6138,6 +6138,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #include "swift/AST/TypeNodes.def"
       llvm_unreachable("artificial type in constraint");
 
+    case TypeKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType in constraint");
+
+    // Note: Mismatched builtin types fall through to the TypeKind::Error
+    // case below.
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -6991,6 +6996,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
       llvm_unreachable("artificial type in constraint");
+
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType in constraint");
     
   case TypeKind::Unresolved:
   case TypeKind::Error:
@@ -8221,27 +8229,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // of the tuple.
   auto &ctx = getASTContext();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
-    // Tuples don't have compound-name members.
-    if (!memberName.isSimpleName() || memberName.isSpecial())
-      return result;  // No result.
+    if (!memberName.isSpecial()) {
+      StringRef nameStr = memberName.getBaseIdentifier().str();
+      int fieldIdx = -1;
+      // Resolve a number reference into the tuple type.
+      unsigned Value = 0;
+      if (!nameStr.getAsInteger(10, Value) &&
+          Value < baseTuple->getNumElements()) {
+        fieldIdx = Value;
+      } else {
+        fieldIdx = baseTuple->getNamedElementId(memberName.getBaseIdentifier());
+      }
 
-    StringRef nameStr = memberName.getBaseIdentifier().str();
-    int fieldIdx = -1;
-    // Resolve a number reference into the tuple type.
-    unsigned Value = 0;
-    if (!nameStr.getAsInteger(10, Value) &&
-        Value < baseTuple->getNumElements()) {
-      fieldIdx = Value;
-    } else {
-      fieldIdx = baseTuple->getNamedElementId(memberName.getBaseIdentifier());
+      if (fieldIdx != -1) {
+        // Add an overload set that selects this field.
+        result.ViableCandidates.push_back(OverloadChoice(baseTy, fieldIdx));
+        return result;
+      }
     }
-    
-    if (fieldIdx == -1)
-      return result;    // No result.
-    
-    // Add an overload set that selects this field.
-    result.ViableCandidates.push_back(OverloadChoice(baseTy, fieldIdx));
-    return result;
   }
 
   if (auto *selfTy = instanceTy->getAs<DynamicSelfType>())

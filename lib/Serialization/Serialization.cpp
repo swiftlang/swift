@@ -1788,6 +1788,9 @@ static bool shouldSerializeMember(Decl *D) {
       return false;
     llvm_unreachable("should never need to reserialize a member placeholder");
 
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
+
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
     return false;
@@ -4272,6 +4275,10 @@ public:
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
     llvm_unreachable("member placeholders shouldn't be serialized");
+  }
+
+  void visitBuiltinTupleDecl(const BuiltinTupleDecl *) {
+    llvm_unreachable("BuiltinTupleDecl are not serialized");
   }
 };
 

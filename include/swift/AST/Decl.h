@@ -4755,6 +4755,48 @@ public:
   }
 };
 
+/// This is the special singleton Builtin.TheTupleType. It is not directly
+/// visible in the source language, but we use it to attach extensions
+/// and conformances for tuple types.
+///
+/// - The declared interface type is the special TheTupleType singleton.
+/// - The generic parameter list has one pack generic parameter, <Elements...>
+/// - The generic signature has no requirements, <Elements...>
+/// - The self interface type is the tuple type containing a single pack
+///   expansion, (Elements...).
+class BuiltinTupleDecl final : public NominalTypeDecl {
+  TupleType *TupleSelfType = nullptr;
+
+public:
+  BuiltinTupleDecl(Identifier Name, DeclContext *Parent);
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  TupleType *getTupleSelfType() const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::BuiltinTuple;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::BuiltinTuple;
+  }
+  static bool classof(const NominalTypeDecl *D) {
+    return D->getKind() == DeclKind::BuiltinTuple;
+  }
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+  static bool classof(const IterableDeclContext *C) {
+    auto NTD = dyn_cast<NominalTypeDecl>(C);
+    return NTD && classof(NTD);
+  }
+};
+
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {

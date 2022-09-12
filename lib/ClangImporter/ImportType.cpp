@@ -1883,6 +1883,7 @@ private:
   NEVER_VISIT(UnresolvedType)
   NEVER_VISIT(PlaceholderType)
   NEVER_VISIT(BuiltinType)
+  NEVER_VISIT(BuiltinTupleType)
 
   VISIT(TupleType, recurse)
 

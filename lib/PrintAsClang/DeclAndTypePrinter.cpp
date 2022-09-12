@@ -720,6 +720,8 @@ private:
       }
       os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
+      
+      printMembers(ED->getMembers());
     });
   }
 
@@ -2512,6 +2514,8 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
 static bool hasExposeAttr(const ValueDecl *VD) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
     if (VD == VD->getASTContext().getStringDecl())
+      return true;
+    if (VD == VD->getASTContext().getArrayDecl())
       return true;
     return false;
   }

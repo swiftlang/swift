@@ -681,6 +681,11 @@ namespace {
       llvm_unreachable("");
     }
 
+    RetTy visitBuiltinTupleType(CanBuiltinTupleType type, AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("BuiltinTupleType should not show up here");
+    }
+
     // Tuples depend on their elements.
     RetTy visitTupleType(CanTupleType type, AbstractionPattern origType,
                          IsTypeExpansionSensitive_t isSensitive) {
@@ -2026,6 +2031,12 @@ namespace {
       llvm_unreachable("");
     }
 
+    TypeLowering *visitBuiltinTupleType(CanBuiltinTupleType type,
+                                        AbstractionPattern origType,
+                                        IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("BuiltinTupleType should not show up here");
+    }
+
     TypeLowering *visitTupleType(CanTupleType tupleType,
                                  AbstractionPattern origType,
                                  IsTypeExpansionSensitive_t isSensitive) {
@@ -2690,6 +2701,10 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
     CanType visitPackExpansionType(CanPackExpansionType substPackType) {
       llvm_unreachable("");
+    }
+
+    CanType visitBuiltinTupleType(CanBuiltinTupleType type) {
+      llvm_unreachable("BuiltinTupleType should not show up here");
     }
 
     // Lower tuple element types.

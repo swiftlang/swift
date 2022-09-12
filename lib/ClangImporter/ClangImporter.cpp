@@ -41,6 +41,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -73,8 +74,8 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include <algorithm>
-#include <string>
 #include <memory>
+#include <string>
 
 using namespace swift;
 using namespace importer;
@@ -644,7 +645,7 @@ importer::getNormalInvocationArguments(
 
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
-    auto V = version::Version::getCurrentCompilerVersion();
+    auto V = version::getCurrentCompilerVersion();
     if (!V.empty()) {
       // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
       // "X" component resided in its digits.
@@ -5281,6 +5282,48 @@ Type ClangImporter::importFunctionReturnType(
               .getType())
     return imported;
   return dc->getASTContext().getNeverType();
+}
+
+Type ClangImporter::importVarDeclType(
+    const clang::VarDecl *decl, VarDecl *swiftDecl, DeclContext *dc) {
+  if (decl->getTemplateInstantiationPattern())
+    Impl.getClangSema().InstantiateVariableDefinition(
+        decl->getLocation(),
+        const_cast<clang::VarDecl *>(decl));
+
+  // If the declaration is const, consider it audited.
+  // We can assume that loading a const global variable doesn't
+  // involve an ownership transfer.
+  bool isAudited = decl->getType().isConstQualified();
+
+  auto declType = decl->getType();
+
+  // Special case: NS Notifications
+  if (isNSNotificationGlobal(decl))
+    if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
+                                            Impl.CurrentVersion))
+      declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
+
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+
+  // Note that we deliberately don't bridge most globals because we want to
+  // preserve pointer identity.
+  auto importedType =
+      Impl.importType(declType,
+                      (isAudited ? ImportTypeKind::AuditedVariable
+                                 : ImportTypeKind::Variable),
+                      ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                      isInSystemModule, Bridgeability::None,
+                      getImportTypeAttrs(decl));
+
+  if (!importedType)
+    return nullptr;
+
+  if (importedType.isImplicitlyUnwrapped())
+    swiftDecl->setImplicitlyUnwrappedOptional(true);
+
+  return importedType.getType();
 }
 
 bool ClangImporter::isInOverlayModuleForImportedModule(

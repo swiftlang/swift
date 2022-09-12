@@ -331,6 +331,11 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
+  ASTScopeImpl *visitBuiltinTupleDecl(BuiltinTupleDecl *btd, ASTScopeImpl *p,
+                                      ScopeCreator &scopeCreator) {
+    llvm_unreachable("BuiltinTupleDecl should never appear in a source file");
+  }
+
   // This declaration is handled from
   // addChildrenForParsedAccessors
   ASTScopeImpl *visitAccessorDecl(AccessorDecl *ad, ASTScopeImpl *p,
