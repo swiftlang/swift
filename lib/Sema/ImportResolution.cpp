@@ -847,6 +847,33 @@ CheckInconsistentImplementationOnlyImportsRequest::evaluate(
 }
 
 evaluator::SideEffect
+CheckInconsistentSPIOnlyImportsRequest::evaluate(
+    Evaluator &evaluator, SourceFile *SF) const {
+
+  auto mod = SF->getParentModule();
+  auto diagnose = [mod](const ImportDecl *normalImport,
+                        const ImportDecl *spiOnlyImport) {
+    auto &diags = mod->getDiags();
+    {
+      diags.diagnose(normalImport, diag::spi_only_import_conflict,
+                     normalImport->getModule()->getName());
+    }
+    diags.diagnose(spiOnlyImport,
+                   diag::spi_only_import_conflict_here);
+  };
+
+  auto predicate = [](ImportDecl *decl) {
+    return decl->getAttrs().hasAttribute<SPIOnlyAttr>();
+  };
+
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> matchingImports;
+  llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> otherImports;
+  findInconsistentImportsAcrossFile(SF, predicate, diagnose,
+                                    matchingImports, otherImports);
+  return {};
+}
+
+evaluator::SideEffect
 CheckInconsistentWeakLinkedImportsRequest::evaluate(Evaluator &evaluator,
                                                     ModuleDecl *mod) const {
   if (!moduleHasAnyImportsMatchingFlag(mod, ImportFlags::WeakLinked))
