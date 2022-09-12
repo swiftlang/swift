@@ -54,6 +54,18 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 @_implementationOnly import FullyPrivateClang
 @_implementationOnly import LocalClang
 
+/// Expect no errors with spi-only imports.
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
+// RUN:   -experimental-spi-only-imports \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -library-level api -D SPI_ONLY_IMPORTS
+#elseif SPI_ONLY_IMPORTS
+
+@_spiOnly import PrivateSwift
+@_spiOnly import PublicClang_Private
+@_spiOnly import FullyPrivateClang
+@_spiOnly import LocalClang
+
 #endif
 
 /// Test error message on an unknown library level name.

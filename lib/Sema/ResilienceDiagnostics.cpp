@@ -132,7 +132,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersion(6);
+        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
+                                 6);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -140,7 +141,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersion(6);
+        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
+                                 6);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
@@ -253,7 +255,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      M->getName(),
                      static_cast<unsigned>(originKind))
       .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
-                                !ctx.LangOpts.EnableConformanceAvailabilityErrors) ||
+                                !ctx.LangOpts.EnableConformanceAvailabilityErrors &&
+                                originKind != DisallowedOriginKind::SPIOnly) ||
                                originKind == DisallowedOriginKind::ImplicitlyImported,
                                6);
 
