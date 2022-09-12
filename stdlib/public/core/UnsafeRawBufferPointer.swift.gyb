@@ -534,7 +534,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer's `count`.
   @inlinable
-  public func copyBytes(from source: some Collection<UInt8>) {
+  public func copyBytes<C: Collection>(
+    from source: C
+  ) where C.Element == UInt8 {
     guard let position = _position else {
       return
     }
