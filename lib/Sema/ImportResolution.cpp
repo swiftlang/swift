@@ -749,10 +749,55 @@ static bool moduleHasAnyImportsMatchingFlag(ModuleDecl *mod, ImportFlags flag) {
   return false;
 }
 
+/// Finds all import declarations for a single file that inconsistently match
+/// \c predicate and passes each pair of inconsistent imports to \c diagnose.
+template <typename Pred, typename Diag>
+static void findInconsistentImportsAcrossFile(
+    const SourceFile *SF, Pred predicate, Diag diagnose,
+    llvm::DenseMap<ModuleDecl *, const ImportDecl *> &matchingImports,
+    llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> &otherImports) {
+
+  for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+    auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
+    if (!nextImport)
+      continue;
+
+    ModuleDecl *module = nextImport->getModule();
+    if (!module)
+      continue;
+
+    if (predicate(nextImport)) {
+      // We found a matching import.
+      bool isNew = matchingImports.insert({module, nextImport}).second;
+      if (!isNew)
+        continue;
+
+      auto seenOtherImportPosition = otherImports.find(module);
+      if (seenOtherImportPosition != otherImports.end()) {
+        for (auto *seenOtherImport : seenOtherImportPosition->getSecond())
+          diagnose(seenOtherImport, nextImport);
+
+        // We're done with these; keep the map small if possible.
+        otherImports.erase(seenOtherImportPosition);
+      }
+      continue;
+    }
+
+    // We saw a non-matching import. Is that in conflict with what we've seen?
+    if (auto *seenMatchingImport = matchingImports.lookup(module)) {
+      diagnose(nextImport, seenMatchingImport);
+      continue;
+    }
+
+    // Otherwise, record it for later.
+    otherImports[module].push_back(nextImport);
+  }
+}
+
 /// Finds all import declarations for a single module that inconsistently match
 /// \c predicate and passes each pair of inconsistent imports to \c diagnose.
 template <typename Pred, typename Diag>
-static void findInconsistentImports(ModuleDecl *mod, Pred predicate,
+static void findInconsistentImportsAcrossModule(ModuleDecl *mod, Pred predicate,
                                     Diag diagnose) {
   llvm::DenseMap<ModuleDecl *, const ImportDecl *> matchingImports;
   llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> otherImports;
@@ -762,41 +807,8 @@ static void findInconsistentImports(ModuleDecl *mod, Pred predicate,
     if (!SF)
       continue;
 
-    for (auto *topLevelDecl : SF->getTopLevelDecls()) {
-      auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
-      if (!nextImport)
-        continue;
-
-      ModuleDecl *module = nextImport->getModule();
-      if (!module)
-        continue;
-
-      if (predicate(nextImport)) {
-        // We found a matching import.
-        bool isNew = matchingImports.insert({module, nextImport}).second;
-        if (!isNew)
-          continue;
-
-        auto seenOtherImportPosition = otherImports.find(module);
-        if (seenOtherImportPosition != otherImports.end()) {
-          for (auto *seenOtherImport : seenOtherImportPosition->getSecond())
-            diagnose(seenOtherImport, nextImport);
-
-          // We're done with these; keep the map small if possible.
-          otherImports.erase(seenOtherImportPosition);
-        }
-        continue;
-      }
-
-      // We saw a non-matching import. Is that in conflict with what we've seen?
-      if (auto *seenMatchingImport = matchingImports.lookup(module)) {
-        diagnose(nextImport, seenMatchingImport);
-        continue;
-      }
-
-      // Otherwise, record it for later.
-      otherImports[module].push_back(nextImport);
-    }
+    findInconsistentImportsAcrossFile(SF, predicate, diagnose,
+                                      matchingImports, otherImports);
   }
 }
 
@@ -830,7 +842,7 @@ CheckInconsistentImplementationOnlyImportsRequest::evaluate(
     return decl->getAttrs().hasAttribute<ImplementationOnlyAttr>();
   };
 
-  findInconsistentImports(mod, predicate, diagnose);
+  findInconsistentImportsAcrossModule(mod, predicate, diagnose);
   return {};
 }
 
@@ -855,7 +867,7 @@ CheckInconsistentWeakLinkedImportsRequest::evaluate(Evaluator &evaluator,
     return decl->getAttrs().hasAttribute<WeakLinkedAttr>();
   };
 
-  findInconsistentImports(mod, predicate, diagnose);
+  findInconsistentImportsAcrossModule(mod, predicate, diagnose);
   return {};
 }
 
