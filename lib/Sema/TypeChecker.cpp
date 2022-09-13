@@ -337,6 +337,11 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   evaluateOrDefault(
       Ctx.evaluator,
+      CheckInconsistentSPIOnlyImportsRequest{SF},
+      {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Perform various AST transforms we've been asked to perform.
