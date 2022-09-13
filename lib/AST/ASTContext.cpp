@@ -253,6 +253,9 @@ struct ASTContext::Implementation {
   /// The declaration of _Concurrency.NSObjectDefaultActor.
   ClassDecl *NSObjectDefaultActorDecl = nullptr;
 
+  /// The declaration of Swift.DSLDebugInfoProvider.init(_:)
+  ConcreteDeclRef DSLDebugInfoProviderInitDecl = nullptr;
+
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
@@ -1310,6 +1313,31 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
   auto subs = regexType->getMemberSubstitutionMap(spModule, foundDecl);
   return ConcreteDeclRef(foundDecl, subs);
+}
+
+ConcreteDeclRef ASTContext::getDSLDebugInfoProviderInitDecl() const {
+  if (getImpl().DSLDebugInfoProviderInitDecl)
+    return getImpl().DSLDebugInfoProviderInitDecl;
+
+  auto initializers = getDSLDebugInfoProviderDecl()->lookupDirect(
+      DeclBaseName::createConstructor());
+
+  for (Decl *initializer : initializers) {
+    auto *constructor = cast<ConstructorDecl>(initializer);
+    if (!constructor->isUsableFromInline())
+      continue;
+    auto ParamList = constructor->getParameters();
+    if (ParamList->size() != 1)
+      continue;
+    ParamDecl *param = constructor->getParameters()->get(0);
+    if (param->getArgumentName().str() != "")
+      continue;
+
+    getImpl().DSLDebugInfoProviderInitDecl = constructor;
+    return constructor;
+  }
+  assert(false);
+  return nullptr;
 }
 
 static

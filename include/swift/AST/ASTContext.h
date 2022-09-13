@@ -732,6 +732,9 @@ public:
   FuncDecl *getDoneRecordingOnDistributedInvocationEncoder(
       NominalTypeDecl *nominal) const;
 
+  /// Retrieve DSLDebugInfoProvider.init(_:)
+  ConcreteDeclRef getDSLDebugInfoProviderInitDecl() const;
+
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,

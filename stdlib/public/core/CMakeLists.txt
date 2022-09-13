@@ -60,6 +60,7 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryStorage.swift
   DictionaryVariant.swift
   DropWhile.swift
+  DSLDebugInfo.swift
   Dump.swift
   EmptyCollection.swift
   Equatable.swift

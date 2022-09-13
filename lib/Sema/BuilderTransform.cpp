@@ -239,6 +239,19 @@ class BuilderClosureVisitor
     return builder.buildCall(loc, fnName, argExprs, argLabels);
   }
 
+  /// Produce a builder call to buildDebuggable when DSL debugging is supported,
+  /// or else return the original expression.
+  Expr *buildDebuggableIfWanted(Expr *expr, Identifier label) {
+    if (cs && builder.supports(ctx.Id_buildDebuggable, {label}) &&
+        (ctx.SILOpts.OptMode <= OptimizationMode::NoOptimization)) {
+      Expr *debugInfoProvider = builder.buildDebugInfoProvider(expr);
+      return buildCallIfWanted(SourceLoc(), ctx.Id_buildDebuggable,
+                               {expr, debugInfoProvider},
+                               {label, ctx.Id_debugInfoProvider});
+    }
+    return expr;
+  }
+
   /// Capture the given expression into an implicitly-generated variable.
   VarDecl *captureExpr(Expr *expr, bool oneWay,
                        llvm::PointerUnion<Stmt *, Expr *> forEntity = nullptr) {
@@ -295,9 +308,11 @@ public:
     // If there is a buildFinalResult(_:), call it.
     ASTContext &ctx = cs->getASTContext();
     if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
-      applied.returnExpr = buildCallIfWanted(
-          applied.returnExpr->getLoc(), ctx.Id_buildFinalResult,
-          { applied.returnExpr }, { Identifier() });
+      applied.returnExpr = buildDebuggableIfWanted(
+          buildCallIfWanted(applied.returnExpr->getLoc(),
+                            ctx.Id_buildFinalResult, {applied.returnExpr},
+                            {Identifier()}),
+          ctx.Id_finalResult);
     }
 
     applied.returnExpr = cs->buildTypeErasedExpr(
@@ -422,6 +437,7 @@ protected:
         expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
                                  { expr }, { Identifier() });
       }
+      expr = buildDebuggableIfWanted(expr, ctx.Id_component);
 
       addChild(captureExpr(expr, /*oneWay=*/true, node.get<Expr *>()));
     }
@@ -2979,6 +2995,15 @@ void swift::printResultBuilderBuildFunction(
     printer << "buildPartialBlock(accumulated: " << componentTypeString
             << ", next: " << componentTypeString << ")";
     break;
+
+  case ResultBuilderBuildFunction::BuildDebuggableComponent:
+    printer << "buildDebuggable(component: " << componentTypeString << ")";
+    break;
+
+  case ResultBuilderBuildFunction::BuildDebuggableFinalResult:
+    printer << "buildDebuggable(finalResult: <#Result#>) -> <#Result#>";
+    printedResult = true;
+    break;
   }
 
   if (!printedResult)
@@ -3096,4 +3121,70 @@ VarDecl *ResultBuilder::buildVar(SourceLoc loc) {
 DeclRefExpr *ResultBuilder::buildVarRef(VarDecl *var, SourceLoc loc) {
   return new (DC->getASTContext())
       DeclRefExpr(var, DeclNameLoc(loc), /*Implicit=*/true);
+}
+
+Expr *ResultBuilder::buildDebugInfoProvider(Expr *expr) {
+  auto loc = expr->getLoc();
+  auto &ctx = DC->getASTContext();
+
+  // FIXME: ApolloZhu should DeclContext be callbackExpr?
+  // Define the parameter list
+  auto debugInfo = new (ctx)
+      ParamDecl(SourceLoc(), SourceLoc(), Identifier(), loc,
+                ctx.getIdentifier("dslDebugInfo"), DC->getParentModule());
+  debugInfo->setInterfaceType(ctx.getAnyExistentialType());
+  debugInfo->setSpecifier(ParamSpecifier::Default);
+  debugInfo->setImplicit();
+  auto *continuationType = FunctionType::get(
+      {}, ctx.getVoidType(), ASTExtInfoBuilder().withNoEscape().build());
+  auto *paramList = ParameterList::create(
+      ctx, {debugInfo, ParamDecl::createImplicit(
+                           ctx, /*argumentName*/ Identifier(),
+                           /*parameterName*/ ctx.getIdentifier("$1"),
+                           continuationType, DC->getParentModule())});
+
+  // Build `$1()`, and include source location for debugger to
+  // resolve source location in stack trace
+  auto *continuationRef = new (ctx) DeclRefExpr(
+      ConcreteDeclRef(paramList->back()), DeclNameLoc(loc), /*implicit=*/true);
+  continuationRef->setType(continuationType);
+  continuationRef->setFunctionRefKind(FunctionRefKind::SingleApply);
+  auto call = CallExpr::createImplicit(ctx, continuationRef,
+                                       ArgumentList::createImplicit(ctx, {}));
+
+  // Build `{ (dslDebugInfoProvider, $1) in $1() }`
+  // FIXME: ApolloZhu closure discriminator
+  auto callbackExpr =
+      new (ctx) ClosureExpr(DeclAttributes(), SourceRange(), nullptr, paramList,
+                            SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc(),
+                            nullptr, 1000 + DebugCallbackCounter, DC);
+  callbackExpr->setImplicit();
+  callbackExpr->hasAnonymousClosureVars();
+  auto callbackType =
+      FunctionType::get({FunctionType::Param(ctx.getAnyExistentialType()),
+                         FunctionType::Param(continuationType)},
+                        ctx.getVoidType());
+  callbackExpr->setType(callbackType);
+  callbackExpr->setBody(
+      BraceStmt::create(ctx, SourceLoc(), {call}, SourceLoc()),
+      /*isSingleExpression*/ false);
+  callbackExpr->setBodyState(ClosureExpr::BodyState::SeparatelyTypeChecked);
+
+  // Cache this pair in the module so that SILGen will remember to lower it.
+  DC->getParentModule()->addDSLDebugInfoCallback(
+      callbackExpr, DebugCallbackCounter, expr, DC);
+
+  ++DebugCallbackCounter;
+
+  // Build `DSLDebugInfoProvider({ ... })`
+  auto constructorDeclRef = ctx.getDSLDebugInfoProviderInitDecl();
+  auto constructorDRE =
+      new (ctx) DeclRefExpr(constructorDeclRef, DeclNameLoc(), true);
+  auto apply = ConstructorRefCallExpr::create(
+      ctx, constructorDRE,
+      TypeExpr::createImplicit(ctx.getDSLDebugInfoProviderType(), ctx));
+
+  auto constructorArgs = ArgumentList::createImplicit(
+      ctx, {Argument(SourceLoc(), Identifier(), callbackExpr)});
+  return CallExpr::createImplicit(ctx, apply, constructorArgs);
 }

@@ -152,6 +152,10 @@ private:
   /// created implicitly.
   unsigned VarCounter = 0;
 
+  /// TODO: ApolloZhu - doc
+  /// FIXME: ApolloZhu replace with actual value
+  unsigned DebugCallbackCounter = 0;
+
 public:
   ResultBuilder(ConstraintSystem *CS, DeclContext *DC, Type builderType);
 
@@ -189,6 +193,11 @@ public:
   /// Build a reference to a given variable and mark it
   /// as located at a given source location.
   DeclRefExpr *buildVarRef(VarDecl *var, SourceLoc loc);
+
+  /// Build `DebugInfoProvider({(dslDebugInfo, $1) in $1() })`
+  /// and ...
+  /// TODO: ApolloZhu - doc
+  Expr *buildDebugInfoProvider(Expr *expr);
 };
 
 /// Describes the algorithm to use for trailing closure matching.

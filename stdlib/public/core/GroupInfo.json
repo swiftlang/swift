@@ -232,6 +232,7 @@
     "Tuple.swift",
     "NewtypeWrapper.swift",
     "DebuggerSupport.swift",
+    "DSLDebugInfo.swift",
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",

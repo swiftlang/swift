@@ -470,6 +470,12 @@ StringRef CompletionOverrideLookup::getResultBuilderDocComment(
   case ResultBuilderBuildFunction::BuildPartialBlockAccumulated:
     return "Builds a partial result component by combining an accumulated "
            "component and a new component";
+
+  case ResultBuilderBuildFunction::BuildDebuggableComponent:
+    return "Enables support for setting breakpoints on each component";
+  case ResultBuilderBuildFunction::BuildDebuggableFinalResult:
+    return "Enables support for setting breakpoints on ending curly braces "
+           "to debug the final result";
   }
 }
 
@@ -528,6 +534,12 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletions(
   addResultBuilderBuildCompletion(
       builder, componentType,
       ResultBuilderBuildFunction::BuildPartialBlockAccumulated);
+  addResultBuilderBuildCompletion(
+      builder, componentType,
+      ResultBuilderBuildFunction::BuildDebuggableComponent);
+  addResultBuilderBuildCompletion(
+      builder, componentType,
+      ResultBuilderBuildFunction::BuildDebuggableFinalResult);
 }
 
 void CompletionOverrideLookup::getOverrideCompletions(SourceLoc Loc) {

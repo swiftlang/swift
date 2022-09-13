@@ -47,6 +47,7 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class BraceStmt;
+  class ClosureExpr;
   class Decl;
   class DeclAttribute;
   class TypeDecl;
@@ -231,6 +232,12 @@ private:
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
+
+  /// Mapping from DSL debug info callback closures to their corresponding decl
+  /// contexts.
+  llvm::SmallDenseMap<ClosureExpr *,
+                      std::tuple<unsigned, Expr *, DeclContext *>>
+      dslDebugInfoCallbackClosures;
 
   /// A description of what should be implicitly imported by each file of this
   /// module.
@@ -460,6 +467,20 @@ public:
   void setDebugClient(DebuggerClient *R) {
     assert(!DebugClient && "Debugger client already set");
     DebugClient = R;
+  }
+
+  void addDSLDebugInfoCallback(ClosureExpr *closure, unsigned discriminator,
+                               Expr *dslExpr, DeclContext *dc) {
+    dslDebugInfoCallbackClosures.insert(
+        {closure, {discriminator, dslExpr, dc}});
+  }
+
+  Optional<std::tuple<unsigned, Expr *, DeclContext *>>
+  findDSLExprForDSLDebugInfoCallback(ClosureExpr *closure) {
+    auto foundIt = dslDebugInfoCallbackClosures.find(closure);
+    if (foundIt == dslDebugInfoCallbackClosures.end())
+      return None;
+    return foundIt->second;
   }
 
   /// Returns true if this module is compiled as static library.
