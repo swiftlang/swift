@@ -966,9 +966,9 @@ and is usually the mangled name of the originating Swift declaration.
 The ``sil`` syntax declares the function's name and SIL type, and
 defines the body of the function inside braces. The declared type must
 be a function type, which may be generic.
-If there are no `sil-basic-block`s contained in the body, the function
-is an external declaration.
 
+If a function body does not contain atleast one ``sil-basic-block``, the
+function is an external declaration.
 
 Function Attributes
 ```````````````````
