@@ -9728,7 +9728,12 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   if (resolvedBaseType->isTypeVariableOrMember())
     return formUnsolved();
 
-  auto choice = OverloadChoice(resolvedBaseType, requirement, functionRefKind);
+  auto witness =
+      conformance.getWitnessByName(baseObjectType, requirement->getName());
+  if (!witness)
+    return SolutionKind::Error;
+
+  auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefKind);
   resolveOverload(getConstraintLocator(locator), memberType, choice,
                   useDC);
   return SolutionKind::Solved;
