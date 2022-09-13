@@ -359,13 +359,14 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned inden
 
     interleave(sortedConstraints,
                [&](Constraint *constraint) {
+                Out.indent(indent);
                  if (constraint->isDisabled())
                    Out << ">  [disabled] ";
                  else if (constraint->isFavored())
                    Out << ">  [favored]  ";
                  else
                    Out << ">             ";
-                 constraint->print(Out, sm,
+                 constraint->print(Out, sm, indent,
                    /*skipLocator=*/constraint->getLocator() == Locator);
                },
                [&] { Out << "\n"; });
