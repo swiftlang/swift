@@ -2993,8 +2993,8 @@ NOTE(spi_only_import_conflict_here,none,
      "imported for SPI only here", ())
 
 ERROR(error_public_import_of_private_module,none,
-        "private module %0 is imported publicly from the public module %1",
-        (Identifier, Identifier))
+      "private module %0 is imported publicly from the public module %1",
+      (Identifier, Identifier))
 
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())

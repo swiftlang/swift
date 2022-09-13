@@ -71,3 +71,21 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 // RUN: not %target-swift-frontend -typecheck %s -library-level ThatsNotALibraryLevel 2>&1 \
 // RUN:   | %FileCheck %s --check-prefix CHECK-ARG
 // CHECK-ARG: error: unknown library level 'ThatsNotALibraryLevel', expected one of 'api', 'spi' or 'other'
+
+/// Expect no errors in swiftinterfaces.
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) \
+// RUN: -sdk %t/sdk -module-cache-path %t -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -I %t -module-name Client
+
+//--- Client.private.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 5.8-dev effective-4.1.50
+// swift-module-flags: -swift-version 4 -module-name Client -library-level api
+
+import PublicSwift
+import PrivateSwift
+import PublicClang
+import PublicClang_Private
+import FullyPrivateClang
+import LocalClang
+@_exported import MainLib
