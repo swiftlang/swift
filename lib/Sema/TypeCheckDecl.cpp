@@ -582,7 +582,8 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
 
   auto &ctx = decl->getASTContext();
   FindReferenceToInitializer finder(decl, ctx);
-  decl->getBody()->walk(finder);
+  if (auto *body = decl->getBody())
+    body->walk(finder);
 
   // get the kind out of the finder.
   auto Kind = finder.Kind;

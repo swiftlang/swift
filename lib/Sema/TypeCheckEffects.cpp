@@ -2906,8 +2906,10 @@ void TypeChecker::checkTopLevelEffects(TopLevelCodeDecl *code) {
   if (ctx.LangOpts.EnableThrowWithoutTry)
     checker.setTopLevelThrowWithoutTry();
 
-  code->getBody()->walk(checker);
-  code->getBody()->walk(LocalFunctionEffectsChecker());
+  if (auto *body = code->getBody()) {
+    body->walk(checker);
+    body->walk(LocalFunctionEffectsChecker());
+  }
 }
 
 void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {

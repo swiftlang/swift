@@ -854,9 +854,11 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually walk
     // into the body.
     if (auto *FD = DeferS->getTempDecl()) {
-      auto *RetS = FD->getBody()->walk(*this);
-      assert(RetS == FD->getBody());
-      (void)RetS;
+      if (auto *Body = FD->getBody()) {
+        auto *RetS = Body->walk(*this);
+        assert(RetS == Body);
+        (void)RetS;
+      }
       walkToStmtPost(DeferS);
     }
     // Already walked children.

@@ -205,7 +205,8 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelCodeDecl *TLCD) {
   auto &Context = TLCD->DeclContext::getASTContext();
   unsigned nextDiscriminator = Context.NextAutoClosureDiscriminator;
   ContextualizeClosures CC(TLCD, nextDiscriminator);
-  TLCD->getBody()->walk(CC);
+  if (auto *body = TLCD->getBody())
+    body->walk(CC);
   assert(nextDiscriminator == Context.NextAutoClosureDiscriminator &&
          "reentrant/concurrent invocation of contextualizeTopLevelCode?");
   Context.NextAutoClosureDiscriminator = CC.NextDiscriminator;
