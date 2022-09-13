@@ -104,7 +104,14 @@ public:
   ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
                                           ArrayRef<VarDecl *> members,
                                           bool wantCtorParamNames,
-                                          bool wantBody);
+                                          bool wantBody,
+                                          DeclContext *dc = nullptr);
+
+  /// Create a constructor that initializes a struct from a conversion function
+  ConstructorDecl *createConversionConstructor(NominalTypeDecl *structDecl,
+                                               ArrayRef<VarDecl *> members,
+                                               Decl *conversionFunctionDecl,
+                                               DeclContext *dc);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
   ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,

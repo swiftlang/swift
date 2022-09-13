@@ -31,6 +31,7 @@ struct LoadableIntWrapper {
   friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
     return LoadableIntWrapper{.value = -obj.value};
   }
+
 };
 
 struct LoadableBoolWrapper {
@@ -38,6 +39,9 @@ struct LoadableBoolWrapper {
   LoadableBoolWrapper operator!() {
     return LoadableBoolWrapper{.value = !value};
   }
+
+  // Cast Operator
+  operator LoadableIntWrapper() const { return LoadableIntWrapper{.value = value}; }
 };
 
 struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {

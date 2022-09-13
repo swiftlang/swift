@@ -585,7 +585,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
 ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
     NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
-    bool wantCtorParamNames, bool wantBody) {
+    bool wantCtorParamNames, bool wantBody, DeclContext *dc) {
   auto &context = ImporterImpl.SwiftContext;
 
   // Construct the set of parameters from the list of members.
@@ -632,7 +632,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
                       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
-                      /*GenericParams=*/nullptr, structDecl);
+                      /*GenericParams=*/nullptr, dc ? dc : structDecl);
 
   constructor->setAccess(AccessLevel::Public);
 
@@ -2056,4 +2056,51 @@ SwiftDeclSynthesizer::makeComputedPropertyFromCXXMethods(FuncDecl *getter,
   ImporterImpl.makeComputed(result, getterDecl, setterDecl);
 
   return result;
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeConversionCtorMethodBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+
+  auto ctorDecl = cast<FuncDecl>(afd); /* The ctor */
+  auto methodDecl =
+      static_cast<FuncDecl *>(context); /* Swift version of CXXConversionDecl */
+
+  auto methodExpr =
+      new (ctx) DeclRefExpr(methodDecl, DeclNameLoc(), /*implicit*/ true);
+  methodExpr->setType(methodDecl->getInterfaceType());
+
+  auto ctorInputRefExpr = new (ctx) DeclRefExpr(
+      /* Self param */ ctorDecl->getParameters()->get(1), DeclNameLoc(), /*implicit=*/true);
+  ctorInputRefExpr->setType(LValueType::get(ctorDecl->getParameters()->get(1)->getType()));
+
+  auto dotCallExpr =
+      DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), ctorInputRefExpr);
+  dotCallExpr->setType(methodDecl->getMethodInterfaceType());
+  dotCallExpr->setThrows(false);
+
+  SmallVector<Expr *, 8> forwardingParams;
+  auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
+  auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
+  callExpr->setType(ctorDecl->getResultInterfaceType());
+  callExpr->setThrows(false);
+
+  auto declDestRef = new (ctx) DeclRefExpr(
+      /* Self param */ ctorDecl->getParameters()->get(0), DeclNameLoc(), /*implicit=*/true);
+  declDestRef->setType(LValueType::get(ctorDecl->getParameters()->get(0)->getType()));
+  auto assignExpr = new (ctx) AssignExpr(declDestRef, SourceLoc(), callExpr, true);
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assignExpr}, SourceLoc(),
+                                /*implicit*/ true);
+
+  return {body, /*isTypeChecked*/ true};
+}
+
+ConstructorDecl *SwiftDeclSynthesizer::createConversionConstructor(
+    NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members, Decl *conversionFunctionDecl, DeclContext *dc) {
+
+  auto constructor = createValueConstructor(structDecl, members, false, false, dc);
+  constructor->setBodySynthesizer(synthesizeConversionCtorMethodBody,
+                                  conversionFunctionDecl);
+  // We're done.
+  return constructor;
 }

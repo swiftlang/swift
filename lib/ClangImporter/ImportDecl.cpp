@@ -2143,6 +2143,49 @@ namespace {
           }
         }
 
+        // Handle user-defined conversion operators specially
+        if(auto cxxConversionDecl = dyn_cast<clang::CXXConversionDecl>(m)) {
+          auto type = Impl.importTypeIgnoreIUO(
+              cxxConversionDecl->getConversionType(), ImportTypeKind::Result,
+              ImportDiagnosticAdder(Impl, cxxConversionDecl, cxxConversionDecl->getLocation()),
+              isInSystemModule(dc), Bridgeability::None, ImportTypeAttrs());
+
+          auto ext = ExtensionDecl::create(
+              Impl.SwiftContext, SourceLoc(),
+              nullptr, {}, dc->getModuleScopeContext(),
+              nullptr, cxxConversionDecl
+              );
+
+          auto nominal = type->getCanonicalType()->getAnyNominal();
+          auto lhsParam =
+              new (Impl.SwiftContext) ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                                  Impl.SwiftContext.getIdentifier("value"), ext->getDeclContext());
+          lhsParam->setInterfaceType(result->getDeclaredType());
+
+          Decl *conversionFunc = Impl.importDecl(dyn_cast<clang::NamedDecl>(m), getActiveSwiftVersion());
+          auto ctor = synthesizer.createConversionConstructor(nominal, {lhsParam}, conversionFunc, ext);
+
+          ext->setImplicit();
+          ext->addMember(ctor);
+          ext->setMemberLoader(&Impl, 0);
+
+          nominal->addExtension(ext);
+          ext->setExtendedNominal(nominal);
+
+          Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{ext},
+                                    nominal->getDeclaredType());
+          Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{ext},
+                                    std::move(nominal));
+
+          Impl.ImportedDecls[{cxxConversionDecl, getVersion()}] = ext;
+
+          auto lookupTable = Impl.findLookupTable(cxxConversionDecl->getOwningModule());
+          addEntryToLookupTable(*lookupTable, cxxConversionDecl,
+                                Impl.getNameImporter());
+
+          continue;
+        }
+
         auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.

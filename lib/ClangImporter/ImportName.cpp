@@ -1835,7 +1835,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     break;
   }
 
-  case clang::DeclarationName::CXXConversionFunctionName:
+  case clang::DeclarationName::CXXConversionFunctionName: {
+    baseName = swiftCtx.getIdentifier("__conversionTo" + dyn_cast<clang::CXXConversionDecl>(D)->getConversionType().getBaseTypeIdentifier()->getName().str()).str();
+    auto functionDecl = dyn_cast<clang::FunctionDecl>(D);
+    isFunction = true;
+    addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+    break;
+  }
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
