@@ -843,6 +843,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// `moveInitialize(from:count:)`, the region is initialized and the memory
   /// region `source..<(source + count)` is uninitialized.
   ///
+  /// - Note: Returns without performing work if `self` and `source` are equal.
+  ///
   /// - Parameters:
   ///   - source: A pointer to the values to copy. The memory region
   ///     `source..<(source + count)` must be initialized. The memory regions
@@ -864,7 +866,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
       //   (self + i).initialize(to: (source + i).move())
       // }
     }
-    else {
+    else if self != source {
       // initialize backward from a non-following overlapping range.
       Builtin.takeArrayBackToFront(
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
