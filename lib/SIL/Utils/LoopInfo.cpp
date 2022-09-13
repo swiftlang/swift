@@ -15,6 +15,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "llvm/Analysis/LoopInfoImpl.h"
 #include "llvm/Support/Debug.h"
 
@@ -36,6 +37,17 @@ SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
 }
 
 bool SILLoop::canDuplicate(SILInstruction *I) const {
+  SinkAddressProjections sinkProj;
+  for (auto res : I->getResults()) {
+    if (!res->getType().isAddress()) {
+      continue;
+    }
+    auto canSink = sinkProj.analyzeAddressProjections(I);
+    if (!canSink) {
+      return false;
+    }
+  }
+
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
   if (I->isAllocatingStack()) {
