@@ -35,12 +35,6 @@ void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
     function();
 }
 
-void SwiftToClangInteropContext::recordEmittedClangTypeDecl(
-    const NominalTypeDecl *typeDecl) {
-  assert(typeDecl->hasClangNode());
-  referencedClangTypeDecls.insert(typeDecl);
-}
-
 void SwiftToClangInteropContext::recordExtensions(
     const NominalTypeDecl *typeDecl, const ExtensionDecl *ext) {
   auto it = extensions.insert(
