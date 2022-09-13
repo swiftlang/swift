@@ -3066,12 +3066,15 @@ OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
         !isa<FuncDecl>(this) &&
         !isa<SubscriptDecl>(this))
       return nullptr;
-    auto file = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-    // Don't look up when the decl is from source, otherwise a cycle will happen.
-    if (file->getKind() == FileUnitKind::SerializedAST) {
-      Mangle::ASTMangler mangler;
-      auto name = mangler.mangleOpaqueTypeDecl(this);
-      return file->lookupOpaqueResultType(name);
+    if (auto file =
+            dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
+      // Don't look up when the decl is from source, otherwise a cycle will
+      // happen.
+      if (file->getKind() == FileUnitKind::SerializedAST) {
+        Mangle::ASTMangler mangler;
+        auto name = mangler.mangleOpaqueTypeDecl(this);
+        return file->lookupOpaqueResultType(name);
+      }
     }
     return nullptr;
   }

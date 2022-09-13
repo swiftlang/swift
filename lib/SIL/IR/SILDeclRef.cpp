@@ -947,8 +947,20 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   switch (kind) {
   case SILDeclRef::Kind::Func:
-    if (auto *ACE = getAbstractClosureExpr())
+    if (auto *ACE = getAbstractClosureExpr()) {
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (auto tuple =
+                getModuleContext()->findDSLExprForDSLDebugInfoCallback(CE)) {
+          unsigned discriminator;
+          Expr *dslExpr;
+          DeclContext *dc;
+          std::tie(discriminator, dslExpr, dc) = *tuple;
+          return mangler.mangleDSLDebugScope(discriminator, dslExpr->getType(),
+                                             dc);
+        }
+      }
       return mangler.mangleClosureEntity(ACE, SKind);
+    }
 
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry

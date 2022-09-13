@@ -575,6 +575,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
+    case Node::Kind::DSLDebugScope:
       if (!fullSubstitutionMap)
         break;
 
@@ -1273,6 +1274,13 @@ ManglingError Remangler::mangleExplicitClosure(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
   RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // type
   Buffer << "fU";
+  return mangleChildNode(node, 1, depth + 1); // index
+}
+
+ManglingError Remangler::mangleDSLDebugScope(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1)); // context
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1)); // type
+  Buffer << "ff";
   return mangleChildNode(node, 1, depth + 1); // index
 }
 
@@ -3610,6 +3618,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
     case Node::Kind::Static:
+    case Node::Kind::DSLDebugScope:
       assert(node->getNumChildren() > 0);
       return node->getNumChildren() > 0 && isSpecialized(node->getChild(0));
 

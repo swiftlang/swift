@@ -1258,6 +1258,12 @@ ManglingError Remangler::mangleImplicitClosure(Node *node, EntityContext &ctx,
                                    depth + 1); // name is index
 }
 
+ManglingError Remangler::mangleDSLDebugScope(Node *node, EntityContext &ctx,
+                                             unsigned depth) {
+  Buffer << "<dsl-debug-scope>";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleStatic(Node *node, EntityContext &ctx,
                                       unsigned depth) {
   Buffer << 'Z';

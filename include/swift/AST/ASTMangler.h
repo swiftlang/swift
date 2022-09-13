@@ -357,6 +357,9 @@ public:
 
   std::string mangleGenericSignature(const GenericSignature sig);
 
+  std::string mangleDSLDebugScope(unsigned discriminator, Type type,
+                                  const DeclContext *dc);
+
   enum SpecialContext {
     ObjCContext,
     ClangImporterContext,

@@ -861,6 +861,19 @@ std::string ASTMangler::mangleGenericSignature(const GenericSignature sig) {
   return finalize();
 }
 
+std::string ASTMangler::mangleDSLDebugScope(unsigned discriminator, Type type,
+                                            const DeclContext *dc) {
+  beginMangling();
+  appendContext(dc, StringRef());
+  if (!type)
+    type = ErrorType::get(dc->getASTContext());
+  auto sig = dc->getGenericSignatureOfContext();
+  type = type->mapTypeOutOfContext();
+  appendType(type->getCanonicalType(), sig);
+  appendOperator("ff", Index(discriminator));
+  return finalize();
+}
+
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;

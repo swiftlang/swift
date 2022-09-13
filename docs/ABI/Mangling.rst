@@ -356,6 +356,7 @@ Entities
   entity-spec ::= 'Tv' NATURAL               // outlined global variable (from context function)
   entity-spec ::= 'Tv' NATURAL 'r'           // outlined global read-only object
   entity-spec ::= 'Te' bridge-spec           // outlined objective c method call
+  entity-spec ::= type 'ff' INDEX            // DSL debug scope
 
   entity-spec ::= decl-name label-list function-signature generic-signature? 'F'    // function
   entity-spec ::= label-list type file-discriminator? 'i' ACCESSOR                  // subscript
