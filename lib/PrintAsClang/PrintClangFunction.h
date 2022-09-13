@@ -123,6 +123,12 @@ public:
                                       StringRef swiftSymbolName, Type resultTy,
                                       bool isDefinition);
 
+  /// Print the C++ subscript method.
+  void printCxxSubscriptAccessorMethod(
+      const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
+      const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
+      Type resultTy, bool isDefinition);
+
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
   ClangRepresentation
   printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,

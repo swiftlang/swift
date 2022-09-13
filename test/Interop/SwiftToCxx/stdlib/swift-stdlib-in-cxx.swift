@@ -6,6 +6,8 @@
 
 // CHECK: namespace Swift {
 
+// CHECK: class String;
+
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
@@ -15,6 +17,12 @@
 // CHECK: }
 // CHECK-NEXT: inline Array(const Array &other) {
 // CHECK: }
+// CHECK: static inline Array<T_0_0> init();
+// CHECK: inline void append(const T_0_0& newElement);
+// CHECK: inline T_0_0 remove(swift::Int index);
+// CHECK: inline T_0_0 operator [](swift::Int index) const;
+// CHECK: inline swift::Int getCount() const;
+// CHECK: inline swift::Int getCapacity() const;
 
 // CHECK: class String final {
 // CHECK-NEXT: public:
