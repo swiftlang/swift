@@ -875,6 +875,99 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     auto decl2 = choice2.getDecl();
     auto dc2 = decl2->getDeclContext();
 
+    // Prefer an overload of `makeIterator` that satisfies
+    // `Sequence#makeIterator` requirement when `.makeIterator()`
+    // is implicitly injected after sequence expression in `for-in`
+    // loop context.
+    //
+    // This helps to avoid issues related to conditional conformances
+    // to `Sequence` that add `makeIterator` preferred by overloading
+    // rules that could change behavior i.e.:
+    //
+    // \code
+    // extension Array where Element == Double {
+    //   func makeIterator() -> Array<Int>.Iterator {
+    //     return [1, 2, 3].makeIterator()
+    //   }
+    // }
+    //
+    // for i in [4.0, 5.0, 6.0] {
+    //   print(i)
+    // }
+    // \endcode
+    //
+    // `makeIterator` declared in the `Array` extension is not a witness
+    // to `Sequence#makeIterator` and shouldn't be used because that would
+    // change runtime behavior.
+    if (auto *locator = overload.locator) {
+      auto memberRef = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
+      // `<sequence-expr>.makeIterator()` in `for-in` loop.
+      if (memberRef && memberRef->isImplicit() &&
+          locator->isLastElement<LocatorPathElt::Member>()) {
+        auto *sequenceExpr = memberRef->getBase();
+        if (cs.getContextualTypePurpose(sequenceExpr) == CTP_ForEachSequence) {
+          auto &ctx = cs.getASTContext();
+
+          assert(decl1->getBaseIdentifier() == ctx.Id_makeIterator &&
+                 decl2->getBaseIdentifier() == ctx.Id_makeIterator);
+
+          auto *sequenceProto = cast<ProtocolDecl>(
+              cs.getContextualType(sequenceExpr, /*forConstraint=*/false)
+                  ->getAnyNominal());
+
+          auto getWitnessFor = [&](Type type, ProtocolDecl *protocol,
+                                   DeclName requirement) -> ValueDecl * {
+            auto conformance =
+                cs.DC->getParentModule()->lookupConformance(type, protocol);
+
+            if (!conformance)
+              return nullptr;
+
+            return conformance.getWitnessByName(type, requirement).getDecl();
+          };
+
+          auto getSequenceExprType =
+              [&](const Solution &solution) -> Optional<Type> {
+            // Check whether given solution has a fixed type for
+            // the sequence expression, inner partial solutions
+            // would not have the expr type (because there is no
+            // constraints that bring that type into their scope),
+            // so this check could only be performed on "complete"
+            // solutions that have both overload choice and base type.
+            auto type = cs.getType(sequenceExpr);
+            if (auto *typeVar = type->getAs<TypeVariableType>()) {
+              if (!solution.hasFixedType(typeVar))
+                return None;
+            }
+            return solution.getResolvedType(sequenceExpr);
+          };
+
+          auto baseTy1 = getSequenceExprType(solutions[idx1]);
+          auto baseTy2 = getSequenceExprType(solutions[idx2]);
+
+          if (baseTy1 && baseTy2) {
+            auto witness1 =
+                getWitnessFor(*baseTy1, sequenceProto, decl1->getName());
+
+            auto witness2 =
+                getWitnessFor(*baseTy2, sequenceProto, decl2->getName());
+
+            if (decl1 == witness1) {
+              identical = false;
+              score1 += 2 * weight;
+            }
+
+            if (decl2 == witness2) {
+              identical = false;
+              score2 += 2 * weight;
+            }
+
+            continue;
+          }
+        }
+      }
+    }
+
     // The two systems are not identical. If the decls in question are distinct
     // protocol members, let the checks below determine if the two choices are
     // 'identical' or not. This allows us to structurally unify disparate
