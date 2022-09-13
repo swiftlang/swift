@@ -765,17 +765,19 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
     bool FoundResultReturn = false;
     bool FoundNoResultReturn = false;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      return {false, expr};
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      return Action::SkipChildren(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Record return statements.
       if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
         if (ret->isImplicit())
-          return {true, stmt};
+          return Action::Continue(stmt);
 
         // If it has a result, remember that we saw one, but keep
         // traversing in case there's a no-result return somewhere.
@@ -785,10 +787,10 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
           // Otherwise, stop traversing.
         } else {
           FoundNoResultReturn = true;
-          return {false, nullptr};
+          return Action::Stop();
         }
       }
-      return {true, stmt};
+      return Action::Continue(stmt);
     }
 
   public:

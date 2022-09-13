@@ -861,7 +861,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     // FIXME: Remove this
     bool shouldWalkAccessorsTheOldWay() override { return true; }
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
@@ -871,7 +871,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
               TypeChecker::checkFunctionEffects(FD);
             }
-            return false;
+            return Action::SkipChildren();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -883,11 +883,11 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelEffects(TLCD);
             }
-            return false;
+            return Action::SkipChildren();
           }
         }
       }
-      return true;
+      return Action::Continue();
     }
   };
 

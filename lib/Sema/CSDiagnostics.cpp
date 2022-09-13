@@ -1040,9 +1040,9 @@ bool AttributedFuncToTypeConversionFailure::
 
   auto declRepr = decl->getTypeReprOrParentPatternTypeRepr();
   class TopLevelFuncReprFinder : public ASTWalker {
-    bool walkToTypeReprPre(TypeRepr *TR) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
       FnRepr = dyn_cast<FunctionTypeRepr>(TR);
-      return FnRepr == nullptr;
+      return Action::VisitChildrenIf(FnRepr == nullptr);
     }
 
   public:
@@ -1469,7 +1469,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
   VarDecl *varDecl;
   int count;
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->getDecl() == varDecl)
         ++count;
@@ -1492,7 +1492,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
       }
     }
 
-    return { true, E };
+    return Action::Continue(E);
   }
 
 public:
@@ -1595,7 +1595,8 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
       AbstractFunctionDecl *AFD = nullptr;
       if ((AFD = dyn_cast<AbstractFunctionDecl>(varDecl->getDeclContext()))) {
         auto checker = VarDeclMultipleReferencesChecker(getDC(), varDecl);
-        AFD->getBody()->walk(checker);
+        if (auto *body = AFD->getBody())
+          body->walk(checker);
         singleUse = checker.referencesCount() == 1;
       }
 
@@ -5419,7 +5420,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
           ParamRefFinder(DiagnosticEngine &diags, ParameterList *params)
               : D(diags), Params(params) {}
 
-          std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+          PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
             if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
               if (llvm::is_contained(Params->getArray(), DRE->getDecl())) {
                 auto *P = cast<ParamDecl>(DRE->getDecl());
@@ -5427,7 +5428,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
                            P->getName());
               }
             }
-            return {true, E};
+            return Action::Continue(E);
           }
         };
 
@@ -6090,28 +6091,28 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
                            Callback callback)
         : Params(params.begin(), params.end()), Fn(callback) {}
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (Params.empty())
-        return false;
+        return Action::SkipChildren();
 
       auto *ident = dyn_cast<ComponentIdentTypeRepr>(T);
       if (!ident)
-        return true;
+        return Action::Continue();
 
       auto *decl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
       if (!decl)
-        return true;
+        return Action::Continue();
 
       auto *paramList = decl->getGenericParams();
       if (!paramList)
-        return true;
+        return Action::Continue();
 
       // There could a situation like `S<S>()`, so we need to be
       // careful not to point at first `S` because it has all of
       // its generic parameters specified.
       if (auto *generic = dyn_cast<GenericIdentTypeRepr>(ident)) {
         if (paramList->size() == generic->getNumGenericArgs())
-          return true;
+          return Action::Continue();
       }
 
       for (auto *candidate : paramList->getParams()) {
@@ -6127,7 +6128,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
       }
 
       // Keep walking.
-      return true;
+      return Action::Continue();
     }
 
     bool allParamsAssigned() const { return Params.empty(); }
