@@ -5750,8 +5750,8 @@ NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
 
 WARNING(public_decl_needs_availability, none,
-        "public declarations should have an availability attribute when building "
-        "with -require-explicit-availability", ())
+        "public declarations should have an availability attribute "
+        "with an introduction version", ())
 
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
