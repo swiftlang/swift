@@ -142,7 +142,7 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
 
   bool walkToTypeReprPost(TypeRepr *T) override {
     // Exit early if we've already found a problem type.
-    return offendingType != nullptr;
+    return offendingType == nullptr;
   }
 
   explicit TypeAccessScopeDiagnoser(AccessScope accessScope,
