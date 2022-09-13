@@ -322,8 +322,10 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
       // We are only interested in synthesized members that come from an
       // extension that we defined in our module.
-      if (Info.EnablingExt && Info.EnablingExt->getModuleContext() != &M) {
-        continue;
+      if (Info.EnablingExt) {
+        const auto *ExtM = Info.EnablingExt->getModuleContext();
+        if (!Walker.isOurModule(ExtM))
+          continue;
       }
 
       for (const auto ExtensionMember : Info.Ext->getMembers()) {
@@ -399,7 +401,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
           // If P is from a different module, and it's being added to a type
           // from the current module, add a `memberOf` relation to the extended
           // protocol.
-          if (MemberVD->getModuleContext()->getNameStr() != M.getNameStr() && VD->getDeclContext()) {
+          if (!Walker.isOurModule(MemberVD->getModuleContext()) && VD->getDeclContext()) {
             if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
               recordEdge(Symbol(this, VD, nullptr),
                          Symbol(this, ExP, nullptr),
