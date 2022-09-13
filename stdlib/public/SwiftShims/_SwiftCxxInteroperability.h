@@ -160,6 +160,11 @@ template <class T> static inline const constexpr bool isValueType = false;
 /// boxed.
 template <class T> static inline const constexpr bool isOpaqueLayout = false;
 
+/// True if the given type is a C++ record that was bridged to Swift, giving
+/// Swift ability to work with it in a generic context.
+template <class T>
+static inline const constexpr bool isSwiftBridgedCxxRecord = false;
+
 /// Returns the opaque pointer to the given value.
 template <class T>
 inline const void *_Nonnull getOpaquePointer(const T &value) {

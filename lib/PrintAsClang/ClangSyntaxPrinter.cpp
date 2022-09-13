@@ -15,6 +15,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclTemplate.h"
+#include "clang/AST/NestedNameSpecifier.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -80,8 +83,35 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
   return false;
 }
 
+void ClangSyntaxPrinter::printNominalClangTypeReference(
+    const clang::Decl *typeDecl) {
+  auto &clangCtx = typeDecl->getASTContext();
+  clang::PrintingPolicy pp(clangCtx.getLangOpts());
+  const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
+      clangCtx, clangCtx.getTranslationUnitDecl(),
+      typeDecl->getLexicalDeclContext());
+  if (NS)
+    NS->print(os, pp);
+  assert(cast<clang::NamedDecl>(typeDecl)->getDeclName().isIdentifier());
+  os << cast<clang::NamedDecl>(typeDecl)->getName();
+  if (auto *ctd = dyn_cast<clang::ClassTemplateSpecializationDecl>(typeDecl)) {
+    if (ctd->getTemplateArgs().size()) {
+      os << '<';
+      llvm::interleaveComma(ctd->getTemplateArgs().asArray(), os,
+                            [&](const clang::TemplateArgument &arg) {
+                              arg.print(pp, os, /*IncludeType=*/true);
+                            });
+      os << '>';
+    }
+  }
+}
+
 void ClangSyntaxPrinter::printNominalTypeReference(
     const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext) {
+  if (typeDecl->hasClangNode()) {
+    printNominalClangTypeReference(typeDecl->getClangDecl());
+    return;
+  }
   printModuleNamespaceQualifiersIfNeeded(typeDecl->getModuleContext(),
                                          moduleContext);
   // FIXME: Full qualifiers for nested types?
