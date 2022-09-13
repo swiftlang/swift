@@ -1112,7 +1112,8 @@ ParserResult<Pattern> Parser::parsePattern() {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
-    if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
+    if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword() &&
+        !Tok.isAtStartOfLine())
       diagnoseConsecutiveIDs(name.str(), loc,
                              introducer == VarDecl::Introducer::Let
                              ? "constant" : "variable");

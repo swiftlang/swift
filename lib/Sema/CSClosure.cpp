@@ -1919,6 +1919,7 @@ private:
         switch (cond.getKind()) {
         case StmtConditionElement::CK_Boolean:
         case StmtConditionElement::CK_PatternBinding:
+        case StmtConditionElement::CK_HasSymbol:
           continue;
 
         case StmtConditionElement::CK_Availability:

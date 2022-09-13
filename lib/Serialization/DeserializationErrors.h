@@ -445,6 +445,38 @@ public:
   }
 };
 
+class InvalidRecordKindError :
+    public llvm::ErrorInfo<InvalidRecordKindError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  unsigned recordKind;
+  const char *extraText;
+
+public:
+  explicit InvalidRecordKindError(unsigned kind,
+                                  const char *extraText = nullptr) {
+    this->recordKind = kind;
+    this->extraText = extraText;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "don't know how to deserialize record with code " << recordKind;
+    if (recordKind >= decls_block::SILGenName_DECL_ATTR)
+      OS << " (attribute kind "
+         << recordKind - decls_block::SILGenName_DECL_ATTR << ")";
+    if (extraText)
+      OS << ": " << extraText;
+    OS << "; this may be a compiler bug, or a file on disk may have changed "
+          "during compilation";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 LLVM_NODISCARD
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {

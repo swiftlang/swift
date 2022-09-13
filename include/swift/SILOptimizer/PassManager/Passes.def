@@ -454,6 +454,8 @@ PASS(AssemblyVisionRemarkGenerator, "assembly-vision-remark-generator",
      "Emit assembly vision remarks that provide source level guidance of where runtime calls ended up")
 PASS(MoveOnlyObjectChecker, "sil-move-only-object-checker",
      "Pass that enforces move only invariants on raw SIL for objects")
+PASS(MoveOnlyAddressChecker, "sil-move-only-address-checker",
+     "Pass that enforces move only invariants on raw SIL for addresses")
 PASS(MoveKillsCopyableValuesChecker, "sil-move-kills-copyable-values-checker",
      "Pass that checks that any copyable (non-move only) value that is passed "
      "to _move do not have any uses later than the _move")

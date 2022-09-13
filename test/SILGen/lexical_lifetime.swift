@@ -134,7 +134,7 @@ extension C {
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_lexical @owned $C):
 // CHECK-LABEL: } // end sil function 'lexical_method_attr'
   @_silgen_name("lexical_method_attr")
-  @_lexical
+  @_noEagerMove
   __consuming
   func lexical_method_attr() {}
 

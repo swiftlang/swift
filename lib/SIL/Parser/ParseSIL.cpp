@@ -960,12 +960,6 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
   }
 }
 
-struct ArgEffectLoc {
-  SourceLoc start;
-  SourceLoc end;
-  bool isDerived;
-};
-
 static bool parseDeclSILOptional(bool *isTransparent,
                                  IsSerialized_t *isSerialized,
                                  bool *isCanonical,
@@ -990,7 +984,6 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK,
-                             llvm::SmallVectorImpl<ArgEffectLoc> *argEffectLocs,
                                  SILParser &SP, SILModule &M) {
   while (SP.P.consumeIf(tok::l_square)) {
     if (isLet && SP.P.Tok.is(tok::kw_let)) {
@@ -1215,20 +1208,6 @@ static bool parseDeclSILOptional(bool *isTransparent,
         return true;
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
-      continue;
-    } else if (argEffectLocs && (SP.P.Tok.getText() == "escapes" ||
-                                 SP.P.Tok.getText() == "defined_escapes")) {
-      bool isDerived = SP.P.Tok.getText() == "escapes";
-      SP.P.consumeToken();
-      do {
-        SourceLoc effectsStart = SP.P.Tok.getLoc();
-        while (SP.P.Tok.isNot(tok::r_square, tok::comma, tok::eof)) {
-          SP.P.consumeToken();
-        }
-        SourceLoc effectsEnd = SP.P.Tok.getLoc();
-        argEffectLocs->push_back({effectsStart, effectsEnd, isDerived});
-      } while (SP.P.consumeIf(tok::comma));
-      SP.P.consumeToken();
       continue;
     } else {
       SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
@@ -6548,7 +6527,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
-  llvm::SmallVector<ArgEffectLoc, 8> argEffectLocs;
   SILFunction *DynamicallyReplacedFunction = nullptr;
   SILFunction *AdHocWitnessFunction = nullptr;
   Identifier objCReplacementFor;
@@ -6560,7 +6538,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &inlineStrategy, &optimizationMode, &perfConstr, nullptr,
           &isWeakImported, &needStackProtection, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, &argEffectLocs, FunctionState, M) ||
+          &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_function_name) ||
@@ -6608,20 +6586,6 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setPerfConstraints(perfConstr);
     FunctionState.F->setEffectsKind(MRK);
 
-    for (ArgEffectLoc aeLoc : argEffectLocs) {
-      StringRef effectsStr = P.SourceMgr.extractText(
-                        CharSourceRange(P.SourceMgr, aeLoc.start, aeLoc.end));
-      auto error = FunctionState.F->parseEffects(effectsStr, /*fromSIL*/true,
-                                                 /*isDerived*/ aeLoc.isDerived,
-                                                 {});
-      if (error.first) {
-        SourceLoc loc = aeLoc.start;
-        if (loc.isValid())
-          loc = loc.getAdvancedLoc(error.second);
-        P.diagnose(loc, diag::error_in_effects_attribute, StringRef(error.first));
-        return true;
-      }
-    }
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
     for (auto &Attr : Semantics) {
@@ -6633,45 +6597,68 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     SourceLoc LBraceLoc = P.Tok.getLoc();
 
     if (P.consumeIf(tok::l_brace)) {
-      isDefinition = true;
+      while (P.consumeIf(tok::l_square)) {
+        SourceLoc effectsStart = P.Tok.getLoc();
+        while (P.Tok.isNot(tok::r_square, tok::eof)) {
+          P.consumeToken();
+        }
+        SourceLoc effectsEnd = P.Tok.getLoc();
+        P.consumeToken();
+        StringRef effectsStr = P.SourceMgr.extractText(
+                      CharSourceRange(P.SourceMgr, effectsStart, effectsEnd));
 
-      FunctionState.ContextGenericSig = GenericSig;
-      FunctionState.ContextGenericParams = GenericParams;
-      FunctionState.F->setGenericEnvironment(GenericSig.getGenericEnvironment());
-
-      if (GenericSig && !SpecAttrs.empty()) {
-        for (auto &Attr : SpecAttrs) {
-          SmallVector<Requirement, 2> requirements;
-          // Resolve types and convert requirements.
-          FunctionState.convertRequirements(Attr.requirements, requirements);
-          auto *fenv = FunctionState.F->getGenericEnvironment();
-          auto genericSig = buildGenericSignature(P.Context,
-                                                  fenv->getGenericSignature(),
-                                                  /*addedGenericParams=*/{ },
-                                                  std::move(requirements));
-          FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
-              FunctionState.F->getModule(), genericSig, Attr.exported,
-              Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
+        auto error = FunctionState.F->parseEffects(effectsStr, /*fromSIL*/true,
+                                     /*argumentIndex*/ -1, /*isDerived*/ false,
+                                     {});
+        if (error.first) {
+          SourceLoc loc = effectsStart;
+          if (loc.isValid())
+            loc = loc.getAdvancedLoc(error.second);
+          P.diagnose(loc, diag::error_in_effects_attribute, StringRef(error.first));
+          return true;
         }
       }
+      if (!P.consumeIf(tok::r_brace)) {
+        isDefinition = true;
 
-      // Parse the basic block list.
-      SILBuilder B(*FunctionState.F);
+        FunctionState.ContextGenericSig = GenericSig;
+        FunctionState.ContextGenericParams = GenericParams;
+        FunctionState.F->setGenericEnvironment(GenericSig.getGenericEnvironment());
 
-      do {
-        if (FunctionState.parseSILBasicBlock(B))
-          return true;
-      } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
+        if (GenericSig && !SpecAttrs.empty()) {
+          for (auto &Attr : SpecAttrs) {
+            SmallVector<Requirement, 2> requirements;
+            // Resolve types and convert requirements.
+            FunctionState.convertRequirements(Attr.requirements, requirements);
+            auto *fenv = FunctionState.F->getGenericEnvironment();
+            auto genericSig = buildGenericSignature(P.Context,
+                                                    fenv->getGenericSignature(),
+                                                    /*addedGenericParams=*/{ },
+                                                    std::move(requirements));
+            FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
+                FunctionState.F->getModule(), genericSig, Attr.exported,
+                Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
+          }
+        }
 
-      SourceLoc RBraceLoc;
-      P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
-                           LBraceLoc);
+        // Parse the basic block list.
+        SILBuilder B(*FunctionState.F);
 
-      // Check that there are no unresolved forward definitions of opened
-      // archetypes.
-      if (M.hasUnresolvedOpenedArchetypeDefinitions())
-        llvm_unreachable(
-            "All forward definitions of opened archetypes should be resolved");
+        do {
+          if (FunctionState.parseSILBasicBlock(B))
+            return true;
+        } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
+
+        SourceLoc RBraceLoc;
+        P.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                             LBraceLoc);
+
+        // Check that there are no unresolved forward definitions of opened
+        // archetypes.
+        if (M.hasUnresolvedOpenedArchetypeDefinitions())
+          llvm_unreachable(
+              "All forward definitions of opened archetypes should be resolved");
+      }
     }
 
     FunctionState.F->setLinkage(resolveSILLinkage(FnLinkage, isDefinition));
@@ -6791,7 +6778,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -6842,7 +6829,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, SP, M))
+                           nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6911,7 +6898,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7431,7 +7418,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

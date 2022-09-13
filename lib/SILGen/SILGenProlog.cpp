@@ -22,6 +22,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
@@ -108,8 +109,14 @@ public:
         }
       }
     }
-    if (isInOut)
+    if (isInOut) {
+      // If we are inout and are move only, insert a note to the move checker to
+      // check ownership.
+      if (mv.getType().isMoveOnly() && !mv.getType().isMoveOnlyWrapped())
+        mv = SGF.B.createMarkMustCheckInst(
+            loc, mv, MarkMustCheckInst::CheckKind::NoImplicitCopy);
       return mv;
+    }
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
@@ -272,7 +279,7 @@ struct ArgumentInitHelper {
     // Look for the following annotations on the function argument:
     // - @noImplicitCopy
     // - @_eagerMove
-    // - @_lexical
+    // - @_noEagerMove
     auto isNoImplicitCopy = pd->isNoImplicitCopy();
     auto lifetime = SGF.F.getLifetime(pd, value->getType());
 
@@ -561,6 +568,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       ty = ty.getAddressType();
     }
     SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
+      arg = SGF.B.createMarkMustCheckInst(
+          Loc, arg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     if (ty.isAddress()) {

@@ -2834,7 +2834,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   auto subject = ([&]() -> ConsumableManagedValue {
     // If we have a move only value, ensure plus one and convert it. Switches
     // always consume move only values.
-    if (subjectMV.getType().isMoveOnly()) {
+    if (subjectMV.getType().isMoveOnly() && subjectMV.getType().isObject()) {
       if (subjectMV.getType().isMoveOnlyWrapped()) {
         subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
             S, subjectMV.ensurePlusOne(*this, S));

@@ -18,6 +18,7 @@
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangValueType.h"
 #include "PrintSwiftToClangCoreScaffold.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -26,6 +27,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Strings.h"
 
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
@@ -178,6 +180,14 @@ public:
       }
     }
 
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      // Only add C++ imports in C++ mode for now.
+      if (!D->hasClangNode())
+        return true;
+      if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
+        return true;
+    }
+
     imports.insert(otherModule);
     return true;
   }
@@ -258,8 +268,10 @@ public:
     if (outputLangMode == OutputLanguageMode::Cxx) {
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
-        forwardDeclare(
-            NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        if (!addImport(NTD)) {
+          forwardDeclare(
+              NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        }
       }
       return;
     }
@@ -666,8 +678,14 @@ public:
       }
       printer.printAdHocCategory(make_range(groupBegin, delayedMembers.end()));
     }
+
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
+
+    // Print any additional metadata for referenced C++ types.
+    for (const auto *typeDecl :
+         printer.getInteropContext().getEmittedClangTypeDecls())
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
 };
 } // end anonymous namespace

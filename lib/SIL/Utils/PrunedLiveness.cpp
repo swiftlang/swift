@@ -11,10 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/PrunedLiveness.h"
+#include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 
@@ -406,8 +408,26 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
     return;
   }
 
-  // If this isn't a tuple or struct, it is a single element. This was our
-  // default value, so we can just return.
+  // If we have an enum, we add one for tracking if the base enum is set and use
+  // the remaining bits for the max sized payload. This ensures that if we have
+  // a smaller sized payload, we still get all of the bits set, allowing for a
+  // homogeneous representation.
+  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+    unsigned numElements = 0;
+    for (auto *eltDecl : enumDecl->getAllElements()) {
+      if (!eltDecl->hasAssociatedValues())
+        continue;
+      numElements = std::max(
+          numElements,
+          unsigned(TypeSubElementCount(
+              type.getEnumElementType(eltDecl, mod, context), mod, context)));
+    }
+    number = numElements + 1;
+    return;
+  }
+
+  // If this isn't a tuple, struct, or enum, it is a single element. This was
+  // our default value, so we can just return.
 }
 
 Optional<SubElementNumber>
@@ -463,8 +483,30 @@ SubElementNumber::compute(SILValue projectionDerivedFromRoot,
       continue;
     }
 
-    // This fails when we visit unchecked_take_enum_data_addr. We should just
-    // add support for enums.
+    // In the case of enums, we note that our representation is:
+    //
+    //                   ---------|Enum| ---
+    //                  /                   \
+    //                 /                     \
+    //                v                       v
+    //  |Bits for Max Sized Payload|    |Discrim Bit|
+    //
+    // So our payload is always going to start at the current field number since
+    // we are the left most child of our parent enum. So we just need to look
+    // through to our parent enum.
+    if (auto *enumData = dyn_cast<UncheckedTakeEnumDataAddrInst>(
+            projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = enumData->getOperand();
+      continue;
+    }
+
+    // Init enum data addr is treated like unchecked take enum data addr.
+    if (auto *initData =
+            dyn_cast<InitEnumDataAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = initData->getOperand();
+      continue;
+    }
+
 #ifndef NDEBUG
     if (!isa<InitExistentialAddrInst>(projectionDerivedFromRoot)) {
       llvm::errs() << "Unknown access path instruction!\n";

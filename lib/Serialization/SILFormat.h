@@ -308,6 +308,7 @@ namespace sil_block {
   using SILArgEffectsAttrLayout =
       BCRecordLayout<SIL_ARG_EFFECTS_ATTR,
                      IdentifierIDField, // argument effects string
+                     BCVBR<8>,          // argumentIndex
                      BCFixed<1>         // isDerived
                      >;
 
