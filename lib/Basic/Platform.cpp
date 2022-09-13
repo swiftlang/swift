@@ -426,7 +426,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
         }
       }
     } else if (Major == 11) {
-      if (Minor <= 3)
+      if (Minor <= 2)
         return floorFor64(llvm::VersionTuple(5, 3));
 
       return floorFor64(llvm::VersionTuple(5, 4));
@@ -489,7 +489,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
         return floorFor64bits(llvm::VersionTuple(5, 2));
       }
     } else if (Major <= 7) {
-      if (Minor <= 4)
+      if (Minor <= 3)
         return floorFor64bits(llvm::VersionTuple(5, 3));
 
       return floorFor64bits(llvm::VersionTuple(5, 4));
