@@ -873,7 +873,8 @@ private:
 
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
-                                     bool isNSUIntegerSubscript = false) {
+                                     bool isNSUIntegerSubscript = false,
+                                     const SubscriptDecl *SD = nullptr) {
     printDocumentationComment(AFD);
 
     Optional<ForeignAsyncConvention> asyncConvention =
@@ -910,10 +911,15 @@ private:
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        declPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSignature(),
-            funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/false);
+        if (SD)
+          declPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/false);
+        else
+          declPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/false);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
@@ -927,11 +933,15 @@ private:
           owningPrinter);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-
-        defPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSignature(),
-            funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/true);
+        if (SD)
+          defPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true);
+        else
+          defPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/true);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
@@ -1818,8 +1828,14 @@ private:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    if (outputLang == OutputLanguageMode::Cxx)
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!SD->isInstanceMember())
+        return;
+      auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+      printAbstractFunctionAsMethod(getter, false,
+                                    /*isNSUIntegerSubscript=*/false, SD);
       return;
+    }
     assert(SD->isInstanceMember() && "static subscripts not supported");
 
     bool isNSUIntegerSubscript = false;

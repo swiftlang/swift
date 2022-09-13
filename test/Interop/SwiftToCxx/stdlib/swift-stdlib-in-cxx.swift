@@ -20,6 +20,7 @@
 // CHECK: static inline Array<T_0_0> init();
 // CHECK: inline void append(const T_0_0& newElement);
 // CHECK: inline T_0_0 remove(swift::Int index);
+// CHECK: inline T_0_0 operator [](swift::Int index) const;
 // CHECK: inline swift::Int getCount() const;
 // CHECK: inline swift::Int getCapacity() const;
 

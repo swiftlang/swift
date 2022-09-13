@@ -1208,6 +1208,32 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   os << "  }\n";
 }
 
+void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
+    const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
+    const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
+    Type resultTy, bool isDefinition) {
+  assert(accessor->isGetter());
+  FunctionSignatureModifiers modifiers;
+  if (isDefinition)
+    modifiers.qualifierContext = typeDeclContext;
+  modifiers.isInline = true;
+  modifiers.isConst = true;
+  auto result =
+      printFunctionSignature(accessor, signature, "operator []", resultTy,
+                             FunctionSignatureKind::CxxInlineThunk, modifiers);
+  assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  if (!isDefinition) {
+    os << ";\n";
+    return;
+  }
+  os << " {\n";
+  // FIXME: should it be objTy for resultTy?
+  printCxxThunkBody(accessor, signature, swiftSymbolName,
+                    accessor->getModuleContext(), resultTy,
+                    accessor->getParameters());
+  os << "  }\n";
+}
+
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     Type type) {
   if (auto optionalObjectType = type->getOptionalObjectType()) {

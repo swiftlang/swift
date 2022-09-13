@@ -48,6 +48,8 @@ int main() {
     UseArray::printArray(val);
     assert(val.getCount() == 1);
     assert(val.getCapacity() >= 1);
+    auto zeroInt = val[0];
+    assert(zeroInt == -11);
     auto firstInt = val.remove(0);
     assert(firstInt == -11);
     assert(val.getCount() == 0);
