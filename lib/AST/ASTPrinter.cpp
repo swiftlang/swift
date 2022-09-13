@@ -6670,43 +6670,6 @@ void GenericSignature::print(ASTPrinter &Printer,
                                                 PrintAST::PrintRequirements);
 }
 
-void GenericSignature::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
-}
-
-void Requirement::dump() const {
-  dump(llvm::errs());
-  llvm::errs() << '\n';
-}
-void Requirement::dump(raw_ostream &out) const {
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-    out << "conforms_to: ";
-    break;
-  case RequirementKind::Layout:
-    out << "layout: ";
-    break;
-  case RequirementKind::Superclass:
-    out << "superclass: ";
-    break;
-  case RequirementKind::SameType:
-    out << "same_type: ";
-    break;
-  }
-
-  PrintOptions opts;
-  opts.ProtocolQualifiedDependentMemberTypes = true;
-
-  getFirstType().print(out, opts);
-  out << " ";
-
-  if (getKind() != RequirementKind::Layout && getSecondType()) {
-    getSecondType().print(out, opts);
-  } else if (getLayoutConstraint())
-    out << getLayoutConstraint();
-}
-
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
   StreamPrinter printer(os);
   PrintAST(printer, opts).printRequirement(*this);

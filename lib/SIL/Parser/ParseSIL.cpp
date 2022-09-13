@@ -6639,6 +6639,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         if (GenericSig && !SpecAttrs.empty()) {
           for (auto &Attr : SpecAttrs) {
             SmallVector<Requirement, 2> requirements;
+            SmallVector<Type, 2> typeErasedParams;
             // Resolve types and convert requirements.
             FunctionState.convertRequirements(Attr.requirements, requirements, typeErasedParams);
             auto *fenv = FunctionState.F->getGenericEnvironment();

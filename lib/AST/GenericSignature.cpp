@@ -131,6 +131,7 @@ void GenericSignatureImpl::forEachParam(
     case RequirementKind::Superclass:
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
+    case RequirementKind::SameCount:
       continue;
     }
 
@@ -159,6 +160,7 @@ bool GenericSignatureImpl::areAllParamsConcrete() const {
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::Layout:
+    case RequirementKind::SameCount:
       continue;
     }
   }
