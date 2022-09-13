@@ -385,8 +385,12 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         if (var->isImplicit())
           continue;
 
-        // Computed properties are not included.
-        if (!var->hasStorage())
+        // Computed properties are not included, except in cases
+        // where property has a property wrapper and `@typeWrapperIgnored`
+        // attribute.
+        if (!var->hasStorage() &&
+            !(var->hasAttachedPropertyWrapper() &&
+              var->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>()))
           continue;
 
         // If this is a memberwise initializeable property include

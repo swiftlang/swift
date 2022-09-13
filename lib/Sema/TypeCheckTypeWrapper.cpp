@@ -315,6 +315,11 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   if (property->isStatic() || property->isLet())
     return false;
 
+  // If this property has `@typeWrapperIgnored` attribute
+  // it should not be managed by a type wrapper.
+  if (property->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>())
+    return false;
+
   // `lazy` properties are not wrapped.
   if (property->getAttrs().hasAttribute<LazyAttr>() ||
       property->isLazyStorageProperty())
@@ -337,9 +342,13 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
     // This is the only thing that wrapper needs to handle because
     // all access to the wrapped variable and it's projection
     // is routed through it.
-    if (property->getOriginalWrappedProperty(
-          PropertyWrapperSynthesizedPropertyKind::Backing))
-      return true;
+    if (auto *wrappedProperty = property->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Backing)) {
+      // If wrapped property is ignored - its backing storage is
+      // ignored as well.
+      return !wrappedProperty->getAttrs()
+                  .hasAttribute<TypeWrapperIgnoredAttr>();
+    }
   }
 
   // Don't wrap any compiler synthesized properties except to

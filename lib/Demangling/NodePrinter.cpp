@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Ownership.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -3209,6 +3210,146 @@ void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
   } else {
     print(type, depth + 1);
   }
+}
+
+NodePointer
+matchSequenceOfKinds(NodePointer start,
+                     std::vector<std::tuple<Node::Kind, size_t>> pattern) {
+  if (start != nullptr) {
+    NodePointer current = start;
+    size_t idx = 0;
+    while (idx < pattern.size()) {
+      std::tuple<Node::Kind, size_t> next = pattern[idx];
+      idx += 1;
+      NodePointer nextChild = current->getChild(std::get<1>(next));
+      if (nextChild != nullptr && nextChild->getKind() == std::get<0>(next)) {
+        current = nextChild;
+      } else {
+        return nullptr;
+      }
+    }
+    if (idx == pattern.size()) {
+      return current;
+    } else {
+      return nullptr;
+    }
+  } else {
+    return nullptr;
+  }
+}
+
+std::string Demangle::keyPathSourceString(const char *MangledName,
+                                          size_t MangledNameLength) {
+  std::string invalid = "";
+  std::string unlabelledArg = "_: ";
+  Context ctx;
+  NodePointer root =
+      ctx.demangleSymbolAsNode(StringRef(MangledName, MangledNameLength));
+  if (!root)
+    return invalid;
+  if (root->getNumChildren() >= 1) {
+    NodePointer firstChild = root->getChild(0);
+    if (firstChild->getKind() == Node::Kind::KeyPathGetterThunkHelper) {
+      NodePointer child = firstChild->getChild(0);
+      switch (child->getKind()) {
+      case Node::Kind::Subscript: {
+        std::string subscriptText = "subscript(";
+        std::vector<std::string> argumentTypeNames;
+        // Multiple arguments case
+        NodePointer argList = matchSequenceOfKinds(
+            child, {
+                       std::make_pair(Node::Kind::Type, 2),
+                       std::make_pair(Node::Kind::FunctionType, 0),
+                       std::make_pair(Node::Kind::ArgumentTuple, 0),
+                       std::make_pair(Node::Kind::Type, 0),
+                       std::make_pair(Node::Kind::Tuple, 0),
+                   });
+        if (argList != nullptr) {
+          size_t numArgumentTypes = argList->getNumChildren();
+          size_t idx = 0;
+          while (idx < numArgumentTypes) {
+            NodePointer argumentType = argList->getChild(idx);
+            idx += 1;
+            if (argumentType->getKind() == Node::Kind::TupleElement) {
+              argumentType =
+                  argumentType->getChild(0)->getChild(0)->getChild(1);
+              if (argumentType->getKind() == Node::Kind::Identifier) {
+                argumentTypeNames.push_back(
+                    std::string(argumentType->getText()));
+                continue;
+              }
+            }
+            argumentTypeNames.push_back("<Unknown>");
+          }
+        } else {
+          // Case where there is a single argument
+          argList = matchSequenceOfKinds(
+              child, {
+                         std::make_pair(Node::Kind::Type, 2),
+                         std::make_pair(Node::Kind::FunctionType, 0),
+                         std::make_pair(Node::Kind::ArgumentTuple, 0),
+                         std::make_pair(Node::Kind::Type, 0),
+                     });
+          if (argList != nullptr) {
+            argumentTypeNames.push_back(
+                std::string(argList->getChild(0)->getChild(1)->getText()));
+          }
+        }
+        child = child->getChild(1);
+        size_t idx = 0;
+        // There is an argument label:
+        if (child != nullptr) {
+          if (child->getKind() == Node::Kind::LabelList) {
+            size_t numChildren = child->getNumChildren();
+            if (numChildren == 0) {
+              subscriptText += unlabelledArg + argumentTypeNames[0];
+            } else {
+              while (idx < numChildren) {
+                Node *argChild = child->getChild(idx);
+                idx += 1;
+                if (argChild->getKind() == Node::Kind::Identifier) {
+                  subscriptText += std::string(argChild->getText()) + ": " +
+                                   argumentTypeNames[idx - 1];
+                  if (idx != numChildren) {
+                    subscriptText += ", ";
+                  }
+                } else if (argChild->getKind() ==
+                               Node::Kind::FirstElementMarker ||
+                           argChild->getKind() == Node::Kind::VariadicMarker) {
+                  subscriptText += unlabelledArg + argumentTypeNames[idx - 1];
+                }
+              }
+            }
+          }
+        } else {
+          subscriptText += unlabelledArg + argumentTypeNames[0];
+        }
+        return subscriptText + ")";
+      }
+      case Node::Kind::Variable: {
+        child = child->getChild(1);
+        if (child == nullptr) {
+          return invalid;
+        }
+        if (child->getKind() == Node::Kind::PrivateDeclName) {
+          child = child->getChild(1);
+          if (child == nullptr) {
+            return invalid;
+          }
+          if (child->getKind() == Node::Kind::Identifier) {
+            return std::string(child->getText());
+          }
+        } else if (child->getKind() == Node::Kind::Identifier) {
+          return std::string(child->getText());
+        }
+        break;
+      }
+      default:
+        return invalid;
+      }
+    }
+  }
+  return invalid;
 }
 
 std::string Demangle::nodeToString(NodePointer root,
