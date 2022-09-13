@@ -110,7 +110,7 @@ struct is_apply_subscript_or_autoclosure_expr
 };
 
 template <typename Verifier, typename Kind>
-std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     Verifier &V,
     typename std::enable_if<
         is_apply_expr<typename std::remove_pointer<Kind>::type>::value,
@@ -119,14 +119,14 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
     V.maybeRecordValidPointerConversion(node->getArgs());
-    return {true, node};
+    return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return {false, node};
+  return ASTWalker::Action::SkipChildren(node);
 }
 
 template <typename Verifier, typename Kind>
-std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     Verifier &V,
     typename std::enable_if<
         is_subscript_expr<typename std::remove_pointer<Kind>::type>::value,
@@ -135,14 +135,14 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
     V.maybeRecordValidPointerConversion(node->getArgs());
-    return {true, node};
+    return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return {false, node};
+  return ASTWalker::Action::SkipChildren(node);
 }
 
 template <typename Verifier, typename Kind>
-std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     Verifier &V,
     typename std::enable_if<
         is_autoclosure_expr<typename std::remove_pointer<Kind>::type>::value,
@@ -151,23 +151,23 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
     V.maybeRecordValidPointerConversionForArg(node->getSingleExpressionBody());
-    return {true, node};
+    return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return {false, node};
+  return ASTWalker::Action::SkipChildren(node);
 }
 
 template <typename Verifier, typename Kind>
-std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+ASTWalker::PreWalkResult<Expr *> dispatchVisitPreExprHelper(
     Verifier &V, typename std::enable_if<
                      !is_apply_subscript_or_autoclosure_expr<
                          typename std::remove_pointer<Kind>::type>::value,
                      Kind>::type node) {
   if (V.shouldVerify(node)) {
-    return {true, node};
+    return ASTWalker::Action::Continue(node);
   }
   V.cleanup(node);
-  return {false, node};
+  return ASTWalker::Action::SkipChildren(node);
 }
 
 namespace {
@@ -264,7 +264,7 @@ public:
     return Verifier(topDC->getParentModule(), DC);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     switch (E->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPreExpr(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
@@ -282,7 +282,7 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       switch (E->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
@@ -300,7 +300,7 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       switch (S->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPreStmt(static_cast<ID##Stmt*>(S))
 #define STMT(ID, PARENT) \
@@ -312,7 +312,7 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    Stmt *walkToStmtPost(Stmt *S) override {
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
       switch (S->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Stmt*>(S))
 #define STMT(ID, PARENT) \
@@ -324,7 +324,7 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       switch (P->getKind()) {
 #define DISPATCH(ID) \
         return dispatchVisitPrePattern(static_cast<ID##Pattern*>(P))
@@ -337,7 +337,7 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    Pattern *walkToPatternPost(Pattern *P) override {
+  PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
       switch (P->getKind()) {
 #define DISPATCH(ID) \
         return dispatchVisitPost(static_cast<ID##Pattern*>(P))
@@ -350,7 +350,7 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       switch (D->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Decl*>(D))
 #define DECL(ID, PARENT) \
@@ -362,9 +362,9 @@ public:
       llvm_unreachable("not all cases handled!");
     }
 
-    bool walkToDeclPost(Decl *D) override {
+    PostWalkAction walkToDeclPost(Decl *D) override {
       switch (D->getKind()) {
-#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Decl*>(D))
+#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Decl*>(D)).Action
 #define DECL(ID, PARENT) \
       case DeclKind::ID: \
         DISPATCH(ID);
@@ -378,44 +378,44 @@ public:
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
-    template <class T> bool dispatchVisitPre(T node) {
+    template <class T> PreWalkAction dispatchVisitPre(T node) {
       if (shouldVerify(node))
-        return true;
+        return Action::Continue();
       cleanup(node);
-      return false;
+      return Action::SkipChildren();
     }
 
     /// Helper template for dispatching pre-visitation.
     ///
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
-    template <class T> std::pair<bool, Expr *> dispatchVisitPreExpr(T node) {
+    template <class T> PreWalkResult<Expr *> dispatchVisitPreExpr(T node) {
       return dispatchVisitPreExprHelper<Verifier, T>(*this, node);
     }
 
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
-    template <class T> std::pair<bool, Stmt *> dispatchVisitPreStmt(T node) {
+    template <class T> PreWalkResult<Stmt *> dispatchVisitPreStmt(T node) {
       if (shouldVerify(node))
-        return { true, node };
+        return Action::Continue(node);
       cleanup(node);
-      return { false, node };
+      return Action::SkipChildren(node);
     }
 
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
     template <class T>
-    std::pair<bool, Pattern *> dispatchVisitPrePattern(T node) {
+  PreWalkResult<Pattern *> dispatchVisitPrePattern(T node) {
       if (shouldVerify(node))
-        return { true, node };
+        return Action::Continue(node);
       cleanup(node);
-      return { false, node };
+      return Action::SkipChildren(node);
     }
 
     /// Helper template for dispatching post-visitation.
-    template <class T> T dispatchVisitPost(T node) {
+    template <class T> PostWalkResult<T> dispatchVisitPost(T node) {
       // Verify source ranges if the AST node was parsed from source.
       auto *SF = M.dyn_cast<SourceFile *>();
       if (SF) {
@@ -443,7 +443,7 @@ public:
       cleanup(node);
 
       // Always continue.
-      return node;
+      return Action::Continue(node);
     }
 
     // Default cases for whether we should verify within the given subtree.
