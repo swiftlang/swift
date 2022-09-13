@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
+
 // RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-public-decls
 
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o -g
@@ -88,9 +90,14 @@ public func retPassThroughGeneric<T>(_ x: T) -> T {
     return x
 }
 
+public func retArrayNonTrivial(_ x: CInt) -> [NonTrivialTemplate<Trivial>] {
+    return [NonTrivialTemplate<Trivial>(Trivial(x, -x))]
+}
+
 //--- use-swift-cxx-types.cpp
 
 #include "header.h"
+#include "Swift.h"
 #include "UseCxx.h"
 #include <assert.h>
 
@@ -134,7 +141,6 @@ int main() {
     }
     puts("secondon non trivial");
   }
-  puts("EndOfTest");
 // CHECK-NEXT: create NonTrivialTemplate
 // CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
@@ -158,6 +164,19 @@ int main() {
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: secondon non trivial
 // CHECK-NEXT: ~NonTrivialTemplate
+  {
+    auto arr = UseCxx::retArrayNonTrivial(1234);
+    auto val = arr[0];
+    assert(val.x.x == 1234);
+    assert(val.x.y == -1234);
+  }
+// CHECK-NEXT: create NonTrivialTemplate
+// CHECK-NEXT: copy NonTrivialTemplate
+// CHECK-NEXT: move NonTrivialTemplate
+// CHECK-NEXT: ~NonTrivialTemplate
+// CHECK-NEXT: ~NonTrivialTemplate
+// CHECK-NEXT: ~NonTrivialTemplate
+  puts("EndOfTest");
 // CHECK-NEXT: EndOfTest
   return 0;
 }
