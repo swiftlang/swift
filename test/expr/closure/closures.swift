@@ -171,11 +171,17 @@ class ExplicitSelfRequiredTest {
     doStuff({ [unowned(unsafe) self] in x+1 })
     doStuff({ [unowned self = self] in x+1 })
     doStuff({ x+1 })    // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}} expected-note{{reference 'self.' explicitly}} {{15-15=self.}}
+    // expected-note@-1{{explicitly capture 'x' to capture value in this closure}}{{14-14= [x] in}}
     doVoidStuff({ doStuff({ x+1 })}) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{28-28= [self] in}} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
+    // expected-note@-1{{explicitly capture 'x' to capture value in this closure}}{{28-28= [x] in}}
     doVoidStuff({ x += 1 })    // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}} expected-note{{reference 'self.' explicitly}} {{19-19=self.}}
+    // expected-note@-1{{explicitly capture 'x' to capture value in this closure}}{{18-18= [x] in}}
     doVoidStuff({ _ = "\(x)"}) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}}
+    // expected-note@-1{{explicitly capture 'x' to capture value in this closure}}{{18-18= [x] in}}
     doVoidStuff({ [y = self] in x += 1 }) // expected-warning {{capture 'y' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{20-20=self, }} expected-note{{reference 'self.' explicitly}} {{33-33=self.}}
+    // expected-note@-1{{explicitly capture 'x' to capture value in this closure}}{{20-20=x, }}
     doStuff({ [y = self] in x+1 }) // expected-warning {{capture 'y' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
+    // expected-note@-1{{explicitly capture 'x' to capture value in this closure}}{{16-16=x, }}
     doVoidStuff({ [weak self] in x += 1 }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
     doStuff({ [weak self] in x+1 }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
     doVoidStuff({ [self = self.x] in x += 1 }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
@@ -183,11 +189,17 @@ class ExplicitSelfRequiredTest {
 
     // Methods follow the same rules as properties, uses of 'self' without capturing must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}} expected-note{{reference 'self.' explicitly}} {{15-15=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{14-14= [method] in}}
     doVoidStuff { _ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}} expected-note{{reference 'self.' explicitly}} {{23-23=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{18-18= [method] in}}
     doVoidStuff { _ = "\(method())" } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{18-18= [method] in}}
     doVoidStuff { () -> () in _ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self]}} expected-note{{reference 'self.' explicitly}} {{35-35=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{18-18= [method]}}
     doVoidStuff { [y = self] in _ = method() } // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{20-20=self, }} expected-note{{reference 'self.' explicitly}} {{37-37=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{20-20=method, }}
     doStuff({ [y = self] in method() }) // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{16-16=method, }}
     doVoidStuff({ [weak self] in _ = method() }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     doStuff({ [weak self] in method() }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     doVoidStuff({ [self = self.x] in _ = method() }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
@@ -208,12 +220,22 @@ class ExplicitSelfRequiredTest {
     
     // When there's no space between the opening brace and the first expression, insert it
     doStuff {method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in }} expected-note{{reference 'self.' explicitly}} {{14-14=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{14-14= [method] in }}
     doVoidStuff {_ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in }} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{18-18= [method] in }}
     doVoidStuff {() -> () in _ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self]}} expected-note{{reference 'self.' explicitly}} {{34-34=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{18-18= [method]}}
     // With an empty capture list, insertion should be suggested without a comma
     doStuff { [] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{21-21=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{16-16=method}}
     doStuff { [  ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{23-23=self.}}
-    doStuff { [ /* This space intentionally left blank. */ ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}} expected-note{{reference 'self.' explicitly}} {{65-65=self.}}
+    // expected-note@-1{{explicitly capture 'method' to call method in this closure}}{{16-16=method}}
+    doStuff { [ /* This space intentionally left blank. */ ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}}
+    // expected-note@-2{{reference 'self.' explicitly}} {{65-65=self.}}
+    // expected-note@-3{{explicitly capture 'method' to call method in this closure}}{{16-16=method}}
+
+    // expected-note@+2{{explicitly capture 'method' to call method in this closure}}{{16-16=method}}
     // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self}}
     doStuff { [ // Nothing in this capture list!
         ]
@@ -221,32 +243,45 @@ class ExplicitSelfRequiredTest {
         method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{9-9=self.}}
     }
     // An inserted capture list should be on the same line as the opening brace, immediately following it.
+    // expected-note@+2{{explicitly capture 'method' to call method in this closure}}{{14-14= [method] in}}
     // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     doStuff {
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
+    // expected-note@+3{{explicitly capture 'method' to call method in this closure}}{{14-14= [method] in}}
     // expected-note@+2 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     // Note: Trailing whitespace on the following line is intentional and should not be removed!
     doStuff {             
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
+    // expected-note@+2{{explicitly capture 'method' to call method in this closure}}{{14-14= [method] in}}
     // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     doStuff {   // We have stuff to do.
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
+    // expected-note@+2{{explicitly capture 'method' to call method in this closure}}{{14-14= [method] in}}
     // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     doStuff {// We have stuff to do.
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
 
     // String interpolation should offer the diagnosis and fix-its at the expected locations
-    doVoidStuff { _ = "\(method())" } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
-    doVoidStuff { _ = "\(x+1)" } // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
-    
+    doVoidStuff { _ = "\(method())" } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    //expected-note@-1{{reference 'self.' explicitly}} {{26-26=self.}}
+    //expected-note@-2{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
+    //expected-note@-3{{explicitly capture 'method' to call method in this closure}}{{18-18= [method] in}}
+    doVoidStuff { _ = "\(x+1)" } // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    //expected-note@-1{{reference 'self.' explicitly}} {{26-26=self.}}
+    //expected-note@-2{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
+    //expected-note@-3{{explicitly capture 'x' to capture value in this closure}}{{18-18= [x] in}}
+
     // If we already have a capture list, self should be added to the list
     let y = 1
-    doStuff { [y] in method() } // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
-    doStuff { [ // expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    doStuff { [y] in method() } // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    //expected-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    //expected-note@-2{{reference 'self.' explicitly}} {{22-22=self.}}
+    //expected-note@-3{{explicitly capture 'method' to call method in this closure}}{{16-16=method, }}
+    doStuff { [ // expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note {{explicitly capture 'method' to call method in this closure}}{{16-16=method, }}
         y // expected-warning {{capture 'y' was never used}}
         ] in method() } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}  expected-note{{reference 'self.' explicitly}} {{14-14=self.}}
 
@@ -255,8 +290,11 @@ class ExplicitSelfRequiredTest {
     doStuff({ [myX = x] in myX })
 
     // This should produce an error, since x is used within the inner closure.
-    doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{23-23= [self] in }} expected-note{{reference 'self.' explicitly}} {{23-23=self.}}
-    // expected-warning @-1 {{capture 'myX' was never used}}
+    doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{23-23= [self] in }}
+    // expected-note@-2{{reference 'self.' explicitly}} {{23-23=self.}}
+    // expected-note@-3:22{{explicitly capture 'x' to capture value in this closure}}{{23-23= [x] in }}
+    // expected-warning @-4 {{capture 'myX' was never used}}
 
     return 42
   }
@@ -303,6 +341,7 @@ class SomeClass {
   var field : SomeClass?
   var `class` : SomeClass?
   var `in`: Int = 0
+  var classRef: SomeClass = SomeClass()
   func foo() -> Int {}
 }
 
@@ -343,17 +382,20 @@ extension SomeClass {
     doStuff { [weak xyz = self.field] in xyz!.foo() }
 
     // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
+
     doStuff { [weak self.field] in field!.foo() }
     // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{21-21=field = }}
     // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
     // expected-note@-3{{reference 'self.' explicitly}} {{36-36=self.}}
     // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    // expected-note@-5{{explicitly capture 'field' to capture value in this closure}}{{16-16=field, }}
 
     doStuff { [self.field] in field!.foo() }
     // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=field = }}
     // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
     // expected-note@-3{{reference 'self.' explicitly}} {{31-31=self.}}
     // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    // expected-note@-5{{explicitly capture 'field' to capture value in this closure}}{{16-16=field, }}
 
     doStuff { [self.field!.foo()] in 32 }
     //expected-error@-1{{fields may only be captured by assigning to a specific name}}
@@ -366,10 +408,15 @@ extension SomeClass {
     //expected-error@-2{{fields may only be captured by assigning to a specific name}}{{16-16=`in` = }}
     //expected-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}}
     //expected-note@-4{{reference 'self.' explicitly}}
+    // expected-note@-5{{explicitly capture 'in' to capture value in this closure}}{{16-16=in, }}
 
     // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
+    doStuff { classRef.foo() } // expected-error {{reference to property 'classRef' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-1{{reference 'self.' explicitly}} {{15-15=self.}}
+    // expected-note@-2{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
+    // expected-note@-3{{explicitly capture 'classRef' to capture reference in this closure}}{{14-14= [classRef] in}}
   }
 
   func strong_in_capture_list() {
@@ -566,8 +613,9 @@ class C_56501 {
   func test2() {
     doVoidStuff { [self] in
       doVoidStuff {
-        // expected-warning@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+        // expected-warning@+4 {{call to method 'operation' in closure requires explicit use of 'self'}}
         // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        // expected-note@-3 {{explicitly capture 'operation' to call method in this closure}}{{20-20= [operation] in}}
         // expected-note@+1 {{reference 'self.' explicitly}}
         operation()
       }
@@ -602,8 +650,9 @@ class C_56501 {
     doVoidStuff { [self] in
       doVoidStuff { [self] in
         doVoidStuff {
-          // expected-warning@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+          // expected-warning@+4 {{call to method 'operation' in closure requires explicit use of 'self'}}
           // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          // expected-note@-3 {{explicitly capture 'operation' to call method in this closure}}{{22-22= [operation] in}}
           // expected-note@+1 {{reference 'self.' explicitly}}
           operation()
         }
@@ -726,6 +775,7 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
         doVoidStuff { [unowned self] in
             doVoidStuff {}
             doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+                //expected-note@-1{{explicitly capture 'property' to capture value in this closure}}{{26-26= [property] in}}
                 doVoidStuff {}
                 property = false // expected-warning {{reference to property 'property' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
             }

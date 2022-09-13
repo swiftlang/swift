@@ -9,6 +9,7 @@ class ExplicitSelfRequiredTest {
   var x = 42
   func method() {
     doVoidStuff({ doStuff({ x+1 })}) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{28-28= [self] in}} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
+  // expected-note@-1 {{explicitly capture 'x' to capture value in this closure}}
   }
 }
 
@@ -25,8 +26,9 @@ class C_56501 {
   func test2() {
     doVoidStuff { [self] in
       doVoidStuff {
-        // expected-error@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+        // expected-error@+4 {{call to method 'operation' in closure requires explicit use of 'self'}}
         // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        // expected-note@-3 {{explicitly capture 'operation' to call method in this closure}}
         // expected-note@+1 {{reference 'self.' explicitly}}
         operation()
       }
@@ -61,8 +63,9 @@ class C_56501 {
     doVoidStuff { [self] in
       doVoidStuff { [self] in
         doVoidStuff {
-          // expected-error@+3 {{call to method 'operation' in closure requires explicit use of 'self'}}
+          // expected-error@+4 {{call to method 'operation' in closure requires explicit use of 'self'}}
           // expected-note@-2 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+          // expected-note@-3 {{explicitly capture 'operation' to call method in this closure}}
           // expected-note@+1 {{reference 'self.' explicitly}}
           operation()
         }

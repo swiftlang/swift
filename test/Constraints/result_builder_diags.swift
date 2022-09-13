@@ -373,6 +373,7 @@ func checkImplicitSelfInClosure() {
       }
 
       Element.escapingClosure { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        // expected-note@-1{{explicitly capture 'identifier' to capture value in this closure}}{{32-32= [identifier] in}}
         identifier // expected-error {{reference to property 'identifier' in closure requires explicit use of 'self' to make capture semantics explicit}}
         // expected-note@-1 {{reference 'self.' explicitly}}
       }

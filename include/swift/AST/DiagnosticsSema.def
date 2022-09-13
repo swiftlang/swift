@@ -3924,6 +3924,9 @@ ERROR(method_call_in_closure_without_explicit_self,none,
       " capture semantics explicit", (Identifier))
 NOTE(note_capture_self_explicitly,none,
       "capture 'self' explicitly to enable implicit 'self' in this closure", ())
+NOTE(note_capture_name_explicitly,none,
+      "explicitly capture %0 to %select{call method|capture value|capture reference}1 in this closure", (Identifier, unsigned))
+
 NOTE(note_reference_self_explicitly,none,
       "reference 'self.' explicitly", ())
 NOTE(note_other_self_capture,none,

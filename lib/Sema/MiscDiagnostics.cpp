@@ -1644,35 +1644,36 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return !cast<VarDecl>(cast<DeclRefExpr>(selfRef)->getDecl())
                   ->isSelfParameter();
       };
-      
-      SourceLoc memberLoc = SourceLoc();
+
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
         if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase(), ACE)) {
-          auto baseName = MRE->getMember().getDecl()->getBaseName();
-          memberLoc = MRE->getLoc();
-          Diags.diagnose(memberLoc,
-                         diag::property_use_in_closure_without_explicit_self,
-                         baseName.getIdentifier())
-               .warnUntilSwiftVersionIf(shouldOnlyWarn(MRE->getBase()), 6);
+          auto memberDecl = MRE->getMember().getDecl();
+          auto memberName = memberDecl->getBaseName().getIdentifier();
+          Diags
+              .diagnose(MRE->getLoc(),
+                        diag::property_use_in_closure_without_explicit_self,
+                        memberName)
+              .warnUntilSwiftVersionIf(shouldOnlyWarn(MRE->getBase()), 6);
+          emitFixIts(Diags, memberDecl, MRE, ACE);
+          return {false, E};
         }
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
         if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase(), ACE) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
-          auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
-          memberLoc = DSCE->getLoc();
-          Diags.diagnose(DSCE->getLoc(),
-                         diag::method_call_in_closure_without_explicit_self,
-                         MethodExpr->getDecl()->getBaseIdentifier())
-               .warnUntilSwiftVersionIf(shouldOnlyWarn(DSCE->getBase()), 6);
+          auto methodExpr = cast<DeclRefExpr>(DSCE->getFn());
+          auto methodDecl = methodExpr->getDecl();
+          auto methodName = methodDecl->getBaseIdentifier();
+          Diags
+              .diagnose(DSCE->getLoc(),
+                        diag::method_call_in_closure_without_explicit_self,
+                        methodName)
+              .warnUntilSwiftVersionIf(shouldOnlyWarn(DSCE->getBase()), 6);
+          emitFixIts(Diags, methodDecl, DSCE, ACE);
+          return {false, E};
         }
 
-      if (memberLoc.isValid()) {
-        emitFixIts(Diags, memberLoc, ACE);
-        return { false, E };
-      }
-      
       // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
@@ -1680,7 +1681,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       return { true, E };
     }
-    
+
     Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
@@ -1688,14 +1689,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Closures.pop_back();
         }
       }
-      
+
       return E;
     }
 
     /// Emit any fix-its for this error.
-    void emitFixIts(DiagnosticEngine &Diags,
-                    SourceLoc memberLoc,
-                    const AbstractClosureExpr *ACE) {
+    void emitFixIts(DiagnosticEngine &Diags, const ValueDecl *memberDecl,
+                    const Expr *memberUse, const AbstractClosureExpr *ACE) {
+      SourceLoc memberLoc = memberUse->getLoc();
       // This error can be fixed by either capturing self explicitly (if in an
       // explicit closure), or referencing self explicitly.
       if (auto *CE = dyn_cast<const ClosureExpr>(ACE)) {
@@ -1708,6 +1709,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           return;
         }
         emitFixItsForExplicitClosure(Diags, memberLoc, CE);
+        emitFixItsForExplicitCaptures(Diags, memberDecl, memberUse, CE);
       } else {
         // If this wasn't an explicit closure, just offer the fix-it to
         // reference self explicitly.
@@ -1715,7 +1717,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           .fixItInsert(memberLoc, "self.");
       }
     }
-    
+
     /// Diagnose any captures which might have been an attempt to capture
     /// \c self strongly, but do not actually enable implicit \c self. Returns
     /// whether there were any such captures to diagnose.
@@ -1732,10 +1734,66 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         } else {
           Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
         }
-        
+
         return true;
       }
       return false;
+    }
+
+    /// Emit fix-its to explicitly capture members
+    void emitFixItsForExplicitCaptures(DiagnosticEngine &Diags,
+                                       const ValueDecl *capturedDecl,
+                                       const Expr *declUse,
+                                       const ClosureExpr *closureExpr) {
+      enum MemberCaptureType {
+        Call = 0,      // Are we capturing so that we can call
+        Value = 1,     // Are we capturing a value
+        Reference = 2, // Are we capturing a reference
+      };
+      Identifier memberName;
+      MemberCaptureType memberCaptureType = MemberCaptureType::Call;
+      if (const auto *declCall = dyn_cast<DotSyntaxCallExpr>(declUse)) {
+        // Cast is safe because this is checked in walkToExprPre
+        auto methodDecl = cast<DeclRefExpr>(declCall->getFn());
+        memberName = methodDecl->getDecl()->getBaseIdentifier();
+        memberCaptureType = MemberCaptureType::Call;
+      } else if (const auto *memberRef = dyn_cast<MemberRefExpr>(declUse)) {
+        memberName =
+            memberRef->getMember().getDecl()->getBaseName().getIdentifier();
+        if (capturedDecl->getInterfaceType()
+                ->getCanonicalType()
+                .hasReferenceSemantics()) {
+          memberCaptureType = MemberCaptureType::Reference;
+        } else {
+          memberCaptureType = MemberCaptureType::Value;
+        }
+      } else {
+        assert(false &&
+               "emitFixItsForExplicitCaptures is only implemented to handle "
+               "MemberRefExpr and DotSyntaxCallExpr expressions");
+      }
+
+      auto diag = Diags.diagnose(closureExpr->getLoc(),
+                                 diag::note_capture_name_explicitly, memberName,
+                                 memberCaptureType);
+      // There are four different potential fix-its to offer based on the
+      // closure signature:
+      //   1. There is an existing capture list which already has some
+      //      entries. We need to insert 'self' into the capture list along
+      //      with a separating comma.
+      //   2. There is an existing capture list, but it is empty (just '[]').
+      //      We can just insert 'self'.
+      //   3. Arguments or types are already specified in the signature,
+      //      but there is no existing capture list. We will need to insert
+      //      the capture list, but 'in' will already be present.
+      //   4. The signature empty so far. We must insert the full capture
+      //      list as well as 'in'.
+      const auto brackets = closureExpr->getBracketRange();
+      if (brackets.isValid()) {
+        emitInsertNameIntoCaptureListFixIt(brackets, diag, memberName.str());
+      } else {
+        emitInsertNewCaptureListFixIt(closureExpr, diag, memberName.str());
+      }
     }
 
     /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
@@ -1762,18 +1820,19 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       //      list as well as 'in'.
       const auto brackets = closureExpr->getBracketRange();
       if (brackets.isValid()) {
-        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
+        emitInsertNameIntoCaptureListFixIt(brackets, diag, "self");
       }
       else {
-        emitInsertNewCaptureListFixIt(closureExpr, diag);
+        emitInsertNewCaptureListFixIt(closureExpr, diag, "self");
       }
     }
 
     /// Emit a fix-it for inserting \c self into in existing capture list, along
     /// with a trailing comma if needed. The fix-it will be attached to the
     /// provided diagnostic \c diag.
-    void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
-                                            InFlightDiagnostic &diag) {
+    void emitInsertNameIntoCaptureListFixIt(SourceRange brackets,
+                                            InFlightDiagnostic &diag,
+                                            StringRef name) {
       // Look for any non-comment token. If there's anything before the
       // closing bracket, we assume that it is a valid capture list entry and
       // insert 'self,'. If it wasn't a valid entry, then we will at least not
@@ -1782,19 +1841,20 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       const auto nextAfterBracket =
           Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
                                     CommentRetentionMode::None);
+      std::string formatted = name.str();
       if (nextAfterBracket.getLoc() != brackets.End)
-        diag.fixItInsertAfter(brackets.Start, "self, ");
-      else
-        diag.fixItInsertAfter(brackets.Start, "self");
+        formatted += ", ";
+      diag.fixItInsertAfter(brackets.Start, formatted);
     }
 
     /// Emit a fix-it for inserting a capture list into a closure that does not
     /// already have one, along with a trailing \c in if necessary. The fix-it
     /// will be attached to the provided diagnostic \c diag.
     void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
-                                       InFlightDiagnostic &diag) {
+                                       InFlightDiagnostic &diag,
+                                       StringRef name) {
       if (closureExpr->getInLoc().isValid()) {
-        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+        diag.fixItInsertAfter(closureExpr->getLoc(), (" [" + name + "]").str());
         return;
       }
 
@@ -1805,9 +1865,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       const auto next =
       Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
                                 CommentRetentionMode::None);
-      std::string trailing = next.getLoc() == nextLoc ? " " : "";
-
-      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+      std::string formatted =
+          (" [" + name + "] in" + (next.getLoc() == nextLoc ? " " : "")).str();
+      diag.fixItInsertAfter(closureExpr->getLoc(), formatted);
     }
   };
 
