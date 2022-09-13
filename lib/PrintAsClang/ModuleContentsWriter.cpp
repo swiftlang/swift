@@ -18,6 +18,7 @@
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangValueType.h"
 #include "PrintSwiftToClangCoreScaffold.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -677,8 +678,14 @@ public:
       }
       printer.printAdHocCategory(make_range(groupBegin, delayedMembers.end()));
     }
+
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
+
+    // Print any additional metadata for referenced C++ types.
+    for (const auto *typeDecl :
+         printer.getInteropContext().getEmittedClangTypeDecls())
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
 };
 } // end anonymous namespace

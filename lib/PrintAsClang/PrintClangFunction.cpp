@@ -28,8 +28,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclTemplate.h"
-#include "clang/AST/NestedNameSpecifier.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -108,26 +106,14 @@ public:
   }
 
   void printTypeName(raw_ostream &os) const {
-    auto &clangCtx = typeDecl->getASTContext();
-    clang::PrintingPolicy pp(clangCtx.getLangOpts());
-    const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
-        clangCtx, clangCtx.getTranslationUnitDecl(),
-        typeDecl->getLexicalDeclContext());
-    if (NS)
-      NS->print(os, pp);
-    assert(cast<clang::NamedDecl>(typeDecl)->getDeclName().isIdentifier());
-    os << cast<clang::NamedDecl>(typeDecl)->getName();
-    if (auto *ctd =
-            dyn_cast<clang::ClassTemplateSpecializationDecl>(typeDecl)) {
-      if (ctd->getTemplateArgs().size()) {
-        os << '<';
-        llvm::interleaveComma(ctd->getTemplateArgs().asArray(), os,
-                              [&](const clang::TemplateArgument &arg) {
-                                arg.print(pp, os, /*IncludeType=*/true);
-                              });
-        os << '>';
-      }
-    }
+    ClangSyntaxPrinter(os).printNominalClangTypeReference(typeDecl);
+  }
+
+  static void
+  printGenericReturnScaffold(raw_ostream &os, StringRef templateParamName,
+                             llvm::function_ref<void(StringRef)> bodyOfReturn) {
+    printReturnScaffold(nullptr, os, templateParamName, templateParamName,
+                        bodyOfReturn);
   }
 
   void printReturnScaffold(raw_ostream &os,
@@ -140,14 +126,22 @@ public:
       llvm::raw_string_ostream unqualTypeNameOS(typeName);
       unqualTypeNameOS << cast<clang::NamedDecl>(typeDecl)->getName();
     }
+    printReturnScaffold(typeDecl, os, fullQualifiedType, typeName,
+                        bodyOfReturn);
+  }
+
+private:
+  static void
+  printReturnScaffold(const clang::Decl *typeDecl, raw_ostream &os,
+                      StringRef fullQualifiedType, StringRef typeName,
+                      llvm::function_ref<void(StringRef)> bodyOfReturn) {
     os << "alignas(alignof(" << fullQualifiedType << ")) char storage[sizeof("
        << fullQualifiedType << ")];\n";
     os << "auto * _Nonnull storageObjectPtr = reinterpret_cast<"
        << fullQualifiedType << " *>(storage);\n";
     bodyOfReturn("storage");
     os << ";\n";
-    auto *cxxRecord = cast<clang::CXXRecordDecl>(typeDecl);
-    if (cxxRecord->isTrivial()) {
+    if (typeDecl && cast<clang::CXXRecordDecl>(typeDecl)->isTrivial()) {
       // Trivial object can be just copied and not destroyed.
       os << "return *storageObjectPtr;\n";
       return;
@@ -157,7 +151,6 @@ public:
     os << "return result;\n";
   }
 
-private:
   const clang::Decl *typeDecl;
 };
 
@@ -316,6 +309,7 @@ public:
       handler.printTypeName(os);
       if (typeUseKind == FunctionSignatureTypeUse::ParamType)
         os << '&';
+      interopContext.recordEmittedClangTypeDecl(decl);
       return ClangRepresentation::representable;
     }
 
@@ -1019,6 +1013,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
          << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
       printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
       os << ";\n  });\n";
+      os << "  } else if constexpr (::swift::"
+         << cxx_synthesis::getCxxImplNamespaceName()
+         << "::isSwiftBridgedCxxRecord<" << resultTyName << ">) {\n";
+      ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
+                                                   printCallToCFunc);
       os << "  } else {\n";
       os << "  " << resultTyName << " returnValue;\n";
       printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));

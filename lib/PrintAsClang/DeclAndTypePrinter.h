@@ -72,6 +72,8 @@ public:
         requiresExposedAttribute(requiresExposedAttribute),
         outputLang(outputLang) {}
 
+  SwiftToClangInteropContext &getInteropContext() { return interopContext; }
+
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
   bool shouldInclude(const ValueDecl *VD);

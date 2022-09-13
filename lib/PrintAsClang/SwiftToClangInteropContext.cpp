@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftToClangInteropContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 
 using namespace swift;
@@ -32,4 +33,10 @@ void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
   auto result = emittedStubs.insert(stubName);
   if (result.second)
     function();
+}
+
+void SwiftToClangInteropContext::recordEmittedClangTypeDecl(
+    const NominalTypeDecl *typeDecl) {
+  assert(typeDecl->hasClangNode());
+  referencedClangTypeDecls.insert(typeDecl);
 }

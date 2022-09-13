@@ -95,7 +95,8 @@ void ClangClassTypePrinter::printClassTypeDecl(
       });
 
   ClangValueTypePrinter::printTypeGenericTraits(
-      os, typeDecl, typeMetadataFuncName, /*genericRequirements=*/{});
+      os, typeDecl, typeMetadataFuncName, /*genericRequirements=*/{},
+      typeDecl->getModuleContext());
 }
 
 void ClangClassTypePrinter::printClassTypeReturnScaffold(
