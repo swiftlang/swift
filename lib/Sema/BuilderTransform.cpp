@@ -3153,11 +3153,10 @@ Expr *ResultBuilder::buildDebugInfoProvider(Expr *expr) {
                                        ArgumentList::createImplicit(ctx, {}));
 
   // Build `{ (dslDebugInfoProvider, $1) in $1() }`
-  // FIXME: ApolloZhu closure discriminator
-  auto callbackExpr =
-      new (ctx) ClosureExpr(DeclAttributes(), SourceRange(), nullptr, paramList,
-                            SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc(),
-                            nullptr, 1000 + DebugCallbackCounter, DC);
+  auto callbackExpr = new (ctx)
+      ClosureExpr(DeclAttributes(), SourceRange(), nullptr, paramList,
+                  SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc(), nullptr,
+                  AbstractClosureExpr::InvalidDiscriminator, DC);
   callbackExpr->setImplicit();
   callbackExpr->hasAnonymousClosureVars();
   auto callbackType =

@@ -1179,6 +1179,15 @@ public:
       assert(E->getParent()->isLocalContext() &&
              "closure expression was not in local context!");
 
+      // DSL debug closures are separately mangled, no need for discriminator
+      if (E->getDiscriminator() == AbstractClosureExpr::InvalidDiscriminator) {
+        if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+          if (CE->getParentModule()->findDSLExprForDSLDebugInfoCallback(CE)) {
+            return;
+          }
+        }
+      }
+
       // Check that the discriminator is unique in its context.
       auto &discriminatorSet = getClosureDiscriminators(E);
       unsigned discriminator = E->getDiscriminator();

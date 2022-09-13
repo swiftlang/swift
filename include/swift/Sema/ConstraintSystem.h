@@ -153,7 +153,6 @@ private:
   unsigned VarCounter = 0;
 
   /// TODO: ApolloZhu - doc
-  /// FIXME: ApolloZhu replace with actual value
   unsigned DebugCallbackCounter = 0;
 
 public:
