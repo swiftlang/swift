@@ -120,6 +120,10 @@ void GenericCloner::populateCloned() {
           mappedType = mappedType.getObjectType();
           auto *NewArg = ClonedEntryBB->createFunctionArgument(
               mappedType, OrigArg->getDecl());
+          NewArg->setNoImplicitCopy(
+              cast<SILFunctionArgument>(OrigArg)->isNoImplicitCopy());
+          NewArg->setLifetimeAnnotation(
+              cast<SILFunctionArgument>(OrigArg)->getLifetimeAnnotation());
 
           // Try to create a new debug_value from an existing debug_value w/
           // address value for the argument. We do this before storing to
@@ -164,6 +168,10 @@ void GenericCloner::populateCloned() {
     if (!handleConversion()) {
       auto *NewArg =
           ClonedEntryBB->createFunctionArgument(mappedType, OrigArg->getDecl());
+      NewArg->setNoImplicitCopy(
+          cast<SILFunctionArgument>(OrigArg)->isNoImplicitCopy());
+      NewArg->setLifetimeAnnotation(
+          cast<SILFunctionArgument>(OrigArg)->getLifetimeAnnotation());
       entryArgs.push_back(NewArg);
     }
     ++ArgIdx;
