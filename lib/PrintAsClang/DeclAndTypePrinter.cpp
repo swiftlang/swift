@@ -348,8 +348,17 @@ private:
     // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
                                   owningPrinter.interopContext);
-    printer.printValueTypeDecl(
-        SD, /*bodyPrinter=*/[&]() { printMembers(SD->getMembers()); });
+    printer.printValueTypeDecl(SD, /*bodyPrinter=*/[&]() {
+      printMembers(SD->getMembers());
+      for (const auto *ed :
+           owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
+        auto sign = ed->getGenericSignature();
+        // FIXME: support requirements.
+        if (!sign.getRequirements().empty())
+          continue;
+        printMembers(ed->getMembers());
+      }
+    });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -881,7 +890,11 @@ private:
       if (isClassMethod)
         return;
       assert(!AFD->isStatic());
-      auto *typeDeclContext = cast<NominalTypeDecl>(AFD->getParent());
+      auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
+      if (!typeDeclContext) {
+        typeDeclContext =
+            cast<ExtensionDecl>(AFD->getParent())->getExtendedNominal();
+      }
 
       std::string cFuncDecl;
       llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);

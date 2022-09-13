@@ -452,8 +452,13 @@ public:
   bool writeStruct(const StructDecl *SD) {
     if (addImport(SD))
       return true;
-    if (outputLangMode == OutputLanguageMode::Cxx)
+    if (outputLangMode == OutputLanguageMode::Cxx) {
       (void)forwardDeclareMemberTypes(SD->getMembers(), SD);
+      for (const auto *ed :
+           printer.getInteropContext().getExtensionsForNominalType(SD)) {
+        (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
+      }
+    }
     printer.print(SD);
     return true;
   }
@@ -555,6 +560,8 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        if (outputLangMode == OutputLanguageMode::Cxx)
+          return false;
         auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
@@ -580,6 +587,8 @@ public:
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           auto baseClass = ED->getSelfClassDecl();
+          if (!baseClass)
+              return ED->getExtendedNominal()->getName().str();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");
@@ -631,6 +640,16 @@ public:
 
     assert(declsToWrite.empty());
     declsToWrite.assign(decls.begin(), decls.end());
+
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      for (const Decl *D : declsToWrite) {
+        if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+          const auto *type = ED->getExtendedNominal();
+          if (isa<StructDecl>(type))
+            printer.getInteropContext().recordExtensions(type, ED);
+        }
+      }
+    }
 
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
