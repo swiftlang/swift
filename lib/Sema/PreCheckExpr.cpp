@@ -993,12 +993,12 @@ namespace {
       public:
         StrangeInterpolationRewriter(ASTContext &Ctx) : Context(Ctx) {}
 
-        virtual bool walkToDeclPre(Decl *D) override {
+        virtual PreWalkAction walkToDeclPre(Decl *D) override {
           // We don't want to look inside decls.
-          return false;
+          return Action::SkipChildren();
         }
 
-        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
           // One InterpolatedStringLiteralExpr should never be nested inside
           // another except as a child of a CallExpr, and we don't recurse into
           // the children of CallExprs.
@@ -1007,7 +1007,7 @@ namespace {
 
           // We only care about CallExprs.
           if (!isa<CallExpr>(E))
-            return { true, E };
+            return Action::Continue(E);
 
           auto *call = cast<CallExpr>(E);
           auto *args = call->getArgs();
@@ -1038,7 +1038,7 @@ namespace {
                   if (arg.isInOut()) {
                     Context.Diags.diagnose(arg.getExpr()->getStartLoc(),
                                            diag::extraneous_address_of);
-                    return {false, nullptr};
+                    return Action::Stop();
                   }
                 }
 
@@ -1087,7 +1087,7 @@ namespace {
           // There is never a CallExpr between an InterpolatedStringLiteralExpr
           // and an un-typechecked appendInterpolation(...) call, so whether we
           // changed E or not, we don't need to recurse any deeper.
-          return { false, E };
+          return Action::SkipChildren(E);
         }
       };
 
@@ -1153,7 +1153,7 @@ namespace {
       return methodSelf;
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // FIXME(diagnostics): `InOutType` could appear here as a result
       // of successful re-typecheck of the one of the sub-expressions e.g.
       // `let _: Int = { (s: inout S) in s.bar() }`. On the first
@@ -1180,15 +1180,17 @@ namespace {
 
       // Local function used to finish up processing before returning. Every
       // return site should call through here.
-      auto finish = [&](bool recursive, Expr *expr) {
+      auto finish = [&](bool recursive, Expr *expr) -> PreWalkResult<Expr *> {
+        if (!expr)
+          return Action::Stop();
+
         // If we're going to recurse, record this expression on the stack.
         if (recursive) {
           if (isa<SequenceExpr>(expr))
             SequenceExprDepth++;
           ExprStack.push_back(expr);
         }
-
-        return std::make_pair(recursive, expr);
+        return Action::VisitChildrenIf(recursive, expr);
       };
 
       // Resolve 'super' references.
@@ -1284,7 +1286,7 @@ namespace {
       return finish(true, expr);
     }
 
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       // Remove this expression from the stack.
       assert(ExprStack.back() == expr);
       ExprStack.pop_back();
@@ -1297,13 +1299,17 @@ namespace {
       if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TypeChecker::foldSequence(seqExpr, DC);
         SequenceExprDepth--;
-        return result->walk(*this);
+        result = result->walk(*this);
+        if (!result)
+          return Action::Stop();
+
+        return Action::Continue(result);
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto *us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         if (auto *typeExpr = simplifyUnresolvedSpecializeExpr(us))
-          return typeExpr;
+          return Action::Continue(typeExpr);
       }
       
       // If we're about to step out of a ClosureExpr, restore the DeclContext.
@@ -1379,7 +1385,7 @@ namespace {
         expr = new (ctx)
             RebindSelfInConstructorExpr(expr, UnresolvedCtorSelf);
         UnresolvedCtorRebindTarget = nullptr;
-        return expr;
+        return Action::Continue(expr);
       }
 
       // Double check if there are any BindOptionalExpr remaining in the
@@ -1395,7 +1401,7 @@ namespace {
           return hasBindOptional ? nullptr : expr;
         });
 
-        return hasBindOptional ? OEE : OEE->getSubExpr();
+        return Action::Continue(hasBindOptional ? OEE : OEE->getSubExpr());
       }
 
       // Check if there are any BindOptionalExpr in the tree which
@@ -1407,13 +1413,13 @@ namespace {
       if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
           if (CorrectDiscardAssignmentExprs.count(DAE))
-            return DAE;
+            return Action::Continue(DAE);
       }
 
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
-        return simplified;
+        return Action::Continue(simplified);
 
       // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
       // skip diagnostics if we've explicitly marked the expression as valid,
@@ -1424,42 +1430,49 @@ namespace {
             SequenceExprDepth == 0) {
           ctx.Diags.diagnose(expr->getLoc(),
                              diag::discard_expr_outside_of_assignment);
-          return nullptr;
+          return Action::Stop();
         }
       }
 
       if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
         resolveKeyPathExpr(KPE);
-        return KPE;
+        return Action::Continue(KPE);
       }
 
       if (auto *result = simplifyTypeConstructionWithLiteralArg(expr)) {
-        return isa<ErrorExpr>(result) ? nullptr : result;
+        if (isa<ErrorExpr>(result))
+           return Action::Stop();
+
+        return Action::Continue(result);
       }
 
       // If we find an unresolved member chain, wrap it in an
       // UnresolvedMemberChainResultExpr (unless this has already been done).
       auto *parent = Parent.getAsExpr();
-      if (isMemberChainTail(expr, parent))
-        if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr))
-          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent))
-            return new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-
-      return expr;
+      if (isMemberChainTail(expr, parent)) {
+        if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
+          if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
+            auto *chain = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
+            return Action::Continue(chain);
+          }
+        }
+      }
+      return Action::Continue(expr);
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { true, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::Continue(stmt);
     }
 
-    bool walkToDeclPre(Decl *D) override { return isa<PatternBindingDecl>(D); }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    }
 
-    std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
       // Constraint generation is responsible for pattern verification and
       // type-checking in the body of the closure, so there is no need to
       // walk into patterns.
-      bool walkIntoPatterns = !isa<ClosureExpr>(DC);
-      return {walkIntoPatterns, pattern};
+      return Action::SkipChildrenIf(isa<ClosureExpr>(DC), pattern);
     }
   };
 } // end anonymous namespace

@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ASTWALKER_H
 #define SWIFT_AST_ASTWALKER_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include <utility>
@@ -119,94 +120,341 @@ public:
   /// The parent of the node we are visiting.
   ParentTy Parent;
 
+  struct _Detail {
+    _Detail() = delete;
+
+    // The 'Action' set of types, which do not take a payload.
+    struct ContinueWalkAction {};
+    struct SkipChildrenIfWalkAction { bool Cond; };
+    struct StopIfWalkAction { bool Cond; };
+    struct StopWalkAction {};
+
+    // The 'Result' set of types, which do take a payload.
+    template <typename T>
+    struct ContinueWalkResult {
+      T Value;
+    };
+    template <typename T>
+    struct SkipChildrenIfWalkResult {
+      bool Cond;
+      T Value;
+    };
+    template <typename T>
+    struct StopIfWalkResult {
+      bool Cond;
+      T Value;
+    };
+  };
+
+  /// A namespace for ASTWalker actions that may be returned from pre-walk and
+  /// post-walk functions.
+  ///
+  /// Each action returns a separate underscored type, which is then consumed
+  /// by PreWalkAction/PreWalkResult/PostWalkAction/PostWalkAction. It is
+  /// designed this way to achieve a pseudo form of return type overloading,
+  /// where e.g \c Action::Continue() can become either a pre-walk action or a
+  /// post-walk action, but \c Action::SkipChildren() can only become a pre-walk
+  /// action.
+  struct Action {
+    Action() = delete;
+
+    /// Continue the current walk, replacing the current node with \p node.
+    template <typename T>
+    static _Detail::ContinueWalkResult<T> Continue(T node) {
+      return {std::move(node)};
+    }
+
+    /// Continue the current walk, replacing the current node with \p node.
+    /// However, skip visiting the children of \p node, and instead resume the
+    /// walk of the parent node.
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T> SkipChildren(T node) {
+      return SkipChildrenIf(true, std::move(node));
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::SkipChildren(node).
+    /// Otherwise, it is equivalent to \c Action::Continue(node).
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    SkipChildrenIf(bool cond, T node) {
+      return {cond, std::move(node)};
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::Continue(node).
+    /// Otherwise, it is equivalent to \c Action::SkipChildren(node).
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    VisitChildrenIf(bool cond, T node) {
+      return SkipChildrenIf(!cond, std::move(node));
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::Stop().
+    /// Otherwise, it is equivalent to \c Action::Continue(node).
+    template <typename T>
+    static _Detail::StopIfWalkResult<T> StopIf(bool cond, T node) {
+      return {cond, std::move(node)};
+    }
+
+    /// Continue the current walk.
+    static _Detail::ContinueWalkAction Continue() { return {}; }
+
+    /// Continue the current walk, but do not visit the children of the current
+    /// node. Instead, resume at the parent's post-walk.
+    static _Detail::SkipChildrenIfWalkAction SkipChildren() {
+      return SkipChildrenIf(true);
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::SkipChildren().
+    /// Otherwise, it is equivalent to \c Action::Continue().
+    static _Detail::SkipChildrenIfWalkAction SkipChildrenIf(bool cond) {
+      return {cond};
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::Continue().
+    /// Otherwise, it is equivalent to \c Action::SkipChildren().
+    static _Detail::SkipChildrenIfWalkAction VisitChildrenIf(bool cond) {
+      return SkipChildrenIf(!cond);
+    }
+
+    /// Terminate the walk, returning without visiting any other nodes.
+    static _Detail::StopWalkAction Stop() { return {}; }
+
+    /// If \p cond is true, this is equivalent to \c Action::Stop().
+    /// Otherwise, it is equivalent to \c Action::Continue().
+    static _Detail::StopIfWalkAction StopIf(bool cond) { return {cond}; }
+  };
+
+  /// Do not construct directly, use \c Action::<action> instead.
+  struct PreWalkAction {
+    enum Kind { Stop, SkipChildren, Continue };
+    Kind Action;
+
+    PreWalkAction(Kind action) : Action(action) {}
+
+    PreWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
+    PreWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
+
+    PreWalkAction(_Detail::SkipChildrenIfWalkAction action)
+        : Action(action.Cond ? SkipChildren : Continue) {}
+
+    PreWalkAction(_Detail::StopIfWalkAction action)
+        : Action(action.Cond ? Stop : Continue) {}
+  };
+
+  /// Do not construct directly, use \c Action::<action> instead.
+  struct PostWalkAction {
+    enum Kind { Stop, Continue };
+    Kind Action;
+
+    PostWalkAction(Kind action) : Action(action) {}
+
+    PostWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
+    PostWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
+
+    PostWalkAction(_Detail::StopIfWalkAction action)
+        : Action(action.Cond ? Stop : Continue) {}
+  };
+
+  /// Do not construct directly, use \c Action::<action> instead.
+  template <typename T>
+  struct PreWalkResult {
+    PreWalkAction Action;
+    Optional<T> Value;
+
+    template <typename U,
+              typename std::enable_if<std::is_convertible<U, T>::value>::type
+                  * = nullptr>
+    PreWalkResult(const PreWalkResult<U> &Other) : Action(Other.Action) {
+      if (Other.Value)
+        Value = *Other.Value;
+    }
+
+    template <typename U,
+              typename std::enable_if<std::is_convertible<U, T>::value>::type
+                  * = nullptr>
+    PreWalkResult(PreWalkResult<U> &&Other) : Action(Other.Action) {
+      if (Other.Value)
+        Value = std::move(*Other.Value);
+    }
+
+    template <typename U>
+    PreWalkResult(_Detail::ContinueWalkResult<U> Result)
+        : Action(PreWalkAction::Continue), Value(std::move(Result.Value)) {}
+
+    template <typename U>
+    PreWalkResult(_Detail::SkipChildrenIfWalkResult<U> Result)
+        : Action(Result.Cond ? PreWalkAction::SkipChildren
+                             : PreWalkAction::Continue),
+          Value(std::move(Result.Value)) {}
+
+    template <typename U>
+    PreWalkResult(_Detail::StopIfWalkResult<U> Result)
+        : Action(Result.Cond ? PreWalkAction::Stop : PreWalkAction::Continue),
+          Value(std::move(Result.Value)) {}
+
+    PreWalkResult(_Detail::StopWalkAction)
+        : Action(PreWalkAction::Stop), Value(None) {}
+  };
+
+  /// Do not construct directly, use \c Action::<action> instead.
+  template <typename T>
+  struct PostWalkResult {
+    PostWalkAction Action;
+    Optional<T> Value;
+
+    template <typename U,
+              typename std::enable_if<std::is_convertible<U, T>::value>::type
+                  * = nullptr>
+    PostWalkResult(const PostWalkResult<U> &Other) : Action(Other.Action) {
+      if (Other.Value)
+        Value = *Other.Value;
+    }
+
+    template <typename U,
+              typename std::enable_if<std::is_convertible<U, T>::value>::type
+                  * = nullptr>
+    PostWalkResult(PostWalkResult<U> &&Other) : Action(Other.Action) {
+      if (Other.Value)
+        Value = std::move(*Other.Value);
+    }
+
+    template <typename U>
+    PostWalkResult(_Detail::ContinueWalkResult<U> Result)
+        : Action(PostWalkAction::Continue), Value(std::move(Result.Value)) {}
+
+    template <typename U>
+    PostWalkResult(_Detail::StopIfWalkResult<U> Result)
+        : Action(Result.Cond ? PostWalkAction::Stop : PostWalkAction::Continue),
+          Value(std::move(Result.Value)) {}
+
+    PostWalkResult(_Detail::StopWalkAction)
+        : Action(PostWalkAction::Stop), Value(None) {}
+  };
+
   /// This method is called when first visiting an expression
   /// before walking into its children.
   ///
   /// \param E The expression to check.
   ///
-  /// \returns a pair indicating whether to visit the children along with
-  /// the expression that should replace this expression in the tree. If the
-  /// latter is null, the traversal will be terminated.
-  ///
-  /// The default implementation returns \c {true, E}.
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-    return { true, E };
+  /// \returns A result that contains a potentially re-written expression,
+  /// along with the walk action to perform. The default implementation
+  /// returns \c Action::Continue(E).
+  /// 
+  virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) {
+    return Action::Continue(E);
   }
 
-  /// This method is called after visiting an expression's children.
-  /// If it returns null, the walk is terminated; otherwise, the
-  /// returned expression is spliced in where the old expression
+  /// This method is called after visiting an expression's children. If a new
+  /// expression is returned, it is spliced in where the old expression
   /// previously appeared.
   ///
-  /// The default implementation always returns its argument.
-  virtual Expr *walkToExprPost(Expr *E) { return E; }
+  /// \param E The expression that was walked.
+  ///
+  /// \returns A result that contains a potentially re-written expression,
+  /// along with the walk action to perform. The default implementation
+  /// returns \c Action::Continue(E).
+  ///
+  virtual PostWalkResult<Expr *> walkToExprPost(Expr *E) {
+    return Action::Continue(E);
+  }
 
   /// This method is called when first visiting a statement before
   /// walking into its children.
   ///
   /// \param S The statement to check.
   ///
-  /// \returns a pair indicating whether to visit the children along with
-  /// the statement that should replace this statement in the tree. If the
-  /// latter is null, the traversal will be terminated.
+  /// \returns A result that contains a potentially re-written statement,
+  /// along with the walk action to perform. The default implementation
+  /// returns \c Action::Continue(S).
   ///
-  /// The default implementation returns \c {true, S}.
-  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) {
-    return { true, S };
+  virtual PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) {
+    return Action::Continue(S);
   }
 
-  /// This method is called after visiting a statement's children.  If
-  /// it returns null, the walk is terminated; otherwise, the returned
-  /// statement is spliced in where the old statement previously
-  /// appeared.
+  /// This method is called after visiting an statements's children. If a new
+  /// statement is returned, it is spliced in where the old statement
+  /// previously appeared.
   ///
-  /// The default implementation always returns its argument.
-  virtual Stmt *walkToStmtPost(Stmt *S) { return S; }
+  /// \param S The statement that was walked.
+  ///
+  /// \returns A result that contains a potentially re-written statement,
+  /// along with the walk action to perform. The default implementation
+  /// returns \c Action::Continue(S).
+  ///
+  virtual PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) {
+    return Action::Continue(S);
+  }
 
   /// This method is called when first visiting a pattern before walking into
   /// its children.
   ///
   /// \param P The statement to check.
   ///
-  /// \returns a pair indicating whether to visit the children along with
-  /// the statement that should replace this statement in the tree. If the
-  /// latter is null, the traversal will be terminated.
+  /// \returns A result that contains a potentially re-written pattern,
+  /// along with the walk action to perform. The default implementation
+  /// returns \c Action::Continue(P).
   ///
-  /// The default implementation returns \c {true, P}.
-  virtual std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) {
-    return { true, P };
+  virtual PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) {
+    return Action::Continue(P);
   }
 
-  /// This method is called after visiting a pattern's children.  If
-  /// it returns null, the walk is terminated; otherwise, the returned
-  /// pattern is spliced in where the old statement previously
-  /// appeared.
+  /// This method is called after visiting an pattern's children. If a new
+  /// pattern is returned, it is spliced in where the old pattern
+  /// previously appeared.
   ///
-  /// The default implementation always returns its argument.
-  virtual Pattern *walkToPatternPost(Pattern *P) { return P; }
+  /// \param P The pattern that was walked.
+  ///
+  /// \returns A result that contains a potentially re-written pattern,
+  /// along with the walk action to perform. The default implementation
+  /// returns \c Action::Continue(P).
+  ///
+  virtual PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) {
+    return Action::Continue(P);
+  }
 
   /// walkToDeclPre - This method is called when first visiting a decl, before
-  /// walking into its children.  If it returns false, the subtree is skipped.
+  /// walking into its children.
   ///
   /// \param D The declaration to check. The callee may update this declaration
   /// in-place.
-  virtual bool walkToDeclPre(Decl *D) { return true; }
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToDeclPre(Decl *D) { return Action::Continue(); }
 
   /// walkToDeclPost - This method is called after visiting the children of a
-  /// decl.  If it returns false, the remaining traversal is terminated and
-  /// returns failure.
-  virtual bool walkToDeclPost(Decl *D) { return true; }
+  /// decl.
+  ///
+  /// \param D The declaration that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToDeclPost(Decl *D) { return Action::Continue(); }
 
   /// This method is called when first visiting a TypeRepr, before
-  /// walking into its children.  If it returns false, the subtree is skipped.
+  /// walking into its children.
   ///
   /// \param T The TypeRepr to check.
-  virtual bool walkToTypeReprPre(TypeRepr *T) { return true; }
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToTypeReprPre(TypeRepr *T) {
+    return Action::Continue();
+  }
 
   /// This method is called after visiting the children of a TypeRepr.
-  /// If it returns false, the remaining traversal is terminated and returns
-  /// failure.
-  virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
+  ///
+  /// \param T The type that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToTypeReprPost(TypeRepr *T) {
+    return Action::Continue();
+  }
 
   /// This method configures whether the walker should explore into the generic
   /// params in AbstractFunctionDecl and NominalTypeDecl.
@@ -258,39 +506,51 @@ public:
   virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
 
   /// walkToParameterListPre - This method is called when first visiting a
-  /// ParameterList, before walking into its parameters.  If it returns false,
-  /// the subtree is skipped.
+  /// ParameterList, before walking into its parameters.
   ///
-  virtual bool walkToParameterListPre(ParameterList *PL) { return true; }
+  /// \param PL The parameter list to walk.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PreWalkAction walkToParameterListPre(ParameterList *PL) {
+    return Action::Continue();
+  }
 
   /// walkToParameterListPost - This method is called after visiting the
-  /// children of a parameter list.  If it returns false, the remaining
-  /// traversal is terminated and returns failure.
-  virtual bool walkToParameterListPost(ParameterList *PL) { return true; }
+  /// children of a parameter list.
+  ///
+  /// \param PL The parameter list that was walked.
+  ///
+  /// \returns The walking action to perform. By default, this
+  /// is \c Action::Continue().
+  ///
+  virtual PostWalkAction walkToParameterListPost(ParameterList *PL) {
+    return Action::Continue();
+  }
 
   /// This method is called when first visiting an argument list before walking
   /// into its arguments.
   ///
   /// \param ArgList The argument list to walk.
   ///
-  /// \returns a pair indicating whether to visit the arguments, along with
-  /// the argument list that should replace this argument list in the tree. If
-  /// the latter is null, the traversal will be terminated.
+  /// \returns A result that contains a potentially re-written argument list,
+  /// along with the walk action to perform.
   ///
-  /// The default implementation returns \c {true, ArgList}.
-  virtual std::pair<bool, ArgumentList *>
+  /// The default implementation returns \c Action::Continue(ArgList).
+  virtual PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) {
-    return {true, ArgList};
+    return Action::Continue(ArgList);
   }
 
   /// This method is called after visiting the arguments in an argument list.
-  /// If it returns null, the walk is terminated; otherwise, the
-  /// returned argument list is spliced in where the old argument list
-  /// previously appeared.
+  /// If a new argument list is returned, it is spliced in where the old
+  /// argument list previously appeared.
   ///
-  /// The default implementation always returns the argument list.
-  virtual ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) {
-    return ArgList;
+  /// The default implementation returns \c Action::Continue(ArgList).
+  virtual PostWalkResult<ArgumentList *>
+  walkToArgumentListPost(ArgumentList *ArgList) {
+    return Action::Continue(ArgList);
   }
 
 protected:

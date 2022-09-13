@@ -1828,7 +1828,7 @@ namespace {
 
     bool shouldWalkIntoTapExpression() override { return true; }
 
-    bool walkToDeclPre(Decl *decl) override {
+    PreWalkAction walkToDeclPre(Decl *decl) override {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         contextStack.push_back(func);
       }
@@ -1837,10 +1837,10 @@ namespace {
         patternBindingStack.push_back(PBD);
       }
 
-      return true;
+      return Action::Continue();
     }
 
-    bool walkToDeclPost(Decl *decl) override {
+    PostWalkAction walkToDeclPost(Decl *decl) override {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         assert(contextStack.back() == func);
         contextStack.pop_back();
@@ -1851,22 +1851,22 @@ namespace {
         patternBindingStack.pop_back();
       }
 
-      return true;
+      return Action::Continue();
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
             openExistential->getExistentialValue()});
-        return { true, expr };
+        return Action::Continue(expr);
       }
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
         checkClosureCaptures(closure);
         contextStack.push_back(closure);
-        return { true, expr };
+        return Action::Continue(expr);
       }
 
       if (auto inout = dyn_cast<InOutExpr>(expr)) {
@@ -1882,7 +1882,7 @@ namespace {
         if (auto destExpr = assign->getDest())
           recordMutableVarParent(assign, destExpr);
 
-        return {true, expr };
+        return Action::Continue(expr);
       }
 
       if (auto load = dyn_cast<LoadExpr>(expr))
@@ -1893,7 +1893,7 @@ namespace {
                              lookup->getLoc(),
                              /*partialApply*/None,
                              lookup);
-        return { true, expr };
+        return Action::Continue(expr);
       }
 
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
@@ -1906,7 +1906,7 @@ namespace {
           checkLocalCapture(valueRef, loc, declRef);
         else
           checkReference(nullptr, valueRef, loc, None, declRef);
-        return { true, expr };
+        return Action::Continue(expr);
       }
 
       if (auto apply = dyn_cast<ApplyExpr>(expr)) {
@@ -1932,7 +1932,7 @@ namespace {
             assert(applyStack.back() == apply);
             applyStack.pop_back();
 
-            return { false, expr };
+            return Action::SkipChildren(expr);
           }
         }
       }
@@ -1962,7 +1962,7 @@ namespace {
           assert(applyStack.back() == dyn_cast<ApplyExpr>(expr));
           applyStack.pop_back();
 
-          return { false, expr };
+          return Action::SkipChildren(expr);
         }
       }
 
@@ -1975,7 +1975,7 @@ namespace {
       // expressions tend to violate restrictions on the use of instance
       // methods.
       if (isa<ObjCSelectorExpr>(expr))
-        return { false, expr };
+        return Action::SkipChildren(expr);
 
       // Track the capture contexts for variables.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
@@ -1985,14 +1985,14 @@ namespace {
         }
       }
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         assert(opaqueValues.back().first == openExistential->getOpaqueValue());
         opaqueValues.pop_back();
-        return expr;
+        return Action::Continue(expr);
       }
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
@@ -2024,7 +2024,7 @@ namespace {
         }
       }
 
-      return expr;
+      return Action::Continue(expr);
     }
 
   private:
