@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// RUN: split-file %s %t
 // REQUIRES: VENDOR=apple
 // REQUIRES: asserts
 
@@ -12,28 +13,28 @@
 // RUN:   -o %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/%target-swiftmodule-name
 
 /// Expect errors when building a public client.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -library-level api -verify -D PUBLIC_IMPORTS -module-name MainLib
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -library-level api -verify -module-name MainLib
 
 /// Expect no errors when building an SPI client.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -library-level spi -D PUBLIC_IMPORTS -module-name MainLib
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -library-level spi -module-name MainLib
 
 /// The driver should also accept the flag and pass it along.
-// RUN: %target-swiftc_driver -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -library-level spi -D PUBLIC_IMPORTS -module-name MainLib
+// RUN: %target-swiftc_driver -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -library-level spi -module-name MainLib
 
 /// Expect no errors when building a client with some other library level.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -D PUBLIC_IMPORTS -module-name MainLib
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -library-level other -D PUBLIC_IMPORTS -module-name MainLib
-#if PUBLIC_IMPORTS
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -module-name MainLib
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
+// RUN:   -library-level other -module-name MainLib
+//--- PublicImports.swift
 import PublicSwift
 import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
 
@@ -44,10 +45,10 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 @_exported import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
 
 /// Expect no errors with implementation-only imports.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ImplOnlyImports.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
 // RUN:   -library-level api -D IMPL_ONLY_IMPORTS
-#elseif IMPL_ONLY_IMPORTS
+//--- ImplOnlyImports.swift
 
 @_implementationOnly import PrivateSwift
 @_implementationOnly import PublicClang_Private
@@ -55,18 +56,16 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 @_implementationOnly import LocalClang
 
 /// Expect no errors with spi-only imports.
-// RUN: %target-swift-frontend -typecheck -sdk %t/sdk -module-cache-path %t %s \
-// RUN:   -experimental-spi-only-imports \
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/SpiOnlyImports.swift \
+// RUN:   -experimental-spi-only-imports -module-cache-path %t \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
-// RUN:   -library-level api -D SPI_ONLY_IMPORTS
-#elseif SPI_ONLY_IMPORTS
+// RUN:   -library-level api
+//--- SPIOnlyImports.swift
 
 @_spiOnly import PrivateSwift
 @_spiOnly import PublicClang_Private
 @_spiOnly import FullyPrivateClang
 @_spiOnly import LocalClang
-
-#endif
 
 /// Test error message on an unknown library level name.
 // RUN: not %target-swift-frontend -typecheck %s -library-level ThatsNotALibraryLevel 2>&1 \
