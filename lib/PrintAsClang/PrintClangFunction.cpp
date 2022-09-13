@@ -208,8 +208,9 @@ public:
   ClangRepresentation visitTupleType(TupleType *TT,
                                      Optional<OptionalTypeKind> optionalKind,
                                      bool isInOutParam) {
-    assert(TT->getNumElements() == 0);
-    // FIXME: Handle non-void type.
+    if (TT->getNumElements() > 0)
+      // FIXME: Handle non-void type.
+      return ClangRepresentation::unsupported;
     os << "void";
     return ClangRepresentation::representable;
   }
