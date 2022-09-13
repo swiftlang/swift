@@ -28,21 +28,6 @@ using namespace swift;
 using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
 
-class swift::ClangModuleDependenciesCacheImpl {
-public:
-  /// Set containing all of the Clang modules that have already been seen.
-  llvm::StringSet<> alreadySeen;
-
-  DependencyScanningService service;
-
-  DependencyScanningTool tool;
-
-  ClangModuleDependenciesCacheImpl()
-      : service(ScanningMode::DependencyDirectivesScan,
-                ScanningOutputFormat::Full, clang::CASOptions(), nullptr, nullptr),
-        tool(service) {}
-};
-
 // Add search paths.
 // Note: This is handled differently for the Clang importer itself, which
 // adds search paths to Clang's data structures rather than to its
@@ -105,21 +90,6 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
   }
 
   return commandLineArgs;
-}
-
-/// Get or create the Clang-specific
-static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
-    ModuleDependenciesCache &cache) {
-  auto clangImpl = cache.getClangImpl();
-  if (!clangImpl) {
-    clangImpl = new ClangModuleDependenciesCacheImpl();
-    cache.setClangImpl(clangImpl,
-                       [](ClangModuleDependenciesCacheImpl *ptr) {
-      delete ptr;
-    });
-  }
-
-  return clangImpl;
 }
 
 /// Record the module dependencies we found by scanning Clang modules into
@@ -272,9 +242,6 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
           {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
     return found;
 
-  // Retrieve or create the shared state.
-  auto clangImpl = getOrCreateClangImpl(cache);
-
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx);
@@ -298,16 +265,17 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
     workingDir = *(clangWorkingDirPos - 1);
   }
 
-  auto clangDependencies = clangImpl->tool.getFullDependencies(
-      commandLineArgs, workingDir, clangImpl->alreadySeen, moduleName);
+  auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
+      commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
+      moduleName);
   if (!clangDependencies) {
     auto errorStr = toString(clangDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
     // scanner will report such an error only if all of the module loaders
     // fail as well.
-    if (errorStr.find("fatal error: module '" + moduleName.str() + "' not found") == std::string::npos)
-      ctx.Diags.diagnose(SourceLoc(),
-                         diag::clang_dependency_scan_error,
+    if (errorStr.find("fatal error: module '" + moduleName.str() +
+                      "' not found") == std::string::npos)
+      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
                          errorStr);
     return None;
   }
@@ -344,9 +312,6 @@ bool ClangImporter::addBridgingHeaderDependencies(
     llvm_unreachable("Unexpected module dependency kind");
   }
 
-  // Retrieve or create the shared state.
-  auto clangImpl = getOrCreateClangImpl(cache);
-
   // Retrieve the bridging header.
   std::string bridgingHeader = *targetModule.getBridgingHeader();
 
@@ -356,9 +321,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
 
-  auto clangDependencies = clangImpl->tool.getFullDependencies(
-      commandLineArgs, workingDir, clangImpl->alreadySeen);
-
+  auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
+      commandLineArgs, workingDir, cache.getAlreadySeenClangModules());
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());

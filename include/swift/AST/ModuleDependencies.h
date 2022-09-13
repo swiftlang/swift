@@ -20,6 +20,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Import.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSet.h"
@@ -305,6 +307,7 @@ public:
   }
 };
 
+// MARK: Module Dependencies
 /// Describes the dependencies of a given module.
 ///
 /// The dependencies of a module include all of the source files that go
@@ -475,6 +478,7 @@ using ModuleDependenciesKindRefMap =
                        llvm::StringMap<const ModuleDependencies *>,
                        ModuleDependenciesKindHash>;
 
+// MARK: GlobalModuleDependenciesCache
 /// A cache describing the set of module dependencies that has been queried
 /// thus far. This cache records/stores the actual Dependency values and can be
 /// preserved across different scanning actions (e.g. in
@@ -523,7 +527,7 @@ class GlobalModuleDependenciesCache {
   getDependenciesMap(ModuleDependenciesKind kind) const;
 
 public:
-  GlobalModuleDependenciesCache() {};
+  GlobalModuleDependenciesCache();
   GlobalModuleDependenciesCache(const GlobalModuleDependenciesCache &) = delete;
   GlobalModuleDependenciesCache &
   operator=(const GlobalModuleDependenciesCache &) = delete;
@@ -592,6 +596,7 @@ public:
   }
 };
 
+// MARK: ModuleDependenciesCache
 /// This "local" dependencies cache persists only for the duration of a given
 /// scanning action, and wraps an instance of a `GlobalModuleDependenciesCache`
 /// which may carry cached scanning information from prior scanning actions.
@@ -609,20 +614,16 @@ private:
   
   /// Name of the module under scan
   StringRef mainScanModuleName;
+  /// Set containing all of the Clang modules that have already been seen.
+  llvm::StringSet<> alreadySeenClangModules;
+  /// The 'persistent' Clang dependency scanner service
+  /// TODO: Share this service among common scanner invocations
+  clang::tooling::dependencies::DependencyScanningService clangScanningService;
+  /// The Clang dependency scanner tool
+  clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
 
   /// Discovered Clang modules are only cached locally.
   llvm::StringMap<ModuleDependenciesVector> clangModuleDependencies;
-
-  /// Function that will delete \c clangImpl properly.
-  void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *) = nullptr;
-  /// Additional information needed for Clang dependency scanning.
-  ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
-
-  /// Free up the storage associated with the Clang implementation.
-  void destroyClangImpl() {
-    if (this->clangImplDeleter)
-      this->clangImplDeleter(this->clangImpl);
-  }
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -647,28 +648,20 @@ public:
                           StringRef mainScanModuleName);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
-  virtual ~ModuleDependenciesCache() { destroyClangImpl(); }
 
 public:
-  /// Set the Clang-specific implementation data.
-  void
-  setClangImpl(ClangModuleDependenciesCacheImpl *clangImpl,
-               void (*clangImplDeleter)(ClangModuleDependenciesCacheImpl *)) {
-    destroyClangImpl();
-
-    this->clangImpl = clangImpl;
-    this->clangImplDeleter = clangImplDeleter;
-  }
-
-  /// Retrieve the Clang-specific implementation data;
-  ClangModuleDependenciesCacheImpl *getClangImpl() const {
-    return clangImpl;
-  }
-
   /// Whether we have cached dependency information for the given module.
   bool hasDependencies(StringRef moduleName,
                        ModuleLookupSpecifics details) const;
 
+  /// Produce a reference to the Clang scanner tool associated with this cache
+  clang::tooling::dependencies::DependencyScanningTool& getClangScannerTool() {
+    return clangScanningTool;
+  }
+  llvm::StringSet<>& getAlreadySeenClangModules() {
+    return alreadySeenClangModules;
+  }
+  
   /// Look for module dependencies for a module with the given name given
   /// current search paths.
   ///

@@ -225,6 +225,7 @@ void ModuleDependencies::addBridgingModuleDependency(
   }
 }
 
+GlobalModuleDependenciesCache::GlobalModuleDependenciesCache() {}
 GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
 GlobalModuleDependenciesCache::getCurrentCache() const {
   assert(CurrentTriple.hasValue() &&
@@ -533,7 +534,17 @@ ModuleDependenciesCache::getDependencyReferencesMap(
 ModuleDependenciesCache::ModuleDependenciesCache(
     GlobalModuleDependenciesCache &globalCache,
     StringRef mainScanModuleName)
-    : globalCache(globalCache), mainScanModuleName(mainScanModuleName) {
+    : globalCache(globalCache),
+      mainScanModuleName(mainScanModuleName),
+      clangScanningService(
+          clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
+          clang::tooling::dependencies::ScanningOutputFormat::Full,
+          clang::CASOptions(),
+          /* Cache */ nullptr,
+          /* SharedFS */ nullptr,
+          /* ReuseFileManager */ false,
+          /* OptimizeArgs */ false),
+      clangScanningTool(clangScanningService) {
   for (auto kind = ModuleDependenciesKind::FirstKind;
        kind != ModuleDependenciesKind::LastKind; ++kind) {
     ModuleDependenciesMap.insert(
