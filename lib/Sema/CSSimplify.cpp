@@ -9260,6 +9260,40 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     }
   }
 
+  // Special handling of injected references to `makeIterator` in for-in loops.
+  {
+    auto memberRef = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
+    if (memberRef && memberRef->isImplicit() &&
+        locator->isLastElement<LocatorPathElt::Member>()) {
+      // Cannot simplify this constraint yet since we don't know whether
+      // the base type is going to be existential or not.
+      if (baseObjTy->isTypeVariableOrMember())
+        return formUnsolved();
+
+      auto *sequenceExpr = memberRef->getBase();
+      // If base type is an existential, member lookup is fine because
+      // it would return a witness.
+      if (!baseObjTy->isExistentialType() &&
+          getContextualTypePurpose(sequenceExpr) == CTP_ForEachSequence) {
+        auto &ctx = getASTContext();
+
+        auto *sequenceProto = cast<ProtocolDecl>(
+            getContextualType(sequenceExpr, /*forConstraint=*/false)
+                ->getAnyNominal());
+        bool isAsync = sequenceProto ==
+                       TypeChecker::getProtocol(
+                           ctx, SourceLoc(), KnownProtocolKind::AsyncSequence);
+
+        auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                     : ctx.getSequenceMakeIterator();
+
+        return simplifyValueWitnessConstraint(
+            ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, DC,
+            FunctionRefKind::Compound, flags, locator);
+      }
+    }
+  }
+
   MemberLookupResult result =
       performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
@@ -9696,6 +9730,17 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return SolutionKind::Unsolved;
   };
 
+  auto fail = [&] {
+    // The constraint failed, so mark the member type as a "hole".
+    // We cannot do anything further here.
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    recordAnyTypeVarAsPotentialHole(memberType);
+
+    return SolutionKind::Solved;
+  };
+
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   Type baseObjectType = getFixedTypeRecursive(
@@ -9712,16 +9757,8 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   assert(proto && "Value witness constraint for a non-requirement");
   auto conformance = useDC->getParentModule()->lookupConformance(
       baseObjectType, proto);
-  if (!conformance) {
-    // The conformance failed, so mark the member type as a "hole". We cannot
-    // do anything further here.
-    if (!shouldAttemptFixes())
-      return SolutionKind::Error;
-
-    recordAnyTypeVarAsPotentialHole(memberType);
-
-    return SolutionKind::Solved;
-  }
+  if (!conformance)
+    return fail();
 
   // Reference the requirement.
   Type resolvedBaseType = simplifyType(baseType, flags);
@@ -9731,7 +9768,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   auto witness =
       conformance.getWitnessByName(baseObjectType, requirement->getName());
   if (!witness)
-    return SolutionKind::Error;
+    return fail();
 
   auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefKind);
   resolveOverload(getConstraintLocator(locator), memberType, choice,
