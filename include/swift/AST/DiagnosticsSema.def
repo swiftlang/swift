@@ -973,8 +973,11 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
-ERROR(import_implementation_cannot_be_exported,none,
-      "module %0 cannot be both exported and implementation-only", (Identifier))
+ERROR(import_restriction_conflict,none,
+      "module %0 cannot be both "
+      "%select{implementation-only|SPI only|exported}1 and "
+      "%select{implementation-only|SPI only|exported}2 ",
+      (Identifier, unsigned, unsigned))
 
 WARNING(module_not_compiled_with_library_evolution,none,
         "module %0 was not compiled with library evolution support; "
@@ -3003,6 +3006,13 @@ WARNING(warn_implementation_only_conflict,none,
         (Identifier))
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
+
+ERROR(spi_only_import_conflict,none,
+      "%0 inconsistently imported for SPI only",
+      (Identifier))
+NOTE(spi_only_import_conflict_here,none,
+     "imported for SPI only here", ())
+
 ERROR(error_public_import_of_private_module,none,
         "private module %0 is imported publicly from the public module %1",
         (Identifier, Identifier))

@@ -3289,6 +3289,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Check that if one import in a file uses \c @_spiOnly, all imports from the
+/// same file are consistently using \c @_spiOnly.
+class CheckInconsistentSPIOnlyImportsRequest
+    : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Checks to see if any of the imports in a module use \c @_weakLinked
 /// in one file and not in another.
 ///
