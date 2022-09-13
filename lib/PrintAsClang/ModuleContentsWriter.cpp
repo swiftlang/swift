@@ -227,8 +227,11 @@ public:
 
   void forwardDeclare(const NominalTypeDecl *NTD,
                       llvm::function_ref<void(void)> Printer) {
-    if (NTD->getModuleContext()->isStdlibModule())
-      return;
+    if (NTD->getModuleContext()->isStdlibModule()) {
+      if (outputLangMode != OutputLanguageMode::Cxx ||
+          !printer.shouldInclude(NTD))
+        return;
+    }
     auto &state = seenTypes[NTD];
     if (state.second)
       return;

@@ -295,7 +295,9 @@ public:
     if (!declPrinter.shouldInclude(decl))
       return ClangRepresentation::unsupported; // FIXME: propagate why it's not
                                                // exposed.
-
+    // FIXME: Support Optional<T>.
+    if (optionalKind && *optionalKind != OTK_None)
+      return ClangRepresentation::unsupported;
     // Only C++ mode supports struct types.
     if (languageMode != OutputLanguageMode::Cxx)
       return ClangRepresentation::unsupported;
@@ -337,9 +339,10 @@ public:
     return ClangRepresentation::representable;
   }
 
-  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
-                                 Optional<OptionalTypeKind> optionalKind,
-                                 bool isInOutParam) {
+  Optional<ClangRepresentation>
+  printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+                            Optional<OptionalTypeKind> optionalKind,
+                            bool isInOutParam) {
     auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
     bool isConst;
     if (bgsTy->isUnsafePointer())
@@ -347,26 +350,34 @@ public:
     else if (bgsTy->isUnsafeMutablePointer())
       isConst = false;
     else
-      return false;
+      return None;
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
-    visitPart(args.front(), OTK_None, /*isInOutParam=*/false);
+    llvm::SaveAndRestore<FunctionSignatureTypeUse> typeUseNormal(
+        typeUseKind, FunctionSignatureTypeUse::TypeReference);
+    // FIXME: We can definitely support pointers to known Clang types.
+    if (!isKnownCType(args.front(), typeMapping))
+      return ClangRepresentation(ClangRepresentation::unsupported);
+    auto partRepr = visitPart(args.front(), OTK_None, /*isInOutParam=*/false);
+    if (partRepr.isUnsupported())
+      return partRepr;
     if (isConst)
       os << " const";
     os << " *";
     printNullability(optionalKind);
     if (isInOutParam)
       printInoutTypeModifier();
-    return true;
+    return ClangRepresentation(ClangRepresentation::representable);
   }
 
   ClangRepresentation
   visitBoundGenericStructType(BoundGenericStructType *BGT,
                               Optional<OptionalTypeKind> optionalKind,
                               bool isInOutParam) {
-    if (printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
-      return ClangRepresentation::representable;
+    if (auto result =
+            printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
+      return *result;
     return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
                           BGT->getGenericArgs());
   }
@@ -375,11 +386,17 @@ public:
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             Optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
+    // FIXME: Support Optional<T>.
+    if (optionalKind && *optionalKind != OTK_None)
+      return ClangRepresentation::unsupported;
     bool isParam = typeUseKind == FunctionSignatureTypeUse::ParamType;
     if (isParam && !isInOutParam)
       os << "const ";
     // FIXME: handle optionalKind.
     if (languageMode != OutputLanguageMode::Cxx) {
+      // Note: This can happen for UnsafeMutablePointer<T>.
+      if (typeUseKind != FunctionSignatureTypeUse::ParamType)
+        return ClangRepresentation::unsupported;
       assert(typeUseKind == FunctionSignatureTypeUse::ParamType);
       // Pass an opaque param in C mode.
       os << "void * _Nonnull";
@@ -1194,9 +1211,11 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     Type type) {
   if (auto optionalObjectType = type->getOptionalObjectType()) {
-    if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
-            optionalObjectType->getNominalOrBoundGenericNominal())) {
-      return typeInfo->canBeNullable;
+    if (optionalObjectType->getNominalOrBoundGenericNominal()) {
+      if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
+              optionalObjectType->getNominalOrBoundGenericNominal())) {
+        return typeInfo->canBeNullable;
+      }
     }
   }
   return false;

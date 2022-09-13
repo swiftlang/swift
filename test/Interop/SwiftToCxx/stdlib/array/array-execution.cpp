@@ -42,5 +42,18 @@ int main() {
     UseArray::printArray(UseArray::passthroughArray(val));
   }
 // CHECK: [2, 2]
+  {
+    auto val = Array<int>::init();
+    val.append(-11);
+    UseArray::printArray(val);
+    assert(val.getCount() == 1);
+    assert(val.getCapacity() >= 1);
+    auto firstInt = val.remove(0);
+    assert(firstInt == -11);
+    assert(val.getCount() == 0);
+    UseArray::printArray(val);
+  }
+// CHECK-NEXT: [-11]
+// CHECK-NEXT: []
   return 0;
 }
