@@ -1614,9 +1614,14 @@ def use_frontend_parseable_output:
 
 def print_explicit_dependency_graph:
   Flag<["-"], "print-explicit-dependency-graph">,
-  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  Flags<[DoesNotAffectIncrementalBuild, HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Print the result of module dependency scanning after external "
            "module resolution to output">;
+
+def explicit_dependency_graph_format:
+  Joined<["-"], "explicit-dependency-graph-format=">,
+  Flags<[DoesNotAffectIncrementalBuild, HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Specify the explicit dependency graph output format to either 'json' or 'dot'">;
 
 def print_preprocessed_explicit_dependency_graph:
   Flag<["-"], "print-preprocessed-explicit-dependency-graph">,
