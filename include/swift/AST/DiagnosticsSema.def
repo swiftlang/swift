@@ -6568,5 +6568,14 @@ ERROR(type_wrapper_type_requirement_not_accessible,none,
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
 
+ERROR(type_wrapper_ignored_on_local_properties,none,
+      "%0 must not be used on local properties", (DeclAttribute))
+ERROR(type_wrapper_ignored_on_computed_properties,none,
+      "%0 must not be used on computed properties", (DeclAttribute))
+ERROR(type_wrapper_ignored_on_static_properties,none,
+      "%0 must not be used on static properties", (DeclAttribute))
+ERROR(type_wrapper_ignored_on_lazy_properties,none,
+      "%0 must not be used on lazy properties", (DeclAttribute))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
