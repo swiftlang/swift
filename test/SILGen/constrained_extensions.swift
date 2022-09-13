@@ -227,3 +227,16 @@ func referenceNestedTypes() {
   _ = Array<AnyObject>.NestedClass()
   _ = Array<AnyObject>.DerivedClass()
 }
+
+struct S<T> {
+  struct X {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s22constrained_extensions1SVAASiRszlEyAC1XVySi_GSicir : $@yield_once @convention(method) (Int, S<Int>) -> @yields S<Int>.X
+extension S<Int> {
+  subscript(index:Int) -> X {
+    _read {
+      fatalError()
+    }
+  }
+}
