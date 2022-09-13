@@ -312,7 +312,6 @@ public:
       handler.printTypeName(os);
       if (typeUseKind == FunctionSignatureTypeUse::ParamType)
         os << '&';
-      interopContext.recordEmittedClangTypeDecl(decl);
       return ClangRepresentation::representable;
     }
 

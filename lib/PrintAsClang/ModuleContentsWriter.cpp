@@ -126,6 +126,7 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
+  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
@@ -267,6 +268,12 @@ public:
     });
   }
 
+  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
+    auto it = seenClangTypes.insert(typeDecl);
+    if (it.second)
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
+  }
+
   void forwardDeclareType(const TypeDecl *TD) {
     if (outputLangMode == OutputLanguageMode::Cxx) {
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
@@ -274,6 +281,9 @@ public:
         if (!addImport(NTD)) {
           forwardDeclare(
               NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        } else {
+          if (isa<StructDecl>(TD) && NTD->hasClangNode())
+            emitReferencedClangTypeMetadata(NTD);
         }
       }
       return;
@@ -703,11 +713,6 @@ public:
 
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
-
-    // Print any additional metadata for referenced C++ types.
-    for (const auto *typeDecl :
-         printer.getInteropContext().getEmittedClangTypeDecls())
-      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
 };
 } // end anonymous namespace
