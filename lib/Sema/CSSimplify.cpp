@@ -9260,36 +9260,71 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     }
   }
 
-  // Special handling of injected references to `makeIterator` in for-in loops.
-  {
-    auto memberRef = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
+  // Special handling of injected references to `makeIterator` and `next`
+  // in for-in loops.
+  if (auto *expr = getAsExpr(locator->getAnchor())) {
+    // `next()` could be wrapped in `await` expression.
+    auto memberRef =
+        getAsExpr<UnresolvedDotExpr>(expr->getSemanticsProvidingExpr());
+
     if (memberRef && memberRef->isImplicit() &&
         locator->isLastElement<LocatorPathElt::Member>()) {
+      auto &ctx = getASTContext();
+
       // Cannot simplify this constraint yet since we don't know whether
       // the base type is going to be existential or not.
       if (baseObjTy->isTypeVariableOrMember())
         return formUnsolved();
 
-      auto *sequenceExpr = memberRef->getBase();
+      // Check whether the given dot expression is a reference
+      // to the given name with the given set of argument labels
+      // (aka compound name).
+      auto isRefTo = [&](UnresolvedDotExpr *UDE, Identifier name,
+                         ArrayRef<StringRef> labels) {
+        auto refName = UDE->getName().getFullName();
+        return refName.isCompoundName(name, labels);
+      };
+
+      auto *baseExpr = memberRef->getBase();
       // If base type is an existential, member lookup is fine because
       // it would return a witness.
-      if (!baseObjTy->isExistentialType() &&
-          getContextualTypePurpose(sequenceExpr) == CTP_ForEachSequence) {
-        auto &ctx = getASTContext();
+      if (!baseObjTy->isExistentialType()) {
+        // Handle `makeIterator` reference.
+        if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
+            isRefTo(memberRef, ctx.Id_makeIterator, /*lables=*/{})) {
+          auto *sequenceProto = cast<ProtocolDecl>(
+              getContextualType(baseExpr, /*forConstraint=*/false)
+                  ->getAnyNominal());
+          bool isAsync = sequenceProto == TypeChecker::getProtocol(
+                                              ctx, SourceLoc(),
+                                              KnownProtocolKind::AsyncSequence);
 
-        auto *sequenceProto = cast<ProtocolDecl>(
-            getContextualType(sequenceExpr, /*forConstraint=*/false)
-                ->getAnyNominal());
-        bool isAsync = sequenceProto ==
-                       TypeChecker::getProtocol(
-                           ctx, SourceLoc(), KnownProtocolKind::AsyncSequence);
+          auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                       : ctx.getSequenceMakeIterator();
 
-        auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
+          return simplifyValueWitnessConstraint(
+              ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, DC,
+              FunctionRefKind::Compound, flags, locator);
+        }
 
-        return simplifyValueWitnessConstraint(
-            ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, DC,
-            FunctionRefKind::Compound, flags, locator);
+        // Handle `next` reference.
+        if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
+            isRefTo(memberRef, ctx.Id_next, /*labels=*/{})) {
+          auto *iteratorProto = cast<ProtocolDecl>(
+              getContextualType(baseExpr, /*forConstraint=*/false)
+                  ->getAnyNominal());
+          bool isAsync =
+              iteratorProto ==
+              TypeChecker::getProtocol(
+                  ctx, SourceLoc(), KnownProtocolKind::AsyncIteratorProtocol);
+
+          auto *next =
+              isAsync ? ctx.getAsyncIteratorNext() : ctx.getIteratorNext();
+
+          return simplifyValueWitnessConstraint(
+              ConstraintKind::ValueWitness, baseTy, next, memberTy, DC,
+              FunctionRefKind::Compound, flags, locator);
+        }
       }
     }
   }
