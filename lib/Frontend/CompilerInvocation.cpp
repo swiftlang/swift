@@ -728,7 +728,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      diagLevel);
     }
   } else if (Args.getLastArg(OPT_require_explicit_availability,
-                             OPT_require_explicit_availability_target)) {
+                             OPT_require_explicit_availability_target) ||
+             Opts.LibraryLevel == LibraryLevel::API) {
     Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
   }
 
