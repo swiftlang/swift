@@ -126,6 +126,7 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
+  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
@@ -227,8 +228,11 @@ public:
 
   void forwardDeclare(const NominalTypeDecl *NTD,
                       llvm::function_ref<void(void)> Printer) {
-    if (NTD->getModuleContext()->isStdlibModule())
-      return;
+    if (NTD->getModuleContext()->isStdlibModule()) {
+      if (outputLangMode != OutputLanguageMode::Cxx ||
+          !printer.shouldInclude(NTD))
+        return;
+    }
     auto &state = seenTypes[NTD];
     if (state.second)
       return;
@@ -264,6 +268,12 @@ public:
     });
   }
 
+  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
+    auto it = seenClangTypes.insert(typeDecl);
+    if (it.second)
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
+  }
+
   void forwardDeclareType(const TypeDecl *TD) {
     if (outputLangMode == OutputLanguageMode::Cxx) {
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
@@ -271,6 +281,9 @@ public:
         if (!addImport(NTD)) {
           forwardDeclare(
               NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        } else {
+          if (isa<StructDecl>(TD) && NTD->hasClangNode())
+            emitReferencedClangTypeMetadata(NTD);
         }
       }
       return;
@@ -452,8 +465,13 @@ public:
   bool writeStruct(const StructDecl *SD) {
     if (addImport(SD))
       return true;
-    if (outputLangMode == OutputLanguageMode::Cxx)
+    if (outputLangMode == OutputLanguageMode::Cxx) {
       (void)forwardDeclareMemberTypes(SD->getMembers(), SD);
+      for (const auto *ed :
+           printer.getInteropContext().getExtensionsForNominalType(SD)) {
+        (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
+      }
+    }
     printer.print(SD);
     return true;
   }
@@ -555,6 +573,8 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        if (outputLangMode == OutputLanguageMode::Cxx)
+          return false;
         auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
@@ -580,6 +600,8 @@ public:
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           auto baseClass = ED->getSelfClassDecl();
+          if (!baseClass)
+              return ED->getExtendedNominal()->getName().str();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");
@@ -632,6 +654,16 @@ public:
     assert(declsToWrite.empty());
     declsToWrite.assign(decls.begin(), decls.end());
 
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      for (const Decl *D : declsToWrite) {
+        if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+          const auto *type = ED->getExtendedNominal();
+          if (isa<StructDecl>(type))
+            printer.getInteropContext().recordExtensions(type, ED);
+        }
+      }
+    }
+
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
       bool success = true;
@@ -681,11 +713,6 @@ public:
 
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
-
-    // Print any additional metadata for referenced C++ types.
-    for (const auto *typeDecl :
-         printer.getInteropContext().getEmittedClangTypeDecls())
-      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
 };
 } // end anonymous namespace

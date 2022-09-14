@@ -56,7 +56,7 @@ public:
       ClosureDCs.push_back(closure);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
       ClosureDCs.push_back(closure);
     }
@@ -84,17 +84,17 @@ public:
             });
 
             CS.setType(decl, transformedTy);
-            return {true, expr};
+            return Action::Continue(expr);
           }
         }
 
         inferVariables(type);
-        return {true, expr};
+        return Action::Continue(expr);
       }
 
       auto var = dyn_cast<VarDecl>(decl);
       if (!var)
-        return {true, expr};
+        return Action::Continue(expr);
 
       if (auto *wrappedVar = var->getOriginalWrappedProperty()) {
         auto outermostWrapperAttr =
@@ -103,7 +103,7 @@ public:
         // If the attribute doesn't have a type it could only mean
         // that the declaration was incorrect.
         if (!CS.hasType(outermostWrapperAttr->getTypeExpr()))
-          return {true, expr};
+          return Action::Continue(expr);
 
         auto wrapperType =
             CS.simplifyType(CS.getType(outermostWrapperAttr->getTypeExpr()));
@@ -113,10 +113,10 @@ public:
           CS.setType(var, computeProjectedValueType(wrappedVar, wrapperType));
         } else {
           // _<name> is the wrapper var
-          CS.setType(var, computeWrappedValueType(wrappedVar, wrapperType));
+          CS.setType(var, wrapperType);
         }
 
-        return {true, expr};
+        return Action::Continue(expr);
       }
 
       // If there is no type recorded yet, let's check whether
@@ -132,17 +132,17 @@ public:
       }
     }
 
-    return {true, expr};
+    return Action::Continue(expr);
   }
 
-  Expr *walkToExprPost(Expr *expr) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
     if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
       ClosureDCs.pop_back();
     }
-    return expr;
+    return Action::Continue(expr);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     // Return statements have to reference outside result type
     // since all of them are joined by it if it's not specified
     // explicitly.
@@ -154,7 +154,7 @@ public:
       }
     }
 
-    return {true, stmt};
+    return Action::Continue(stmt);
   }
 
 private:
@@ -212,7 +212,7 @@ class UnresolvedClosureParameterCollector : public ASTWalker {
 public:
   UnresolvedClosureParameterCollector(ConstraintSystem &cs) : CS(cs) {}
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
       if (isa<ParamDecl>(decl)) {
@@ -230,7 +230,7 @@ public:
         }
       }
     }
-    return {true, expr};
+    return Action::Continue(expr);
   }
 
   ArrayRef<TypeVariableType *> getVariables() const {
@@ -530,18 +530,13 @@ private:
       init = TypeChecker::buildDefaultInitializer(patternType);
     }
 
-    if (init) {
-      return SolutionApplicationTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
-          /*bindPatternVarsOneWay=*/false);
-    }
-
-    // If there was no initializer, there could be one from a property
-    // wrapper which has to be pre-checked before use. This is not a
-    // problem in top-level code because pattern bindings go through
-    // `typeCheckExpression` which does pre-check automatically and
-    // result builders do not allow declaring local wrapped variables.
+    // A property wrapper initializer (either user-defined
+    // or a synthesized one) has to be pre-checked before use.
+    //
+    // This is not a problem in top-level code because pattern
+    // bindings go through `typeCheckExpression` which does
+    // pre-check automatically and result builders do not allow
+    // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SolutionApplicationTarget::forInitialization(
           init, patternBinding->getDeclContext(), patternType, patternBinding,
@@ -554,6 +549,13 @@ private:
         return None;
 
       return target;
+    }
+
+    if (init) {
+      return SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
     }
 
     return SolutionApplicationTarget::forUninitializedVar(patternBinding, index,

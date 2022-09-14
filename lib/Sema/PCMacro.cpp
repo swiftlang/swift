@@ -674,14 +674,14 @@ void swift::performPCMacro(SourceFile &SF) {
   public:
     ExpressionFinder() = default;
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       ASTContext &ctx = D->getASTContext();
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (FD->getBody()) {
             Instrumenter I(ctx, FD, TmpNameIndex);
             I.transformDecl(FD);
-            return false;
+            return Action::SkipChildren();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -694,11 +694,11 @@ void swift::performPCMacro(SourceFile &SF) {
               TypeChecker::checkTopLevelEffects(TLCD);
               TypeChecker::contextualizeTopLevelCode(TLCD);
             }
-            return false;
+            return Action::SkipChildren();
           }
         }
       }
-      return true;
+      return Action::Continue();
     }
   };
 

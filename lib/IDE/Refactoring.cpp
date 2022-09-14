@@ -2387,17 +2387,18 @@ isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
     bool ConditionUseOnlyAllowedFunctions = false;
     StringRef ExpectName;
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
-        return E;
+        return Action::Continue(E);
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
       if (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param)
         ParamsUseSameVars = checkName(dyn_cast<VarDecl>(D));
       if (D->getKind() == DeclKind::Func)
         ConditionUseOnlyAllowedFunctions = checkName(dyn_cast<FuncDecl>(D));
       if (allCheckPassed())
-        return E;
-      return nullptr;
+        return Action::Continue(E);
+
+      return Action::Stop();
     }
 
     bool allCheckPassed() {
@@ -2484,14 +2485,14 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
   public:
     std::string VarName;
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
-        return E;
+        return Action::Continue(E);
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
       if (D->getKind() != DeclKind::Var && D->getKind() != DeclKind::Param)
-        return E;
+        return Action::Continue(E);
       VarName = dyn_cast<VarDecl>(D)->getName().str().str();
-      return nullptr;
+      return Action::Stop();
     }
   };
 
@@ -2501,20 +2502,20 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
 
     SmallString<64> ConditionalPattern = SmallString<64>();
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       auto *BE = dyn_cast<BinaryExpr>(E);
       if (!BE)
-        return E;
+        return Action::Continue(E);
       if (isFunctionNameAllowed(BE))
         appendPattern(BE->getLHS(), BE->getRHS());
-      return E;
+      return Action::Continue(E);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, P->getSourceRange()).str());
       if (P->getKind() == PatternKind::OptionalSome)
         ConditionalPattern.append("?");
-      return { true, nullptr };
+      return Action::Stop();
     }
 
   private:
@@ -3638,13 +3639,13 @@ private:
 public:
   SynthesizedCodablePrinter(ASTPrinter &Printer) : Printer(Printer) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
-      return false;
+      return Action::SkipChildren();
 
     if (!VD->isSynthesized()) {
-      return true;
+      return Action::Continue();
     }
     SmallString<32> Scratch;
     auto name = VD->getName().getString(Scratch);
@@ -3654,7 +3655,7 @@ public:
         isa<EnumDecl>(VD) || name == "init(from:)" || name == "encode(to:)";
     if (!shouldPrint) {
       // Some other synthesized decl that we don't want to print.
-      return false;
+      return Action::SkipChildren();
     }
 
     Printer.printNewline();
@@ -3674,7 +3675,7 @@ public:
       }
       Printer.printNewline();
       Printer << "}";
-      return false;
+      return Action::SkipChildren();
     }
 
     PrintOptions Options;
@@ -3688,7 +3689,7 @@ public:
     Printer.printNewline();
     D->print(Printer, Options);
 
-    return false;
+    return Action::SkipChildren();
   }
 };
 
@@ -3816,7 +3817,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(
 
     explicit FindLiteralNumber(Expr *parent) : parent(parent) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (auto *literal = dyn_cast<NumberLiteralExpr>(expr)) {
         // The sub-expression must have the same start loc with the outermost
         // expression, i.e. the cursor position.
@@ -3826,8 +3827,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(
           found = literal;
         }
       }
-
-      return { found == nullptr, expr };
+      return Action::SkipChildrenIf(found, expr);
     }
   };
 
@@ -5372,40 +5372,40 @@ private:
           : ErrParam(ErrParam) {}
       bool foundUnwrap() const { return FoundUnwrap; }
 
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         // Don't walk into ternary conditionals as they may have additional
         // conditions such as err != nil that make a force unwrap now valid.
         if (isa<IfExpr>(E))
-          return {false, E};
+          return Action::SkipChildren(E);
 
         auto *FVE = dyn_cast<ForceValueExpr>(E);
         if (!FVE)
-          return {true, E};
+          return Action::Continue(E);
 
         auto *DRE = dyn_cast<DeclRefExpr>(FVE->getSubExpr());
         if (!DRE)
-          return {true, E};
+          return Action::Continue(E);
 
         if (DRE->getDecl() != ErrParam)
-          return {true, E};
+          return Action::Continue(E);
 
         // If we find the node we're looking for, make a note of it, and abort
         // the walk.
         FoundUnwrap = true;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
         // Don't walk into new explicit scopes, we only want to consider force
         // unwraps in the immediate conditional body.
         if (!S->isImplicit() && startsNewScope(S))
-          return {false, S};
-        return {true, S};
+          return Action::SkipChildren(S);
+        return Action::Continue(S);
       }
 
-      bool walkToDeclPre(Decl *D) override {
+      PreWalkAction walkToDeclPre(Decl *D) override {
         // Don't walk into new explicit DeclContexts.
-        return D->isImplicit() || !isa<DeclContext>(D);
+        return Action::VisitChildrenIf(D->isImplicit() || !isa<DeclContext>(D));
       }
     };
     for (auto Node : Nodes) {

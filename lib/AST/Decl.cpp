@@ -7311,16 +7311,16 @@ swift::findWrappedValuePlaceholder(Expr *init) {
   public:
     PropertyWrapperValuePlaceholderExpr *placeholder = nullptr;
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (placeholder)
-        return { false, E };
+        return Action::SkipChildren(E);
 
       if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
         placeholder = value;
-        return { false, value };
+        return Action::SkipChildren(value);
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   } walker;
   init->walk(walker);
@@ -7999,9 +7999,9 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
   public:
     HashCombiner(StableHasher &hasher) : hasher(hasher) {}
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (D->isImplicit())
-        return false;
+        return Action::SkipChildren();
 
       if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
         if (auto fp = idc->getBodyFingerprint())
@@ -8012,7 +8012,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
         for (auto *d : idc->getParsedMembers())
           const_cast<Decl *>(d)->walk(*this);
 
-        return false;
+        return Action::SkipChildren();
       }
 
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -8020,7 +8020,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
           hasher.combine(*fp);
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 

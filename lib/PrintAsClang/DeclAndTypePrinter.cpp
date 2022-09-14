@@ -348,8 +348,17 @@ private:
     // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
                                   owningPrinter.interopContext);
-    printer.printValueTypeDecl(
-        SD, /*bodyPrinter=*/[&]() { printMembers(SD->getMembers()); });
+    printer.printValueTypeDecl(SD, /*bodyPrinter=*/[&]() {
+      printMembers(SD->getMembers());
+      for (const auto *ed :
+           owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
+        auto sign = ed->getGenericSignature();
+        // FIXME: support requirements.
+        if (!sign.getRequirements().empty())
+          continue;
+        printMembers(ed->getMembers());
+      }
+    });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -866,7 +875,8 @@ private:
 
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
-                                     bool isNSUIntegerSubscript = false) {
+                                     bool isNSUIntegerSubscript = false,
+                                     const SubscriptDecl *SD = nullptr) {
     printDocumentationComment(AFD);
 
     Optional<ForeignAsyncConvention> asyncConvention =
@@ -883,7 +893,11 @@ private:
       if (isClassMethod)
         return;
       assert(!AFD->isStatic());
-      auto *typeDeclContext = cast<NominalTypeDecl>(AFD->getParent());
+      auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
+      if (!typeDeclContext) {
+        typeDeclContext =
+            cast<ExtensionDecl>(AFD->getParent())->getExtendedNominal();
+      }
 
       std::string cFuncDecl;
       llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);
@@ -899,10 +913,15 @@ private:
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        declPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSignature(),
-            funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/false);
+        if (SD)
+          declPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/false);
+        else
+          declPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/false);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
@@ -916,11 +935,15 @@ private:
           owningPrinter);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-
-        defPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSignature(),
-            funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/true);
+        if (SD)
+          defPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true);
+        else
+          defPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/true);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
@@ -1807,6 +1830,14 @@ private:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!SD->isInstanceMember())
+        return;
+      auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+      printAbstractFunctionAsMethod(getter, false,
+                                    /*isNSUIntegerSubscript=*/false, SD);
+      return;
+    }
     assert(SD->isInstanceMember() && "static subscripts not supported");
 
     bool isNSUIntegerSubscript = false;
@@ -2511,9 +2542,9 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
   return false;
 }
 
-static bool hasExposeAttr(const ValueDecl *VD) {
+static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
-    if (VD == VD->getASTContext().getStringDecl())
+    if (VD == VD->getASTContext().getStringDecl() && !isExtension)
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
@@ -2523,6 +2554,26 @@ static bool hasExposeAttr(const ValueDecl *VD) {
     return true;
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+    // FIXME: Do not expose 'index' methods as the overloads are conflicting.
+    // this should either be prohibited in the stdlib module, or the overloads
+    // should be renamed automatically or using the expose attribute.
+    if (ED->getExtendedNominal() == VD->getASTContext().getArrayDecl()) {
+      if (isa<AbstractFunctionDecl>(VD) &&
+          !cast<AbstractFunctionDecl>(VD)
+               ->getName()
+               .getBaseName()
+               .isSpecial() &&
+          cast<AbstractFunctionDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("index"))
+        return false;
+    }
+    return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
+  }
   return false;
 }
 

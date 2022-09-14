@@ -35,8 +35,18 @@ void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
     function();
 }
 
-void SwiftToClangInteropContext::recordEmittedClangTypeDecl(
-    const NominalTypeDecl *typeDecl) {
-  assert(typeDecl->hasClangNode());
-  referencedClangTypeDecls.insert(typeDecl);
+void SwiftToClangInteropContext::recordExtensions(
+    const NominalTypeDecl *typeDecl, const ExtensionDecl *ext) {
+  auto it = extensions.insert(
+      std::make_pair(typeDecl, std::vector<const ExtensionDecl *>()));
+  it.first->second.push_back(ext);
+}
+
+llvm::ArrayRef<const ExtensionDecl *>
+SwiftToClangInteropContext::getExtensionsForNominalType(
+    const NominalTypeDecl *typeDecl) const {
+  auto exts = extensions.find(typeDecl);
+  if (exts != extensions.end())
+    return exts->getSecond();
+  return {};
 }

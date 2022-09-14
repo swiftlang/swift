@@ -49,9 +49,10 @@ SimpleTypeDeclFinder::visitTypeAliasType(TypeAliasType *ty) {
   return Callback(ty->getDecl());
 }
 
-bool TypeReprIdentFinder::walkToTypeReprPost(TypeRepr *TR) {
+ASTWalker::PostWalkAction
+TypeReprIdentFinder::walkToTypeReprPost(TypeRepr *TR) {
   auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
   if (!CITR || !CITR->getBoundDecl())
-    return true;
-  return Callback(CITR);
+    return Action::Continue();
+  return Action::StopIf(!Callback(CITR));
 }

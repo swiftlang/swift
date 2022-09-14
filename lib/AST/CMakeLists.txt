@@ -137,6 +137,7 @@ if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
     clangFormat
     clangToolingCore
     clangFrontendTool
+    clangDependencyScanning
     clangFrontend
     clangDriver
     clangSerialization
