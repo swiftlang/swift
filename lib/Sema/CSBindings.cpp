@@ -1467,6 +1467,7 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::ValueWitness:
   case ConstraintKind::PropertyWrapper: {
     // If current type variable represents a member type of some reference,
     // it would be bound once member is resolved either to a actual member
