@@ -14,6 +14,8 @@ import StdlibUnittest
 
 let longTaggedTests = TestSuite("NonContiguousTaggedStrings")
 var constant = "Send Message to different Team"
+//doesn't fit in a tagged pointer because of ', but does fit in a SmallString
+var shortNonTagged = "Don't Save"
 
 func runEqualLongTagged() {
   
@@ -37,6 +39,25 @@ func runEqualLongTagged() {
 
 longTaggedTests.test("EqualLongTagged") {
   runEqualLongTagged()
+}
+
+longTaggedTests.test("EqualNonASCIISubsetSmall") {
+  if MemoryLayout<AnyObject>.size != 8 {
+    return //no tagged pointers
+  }
+  
+  let native = shortNonTagged.withUTF8 { String(decoding: $0, as: UTF8.self) }
+  let longTagged = NSSlowTaggedLocalizedString.createTest()!
+  shortNonTagged.withCString {
+    NSSlowTaggedLocalizedString.setContents($0)
+  }
+  defer {
+    NSSlowTaggedLocalizedString.setContents(nil)
+  }
+  let reverseBridged = unsafeBitCast(native._guts._object.largeAddressBits, to: AnyObject.self)
+  let eq = reverseBridged.isEqual(to: longTagged)
+  expectEqual(eq, 1)
+  _fixLifetime(native)
 }
 
 runAllTests()
