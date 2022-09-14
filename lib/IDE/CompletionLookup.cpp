@@ -2091,9 +2091,7 @@ bool CompletionLookup::handleEnumElement(ValueDecl *D,
                       /*HasTypeContext=*/true);
     return true;
   } else if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    llvm::DenseSet<EnumElementDecl *> Elements;
-    ED->getAllElements(Elements);
-    for (auto *Ele : Elements) {
+    for (auto *Ele : ED->getAllElements()) {
       addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
     }
