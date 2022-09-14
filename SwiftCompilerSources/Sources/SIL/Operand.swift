@@ -54,14 +54,14 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   public var endIndex: Int { return Int(opArray.numElements) }
   
   public subscript(_ index: Int) -> Operand {
-    precondition(index >= 0 && index < endIndex)
+    assert(index >= 0 && index < endIndex)
     return Operand(BridgedOperand(op: opArray.data! + index &* BridgedOperandSize))
   }
   
   public func getIndex(of operand: Operand) -> Int {
     let idx = (operand.bridged.op - UnsafeRawPointer(opArray.data!)) /
                 BridgedOperandSize
-    precondition(self[idx].bridged.op == operand.bridged.op)
+    assert(self[idx].bridged.op == operand.bridged.op)
     return idx
   }
   
@@ -74,8 +74,8 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   ///
   /// Note: this does not return a Slice. The first index of the returnd array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
-    precondition(bounds.lowerBound >= 0)
-    precondition(bounds.upperBound <= endIndex)
+    assert(bounds.lowerBound >= 0)
+    assert(bounds.upperBound <= endIndex)
     return OperandArray(opArray: BridgedArrayRef(
       data: opArray.data! + bounds.lowerBound &* BridgedOperandSize,
       numElements: bounds.upperBound - bounds.lowerBound))

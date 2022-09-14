@@ -303,7 +303,7 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
   }
   
   mutating func start(forAnalyzingAddresses: Bool) {
-    precondition(walkDownCache.isEmpty && walkUpCache.isEmpty)
+    assert(walkDownCache.isEmpty && walkUpCache.isEmpty)
     analyzeAddresses = forAnalyzingAddresses
   }
 

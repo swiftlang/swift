@@ -60,7 +60,7 @@ public struct WitnessTable : CustomStringConvertible, CustomReflectable {
     public var endIndex: Int { return Int(bridged.numElements) }
     
     public subscript(_ index: Int) -> Entry {
-      precondition(index >= 0 && index < endIndex)
+      assert(index >= 0 && index < endIndex)
       return Entry(bridged: BridgedWitnessTableEntry(ptr: bridged.data! + index &* BridgedWitnessTableEntrySize))
     }
   }
