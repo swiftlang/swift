@@ -382,6 +382,14 @@ public:
   }
 
   ClangRepresentation
+  visitBoundGenericEnumType(BoundGenericEnumType *BGT,
+                            Optional<OptionalTypeKind> optionalKind,
+                            bool isInOutParam) {
+    return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
+                          BGT->getGenericArgs());
+  }
+
+  ClangRepresentation
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             Optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {

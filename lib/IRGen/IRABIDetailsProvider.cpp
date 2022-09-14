@@ -111,8 +111,8 @@ public:
   getEnumTagMapping(const EnumDecl *ED) {
     llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
         elements;
-    auto &enumImplStrat =
-        getEnumImplStrategy(IGM, ED->getDeclaredType()->getCanonicalType());
+    auto &enumImplStrat = getEnumImplStrategy(
+        IGM, ED->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
 
     for (auto *element : ED->getAllElements()) {
       auto tagIdx = enumImplStrat.getTagIndex(element);
