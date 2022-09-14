@@ -100,6 +100,19 @@ Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
+Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
+Func UnsafeMutableBufferPointer.update(repeating:) is a new API without @available attribute
+Func UnsafeMutablePointer.assign(from:count:) has been removed
+Func UnsafeMutablePointer.update(from:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.assign(repeating:count:) has been removed
+Func UnsafeMutablePointer.update(repeating:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.moveAssign(from:count:) has been removed
+Func UnsafeMutablePointer.moveUpdate(from:count:) is a new API without @available attribute
+
+// These haven't actually been removed; they were renamed at the source level while
+// retaining their old mangled name. The source break was accepted as part of se-0370.
+Func UnsafeMutableBufferPointer.initialize(from:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (A1.Iterator, Swift.Int)' to 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (unwritten: A1.Iterator, index: Swift.Int)'
+Func UnsafeMutableBufferPointer.initialize(from:) has return type change from (τ_1_0.Iterator, Swift.Int) to (unwritten: τ_1_0.Iterator, index: Swift.Int)
 
 // These haven't actually been removed; they are simply marked unavailable.
 // This seems to be a false positive in the ABI checker. This is not an ABI
