@@ -10,13 +10,17 @@
 
 // FIXME: remove the need for -Wno-reserved-identifier
 
-class TracksDeinit {
+public class TracksDeinit {
     init() {
         print("init-TracksDeinit")
     }
     deinit {
         print("destroy-TracksDeinit")
     }
+}
+
+public func constructTracksDeinit() -> TracksDeinit {
+    return TracksDeinit()
 }
 
 @frozen
@@ -179,7 +183,9 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:       auto *thisCopy = new(buffer) GenericOpt(*this);
 // CHECK-NEXT:       char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
 // CHECK-NEXT:     if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
-// CHECK-NEXT:   abort();
+// CHECK-NEXT:     void *returnValue;
+// CHECK-NEXT:     returnValue = *reinterpret_cast<void **>(payloadFromDestruction);
+// CHECK-NEXT:     return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
 // CHECK-NEXT:     } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
 // CHECK-NEXT:     return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) {
 // CHECK-NEXT:    return ::swift::_impl::implClassFor<T_0_0>::type::initializeWithTake(reinterpret_cast<char * _Nonnull>(returnValue), payloadFromDestruction);

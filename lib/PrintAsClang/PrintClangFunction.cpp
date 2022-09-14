@@ -928,26 +928,26 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
   os << "  if constexpr (std::is_base_of<::swift::"
      << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
      << resultTyName << ">::value) {\n";
+  os << "  void *returnValue;\n  ";
   if (!initializeWithTakeFromValue) {
-    os << "  void *returnValue;\n  ";
     invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+  } else {
+    os << "returnValue = *reinterpret_cast<void **>("
+       << *initializeWithTakeFromValue << ")";
+  }
     os << ";\n";
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
        << ">::type::makeRetained(returnValue);\n";
-  } else {
-    // FIXME: support taking a class pointer.
-    os << "abort();\n";
-  }
-  os << "  } else if constexpr (::swift::"
-     << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
-     << resultTyName << ">) {\n";
+    os << "  } else if constexpr (::swift::"
+       << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
+       << resultTyName << ">) {\n";
 
-  os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-     << "::implClassFor<" << resultTyName
-     << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
-  if (!initializeWithTakeFromValue) {
-    invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
+    os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::implClassFor<" << resultTyName
+       << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+    if (!initializeWithTakeFromValue) {
+      invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
   } else {
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName

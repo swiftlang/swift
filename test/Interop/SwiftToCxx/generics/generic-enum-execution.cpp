@@ -14,6 +14,13 @@
 #include <cassert>
 #include <cstdio>
 
+extern "C" size_t swift_retainCount(void * _Nonnull obj);
+
+size_t getRetainCount(const Generics::TracksDeinit & swiftClass) {
+  void *p = swift::_impl::_impl_RefCountedClass::getOpaquePointer(swiftClass);
+  return swift_retainCount(p);
+}
+
 int main() {
   using namespace Generics;
 
@@ -63,6 +70,21 @@ int main() {
     auto x   = makeGenericOpt<StructForEnum>(StructForEnum::init());
     auto val = x.getSome();
     // CHECK-NEXT: init-TracksDeinit
+    // CHECK-NEXT: destroy-TracksDeinit
+  }
+  {
+    auto ptr = constructTracksDeinit();
+    // CHECK-NEXT: init-TracksDeinit
+    assert(getRetainCount(ptr) == 1);
+    {
+      auto x   = makeGenericOpt<TracksDeinit>(ptr);
+      assert(getRetainCount(ptr) == 2);
+      auto ptr2 = x.getSome();
+      assert(getRetainCount(ptr) == 3);
+    }
+    puts("after some");
+    assert(getRetainCount(ptr) == 1);
+    // CHECK-NEXT: after some
     // CHECK-NEXT: destroy-TracksDeinit
   }
   puts("EOF");
