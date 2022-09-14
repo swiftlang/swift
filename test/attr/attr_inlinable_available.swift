@@ -14,7 +14,7 @@
 
 
 // Check that `-library-level api` implies `-target-min-inlining-version min`
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -module-name Test -target %target-next-stable-abi-triple -library-level api
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -module-name Test -target %target-next-stable-abi-triple -library-level api -require-explicit-availability=ignore
 
 
 // Check that these rules are only applied when requested and that at least some
@@ -24,7 +24,7 @@
 
 // Check that -target-min-inlining-version overrides -library-level, allowing
 // library owners to disable this behavior for API libraries if needed.
-// RUN: not %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -module-name Test -target %target-next-stable-abi-triple -target-min-inlining-version target -library-level api 2>&1 | %FileCheck --check-prefix NON_MIN %s
+// RUN: not %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -module-name Test -target %target-next-stable-abi-triple -target-min-inlining-version target -library-level api -require-explicit-availability=ignore 2>&1 | %FileCheck --check-prefix NON_MIN %s
 
 
 // Check that we respect -target-min-inlining-version by cranking it up high
