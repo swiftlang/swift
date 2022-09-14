@@ -2198,26 +2198,82 @@ namespace {
     }
   };
 
-  /// A physical component which performs an unchecked_addr_cast
-  class ABISafeConversionComponent final : public PhysicalPathComponent {
+  /// A translation component that performs \c unchecked_*_cast 's as-needed.
+  class UncheckedConversionComponent final : public TranslationPathComponent {
+  private:
+    Type OrigType;
+
+    /// \returns the type this component is trying to convert \b to
+    CanType getTranslatedType() const {
+      return getTypeData().SubstFormalType->getCanonicalType();
+    }
+
+    /// \returns the type this component is trying to convert \b from
+    CanType getUntranslatedType() const {
+      return OrigType->getRValueType()->getCanonicalType();
+    }
+
+    /// perform a conversion of ManagedValue -> ManagedValue
+    ManagedValue doUncheckedConversion(SILGenFunction &SGF, SILLocation loc,
+                                       ManagedValue val, CanType toType) {
+      auto toTy = SGF.getLoweredType(toType);
+      auto fromTy = val.getType();
+
+      if (fromTy == toTy)
+        return val; // nothing to do.
+
+      // otherwise emit the right kind of cast based on whether it's an address.
+      assert(fromTy.isAddress() == toTy.isAddress());
+
+      if (toTy.isAddress())
+        return SGF.B.createUncheckedAddrCast(loc, val, toTy);
+
+      return SGF.B.createUncheckedBitCast(loc, val, toTy);
+    }
+
+    /// perform a conversion of RValue -> RValue
+    RValue doUncheckedConversion(SILGenFunction &SGF, SILLocation loc,
+                                 RValue &&rv, CanType toType) {
+      auto val = std::move(rv).getAsSingleValue(SGF, loc);
+      val = doUncheckedConversion(SGF, loc, val, toType);
+      return RValue(SGF, loc, toType, val);
+    }
+
   public:
-    ABISafeConversionComponent(LValueTypeData typeData)
-      : PhysicalPathComponent(typeData, ABISafeConversionKind,
-                              /*actorIsolation=*/None) {}
+    /// \param OrigType is the type we are converting \b from
+    /// \param typeData will contain the type we are converting \b to
+    UncheckedConversionComponent(LValueTypeData typeData, Type OrigType)
+      : TranslationPathComponent(typeData, UncheckedConversionKind),
+      OrigType(OrigType) {}
 
-    ManagedValue project(SILGenFunction &SGF, SILLocation loc,
-                         ManagedValue base) && override {
-      auto toType = SGF.getLoweredType(getTypeData().SubstFormalType)
-                       .getAddressType();
+    bool isLoadingPure() const override { return true; }
 
-      if (base.getType() == toType)
-        return base; // nothing to do
+    /// Used during write operations to convert the value prior to writing to
+    /// the base.
+    RValue untranslate(SILGenFunction &SGF, SILLocation loc,
+                       RValue &&rv, SGFContext c) && override {
+      return doUncheckedConversion(SGF, loc, std::move(rv),
+                getUntranslatedType());
+    }
 
-      return SGF.B.createUncheckedAddrCast(loc, base, toType);
+    /// Used during read operations to convert the value after reading the base.
+    RValue translate(SILGenFunction &SGF, SILLocation loc,
+                     RValue &&rv, SGFContext c) && override {
+      return doUncheckedConversion(SGF, loc, std::move(rv),
+                getTranslatedType());
+    }
+
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &SGF, SILLocation loc) const override {
+      return std::make_unique<UncheckedConversionComponent>(getTypeData(),
+                                                            OrigType);
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "ABISafeConversionComponent\n";
+      OS.indent(indent) << "UncheckedConversionComponent"
+                        << "\n\tfromType: " << getUntranslatedType()
+                        << "\n\ttoType: " << getTranslatedType()
+                        << "\n";
     }
   };
 } // end anonymous namespace
@@ -3756,7 +3812,9 @@ LValue SILGenLValue::visitABISafeConversionExpr(ABISafeConversionExpr *e,
   LValue lval = visitRec(e->getSubExpr(), accessKind, options);
   auto typeData = getValueTypeData(SGF, accessKind, e);
 
-  lval.add<ABISafeConversionComponent>(typeData);
+  auto OrigType = e->getSubExpr()->getType();
+
+  lval.add<UncheckedConversionComponent>(typeData, OrigType);
 
   return lval;
 }
