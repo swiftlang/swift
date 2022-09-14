@@ -1,7 +1,25 @@
 // Test the -require-explicit-availability flag
 // REQUIRES: OS=macosx
+// RUN: %empty-directory(%t)
 
-// RUN: %swiftc_driver -typecheck -parse-as-library -target %target-cpu-apple-macosx10.10 -Xfrontend -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
+/// Using the flag directly raises warnings and fixits.
+// RUN: %swiftc_driver -typecheck -parse-as-library -Xfrontend -verify %s \
+// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability \
+// RUN:   -require-explicit-availability-target "macOS 10.10"
+// RUN: %swiftc_driver -typecheck -parse-as-library -Xfrontend -verify %s \
+// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability=warn \
+// RUN:   -require-explicit-availability-target "macOS 10.10"
+
+/// Upgrade the diagnostic to an error.
+// RUN: sed -e "s/xpected-warning/xpected-error/" < %s > %t/Errors.swift
+// RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/Errors.swift \
+// RUN:   -target %target-cpu-apple-macosx10.10 -require-explicit-availability=error \
+// RUN:   -require-explicit-availability-target "macOS 10.10"
+
+/// Error on an invalid argument.
+// RUN: not %target-swift-frontend -typecheck %s -require-explicit-availability=NotIt 2>&1 \
+// RUN:   | %FileCheck %s --check-prefix CHECK-ARG
+// CHECK-ARG: error: unknown argument 'NotIt', passed to -require-explicit-availability, expected 'error', 'warn' or 'ignore'
 
 public struct S { // expected-warning {{public declarations should have an availability attribute with an introduction version}}
   public func method() { }

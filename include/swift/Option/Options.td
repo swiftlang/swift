@@ -411,7 +411,13 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
 
 def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Require explicit availability on public declarations">;
+  HelpText<"Warn on public declarations without an availability attribute">;
+
+def require_explicit_availability_EQ : Joined<["-"], "require-explicit-availability=">,
+  MetaVarName<"<error,warn,ignore>">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Set diagnostic level to report public declarations without an availability attribute">;
+
 def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
