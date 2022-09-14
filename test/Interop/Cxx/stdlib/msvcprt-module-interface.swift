@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -print-module -module-to-print std -source-filename none -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s -check-prefix CHECK-STD
-// RUN: %target-swift-ide-test -print-module -module-to-print=std.string -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s -check-prefix CHECK-STRING
+// RUN: %target-swift-ide-test -print-module -module-to-print CxxStdlib -source-filename none -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s -check-prefix CHECK-STD
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib.string -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s -check-prefix CHECK-STRING
 
 // This test is specific to msvcprt and therefore only runs on Windows.
 // REQUIRES: OS=windows-msvc
