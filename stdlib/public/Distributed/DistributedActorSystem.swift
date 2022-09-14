@@ -280,17 +280,24 @@ public protocol DistributedActorSystem: Sendable {
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity
 
-  /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
+  /// Resolves a local or remote ``ActorID`` to a reference to given actor, or throws if unable to.
+  ///
   /// The returned value is either a local actor or proxy to a remote actor.
   ///
-  /// Resolving an actor is called when a specific distributed actors `init(from:)`
-  /// decoding initializer is invoked. Once the actor's identity is deserialized
-  /// using the `decodeIdentity(from:)` call, it is fed into this function, which
-  /// is responsible for resolving the identity to a remote or local actor reference.
+  /// This function is not intended to be used directly, but instead is called by the Swift runtime
+  /// whenever ``DistributedActor/resolve(id:using:)` or  a concrete distributed actor's `init(from:)` is invoked.
   ///
-  /// If the resolve fails, meaning that it cannot locate a local actor managed for
-  /// this identity, managed by this transport, nor can a remote actor reference
-  /// be created for this identity on this transport, then this function must throw.
+  /// This function should either return an existing actor reference, or `nil` to signal that a remote distributed actor
+  /// "proxy" should be created for this ``ActorID``. If the resolve fails, meaning that it can neither locate a local
+  /// actor managed by this actor system, nor identify that the identity is located on some remote actor system, then
+  /// this function should throw.
+  ///
+  /// ```swift
+  /// distributed actor Worker { /* ... */ }
+  ///
+  /// // the following internally calls actorSystem.resolve(id: id, as: Worker.self)
+  /// let worker: Worker = try  Worker.resolve(id: id, using: actorSystem)
+  /// ```
   ///
   /// If this function returns correctly, the returned actor reference is immediately
   /// usable. It may not necessarily imply the strict *existence* of a remote actor
@@ -300,13 +307,20 @@ public protocol DistributedActorSystem: Sendable {
   ///
   /// Detecting liveness of such remote actors shall be offered / by transport libraries
   /// by other means, such as "watching an actor for termination" or similar.
+  ///
+  /// - Parameter id: The `ActorID` to resolve an actor reference for
+  /// - Parameter actorType: The type of distributed actor the ID is expected to point at.
+  ///
+  /// - Throws: When unable to confirm if the `id` is correct, the resolved actor does not match the expected `actorType`,
+  ///           or any other internal validation error within the actor system's resolve process occurs.
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
     where Act: DistributedActor,
     Act.ID == ActorID
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Actor Lifecycle
-  /// Create an `ActorID` for the passed actor type.
+
+  /// Assign an ``ActorID`` for the passed actor type.
   ///
   /// This function is invoked by an distributed actor during its initialization,
   /// and the returned address value is stored along with it for the time of its
@@ -326,10 +340,10 @@ public protocol DistributedActorSystem: Sendable {
   /// mapping for the purpose of implementing the `resolve(id:as:)` method.
   ///
   /// The system usually should NOT retain the passed reference, and it will be informed via
-  /// `resignID(_:)` when the actor has been deallocated so it can remove the stale reference from its
+  /// ``resignID(_:)`` when the actor has been deallocated so it can remove the stale reference from its
   /// internal `ActorID: DistributedActor` mapping.
   ///
-  /// The `actor.id` of the passed actor must be an `ActorID` that this system previously has assigned.
+  /// The ``DistributedActor/id`` of the passed actor must be an ``ActorID`` that this system previously has assigned.
   ///
   /// If `actorReady` gets called with some unknown ID, it should crash immediately as it signifies some
   /// very unexpected use of the system.
@@ -726,10 +740,13 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// entry points on the provided types.
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationEncoder {
+  /// The serialization requirement that the types passed to `recordArgument` and `recordReturnType` are required to conform to.
   associatedtype SerializationRequirement
 
   /// The arguments must be encoded order-preserving, and once `decodeGenericSubstitutions`
   /// is called, the substitutions must be returned in the same order in which they were recorded.
+  ///
+  /// - Parameter type: a generic substitution type to be recorded for this invocation.
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws
 
 //  /// Ad-hoc requirement
@@ -742,6 +759,8 @@ public protocol DistributedTargetInvocationEncoder {
 
   /// Record the error type of the distributed method.
   /// This method will not be invoked if the target is not throwing.
+  ///
+  /// - Parameter type: the type of error that was declared to be thrown by the invocation target. Currently this can only ever be `Error.self`.
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws
 
 //  /// Ad-hoc requirement
@@ -750,6 +769,10 @@ public protocol DistributedTargetInvocationEncoder {
 //  /// This method will not be invoked if the target is returning `Void`.
 //  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws
 
+  /// Invoked to signal to the encoder that no further `record...` calls will be made on it.
+  ///
+  /// Useful if the encoder needs to perform some "final" task before the underlying message is considered complete,
+  /// e.g. computing a checksum, or some additional message signing or finalization step.
   mutating func doneRecording() throws
 }
 
@@ -828,8 +851,17 @@ public struct RemoteCallArgument<Value> {
 /// ```
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
+  /// The serialization requirement that the types passed to `decodeNextArgument` are required to conform to.
+  /// The type returned by `decodeReturnType` is also expected to conform to this associated type requirement.
   associatedtype SerializationRequirement
 
+  /// Decode all generic substitutions that were recorded for this invocation.
+  ///
+  /// The values retrieved from here must be in the same order as they were recorded by
+  /// ``DistributedTargetInvocationEncoder/recordGenericSubstitution(_:)``.
+  ///
+  /// - Returns: array of all generic substitutions necessary to execute this invocation target.
+  /// - Throws: if decoding substitutions fails.
   mutating func decodeGenericSubstitutions() throws -> [Any.Type]
 
 //  /// Ad-hoc protocol requirement
@@ -847,6 +879,10 @@ public protocol DistributedTargetInvocationDecoder {
 //  /// performs the actual distributed (local) instance method invocation.
 //  mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 
+  /// Decode the specific error type that the distributed invocation target has recorded.
+  /// Currently this effectively can only ever be `Error.self`.
+  ///
+  /// If the target known to not be throwing, or no error type was recorded, the method should return `nil`.
   mutating func decodeErrorType() throws -> Any.Type?
 
   /// Attempt to decode the known return type of the distributed invocation.
@@ -884,6 +920,7 @@ public protocol DistributedTargetInvocationDecoder {
 /// ```
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationResultHandler {
+  /// The serialization requirement that the value passed to `onReturn` is required to conform to.
   associatedtype SerializationRequirement
 
 //  /// Ad-hoc protocol requirement
