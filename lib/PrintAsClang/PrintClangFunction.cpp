@@ -382,6 +382,14 @@ public:
   }
 
   ClangRepresentation
+  visitBoundGenericEnumType(BoundGenericEnumType *BGT,
+                            Optional<OptionalTypeKind> optionalKind,
+                            bool isInOutParam) {
+    return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
+                          BGT->getGenericArgs());
+  }
+
+  ClangRepresentation
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             Optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
@@ -904,6 +912,72 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
   namePrinter();
 }
 
+void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
+    raw_ostream &os, const GenericTypeParamType *gtpt,
+    llvm::function_ref<void(StringRef)> invocationPrinter,
+    Optional<StringRef> initializeWithTakeFromValue) {
+  std::string returnAddress;
+  llvm::raw_string_ostream ros(returnAddress);
+  ros << "reinterpret_cast<void *>(&returnValue)";
+  std::string resultTyName;
+  {
+    llvm::raw_string_ostream os(resultTyName);
+    ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
+  }
+
+  os << "  if constexpr (std::is_base_of<::swift::"
+     << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
+     << resultTyName << ">::value) {\n";
+  os << "  void *returnValue;\n  ";
+  if (!initializeWithTakeFromValue) {
+    invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+  } else {
+    os << "returnValue = *reinterpret_cast<void **>("
+       << *initializeWithTakeFromValue << ")";
+  }
+    os << ";\n";
+    os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::implClassFor<" << resultTyName
+       << ">::type::makeRetained(returnValue);\n";
+    os << "  } else if constexpr (::swift::"
+       << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
+       << resultTyName << ">) {\n";
+
+    os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::implClassFor<" << resultTyName
+       << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
+    if (!initializeWithTakeFromValue) {
+      invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
+  } else {
+    os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::implClassFor<" << resultTyName
+       << ">::type::initializeWithTake(reinterpret_cast<char * "
+          "_Nonnull>(returnValue), "
+       << *initializeWithTakeFromValue << ")";
+  }
+  os << ";\n  });\n";
+  os << "  } else if constexpr (::swift::"
+     << cxx_synthesis::getCxxImplNamespaceName() << "::isSwiftBridgedCxxRecord<"
+     << resultTyName << ">) {\n";
+  if (!initializeWithTakeFromValue) {
+    ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
+                                                 invocationPrinter);
+  } else {
+    // FIXME: support taking a C++ record type.
+    os << "abort();\n";
+  }
+  os << "  } else {\n";
+  os << "  " << resultTyName << " returnValue;\n";
+  if (!initializeWithTakeFromValue) {
+    invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+  } else {
+    os << "memcpy(&returnValue, " << *initializeWithTakeFromValue
+       << ", sizeof(returnValue))";
+  }
+  os << ";\n  return returnValue;\n";
+  os << "  }\n";
+}
+
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
     StringRef swiftSymbolName, const ModuleDecl *moduleContext, Type resultTy,
@@ -1004,42 +1078,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (!isKnownCxxType(resultTy, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
     if (const auto *gtpt = resultTy->getAs<GenericTypeParamType>()) {
-      std::string returnAddress;
-      llvm::raw_string_ostream ros(returnAddress);
-      ros << "reinterpret_cast<void *>(&returnValue)";
-      std::string resultTyName;
-      {
-        llvm::raw_string_ostream os(resultTyName);
-        ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
-      }
-
-      os << "  if constexpr (std::is_base_of<::swift::"
-         << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
-         << resultTyName << ">::value) {\n";
-      os << "  void *returnValue;\n  ";
-      printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
-      os << ";\n";
-      os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-         << "::implClassFor<" << resultTyName
-         << ">::type::makeRetained(returnValue);\n";
-      os << "  } else if constexpr (::swift::"
-         << cxx_synthesis::getCxxImplNamespaceName() << "::isValueType<"
-         << resultTyName << ">) {\n";
-      os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-         << "::implClassFor<" << resultTyName
-         << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
-      printCallToCFunc(/*additionalParam=*/StringRef("returnValue"));
-      os << ";\n  });\n";
-      os << "  } else if constexpr (::swift::"
-         << cxx_synthesis::getCxxImplNamespaceName()
-         << "::isSwiftBridgedCxxRecord<" << resultTyName << ">) {\n";
-      ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
-                                                   printCallToCFunc);
-      os << "  } else {\n";
-      os << "  " << resultTyName << " returnValue;\n";
-      printCallToCFunc(/*additionalParam=*/StringRef(ros.str()));
-      os << ";\n  return returnValue;\n";
-      os << "  }\n";
+      printGenericReturnSequence(os, gtpt, printCallToCFunc);
       return;
     }
     if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
