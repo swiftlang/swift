@@ -196,7 +196,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
 #ifdef SWIFT_SWIFT_PARSER
   if ((ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
        ctx.LangOpts.hasFeature(Feature::ParserValidation)) &&
-      ctx.SourceMgr.getCodeCompletionBufferID() != bufferID) {
+      ctx.SourceMgr.getCodeCompletionBufferID() != bufferID &&
+      SF->Kind != SourceFileKind::SIL) {
     auto bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
     unsigned int flags = 0;
 
