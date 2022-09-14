@@ -602,6 +602,12 @@ public:
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
 
+  /// Get IteratorProtocol.next().
+  FuncDecl *getIteratorNext() const;
+
+  /// Get AsyncIteratorProtocol.next().
+  FuncDecl *getAsyncIteratorNext() const;
+
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
