@@ -210,6 +210,12 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
 
+  /// The declaration of 'IteratorProtocol.next()'.
+  FuncDecl *IteratorNext = nullptr;
+
+  /// The declaration of 'AsyncIteratorProtocol.next()'.
+  FuncDecl *AsyncIteratorNext = nullptr;
+
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -779,6 +785,23 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
   return getImpl().PlusFunctionOnString;
 }
 
+static FuncDecl *lookupRequirement(ProtocolDecl *proto,
+                                   Identifier requirement) {
+  for (auto result : proto->lookupDirect(requirement)) {
+    if (result->getDeclContext() != proto)
+      continue;
+
+    if (auto func = dyn_cast<FuncDecl>(result)) {
+      if (func->getParameters()->size() != 0)
+        continue;
+
+      return func;
+    }
+  }
+
+  return nullptr;
+}
+
 FuncDecl *ASTContext::getSequenceMakeIterator() const {
   if (getImpl().MakeIterator) {
     return getImpl().MakeIterator;
@@ -788,17 +811,9 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   if (!proto)
     return nullptr;
 
-  for (auto result : proto->lookupDirect(Id_makeIterator)) {
-    if (result->getDeclContext() != proto)
-      continue;
-
-    if (auto func = dyn_cast<FuncDecl>(result)) {
-      if (func->getParameters()->size() != 0)
-        continue;
-
-      getImpl().MakeIterator = func;
-      return func;
-    }
+  if (auto *func = lookupRequirement(proto, Id_makeIterator)) {
+    getImpl().MakeIterator = func;
+    return func;
   }
 
   return nullptr;
@@ -813,17 +828,43 @@ FuncDecl *ASTContext::getAsyncSequenceMakeAsyncIterator() const {
   if (!proto)
     return nullptr;
 
-  for (auto result : proto->lookupDirect(Id_makeAsyncIterator)) {
-    if (result->getDeclContext() != proto)
-      continue;
+  if (auto *func = lookupRequirement(proto, Id_makeAsyncIterator)) {
+    getImpl().MakeAsyncIterator = func;
+    return func;
+  }
 
-    if (auto func = dyn_cast<FuncDecl>(result)) {
-      if (func->getParameters()->size() != 0)
-        continue;
+  return nullptr;
+}
 
-      getImpl().MakeAsyncIterator = func;
-      return func;
-    }
+FuncDecl *ASTContext::getIteratorNext() const {
+  if (getImpl().IteratorNext) {
+    return getImpl().IteratorNext;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::IteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_next)) {
+    getImpl().IteratorNext = func;
+    return func;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getAsyncIteratorNext() const {
+  if (getImpl().AsyncIteratorNext) {
+    return getImpl().AsyncIteratorNext;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_next)) {
+    getImpl().AsyncIteratorNext = func;
+    return func;
   }
 
   return nullptr;
