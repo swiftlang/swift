@@ -77,10 +77,13 @@ static bool isUnmapped(ASTNode N) {
       return true;
     }
 
-    // Map implicit getters.
-    if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
-      if (accessor->isImplicit() && accessor->isGetter())
+    // Map implicit getters for lazy variables.
+    if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+      if (accessor->isImplicit() && accessor->isGetter() &&
+          accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
         return false;
+      }
+    }
   }
 
   // Skip any remaining implicit, or otherwise unsupported decls.
