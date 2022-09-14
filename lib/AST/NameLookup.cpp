@@ -2808,9 +2808,13 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
 
     bool walkToTypeReprPre(TypeRepr *repr) override {
       if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
-        return false;
+        auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
+        if(generic)
+          Reprs.push_back(existential);
+        auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
+        return meta || generic?  true : false;
       }
-      
+
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
         Reprs.push_back(opaqueRepr);
         if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
@@ -2822,6 +2826,14 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
           if (!compositionRepr->isTypeReprAny())
             Reprs.push_back(compositionRepr);
           return false;
+        } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
+          if (!Reprs.empty()){
+            if(isa<ExistentialTypeRepr>(Reprs.front())){
+              Reprs.clear();
+              return true;
+            }
+          }
+          Reprs.push_back(generic);
         } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
           if (identRepr->isProtocol(dc))
             Reprs.push_back(identRepr);

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-implicit-some -typecheck -verify %s
 
 // I do not like nested some type params,
 // I do not like them Σam-i-am
