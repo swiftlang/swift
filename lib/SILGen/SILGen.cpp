@@ -1459,8 +1459,6 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   SILDeclRef constant(decl);
   DeclContext *declCtx = decl->getDeclContext();
 
-  bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
-
   if (declCtx->getSelfClassDecl()) {
     // Designated initializers for classes, as well as @objc convenience
     // initializers, have have separate entry points for allocation and
@@ -1470,8 +1468,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
       if (decl->hasBody()) {
         SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-        emitOrDelayFunction(*this, initConstant,
-                            /*forceEmission=*/ForCoverageMapping);
+        emitOrDelayFunction(*this, initConstant);
       }
 
       return;
