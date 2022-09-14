@@ -374,7 +374,6 @@ extension _SmallString {
   }
   
   @_effects(readonly) // @opaque
-  @usableFromInline // testable
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()
     var success = true
