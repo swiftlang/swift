@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Basic
 import SIL
 
 /// Removes redundant ObjectiveC <-> Swift bridging calls.

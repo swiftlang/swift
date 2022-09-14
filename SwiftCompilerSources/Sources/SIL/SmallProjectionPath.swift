@@ -541,14 +541,14 @@ extension SmallProjectionPath {
       let p1 = SmallProjectionPath(.structField, index: 3)
                         .push(.classField, index: 12345678)
       let (k2, i2, p2) = p1.pop()
-      precondition(k2 == .classField && i2 == 12345678)
+      assert(k2 == .classField && i2 == 12345678)
       let (k3, i3, p3) = p2.pop()
-      precondition(k3 == .structField && i3 == 3)
-      precondition(p3.isEmpty)
+      assert(k3 == .structField && i3 == 3)
+      assert(p3.isEmpty)
       let (k4, i4, _) = p2.push(.enumCase, index: 876).pop()
-      precondition(k4 == .enumCase && i4 == 876)
+      assert(k4 == .enumCase && i4 == 876)
       let p5 = SmallProjectionPath(.anything)
-      precondition(p5.pop().path.isEmpty)
+      assert(p5.pop().path.isEmpty)
     }
     
     func parsing() {
@@ -581,9 +581,9 @@ extension SmallProjectionPath {
     func testParse(_ pathStr: String, expect: SmallProjectionPath) {
       var parser = StringParser(pathStr)
       let path = try! parser.parseProjectionPathFromSIL()
-      precondition(path == expect)
+      assert(path == expect)
       let str = path.description
-      precondition(str == pathStr)
+      assert(str == pathStr)
     }
    
     func merging() {
@@ -609,9 +609,9 @@ extension SmallProjectionPath {
       let expect = try! expectParser.parseProjectionPathFromSIL()
 
       let result = lhs.merge(with: rhs)
-      precondition(result == expect)
+      assert(result == expect)
       let result2 = rhs.merge(with: lhs)
-      precondition(result2 == expect)
+      assert(result2 == expect)
     }
    
     func matching() {
@@ -643,7 +643,7 @@ extension SmallProjectionPath {
       var rhsParser = StringParser(rhsStr)
       let rhs = try! rhsParser.parseProjectionPathFromSIL()
       let result = lhs.matches(pattern: rhs)
-      precondition(result == expect)
+      assert(result == expect)
     }
 
     func overlapping() {
@@ -673,9 +673,9 @@ extension SmallProjectionPath {
       var rhsParser = StringParser(rhsStr)
       let rhs = try! rhsParser.parseProjectionPathFromSIL()
       let result = lhs.mayOverlap(with: rhs)
-      precondition(result == expect)
+      assert(result == expect)
       let reversedResult = rhs.mayOverlap(with: lhs)
-      precondition(reversedResult == expect)
+      assert(reversedResult == expect)
     }
 
     func predicates() {
@@ -696,7 +696,7 @@ extension SmallProjectionPath {
       var parser = StringParser(pathStr)
       let path = try! parser.parseProjectionPathFromSIL()
       let result = property(path)
-      precondition(result == expect)
+      assert(result == expect)
     }
     
     func path2path() {
@@ -727,9 +727,9 @@ extension SmallProjectionPath {
       if let expect = expect {
         var expectParser = StringParser(expect)
         let expectPath = try! expectParser.parseProjectionPathFromSIL()
-        precondition(result == expectPath)
+        assert(result == expectPath)
       } else {
-        precondition(result == nil)
+        assert(result == nil)
       }
     }
   }

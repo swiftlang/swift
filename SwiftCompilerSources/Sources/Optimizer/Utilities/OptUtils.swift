@@ -44,8 +44,8 @@ extension Value {
   /// in a loop while this value is not in that loop, the value has to be copied for
   /// each loop iteration.
   func makeAvailable(in destBlock: BasicBlock, _ context: PassContext) -> Value {
-    precondition(uses.isEmpty)
-    precondition(ownership == .owned)
+    assert(uses.isEmpty)
+    assert(ownership == .owned)
 
     let beginBlock = definingBlock
     var useToDefRange = BasicBlockRange(begin: beginBlock, context)
