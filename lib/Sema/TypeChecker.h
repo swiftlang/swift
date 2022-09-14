@@ -905,8 +905,8 @@ lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
 
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
-PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
-                                                           Expr *op);
+PrecedenceGroupDecl *
+lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
