@@ -211,6 +211,9 @@ public:
     if (TT->getNumElements() > 0)
       // FIXME: Handle non-void type.
       return ClangRepresentation::unsupported;
+    // FIXME: how to support `()` parameters.
+    if (typeUseKind != FunctionSignatureTypeUse::ReturnType)
+      return ClangRepresentation::unsupported;
     os << "void";
     return ClangRepresentation::representable;
   }
