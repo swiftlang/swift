@@ -177,5 +177,6 @@ endif()
 # headers.
 # For more information see the comment at the top of lib/CMakeLists.txt.
 add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
+add_dependencies(swiftAST swift-ast-generated-headers)
 
 set_swift_llvm_is_available(swiftAST)
