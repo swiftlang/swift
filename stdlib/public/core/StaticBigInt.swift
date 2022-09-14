@@ -148,7 +148,7 @@ extension StaticBigInt: CustomDebugStringConvertible {
     var result = String(unsafeUninitializedCapacity: capacity) { utf8 in
 
       // Pre-initialize with zeros, ignoring extra capacity.
-      var utf8 = UnsafeMutableBufferPointer(rebasing: utf8.prefix(capacity))
+      var utf8 = utf8.prefix(capacity)
       utf8.initialize(repeating: UInt8(ascii: "0"))
 
       // Use a 32-bit element type, to generate small hexadecimal strings.
@@ -171,12 +171,8 @@ extension StaticBigInt: CustomDebugStringConvertible {
 
         // Overwrite trailing zeros with hexadecimal digits.
         let hexDigits = String(element, radix: 16, uppercase: true).utf8
-        _ = UnsafeMutableBufferPointer(
-          rebasing: utf8.suffix(hexDigits.count)
-        ).initialize(from: hexDigits)
-        utf8 = UnsafeMutableBufferPointer(
-          rebasing: utf8.dropLast(hexDigitsPerElement)
-        )
+        _ = utf8.suffix(hexDigits.count).update(fromContentsOf: hexDigits)
+        utf8 = utf8.dropLast(hexDigitsPerElement)
       }
       return capacity
     }
