@@ -62,6 +62,7 @@ KNOWN_SETTINGS=(
     build-args                                    ""                "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                                     ""                "out-of-tree build directory; default is in-tree. **This argument is required**"
     build-jobs                                    ""                "The number of parallel build jobs to use"
+    lit-jobs                                      ""                "The number of workers to use when testing with lit"
     build-runtime-with-host-compiler              ""                "use the host c++ compiler to build everything"
     build-stdlib-deployment-targets               "all"             "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
     build-toolchain-only                          ""                "If set, only build the necessary tools to build an external toolchain"
@@ -829,10 +830,10 @@ function set_build_options_for_host() {
     )
 
     llvm_cmake_options+=(
-        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
     swift_cmake_options+=(
-        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
@@ -2949,7 +2950,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : int($2/2) }')"
+                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < $2) ? N : int($2/2) }')"
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"
