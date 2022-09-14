@@ -9280,45 +9280,41 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       };
 
       auto *baseExpr = memberRef->getBase();
-      // If base type is an existential, member lookup is fine because
-      // it would return a witness.
-      if (!baseObjTy->isExistentialType()) {
-        // Handle `makeIterator` reference.
-        if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-            isRefTo(memberRef, ctx.Id_makeIterator, /*lables=*/{})) {
-          auto *sequenceProto = cast<ProtocolDecl>(
-              getContextualType(baseExpr, /*forConstraint=*/false)
-                  ->getAnyNominal());
-          bool isAsync = sequenceProto == TypeChecker::getProtocol(
-                                              ctx, SourceLoc(),
-                                              KnownProtocolKind::AsyncSequence);
+      // Handle `makeIterator` reference.
+      if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
+          isRefTo(memberRef, ctx.Id_makeIterator, /*lables=*/{})) {
+        auto *sequenceProto = cast<ProtocolDecl>(
+            getContextualType(baseExpr, /*forConstraint=*/false)
+                ->getAnyNominal());
+        bool isAsync = sequenceProto ==
+                       TypeChecker::getProtocol(
+                           ctx, SourceLoc(), KnownProtocolKind::AsyncSequence);
 
-          auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                       : ctx.getSequenceMakeIterator();
+        auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                     : ctx.getSequenceMakeIterator();
 
-          return simplifyValueWitnessConstraint(
-              ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, DC,
-              FunctionRefKind::Compound, flags, locator);
-        }
+        return simplifyValueWitnessConstraint(
+            ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, useDC,
+            FunctionRefKind::Compound, flags, locator);
+      }
 
-        // Handle `next` reference.
-        if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-            isRefTo(memberRef, ctx.Id_next, /*labels=*/{})) {
-          auto *iteratorProto = cast<ProtocolDecl>(
-              getContextualType(baseExpr, /*forConstraint=*/false)
-                  ->getAnyNominal());
-          bool isAsync =
-              iteratorProto ==
-              TypeChecker::getProtocol(
-                  ctx, SourceLoc(), KnownProtocolKind::AsyncIteratorProtocol);
+      // Handle `next` reference.
+      if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
+          isRefTo(memberRef, ctx.Id_next, /*labels=*/{})) {
+        auto *iteratorProto = cast<ProtocolDecl>(
+            getContextualType(baseExpr, /*forConstraint=*/false)
+                ->getAnyNominal());
+        bool isAsync =
+            iteratorProto ==
+            TypeChecker::getProtocol(ctx, SourceLoc(),
+                                     KnownProtocolKind::AsyncIteratorProtocol);
 
-          auto *next =
-              isAsync ? ctx.getAsyncIteratorNext() : ctx.getIteratorNext();
+        auto *next =
+            isAsync ? ctx.getAsyncIteratorNext() : ctx.getIteratorNext();
 
-          return simplifyValueWitnessConstraint(
-              ConstraintKind::ValueWitness, baseTy, next, memberTy, DC,
-              FunctionRefKind::Compound, flags, locator);
-        }
+        return simplifyValueWitnessConstraint(
+            ConstraintKind::ValueWitness, baseTy, next, memberTy, useDC,
+            FunctionRefKind::Compound, flags, locator);
       }
     }
   }
@@ -9776,6 +9772,14 @@ ConstraintSystem::simplifyValueWitnessConstraint(
       baseType, flags, /*wantRValue=*/true);
   if (baseObjectType->isTypeVariableOrMember()) {
     return formUnsolved();
+  }
+
+  // If base type is an existential, let's open it before checking
+  // conformance.
+  if (baseObjectType->isExistentialType()) {
+    baseObjectType =
+        OpenedArchetypeType::get(baseObjectType->getCanonicalType(),
+                                 useDC->getGenericSignatureOfContext());
   }
 
   // Check conformance to the protocol. If it doesn't conform, this constraint
