@@ -147,24 +147,19 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
   return false;
 }
 
-SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
-                                 ASTNode N, SILDeclRef forDecl) {
-  // Avoid generating profiling state for declarations.
-  if (!forDefinition)
-    return nullptr;
-
+SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
   const auto &Opts = M.getOptions();
   if (!doesASTRequireProfiling(M, N) && Opts.UseProfile.empty())
     return nullptr;
 
-  if (!canCreateProfilerForAST(N, forDecl)) {
+  if (!canCreateProfilerForAST(N, Ref)) {
     N.dump(llvm::errs());
     llvm_unreachable("Invalid AST node for profiling");
   }
 
   auto *Buf = M.allocate<SILProfiler>(1);
   auto *SP =
-      ::new (Buf) SILProfiler(M, N, forDecl, Opts.EmitProfileCoverageMapping);
+      ::new (Buf) SILProfiler(M, N, Ref, Opts.EmitProfileCoverageMapping);
   SP->assignRegionCounters();
   return SP;
 }
