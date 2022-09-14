@@ -2224,8 +2224,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         auto bridged = emitNativeToBridgedValue(fd, param, nativeFormalType,
                                                 foreignFormalType,
                                                 foreignLoweredTy);
-        // Handle C pointer arguments imported as indirect `self` arguments.
-        if (foreignParam.getConvention() == ParameterConvention::Indirect_In) {
+        if (foreignParam.getConvention() == ParameterConvention::Indirect_In ||
+            foreignParam.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
           auto temp = emitTemporaryAllocation(fd, bridged.getType());
           bridged.forwardInto(*this, fd, temp);
           bridged = emitManagedBufferWithCleanup(temp);
