@@ -12,6 +12,7 @@
 
 #include "generics.h"
 #include <cassert>
+#include <cstdio>
 
 int main() {
   using namespace Generics;
@@ -29,7 +30,11 @@ int main() {
     x.method();
     // CHECK-NEXT: GenericOpt<T>::testme::some(-11);
     assert(x.getComputedProp() == 42);
+    assert(x.isSome());
+    auto val = x.getSome();
+    assert(val == -11);
     x.reset();
+    assert(x.isNone());
     assert(x.genericMethod<double>(5.25) == 5.25);
     // CHECK-NEXT: GenericOpt<T>::genericMethod<T>::none,5.25;
   }
@@ -46,9 +51,21 @@ int main() {
     x.method();
     // CHECK-NEXT: GenericOpt<T>::testme::some(2250);
     assert(x.getComputedProp() == 42);
+    assert(x.isSome());
+    auto val = x.getSome();
+    assert(val == 2250);
     x.reset();
+    assert(x.isNone());
     assert(x.genericMethod<double>(-1.25) == -1.25);
     // CHECK-NEXT: GenericOpt<T>::genericMethod<T>::none,-1.25;
   }
+  {
+    auto x   = makeGenericOpt<StructForEnum>(StructForEnum::init());
+    auto val = x.getSome();
+    // CHECK-NEXT: init-TracksDeinit
+    // CHECK-NEXT: destroy-TracksDeinit
+  }
+  puts("EOF");
+  // CHECK-NEXT: EOF
   return 0;
 }

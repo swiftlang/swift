@@ -455,28 +455,24 @@ private:
           associatedValueList->size() > 1) {
         return;
       }
-      auto paramType = associatedValueList->front()->getType();
-      Type objectType;
-      OptionalTypeKind optKind;
-      std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-          paramType->getNominalOrBoundGenericNominal(), paramType);
-      auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+      auto paramType = associatedValueList->front()->getInterfaceType();
 
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
       ClangSyntaxPrinter(nameOS).printIdentifier(elementDecl->getNameStr());
       name[0] = std::toupper(name[0]);
 
-      if (ED->isGeneric())
-        return;
       clangFuncPrinter.printCustomCxxFunction(
           {paramType},
           [&](auto &types) {
             // Printing function name and return type
             os << "  inline " << types[paramType] << " get" << name;
+            outOfLineSyntaxPrinter
+                .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
             outOfLineOS << "  inline " << types[paramType] << ' ';
-            outOfLineSyntaxPrinter.printBaseName(ED);
-            outOfLineOS << "::get" << name;
+            outOfLineSyntaxPrinter.printNominalTypeQualifier(
+                ED, /*moduleContext=*/ED->getModuleContext());
+            outOfLineOS << "get" << name;
           },
           [&](auto &types) {}, true,
           [&](auto &types) {
@@ -492,6 +488,20 @@ private:
             outOfLineOS << "(*this);\n";
             outOfLineOS << "    char * _Nonnull payloadFromDestruction = "
                            "thisCopy->_destructiveProjectEnumData();\n";
+            if (const auto *gtpt = paramType->getAs<GenericTypeParamType>()) {
+              DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
+                  outOfLineOS, gtpt, [](StringRef) {},
+                  /*initializeWithTake=*/StringRef("payloadFromDestruction"));
+              return;
+            }
+            // FIXME: unify non-generic return with regular function emission
+            // return path.
+            Type objectType;
+            OptionalTypeKind optKind;
+            std::tie(objectType, optKind) = getObjectTypeAndOptionality(
+                paramType->getNominalOrBoundGenericNominal(), paramType);
+            auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+
             if (auto knownCxxType =
                     owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
