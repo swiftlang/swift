@@ -109,7 +109,7 @@ public:
           CS.setType(var, computeProjectedValueType(wrappedVar, wrapperType));
         } else {
           // _<name> is the wrapper var
-          CS.setType(var, computeWrappedValueType(wrappedVar, wrapperType));
+          CS.setType(var, wrapperType);
         }
 
         return {true, expr};
@@ -498,18 +498,13 @@ private:
       init = TypeChecker::buildDefaultInitializer(patternType);
     }
 
-    if (init) {
-      return SolutionApplicationTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
-          /*bindPatternVarsOneWay=*/false);
-    }
-
-    // If there was no initializer, there could be one from a property
-    // wrapper which has to be pre-checked before use. This is not a
-    // problem in top-level code because pattern bindings go through
-    // `typeCheckExpression` which does pre-check automatically and
-    // result builders do not allow declaring local wrapped variables.
+    // A property wrapper initializer (either user-defined
+    // or a synthesized one) has to be pre-checked before use.
+    //
+    // This is not a problem in top-level code because pattern
+    // bindings go through `typeCheckExpression` which does
+    // pre-check automatically and result builders do not allow
+    // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SolutionApplicationTarget::forInitialization(
           init, patternBinding->getDeclContext(), patternType, patternBinding,
@@ -522,6 +517,13 @@ private:
         return None;
 
       return target;
+    }
+
+    if (init) {
+      return SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
     }
 
     return SolutionApplicationTarget::forUninitializedVar(patternBinding, index,

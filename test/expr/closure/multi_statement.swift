@@ -535,3 +535,63 @@ struct Test {
     }
   }
 }
+
+https://github.com/apple/swift/issues/61017
+do {
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+
+    init(wrappedValue: Int) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  class Test {
+    let bar: () -> Void = {
+      @Wrapper var wrapped = 1
+      let wrapper: Wrapper = _wrapped // Ok
+    }
+  }
+}
+
+https://github.com/apple/swift/issues/61024
+do {
+  enum Baz: String {
+  case someCase
+  }
+
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+    let argument: String
+
+    init(wrappedValue: Int, argument: String) { // expected-note 2 {{'init(wrappedValue:argument:)' declared here}}
+      self.wrappedValue = wrappedValue
+      self.argument = argument
+    }
+  }
+
+  class Foo {
+    let ok: () -> Void = {
+      @Wrapper(argument: Baz.someCase.rawValue) var wrapped1 = 1 // Ok
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped2 // Ok
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped3: Int // Ok
+    }
+
+    let bad0: () -> Void = {
+      @Wrapper var wrapped: Int
+      // expected-error@-1 {{missing arguments for parameters 'wrappedValue', 'argument' in call}}
+    }
+
+    let bad1: () -> Void = {
+      @Wrapper var wrapped = 0
+      // expected-error@-1 {{missing argument for parameter 'argument' in property wrapper initializer; add 'wrappedValue' and 'argument' arguments in '@Wrapper(...)'}}
+    }
+
+    let bad2: () -> Void = {
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped = 0
+      // expected-error@-1 {{extra argument 'wrappedValue' in call}}
+    }
+  }
+}
