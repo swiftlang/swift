@@ -1443,10 +1443,13 @@ void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
     addRuntimeResolvableType(opaque);
     if (IRGen.hasLazyMetadata(opaque))
       IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
-    else
-      emitOpaqueTypeDecl(opaque);
+    else {
+      if (IRGen.EmittedNonLazyOpaqueTypeDecls.insert(opaque).second)
+        emitOpaqueTypeDecl(opaque);
+    }
   } else if (!IRGen.hasLazyMetadata(opaque)) {
-    emitOpaqueTypeDecl(opaque);
+    if (IRGen.EmittedNonLazyOpaqueTypeDecls.insert(opaque).second)
+      emitOpaqueTypeDecl(opaque);
   }
 }
 
