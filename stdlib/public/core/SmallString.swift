@@ -372,6 +372,28 @@ extension _SmallString {
     }
     self._invariantCheck()
   }
+  
+  @_effects(readonly) // @opaque
+  @usableFromInline // testable
+  internal init?(taggedASCIICocoa cocoa: AnyObject) {
+    self.init()
+    var success = true
+    self.withMutableCapacity {
+      /*
+       For regular NSTaggedPointerStrings we will always succeed here, but
+       tagged NSLocalizedStrings may not fit in a SmallString
+       */
+      if let len = _bridgeTaggedASCII(cocoa, intoUTF8: $0) {
+        return len
+      }
+      success = false
+      return 0
+    }
+    if !success {
+      return nil
+    }
+    self._invariantCheck()
+  }
 }
 #endif
 
