@@ -196,7 +196,7 @@ internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableRawBufferPointer
 ) -> Int? {
-  return _NSStringCopyUTF8(
+  return _NSStringCopyBytes(
     _objc(target),
     encoding: _cocoaUTF8Encoding,
     into: bufPtr
@@ -208,7 +208,7 @@ internal func _cocoaStringCopyASCII(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableRawBufferPointer
 ) -> Int? {
-  return _NSStringCopyASCII(
+  return _NSStringCopyBytes(
     _objc(target),
     encoding: _cocoaASCIIEncoding,
     into: bufPtr
