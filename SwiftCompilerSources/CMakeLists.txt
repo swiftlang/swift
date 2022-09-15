@@ -126,6 +126,11 @@ function(add_swift_compiler_modules_library name)
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
 
+  # Let Swift discover SwiftShims headers which are included by some headers
+  # under `include/swift`.
+  get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+  set(sdk_option ${sdk_option} "-I" "${swift_exec_bin_dir}/../lib")
+
   set(all_obj_files)
   set(all_module_targets)
   set(syntaxparse_obj_files)
