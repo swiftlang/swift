@@ -7,26 +7,28 @@
 
 // RUN: not %target-swift-frontend %s -emit-silgen
 
-func sr11027(_ f: @convention(block) @autoclosure () -> Int) -> Void {}
-sr11027(1)
+// https://github.com/apple/swift/issues/53417
 
-func sr11027_c(_ f: @convention(c) @autoclosure () -> Int) -> Void {}
-sr11027_c(1)
+func block1(_ f: @convention(block) @autoclosure () -> Int) -> Void {}
+block1(1)
 
-func sr11027_swift(_ f: @convention(swift) @autoclosure () -> Int) -> Void {} // OK
-sr11027_swift(1)
+func c1(_ f: @convention(c) @autoclosure () -> Int) -> Void {}
+c1(1)
 
-func sr11027_thin(_ f: @convention(thin) @autoclosure () -> Int) -> Void {} // OK
-sr11027_thin(1)
+func swift1(_ f: @convention(swift) @autoclosure () -> Int) -> Void {} // OK
+swift1(1)
 
-func sr11027_2(_ f: @autoclosure @convention(block) () -> Int) -> Void {}
-sr11027_2(1)
+func thin1(_ f: @convention(thin) @autoclosure () -> Int) -> Void {} // OK
+thin1(1)
 
-func sr11027_c_2(_ f: @autoclosure @convention(c) () -> Int) -> Void {}
-sr11027_c_2(1)
+func block2(_ f: @autoclosure @convention(block) () -> Int) -> Void {}
+block2(1)
 
-func sr11027_swift_2(_ f: @autoclosure @convention(swift) () -> Int) -> Void {} // OK
-sr11027_swift_2(1)
+func c2(_ f: @autoclosure @convention(c) () -> Int) -> Void {}
+c2(1)
 
-func sr11027_thin_2(_ f: @autoclosure @convention(thin) () -> Int) -> Void {} // OK
-sr11027_thin_2(1)
+func swift2(_ f: @autoclosure @convention(swift) () -> Int) -> Void {} // OK
+swift2(1)
+
+func thin2(_ f: @autoclosure @convention(thin) () -> Int) -> Void {} // OK
+thin2(1)
