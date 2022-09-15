@@ -90,7 +90,7 @@ public:
     AssociatedType,
     AssociatedTypeProtocol,
     BaseProtocol
-  };
+  } ENUM_EXTENSIBILITY_ATTR(open);
   
   /// A witness table entry.
   class Entry {

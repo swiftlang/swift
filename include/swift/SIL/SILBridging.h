@@ -19,6 +19,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <string>
@@ -95,14 +96,6 @@ typedef struct {
 typedef struct {
   const void * _Nonnull ptr;
 } BridgedWitnessTableEntry;
-
-typedef enum {
-  SILWitnessTableEntry_Invalid,
-  SILWitnessTableEntry_Method,
-  SILWitnessTableEntry_AssociatedType,
-  SILWitnessTableEntry_AssociatedTypeProtocol,
-  SILWitnessTableEntry_BaseProtocol
-} SILWitnessTableEntryKind;
 
 typedef struct {
   SwiftObject obj;
@@ -265,7 +258,7 @@ BridgedArrayRef SILWitnessTable_getEntries(BridgedWitnessTable table);
 std::string SILDefaultWitnessTable_debugDescription(BridgedDefaultWitnessTable table);
 BridgedArrayRef SILDefaultWitnessTable_getEntries(BridgedDefaultWitnessTable table);
 std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry);
-SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry);
+swift::SILWitnessTable::WitnessKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry);
 OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
