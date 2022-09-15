@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
+// https://github.com/apple/swift/issues/52070
+
 protocol P {
   associatedtype T
   func foo(t: inout T)
