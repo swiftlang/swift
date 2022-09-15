@@ -186,6 +186,7 @@ EXPECTED_DEFAULTS = {
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'libxml2_build_variant': 'Debug',
+    'lit_jobs': multiprocessing.cpu_count(),
     'zlib_build_variant': 'Debug',
     'curl_build_variant': 'Debug',
     'bootstrapping_mode': None,
@@ -732,6 +733,7 @@ EXPECTED_OPTIONS = [
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
     EnableOption('--swift-tools-ld64-lto-codegen-only-for-supporting-targets'),
     IntOption('-j', dest='build_jobs'),
+    IntOption('--lit-jobs', dest='lit_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 
     AppendOption('--cross-compile-hosts'),

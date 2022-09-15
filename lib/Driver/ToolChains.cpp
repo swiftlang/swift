@@ -241,6 +241,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_sendable);
   inputArgs.AddLastArg(arguments, options::OPT_check_api_availability_only);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);

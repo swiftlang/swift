@@ -2001,6 +2001,14 @@ ClangImporter::loadModule(SourceLoc importLoc,
 ModuleDecl *ClangImporter::Implementation::loadModule(
     SourceLoc importLoc, ImportPath::Module path) {
   ModuleDecl *MD = nullptr;
+  ASTContext &ctx = getNameImporter().getContext();
+
+  if (path.front().Item == ctx.Id_CxxStdlib) {
+    ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
+    adjustedPath.append(path.getSubmodulePath());
+    path = adjustedPath.get().getModulePath(ImportKind::Module);
+  }
+
   if (!DisableSourceImport)
     MD = loadModuleClang(importLoc, path);
   if (!MD)
