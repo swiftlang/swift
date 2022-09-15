@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test --code-completion --source-filename %s --code-completion-token=COMPLETE
 
+// https://github.com/apple/swift/issues/57089
+
 struct ItemDetailView {
   private var itemViewModel: Int
   @ViewBuilder2 var body: some View2 {

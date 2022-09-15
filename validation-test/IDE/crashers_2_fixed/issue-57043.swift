@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE
 
+// https://github.com/apple/swift/issues/57043
+
 @resultBuilder public struct ViewBuilder2 {
     public static func buildBlock<Content>(_ content: Content) -> Never
 }

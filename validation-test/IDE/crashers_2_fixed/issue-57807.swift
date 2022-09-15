@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test --code-completion --code-completion-token COMPLETE --source-filename %s
+
 // Should not crash
+// https://github.com/apple/swift/issues/57807
 
 protocol View2 {}
 

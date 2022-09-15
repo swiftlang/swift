@@ -1,5 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=COMPLETE -source-filename=%s | %FileCheck %s
 
+// https://github.com/apple/swift/issues/56849
+
 protocol MyView {
     associatedtype Body : MyView
     @MyViewBuilder var body: Self.Body { get }

@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test --code-completion --source-filename %s --code-completion-token=CC
 
+// https://github.com/apple/swift/issues/57059
+
 struct Listing {}
 
 protocol View2 {}

@@ -1,5 +1,7 @@
 // RUN: %target-swift-ide-test --code-completion --source-filename %s --code-completion-token=COMPLETE | %FileCheck %s
 
+// https://github.com/apple/swift/issues/57058
+
 protocol View2 {}
  
 extension Never : View2 {}

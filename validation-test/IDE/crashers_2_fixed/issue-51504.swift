@@ -1,6 +1,8 @@
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=COMPLETE_1 -source-filename=%s
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=COMPLETE_2 -source-filename=%s
 
+// https://github.com/apple/swift/issues/51504
+
 struct MyStruct<T> {
 }
 

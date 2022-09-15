@@ -1,5 +1,7 @@
 // RUN: %swift-ide-test --code-completion --source-filename %s --code-completion-token=COMPLETE
 
+// https://github.com/apple/swift/issues/57054
+
 @resultBuilder struct ViewBuilder2 {
   static func buildBlock() -> Never { fatalError() }
   static func buildBlock<Content>(_ content: Content) -> Content where Content : View2 { fatalError() }

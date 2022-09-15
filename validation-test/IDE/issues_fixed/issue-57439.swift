@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
+// https://github.com/apple/swift/issues/57439
+
 struct TodayView {
     func foo() {
         Uext(verbatim: #^COMPLETE^#)
