@@ -2,6 +2,8 @@
 // RUN: %target-build-swift -emit-module-path %t/Lib.swiftmodule %s -module-name Lib
 // RUN: echo 'import Lib; _ = MyClass(with: "test", and: 341)' | %target-build-swift -I %t -typecheck -
 
+// https://github.com/apple/swift/issues/50512
+
 public protocol MyProtocol {
   var string: String { get }
   var int: Int { get }

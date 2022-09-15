@@ -4,6 +4,8 @@
 
 // REQUIRES: OS=ios
 
+// https://github.com/apple/swift/issues/50414
+
 import UIKit
 
 public func testInsets(_: UIEdgeInsets = .zero) {}

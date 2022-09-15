@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -o %t/SR3915.swiftmodule %s %S/Inputs/SR3915-other.swift
+// RUN: %target-build-swift -emit-module -o %t/M.swiftmodule %s %S/Inputs/issue-46500-other.swift
+
+// https://github.com/apple/swift/issues/46500
 
 public enum A {}
 

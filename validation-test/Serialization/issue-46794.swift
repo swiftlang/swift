@@ -1,6 +1,9 @@
 // RUN: %target-build-swift -emit-module %s
 
 // REQUIRES: objc_interop
+
+// https://github.com/apple/swift/issues/46794
+
 import Foundation
 
 /// Set of notifications that can be sent by this manager
