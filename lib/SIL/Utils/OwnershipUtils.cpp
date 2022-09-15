@@ -25,7 +25,9 @@
 
 using namespace swift;
 
-bool swift::hasEscaped(BorrowedValue value) {
+bool swift::hasPointerEscape(BorrowedValue value) {
+  assert(value.kind == BorrowedValueKind::BeginBorrow ||
+         value.kind == BorrowedValueKind::LoadBorrow);
   GraphNodeWorklist<Operand *, 8> worklist;
   for (Operand *use : value->getUses()) {
     if (use->getOperandOwnership() != OperandOwnership::NonUse)
@@ -42,7 +44,6 @@ bool swift::hasEscaped(BorrowedValue value) {
 
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
-    case OperandOwnership::BitwiseEscape:
       return true;
 
     case OperandOwnership::Borrow:
@@ -50,6 +51,7 @@ bool swift::hasEscaped(BorrowedValue value) {
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::BitwiseEscape:
       break;
 
     case OperandOwnership::Reborrow: {
