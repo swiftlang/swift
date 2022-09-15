@@ -761,13 +761,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           UDRE->getNameLoc(), NTD, BaseDC,
           DC->mapTypeIntoContext(NTD->getInterfaceType()));
     } else {
-      // If this is an implicit self reference, the `VarDecl` will
-      // currently have a non-optional type. But at this point,
-      // we don't actually know if this is correct (it could be a
-      // weak self capture that hasn't been unwrapped yet).
-      //  - Since we don't know the correct type of self yet,
-      //    we leave this as an UnresolvedDeclRefExpr that is
-      //    populated with the actual type later.
+      // If this is an implicit self reference, we replace the `DeclRefExpr`
+      // with an `UnresolvedDeclRefExpr` to make the type checker take another
+      // pass on the expr. This causes `getParentPatternStmt()` to be populated,
+      // which is required later to validate conditions for permitting
+      // implicit self for `[weak self]` captures.
       bool isClosureImplicitSelfParameter = false;
       if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr)
         if (auto varDecl = dyn_cast<VarDecl>(Base))

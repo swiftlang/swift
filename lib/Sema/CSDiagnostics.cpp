@@ -1376,7 +1376,9 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     if (auto dotExpr = getAsExpr<UnresolvedDotExpr>(locator->getAnchor())) {
       if (auto base = dotExpr->getBase()) {
         if (auto baseDeclRef = dyn_cast<DeclRefExpr>(base)) {
-          if (baseDeclRef->isImplicit() && baseDeclRef->getDecl()->getBaseIdentifier().is("self")) {
+          ASTContext &Ctx = baseDeclRef->getDecl()->getASTContext();
+          if (baseDeclRef->isImplicit()
+              && baseDeclRef->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
             emitDiagnostic(diag::optional_self_not_unwrapped);
             
             emitDiagnostic(diag::optional_self_chain)

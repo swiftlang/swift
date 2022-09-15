@@ -1591,7 +1591,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       
       // If this decl isn't named "self", then it isn't an implicit self capture
       // and we have no reason to reject it.
-      if (!DRE->getDecl()->getBaseName().getIdentifier().is("self")) {
+      ASTContext &Ctx = DRE->getDecl()->getASTContext();
+      if (!DRE->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
         return false;
       }
       
@@ -1634,11 +1635,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
               if (cond.getKind() == StmtConditionElement::CK_PatternBinding) {
                 if (auto optionalPattern = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
                   // if the lhs of the optional binding is `self`...
-                  if (optionalPattern->getSubPattern()->getBoundName().is("self")) {
+                  if (optionalPattern->getSubPattern()->getBoundName() == Ctx.Id_self) {
                     if (auto loadExpr = dyn_cast<LoadExpr>(cond.getInitializer())) {
                       if (auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr())) {
                         // and the rhs of the optional binding is `self`...
-                        if (declRefExpr->getDecl()->getBaseIdentifier().is("self")) {
+                        if (declRefExpr->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
                           // then we can permit implicit self in this closure
                           hasCorrectSelfBindingCondition = true;
                         }
