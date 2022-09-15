@@ -877,18 +877,8 @@ SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
 }
 
-BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) {
-  auto kind = castToInst<BeginAccessInst>(beginAccess)->getAccessKind();
-  switch (kind) {
-    case SILAccessKind::Init:
-      return BridgedAccessKind::AccessKind_Init;
-    case SILAccessKind::Read:
-      return BridgedAccessKind::AccessKind_Read;
-    case SILAccessKind::Modify:
-      return BridgedAccessKind::AccessKind_Modify;
-    case SILAccessKind::Deinit:
-      return BridgedAccessKind::AccessKind_Deinit;
-  }
+SILAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) {
+  return castToInst<BeginAccessInst>(beginAccess)->getAccessKind();
 }
 
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {

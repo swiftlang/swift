@@ -17,6 +17,7 @@
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -175,13 +176,6 @@ typedef enum {
   MayReadWriteBehavior,
   MayHaveSideEffectsBehavior
 } BridgedMemoryBehavior;
-
-typedef enum {
-  AccessKind_Init,
-  AccessKind_Read,
-  AccessKind_Modify,
-  AccessKind_Deinit
-} BridgedAccessKind;
 
 typedef enum {
   Ownership_Unowned,
@@ -378,7 +372,7 @@ BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
-BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess);
+swift::SILAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess);
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr);
 SwiftInt CopyAddrInst_isInitializationOfDest(BridgedInstruction copyAddr);
 void RefCountingInst_setIsAtomic(BridgedInstruction rc, bool isAtomic);

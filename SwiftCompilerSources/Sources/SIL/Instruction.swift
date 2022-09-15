@@ -533,34 +533,12 @@ final public class BridgeObjectToRefInst : SingleValueInstruction,
 final public class BridgeObjectToWordInst : SingleValueInstruction,
                                            UnaryInstruction {}
 
-public enum AccessKind {
-  case initialize
-  case read
-  case modify
-  case deinitialize
-}
-
-extension BridgedAccessKind {
-  var kind: AccessKind {
-    switch self {
-    case AccessKind_Init:
-      return .initialize
-    case AccessKind_Read:
-      return .read
-    case AccessKind_Modify:
-      return .modify
-    case AccessKind_Deinit:
-      return .deinitialize
-    default:
-      fatalError("unsupported access kind")
-    }
-  }
-}
+public typealias AccessKind = swift.SILAccessKind
 
 
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
+  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged) }
 }
 
 public protocol ScopedInstruction {
