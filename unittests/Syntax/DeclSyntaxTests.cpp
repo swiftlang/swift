@@ -261,7 +261,10 @@ FunctionParameterSyntax getCannedFunctionParameter(const RC<SyntaxArena> &Arena)
   auto Comma = Factory.makeCommaToken("", " ");
 
   return Factory.makeFunctionParameter(
-      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, ExternalName,
+      /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, ExternalName,
       /*UnexpectedNodes=*/None, LocalName, /*UnexpectedNodes=*/None, Colon,
       /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, NoEllipsis,
       /*UnexpectedNodes=*/None, DefaultArg, /*UnexpectedNodes=*/None, Comma);
@@ -305,7 +308,10 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   auto Comma = Factory.makeCommaToken("", "");
 
   auto Param = Factory.makeFunctionParameter(
-      /*UnexpectedNodes=*/None, None, /*UnexpectedNodes=*/None, ExternalName,
+      /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, None,
+      /*UnexpectedNodes=*/None, ExternalName,
       /*UnexpectedNodes=*/None, LocalName, /*UnexpectedNodes=*/None, Colon,
       /*UnexpectedNodes=*/None, Int, /*UnexpectedNodes=*/None, NoEllipsis,
       /*UnexpectedNodes=*/None, DefaultArg, /*UnexpectedNodes=*/None, Comma);
