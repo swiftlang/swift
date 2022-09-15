@@ -6,6 +6,6 @@ public enum EmptyEnum {}
 public enum SingleCaseEnum { case first }
 
 // CHECK: namespace Enums {
-// CHECK-NOT: EmptyEnum
-// CHECK-NOT: SingleCaseEnum
+// CHECK-NOT: class EmptyEnum final {
+// CHECK-NOT: class SingleCaseEnum final {
 // CHECK: } // namespace Enums
