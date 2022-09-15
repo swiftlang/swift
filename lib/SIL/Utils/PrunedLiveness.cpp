@@ -507,14 +507,12 @@ SubElementNumber::compute(SILValue projectionDerivedFromRoot,
       continue;
     }
 
-#ifndef NDEBUG
-    if (!isa<InitExistentialAddrInst>(projectionDerivedFromRoot)) {
-      llvm::errs() << "Unknown access path instruction!\n";
-      llvm::errs() << "Value: " << *projectionDerivedFromRoot;
-      llvm_unreachable("standard error");
-    }
-#endif
-    // Cannot promote loads and stores from within an existential projection.
+    // If we do not know how to handle this case, just return None.
+    //
+    // NOTE: We use to assert here, but since this is used for diagnostics, we
+    // really do not want to abort. Instead, our caller can choose to abort if
+    // they get back a None. This ensures that we do not abort in cases where we
+    // just want to emit to the user a "I do not understand" error.
     return None;
   }
 }

@@ -114,7 +114,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
       ++ii;
 
-      if (!mmci || !mmci->hasMoveCheckerKind())
+      if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isObject())
         continue;
 
       // Handle guaranteed/owned move arguments and values.

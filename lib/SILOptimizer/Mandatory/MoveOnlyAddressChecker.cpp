@@ -841,17 +841,22 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
     // TODO: What about copy_addr of itself. We really should just pre-process
     // those maybe.
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange)
+      return false;
+
     assert(!useState.initInsts.count(user));
-    useState.initInsts.insert(
-        {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+    useState.initInsts.insert({user, *leafRange});
     return true;
   }
 
   if (::memInstMustReinitialize(op)) {
     LLVM_DEBUG(llvm::dbgs() << "Found reinit: " << *user);
     assert(!useState.reinitInsts.count(user));
-    useState.reinitInsts.insert(
-        {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange)
+      return false;
+    useState.reinitInsts.insert({user, *leafRange});
     return true;
   }
 
@@ -891,9 +896,12 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
       return true;
     }
 
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange)
+      return false;
+
     LLVM_DEBUG(llvm::dbgs() << "Found take: " << *user);
-    useState.takeInsts.insert(
-        {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+    useState.takeInsts.insert({user, *leafRange});
     return true;
   }
 
@@ -935,9 +943,13 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
         // If set, this will tell the checker that we can change this load into
         // a load_borrow.
+        auto leafRange =
+            TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+        if (!leafRange)
+          return false;
+
         LLVM_DEBUG(llvm::dbgs() << "Found potential borrow: " << *user);
-        useState.borrows.insert(
-            {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+        useState.borrows.insert({user, *leafRange});
         return true;
       }
 
@@ -963,14 +975,16 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
       // Then if we had any final consuming uses, mark that this liveness use is
       // a take and if not, mark this as a borrow.
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange)
+        return false;
+
       if (moveChecker.finalConsumingUses.empty()) {
         LLVM_DEBUG(llvm::dbgs() << "Found borrow inst: " << *user);
-        useState.borrows.insert(
-            {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+        useState.borrows.insert({user, *leafRange});
       } else {
         LLVM_DEBUG(llvm::dbgs() << "Found take inst: " << *user);
-        useState.takeInsts.insert(
-            {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+        useState.takeInsts.insert({user, *leafRange});
       }
       return true;
     }
@@ -978,18 +992,24 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 
   // Now that we have handled or loadTakeOrCopy, we need to now track our Takes.
   if (::memInstMustConsume(op)) {
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange)
+      return false;
     LLVM_DEBUG(llvm::dbgs() << "Pure consuming use: " << *user);
-    useState.takeInsts.insert(
-        {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+    useState.takeInsts.insert({user, *leafRange});
     return true;
   }
 
   if (auto fas = FullApplySite::isa(op->getUser())) {
     switch (fas.getArgumentConvention(*op)) {
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-      useState.livenessUses.insert(
-          {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+    case SILArgumentConvention::Indirect_In_Guaranteed: {
+      auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+      if (!leafRange)
+        return false;
+
+      useState.livenessUses.insert({user, *leafRange});
       return true;
+    }
 
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
@@ -1006,6 +1026,10 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   // If we don't fit into any of those categories, just track as a liveness
   // use. We assume all such uses must only be reads to the memory. So we assert
   // to be careful.
+  auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+  if (!leafRange)
+    return false;
+
   LLVM_DEBUG(llvm::dbgs() << "Found liveness use: " << *user);
 #ifndef NDEBUG
   if (user->mayWriteToMemory()) {
@@ -1014,8 +1038,7 @@ bool GatherUsesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     llvm_unreachable("standard failure");
   }
 #endif
-  useState.livenessUses.insert(
-      {user, TypeTreeLeafTypeRange(op->get(), getRootAddress())});
+  useState.livenessUses.insert({user, *leafRange});
 
   return true;
 }
@@ -1036,8 +1059,26 @@ void MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       // Skip any alloc_box due to heap to stack failing on a box capture. This
       // will just cause an error.
       if (auto *pbi = dyn_cast<ProjectBoxInst>(mmci->getOperand())) {
+        if (isa<AllocBoxInst>(pbi->getOperand())) {
+          LLVM_DEBUG(
+              llvm::dbgs()
+              << "Early emitting diagnostic for unsupported alloc box!\n");
+          if (mmci->getType().isMoveOnlyWrapped()) {
+            diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+                     diag::sil_moveonlychecker_not_understand_no_implicit_copy);
+          } else {
+            diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+                     diag::sil_moveonlychecker_not_understand_moveonly);
+          }
+          valuesWithDiagnostics.insert(mmci);
+          continue;
+        }
+
         if (auto *bbi = dyn_cast<BeginBorrowInst>(pbi->getOperand())) {
           if (isa<AllocBoxInst>(bbi->getOperand())) {
+            LLVM_DEBUG(
+                llvm::dbgs()
+                << "Early emitting diagnostic for unsupported alloc box!\n");
             if (mmci->getType().isMoveOnlyWrapped()) {
               diagnose(
                   fn->getASTContext(), mmci->getLoc().getSourceLoc(),
@@ -1604,6 +1645,8 @@ bool MoveOnlyChecker::check() {
 
     // Perform our address check.
     if (!performSingleCheck(markedValue)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Failed to perform single check! Emitting error!\n");
       // If we fail the address check in some way, set the diagnose!
       if (markedValue->getType().isMoveOnlyWrapped()) {
         diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),

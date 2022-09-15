@@ -752,6 +752,11 @@ struct TypeTreeLeafTypeRange {
   SubElementNumber startEltOffset;
   SubElementNumber endEltOffset;
 
+private:
+  TypeTreeLeafTypeRange(SubElementNumber start, SubElementNumber end)
+      : startEltOffset(start), endEltOffset(end) {}
+
+public:
   /// The leaf type range for the entire type tree.
   TypeTreeLeafTypeRange(SILValue rootAddress)
       : startEltOffset(0), endEltOffset(TypeSubElementCount(rootAddress)) {}
@@ -759,10 +764,18 @@ struct TypeTreeLeafTypeRange {
   /// The leaf type sub-range of the type tree of \p rootAddress, consisting of
   /// \p projectedAddress and all of \p projectedAddress's descendent fields in
   /// the type tree.
-  TypeTreeLeafTypeRange(SILValue projectedAddress, SILValue rootAddress)
-      : startEltOffset(
-            *SubElementNumber::compute(projectedAddress, rootAddress)),
-        endEltOffset(startEltOffset + TypeSubElementCount(projectedAddress)) {}
+  ///
+  /// \returns None if we are unable to understand the path in between \p
+  /// projectedAddress and \p rootAddress.
+  static Optional<TypeTreeLeafTypeRange> get(SILValue projectedAddress,
+                                             SILValue rootAddress) {
+    auto startEltOffset =
+        SubElementNumber::compute(projectedAddress, rootAddress);
+    if (!startEltOffset)
+      return None;
+    return {{*startEltOffset,
+             *startEltOffset + TypeSubElementCount(projectedAddress)}};
+  }
 
   /// Is the given leaf type specified by \p singleLeafElementNumber apart of
   /// our \p range of leaf type values in the our larger type.
