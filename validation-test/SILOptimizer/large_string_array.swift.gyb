@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
-// https://bugs.swift.org/browse/SR-14460
+// https://github.com/apple/swift/issues/56816
 // UNSUPPORTED: OS=linux-gnu
 
 // The compiler should finish in less than 1 minute. To give some slack,
