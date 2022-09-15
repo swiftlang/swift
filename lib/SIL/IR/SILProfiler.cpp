@@ -97,7 +97,12 @@ static bool isUnmapped(ASTNode N) {
 
 namespace swift {
 bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
-  return M.getOptions().GenerateProfile && !isUnmapped(N);
+  // If profiling isn't enabled, don't profile anything.
+  auto &Opts = M.getOptions();
+  if (Opts.UseProfile.empty() && !Opts.GenerateProfile)
+    return false;
+
+  return !isUnmapped(N);
 }
 } // namespace swift
 
@@ -152,7 +157,7 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
 
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
   const auto &Opts = M.getOptions();
-  if (!doesASTRequireProfiling(M, N) && Opts.UseProfile.empty())
+  if (!doesASTRequireProfiling(M, N))
     return nullptr;
 
   if (!canCreateProfilerForAST(N, Ref)) {
