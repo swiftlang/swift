@@ -366,44 +366,6 @@ static bool memInstMustInitialize(Operand *memOper) {
   }
 }
 
-static bool memInstMustReinitialize(Operand *memOper) {
-  SILValue address = memOper->get();
-
-  SILInstruction *memInst = memOper->getUser();
-
-  switch (memInst->getKind()) {
-  default:
-    return false;
-
-  case SILInstructionKind::CopyAddrInst: {
-    auto *CAI = cast<CopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::ExplicitCopyAddrInst: {
-    auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
-    return CAI->getDest() == address && !CAI->isInitializationOfDest();
-  }
-  case SILInstructionKind::YieldInst: {
-    auto *yield = cast<YieldInst>(memInst);
-    return yield->getYieldInfoForOperand(*memOper).isIndirectInOut();
-  }
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::ApplyInst: {
-    FullApplySite applySite(memInst);
-    return applySite.getArgumentOperandConvention(*memOper).isInoutConvention();
-  }
-  case SILInstructionKind::StoreInst:
-    return cast<StoreInst>(memInst)->getOwnershipQualifier() ==
-           StoreOwnershipQualifier::Assign;
-
-#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
-  case SILInstructionKind::Store##Name##Inst:                                  \
-    return !cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
-#include "swift/AST/ReferenceStorage.def"
-  }
-}
-
 static bool memInstMustConsume(Operand *memOper) {
   SILValue address = memOper->get();
 
@@ -1448,6 +1410,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   valuesWithDiagnostics.insert(markedAddress);
   return true;
 
+#if false
   // Ok, we not have emitted our main errors. Now we begin the
   // transformation. We begin by processing borrows. We can also emit errors
   // here if we find that we can not expand the borrow scope of the load [copy]
@@ -1584,6 +1547,7 @@ bool MoveOnlyChecker::performSingleCheck(MarkMustCheckInst *markedAddress) {
   }
 
   return true;
+#endif
 }
 
 bool MoveOnlyChecker::check() {
