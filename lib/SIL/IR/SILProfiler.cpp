@@ -211,8 +211,9 @@ shouldSkipExpr(Expr *E, ASTWalker::ParentTy Parent) {
   return None;
 }
 
-/// Whether the children of an unmapped decl should still be walked.
-static bool shouldWalkUnmappedDecl(const Decl *D) {
+/// Whether the children of a decl that isn't explicitly handled should be
+/// walked.
+static bool shouldWalkIntoUnhandledDecl(const Decl *D) {
   // We want to walk into the initializer for a pattern binding decl. This
   // allows us to map LazyInitializerExprs.
   return isa<PatternBindingDecl>(D);
@@ -252,15 +253,13 @@ struct MapRegionCounters : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (isUnmapped(D))
-      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
-
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       mapRegion(TLCD->getBody());
+      return Action::Continue();
     }
-    return Action::Continue();
+    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -601,17 +600,16 @@ struct PGOMapping : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (isUnmapped(D))
-      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
         setKnownExecutionCount(AFD->getBody());
       });
     }
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       setKnownExecutionCount(TLCD->getBody());
-
-    return Action::Continue();
+      return Action::Continue();
+    }
+    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
@@ -974,9 +972,6 @@ public:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (isUnmapped(D))
-      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
-
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
         assignCounter(AFD->getBody());
@@ -984,8 +979,9 @@ public:
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       assignCounter(TLCD->getBody());
       ImplicitTopLevelBody = TLCD->getBody();
+      return Action::Continue();
     }
-    return Action::Continue();
+    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
