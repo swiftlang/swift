@@ -549,15 +549,6 @@ SwiftInt SILType_getCaseIdxOfEnumType(BridgedType type,
   return -1;
 }
 
-
-//===----------------------------------------------------------------------===//
-//                            SubstitutionMap
-//===----------------------------------------------------------------------===//
-
-BridgedSubstitutionMap SubstitutionMap_getEmpty() {
-  return {SubstitutionMap().getOpaqueValue()};
-}
-
 //===----------------------------------------------------------------------===//
 //                                SILLocation
 //===----------------------------------------------------------------------===//
@@ -942,9 +933,9 @@ void KeyPathInst_getReferencedFunctions(BridgedInstruction kpi, SwiftInt compone
     }, [](SILDeclRef) {});
 }
 
-BridgedSubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
+SubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst) {
   auto as = ApplySite(castToInst(inst));
-  return {as.getSubstitutionMap().getOpaqueValue()};
+  return as.getSubstitutionMap();
 }
 
 BridgedArgumentConvention
@@ -1075,14 +1066,14 @@ BridgedInstruction SILBuilder_createDestroyValue(BridgedBuilder b,
 
 BridgedInstruction SILBuilder_createApply(BridgedBuilder b,
                                           BridgedValue function,
-                                          BridgedSubstitutionMap subMap,
+                                          SubstitutionMap subMap,
                                           BridgedValueArray arguments) {
   SILBuilder builder(castToInst(b.insertBefore), castToBasicBlock(b.insertAtEnd),
                      b.loc.getScope());
   SmallVector<SILValue, 16> argValues;
-  return {builder.createApply(
-      RegularLocation(b.loc.getLocation()), castToSILValue(function),
-      castToSubstitutionMap(subMap), getSILValues(arguments, argValues))};
+  return {builder.createApply(RegularLocation(b.loc.getLocation()),
+                              castToSILValue(function), subMap,
+                              getSILValues(arguments, argValues))};
 }
 
 static EnumElementDecl *getEnumElement(SILType enumType, int caseIndex) {

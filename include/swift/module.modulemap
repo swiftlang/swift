@@ -10,6 +10,7 @@ module ASTBridging {
   header "AST/ASTBridging.h"
   header "AST/DiagnosticEngine.h"
   header "AST/DiagnosticConsumer.h"
+  header "AST/SubstitutionMap.h"
   requires cplusplus
   export *
 }

@@ -41,10 +41,6 @@ inline SILType castToSILType(BridgedType type) {
   return SILType::getFromOpaqueValue(type.typePtr);
 }
 
-inline SubstitutionMap castToSubstitutionMap(BridgedSubstitutionMap subMap) {
-  return SubstitutionMap::getFromOpaqueValue(subMap.op);
-}
-
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
   return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
 }
