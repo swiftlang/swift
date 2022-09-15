@@ -301,6 +301,10 @@ private:
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
   /// The queue of opaque type descriptors to emit.
   llvm::SmallVector<OpaqueTypeDecl*, 4> LazyOpaqueTypeDescriptors;
+public:
+  /// The set of eagerly emitted opaque types.
+  llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
+private:
 
   /// The queue of lazy field metadata records to emit.
   llvm::SmallVector<NominalTypeDecl *, 4> LazyFieldDescriptors;
@@ -1761,6 +1765,11 @@ public:
 
   /// Emit a resilient class stub.
   llvm::Constant *emitObjCResilientClassStub(ClassDecl *D, bool isPublic);
+
+  /// Runs additional lowering logic on the given SIL function to ensure that
+  /// the SIL function is correctly lowered even if the lowering passes do not
+  /// run on the SIL module that owns this function.
+  void lowerSILFunction(SILFunction *f);
 
 private:
   llvm::Constant *

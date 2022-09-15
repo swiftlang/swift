@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-// SR-8990
+// https://github.com/apple/swift/issues/51493
 
 // CHECK: A
 // CHECK: B

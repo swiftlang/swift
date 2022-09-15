@@ -193,8 +193,9 @@ namespace swift {
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
-    /// Require public declarations to declare an introduction OS version.
-    bool RequireExplicitAvailability = false;
+    /// Diagnostic level to report when a public declarations doesn't declare
+    /// an introduction OS version.
+    Optional<DiagnosticBehavior> RequireExplicitAvailability = None;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.
@@ -456,6 +457,9 @@ namespace swift {
     // FrontendOptions.
     bool AllowModuleWithCompilerErrors = false;
 
+    /// Enable using @_spiOnly on import decls.
+    bool EnableSPIOnlyImports = false;
+
     /// A helper enum to represent whether or not we customized the default
     /// ASTVerifier behavior via a frontend flag. By default, we do not
     /// customize.
@@ -525,6 +529,8 @@ namespace swift {
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }
+
+    LangOptions();
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

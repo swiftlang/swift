@@ -400,10 +400,15 @@ bool TempRValueOptPass::extendAccessScopes(
       if (endAccessToMove)
         return false;
       // Is this the end of an access scope of the copy-source?
-      if (!aa->isNoAlias(copySrc, endAccess->getSource())) {
-        assert(endAccess->getBeginAccess()->getAccessKind() ==
-                 SILAccessKind::Read &&
-               "a may-write end_access should not be in the copysrc lifetime");
+      if (!aa->isNoAlias(copySrc, endAccess->getSource()) &&
+
+          // There cannot be any aliasing modifying accesses within the liferange
+          // of the temporary, because we would have cought this in
+          // `getLastUseWhileSourceIsNotModified`.
+          // But there are cases where `AliasAnalysis::isNoAlias` is less precise
+          // than `AliasAnalysis::mayWriteToMemory`. Therefore, just ignore any
+          // non-read accesses.
+          endAccess->getBeginAccess()->getAccessKind() == SILAccessKind::Read) {
 
         // Don't move instructions beyond the block's terminator.
         if (isa<TermInst>(lastUseInst))

@@ -42,7 +42,7 @@ struct ModulePassContext {
     var endIndex: Int { return Int(bridged.count) }
     
     subscript(_ index: Int) -> VTable {
-      precondition(index >= 0 && index < bridged.count)
+      assert(index >= 0 && index < bridged.count)
       return VTable(bridged: bridged.vTables![index])
     }
   }
@@ -90,6 +90,8 @@ struct ModulePassContext {
   var defaultWitnessTables: DefaultWitnessTableList {
     DefaultWitnessTableList(first: PassContext_firstDefaultWitnessTableInModule(_bridged).table)
   }
+
+  var options: Options { Options(_bridged: _bridged) }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
   ///

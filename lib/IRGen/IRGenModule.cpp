@@ -1265,7 +1265,7 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
   }
   if (stackProtector == StackProtectorMode::StackProtector) {
-    Attrs.addAttribute(llvm::Attribute::StackProtectStrong);
+    Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
 }

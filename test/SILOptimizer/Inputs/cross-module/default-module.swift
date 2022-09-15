@@ -27,3 +27,8 @@ public func moduleKlassMember() -> Int {
   return k.i
 }
 
+public struct ModuleStruct {
+  public static var publicFunctionPointer: (Int) -> (Int) = incrementByThree
+  public static var privateFunctionPointer: (Int) -> (Int) = { $0 }
+}
+

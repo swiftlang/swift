@@ -381,3 +381,71 @@ do {
   // CHECK: in getter
   // CHECK-NEXT: yellow
 }
+
+do {
+  var test = ClassWithDesignatedInit(a: 42)
+
+  print(test.a)
+  // CHECK: in getter
+  // CHECK-NEXT: 42
+
+  print(test.b)
+  // CHECK: in getter
+  // CHECK-NEXT: [1, 2, 3]
+
+  test.a = 0
+  // CHECK: in setter => 0
+
+  test.b = [42]
+  // CHECK: in getter
+  // CHECK-NEXT: in setter => PropWrapperWithoutInit<Array<Int>>(value: [42])
+
+  print(test.a)
+  // CHECK: in getter
+  // CHECK-NEXT: 0
+
+  print(test.b)
+  // CHECK: in getter
+  // CHECK-NEXT: [42]
+}
+
+do {
+  var arthur = PersonWithIgnoredAge(name: "Arthur Dent", age: 30)
+  // CHECK: Wrapper.init($Storage(name: "Arthur Dent"))
+
+  print(arthur.name)
+  // CHECK: in getter
+  // CHECK-NEXT: Arthur Dent
+
+  print(arthur.age)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: 30
+
+  print(arthur.manufacturer)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: nil
+
+  arthur.age = 32
+  // CHECK-NOT: in setter
+
+  var marvin = PersonWithIgnoredAge(name: "Marvin The Paranoid Android", manufacturer: "Sirius Cybernetics Corporation")
+  // CHECK: Wrapper.init($Storage(name: "Marvin The Paranoid Android"))
+
+  print(marvin.name)
+  // CHECK: in getter
+  // CHECK-NEXT: Marvin The Paranoid Android
+
+  print(marvin.age)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: 0
+
+  print(marvin.manufacturer)
+  // CHECK-NOT: in getter
+  // CHECK-NEXT: Sirius Cybernetics Corporation
+
+  marvin.age = 1000
+  // CHECK-NOT: in setter
+
+  marvin.manufacturer = nil
+  // CHECK-NOT: in setter
+}

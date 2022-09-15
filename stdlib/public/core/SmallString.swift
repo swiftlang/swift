@@ -221,7 +221,7 @@ extension _SmallString {
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift.withUnsafeBytes(of: &raw) {
+    return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
       let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.

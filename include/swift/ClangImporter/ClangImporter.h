@@ -204,9 +204,11 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
+  ///
+  /// If a non-null \p versionInfo is provided, the module version will be
+  /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               llvm::VersionTuple version,
-                               bool underlyingVersion) override;
+                               ModuleVersionInfo *versionInfo) override;
 
   /// Import a module with the given module path.
   ///
@@ -484,6 +486,10 @@ public:
 
   Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                  DeclContext *dc) override;
+
+  Type importVarDeclType(const clang::VarDecl *clangDecl,
+                         VarDecl *swiftDecl,
+                         DeclContext *dc) override;
 
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,

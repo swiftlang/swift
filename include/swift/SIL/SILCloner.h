@@ -1461,7 +1461,8 @@ SILCloner<ImplClass>::visitAddressToPointerInst(AddressToPointerInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAddressToPointer(getOpLocation(Inst->getLoc()),
                                                 getOpValue(Inst->getOperand()),
-                                                getOpType(Inst->getType())));
+                                                getOpType(Inst->getType()),
+                                                Inst->needsStackProtection()));
 }
 
 template<typename ImplClass>
@@ -2620,6 +2621,17 @@ SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
                                         Inst->getMessage()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIncrementProfilerCounterInst(
+    IncrementProfilerCounterInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createIncrementProfilerCounter(
+                              getOpLocation(Inst->getLoc()),
+                              Inst->getCounterIndex(), Inst->getPGOFuncName(),
+                              Inst->getNumCounters(), Inst->getPGOFuncHash()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
@@ -2627,7 +2639,8 @@ SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createIndexAddr(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getBase()),
-                                         getOpValue(Inst->getIndex())));
+                                         getOpValue(Inst->getIndex()),
+                                         Inst->needsStackProtection()));
 }
 
 template<typename ImplClass>

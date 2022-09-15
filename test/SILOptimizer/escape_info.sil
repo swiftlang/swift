@@ -70,19 +70,46 @@ enum E {
   case B(Z)
 }
 
-sil [escapes !%0.**] @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> ()
-sil [ossa] [escapes !%1.**] @not_escaping_second_argument : $@convention(thin) (@owned X, @owned Y) -> ()
-sil [escapes %0 => %r, %0.c*.c*.v** => %r.c*.c*.v**] @exclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
-sil [escapes %0 => %r, %0.c*.c*.v** -> %r.c*.c*.v**] @nonexclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
-sil [ossa] [escapes %0 => %r.s0] @arg_to_return : $@convention(thin) (@owned X) -> @owned Str
-sil [escapes %1 => %0.s0, !%0] [ossa] @arg_to_arg : $@convention(thin) (@owned X) -> @out Str
-sil [escapes !%0, %0.c* => %r] [ossa] @content_of_arg_to_return : $@convention(thin) (@owned Z) -> @owned Y
-sil [ossa] [escapes !%0.**] @non_escaping_in_arg : $@convention(thin) (@in Z) -> ()
-sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_from_inout : $@convention(thin) (@inout Y) -> @owned Y
-sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @forward_from_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
-sil [escapes %0 -> %r, %0.c*.v** -> %r.c*.v**] @load_and_store_to_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z
-sil [escapes %0 => %r, %0.c1.v** => %r.c1.v**] @exclusive2 : $@convention(thin) (@owned Z) -> @owned Z
-sil [escapes %0 -> %r, %0.c1.v** -> %r.c1.v**] @nonexclusive2 : $@convention(thin) (@owned Z) -> @owned Z
+sil @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> () {
+[%0: noescape **]
+}
+sil [ossa] @not_escaping_second_argument : $@convention(thin) (@owned X, @owned Y) -> () {
+[%1: noescape **]
+}
+sil @exclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z {
+[%0: escape => %r, escape c*.c*.v** => %r.c*.c*.v**]
+}
+sil @nonexclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z {
+[%0: escape => %r, escape c*.c*.v** -> %r.c*.c*.v**]
+}
+sil [ossa] @arg_to_return : $@convention(thin) (@owned X) -> @owned Str {
+[%0: escape => %r.s0]
+}
+sil [ossa] @arg_to_arg : $@convention(thin) (@owned X) -> @out Str {
+[%0: noescape]
+[%1: escape => %0.s0]
+}
+sil [ossa] @content_of_arg_to_return : $@convention(thin) (@owned Z) -> @owned Y {
+[%0: noescape, escape c* => %r]
+}
+sil [ossa] @non_escaping_in_arg : $@convention(thin) (@in Z) -> () {
+[%0: noescape **]
+}
+sil @load_from_inout : $@convention(thin) (@inout Y) -> @owned Y {
+[%0: escape -> %r, escape c*.v** -> %r.c*.v**]
+}
+sil @forward_from_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z {
+[%0: escape => %r, escape c*.v** => %r.c*.v**]
+}
+sil @load_and_store_to_inout : $@convention(thin) (@inout Z, @guaranteed Y) -> Z {
+[%0: escape -> %r, escape c*.v** -> %r.c*.v**]
+}
+sil @exclusive2 : $@convention(thin) (@owned Z) -> @owned Z {
+[%0: escape => %r, escape c1.v** => %r.c1.v**]
+}
+sil @nonexclusive2 : $@convention(thin) (@owned Z) -> @owned Z {
+[%0: escape -> %r, escape c1.v** -> %r.c1.v**]
+}
 
 // CHECK-LABEL: Escape information for test_simple:
 // CHECK: return[]: %1 = alloc_ref $X
@@ -791,7 +818,9 @@ bb0:
   return %6 : $X
 }
 
-sil [escapes !%0.**] @$s4test1FCfD : $@convention(method) (@owned F) -> ()
+sil @$s4test1FCfD : $@convention(method) (@owned F) -> () {
+[%0: noescape **]
+}
 
 // CHECK-LABEL: Escape information for destructure_struct_walkup:
 // CHECK: arg0[c0]:   %2 = alloc_ref $Y                               // user: %9
@@ -965,11 +994,22 @@ bb0(%0 : @owned $Z):
   return %11 : $()
 }
 
-sil [ossa] [escapes !%1] @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
-sil [ossa] [escapes !%0] @closure2 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
-sil [escapes !%0.**] @closure3 : $@convention(thin) (@guaranteed Z) -> ()
-sil [ossa] [escapes %0 => %1, !%1] @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
-sil [ossa] [escapes %1 => %0, !%1] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
+sil [ossa] @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> () {
+[%1: noescape]
+}
+sil [ossa] @closure2 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> () {
+[%0: noescape]
+}
+sil @closure3 : $@convention(thin) (@guaranteed Z) -> () {
+[%0: noescape **]
+}
+sil [ossa] @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> () {
+[%0: escape => %1]
+[%1: noescape]
+}
+sil [ossa] @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> () {
+[%1: escape => %0, noescape]
+}
 
 // CHECK-LABEL: Escape information for callClosure1:
 // CHECK:  -    :   %0 = alloc_ref $Y
@@ -1140,8 +1180,12 @@ bb0(%0 : $Y):
   return %10 : $()
 }
 
-sil [escapes !%0.c1.**] @$s4test1ZCfD : $@convention(method) (@owned Z) -> ()
-sil [escapes !%0.c0.**] @$s4test8DerivedZCfD : $@convention(method) (@owned DerivedZ) -> ()
+sil @$s4test1ZCfD : $@convention(method) (@owned Z) -> () {
+[%0: noescape c1.**]
+}
+sil @$s4test8DerivedZCfD : $@convention(method) (@owned DerivedZ) -> () {
+[%0: noescape c0.**]
+}
 
 // CHECK-LABEL: Escape information for known_type:
 // CHECK: global:   %0 = alloc_ref $Y

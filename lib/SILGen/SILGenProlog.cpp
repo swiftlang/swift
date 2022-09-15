@@ -22,6 +22,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
@@ -108,8 +109,14 @@ public:
         }
       }
     }
-    if (isInOut)
+    if (isInOut) {
+      // If we are inout and are move only, insert a note to the move checker to
+      // check ownership.
+      if (mv.getType().isMoveOnly() && !mv.getType().isMoveOnlyWrapped())
+        mv = SGF.B.createMarkMustCheckInst(
+            loc, mv, MarkMustCheckInst::CheckKind::NoImplicitCopy);
       return mv;
+    }
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
@@ -272,7 +279,7 @@ struct ArgumentInitHelper {
     // Look for the following annotations on the function argument:
     // - @noImplicitCopy
     // - @_eagerMove
-    // - @_lexical
+    // - @_noEagerMove
     auto isNoImplicitCopy = pd->isNoImplicitCopy();
     auto lifetime = SGF.F.getLifetime(pd, value->getType());
 
@@ -355,8 +362,20 @@ struct ArgumentInitHelper {
     SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(),
-                                      pd->getLifetimeAnnotation(), parent, loc);
+    LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
+    bool isNoImplicitCopy = false;
+    if (pd->isSelfParameter()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(pd->getDeclContext())) {
+        lifetimeAnnotation = afd->getLifetimeAnnotation();
+        isNoImplicitCopy = afd->isNoImplicitCopy();
+      }
+    } else {
+      lifetimeAnnotation = pd->getLifetimeAnnotation();
+      isNoImplicitCopy = pd->isNoImplicitCopy();
+    }
+
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), isNoImplicitCopy,
+                                      lifetimeAnnotation, parent, loc);
 
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -549,6 +568,10 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       ty = ty.getAddressType();
     }
     SILValue arg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    if (isInOut && (ty.isMoveOnly() && !ty.isMoveOnlyWrapped())) {
+      arg = SGF.B.createMarkMustCheckInst(
+          Loc, arg, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(arg);
     SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     if (ty.isAddress()) {
@@ -921,7 +944,10 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
   if (!F.isAsync()) {
     llvm::report_fatal_error("Builtin.hopToActor must be in an async function");
   }
-  auto isolation = getActorIsolationOfContext(FunctionDC);
+  auto isolation =
+      getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
+        return CE->getActorIsolation();
+      });
   if (isolation != ActorIsolation::Independent
       && isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in independent

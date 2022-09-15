@@ -22,10 +22,10 @@ target_sources(swiftSILOptimizer PRIVATE
   LowerHopToActor.cpp
   MandatoryInlining.cpp
   MovedAsyncVarDebugInfoPropagator.cpp
-  MoveFunctionCanonicalization.cpp
   MoveKillsCopyableAddressesChecker.cpp
   MoveKillsCopyableValuesChecker.cpp
   MoveOnlyObjectChecker.cpp
+  MoveOnlyAddressChecker.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp

@@ -63,11 +63,13 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <algorithm>
+#include <queue>
 #include <memory>
 
 #include "RequirementMachine/RewriteContext.h"
@@ -214,6 +216,12 @@ struct ASTContext::Implementation {
 
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
+
+  /// The declaration of 'IteratorProtocol.next()'.
+  FuncDecl *IteratorNext = nullptr;
+
+  /// The declaration of 'AsyncIteratorProtocol.next()'.
+  FuncDecl *AsyncIteratorNext = nullptr;
 
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
@@ -550,6 +558,12 @@ struct ASTContext::Implementation {
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
+
+  /// The singleton Builtin.TheTupleType.
+  BuiltinTupleDecl *TheTupleTypeDecl = nullptr;
+
+  /// The declared interface type of Builtin.TheTupleType.
+  BuiltinTupleType *TheTupleType = nullptr;
 };
 
 ASTContext::Implementation::Implementation()
@@ -798,6 +812,23 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
   return getImpl().PlusFunctionOnString;
 }
 
+static FuncDecl *lookupRequirement(ProtocolDecl *proto,
+                                   Identifier requirement) {
+  for (auto result : proto->lookupDirect(requirement)) {
+    if (result->getDeclContext() != proto)
+      continue;
+
+    if (auto func = dyn_cast<FuncDecl>(result)) {
+      if (func->getParameters()->size() != 0)
+        continue;
+
+      return func;
+    }
+  }
+
+  return nullptr;
+}
+
 FuncDecl *ASTContext::getSequenceMakeIterator() const {
   if (getImpl().MakeIterator) {
     return getImpl().MakeIterator;
@@ -807,17 +838,9 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   if (!proto)
     return nullptr;
 
-  for (auto result : proto->lookupDirect(Id_makeIterator)) {
-    if (result->getDeclContext() != proto)
-      continue;
-
-    if (auto func = dyn_cast<FuncDecl>(result)) {
-      if (func->getParameters()->size() != 0)
-        continue;
-
-      getImpl().MakeIterator = func;
-      return func;
-    }
+  if (auto *func = lookupRequirement(proto, Id_makeIterator)) {
+    getImpl().MakeIterator = func;
+    return func;
   }
 
   return nullptr;
@@ -832,17 +855,43 @@ FuncDecl *ASTContext::getAsyncSequenceMakeAsyncIterator() const {
   if (!proto)
     return nullptr;
 
-  for (auto result : proto->lookupDirect(Id_makeAsyncIterator)) {
-    if (result->getDeclContext() != proto)
-      continue;
+  if (auto *func = lookupRequirement(proto, Id_makeAsyncIterator)) {
+    getImpl().MakeAsyncIterator = func;
+    return func;
+  }
 
-    if (auto func = dyn_cast<FuncDecl>(result)) {
-      if (func->getParameters()->size() != 0)
-        continue;
+  return nullptr;
+}
 
-      getImpl().MakeAsyncIterator = func;
-      return func;
-    }
+FuncDecl *ASTContext::getIteratorNext() const {
+  if (getImpl().IteratorNext) {
+    return getImpl().IteratorNext;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::IteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_next)) {
+    getImpl().IteratorNext = func;
+    return func;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getAsyncIteratorNext() const {
+  if (getImpl().AsyncIteratorNext) {
+    return getImpl().AsyncIteratorNext;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::AsyncIteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_next)) {
+    getImpl().AsyncIteratorNext = func;
+    return func;
   }
 
   return nullptr;
@@ -1822,13 +1871,116 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
+using ModuleDependencyIDSet = std::unordered_set<ModuleDependencyID, llvm::pair_hash<std::string, ModuleDependenciesKind>>;
+static void findPath_dfs(ModuleDependencyID X,
+                         ModuleDependencyID Y,
+                         ModuleDependencyIDSet &visited,
+                         std::vector<ModuleDependencyID> &stack,
+                         std::vector<ModuleDependencyID> &result,
+                         const ModuleDependenciesCache &cache,
+                         const llvm::StringSet<> &searchPathSet) {
+  stack.push_back(X);
+  if (X == Y) {
+    copy(stack.begin(), stack.end(), std::back_inserter(result));
+    return;
+  }
+  visited.insert(X);
+  auto node = cache.findDependencies(X.first, {X.second, searchPathSet});
+  assert(node.hasValue() && "Expected cache value for dependency.");
+  for (const auto &dep : node->getModuleDependencies()) {
+    Optional<ModuleDependenciesKind> lookupKind = None;
+    // Underlying Clang module needs an explicit lookup to avoid confusing it
+    // with the parent Swift module.
+    if ((dep == X.first && node->isSwiftModule()) || node->isClangModule())
+      lookupKind = ModuleDependenciesKind::Clang;
+
+    auto depNode = cache.findDependencies(dep, {lookupKind, searchPathSet});
+    if (!depNode.hasValue())
+      continue;
+    auto depID = std::make_pair(dep, depNode->getKind());
+    if (!visited.count(depID)) {
+      findPath_dfs(depID, Y, visited, stack, result, cache, searchPathSet);
+    }
+  }
+  stack.pop_back();
+}
+
+static std::vector<ModuleDependencyID>
+findPathToDependency(ModuleDependencyID dependency,
+                     const ModuleDependenciesCache &cache,
+                     const llvm::StringSet<> &searchPathSet) {
+  auto mainModuleDep = cache.findDependencies(cache.getMainModuleName(),
+                                              {ModuleDependenciesKind::SwiftSource,
+                                               searchPathSet});
+  // We may be in a batch scan instance which does not have this dependency
+  if (!mainModuleDep.hasValue())
+    return {};
+  auto mainModuleID = std::make_pair(cache.getMainModuleName().str(),
+                                     ModuleDependenciesKind::SwiftSource);
+  auto visited = ModuleDependencyIDSet();
+  auto stack = std::vector<ModuleDependencyID>();
+  auto dependencyPath = std::vector<ModuleDependencyID>();
+  findPath_dfs(mainModuleID, dependency, visited, stack, dependencyPath, cache, searchPathSet);
+  return dependencyPath;
+}
+
+// Diagnose scanner failure and attempt to reconstruct the dependency
+// path from the main module to the missing dependency.
+static void diagnoseScannerFailure(StringRef moduleName,
+                                   DiagnosticEngine &Diags,
+                                   const ModuleDependenciesCache &cache,
+                                   const llvm::StringSet<> &searchPathSet,
+                                   llvm::Optional<ModuleDependencyID> dependencyOf) {
+  Diags.diagnose(SourceLoc(), diag::dependency_scan_module_not_found, moduleName);
+  if (dependencyOf.hasValue()) {
+    auto path = findPathToDependency(dependencyOf.getValue(), cache, searchPathSet);
+    // We may fail to construct a path in some cases, such as a Swift overlay of a Clang
+    // module dependnecy.
+    if (path.empty())
+      path = {dependencyOf.getValue()};
+    
+    for (auto it = path.rbegin(), end = path.rend(); it != end; ++it) {
+      const auto &entry = *it;
+      auto entryNode = cache.findDependencies(entry.first, {entry.second, searchPathSet});
+      assert(entryNode.hasValue());
+      std::string moduleFilePath = "";
+      bool isClang = false;
+      switch (entryNode->getKind()) {
+        case swift::ModuleDependenciesKind::SwiftSource:
+          Diags.diagnose(SourceLoc(), diag::dependency_as_imported_by_main_module, entry.first);
+          continue;
+        case swift::ModuleDependenciesKind::SwiftInterface:
+          moduleFilePath = entryNode->getAsSwiftInterfaceModule()->swiftInterfaceFile;
+          break;
+        case swift::ModuleDependenciesKind::SwiftBinary:
+          moduleFilePath = entryNode->getAsSwiftBinaryModule()->compiledModulePath;
+          break;
+        case swift::ModuleDependenciesKind::SwiftPlaceholder:
+          moduleFilePath = entryNode->getAsPlaceholderDependencyModule()->compiledModulePath;
+          break;
+        case swift::ModuleDependenciesKind::Clang:
+          moduleFilePath = entryNode->getAsClangModule()->moduleMapFile;
+          isClang = true;
+          break;
+        default:
+          llvm_unreachable("Unexpected dependency kind");
+      }
+      
+      // TODO: Consider turning the module file (interface or modulemap) into the SourceLoc
+      // of this diagnostic instead. Ideally with the location of the `import` statement
+      // that this dependency originates from.
+      Diags.diagnose(SourceLoc(), diag::dependency_as_imported_by, entry.first, moduleFilePath, isClang);
+    }
+  }
+}
+
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
-    bool cacheOnly) {
+    bool cacheOnly, llvm::Optional<ModuleDependencyID> dependencyOf) {
+  auto searchPathSet = getAllModuleSearchPathsSet();
   // Retrieve the dependencies for this module.
   if (cacheOnly) {
-    auto searchPathSet = getAllModuleSearchPathsSet();
     // Check whether we've cached this result.
     if (!isUnderlyingClangModule) {
       if (auto found = cache.findDependencies(
@@ -1860,6 +2012,9 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
               loader->getModuleDependencies(moduleName, cache, delegate))
         return dependencies;
     }
+    
+    diagnoseScannerFailure(moduleName, Diags, cache, searchPathSet,
+                           dependencyOf);
   }
 
   return None;
@@ -2184,6 +2339,27 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
+static bool isClangModuleVersion(const ModuleLoader::ModuleVersionInfo &info) {
+  switch (info.getSourceKind()) {
+  case ModuleLoader::ModuleVersionSourceKind::ClangModuleTBD:
+    return true;
+  case ModuleLoader::ModuleVersionSourceKind::SwiftBinaryModule:
+  case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
+    return false;
+  }
+}
+
+static StringRef
+getModuleVersionKindString(const ModuleLoader::ModuleVersionInfo &info) {
+  switch (info.getSourceKind()) {
+  case ModuleLoader::ModuleVersionSourceKind::ClangModuleTBD:
+    return "Clang";
+  case ModuleLoader::ModuleVersionSourceKind::SwiftBinaryModule:
+  case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
+    return "Swift";
+  }
+}
+
 bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
                                      llvm::VersionTuple version,
                                      bool underlyingVersion,
@@ -2195,22 +2371,60 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
-  // If no specific version, the module is importable if it has already been imported.
+
   if (version.empty()) {
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
-  }
-  // Otherwise, ask the module loaders.
-  for (auto &importer : getImpl().ModuleLoaders) {
-    if (importer->canImportModule(ModuleName, version, underlyingVersion)) {
-      return true;
+
+    // Otherwise, ask whether any module loader can load the module.
+    for (auto &importer : getImpl().ModuleLoaders) {
+      if (importer->canImportModule(ModuleName, nullptr))
+        return true;
     }
+
+    if (updateFailingList)
+      FailedModuleImportNames.insert(ModuleNameStr);
+
+    return false;
   }
-  if (updateFailingList && version.empty()) {
-    FailedModuleImportNames.insert(ModuleNameStr);
+
+  // We need to check whether the version of the module is high enough.
+  // Retrieve a module version from each module loader that can find the module
+  // and use the best source available for the query.
+  ModuleLoader::ModuleVersionInfo bestVersionInfo;
+  for (auto &importer : getImpl().ModuleLoaders) {
+    ModuleLoader::ModuleVersionInfo versionInfo;
+
+    if (!importer->canImportModule(ModuleName, &versionInfo))
+      continue; // The loader can't find the module.
+
+    if (!versionInfo.isValid())
+      continue; // The loader didn't attempt to parse a version.
+
+    if (underlyingVersion && !isClangModuleVersion(versionInfo))
+      continue; // We're only matching Clang module versions.
+
+    if (bestVersionInfo.isValid() &&
+        versionInfo.getSourceKind() <= bestVersionInfo.getSourceKind())
+      continue; // This module version's source is lower priority.
+
+    bestVersionInfo = versionInfo;
   }
-  return false;
+
+  if (!bestVersionInfo.isValid())
+    return false;
+
+  if (bestVersionInfo.getVersion().empty()) {
+    // The module version could not be parsed from the preferred source for
+    // this query. Diagnose and treat the query as if it succeeded.
+    auto mID = ModuleName[0];
+    Diags.diagnose(mID.Loc, diag::cannot_find_project_version,
+                   getModuleVersionKindString(bestVersionInfo), mID.Item.str());
+    return true;
+  }
+
+  return version <= bestVersionInfo.getVersion();
 }
 
 bool ASTContext::canImportModule(ImportPath::Module ModuleName,
@@ -3006,6 +3220,14 @@ PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
   RecursiveTypeProperties properties;
   bool isCanonical = true;
   for (Type eltTy : elements) {
+    assert(!eltTy->isTypeParameter() ||
+           !eltTy->getRootGenericParam()->isTypeSequence() &&
+           "Pack type parameter outside of a pack expansion");
+    assert(!eltTy->is<SequenceArchetypeType>() &&
+           "Pack type archetype outside of a pack expansion");
+    assert(!eltTy->is<PackType>() &&
+           "Cannot have pack directly inside another pack");
+
     properties |= eltTy->getRecursiveProperties();
     if (!eltTy->isCanonical())
       isCanonical = false;
@@ -4325,8 +4547,6 @@ Type ExistentialType::get(Type constraint) {
   if (constraint->is<ExistentialMetatypeType>())
     return constraint;
 
-  assert(constraint->isConstraintType());
-
   bool printWithAny = true;
   if (constraint->isEqual(C.TheAnyType) || constraint->isAnyObject())
     printWithAny = false;
@@ -4345,6 +4565,11 @@ Type ExistentialType::get(Type constraint) {
                                                 canonicalContext,
                                                 properties);
 }
+
+BuiltinTupleType::BuiltinTupleType(BuiltinTupleDecl *TheDecl,
+                                   const ASTContext &Ctx)
+  : NominalType(TypeKind::BuiltinTuple, &Ctx, TheDecl, Type(),
+                RecursiveTypeProperties()) { }
 
 LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
@@ -5748,4 +5973,31 @@ bool ASTContext::isASCIIString(StringRef s) const {
     }
   }
   return true;
+}
+
+/// The special Builtin.TheTupleType, which parents tuple extensions and
+/// conformances.
+BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
+  auto &result = getImpl().TheTupleTypeDecl;
+
+  if (result)
+    return result;
+
+  result = new (*this) BuiltinTupleDecl(Id_TheTupleType,
+                                        TheBuiltinModule->getFiles()[0]);
+  result->setAccess(AccessLevel::Public);
+
+  return result;
+}
+
+/// The declared interface type of Builtin.TheTupleType.
+BuiltinTupleType *ASTContext::getBuiltinTupleType() {
+  auto &result = getImpl().TheTupleType;
+
+  if (result)
+    return result;
+
+  result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
+
+  return result;
 }

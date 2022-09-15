@@ -282,7 +282,6 @@ cmake^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DSWIFT_LIT_ARGS="--time-tests"^
     -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH=%source_root%\swift-syntax^
-    -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH=%source_root%\swift-syntax^
     -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%

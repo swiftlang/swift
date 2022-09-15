@@ -336,6 +336,8 @@ private:
   /// Check whether this is a distributed method.
   unsigned IsDistributed : 1;
 
+  unsigned stackProtection : 1;
+
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
   unsigned Inlined : 1;
@@ -560,8 +562,7 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root, SILDeclRef forDecl,
-                      ForDefinition_t forDefinition);
+  void createProfiler(ASTNode Root, SILDeclRef Ref);
 
   void discardProfiler() { Profiler = nullptr; }
 
@@ -832,6 +833,9 @@ public:
     IsDistributed = value;
   }
 
+  bool needsStackProtection() const { return stackProtection; }
+  void setNeedStackProtection(bool needSP) { stackProtection = needSP; }
+
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }
 
@@ -1026,18 +1030,16 @@ public:
     EffectsKindAttr = unsigned(E);
   }
   
-  enum class ArgEffectKind {
-    Unknown,
-    Escape
-  };
-  
   std::pair<const char *, int>  parseEffects(StringRef attrs, bool fromSIL,
-                                             bool isDerived,
+                                             int argumentIndex, bool isDerived,
                                              ArrayRef<StringRef> paramNames);
   void writeEffect(llvm::raw_ostream &OS, int effectIdx) const;
+  void writeEffects(llvm::raw_ostream &OS) const {
+    writeEffect(OS, -1);
+  }
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
-  void visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const;
+  void visitArgEffects(std::function<void(int, int, bool)> c) const;
 
   Purpose getSpecialPurpose() const { return specialPurpose; }
 

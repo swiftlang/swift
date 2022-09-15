@@ -25,12 +25,10 @@ namespace {
 
 /// Compare the two \c ModuleDecl instances to see whether they are the same.
 ///
-/// Pass \c true to the \c ignoreUnderlying argument to consider two modules the same even if
-/// one is a Swift module and the other a non-Swift module. This allows a Swift module and its
-/// underlying Clang module to compare as equal.
-bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool ignoreUnderlying = false) {
-  return lhs->getNameStr() == rhs->getNameStr()
-    && (ignoreUnderlying || lhs->isNonSwiftModule() == rhs->isNonSwiftModule());
+/// This does a by-name comparison to consider a module's underlying Clang module to be equivalent
+/// to the wrapping module of the same name.
+bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs) {
+  return lhs->getNameStr() == rhs->getNameStr();
 }
 
 } // anonymous namespace
@@ -50,11 +48,13 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
 SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
   auto *M = D->getModuleContext();
   const auto *DC = D->getDeclContext();
+  SmallVector<const NominalTypeDecl *, 2> ParentTypes = {};
   const Decl *ExtendedNominal = nullptr;
   while (DC) {
     M = DC->getParentModule();
     if (const auto *NTD = dyn_cast_or_null<NominalTypeDecl>(DC->getAsDecl())) {
       DC = NTD->getDeclContext();
+      ParentTypes.push_back(NTD);
     } else if (const auto *Ext = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
       DC = Ext->getExtendedNominal()->getDeclContext();
       if (!ExtendedNominal)
@@ -64,10 +64,10 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     }
   }
 
-  if (areModulesEqual(&this->M, M, true)) {
+  if (areModulesEqual(&this->M, M)) {
     return &MainGraph;
   } else if (MainGraph.DeclaringModule.hasValue() &&
-             areModulesEqual(MainGraph.DeclaringModule.getValue(), M, true)) {
+             areModulesEqual(MainGraph.DeclaringModule.getValue(), M)) {
     // Cross-import overlay modules already appear as "extensions" of their declaring module; we
     // should put actual extensions of that module into the main graph
     return &MainGraph;
@@ -79,9 +79,8 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     return &MainGraph;
   }
 
-  if (ExtendedNominal && isFromExportedImportedModule(ExtendedNominal)) {
-    return &MainGraph;
-  } else if (!ExtendedNominal && isConsideredExportedImported(D)) {
+  // If this type is the child of a type which was re-exported in a qualified export, use the main graph.
+  if (llvm::any_of(ParentTypes, [&](const NominalTypeDecl *NTD){ return isQualifiedExportedImport(NTD); })) {
     return &MainGraph;
   }
   
@@ -230,10 +229,23 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       auto ExtendedModule = ExtendedNominal->getModuleContext();
       auto ExtendedSG = getModuleSymbolGraph(ExtendedNominal);
-      if (ExtendedModule != &M) {
+      if (!isOurModule(ExtendedModule)) {
         ExtendedSG->recordNode(Symbol(ExtendedSG, VD, nullptr));
         return true;
       }
+    }
+  }
+
+  // Clang decls that are inherited from protocols get the USR of the protocol
+  // symbol, regardless of which class it's actually appearing on. To prevent
+  // multiple of these symbols colliding with each other, treat them as
+  // synthesized symbols and use their parent type as the base type.
+  if (VD->isImplicit() && VD->hasClangNode() &&
+      VD->getClangNode().getAsDecl()) {
+    if (const auto *Parent =
+            dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext())) {
+      SG->recordNode(Symbol(SG, VD, Parent));
+      return true;
     }
   }
 
@@ -244,22 +256,10 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 }
 
 bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
-  // First check the decl itself to see if it was directly re-exported.
-  if (isFromExportedImportedModule(D))
-    return true;
-
-  const auto *DC = D->getDeclContext();
-
-  // Next, see if the decl is a child symbol of another decl that was re-exported.
-  if (DC) {
-    if (const auto *VD = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
-      if (isFromExportedImportedModule(VD))
-        return true;
-    }
-  }
-
-  // Finally, check to see if this decl is an extension of something else that was re-exported.
+  // Check to see if this decl is an extension of something else that was re-exported.
+  // Do this first in case there's a chain of extensions that leads somewhere that's not a re-export.
   // FIXME: this considers synthesized members of extensions to be valid
+  const auto *DC = D->getDeclContext();
   const Decl *ExtendedNominal = nullptr;
   while (DC && !ExtendedNominal) {
     if (const auto *ED = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
@@ -269,9 +269,22 @@ bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
     }
   }
 
-  if (ExtendedNominal && isFromExportedImportedModule(ExtendedNominal)) {
+  if (ExtendedNominal && isConsideredExportedImported(ExtendedNominal)) {
     return true;
   }
+
+  // Check to see if the decl is a child symbol of another decl that was re-exported.
+  DC = D->getDeclContext();
+  if (DC) {
+    if (const auto *VD = dyn_cast_or_null<ValueDecl>(DC->getAsDecl())) {
+      if (isConsideredExportedImported(VD))
+        return true;
+    }
+  }
+
+  // Check the decl itself to see if it was directly re-exported.
+  if (isFromExportedImportedModule(D) || isQualifiedExportedImport(D))
+    return true;
 
   // If none of the other checks passed, this wasn't from a re-export.
   return false;
@@ -292,4 +305,8 @@ bool SymbolGraphASTWalker::isExportedImportedModule(const ModuleDecl *M) const {
   return llvm::any_of(ExportedImportedModules, [&M](const auto *MD) {
     return areModulesEqual(M, MD->getModuleContext());
   });
+}
+
+bool SymbolGraphASTWalker::isOurModule(const ModuleDecl *M) const {
+  return areModulesEqual(M, &this->M) || isExportedImportedModule(M);
 }

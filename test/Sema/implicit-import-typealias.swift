@@ -9,6 +9,7 @@
 
 // RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -I %t
 // RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesImplementationOnlyImport.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesSPIOnlyImport.swift -I %t -experimental-spi-only-imports
 // RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesWithImport.swift  -I %t
 
 /// The swiftinterface is broken by the missing import without the workaround.
@@ -98,6 +99,20 @@ import Aliases
 }
 
 // expected-warning@+1 {{'ProtoAlias' aliases 'Original.Proto' and cannot be used here because 'Original' has been imported as implementation-only; this is an error in Swift 6}}
+public func takesGeneric<T: ProtoAlias>(_ t: T) {}
+
+
+//--- UsesAliasesSPIOnlyImport.swift
+
+import Aliases
+@_spiOnly import Original
+
+@inlinable public func inlinableFunc() {
+  // expected-error@+1 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an '@inlinable' function because 'Original' was imported for SPI only}}
+  _ = StructAlias.self
+}
+
+// expected-error@+1 {{'ProtoAlias' aliases 'Original.Proto' and cannot be used here because 'Original' was imported for SPI only}}
 public func takesGeneric<T: ProtoAlias>(_ t: T) {}
 
 

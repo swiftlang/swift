@@ -33,10 +33,8 @@ class SwiftToClangInteropContext;
 class ClangValueTypePrinter {
 public:
   ClangValueTypePrinter(raw_ostream &os, raw_ostream &cPrologueOS,
-                        PrimitiveTypeMapping &typeMapping,
                         SwiftToClangInteropContext &interopContext)
-      : os(os), cPrologueOS(cPrologueOS), typeMapping(typeMapping),
-        interopContext(interopContext) {}
+      : os(os), cPrologueOS(cPrologueOS), interopContext(interopContext) {}
 
   /// Print the C++ class definition that
   /// corresponds to the given structure or enum declaration.
@@ -46,9 +44,8 @@ public:
   /// Print the use of a C++ struct/enum parameter value as it's passed to the
   /// underlying C function that represents the native Swift function.
   void printParameterCxxToCUseScaffold(
-      bool isIndirect, const NominalTypeDecl *type, ArrayRef<Type> genericArgs,
       const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
-      llvm::function_ref<void()> cxxParamPrinter, bool isInOut, bool isSelf);
+      llvm::function_ref<void()> cxxParamPrinter, bool isSelf);
 
   enum class TypeUseKind {
     // The name of the C++ class that corresponds to the Swift value type (with
@@ -65,29 +62,14 @@ public:
                                 TypeUseKind typeUse,
                                 const ModuleDecl *moduleContext);
 
-  /// Prints out the C stub name used to pass/return value directly for the
-  /// given value type.
-  ///
-  /// If the C stub isn't declared yet in the emitted header, that declaration
-  /// will be emitted by this function.
-  void printCStubType(Type type, const NominalTypeDecl *typeDecl,
-                      ArrayRef<Type> genericArgs);
-
   /// Print the supporting code  that's required to indirectly return a C++
   /// class that represents a Swift value type as it's being indirectly passed
   /// from the C function that represents the native Swift function.
-  void printValueTypeIndirectReturnScaffold(
-      const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext,
-      llvm::function_ref<void()> typePrinter,
-      llvm::function_ref<void(StringRef)> bodyPrinter);
-
-  /// Print the supporting code  that's required to directly return a C++ class
-  /// that represents a Swift value type as it's being returned from the C
-  /// function that represents the native Swift function.
-  void printValueTypeDirectReturnScaffold(
-      const NominalTypeDecl *typeDecl, ArrayRef<Type> genericArgs,
-      const ModuleDecl *moduleContext, llvm::function_ref<void()> typePrinter,
-      llvm::function_ref<void()> bodyPrinter);
+  void
+  printValueTypeReturnScaffold(const NominalTypeDecl *typeDecl,
+                               const ModuleDecl *moduleContext,
+                               llvm::function_ref<void()> typePrinter,
+                               llvm::function_ref<void(StringRef)> bodyPrinter);
 
   /// Print out the C++ type name of the implementation class that provides
   /// hidden access to the private class APIs.
@@ -111,14 +93,20 @@ public:
   static void printTypeGenericTraits(
       raw_ostream &os, const NominalTypeDecl *typeDecl,
       StringRef typeMetadataFuncName,
-      ArrayRef<GenericRequirement> typeMetadataFuncRequirements);
+      ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
+      const ModuleDecl *moduleContext);
 
   static void forwardDeclType(raw_ostream &os, const NominalTypeDecl *typeDecl);
+
+  /// Print out the type traits that allow a C++ type be used a Swift generic
+  /// context.
+  static void printClangTypeSwiftGenericTraits(raw_ostream &os,
+                                               const NominalTypeDecl *typeDecl,
+                                               const ModuleDecl *moduleContext);
 
 private:
   raw_ostream &os;
   raw_ostream &cPrologueOS;
-  PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
 };
 

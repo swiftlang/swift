@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SwiftToClangInteropContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 
 using namespace swift;
@@ -32,4 +33,20 @@ void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
   auto result = emittedStubs.insert(stubName);
   if (result.second)
     function();
+}
+
+void SwiftToClangInteropContext::recordExtensions(
+    const NominalTypeDecl *typeDecl, const ExtensionDecl *ext) {
+  auto it = extensions.insert(
+      std::make_pair(typeDecl, std::vector<const ExtensionDecl *>()));
+  it.first->second.push_back(ext);
+}
+
+llvm::ArrayRef<const ExtensionDecl *>
+SwiftToClangInteropContext::getExtensionsForNominalType(
+    const NominalTypeDecl *typeDecl) const {
+  auto exts = extensions.find(typeDecl);
+  if (exts != extensions.end())
+    return exts->getSecond();
+  return {};
 }

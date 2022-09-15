@@ -25,18 +25,6 @@
 
 namespace swift {
 
-inline SILLocation getSILLocation(BridgedLocation loc) {
-  return reinterpret_cast<SILDebugLocation *>(&loc)->getLocation();
-}
-
-inline RegularLocation getRegularLocation(BridgedLocation loc) {
-  return RegularLocation(getSILLocation(loc));
-}
-
-inline const SILDebugScope *getSILDebugScope(BridgedLocation loc) {
-  return reinterpret_cast<SILDebugLocation *>(&loc)->getScope();
-}
-
 inline SILType getSILType(BridgedType ty) {
   return SILType::getFromOpaqueValue(ty.typePtr);
 }
@@ -51,10 +39,6 @@ inline SILValue castToSILValue(BridgedValue value) {
 
 inline SILType castToSILType(BridgedType type) {
   return SILType::getFromOpaqueValue(type.typePtr);
-}
-
-inline SubstitutionMap castToSubstitutionMap(BridgedSubstitutionMap subMap) {
-  return SubstitutionMap::getFromOpaqueValue(subMap.op);
 }
 
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {

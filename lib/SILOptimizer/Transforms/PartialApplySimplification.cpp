@@ -787,7 +787,8 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       case ParameterConvention::Indirect_Inout: {
         // Pass a pointer to the argument into the box.
         auto p = B.createAddressToPointer(loc, arg,
-                                          SILType::getRawPointerType(C));
+                                          SILType::getRawPointerType(C),
+                                          /*needsStackProtection=*/ false);
         if (caller->hasOwnership()) {
           B.createStore(loc, p, proj, StoreOwnershipQualifier::Trivial);
         } else {

@@ -696,11 +696,13 @@ public:
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
-    /// Include imports of SPIs declared with `@_spi`
+    /// Include imports of SPIs declared with `@_spi`.
     SPIAccessControl = 1 << 3,
+    /// Include imports declared with `@_spiOnly`.
+    SPIOnly = 1 << 4,
     /// Include imports shadowed by a cross-import overlay. Unshadowed imports
     /// are included whether or not this flag is specified.
-    ShadowedByCrossImportOverlay = 1 << 4
+    ShadowedByCrossImportOverlay = 1 << 5
   };
   /// \sa getImportedModules
   using ImportFilter = OptionSet<ImportFilterKind>;
@@ -957,7 +959,8 @@ inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
 /// Collects modules that this module imports via `@_exported import`.
 void collectParsedExportedImports(const ModuleDecl *M,
                                   SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports);
+                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
+                                  llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
 
 } // end namespace swift
 

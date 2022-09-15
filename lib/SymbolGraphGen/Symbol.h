@@ -72,6 +72,8 @@ class Symbol {
 
   void serializeAccessLevelMixin(llvm::json::OStream &OS) const;
 
+  void serializeMetadataMixin(llvm::json::OStream &OS) const;
+
   void serializeLocationMixin(llvm::json::OStream &OS) const;
 
   void serializeAvailabilityMixin(llvm::json::OStream &OS) const;

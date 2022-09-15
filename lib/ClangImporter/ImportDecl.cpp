@@ -2684,17 +2684,6 @@ namespace {
       if (isSpecializationDepthGreaterThan(def, 8))
         return nullptr;
 
-      // If we have an inline data member, it won't get eagerly instantiated
-      // when we instantiate the class. So, make sure we do that now to catch
-      // any instantiation errors.
-      for (auto member : decl->decls()) {
-        if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
-          if (varDecl->getTemplateInstantiationPattern())
-            clangSema.InstantiateVariableDefinition(varDecl->getLocation(),
-                                                    varDecl);
-        }
-      }
-
       return VisitCXXRecordDecl(def);
     }
 
@@ -3390,7 +3379,6 @@ namespace {
     }
 
     Decl *VisitVarDecl(const clang::VarDecl *decl) {
-
       // Variables are imported as... variables.
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
@@ -3402,34 +3390,6 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
-
-      // If the declaration is const, consider it audited.
-      // We can assume that loading a const global variable doesn't
-      // involve an ownership transfer.
-      bool isAudited = decl->getType().isConstQualified();
-
-      auto declType = decl->getType();
-
-      // Special case: NS Notifications
-      if (isNSNotificationGlobal(decl))
-        if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
-                                                Impl.CurrentVersion))
-          declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
-
-      // Note that we deliberately don't bridge most globals because we want to
-      // preserve pointer identity.
-      auto importedType =
-          Impl.importType(declType,
-                          (isAudited ? ImportTypeKind::AuditedVariable
-                                     : ImportTypeKind::Variable),
-                          ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None,
-                          getImportTypeAttrs(decl));
-
-      if (!importedType)
-        return nullptr;
-
-      auto type = importedType.getType();
 
       // If we've imported this variable as a member, it's a static
       // member.
@@ -3451,9 +3411,6 @@ namespace {
                        name, dc);
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      result->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
 
       // If imported as member, the member should be final.
       if (dc->getSelfClassDecl())

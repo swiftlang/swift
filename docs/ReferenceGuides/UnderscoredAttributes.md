@@ -121,6 +121,27 @@ extension Text {
 }
 ```
 
+## `@_documentation(metadata: ...)`
+
+Adds "documentation metadata" to the symbol. The identifier in the attribute is
+added to the symbol graph in the `"metadata"` field of the symbol. This can be
+used to add an arbitrary grouping or other indicator to symbols for use in
+documentation.
+
+## `@_documentation(visibility: ...)`
+
+Forces the symbol to be treated as the given access level when checking
+visibility. This can be used to, for example, force a symbol with an underscored
+name to appear in `public` symbol graphs, or treat an otherwise-`public` symbol
+as being `internal` or `private` for the purposes of documentation, to hide it
+from `public` docs.
+
+This can also be applied to `@_exported import` statements to only include the
+imported symbols in symbol graphs with the given minimum access level. For
+example, applying `@_documentation(visibility: internal)` to an `@_exported
+import` statement will hide the imported symbols from `public` symbol graphs and
+documentation, but show them on `internal` symbol graphs and documentation.
+
 ## `@_dynamicReplacement(for: targetFunc(label:))`
 
 Marks a function as the dynamic replacement for another `dynamic` function.
@@ -138,7 +159,7 @@ that releases of the value may be hoisted without respect to deinit barriers.
 
 When applied to a type, indicates that all values which are _statically_
 instances of that type are themselves `@_eagerMove` as above, unless overridden
-with `@_lexical`.
+with `@_noEagerMove`.
 
 Aggregates all of whose fields are `@_eagerMove` or trivial are inferred to be
 `@_eagerMove`.
@@ -451,6 +472,13 @@ This prevents types from that module being exposed in API
 (types of public functions, constraints in public extension etc.)
 and ABI (usage in `@inlinable` code).
 
+## `@_spiOnly`
+
+Marks an import to be used in SPI and implementation details only.
+The import statement will be printed in the private swiftinterface only and
+skipped in the public swiftinterface. Any use of imported types and decls in API
+will be diagnosed.
+
 ## `@_implements(ProtocolName, Requirement)`
 
 An attribute that indicates that a function with one name satisfies
@@ -506,7 +534,7 @@ initializers from its superclass. This implies that all designated initializers
 overridden. This attribute is often printed alongside
 `@_hasMissingDesignatedInitializers` in this case.
 
-## `@_lexical`
+## `@_noEagerMove`
 
 When applied to a value, indicates that the value's lifetime is lexical, that
 releases of the value may not be hoisted over deinit barriers.  
@@ -516,7 +544,7 @@ This is the default behavior, unless the value's type is annotated
 annotation.
 
 When applied to a type, indicates that all values which are instances of that
-type are themselves `@_lexical` as above.
+type are themselves `@_noEagerMove` as above.
 
 This is the default behavior, unless the type annotated is an aggregate that
 consists entirely of `@_eagerMove` or trivial values, in which case the

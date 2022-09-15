@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFileSharedCore.h"
-#include "ModuleFileCoreTableInfo.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFileCoreTableInfo.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -282,9 +283,9 @@ static ValidationInfo validateControlBlock(
       }
       case 4:
         if (scratch[3] != 0) {
-          result.compatibilityVersion =
-            version::Version(blobData.substr(scratch[2]+1, scratch[3]),
-                             SourceLoc(), nullptr);
+          result.compatibilityVersion = *VersionParser::parseVersionString(
+              blobData.substr(scratch[2] + 1, scratch[3]), SourceLoc(),
+              nullptr);
         }
         LLVM_FALLTHROUGH;
       case 3:
@@ -584,6 +585,8 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
       << "'";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << " (built with -experimental-allow-module-with-compiler-errors)";
+  if (ModuleInputBuffer)
+    os << " at '" << ModuleInputBuffer->getBufferIdentifier() << "'";
 }
 
 ModuleFileSharedCore::~ModuleFileSharedCore() { }

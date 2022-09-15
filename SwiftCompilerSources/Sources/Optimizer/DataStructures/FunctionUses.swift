@@ -109,13 +109,6 @@ struct FunctionUses {
   // The use-list head for each function.
   private var uses: [Function: FirstUse] = [:]
   
-  init() {
-    // Already start with a reasonable big capacity to reduce the number of
-    // re-allocations when appending to the data structures.
-    useStorage.reserveCapacity(128)
-    uses.reserveCapacity(64)
-  }
-
   /// Returns the use-list of `function`.
   ///
   /// Note that `collect` must be called before `getUses` can be used.
@@ -125,7 +118,12 @@ struct FunctionUses {
 
   /// Collects all uses of all function in the module.
   mutating func collect(context: ModulePassContext) {
-  
+
+    // Already start with a reasonable big capacity to reduce the number of
+    // re-allocations when appending to the data structures.
+    useStorage.reserveCapacity(128)
+    uses.reserveCapacity(64)
+
     // Mark all functions, which are referenced from tables, to have "unknown" uses.
 
     for vTable in context.vTables {

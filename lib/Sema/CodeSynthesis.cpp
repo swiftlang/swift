@@ -385,8 +385,12 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         if (var->isImplicit())
           continue;
 
-        // Computed properties are not included.
-        if (!var->hasStorage())
+        // Computed properties are not included, except in cases
+        // where property has a property wrapper and `@typeWrapperIgnored`
+        // attribute.
+        if (!var->hasStorage() &&
+            !(var->hasAttachedPropertyWrapper() &&
+              var->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>()))
           continue;
 
         // If this is a memberwise initializeable property include
@@ -1255,10 +1259,14 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     return;
 
   if (!shouldAttemptInitializerSynthesis(decl)) {
-    // If declaration is type wrapped, synthesize a
-    // special initializer that would instantiate storage.
-    if (decl->hasTypeWrapper())
-      (void)decl->getTypeWrapperInitializer();
+    if (decl->hasTypeWrapper()) {
+      auto &ctx = decl->getASTContext();
+      // If declaration is type wrapped and there are no
+      // designated initializers, synthesize a special
+      // memberwise initializer that would instantiate `$_storage`.
+      if (!hasUserDefinedDesignatedInit(ctx.evaluator, decl))
+        (void)decl->getTypeWrapperInitializer();
+    }
 
     decl->setAddedImplicitInitializers();
     return;

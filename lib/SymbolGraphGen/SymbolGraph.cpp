@@ -18,6 +18,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -321,8 +322,10 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
       // We are only interested in synthesized members that come from an
       // extension that we defined in our module.
-      if (Info.EnablingExt && Info.EnablingExt->getModuleContext() != &M) {
-        continue;
+      if (Info.EnablingExt) {
+        const auto *ExtM = Info.EnablingExt->getModuleContext();
+        if (!Walker.isOurModule(ExtM))
+          continue;
       }
 
       for (const auto ExtensionMember : Info.Ext->getMembers()) {
@@ -398,7 +401,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
           // If P is from a different module, and it's being added to a type
           // from the current module, add a `memberOf` relation to the extended
           // protocol.
-          if (MemberVD->getModuleContext()->getNameStr() != M.getNameStr() && VD->getDeclContext()) {
+          if (!Walker.isOurModule(MemberVD->getModuleContext()) && VD->getDeclContext()) {
             if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
               recordEdge(Symbol(this, VD, nullptr),
                          Symbol(this, ExP, nullptr),
@@ -594,6 +597,12 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     return true;
   }
 
+  // If the decl has a `@_documentation(visibility: <access>)` attribute, override any other heuristic
+  auto DocVisibility = documentationVisibilityForDecl(D);
+  if (DocVisibility) {
+    return Walker.Options.MinimumAccessLevel > (*DocVisibility);
+  }
+
   // Don't record effectively internal declarations if specified
   if (D->hasUnderscoredNaming()) {
     // Some implicit decls from Clang with underscored names sneak in, so throw those out
@@ -639,6 +648,13 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     }
 
     // Special cases below.
+
+    // Symbols from exported-imported modules should only be included if they
+    // were originally public.
+    if (Walker.isFromExportedImportedModule(D) &&
+        VD->getFormalAccess() < AccessLevel::Public) {
+      return true;
+    }
 
     auto BaseName = VD->getBaseName().userFacingName();
 

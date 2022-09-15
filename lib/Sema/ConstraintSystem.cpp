@@ -657,37 +657,38 @@ static void extendDepthMap(
     // should actually do this, as it doesn't reflect the true expression depth,
     // but it's needed to preserve compatibility with the behavior from when
     // TupleExpr and ParenExpr were used to represent argument lists.
-    std::pair<bool, ArgumentList *>
+    PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *ArgList) override {
       ++Depth;
-      return {true, ArgList};
+      return Action::Continue(ArgList);
     }
-    ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) override {
+    PostWalkResult<ArgumentList *>
+    walkToArgumentListPost(ArgumentList *ArgList) override {
       --Depth;
-      return ArgList;
+      return Action::Continue(ArgList);
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = {Depth, Parent.getAsExpr()};
       ++Depth;
 
       if (auto CE = dyn_cast<ClosureExpr>(E))
         Closures.push_back(CE);
 
-      return { true, E };
+      return Action::Continue(E);
     }
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         assert(Closures.back() == CE);
         Closures.pop_back();
       }
 
       --Depth;
-      return E;
+      return Action::Continue(E);
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto RS = dyn_cast<ReturnStmt>(S)) {
         // For return statements, treat the parent of the return expression
         // as the closure itself.
@@ -695,11 +696,11 @@ static void extendDepthMap(
           llvm::SaveAndRestore<ParentTy> SavedParent(Parent, Closures.back());
           auto E = RS->getResult();
           E->walk(*this);
-          return { false, S };
+          return Action::SkipChildren(S);
         }
       }
 
-      return { true, S };
+      return Action::Continue(S);
     }
   };
 
@@ -2856,31 +2857,28 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
     DeclContext *DC;
     bool FoundThrow = false;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found a 'try', record it and terminate the traversal.
       if (isa<TryExpr>(expr)) {
         FoundThrow = true;
-        return { false, nullptr };
+        return Action::Stop();
       }
 
       // Don't walk into a 'try!' or 'try?'.
       if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return { false, expr };
+        return Action::SkipChildren(expr);
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override {
+    PreWalkAction walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
-      if (!isa<PatternBindingDecl>(decl))
-        return false;
-
-      return true;
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(decl));
     }
 
     bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
@@ -2966,11 +2964,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       return LabelItem.isSyntacticallyExhaustive();
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       // If we've found a 'throw', record it and terminate the traversal.
       if (isa<ThrowStmt>(stmt)) {
         FoundThrow = true;
-        return { false, nullptr };
+        return Action::Stop();
       }
 
       // Handle do/catch differently.
@@ -2979,27 +2977,27 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
         // if the catch isn't syntactically exhaustive.
         if (!isSyntacticallyExhaustive(doCatch)) {
           if (!doCatch->getBody()->walk(*this))
-            return { false, nullptr };
+            return Action::Stop();
         }
 
         // Walk into all the catch clauses.
         for (auto catchClause : doCatch->getCatches()) {
           if (!catchClause->walk(*this))
-            return { false, nullptr };
+            return Action::Stop();
         }
 
         // We've already walked all the children we care about.
-        return { false, stmt };
+        return Action::SkipChildren(stmt);
       }
 
       if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
         if (forEach->getTryLoc().isValid()) {
           FoundThrow = true;
-          return { false, nullptr };
+          return Action::Stop();
         }
       }
 
-      return { true, stmt };
+      return Action::Continue(stmt);
     }
 
   public:
@@ -3547,10 +3545,28 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 2)
-      << "(overload set choice binding "
-      << boundType->getString(PO) << " := "
-      << adjustedRefType->getString(PO) << ")\n";
+
+    auto &log = llvm::errs();
+    log.indent(solverState ? solverState->getCurrentIndent() : 2);
+    log << "(overload set choice binding ";
+    boundType->print(log, PO);
+    log << " := ";
+    adjustedRefType->print(log, PO);
+
+    auto openedAtLoc = getOpenedTypes(locator);
+    if (!openedAtLoc.empty()) {
+      log << " [";
+      llvm::interleave(
+          openedAtLoc.begin(), openedAtLoc.end(),
+          [&](OpenedType opened) {
+            opened.second->getImpl().getGenericParameter()->print(log, PO);
+            log << " := ";
+            Type(opened.second).print(log, PO);
+          },
+          [&]() { log << ", "; });
+      log << "]";
+    }
+    log << ")\n";
   }
 
   if (auto *decl = choice.getDeclOrNull()) {
@@ -3603,6 +3619,12 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
         auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance) {
+          // FIXME: This regresses diagnostics if removed, but really the
+          // handling of a missing conformance should be the same for
+          // tuples and non-tuples.
+          if (lookupBaseType->is<TupleType>())
+            return DependentMemberType::get(lookupBaseType, assocType);
+
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
@@ -4810,10 +4832,10 @@ static void extendPreorderIndexMap(
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
       ++Index;
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 

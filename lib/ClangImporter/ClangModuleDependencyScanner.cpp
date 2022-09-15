@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ImporterImpl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -26,60 +27,6 @@ using namespace swift;
 
 using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
-
-class swift::ClangModuleDependenciesCacheImpl {
-  /// Cache the names of the files used for the "import hack" to compute module
-  /// dependencies.
-  /// FIXME: This should go away once Clang's dependency scanning library
-  /// can scan by module name.
-  llvm::StringMap<std::string> importHackFileCache;
-
-public:
-  /// Set containing all of the Clang modules that have already been seen.
-  llvm::StringSet<> alreadySeen;
-
-  DependencyScanningService service;
-
-  DependencyScanningTool tool;
-
-  ClangModuleDependenciesCacheImpl()
-      : importHackFileCache(), service(ScanningMode::DependencyDirectivesScan,
-                                       ScanningOutputFormat::Full,
-                                       clang::CASOptions(), nullptr, nullptr),
-        tool(service) {}
-  ~ClangModuleDependenciesCacheImpl();
-
-  /// Retrieve the name of the file used for the "import hack" that is
-  /// used to scan the dependencies of a Clang module.
-  llvm::ErrorOr<StringRef> getImportHackFile(StringRef moduleName);
-};
-
-ClangModuleDependenciesCacheImpl::~ClangModuleDependenciesCacheImpl() {
-  if (!importHackFileCache.empty()) {
-    for (auto& it: importHackFileCache) {
-      llvm::sys::fs::remove(it.second);
-    }
-  }
-}
-
-llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile(StringRef moduleName) {
-  auto cacheIt = importHackFileCache.find(moduleName.str());
-  if (cacheIt != importHackFileCache.end())
-    return cacheIt->second;
-
-  // Create a temporary file.
-  int resultFD;
-  SmallString<128> resultPath;
-  if (auto error = llvm::sys::fs::createTemporaryFile(
-          "import-hack-" + moduleName.str(), "c", resultFD, resultPath))
-    return error;
-
-  llvm::raw_fd_ostream out(resultFD, /*shouldClose=*/true);
-  out << "#pragma clang module import " << moduleName.str() << ";\n";
-  llvm::sys::RemoveFileOnSignal(resultPath);
-  importHackFileCache.insert(std::make_pair(moduleName, resultPath.str().str()));
-  return importHackFileCache[moduleName];
-}
 
 // Add search paths.
 // Note: This is handled differently for the Clang importer itself, which
@@ -102,7 +49,7 @@ static void addSearchPathInvocationArguments(
 /// Create the command line for Clang dependency scanning.
 static std::vector<std::string> getClangDepScanningInvocationArguments(
     ASTContext &ctx,
-    StringRef sourceFileName) {
+    Optional<StringRef> sourceFileName = None) {
   std::vector<std::string> commandLineArgs;
 
   // Form the basic command line.
@@ -115,7 +62,10 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
       commandLineArgs.begin(), commandLineArgs.end(),
       "<swift-imported-modules>");
   assert(sourceFilePos != commandLineArgs.end());
-  *sourceFilePos = sourceFileName.str();
+  if (sourceFileName.hasValue())
+    *sourceFilePos = sourceFileName->str();
+  else
+    commandLineArgs.erase(sourceFilePos);
 
   // HACK! Drop the -fmodule-format= argument and the one that
   // precedes it.
@@ -139,34 +89,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
     *syntaxOnlyPos = "-c";
   }
 
-  // HACK: Stolen from ClangScanDeps.cpp
-  commandLineArgs.push_back("-o");
-  commandLineArgs.push_back("/dev/null");
-  commandLineArgs.push_back("-M");
-  commandLineArgs.push_back("-MT");
-  commandLineArgs.push_back("import-hack.o");
-  commandLineArgs.push_back("-Xclang");
-  commandLineArgs.push_back("-Eonly");
-  commandLineArgs.push_back("-Xclang");
-  commandLineArgs.push_back("-sys-header-deps");
-  commandLineArgs.push_back("-Wno-error");
-
   return commandLineArgs;
-}
-
-/// Get or create the Clang-specific
-static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
-    ModuleDependenciesCache &cache) {
-  auto clangImpl = cache.getClangImpl();
-  if (!clangImpl) {
-    clangImpl = new ClangModuleDependenciesCacheImpl();
-    cache.setClangImpl(clangImpl,
-                       [](ClangModuleDependenciesCacheImpl *ptr) {
-      delete ptr;
-    });
-  }
-
-  return clangImpl;
 }
 
 /// Record the module dependencies we found by scanning Clang modules into
@@ -319,27 +242,41 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
           {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
     return found;
 
-  // Retrieve or create the shared state.
-  auto clangImpl = getOrCreateClangImpl(cache);
-
-  // HACK! Replace the module import buffer name with the source file hack.
-  auto importHackFile = clangImpl->getImportHackFile(moduleName);
-  if (!importHackFile) {
-    // FIXME: Emit a diagnostic here.
-    return None;
-  }
-
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
-    getClangDepScanningInvocationArguments(ctx, *importHackFile);
-  std::string workingDir =
-      ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+    getClangDepScanningInvocationArguments(ctx);
+  // The Swift compiler does not have a concept of a working directory.
+  // It is instead handled by the Swift driver by resolving relative paths
+  // according to the driver's notion of a working directory. On the other hand,
+  // Clang does have a concept working directory which may be specified on this
+  // Clang invocation with '-working-directory'. If so, it is crucial that we use
+  // this directory as an argument to the Clang scanner invocation below.
+  std::string workingDir;
+  auto clangWorkingDirPos = std::find(commandLineArgs.rbegin(),
+                                      commandLineArgs.rend(),
+                                      "-working-directory");
+  if (clangWorkingDirPos == commandLineArgs.rend())
+    workingDir = ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  else {
+    if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
+      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error, "Missing '-working-directory' argument");
+      return None;
+    }
+    workingDir = *(clangWorkingDirPos - 1);
+  }
 
-  auto clangDependencies = clangImpl->tool.getFullDependencies(
-      commandLineArgs, workingDir, clangImpl->alreadySeen);
+  auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
+      commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
+      moduleName);
   if (!clangDependencies) {
-    // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
+    auto errorStr = toString(clangDependencies.takeError());
+    // We ignore the "module 'foo' not found" error, the Swift dependency
+    // scanner will report such an error only if all of the module loaders
+    // fail as well.
+    if (errorStr.find("fatal error: module '" + moduleName.str() +
+                      "' not found") == std::string::npos)
+      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                         errorStr);
     return None;
   }
 
@@ -375,21 +312,17 @@ bool ClangImporter::addBridgingHeaderDependencies(
     llvm_unreachable("Unexpected module dependency kind");
   }
 
-  // Retrieve or create the shared state.
-  auto clangImpl = getOrCreateClangImpl(cache);
-
   // Retrieve the bridging header.
   std::string bridgingHeader = *targetModule.getBridgingHeader();
 
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
-    getClangDepScanningInvocationArguments(ctx, bridgingHeader);
+    getClangDepScanningInvocationArguments(ctx, StringRef(bridgingHeader));
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
 
-  auto clangDependencies = clangImpl->tool.getFullDependencies(
-      commandLineArgs, workingDir, clangImpl->alreadySeen);
-
+  auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
+      commandLineArgs, workingDir, cache.getAlreadySeenClangModules());
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());

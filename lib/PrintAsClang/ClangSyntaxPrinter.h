@@ -90,6 +90,9 @@ public:
   void printNominalTypeReference(const NominalTypeDecl *typeDecl,
                                  const ModuleDecl *moduleContext);
 
+  /// Print out the C++ record qualifier for the given C++ record.
+  void printNominalClangTypeReference(const clang::Decl *typeDecl);
+
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.
   ///

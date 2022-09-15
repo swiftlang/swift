@@ -1551,15 +1551,15 @@ void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb) {
   castToInst<AllocRefInstBase>(arb)->setStackAllocatable();
 }
 
-BridgedSubstitutionMap
+SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType) {
   auto type = castToSILType(bridgedType);
   auto *ntd = type.getASTType()->getAnyNominal();
   auto *pm = castToPassInvocation(context)->getPassManager();
   auto *m = pm->getModule()->getSwiftModule();
-  
-  return {type.getASTType()->getContextSubstitutionMap(m, ntd).getOpaqueValue()};
+
+  return type.getASTType()->getContextSubstitutionMap(m, ntd);
 }
 
 void PassContext_beginTransformFunction(BridgedFunction function, BridgedPassContext ctxt) {
@@ -1632,4 +1632,9 @@ PassContext_loadFunction(BridgedPassContext context, StringRef name) {
   SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
   SILFunction *f = mod->loadFunction(name, SILModule::LinkingMode::LinkNormal);
   return {f};
+}
+
+SwiftInt SILOptions_enableStackProtection(BridgedPassContext context) {
+  SILModule *mod = castToPassInvocation(context)->getPassManager()->getModule();
+  return mod->getOptions().EnableStackProtection;
 }

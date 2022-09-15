@@ -26,6 +26,10 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 
+#ifdef SWIFT_SWIFT_PARSER
+#include "SwiftParserCompilerSupport.h"
+#endif
+
 using namespace swift;
 
 namespace swift {
@@ -188,6 +192,32 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   Optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = parser.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
+
+#ifdef SWIFT_SWIFT_PARSER
+  if ((ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+       ctx.LangOpts.hasFeature(Feature::ParserValidation)) &&
+      ctx.SourceMgr.getCodeCompletionBufferID() != bufferID &&
+      SF->Kind != SourceFileKind::SIL) {
+    auto bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+    unsigned int flags = 0;
+
+    if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip))
+      flags |= SPCC_RoundTrip;
+
+    if (!ctx.Diags.hadAnyError() &&
+        ctx.LangOpts.hasFeature(Feature::ParserValidation))
+      flags |= SPCC_ParseDiagnostics;
+
+    int roundTripResult =
+      swift_parser_consistencyCheck(
+        bufferRange.str().data(), bufferRange.getByteLength(),
+        SF->getFilename().str().c_str(), flags);
+
+    // FIXME: Produce an error on round-trip failure.
+    if (roundTripResult)
+      abort();
+  }
+#endif
 
   return SourceFileParsingResult{ctx.AllocateCopy(decls), tokensRef,
                                  parser.CurrentTokenHash, syntaxRoot};

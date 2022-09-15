@@ -48,6 +48,7 @@ const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
     switch (cond.getKind()) {
     case StmtConditionElement::CK_Boolean:
     case StmtConditionElement::CK_PatternBinding:
+    case StmtConditionElement::CK_HasSymbol:
       continue;
 
     case StmtConditionElement::CK_Availability:
@@ -1245,10 +1246,26 @@ protected:
         auto *builderCall =
             buildWrappedChainPayload(branchVarRef, i, numPayloads, isOptional);
 
+        auto isTopLevel = [&](Stmt *anchor) {
+          if (ifStmt->getThenStmt() == anchor)
+            return true;
+
+          // The situation is this:
+          //
+          // if <cond> {
+          //   ...
+          // } else if <other-cond> {
+          //   ...
+          // }
+          if (auto *innerIf = getAsStmt<IfStmt>(ifStmt->getElseStmt()))
+            return innerIf->getThenStmt() == anchor;
+
+          return ifStmt->getElseStmt() == anchor;
+        };
+
         // The operand should have optional type if we had optional results,
         // so we just need to call `buildIf` now, since we're at the top level.
-        if (isOptional && (ifStmt->getThenStmt() == anchor ||
-                           ifStmt->getElseStmt() == anchor)) {
+        if (isOptional && isTopLevel(anchor)) {
           builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
@@ -2678,9 +2695,9 @@ public:
     return ResultBuilderBodyPreCheck::Okay;
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (SkipPrecheck)
-      return std::make_pair(false, E);
+      return Action::SkipChildren(E);
 
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
@@ -2704,21 +2721,24 @@ public:
       if (SuppressDiagnostics)
         transaction.abort();
 
-      return std::make_pair(false, HasError ? nullptr : E);
+      if (HasError)
+        return Action::Stop();
+
+      return Action::SkipChildren(E);
     }
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     // If we see a return statement, note it..
     if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
       if (!returnStmt->isImplicit()) {
         ReturnStmts.push_back(returnStmt);
-        return std::make_pair(false, S);
+        return Action::SkipChildren(S);
       }
     }
 
     // Otherwise, recurse into the statement normally.
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
   /// Check whether given expression (including single-statement
@@ -2745,8 +2765,8 @@ public:
   }
 
   /// Ignore patterns.
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
-    return { false, pat };
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+    return Action::SkipChildren(pat);
   }
 };
 

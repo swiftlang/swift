@@ -108,33 +108,39 @@ public:
       ClosureFinder(ScopeCreator &scopeCreator, ASTScopeImpl *parent)
           : scopeCreator(scopeCreator), parent(parent) {}
 
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (auto *closure = dyn_cast<ClosureExpr>(E)) {
           scopeCreator
               .constructExpandAndInsert<ClosureParametersScope>(
                   parent, closure);
-          return {false, E};
+          return Action::SkipChildren(E);
         }
         if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
           scopeCreator
               .constructExpandAndInsert<CaptureListScope>(
                   parent, capture);
-          return {false, E};
+          return Action::SkipChildren(E);
         }
-        return {true, E};
+        return Action::Continue(E);
       }
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
         if (isa<BraceStmt>(S)) { // closures hidden in here
-          return {true, S};
+          return Action::Continue(S);
         }
-        return {false, S};
+        return Action::SkipChildren(S);
       }
-      std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-        return {false, P};
+      PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+        return Action::SkipChildren(P);
       }
-      bool walkToDeclPre(Decl *D) override { return false; }
-      bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-      bool walkToParameterListPre(ParameterList *PL) override { return false; }
+      PreWalkAction walkToDeclPre(Decl *D) override {
+        return Action::SkipChildren();
+      }
+      PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+        return Action::SkipChildren();
+      }
+      PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+        return Action::SkipChildren();
+      }
     };
 
     expr->walk(ClosureFinder(*this, parent));
@@ -330,6 +336,11 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(TypeAliasDecl, TypeAliasScope)
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
+
+  ASTScopeImpl *visitBuiltinTupleDecl(BuiltinTupleDecl *btd, ASTScopeImpl *p,
+                                      ScopeCreator &scopeCreator) {
+    llvm_unreachable("BuiltinTupleDecl should never appear in a source file");
+  }
 
   // This declaration is handled from
   // addChildrenForParsedAccessors
@@ -1167,6 +1178,7 @@ ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
   for (auto &sec : stmt->getCond()) {
     switch (sec.getKind()) {
     case StmtConditionElement::CK_Availability:
+    case StmtConditionElement::CK_HasSymbol:
       break;
     case StmtConditionElement::CK_Boolean:
       scopeCreator.addToScopeTree(sec.getBoolean(), insertionPoint);

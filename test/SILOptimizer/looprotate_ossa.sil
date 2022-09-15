@@ -476,28 +476,24 @@ bb2:
 //
 // CHECK-LABEL: sil [ossa] @addressPhiFixUp : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 // CHECK: bb1:
-// CHECK:   [[NEXT:%.*]] = address_to_pointer {{%.*}} : $*UInt8 to $Builtin.RawPointer
 // CHECK:   cond_br {{%.*}}, bb3, bb2
 //
 // CHECK: bb2:
-// CHECK-NEXT: br bb7(%0 : $Builtin.RawPointer)
+// CHECK-NEXT: br bb7
 //
 // CHECK: bb3:
-// CHECK-NEXT: br bb4([[NEXT]] : $Builtin.RawPointer)
+// CHECK-NEXT: br bb4
 //
 // CHECK: bb4([[ARG:%.*]] :
 // CHECK:  [[CAST_BACK:%.*]] = pointer_to_address [[ARG]] : $Builtin.RawPointer to [strict] $*UInt8
 // CHECK:  [[GEP:%.*]] = index_addr [[CAST_BACK]] :
-// CHECK:  [[CAST_ROUND_TRIP_START:%.*]] = address_to_pointer [[GEP]]
-// CHECK:  [[CAST_ROUND_TRIP_END:%.*]] = pointer_to_address [[CAST_ROUND_TRIP_START]] : $Builtin.RawPointer to [strict] $*UInt8
-// CHECK:  [[BACK_TO_RAWPOINTER:%.*]] = address_to_pointer [[CAST_ROUND_TRIP_END]]
 // CHECK:  cond_br {{%.*}}, bb6, bb5
 //
 // CHECK: bb5:
-// CHECK-NEXT: br bb7([[CAST_ROUND_TRIP_START]] :
+// CHECK-NEXT: br bb7
 //
 // CHECK: bb6:
-// CHECK-NEXT: br bb4([[BACK_TO_RAWPOINTER]] :
+// CHECK-NEXT: br bb4
 //
 // CHECK: bb7([[RESULT:%.*]] :
 // CHECK-NEXT: return [[RESULT]]

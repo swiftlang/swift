@@ -16,7 +16,7 @@ public func blackHole<T>(_ _: T) {  }
 
 @inline(never)
 func localTest() {
-    var x = LocalCount.create()
+    var x = NS.LocalCount.create()
     expectEqual(x.value, 6) // This is 6 because of "var x" "x.value" * 2 and "(x, x, x)".
 
     let t = (x, x, x)

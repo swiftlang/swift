@@ -19,6 +19,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
@@ -431,8 +432,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
     if (vers.hasValue()) {
       if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
@@ -445,8 +446,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     if (vers.hasValue()) {
       Opts.PackageDescriptionVersion = vers.getValue();
     } else {
@@ -587,13 +588,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
-  if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
-    Opts.RequireExplicitAvailability = true;
-    if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
-      Opts.RequireExplicitAvailabilityTarget = A->getValue();
-    }
-  }
-
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
@@ -720,6 +714,31 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       }
     }
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
+    StringRef diagLevel = A->getValue();
+    if (diagLevel == "warn") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+    } else if (diagLevel == "error") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
+    } else if (diagLevel == "ignore") {
+      Opts.RequireExplicitAvailability = None;
+    } else {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unknown_require_explicit_availability,
+                     diagLevel);
+    }
+  } else if (Args.getLastArg(OPT_require_explicit_availability,
+                             OPT_require_explicit_availability_target) ||
+             Opts.LibraryLevel == LibraryLevel::API) {
+    Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailabilityTarget = A->getValue();
+  }
+
+  Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
 
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
@@ -908,8 +927,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()) == "target")
       return Opts.getMinPlatformVersion();
 
-    if (auto vers = version::Version::parseVersionString(A->getValue(),
-                                                         SourceLoc(), &Diags))
+    if (auto vers = VersionParser::parseVersionString(A->getValue(),
+                                                      SourceLoc(), &Diags))
       return (llvm::VersionTuple)*vers;
 
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -1762,6 +1781,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
+  Opts.EnableStackProtection =
+      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableStackProtection);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -2296,6 +2318,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
       } else if (version.equals("5.5")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
+      } else if (version.equals("5.6")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -2409,10 +2433,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_disable_new_llvm_pass_manager,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
-
-  Opts.EnableStackProtector =
-      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
-                   Opts.EnableStackProtector);
 
   return false;
 }

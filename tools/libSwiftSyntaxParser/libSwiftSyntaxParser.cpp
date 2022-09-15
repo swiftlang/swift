@@ -17,15 +17,16 @@
 
 #include "swift-c/SyntaxParser/SwiftSyntaxParser.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Subsystems.h"
 #include <Block.h>
 
 using namespace swift;
@@ -99,7 +100,7 @@ public:
   }
 
   void setLanguageVersion(const char *versionString) {
-    if (auto version = version::Version::parseVersionString(
+    if (auto version = VersionParser::parseVersionString(
             versionString, SourceLoc(), /*Diags=*/nullptr)) {
       this->EffectiveLanguageVersion = version;
     }

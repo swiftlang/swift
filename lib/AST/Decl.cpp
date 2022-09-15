@@ -284,6 +284,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::OpaqueVarType;
      return DescriptiveDeclKind::OpaqueResultType;
    }
+
+   case DeclKind::BuiltinTuple:
+     llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
 #undef TRIVIAL_KIND
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -481,6 +484,9 @@ bool Decl::isInvalid() const {
       return true;
     return AD->getStorage()->isInvalid();
   }
+
+  case DeclKind::BuiltinTuple:
+    return false;
   }
 
   llvm_unreachable("Unknown decl kind");
@@ -515,6 +521,9 @@ void Decl::setInvalid() {
   case DeclKind::EnumElement:
     cast<ValueDecl>(this)->setInterfaceType(ErrorType::get(getASTContext()));
     return;
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
 
   llvm_unreachable("Unknown decl kind");
@@ -1180,6 +1189,9 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::EnumElement:
   case DeclKind::Param:
     llvm_unreachable("not a top-level ValueDecl");
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not end up here");
 
   case DeclKind::Protocol:
     return ImportKind::Protocol;
@@ -1873,10 +1885,6 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
   // Tuple types are default-initializable if all of their element
   // types are.
   if (const auto tuple = dyn_cast<TupleTypeRepr>(typeRepr)) {
-    // ... but not variadic ones.
-    if (tuple->hasEllipsis())
-      return false;
-
     for (const auto &elt : tuple->getElements()) {
       if (!isDefaultInitializable(elt.Type, ctx))
         return false;
@@ -2643,6 +2651,9 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Module:
     // Modules are never instance members.
     return false;
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleDecl should not end up here");
   }
   llvm_unreachable("bad DeclKind");
 }
@@ -4303,6 +4314,10 @@ enum class DeclTypeKind : unsigned {
 
 static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   ASTContext &ctx = decl->getASTContext();
+
+  // Special case the Builtin.TheTupleType singleton.
+  if (isa<BuiltinTupleDecl>(decl))
+    return ctx.getBuiltinTupleType();
 
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
@@ -6530,6 +6545,12 @@ bool ParamDecl::isAnonClosureParam() const {
   return nameStr[0] == '$';
 }
 
+bool ParamDecl::isVariadic() const {
+  (void) getInterfaceType();
+
+  return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
+}
+
 ParamDecl::Specifier ParamDecl::getSpecifier() const {
   auto &ctx = getASTContext();
 
@@ -6964,17 +6985,46 @@ Type DeclContext::getSelfTypeInContext() const {
   return getDeclaredTypeInContext();
 }
 
+TupleType *BuiltinTupleDecl::getTupleSelfType() const {
+  if (TupleSelfType)
+    return TupleSelfType;
+
+  auto &ctx = getASTContext();
+
+  // Get the generic parameter type 'Elements'.
+  auto paramType = getGenericParams()->getParams()[0]
+      ->getDeclaredInterfaceType();
+
+  // Build the pack expansion type 'Elements...'.
+  Type packExpansionType = PackExpansionType::get(paramType, paramType);
+
+  // Build the one-element tuple type '(Elements...)'.
+  SmallVector<TupleTypeElt, 1> elts;
+  elts.push_back(packExpansionType);
+
+  const_cast<BuiltinTupleDecl *>(this)->TupleSelfType =
+      TupleType::get(elts, ctx);
+
+  return TupleSelfType;
+}
+
 /// Retrieve the interface type of 'self' for the given context.
 Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
-  // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl()) {
-    auto selfType = getProtocolSelfType();
-    if (!selfType)
-      return ErrorType::get(getASTContext());
-    return selfType;
+  if (auto *nominalDecl = getSelfNominalTypeDecl()) {
+    if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
+      return builtinTupleDecl->getTupleSelfType();
+
+    // For a protocol or extension thereof, the type is 'Self'.
+    if (isa<ProtocolDecl>(nominalDecl)) {
+      auto selfType = getProtocolSelfType();
+      if (!selfType)
+        return ErrorType::get(getASTContext());
+      return selfType;
+    }
   }
+
   return getDeclaredInterfaceType();
 }
 
@@ -7261,16 +7311,16 @@ swift::findWrappedValuePlaceholder(Expr *init) {
   public:
     PropertyWrapperValuePlaceholderExpr *placeholder = nullptr;
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (placeholder)
-        return { false, E };
+        return Action::SkipChildren(E);
 
       if (auto *value = dyn_cast<PropertyWrapperValuePlaceholderExpr>(E)) {
         placeholder = value;
-        return { false, value };
+        return Action::SkipChildren(value);
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   } walker;
   init->walk(walker);
@@ -7666,8 +7716,7 @@ bool AbstractFunctionDecl::hasDynamicSelfResult() const {
   return isa<ConstructorDecl>(this);
 }
 
-AbstractFunctionDecl *
-AbstractFunctionDecl::getAsyncAlternative(bool isKnownObjC) const {
+AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   // Async functions can't have async alternatives
   if (hasAsync())
     return nullptr;
@@ -7691,8 +7740,7 @@ AbstractFunctionDecl::getAsyncAlternative(bool isKnownObjC) const {
   }
 
   auto *renamedDecl = evaluateOrDefault(
-      getASTContext().evaluator, RenamedDeclRequest{this, avAttr, isKnownObjC},
-      nullptr);
+      getASTContext().evaluator, RenamedDeclRequest{this, avAttr}, nullptr);
   auto *alternative = dyn_cast_or_null<AbstractFunctionDecl>(renamedDecl);
   if (!alternative || !alternative->hasAsync())
     return nullptr;
@@ -7951,9 +7999,9 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
   public:
     HashCombiner(StableHasher &hasher) : hasher(hasher) {}
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (D->isImplicit())
-        return false;
+        return Action::SkipChildren();
 
       if (auto *idc = dyn_cast<IterableDeclContext>(D)) {
         if (auto fp = idc->getBodyFingerprint())
@@ -7964,7 +8012,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
         for (auto *d : idc->getParsedMembers())
           const_cast<Decl *>(d)->walk(*this);
 
-        return false;
+        return Action::SkipChildren();
       }
 
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -7972,7 +8020,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
           hasher.combine(*fp);
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 
@@ -9211,7 +9259,10 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
       ActorIsolation::forUnspecified());
 }
 
-ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
+ActorIsolation swift::getActorIsolationOfContext(
+    DeclContext *dc,
+    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+        getClosureActorIsolation) {
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
   if (auto FD = dyn_cast<FuncDecl>(dcToUse)) {
@@ -9226,27 +9277,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     return getActorIsolation(var);
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
-    switch (auto isolation = closure->getActorIsolation()) {
-    case ClosureActorIsolation::Independent:
-      return ActorIsolation::forIndependent()
-                .withPreconcurrency(isolation.preconcurrency());
-
-    case ClosureActorIsolation::GlobalActor: {
-      return ActorIsolation::forGlobalActor(
-          isolation.getGlobalActor(), /*unsafe=*/false)
-                .withPreconcurrency(isolation.preconcurrency());
-    }
-
-    case ClosureActorIsolation::ActorInstance: {
-      auto selfDecl = isolation.getActorInstance();
-      auto actor = selfDecl->getType()->getReferenceStorageReferent()
-          ->getAnyActor();
-      assert(actor && "Bad closure actor isolation?");
-      // FIXME: This could be a parameter... or a capture... hmmm.
-      return ActorIsolation::forActorInstanceSelf(actor)
-        .withPreconcurrency(isolation.preconcurrency());
-    }
-    }
+    return getClosureActorIsolation(closure).getActorIsolation();
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
@@ -9473,3 +9504,8 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
 bool ActorIsolation::isDistributedActor() const {
   return getKind() == ActorInstance && getActor()->isDistributedActor();
 }
+
+BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name,
+                                   DeclContext *Parent)
+  : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
+                    ArrayRef<InheritedEntry>(), nullptr) {}

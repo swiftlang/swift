@@ -347,10 +347,18 @@ private:
     // FIXME: Print struct's doc comment.
     // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
-                                  owningPrinter.typeMapping,
                                   owningPrinter.interopContext);
-    printer.printValueTypeDecl(
-        SD, /*bodyPrinter=*/[&]() { printMembers(SD->getMembers()); });
+    printer.printValueTypeDecl(SD, /*bodyPrinter=*/[&]() {
+      printMembers(SD->getMembers());
+      for (const auto *ed :
+           owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
+        auto sign = ed->getGenericSignature();
+        // FIXME: support requirements.
+        if (!sign.getRequirements().empty())
+          continue;
+        printMembers(ed->getMembers());
+      }
+    });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -396,7 +404,6 @@ private:
 
     // FIXME: Print enum's availability
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
-                                           owningPrinter.typeMapping,
                                            owningPrinter.interopContext);
     ClangSyntaxPrinter syntaxPrinter(os);
     DeclAndTypeClangFunctionPrinter clangFuncPrinter(
@@ -410,7 +417,7 @@ private:
         owningPrinter.typeMapping, owningPrinter.interopContext, owningPrinter);
     ClangValueTypePrinter outOfLineValTyPrinter(
         owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
-        owningPrinter.typeMapping, owningPrinter.interopContext);
+        owningPrinter.interopContext);
 
     auto elementTagMapping =
         owningPrinter.interopContext.getIrABIDetails().getEnumTagMapping(ED);
@@ -427,12 +434,15 @@ private:
 
       os << "  inline bool is" << name << "() const;\n";
 
+      outOfLineSyntaxPrinter
+          .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
       outOfLineOS << "  inline bool ";
-      outOfLineSyntaxPrinter.printBaseName(ED);
-      outOfLineOS << "::is" << name << "() const {\n";
+      outOfLineSyntaxPrinter.printNominalTypeQualifier(
+          ED, /*moduleContext=*/ED->getModuleContext());
+      outOfLineOS << "is" << name << "() const {\n";
       outOfLineOS << "    return *this == ";
-      outOfLineSyntaxPrinter.printBaseName(ED);
-      outOfLineOS << "::";
+      outOfLineSyntaxPrinter.printNominalTypeQualifier(
+          ED, /*moduleContext=*/ED->getModuleContext());
       outOfLineSyntaxPrinter.printIdentifier(caseName);
       outOfLineOS << ";\n";
       outOfLineOS << "  }\n";
@@ -445,12 +455,7 @@ private:
           associatedValueList->size() > 1) {
         return;
       }
-      auto paramType = associatedValueList->front()->getType();
-      Type objectType;
-      OptionalTypeKind optKind;
-      std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-          paramType->getNominalOrBoundGenericNominal(), paramType);
-      auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+      auto paramType = associatedValueList->front()->getInterfaceType();
 
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
@@ -462,9 +467,12 @@ private:
           [&](auto &types) {
             // Printing function name and return type
             os << "  inline " << types[paramType] << " get" << name;
+            outOfLineSyntaxPrinter
+                .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
             outOfLineOS << "  inline " << types[paramType] << ' ';
-            outOfLineSyntaxPrinter.printBaseName(ED);
-            outOfLineOS << "::get" << name;
+            outOfLineSyntaxPrinter.printNominalTypeQualifier(
+                ED, /*moduleContext=*/ED->getModuleContext());
+            outOfLineOS << "get" << name;
           },
           [&](auto &types) {}, true,
           [&](auto &types) {
@@ -480,6 +488,20 @@ private:
             outOfLineOS << "(*this);\n";
             outOfLineOS << "    char * _Nonnull payloadFromDestruction = "
                            "thisCopy->_destructiveProjectEnumData();\n";
+            if (const auto *gtpt = paramType->getAs<GenericTypeParamType>()) {
+              DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
+                  outOfLineOS, gtpt, [](StringRef) {},
+                  /*initializeWithTake=*/StringRef("payloadFromDestruction"));
+              return;
+            }
+            // FIXME: unify non-generic return with regular function emission
+            // return path.
+            Type objectType;
+            OptionalTypeKind optKind;
+            std::tie(objectType, optKind) = getObjectTypeAndOptionality(
+                paramType->getNominalOrBoundGenericNominal(), paramType);
+            auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+
             if (auto knownCxxType =
                     owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
@@ -546,107 +568,115 @@ private:
           neededTypes.push_back(paramType);
         }
 
-        clangFuncPrinter.printCustomCxxFunction(
-            neededTypes,
-            [&](auto &types) {
-              // Printing function name and return type
-              os << "    inline ";
-              syntaxPrinter.printBaseName(elementDecl->getParentEnum());
-              os << " operator()";
+        // FIXME: support generic constructor.
+        if (!ED->isGeneric())
+          clangFuncPrinter.printCustomCxxFunction(
+              neededTypes,
+              [&](auto &types) {
+                // Printing function name and return type
+                os << "    inline ";
+                syntaxPrinter.printBaseName(elementDecl->getParentEnum());
+                os << " operator()";
 
-              outOfLineOS << "  inline ";
-              outOfLineSyntaxPrinter.printBaseName(
-                  elementDecl->getParentEnum());
-              outOfLineOS << ' ';
-              outOfLineSyntaxPrinter.printBaseName(
-                  elementDecl->getParentEnum());
-              outOfLineOS << "::_impl_" << elementDecl->getNameStr()
-                          << "::operator()";
-            },
-            [&](auto &types) {
-              // Printing parameters
-              if (!paramType) {
-                return;
-              }
-              assert(objectTypeDecl != nullptr);
-              if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                      objectTypeDecl)) {
-                os << types[paramType] << " val";
-                outOfLineOS << types[paramType] << " val";
-              } else {
-                os << "const " << types[paramType] << " &val";
-                outOfLineOS << "const " << types[paramType] << " &val";
-              }
-            },
-            true,
-            [&](auto &types) {
-              // Printing function body
-              outOfLineOS << "    auto result = ";
-              outOfLineSyntaxPrinter.printBaseName(
-                  elementDecl->getParentEnum());
-              outOfLineOS << "::_make();\n";
-
-              if (paramType) {
+                outOfLineOS << "  inline ";
+                outOfLineSyntaxPrinter.printBaseName(
+                    elementDecl->getParentEnum());
+                outOfLineOS << ' ';
+                outOfLineSyntaxPrinter.printBaseName(
+                    elementDecl->getParentEnum());
+                outOfLineOS << "::_impl_" << elementDecl->getNameStr()
+                            << "::operator()";
+              },
+              [&](auto &types) {
+                // Printing parameters
+                if (!paramType) {
+                  return;
+                }
                 assert(objectTypeDecl != nullptr);
-
                 if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
-                  outOfLineOS << "    memcpy(result._getOpaquePointer(), &val, "
-                                 "sizeof(val));\n";
+                  os << types[paramType] << " val";
+                  outOfLineOS << types[paramType] << " val";
                 } else {
-                  outOfLineOS << "    alignas(";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ") unsigned char buffer[sizeof(";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ")];\n";
-                  outOfLineOS << "    auto *valCopy = new(buffer) ";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << "(val);\n";
-                  outOfLineOS << "    ";
-                  outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
-                              << "::";
-                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
-                  outOfLineOS << "::implClassFor<";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ">::type::initializeWithTake(result._"
-                                 "getOpaquePointer(), ";
-                  outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
-                              << "::";
-                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
-                  outOfLineOS << "::implClassFor<";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
-                  outOfLineOS << ");\n";
+                  os << "const " << types[paramType] << " &val";
+                  outOfLineOS << "const " << types[paramType] << " &val";
                 }
-              }
+              },
+              true,
+              [&](auto &types) {
+                // Printing function body
+                outOfLineOS << "    auto result = ";
+                outOfLineSyntaxPrinter.printBaseName(
+                    elementDecl->getParentEnum());
+                outOfLineOS << "::_make();\n";
 
-              outOfLineOS << "    result._destructiveInjectEnumTag(";
-              if (ED->isResilient()) {
-                outOfLineOS << cxx_synthesis::getCxxImplNamespaceName()
-                            << "::" << elementInfo->globalVariableName;
-              } else {
-                outOfLineOS << elementInfo->tag;
-              }
-              outOfLineOS << ");\n";
-              outOfLineOS << "    return result;\n";
-              outOfLineOS << "  ";
-            },
-            ED->getModuleContext(), outOfLineOS);
+                if (paramType) {
+                  assert(objectTypeDecl != nullptr);
+
+                  if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                          objectTypeDecl)) {
+                    outOfLineOS
+                        << "    memcpy(result._getOpaquePointer(), &val, "
+                           "sizeof(val));\n";
+                  } else {
+                    outOfLineOS << "    alignas(";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ") unsigned char buffer[sizeof(";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ")];\n";
+                    outOfLineOS << "    auto *valCopy = new(buffer) ";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << "(val);\n";
+                    outOfLineOS << "    ";
+                    outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                                << "::";
+                    outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
+                    outOfLineOS << "::implClassFor<";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ">::type::initializeWithTake(result._"
+                                   "getOpaquePointer(), ";
+                    outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                                << "::";
+                    outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
+                    outOfLineOS << "::implClassFor<";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
+                    outOfLineOS << ");\n";
+                  }
+                }
+
+                outOfLineOS << "    result._destructiveInjectEnumTag(";
+                if (ED->isResilient()) {
+                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName()
+                              << "::" << elementInfo->globalVariableName;
+                } else {
+                  outOfLineOS << elementInfo->tag;
+                }
+                outOfLineOS << ");\n";
+                outOfLineOS << "    return result;\n";
+                outOfLineOS << "  ";
+              },
+              ED->getModuleContext(), outOfLineOS);
       }
       os << "  } ";
       syntaxPrinter.printIdentifier(caseName);
@@ -722,6 +752,8 @@ private:
       }
       os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
+      
+      printMembers(ED->getMembers());
     });
   }
 
@@ -866,7 +898,8 @@ private:
 
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
-                                     bool isNSUIntegerSubscript = false) {
+                                     bool isNSUIntegerSubscript = false,
+                                     const SubscriptDecl *SD = nullptr) {
     printDocumentationComment(AFD);
 
     Optional<ForeignAsyncConvention> asyncConvention =
@@ -883,7 +916,11 @@ private:
       if (isClassMethod)
         return;
       assert(!AFD->isStatic());
-      auto *typeDeclContext = cast<NominalTypeDecl>(AFD->getParent());
+      auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
+      if (!typeDeclContext) {
+        typeDeclContext =
+            cast<ExtensionDecl>(AFD->getParent())->getExtendedNominal();
+      }
 
       std::string cFuncDecl;
       llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);
@@ -899,13 +936,20 @@ private:
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        declPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/false);
+        if (SD)
+          declPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/false);
+        else
+          declPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/false);
       } else {
-        declPrinter.printCxxMethod(
-            typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/false, funcABI->additionalParams);
+        declPrinter.printCxxMethod(typeDeclContext, AFD,
+                                   funcABI->getSignature(),
+                                   funcABI->getSymbolName(), resultTy,
+                                   /*isDefinition=*/false);
       }
 
       DeclAndTypeClangFunctionPrinter defPrinter(
@@ -914,14 +958,19 @@ private:
           owningPrinter);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-
-        defPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/true);
+        if (SD)
+          defPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true);
+        else
+          defPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/true);
       } else {
-        defPrinter.printCxxMethod(
-            typeDeclContext, AFD, funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/true, funcABI->additionalParams);
+        defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
+                                  funcABI->getSymbolName(), resultTy,
+                                  /*isDefinition=*/true);
       }
 
       // FIXME: SWIFT_WARN_UNUSED_RESULT
@@ -1201,8 +1250,10 @@ private:
     os << ";\n";
   }
 
-  struct FuncionSwiftABIInformation {
-    FuncionSwiftABIInformation(AbstractFunctionDecl *FD) {
+  struct FunctionSwiftABIInformation {
+    FunctionSwiftABIInformation(AbstractFunctionDecl *FD,
+                                LoweredFunctionSignature signature)
+        : signature(signature) {
       isCDecl = FD->getAttrs().hasAttribute<CDeclAttr>();
       if (!isCDecl) {
         auto mangledName = SILDeclRef(FD).mangle();
@@ -1218,56 +1269,16 @@ private:
 
     bool useMangledSymbolName() const { return !isCDecl; }
 
-    SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-        additionalParams;
+    const LoweredFunctionSignature &getSignature() const { return signature; }
 
   private:
     bool isCDecl;
     StringRef symbolName;
+    LoweredFunctionSignature signature;
   };
 
-  // Converts the array of ABIAdditionalParam into an array of AdditionalParam
-  void convertABIAdditionalParams(
-      AbstractFunctionDecl *FD,
-      llvm::SmallVector<IRABIDetailsProvider::ABIAdditionalParam, 1> ABIparams,
-      llvm::SmallVector<DeclAndTypeClangFunctionPrinter::AdditionalParam, 2>
-          &params,
-      Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
-    for (auto param : ABIparams) {
-      using Role = IRABIDetailsProvider::ABIAdditionalParam::ABIParameterRole;
-      switch (param.getRole()) {
-      case Role::GenericRequirement:
-        params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
-                              Role::GenericRequirement,
-                          FD->getASTContext().getOpaquePointerType(),
-                          /*isIndirect=*/false, param.getGenericRequirement()});
-        break;
-      case Role::GenericTypeMetadataSource:
-        params.push_back({DeclAndTypeClangFunctionPrinter::AdditionalParam::
-                              Role::GenericTypeMetadata,
-                          param.getMetadataSourceType(), /*isIndirect=*/false,
-                          None});
-        break;
-      case Role::Self:
-        params.push_back(
-            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-             selfTypeDeclContext
-                 ? (*selfTypeDeclContext)->getDeclaredInterfaceType()
-                 : FD->getASTContext().getOpaquePointerType(),
-             /*isIndirect=*/
-             isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
-        break;
-      case Role::Error:
-        params.push_back(
-            {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Error,
-             FD->getASTContext().getOpaquePointerType()});
-        break;
-      }
-    }
-  }
-
   // Print out the extern C Swift ABI function signature.
-  Optional<FuncionSwiftABIInformation>
+  Optional<FunctionSwiftABIInformation>
   printSwiftABIFunctionSignatureAsCxxFunction(
       AbstractFunctionDecl *FD, Optional<FunctionType *> givenFuncType = None,
       Optional<NominalTypeDecl *> selfTypeDeclContext = None) {
@@ -1291,39 +1302,22 @@ private:
     std::string cRepresentationString;
     llvm::raw_string_ostream cRepresentationOS(cRepresentationString);
 
-    FuncionSwiftABIInformation funcABI(FD);
+    auto signature = owningPrinter.interopContext.getIrABIDetails()
+                         .getFunctionLoweredSignature(FD);
+    // FIXME: Add a note saying that this func is unsupported.
+    if (!signature)
+      return None;
+    FunctionSwiftABIInformation funcABI(FD, *signature);
 
     cRepresentationOS << "SWIFT_EXTERN ";
 
     DeclAndTypeClangFunctionPrinter funcPrinter(
         cRepresentationOS, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
-    auto ABIparams = owningPrinter.interopContext.getIrABIDetails()
-                         .getFunctionABIAdditionalParams(FD);
-    // FIXME: Ideally direct 'self' would come from IR provider too.
-    if (selfTypeDeclContext && !isa<ConstructorDecl>(FD) &&
-        llvm::find_if(
-            ABIparams,
-            [](const IRABIDetailsProvider::ABIAdditionalParam &Param) {
-              return Param.getRole() ==
-                     IRABIDetailsProvider::ABIAdditionalParam::
-                         ABIParameterRole::Self;
-            }) == ABIparams.end()) {
-      (*selfTypeDeclContext)->getDeclaredInterfaceType();
-      funcABI.additionalParams.push_back(
-          {DeclAndTypeClangFunctionPrinter::AdditionalParam::Role::Self,
-           (*selfTypeDeclContext)->getDeclaredInterfaceType(),
-           /*isIndirect=*/
-           isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false});
-    }
-    if (!ABIparams.empty())
-      convertABIAdditionalParams(FD, ABIparams, funcABI.additionalParams,
-                                 /*selfContext=*/selfTypeDeclContext);
 
     auto representation = funcPrinter.printFunctionSignature(
-        FD, funcABI.getSymbolName(), resultTy,
-        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto,
-        funcABI.additionalParams);
+        FD, funcABI.getSignature(), funcABI.getSymbolName(), resultTy,
+        DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CFunctionProto);
     if (representation.isUnsupported()) {
       // FIXME: Emit remark about unemitted declaration.
       return None;
@@ -1352,7 +1346,7 @@ private:
   // Print out the C++ inline function thunk that
   // represents the Swift function in C++.
   void printAbstractFunctionAsCxxFunctionThunk(
-      FuncDecl *FD, const FuncionSwiftABIInformation &funcABI) {
+      FuncDecl *FD, const FunctionSwiftABIInformation &funcABI) {
     assert(outputLang == OutputLanguageMode::Cxx);
     printDocumentationComment(FD);
 
@@ -1370,9 +1364,10 @@ private:
     DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
     modifiers.isInline = true;
     auto result = funcPrinter.printFunctionSignature(
-        FD, cxx_translation::getNameForCxx(FD), resultTy,
+        FD, funcABI.getSignature(), cxx_translation::getNameForCxx(FD),
+        resultTy,
         DeclAndTypeClangFunctionPrinter::FunctionSignatureKind::CxxInlineThunk,
-        {}, modifiers);
+        modifiers);
     assert(
         !result.isUnsupported()); // The C signature should be unsupported too.
     // FIXME: Support throwing exceptions for Swift errors.
@@ -1381,10 +1376,10 @@ private:
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << " {\n";
-    funcPrinter.printCxxThunkBody(funcABI.getSymbolName(),
-                                  FD->getModuleContext(), resultTy,
-                                  FD->getParameters(), funcABI.additionalParams,
-                                  funcTy->isThrowing(), funcTy);
+    funcPrinter.printCxxThunkBody(
+        FD, funcABI.getSignature(), funcABI.getSymbolName(),
+        FD->getModuleContext(), resultTy, FD->getParameters(),
+        funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 
@@ -1547,8 +1542,7 @@ private:
     assert(!AvAttr->Rename.empty());
 
     auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr, false},
-        nullptr);
+        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");
@@ -1859,6 +1853,14 @@ private:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!SD->isInstanceMember())
+        return;
+      auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+      printAbstractFunctionAsMethod(getter, false,
+                                    /*isNSUIntegerSubscript=*/false, SD);
+      return;
+    }
     assert(SD->isInstanceMember() && "static subscripts not supported");
 
     bool isNSUIntegerSubscript = false;
@@ -2563,9 +2565,11 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
   return false;
 }
 
-static bool hasExposeAttr(const ValueDecl *VD) {
+static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
-    if (VD == VD->getASTContext().getStringDecl())
+    if (VD == VD->getASTContext().getStringDecl() && !isExtension)
+      return true;
+    if (VD == VD->getASTContext().getArrayDecl())
       return true;
     return false;
   }
@@ -2573,6 +2577,26 @@ static bool hasExposeAttr(const ValueDecl *VD) {
     return true;
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+    // FIXME: Do not expose 'index' methods as the overloads are conflicting.
+    // this should either be prohibited in the stdlib module, or the overloads
+    // should be renamed automatically or using the expose attribute.
+    if (ED->getExtendedNominal() == VD->getASTContext().getArrayDecl()) {
+      if (isa<AbstractFunctionDecl>(VD) &&
+          !cast<AbstractFunctionDecl>(VD)
+               ->getName()
+               .getBaseName()
+               .isSpecial() &&
+          cast<AbstractFunctionDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("index"))
+        return false;
+    }
+    return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
+  }
   return false;
 }
 

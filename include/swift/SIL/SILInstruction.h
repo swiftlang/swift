@@ -3858,7 +3858,53 @@ public:
     return OperandValueArrayRef(getAllOperands());
   }
 };
-  
+
+/// Increments a given profiler counter for a given PGO function name. This is
+/// lowered to the \c llvm.instrprof.increment LLVM intrinsic.
+class IncrementProfilerCounterInst final
+    : public InstructionBase<SILInstructionKind::IncrementProfilerCounterInst,
+                             NonValueInstruction>,
+      private llvm::TrailingObjects<IncrementProfilerCounterInst, char> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  unsigned CounterIdx;
+  unsigned PGOFuncNameLength;
+  unsigned NumCounters;
+  uint64_t PGOFuncHash;
+
+  IncrementProfilerCounterInst(SILDebugLocation Loc, unsigned CounterIdx,
+                               unsigned PGOFuncNameLength, unsigned NumCounters,
+                               uint64_t PGOFuncHash)
+      : InstructionBase(Loc), CounterIdx(CounterIdx),
+        PGOFuncNameLength(PGOFuncNameLength), NumCounters(NumCounters),
+        PGOFuncHash(PGOFuncHash) {}
+
+  static IncrementProfilerCounterInst *
+  create(SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
+         unsigned NumCounters, uint64_t PGOFuncHash, SILModule &M);
+
+public:
+  /// The index of the counter to be incremented.
+  unsigned getCounterIndex() const { return CounterIdx; }
+
+  /// The PGO function name for the function in which the counter resides.
+  StringRef getPGOFuncName() const {
+    return StringRef(getTrailingObjects<char>(), PGOFuncNameLength);
+  }
+
+  /// The total number of counters within the function.
+  unsigned getNumCounters() const { return NumCounters; }
+
+  /// A hash value for the function used to determine whether the profile is
+  /// outdated.
+  /// FIXME: This is currently always 0.
+  uint64_t getPGOFuncHash() const { return PGOFuncHash; }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
+
 /// Initializes a SIL global variable. Only valid once, before any
 /// usages of the global via GlobalAddrInst.
 class AllocGlobalInst
@@ -5304,9 +5350,18 @@ class AddressToPointerInst
                                 ConversionInst>
 {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  AddressToPointerInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  AddressToPointerInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                       bool needsStackProtection)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+        sharedUInt8().AddressToPointerInst.needsStackProtection = needsStackProtection;
+      }
+
+public:
+  bool needsStackProtection() const {
+    return sharedUInt8().AddressToPointerInst.needsStackProtection;
+  }
 };
 
 /// PointerToAddressInst - Convert a Builtin.RawPointer value to a SIL address.
@@ -8086,11 +8141,20 @@ class IndexAddrInst
     : public InstructionBase<SILInstructionKind::IndexAddrInst,
                              IndexingInst> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
   enum { Base, Index };
 
-  IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index)
-      : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {}
+  IndexAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Index,
+                bool needsStackProtection)
+      : InstructionBase(DebugLoc, Operand->getType(), Operand, Index) {
+    sharedUInt8().IndexAddrInst.needsStackProtection = needsStackProtection;
+  }
+
+public:
+  bool needsStackProtection() const {
+    return sharedUInt8().IndexAddrInst.needsStackProtection;
+  }
 };
 
 /// TailAddrInst - like IndexingInst, but aligns-up the resulting address to a

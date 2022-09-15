@@ -5723,7 +5723,6 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // Handle variadic generic parameters.
     if (ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
-      assert(param.isVariadic());
       assert(!param.isInOut());
 
       SmallVector<Expr *, 4> variadicArgs;
@@ -6968,6 +6967,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     llvm_unreachable("Unimplemented!");
   }
 
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType should not show up here");
+
   // Coerce from a tuple to a tuple.
   case TypeKind::Tuple: {
     auto fromTuple = cast<TupleType>(desugaredFromType);
@@ -7322,6 +7324,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
     break;
+
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType should not show up here");
   }
 
   // Unresolved types come up in diagnostics for lvalue and inout types.
@@ -8111,7 +8116,8 @@ bool swift::exprNeedsParensInsideFollowingOperator(
     DeclContext *DC, Expr *expr,
     PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
-    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, expr);
+    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+        DC, expr, /*diagnose=*/false);
     if (!exprPG) return true;
 
     return DC->getASTContext().associateInfixOperators(exprPG, followingPG)
@@ -8161,8 +8167,8 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
     return false;
 
   if (parent->isInfixOperator()) {
-    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
-                                                                       parent);
+    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+        DC, parent, /*diagnose=*/false);
     if (!parentPG) return true;
 
     // If the index is 0, this is on the LHS of the parent.
@@ -8210,7 +8216,7 @@ namespace {
     explicit SetExprTypes(const Solution &solution)
         : solution(solution) {}
 
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
       auto exprType = cs.getType(expr);
       exprType = solution.simplifyType(exprType);
@@ -8236,16 +8242,18 @@ namespace {
         }
       }
 
-      return expr;
+      return Action::Continue(expr);
     }
 
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
 
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
   };
 
   class ExprWalker : public ASTWalker {
@@ -8327,16 +8335,16 @@ namespace {
       return hadError;
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         rewriteFunction(closure);
 
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
-          return { false, rewriteClosure(closure) };
+          return Action::SkipChildren(rewriteClosure(closure));
         }
 
-        return { false, closure };
+        return Action::SkipChildren(closure);
       }
 
       if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
@@ -8353,20 +8361,26 @@ namespace {
       }
 
       Rewriter.walkToExprPre(expr);
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
-    Expr *walkToExprPost(Expr *expr) override {
-      return Rewriter.walkToExprPost(expr);
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+      auto *result = Rewriter.walkToExprPost(expr);
+      if (!result)
+        return Action::Stop();
+
+      return Action::Continue(result);
     }
 
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
 
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
 
     /// Rewrite the target, producing a new target.
     Optional<SolutionApplicationTarget>
@@ -8910,6 +8924,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     for (auto &condElement : *stmtCondition) {
       switch (condElement.getKind()) {
       case StmtConditionElement::CK_Availability:
+      case StmtConditionElement::CK_HasSymbol:
         continue;
 
       case StmtConditionElement::CK_Boolean: {
@@ -9124,8 +9139,9 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
       // Bodies of single-expression closures use a special locator
       // for contextual type conversion to make sure that result is
       // convertible to `Void` when `return` is not used explicitly.
-      if (contextualTypePurpose == CTP_ClosureResult) {
-        auto *closure = cast<ClosureExpr>(target.getDeclContext());
+      auto *closure = dyn_cast<ClosureExpr>(target.getDeclContext());
+      if (closure && closure->hasSingleExpressionBody() &&
+          contextualTypePurpose == CTP_ClosureResult) {
         auto *returnStmt =
             castToStmt<ReturnStmt>(closure->getBody()->getLastElement());
 

@@ -15,5 +15,5 @@ import ClangMod
 
 public func useHasPointer(_: HasPointer)
 
-// FIXME: SR-14489
+// FIXME: https://github.com/apple/swift/issues/56844
 // UNSUPPORTED: OS=windows-msvc

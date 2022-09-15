@@ -498,20 +498,20 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                                ASTContext &ctx)
         : Decl(decl), ctx(ctx) { }
 
-    bool walkToDeclPre(class Decl *D) override {
+    PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      return !isa<NominalTypeDecl>(D);
+      return Action::SkipChildrenIf(isa<NominalTypeDecl>(D));
     }
     
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
-        return { false, E };
+        return Action::SkipChildren(E);
       
       // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)
-        return { true, E };
+        return Action::Continue(E);
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
@@ -525,12 +525,12 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
         if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
-          return { true, E };
+          return Action::Continue(E);
 
         arg = dotExpr->getBase();
       } else {
         // Not a constructor call.
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // Look for a base of 'self' or 'super'.
@@ -559,13 +559,13 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       }
       
       if (myKind == BodyInitKind::None)
-        return { true, E };
+        return Action::Continue(E);
 
       if (Kind == BodyInitKind::None) {
         Kind = myKind;
 
         InitExpr = apply;
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // If the kind changed, complain.
@@ -576,13 +576,14 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                            Kind == BodyInitKind::Chained);
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 
   auto &ctx = decl->getASTContext();
   FindReferenceToInitializer finder(decl, ctx);
-  decl->getBody()->walk(finder);
+  if (auto *body = decl->getBody())
+    body->walk(finder);
 
   // get the kind out of the finder.
   auto Kind = finder.Kind;
@@ -2205,28 +2206,39 @@ static Type validateParameterType(ParamDecl *decl) {
       options |= TypeResolutionFlags::Preconcurrency;
   }
 
-  // If the element is a variadic parameter, resolve the parameter type as if
-  // it were in non-parameter position, since we want functions to be
-  // @escaping in this case.
-  options.setContext(decl->isVariadic() ?
-                       TypeResolverContext::VariadicFunctionInput :
-                       TypeResolverContext::FunctionInput);
-  options |= TypeResolutionFlags::Direct;
-
   if (dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
-  const auto resolution =
-      TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get);
-  auto Ty = resolution.resolveType(decl->getTypeRepr());
+  Type Ty;
 
-  if (Ty->hasError()) {
-    decl->setInvalid();
-    return ErrorType::get(ctx);
+  auto *nestedRepr = decl->getTypeRepr();
+  while (true) {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+      nestedRepr = attrTypeRepr->getTypeRepr();
+      continue;
+    }
+    if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      nestedRepr = specifierTypeRepr->getBase();
+      continue;
+    }
+    break;
   }
 
-  if (decl->isVariadic()) {
+  if (auto *packExpansionRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    options.setContext(TypeResolverContext::VariadicFunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    // FIXME: This duplicates code found elsewhere
+    auto *patternRepr = packExpansionRepr->getPatternType();
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(patternRepr);
+
     // Find the first type sequence parameter and use that as the count type.
     SmallVector<Type, 2> rootTypeSequenceParams;
     Ty->getTypeSequenceParameters(rootTypeSequenceParams);
@@ -2238,19 +2250,28 @@ static Type validateParameterType(ParamDecl *decl) {
     } else {
       // Monovariadic types (T...) for <T> resolve to [T].
       Ty = VariadicSequenceType::get(Ty);
-    }
-    if (!ctx.getArrayDecl()) {
-      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                         diag::sugar_type_not_found, 0);
-      return ErrorType::get(ctx);
-    }
 
-    // Disallow variadic parameters in enum elements.
-    if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
-      decl->diagnose(diag::enum_element_ellipsis);
-      decl->setInvalid();
-      return ErrorType::get(ctx);
+      // Set the old-style variadic bit.
+      decl->setVariadic();
+      if (!ctx.getArrayDecl()) {
+        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                           diag::sugar_type_not_found, 0);
+        return ErrorType::get(ctx);
+      }
     }
+  } else {
+    options.setContext(TypeResolverContext::FunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(decl->getTypeRepr());
+  }
+
+  if (Ty->hasError()) {
+    decl->setInvalid();
+    return ErrorType::get(ctx);
   }
 
   return Ty;
@@ -2278,6 +2299,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
+  case DeclKind::BuiltinTuple:
     llvm_unreachable("should not get here");
     return Type();
 
@@ -2345,6 +2367,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
+
+    if (auto clangDecl = VD->getClangDecl()) {
+      auto clangVarDecl = cast<clang::VarDecl>(clangDecl);
+
+      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(
+          clangVarDecl, VD, VD->getDeclContext());
+    }
+
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
       return ErrorType::get(Context);

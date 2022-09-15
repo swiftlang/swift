@@ -734,10 +734,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (kind == SIL_ARG_EFFECTS_ATTR) {
       IdentifierID effectID;
       unsigned isDerived;
-      SILArgEffectsAttrLayout::readRecord(scratch, effectID, isDerived);
+      unsigned argumentIndex;
+      SILArgEffectsAttrLayout::readRecord(scratch, effectID,
+                                          argumentIndex, isDerived);
       if (shouldAddEffectAttrs) {
         StringRef effectStr = MF->getIdentifierText(effectID);
-        auto error = fn->parseEffects(effectStr, /*fromSIL*/ true, isDerived, {});
+        auto error = fn->parseEffects(effectStr, /*fromSIL*/ true,
+                                      argumentIndex, isDerived, {});
         (void)error;
         assert(!error.first && "effects deserialization error");
       }
@@ -1250,6 +1253,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
+  case SIL_INST_INCREMENT_PROFILER_COUNTER:
+    SILInstIncrementProfilerCounterLayout::readRecord(scratch, ValID, ValID2,
+                                                      Attr, Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::IncrementProfilerCounterInst;
+    break;
   }
 
   // FIXME: validate
@@ -1360,7 +1368,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(BridgeObjectToRef)
   ONEOPERAND_ONETYPE_INST(BridgeObjectToWord)
   ONEOPERAND_ONETYPE_INST(Upcast)
-  ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
   ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
@@ -1371,6 +1378,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
 
+  case SILInstructionKind::AddressToPointerInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultInst = Builder.createAddressToPointer(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2, Fn)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        /*needsStackProtection=*/ Attr != 0);
+    break;
+  }
   case SILInstructionKind::ProjectBoxInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -1776,7 +1794,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
-                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        /*needsStackProtection=*/ Attr != 0);
     break;
   }
   case SILInstructionKind::TailAddrInst: {
@@ -1798,6 +1817,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
+  case SILInstructionKind::IncrementProfilerCounterInst: {
+    auto PGOFuncName = MF->getIdentifierText(ValID);
+    auto PGOHashStr = MF->getIdentifierText(ValID2);
+
+    uint64_t PGOHash;
+    auto HadError = PGOHashStr.getAsInteger(/*radix*/ 10, PGOHash);
+    assert(!HadError && "Failed to deserialize PGO hash");
+    (void)HadError;
+
+    ResultInst = Builder.createIncrementProfilerCounter(
+        Loc, /*CounterIdx*/ Attr, PGOFuncName, /*NumCounters*/ Attr2, PGOHash);
     break;
   }
   case SILInstructionKind::IntegerLiteralInst: {

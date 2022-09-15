@@ -126,6 +126,11 @@ function(add_swift_compiler_modules_library name)
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
 
+  # Let Swift discover SwiftShims headers which are included by some headers
+  # under `include/swift`.
+  get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+  set(sdk_option ${sdk_option} "-I" "${swift_exec_bin_dir}/../lib")
+
   set(all_obj_files)
   set(all_module_targets)
   set(syntaxparse_obj_files)
@@ -160,6 +165,21 @@ function(add_swift_compiler_modules_library name)
     if (add_to_syntaxparse)
       set(syntaxparse_obj_files ${syntaxparse_obj_files} ${module_obj_file})
     endif()
+    set(c_include_paths
+      # LLVM modules and headers.
+      "${LLVM_MAIN_INCLUDE_DIR}"
+      # Generated LLVM headers.
+      "${LLVM_INCLUDE_DIR}"
+      # Clang modules and headers.
+      ${CLANG_INCLUDE_DIRS}
+      # Bridging modules and headers.
+      "${SWIFT_MAIN_INCLUDE_DIR}"
+      # Generated C headers.
+      "${CMAKE_CURRENT_BINARY_DIR}/../include")
+    set(c_include_paths_args)
+    foreach(c_include_path ${c_include_paths})
+      list(APPEND c_include_paths_args "-Xcc" "-I" "-Xcc" "${c_include_path}")
+    endforeach()
 
     # Compile the module into an object file
     add_custom_command_target(dep_target OUTPUT ${module_obj_file}
@@ -173,14 +193,7 @@ function(add_swift_compiler_modules_library name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
-              # LLVM modules and headers.
-              "-Xcc" "-I" "-Xcc" "${LLVM_MAIN_INCLUDE_DIR}"
-              # Generated LLVM headers.
-              "-Xcc" "-I" "-Xcc" "${LLVM_INCLUDE_DIR}"
-              # Bridging modules and headers.
-              "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
-              # Generated C headers.
-              "-Xcc" "-I" "-Xcc" "${CMAKE_CURRENT_BINARY_DIR}/../include"
+              ${c_include_paths_args}
               # Generated swift modules.
               "-I" "${build_dir}"
       COMMENT "Building swift module ${module}")
@@ -256,6 +269,7 @@ else()
   #         The swift modules can now depend on that target.
   #         Note that this library is unused, i.e. not linked to anything.   
   add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
+  add_dependencies(importedHeaderDependencies swift-ast-generated-headers)
   target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
 
   if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")

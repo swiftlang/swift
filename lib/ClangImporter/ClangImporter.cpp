@@ -41,6 +41,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -73,8 +74,8 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include <algorithm>
-#include <string>
 #include <memory>
+#include <string>
 
 using namespace swift;
 using namespace importer;
@@ -608,7 +609,7 @@ importer::getNormalInvocationArguments(
 
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
-    auto V = version::Version::getCurrentCompilerVersion();
+    auto V = version::getCurrentCompilerVersion();
     if (!V.empty()) {
       // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
       // "X" component resided in its digits.
@@ -1798,8 +1799,7 @@ static std::string getScalaNodeText(llvm::yaml::Node *N) {
 }
 
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
-                                    llvm::VersionTuple version,
-                                    bool underlyingVersion) {
+                                    ModuleVersionInfo *versionInfo) {
   // Look up the top-level module to see if it exists.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto topModule = modulePath.front();
@@ -1842,10 +1842,10 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
     }
   }
 
-  if (version.empty())
+  if (!versionInfo)
     return true;
+
   assert(available);
-  assert(!version.empty());
   llvm::VersionTuple currentVersion;
   StringRef path = getClangASTContext().getSourceManager()
     .getFilename(clangModule->DefinitionLoc);
@@ -1888,16 +1888,10 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
     }
     break;
   }
-  // Diagnose unable to checking the current version.
-  if (currentVersion.empty()) {
-    Impl.diagnose(topModule.Loc, diag::cannot_find_project_version, "Clang",
-                  topModule.Item.str());
-    return true;
-  }
-  assert(!currentVersion.empty());
-  // Give a green light if the version on disk is greater or equal to the version
-  // specified in the canImport condition.
-  return currentVersion >= version;
+
+  versionInfo->setVersion(currentVersion,
+                          ModuleVersionSourceKind::ClangModuleTBD);
+  return true;
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
@@ -2007,6 +2001,14 @@ ClangImporter::loadModule(SourceLoc importLoc,
 ModuleDecl *ClangImporter::Implementation::loadModule(
     SourceLoc importLoc, ImportPath::Module path) {
   ModuleDecl *MD = nullptr;
+  ASTContext &ctx = getNameImporter().getContext();
+
+  if (path.front().Item == ctx.Id_CxxStdlib) {
+    ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
+    adjustedPath.append(path.getSubmodulePath());
+    path = adjustedPath.get().getModulePath(ImportKind::Module);
+  }
+
   if (!DisableSourceImport)
     MD = loadModuleClang(importLoc, path);
   if (!MD)
@@ -5243,6 +5245,48 @@ Type ClangImporter::importFunctionReturnType(
   return dc->getASTContext().getNeverType();
 }
 
+Type ClangImporter::importVarDeclType(
+    const clang::VarDecl *decl, VarDecl *swiftDecl, DeclContext *dc) {
+  if (decl->getTemplateInstantiationPattern())
+    Impl.getClangSema().InstantiateVariableDefinition(
+        decl->getLocation(),
+        const_cast<clang::VarDecl *>(decl));
+
+  // If the declaration is const, consider it audited.
+  // We can assume that loading a const global variable doesn't
+  // involve an ownership transfer.
+  bool isAudited = decl->getType().isConstQualified();
+
+  auto declType = decl->getType();
+
+  // Special case: NS Notifications
+  if (isNSNotificationGlobal(decl))
+    if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
+                                            Impl.CurrentVersion))
+      declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
+
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+
+  // Note that we deliberately don't bridge most globals because we want to
+  // preserve pointer identity.
+  auto importedType =
+      Impl.importType(declType,
+                      (isAudited ? ImportTypeKind::AuditedVariable
+                                 : ImportTypeKind::Variable),
+                      ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                      isInSystemModule, Bridgeability::None,
+                      getImportTypeAttrs(decl));
+
+  if (!importedType)
+    return nullptr;
+
+  if (importedType.isImplicitlyUnwrapped())
+    swiftDecl->setImplicitlyUnwrappedOptional(true);
+
+  return importedType.getType();
+}
+
 bool ClangImporter::isInOverlayModuleForImportedModule(
                                                const DeclContext *overlayDC,
                                                const DeclContext *importedDC) {
@@ -6141,7 +6185,9 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInModule(swiftDecl->getParentModule(), name, results);
+  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(
+      swiftDecl->getClangDecl()->getOwningModule());
+  ctx.lookupInModule(parentModule, name, results);
 
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),

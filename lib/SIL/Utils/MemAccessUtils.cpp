@@ -1368,12 +1368,14 @@ public:
     } else {
       // Ignore everything in getAccessProjectionOperand that is an access
       // projection with no affect on the access path.
-      assert(isa<OpenExistentialAddrInst>(projectedAddr)
-             || isa<InitEnumDataAddrInst>(projectedAddr)
-             || isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
+      assert(isa<OpenExistentialAddrInst>(projectedAddr) ||
+             isa<InitEnumDataAddrInst>(projectedAddr) ||
+             isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
              // project_box is not normally an access projection but we treat it
              // as such when it operates on unchecked_take_enum_data_addr.
-             || isa<ProjectBoxInst>(projectedAddr));
+             || isa<ProjectBoxInst>(projectedAddr)
+             // Ignore mark_must_check, we just look through it when we see it.
+             || isa<MarkMustCheckInst>(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -1862,7 +1864,14 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
   }
 
-  // MARK: Access projections
+  case SILInstructionKind::MarkMustCheckInst: {
+    // Mark must check goes on the project_box, so it isn't a ref.
+    assert(!dfs.isRef());
+    pushUsers(svi, dfs);
+    return IgnoredUse;
+  }
+
+    // MARK: Access projections
 
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
@@ -2460,7 +2469,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       return;
 
     // These effect both operands.
-    case BuiltinValueKind::Move:
     case BuiltinValueKind::Copy:
       visitor(&builtin->getAllOperands()[1]);
       return;
@@ -2495,7 +2503,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DestroyArray:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::PoundAssert:
-    case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::TSanInoutAccess:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
@@ -2692,6 +2699,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::UncheckedRefCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:

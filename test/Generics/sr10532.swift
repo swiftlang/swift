@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// https://github.com/apple/swift/issues/52932
+
 // CHECK: sr10532.(file).ScalarProtocol@
 // CHECK-NEXT: Requirement signature: <Self where Self : ScalarMultiplicative, Self == Self.[ScalarMultiplicative]Scalar>
 public protocol ScalarProtocol: ScalarMultiplicative where Self == Scalar { }

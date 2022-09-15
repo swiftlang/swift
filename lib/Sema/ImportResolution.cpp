@@ -28,6 +28,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -128,7 +129,11 @@ struct UnboundImport {
 
 private:
   void validatePrivate(ModuleDecl *topLevelModule);
-  void validateImplementationOnly(ASTContext &ctx);
+
+  /// Check that no import has more than one of the following modifiers:
+  /// @_exported, @_implementationOnly, and @_spiOnly.
+  void validateRestrictedImport(ASTContext &ctx);
+
   void validateTestable(ModuleDecl *topLevelModule);
   void validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                           SourceFile &SF);
@@ -536,6 +541,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     import.options |= ImportFlags::ImplementationOnly;
 
+  if (ID->getAttrs().hasAttribute<SPIOnlyAttr>())
+    import.options |= ImportFlags::SPIOnly;
+
   if (auto *privateImportAttr =
           ID->getAttrs().getAttribute<PrivateImportAttr>()) {
     import.options |= ImportFlags::PrivateImport;
@@ -557,6 +565,8 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 
   if (auto attr = ID->getAttrs().getAttribute<WeakLinkedAttr>())
     import.options |= ImportFlags::WeakLinked;
+
+  import.docVisibility = swift::symbolgraphgen::documentationVisibilityForDecl(ID);
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {
@@ -595,7 +605,7 @@ bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {
 
 void UnboundImport::validateOptions(NullablePtr<ModuleDecl> topLevelModule,
                                     SourceFile &SF) {
-  validateImplementationOnly(SF.getASTContext());
+  validateRestrictedImport(SF.getASTContext());
 
   if (auto *top = topLevelModule.getPtrOrNull()) {
     // FIXME: Having these two calls in this if condition seems dubious.
@@ -630,16 +640,62 @@ void UnboundImport::validatePrivate(ModuleDecl *topLevelModule) {
   import.sourceFileArg = StringRef();
 }
 
-void UnboundImport::validateImplementationOnly(ASTContext &ctx) {
-  if (!import.options.contains(ImportFlags::ImplementationOnly) ||
-      !import.options.contains(ImportFlags::Exported))
+void UnboundImport::validateRestrictedImport(ASTContext &ctx) {
+  static llvm::SmallVector<ImportFlags, 2> flags = {ImportFlags::Exported,
+                                                    ImportFlags::ImplementationOnly,
+                                                    ImportFlags::SPIOnly};
+  llvm::SmallVector<ImportFlags, 2> conflicts;
+
+  for (auto flag : flags) {
+    if (import.options.contains(flag))
+      conflicts.push_back(flag);
+  }
+
+  // Quit if there's no conflicting attributes.
+  if (conflicts.size() < 2)
     return;
 
-  // Remove one flag to maintain the invariant.
-  import.options -= ImportFlags::ImplementationOnly;
+  // Remove all but one flag to maintain the invariant.
+  for (auto iter = conflicts.begin(); iter != std::prev(conflicts.end()); iter ++)
+    import.options -= *iter;
 
-  diagnoseInvalidAttr(DAK_ImplementationOnly, ctx.Diags,
-                      diag::import_implementation_cannot_be_exported);
+  DeclAttrKind attrToRemove = conflicts[0] == ImportFlags::ImplementationOnly?
+                                      DAK_Exported : DAK_ImplementationOnly;
+
+  // More dense enum with some cases of ImportFlags,
+  // used by import_restriction_conflict.
+  enum class ImportFlagForDiag : uint8_t {
+    ImplementationOnly,
+    SPIOnly,
+    Exported
+  };
+  auto flagToDiag = [](ImportFlags flag) {
+    switch (flag) {
+      case ImportFlags::ImplementationOnly:
+        return ImportFlagForDiag::ImplementationOnly;
+      case ImportFlags::SPIOnly:
+        return ImportFlagForDiag::SPIOnly;
+      case ImportFlags::Exported:
+        return ImportFlagForDiag::Exported;
+      default:
+        llvm_unreachable("Unexpected ImportFlag");
+    }
+  };
+
+  // Report the conflict, only the first two conflicts should be enough.
+  auto diag = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
+                                 diag::import_restriction_conflict,
+                                 import.module.getModulePath().front().Item,
+                                 (uint8_t)flagToDiag(conflicts[0]),
+                                 (uint8_t)flagToDiag(conflicts[1]));
+
+  auto *ID = getImportDecl().getPtrOrNull();
+  if (!ID) return;
+  auto *attr = ID->getAttrs().getAttribute(attrToRemove);
+  if (!attr) return;
+
+  diag.fixItRemove(attr->getRangeWithAt());
+  attr->setInvalid();
 }
 
 void UnboundImport::validateTestable(ModuleDecl *topLevelModule) {
@@ -703,10 +759,55 @@ static bool moduleHasAnyImportsMatchingFlag(ModuleDecl *mod, ImportFlags flag) {
   return false;
 }
 
+/// Finds all import declarations for a single file that inconsistently match
+/// \c predicate and passes each pair of inconsistent imports to \c diagnose.
+template <typename Pred, typename Diag>
+static void findInconsistentImportsAcrossFile(
+    const SourceFile *SF, Pred predicate, Diag diagnose,
+    llvm::DenseMap<ModuleDecl *, const ImportDecl *> &matchingImports,
+    llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> &otherImports) {
+
+  for (auto *topLevelDecl : SF->getTopLevelDecls()) {
+    auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
+    if (!nextImport)
+      continue;
+
+    ModuleDecl *module = nextImport->getModule();
+    if (!module)
+      continue;
+
+    if (predicate(nextImport)) {
+      // We found a matching import.
+      bool isNew = matchingImports.insert({module, nextImport}).second;
+      if (!isNew)
+        continue;
+
+      auto seenOtherImportPosition = otherImports.find(module);
+      if (seenOtherImportPosition != otherImports.end()) {
+        for (auto *seenOtherImport : seenOtherImportPosition->getSecond())
+          diagnose(seenOtherImport, nextImport);
+
+        // We're done with these; keep the map small if possible.
+        otherImports.erase(seenOtherImportPosition);
+      }
+      continue;
+    }
+
+    // We saw a non-matching import. Is that in conflict with what we've seen?
+    if (auto *seenMatchingImport = matchingImports.lookup(module)) {
+      diagnose(nextImport, seenMatchingImport);
+      continue;
+    }
+
+    // Otherwise, record it for later.
+    otherImports[module].push_back(nextImport);
+  }
+}
+
 /// Finds all import declarations for a single module that inconsistently match
 /// \c predicate and passes each pair of inconsistent imports to \c diagnose.
 template <typename Pred, typename Diag>
-static void findInconsistentImports(ModuleDecl *mod, Pred predicate,
+static void findInconsistentImportsAcrossModule(ModuleDecl *mod, Pred predicate,
                                     Diag diagnose) {
   llvm::DenseMap<ModuleDecl *, const ImportDecl *> matchingImports;
   llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> otherImports;
@@ -716,41 +817,8 @@ static void findInconsistentImports(ModuleDecl *mod, Pred predicate,
     if (!SF)
       continue;
 
-    for (auto *topLevelDecl : SF->getTopLevelDecls()) {
-      auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
-      if (!nextImport)
-        continue;
-
-      ModuleDecl *module = nextImport->getModule();
-      if (!module)
-        continue;
-
-      if (predicate(nextImport)) {
-        // We found a matching import.
-        bool isNew = matchingImports.insert({module, nextImport}).second;
-        if (!isNew)
-          continue;
-
-        auto seenOtherImportPosition = otherImports.find(module);
-        if (seenOtherImportPosition != otherImports.end()) {
-          for (auto *seenOtherImport : seenOtherImportPosition->getSecond())
-            diagnose(seenOtherImport, nextImport);
-
-          // We're done with these; keep the map small if possible.
-          otherImports.erase(seenOtherImportPosition);
-        }
-        continue;
-      }
-
-      // We saw a non-matching import. Is that in conflict with what we've seen?
-      if (auto *seenMatchingImport = matchingImports.lookup(module)) {
-        diagnose(nextImport, seenMatchingImport);
-        continue;
-      }
-
-      // Otherwise, record it for later.
-      otherImports[module].push_back(nextImport);
-    }
+    findInconsistentImportsAcrossFile(SF, predicate, diagnose,
+                                      matchingImports, otherImports);
   }
 }
 
@@ -784,7 +852,34 @@ CheckInconsistentImplementationOnlyImportsRequest::evaluate(
     return decl->getAttrs().hasAttribute<ImplementationOnlyAttr>();
   };
 
-  findInconsistentImports(mod, predicate, diagnose);
+  findInconsistentImportsAcrossModule(mod, predicate, diagnose);
+  return {};
+}
+
+evaluator::SideEffect
+CheckInconsistentSPIOnlyImportsRequest::evaluate(
+    Evaluator &evaluator, SourceFile *SF) const {
+
+  auto mod = SF->getParentModule();
+  auto diagnose = [mod](const ImportDecl *normalImport,
+                        const ImportDecl *spiOnlyImport) {
+    auto &diags = mod->getDiags();
+    {
+      diags.diagnose(normalImport, diag::spi_only_import_conflict,
+                     normalImport->getModule()->getName());
+    }
+    diags.diagnose(spiOnlyImport,
+                   diag::spi_only_import_conflict_here);
+  };
+
+  auto predicate = [](ImportDecl *decl) {
+    return decl->getAttrs().hasAttribute<SPIOnlyAttr>();
+  };
+
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> matchingImports;
+  llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> otherImports;
+  findInconsistentImportsAcrossFile(SF, predicate, diagnose,
+                                    matchingImports, otherImports);
   return {};
 }
 
@@ -809,7 +904,7 @@ CheckInconsistentWeakLinkedImportsRequest::evaluate(Evaluator &evaluator,
     return decl->getAttrs().hasAttribute<WeakLinkedAttr>();
   };
 
-  findInconsistentImports(mod, predicate, diagnose);
+  findInconsistentImportsAcrossModule(mod, predicate, diagnose);
   return {};
 }
 
@@ -1029,6 +1124,14 @@ UnboundImport::UnboundImport(
   if (declaringOptions.contains(ImportFlags::ImplementationOnly) ||
       bystandingOptions.contains(ImportFlags::ImplementationOnly))
     import.options |= ImportFlags::ImplementationOnly;
+
+  // If either have a `@_documentation(visibility: <access>)` attribute, the
+  // cross-import has the more restrictive of the two.
+  if (declaringImport.docVisibility || bystandingImport.docVisibility) {
+    auto declaringAccess = declaringImport.docVisibility.getValueOr(AccessLevel::Public);
+    auto bystandingAccess = bystandingImport.docVisibility.getValueOr(AccessLevel::Public);
+    import.docVisibility = std::min(declaringAccess, bystandingAccess);
+  }
 }
 
 void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {

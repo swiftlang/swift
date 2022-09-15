@@ -598,6 +598,7 @@ int main(int argc, char **argv) {
   SILOpts.OptRecordPasses = RemarksPasses;
   SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnablePerformanceAnnotations = true;
+  SILOpts.EnableStackProtection = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -print-module -module-to-print=std -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t > %t/interface.swift
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t > %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-STD < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-SIZE-T < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-TO-STRING < %t/interface.swift

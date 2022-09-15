@@ -484,25 +484,35 @@ forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // When looking at the current node, of course we want to enter it.  We
       // also don't want to enumerate it.
       if (E == ThisNode)
-        return { true, E };
+        return Action::Continue(E);
 
       // Otherwise we must be a child of our expression, enumerate it!
-      return { false, callback(E) };
+      E = callback(E);
+      if (!E)
+        return Action::Stop();
+
+      // We're only interested in the immediate children, so don't walk any
+      // further.
+      return Action::SkipChildren(E);
     }
     
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::SkipChildren(S);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::SkipChildren(P);
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
   
   this->walk(ChildWalker(callback, this));
@@ -518,20 +528,28 @@ void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
     ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
     : callback(callback) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Enumerate the node!
-      return { true, callback(E) };
+      E = callback(E);
+      if (!E)
+        return Action::Stop();
+
+      return Action::Continue(E);
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::SkipChildren(S);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::SkipChildren(P);
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
 
   this->walk(ChildWalker(callback));
@@ -823,11 +841,11 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
     explicit RecordingTraversal(llvm::DenseMap<Expr *, Expr *> &parentMap)
       : ParentMap(parentMap) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto parent = Parent.getAsExpr())
         ParentMap[E] = parent;
 
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 
@@ -1779,6 +1797,29 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
+ActorIsolation ClosureActorIsolation::getActorIsolation() const {
+  switch (getKind()) {
+  case ClosureActorIsolation::Independent:
+    return ActorIsolation::forIndependent().withPreconcurrency(
+        preconcurrency());
+
+  case ClosureActorIsolation::GlobalActor: {
+    return ActorIsolation::forGlobalActor(getGlobalActor(), /*unsafe=*/false)
+        .withPreconcurrency(preconcurrency());
+  }
+
+  case ClosureActorIsolation::ActorInstance: {
+    auto selfDecl = getActorInstance();
+    auto actor =
+        selfDecl->getType()->getReferenceStorageReferent()->getAnyActor();
+    assert(actor && "Bad closure actor isolation?");
+    // FIXME: This could be a parameter... or a capture... hmmm.
+    return ActorIsolation::forActorInstanceSelf(actor).withPreconcurrency(
+        preconcurrency());
+  }
+  }
+}
+
 void AbstractClosureExpr::setParameterList(ParameterList *P) {
   parameterList = P;
   // Change the DeclContext of any parameters to be this closure.
@@ -1878,6 +1919,16 @@ Expr *AbstractClosureExpr::getSingleExpressionBody() const {
     return autoclosure->getSingleExpressionBody();
 
   return nullptr;
+}
+
+ClosureActorIsolation
+swift::__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE) {
+  return CE->getActorIsolation();
+}
+
+llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+swift::_getRef__AbstractClosureExpr_getActorIsolation() {
+  return __AbstractClosureExpr_getActorIsolation;
 }
 
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \

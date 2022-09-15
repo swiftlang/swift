@@ -18,6 +18,7 @@
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangValueType.h"
 #include "PrintSwiftToClangCoreScaffold.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -26,6 +27,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Strings.h"
 
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
@@ -124,6 +126,7 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
+  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
@@ -178,6 +181,14 @@ public:
       }
     }
 
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      // Only add C++ imports in C++ mode for now.
+      if (!D->hasClangNode())
+        return true;
+      if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
+        return true;
+    }
+
     imports.insert(otherModule);
     return true;
   }
@@ -217,8 +228,11 @@ public:
 
   void forwardDeclare(const NominalTypeDecl *NTD,
                       llvm::function_ref<void(void)> Printer) {
-    if (NTD->getModuleContext()->isStdlibModule())
-      return;
+    if (NTD->getModuleContext()->isStdlibModule()) {
+      if (outputLangMode != OutputLanguageMode::Cxx ||
+          !printer.shouldInclude(NTD))
+        return;
+    }
     auto &state = seenTypes[NTD];
     if (state.second)
       return;
@@ -254,12 +268,23 @@ public:
     });
   }
 
+  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
+    auto it = seenClangTypes.insert(typeDecl);
+    if (it.second)
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
+  }
+
   void forwardDeclareType(const TypeDecl *TD) {
     if (outputLangMode == OutputLanguageMode::Cxx) {
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
-        forwardDeclare(
-            NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        if (!addImport(NTD)) {
+          forwardDeclare(
+              NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        } else {
+          if (isa<StructDecl>(TD) && NTD->hasClangNode())
+            emitReferencedClangTypeMetadata(NTD);
+        }
       }
       return;
     }
@@ -440,8 +465,13 @@ public:
   bool writeStruct(const StructDecl *SD) {
     if (addImport(SD))
       return true;
-    if (outputLangMode == OutputLanguageMode::Cxx)
+    if (outputLangMode == OutputLanguageMode::Cxx) {
       (void)forwardDeclareMemberTypes(SD->getMembers(), SD);
+      for (const auto *ed :
+           printer.getInteropContext().getExtensionsForNominalType(SD)) {
+        (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
+      }
+    }
     printer.print(SD);
     return true;
   }
@@ -543,6 +573,8 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        if (outputLangMode == OutputLanguageMode::Cxx)
+          return false;
         auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
@@ -568,6 +600,8 @@ public:
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           auto baseClass = ED->getSelfClassDecl();
+          if (!baseClass)
+              return ED->getExtendedNominal()->getName().str();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");
@@ -620,6 +654,16 @@ public:
     assert(declsToWrite.empty());
     declsToWrite.assign(decls.begin(), decls.end());
 
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      for (const Decl *D : declsToWrite) {
+        if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+          const auto *type = ED->getExtendedNominal();
+          if (isa<StructDecl>(type))
+            printer.getInteropContext().recordExtensions(type, ED);
+        }
+      }
+    }
+
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
       bool success = true;
@@ -666,6 +710,7 @@ public:
       }
       printer.printAdHocCategory(make_range(groupBegin, delayedMembers.end()));
     }
+
     // Print any out of line definitions.
     os << outOfLineDefinitionsOS.str();
   }

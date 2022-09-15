@@ -111,7 +111,7 @@ func testType() {
 // PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]/IsSystem: AssignmentPrecedence; name=AssignmentPrecedence
 // PRECEDENCE_GROUP-DAG: Decl[PrecedenceGroup]/OtherModule[Swift]/IsSystem: ComparisonPrecedence; name=ComparisonPrecedence
 
-/* FIXME: SR-8898 We only see precedence groups that are earlier in life! */
+/* FIXME: (https://github.com/apple/swift/issues/51404) We only see precedence groups that are earlier in life! */
 // PRECEDENCE_GROUP_CURRFILE-DAG: Begin completions
 // PRECEDENCE_GROUP_CURRFILE-DAG: Decl[PrecedenceGroup]/CurrModule: MyPrecedence{{[0-9]+}};
 // PRECEDENCE_GROUP_CURRFILE-DAG: Decl[PrecedenceGroup]/CurrModule: MyPrecedence{{[0-9]+}};

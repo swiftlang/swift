@@ -398,3 +398,42 @@ func testActors() async {
   person.name = "NoName" // expected-error {{actor-isolated property 'name' can not be mutated from a non-isolated context}}
   person.age = 0 // expected-error {{actor-isolated property 'age' can not be mutated from a non-isolated context}}
 }
+
+func testIgnoredAttr() {
+  @NoopWrapper
+  struct X {
+    @typeWrapperIgnored static var staticVar: Int = 0 // expected-error {{@typeWrapperIgnored must not be used on static properties}}
+
+    @typeWrapperIgnored lazy var lazyVar: Int = { // expected-error {{@typeWrapperIgnored must not be used on lazy properties}}
+      42
+    }()
+
+    @typeWrapperIgnored var x: Int // Ok
+
+    var y: Int {
+      @typeWrapperIgnored get { // expected-error {{@typeWrapperIgnored may only be used on 'var' declarations}}
+        42
+      }
+
+      @typeWrapperIgnored set { // expected-error {{@typeWrapperIgnored may only be used on 'var' declarations}}
+      }
+    }
+
+    @typeWrapperIgnored var computed: Int { // expected-error {{@typeWrapperIgnored must not be used on computed properties}}
+      get { 42 }
+      set {}
+    }
+
+    @typeWrapperIgnored let z: Int = 0 // expected-error {{@typeWrapperIgnored may only be used on 'var' declarations}}
+
+    func test_param(@typeWrapperIgnored x: Int) {} // expected-error {{@typeWrapperIgnored may only be used on 'var' declarations}}
+
+    func test_local() {
+      @typeWrapperIgnored var x: Int = 42 // expected-error {{@typeWrapperIgnored must not be used on local properties}}
+      // expected-warning@-1 {{variable 'x' was never used; consider replacing with '_' or removing it}}
+
+      @typeWrapperIgnored let y: String // expected-error {{@typeWrapperIgnored must not be used on local properties}}
+      // expected-warning@-1 {{immutable value 'y' was never used; consider replacing with '_' or removing it}}
+    }
+  }
+}

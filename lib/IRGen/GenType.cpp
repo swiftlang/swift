@@ -2101,7 +2101,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("converting a " #id "Type after canonicalization");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::LValue: llvm_unreachable("@lvalue type made it to irgen");
+  case TypeKind::LValue:
+    llvm_unreachable("@lvalue type made it to IRGen");
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType made it to IRGen");
   case TypeKind::ExistentialMetatype:
     return convertExistentialMetatypeType(cast<ExistentialMetatypeType>(ty));
   case TypeKind::Metatype:
@@ -2460,6 +2463,9 @@ const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
       return convertEnumType(type.getPointer(), type, cast<EnumDecl>(decl));
     case DeclKind::Struct:
       return convertStructType(type.getPointer(), type, cast<StructDecl>(decl));
+
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType should not show up here");
     }
     llvm_unreachable("bad declaration kind");
   }
@@ -2492,6 +2498,9 @@ const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
 
   case DeclKind::Class:
     llvm_unreachable("classes are always considered dependent for now");
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType should not show up here");
 
   case DeclKind::Enum: {
     auto type = decl->getDeclaredTypeInContext()->getCanonicalType();

@@ -69,8 +69,7 @@ private:
         EmitCoverageMapping(EmitCoverageMapping) {}
 
 public:
-  static SILProfiler *create(SILModule &M, ForDefinition_t forDefinition,
-                             ASTNode N, SILDeclRef forDecl);
+  static SILProfiler *create(SILModule &M, ASTNode N, SILDeclRef Ref);
 
   /// Check if the function is set up for profiling.
   bool hasRegionCounters() const { return NumRegionCounters != 0; }

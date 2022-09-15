@@ -159,7 +159,7 @@ BridgedFunction NodeSet_getFunction(BridgedNodeSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
 
-BridgedSubstitutionMap
+swift::SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType);
 
@@ -183,6 +183,8 @@ PassContext_nextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table);
 
 OptionalBridgedFunction
 PassContext_loadFunction(BridgedPassContext context, llvm::StringRef name);
+
+SwiftInt SILOptions_enableStackProtection(BridgedPassContext context);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

@@ -16,7 +16,7 @@
 #ifndef SCRIPT_DATA_H
 #define SCRIPT_DATA_H
 
-#include "SwiftShims/SwiftStdint.h"
+#include "swift/shims/SwiftStdint.h"
 
 #define SCRIPTS_COUNT 1639
 

@@ -1094,9 +1094,9 @@ public:
   }
 
   AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
-                                               SILType Ty) {
+                                               SILType Ty, bool needsStackProtection) {
     return insert(new (getModule()) AddressToPointerInst(
-        getSILDebugLocation(Loc), Op, Ty));
+        getSILDebugLocation(Loc), Op, Ty, needsStackProtection));
   }
 
   PointerToAddressInst *
@@ -2132,13 +2132,26 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Profiler
+  //===--------------------------------------------------------------------===//
+
+  IncrementProfilerCounterInst *
+  createIncrementProfilerCounter(SILLocation Loc, unsigned CounterIdx,
+                                 StringRef PGOFuncName, unsigned NumCounters,
+                                 uint64_t PGOFuncHash) {
+    return insert(IncrementProfilerCounterInst::create(
+        getSILDebugLocation(Loc), CounterIdx, PGOFuncName, NumCounters,
+        PGOFuncHash, getModule()));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Array indexing instructions
   //===--------------------------------------------------------------------===//
 
   IndexAddrInst *createIndexAddr(SILLocation Loc, SILValue Operand,
-                                 SILValue Index) {
+                                 SILValue Index, bool needsStackProtection) {
     return insert(new (getModule()) IndexAddrInst(getSILDebugLocation(Loc),
-                                                    Operand, Index));
+                                    Operand, Index, needsStackProtection));
   }
 
   TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,

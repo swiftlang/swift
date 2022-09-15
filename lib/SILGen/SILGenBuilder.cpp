@@ -625,7 +625,8 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
   // updated.
   assert((isa<UncheckedTrivialBitCastInst>(cast) ||
           isa<UncheckedRefCastInst>(cast) ||
-          isa<UncheckedBitwiseCastInst>(cast)) &&
+          isa<UncheckedBitwiseCastInst>(cast) ||
+          isa<ConvertFunctionInst>(cast)) &&
          "SILGenBuilder is out of sync with SILBuilder.");
 
   // If we have a trivial inst, just return early.
@@ -946,7 +947,8 @@ ManagedValue SILGenBuilder::createGuaranteedCopyableToMoveOnlyWrapperValue(
 ManagedValue
 SILGenBuilder::createMarkMustCheckInst(SILLocation loc, ManagedValue value,
                                        MarkMustCheckInst::CheckKind kind) {
-  assert(value.isPlusOne(SGF) && "Argument must be at +1!");
+  assert((value.isPlusOne(SGF) || value.isLValue()) &&
+         "Argument must be at +1 or be an inout!");
   CleanupCloner cloner(*this, value);
   auto *mdi = SILBuilder::createMarkMustCheckInst(
       loc, value.forward(getSILGenFunction()), kind);

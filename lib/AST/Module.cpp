@@ -32,6 +32,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
@@ -794,12 +795,14 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
 
 void swift::collectParsedExportedImports(const ModuleDecl *M,
                                          SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports) {
+                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
+                                         llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
           if (import.options.contains(ImportFlags::Exported) &&
+              (!includeImport || includeImport(import)) &&
               import.module.importedModule->shouldCollectDisplayDecls()) {
             auto *TheModule = import.module.importedModule;
 
@@ -1136,9 +1139,45 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     Type type, const TupleType *tupleType, ProtocolDecl *protocol,
     ModuleDecl *module) {
+  ASTContext &ctx = protocol->getASTContext();
+
+  // This is the new code path.
+  //
+  // FIXME: Remove the Sendable stuff below.
+  auto *tupleDecl = ctx.getBuiltinTupleDecl();
+
+  // Find the (unspecialized) conformance.
+  SmallVector<ProtocolConformance *, 2> conformances;
+  if (tupleDecl->lookupConformance(protocol, conformances)) {
+    // If we have multiple conformances, first try to filter out any that are
+    // unavailable on the current deployment target.
+    //
+    // FIXME: Conformance lookup should really depend on source location for
+    // this to be 100% correct.
+    if (conformances.size() > 1) {
+      SmallVector<ProtocolConformance *, 2> availableConformances;
+
+      for (auto *conformance : conformances) {
+        if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+          availableConformances.push_back(conformance);
+      }
+
+      // Don't filter anything out if all conformances are unavailable.
+      if (!availableConformances.empty())
+        std::swap(availableConformances, conformances);
+    }
+
+    auto *conformance = cast<NormalProtocolConformance>(conformances.front());
+    auto subMap = type->getContextSubstitutionMap(module,
+                                                  conformance->getDeclContext());
+
+    // TODO: labels
+    auto *specialized = ctx.getSpecializedConformance(type, conformance, subMap);
+    return ProtocolConformanceRef(specialized);
+  }
+
   // Tuple type are Sendable when all of their element types are Sendable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-    ASTContext &ctx = protocol->getASTContext();
 
     // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
     // generic signature <T1, T2, ..., TN>.
@@ -1257,6 +1296,33 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+static ProtocolConformanceRef getPackTypeConformance(
+    PackType *type, ProtocolDecl *protocol, ModuleDecl *mod) {
+  SmallVector<ProtocolConformanceRef, 2> patternConformances;
+
+  for (auto packElement : type->getElementTypes()) {
+    if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
+      auto patternType = packExpansion->getPatternType();
+
+      auto patternConformance =
+          (patternType->isTypeParameter()
+           ? ProtocolConformanceRef(protocol)
+           : mod->lookupConformance(patternType, protocol));
+      patternConformances.push_back(patternConformance);
+      continue;
+    }
+
+    auto patternConformance =
+        (packElement->isTypeParameter()
+         ? ProtocolConformanceRef(protocol)
+         : mod->lookupConformance(packElement, protocol));
+    patternConformances.push_back(patternConformance);
+  }
+
+  return ProtocolConformanceRef(
+      PackConformance::get(type, protocol, patternConformances));
+}
+
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
@@ -1319,6 +1385,11 @@ LookupConformanceInModuleRequest::evaluate(
   // intended type might have. Same goes for PlaceholderType.
   if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
     return ProtocolConformanceRef(protocol);
+
+  // Pack types can conform to protocols.
+  if (auto packType = type->getAs<PackType>()) {
+    return getPackTypeConformance(packType, protocol, mod);
+  }
 
   // Tuple types can conform to protocols.
   if (auto tupleType = type->getAs<TupleType>()) {
@@ -1596,6 +1667,8 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
     else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.options.contains(ImportFlags::SPIOnly))
+      requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
     else if (desc.options.contains(ImportFlags::SPIAccessControl))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
@@ -1904,6 +1977,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter topLevelFilter = filter;
   topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
@@ -2524,21 +2598,25 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::Implicit;
 
+  // Workaround for the cases where the bridging header isn't properly
+  // imported implicitly.
   if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
     return RestrictedImportKind::None;
 
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
-    // Ignore implementation-only imports.
     if (desc.options.contains(ImportFlags::ImplementationOnly)) {
-      if (imports.isImportedBy(module, desc.module.importedModule))
+      if (importKind < RestrictedImportKind::ImplementationOnly &&
+          imports.isImportedBy(module, desc.module.importedModule))
         importKind = RestrictedImportKind::ImplementationOnly;
-      continue;
     }
-
-    // If the module is imported publicly, it's not imported
-    // implementation-only.
-    if (imports.isImportedBy(module, desc.module.importedModule))
+    else if (desc.options.contains(ImportFlags::SPIOnly)) {
+      if (importKind < RestrictedImportKind::SPIOnly &&
+          imports.isImportedBy(module, desc.module.importedModule))
+        importKind = RestrictedImportKind::SPIOnly;
+    }
+    // If the module is imported publicly, there's no restriction.
+    else if (imports.isImportedBy(module, desc.module.importedModule))
       return RestrictedImportKind::None;
   }
 
@@ -2600,6 +2678,7 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
   // @_implementationOnly or @_spi.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::ImplementationOnly,
+    ModuleDecl::ImportFilterKind::SPIOnly,
     ModuleDecl::ImportFilterKind::SPIAccessControl
   };
   SmallVector<ImportedModule, 4> results;

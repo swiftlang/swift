@@ -235,7 +235,8 @@ parse_operator:
       // if we're in a stmt-condition.
       if (Tok.getText() == "&&" &&
           peekToken().isAny(tok::pound_available, tok::pound_unavailable,
-                            tok::kw_let, tok::kw_var, tok::kw_case))
+                            tok::pound__hasSymbol, tok::kw_let, tok::kw_var,
+                            tok::kw_case))
         goto done;
       
       // Parse the operator.
@@ -1829,9 +1830,23 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::pound_unavailable: {
     // For better error recovery, parse but reject availability in an expr
     // context.
-    diagnose(Tok.getLoc(), diag::availability_query_outside_if_stmt_guard, 
+    diagnose(Tok.getLoc(), diag::special_condition_outside_if_stmt_guard,
              Tok.getText());
     auto res = parseStmtConditionPoundAvailable();
+    if (res.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+    if (res.isParseErrorOrHasCompletion() || res.isNull())
+      return nullptr;
+    return makeParserResult(new (Context)
+                                ErrorExpr(res.get()->getSourceRange()));
+  }
+
+  case tok::pound__hasSymbol: {
+    // For better error recovery, parse but reject #_hasSymbol in an expr
+    // context.
+    diagnose(Tok.getLoc(), diag::special_condition_outside_if_stmt_guard,
+             Tok.getText());
+    auto res = parseStmtConditionPoundHasSymbol();
     if (res.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (res.isParseErrorOrHasCompletion() || res.isNull())
@@ -3181,9 +3196,16 @@ ParserResult<Expr> Parser::parseTupleOrParenExpr(tok leftTok, tok rightTok) {
                     rightLoc, SyntaxKind::TupleExprElementList);
 
   // A tuple with a single, unlabeled element is just parentheses.
-  if (elts.size() == 1 && elts[0].Label.empty()) {
-    return makeParserResult(
-        status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
+  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+    if (elts.size() == 1 && elts[0].LabelLoc.isInvalid()) {
+      return makeParserResult(
+          status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
+    }
+  } else {
+    if (elts.size() == 1 && elts[0].Label.empty()) {
+      return makeParserResult(
+          status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
+    }
   }
 
   SmallVector<Expr *, 8> exprs;

@@ -303,7 +303,7 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
   }
   
   mutating func start(forAnalyzingAddresses: Bool) {
-    precondition(walkDownCache.isEmpty && walkUpCache.isEmpty)
+    assert(walkDownCache.isEmpty && walkUpCache.isEmpty)
     analyzeAddresses = forAnalyzingAddresses
   }
 
@@ -396,7 +396,7 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
       return walkDownUses(ofAddress: pta, path: path.with(knownType: nil))
     case let bi as BuiltinInst:
       switch bi.id {
-      case .DestroyArray:
+      case .destroyArray:
         // If it's not the array base pointer operand -> bail. Though, that shouldn't happen
         // because the other operands (metatype, count) shouldn't be visited anyway.
         if operand.index != 1 { return isEscaping }
@@ -601,22 +601,9 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
                         apply: ApplySite, effects: FunctionEffects) -> WalkResult {
     var matched = false
     for effect in effects.argumentEffects {
-      guard case .escaping(let to, let exclusive) = effect.kind else {
-        continue
-      }
-      if effect.selectedArg.matches(.argument(calleeArgIdx), argPath.projectionPath) {
-        matched = true
-
-        switch to.value {
-        case .returnValue:
-          guard let fas = apply as? FullApplySite, let result = fas.singleDirectResult else { return isEscaping }
-          
-          let p = Path(projectionPath: to.pathPattern, followStores: false, knownType: exclusive ? argPath.knownType : nil)
-          
-          if walkDownUses(ofValue: result, path: p) == .abortWalk {
-            return .abortWalk
-          }
-        case .argument(let toArgIdx):
+      switch effect.kind {
+      case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+        if effect.matches(calleeArgIdx, argPath.projectionPath) {
           guard let callerToIdx = apply.callerArgIndex(calleeArgIndex: toArgIdx) else {
             return isEscaping
           }
@@ -624,29 +611,41 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
           // Continue at the destination of an arg-to-arg escape.
           let arg = apply.arguments[callerToIdx]
           
-          let p = Path(projectionPath: to.pathPattern, followStores: false, knownType: nil)
+          let p = Path(projectionPath: toPath, followStores: false, knownType: nil)
           if walkUp(addressOrValue: arg, path: p) == .abortWalk {
             return .abortWalk
           }
-        }
-        continue
-      }
-      // Handle the reverse direction of an arg-to-arg escape.
-      if to.matches(.argument(calleeArgIdx), argPath.projectionPath) {
-        guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.selectedArg.argumentIndex) else {
-          return isEscaping
-        }
-        if !exclusive { return isEscaping }
+          matched = true
+        } else if toArgIdx == calleeArgIdx && argPath.projectionPath.matches(pattern: toPath) {
+          // Handle the reverse direction of an arg-to-arg escape.
+          guard let callerArgIdx = apply.callerArgIndex(calleeArgIndex: effect.argumentIndex) else {
+            return isEscaping
+          }
+          if !exclusive { return isEscaping }
 
-        matched = true
-        
-        let arg = apply.arguments[callerArgIdx]
-        let p = Path(projectionPath: effect.selectedArg.pathPattern, followStores: false, knownType: nil)
+          let arg = apply.arguments[callerArgIdx]
+          let p = Path(projectionPath: effect.pathPattern, followStores: false, knownType: nil)
 
-        if walkUp(addressOrValue: arg, path: p) == .abortWalk {
-          return .abortWalk
+          if walkUp(addressOrValue: arg, path: p) == .abortWalk {
+            return .abortWalk
+          }
+          matched = true
         }
-        continue
+      case .escapingToReturn(let toPath, let exclusive):
+        if effect.matches(calleeArgIdx, argPath.projectionPath) {
+          guard let fas = apply as? FullApplySite, let result = fas.singleDirectResult else {
+            return isEscaping
+          }
+
+          let p = Path(projectionPath: toPath, followStores: false, knownType: exclusive ? argPath.knownType : nil)
+          
+          if walkDownUses(ofValue: result, path: p) == .abortWalk {
+            return .abortWalk
+          }
+          matched = true
+        }
+      default:
+        break
       }
     }
     if !matched { return isEscaping }
@@ -734,7 +733,7 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
     case is AllocStackInst:
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
     case let arg as FunctionArgument:
-      if canIgnoreForLoadOrArgument(path) && arg.isExclusiveIndirectParameter && !path.followStores {
+      if canIgnoreForLoadOrArgument(path) && arg.convention.isExclusiveIndirect && !path.followStores {
         return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
       } else {
         return isEscaping
@@ -765,17 +764,17 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
       var matched = false
       for effect in callee.effects.argumentEffects {
         switch effect.kind {
-        case .notEscaping:
+        case .notEscaping, .escapingToArgument:
           break
-        case .escaping(let toSelectedArg, let exclusive):
-          if exclusive && toSelectedArg.matches(.returnValue, path.projectionPath) {
-            matched = true
-            let arg = apply.arguments[effect.selectedArg.argumentIndex]
+        case .escapingToReturn(let toPath, let exclusive):
+          if exclusive && path.projectionPath.matches(pattern: toPath) {
+            let arg = apply.arguments[effect.argumentIndex]
             
-            let p = Path(projectionPath: effect.selectedArg.pathPattern, followStores: path.followStores, knownType: nil)
+            let p = Path(projectionPath: effect.pathPattern, followStores: path.followStores, knownType: nil)
             if walkUp(addressOrValue: arg, path: p) == .abortWalk {
               return .abortWalk
             }
+            matched = true
           }
         }
       }

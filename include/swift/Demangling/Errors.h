@@ -19,8 +19,8 @@
 #ifndef SWIFT_DEMANGLING_ERRORS_H
 #define SWIFT_DEMANGLING_ERRORS_H
 
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "swift/shims/Visibility.h"
 #include <inttypes.h>
 #include <stdarg.h>
 
