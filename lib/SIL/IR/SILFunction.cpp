@@ -322,10 +322,9 @@ void SILFunction::deleteSnapshot(int ID) {
   } while ((f = f->snapshots) != nullptr);
 }
 
-void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
-                                 ForDefinition_t forDefinition) {
+void SILFunction::createProfiler(ASTNode Root, SILDeclRef Ref) {
   assert(!Profiler && "Function already has a profiler");
-  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
+  Profiler = SILProfiler::create(Module, Root, Ref);
 }
 
 bool SILFunction::hasForeignBody() const {

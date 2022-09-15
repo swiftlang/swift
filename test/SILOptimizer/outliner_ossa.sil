@@ -281,3 +281,27 @@ bb3(%64 : @owned $Optional<Data>):
   return %102 : $()
 }
 
+@objc class Object {
+    @objc var count: Int { get }
+}
+class Super {}
+
+class Sub : Super {
+    var obj: Object
+}
+
+// We used to assert here because of an over-strong expectation about the location
+// of destroy_value instructions.
+sil hidden [ossa] @destroy_after_borrow : $@convention(thin) () -> @owned Sub {
+  %104 = apply undef() : $@convention(objc_method) () -> @owned Super
+  %107 = unchecked_ref_cast %104 : $Super to $Sub
+  %158 = begin_borrow %107 : $Sub
+  %159 = ref_element_addr %158 : $Sub, #Sub.obj
+  %160 = load [copy] %159 : $*Object
+  %161 = objc_method %160 : $Object, #Object.count!getter.foreign : (Object) -> () -> Int, $@convention(objc_method) (Object) -> Int
+  %162 = apply %161(%160) : $@convention(objc_method) (Object) -> Int
+  end_borrow %158 : $Sub
+  destroy_value %160 : $Object
+  apply undef(%162) : $@convention(thin) (Int) -> ()
+  return %107 : $Sub
+}

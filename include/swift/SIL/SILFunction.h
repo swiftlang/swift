@@ -562,8 +562,7 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root, SILDeclRef forDecl,
-                      ForDefinition_t forDefinition);
+  void createProfiler(ASTNode Root, SILDeclRef Ref);
 
   void discardProfiler() { Profiler = nullptr; }
 
