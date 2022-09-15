@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-operator-designated-types -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift -enable-operator-designated-types
 
 precedencegroup LowPrecedence {
   associativity: right
