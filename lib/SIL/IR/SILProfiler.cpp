@@ -41,47 +41,47 @@ static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
   return false;
 }
 
-/// Check whether a root AST node is unmapped, i.e not profiled.
-static bool isUnmapped(ASTNode N) {
-  // Do not map AST nodes with invalid source locations.
+/// Check whether a root AST node should be profiled.
+static bool shouldProfile(ASTNode N) {
+  // Do not profile AST nodes with invalid source locations.
   if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Skipping ASTNode: invalid start/end locations\n");
-    return true;
+    return false;
   }
 
   if (auto *E = N.dyn_cast<Expr *>()) {
     if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-      // Only map closure expressions with bodies.
+      // Only profile closure expressions with bodies.
       if (!doesClosureHaveBody(CE)) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: closure without body\n");
-        return true;
+        return false;
       }
 
-      // Don't map implicit closures, unless they're autoclosures.
+      // Don't profile implicit closures, unless they're autoclosures.
       if (!isa<AutoClosureExpr>(CE) && CE->isImplicit()) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
-        return true;
+        return false;
       }
     }
 
-    // Map all other kinds of expressions.
-    return false;
+    // Profile all other kinds of expressions.
+    return true;
   }
 
   auto *D = N.get<Decl *>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // Don't map functions without bodies.
+    // Don't profile functions without bodies.
     if (!AFD->hasBody()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
-      return true;
+      return false;
     }
 
-    // Map implicit getters for lazy variables.
+    // Profile implicit getters for lazy variables.
     if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
       if (accessor->isImplicit() && accessor->isGetter() &&
           accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
-        return false;
+        return true;
       }
     }
   }
@@ -89,10 +89,10 @@ static bool isUnmapped(ASTNode N) {
   // Skip any remaining implicit, or otherwise unsupported decls.
   if (D->isImplicit() || isa<EnumCaseDecl>(D)) {
     LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit/unsupported decl\n");
-    return true;
+    return false;
   }
 
-  return false;
+  return true;
 }
 
 namespace swift {
@@ -102,7 +102,7 @@ bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
   if (Opts.UseProfile.empty() && !Opts.GenerateProfile)
     return false;
 
-  return !isUnmapped(N);
+  return shouldProfile(N);
 }
 } // namespace swift
 
