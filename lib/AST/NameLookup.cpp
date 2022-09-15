@@ -2774,9 +2774,9 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
 
 bool TypeRepr::isProtocol(DeclContext *dc){
   auto &ctx = dc->getASTContext();
-  DirectlyReferencedTypeDecls d = directReferencesForTypeRepr(ctx.evaluator, ctx, this, dc);
-  return declsAreProtocols(d);
+  return findIf([&ctx, dc](TypeRepr *ty) { return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc)); });
 }
+
 
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
