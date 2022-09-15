@@ -297,6 +297,8 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       // FIXME: Print availability.
+      ClangValueTypePrinter::forwardDeclType(os, owningPrinter.interopContext,
+                                             CD);
       ClangClassTypePrinter(os).printClassTypeDecl(
           CD, [&]() { printMembers(CD->getMembers()); });
       return;

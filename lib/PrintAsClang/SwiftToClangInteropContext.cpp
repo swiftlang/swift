@@ -50,3 +50,9 @@ SwiftToClangInteropContext::getExtensionsForNominalType(
     return exts->getSecond();
   return {};
 }
+
+SwiftToClangInteropContext::TypeEmissionState &
+SwiftToClangInteropContext::getTypeState(const NominalTypeDecl *typeDecl) {
+  return typeState.insert(std::make_pair(typeDecl, TypeEmissionState()))
+      .first->getSecond();
+}

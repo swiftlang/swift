@@ -51,6 +51,15 @@ public:
   llvm::ArrayRef<const ExtensionDecl *>
   getExtensionsForNominalType(const NominalTypeDecl *typeDecl) const;
 
+  /// In which state has the type been emitted in this module.
+  struct TypeEmissionState {
+    /// True if the `swift::isUsableInGenericContext` type trait has been
+    /// defined for this type.
+    bool hasDefinedIsUsableInGenericContext = false;
+  };
+
+  TypeEmissionState &getTypeState(const NominalTypeDecl *typeDecl);
+
 private:
   ModuleDecl &mod;
   const IRGenOptions &irGenOpts;
@@ -58,6 +67,7 @@ private:
   llvm::StringSet<> emittedStubs;
   llvm::DenseMap<const NominalTypeDecl *, std::vector<const ExtensionDecl *>>
       extensions;
+  llvm::DenseMap<const NominalTypeDecl *, TypeEmissionState> typeState;
 };
 
 } // end namespace swift

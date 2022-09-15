@@ -82,6 +82,7 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 }
 
 void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
+                                            SwiftToClangInteropContext &context,
                                             const NominalTypeDecl *typeDecl) {
   if (typeDecl->isGeneric()) {
     auto genericSignature =
@@ -91,6 +92,8 @@ void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
   os << "class ";
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << ";\n";
+  printTypePrecedingGenericTraits(os, context, typeDecl,
+                                  typeDecl->getModuleContext());
 }
 
 static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
@@ -230,6 +233,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << " *>(" << vwTableName << ");\n";
   };
 
+  // Forward declare this class (if needed).
+  forwardDeclType(os, interopContext, typeDecl);
   // Print out the C++ class itself.
   printGenericSignature(os);
   os << "class ";
@@ -471,6 +476,36 @@ void ClangValueTypePrinter::printClangTypeSwiftGenericTraits(
                          /*typeMetadataFuncRequirements=*/{}, moduleContext);
 }
 
+void ClangValueTypePrinter::printTypePrecedingGenericTraits(
+    raw_ostream &os, SwiftToClangInteropContext &context,
+    const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext) {
+  auto &state = context.getTypeState(typeDecl);
+  if (state.hasDefinedIsUsableInGenericContext)
+    return;
+  state.hasDefinedIsUsableInGenericContext = true;
+
+  ClangSyntaxPrinter printer(os);
+  // FIXME: avoid popping out of the module's namespace here.
+  os << "} // end namespace \n\n";
+  os << "namespace swift {\n";
+
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
+  if (!typeDecl->isGeneric()) {
+    // FIXME: generic type support.
+    os << "template<>\n";
+    os << "static inline const constexpr bool isUsableInGenericContext<";
+    printer.printNominalTypeReference(typeDecl,
+                                      /*moduleContext=*/nullptr);
+    os << "> = true;\n";
+  }
+  os << "#pragma clang diagnostic pop\n";
+  os << "} // namespace swift\n";
+  os << "\nnamespace ";
+  printer.printBaseName(moduleContext);
+  os << " {\n";
+}
+
 void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     StringRef typeMetadataFuncName,
@@ -492,7 +527,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  if (typeMetadataFuncRequirements.empty()) {
+  if (typeDecl->hasClangNode()) {
+    // FIXME: share the code.
     // FIXME: generic type support.
     os << "template<>\n";
     os << "static inline const constexpr bool isUsableInGenericContext<";

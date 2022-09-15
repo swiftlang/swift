@@ -96,7 +96,13 @@ public:
       ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
       const ModuleDecl *moduleContext);
 
-  static void forwardDeclType(raw_ostream &os, const NominalTypeDecl *typeDecl);
+  static void printTypePrecedingGenericTraits(
+      raw_ostream &os, SwiftToClangInteropContext &context,
+      const NominalTypeDecl *typeDecl, const ModuleDecl *moduleContext);
+
+  static void forwardDeclType(raw_ostream &os,
+                              SwiftToClangInteropContext &context,
+                              const NominalTypeDecl *typeDecl);
 
   /// Print out the type traits that allow a C++ type be used a Swift generic
   /// context.

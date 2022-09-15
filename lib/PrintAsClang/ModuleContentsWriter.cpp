@@ -279,8 +279,10 @@ public:
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
         if (!addImport(NTD)) {
-          forwardDeclare(
-              NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+          forwardDeclare(NTD, [&]() {
+            ClangValueTypePrinter::forwardDeclType(
+                os, printer.getInteropContext(), NTD);
+          });
         } else {
           if (isa<StructDecl>(TD) && NTD->hasClangNode())
             emitReferencedClangTypeMetadata(NTD);
