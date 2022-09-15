@@ -16,6 +16,7 @@ module ASTBridging {
 
 module SILBridging {
   header "SIL/SILBridging.h"
+  header "SIL/SILLocation.h"
   requires cplusplus
   export *
 }
