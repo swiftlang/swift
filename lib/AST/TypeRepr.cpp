@@ -29,7 +29,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
-//using namespace swift::namelookup;
 
 #define TYPEREPR(Id, _) \
   static_assert(IsTriviallyDestructible<Id##TypeRepr>::value, \
@@ -113,53 +112,6 @@ TypeRepr *TypeRepr::getWithoutParens() const {
     repr = tupleRepr->getElementType(0);
   }
   return repr;
-}
-
-CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
-      // Don't allow variadic opaque parameter or return types.
-      if (isa<PackExpansionTypeRepr>(repr))
-        return Action::SkipChildren();
-
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return Action::Continue();
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  walk(Walker(reprs));
-  return reprs;
-}
-
-CollectedOpaqueReprs TypeRepr::collectTypeReprs() {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    bool walkToTypeReprPre(TypeRepr *repr) override {
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)){
-            Reprs.push_back(opaqueRepr);
-      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)){
-          Reprs.push_back(compositionRepr);
-      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)){
-              Reprs.push_back(identRepr);
-      }
-    return true;
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  walk(Walker(reprs));
-  return reprs;
 }
 
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {

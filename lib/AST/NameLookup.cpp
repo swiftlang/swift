@@ -2806,31 +2806,37 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
   public:
     explicit Walker(CollectedOpaqueReprs &reprs, ASTContext &ctx, DeclContext *d) : Reprs(reprs), Ctx(ctx), dc(d) {}
 
-    bool walkToTypeReprPre(TypeRepr *repr) override {
-      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
-        auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
-        if(generic)
-          Reprs.push_back(existential);
-        auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
-        return meta || generic?  true : false;
-      }
+    PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
+
+      // Don't allow variadic opaque parameter or return types.
+      if (isa<PackExpansionTypeRepr>(repr))
+        return Action::SkipChildren();
 
       if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
         Reprs.push_back(opaqueRepr);
         if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
-          return false;
+          return Action::SkipChildren();
       }
       
       if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+
+        if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+          auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
+          if(generic)
+            Reprs.push_back(existential);
+          auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
+          Action::VisitChildrenIf(meta || generic);
+        }
+
         if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
           if (!compositionRepr->isTypeReprAny())
             Reprs.push_back(compositionRepr);
-          return false;
+          return Action::SkipChildren();
         } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
           if (!Reprs.empty()){
             if(isa<ExistentialTypeRepr>(Reprs.front())){
               Reprs.clear();
-              return true;
+              Action::Continue();
             }
           }
           Reprs.push_back(generic);
@@ -2838,9 +2844,11 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
           if (identRepr->isProtocol(dc))
             Reprs.push_back(identRepr);
         }
+ 
       }
-    return true;
+      return Action::Continue();
     }
+
   };
 
   CollectedOpaqueReprs reprs;
