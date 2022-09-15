@@ -598,10 +598,9 @@ UnsafeMutableRawBufferPointerSliceTests.test(
 UnsafeMutableRawBufferPointerSliceTests.test(
   "slice.of.UnsafeMutableRawBufferPointer.loadUnaligned"
 ) {
-  let count = 4
-  let sizeInBytes = count * MemoryLayout<Int>.stride
+  let sizeInBytes = 32
   let b = UnsafeMutableRawBufferPointer.allocate(
-    byteCount: sizeInBytes, alignment: MemoryLayout<Int>.alignment
+    byteCount: sizeInBytes, alignment: 4
   )
   defer {
     b.deallocate()
