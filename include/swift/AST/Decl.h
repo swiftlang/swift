@@ -3780,9 +3780,9 @@ public:
   /// by the wrapper.
   NominalTypeDecl *getTypeWrapperStorageDecl() const;
 
-  /// Get an initializer that could be used to instantiate a
+  /// Get a memberwise initializer that could be used to instantiate a
   /// type wrapped type.
-  ConstructorDecl *getTypeWrapperInitializer() const;
+  ConstructorDecl *getTypeWrappedTypeMemberwiseInitializer() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

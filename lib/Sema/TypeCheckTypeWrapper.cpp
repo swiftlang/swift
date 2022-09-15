@@ -151,11 +151,12 @@ VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
                            GetTypeWrapperProperty{mutableSelf}, nullptr);
 }
 
-ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
+ConstructorDecl *
+NominalTypeDecl::getTypeWrappedTypeMemberwiseInitializer() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           SynthesizeTypeWrapperInitializer{mutableSelf},
-                           nullptr);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      SynthesizeTypeWrappedTypeMemberwiseInitializer{mutableSelf}, nullptr);
 }
 
 NominalTypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
@@ -390,9 +391,8 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   return true;
 }
 
-BraceStmt *
-SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
-                                               ConstructorDecl *ctor) const {
+BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
+    Evaluator &evaluator, ConstructorDecl *ctor) const {
   auto &ctx = ctor->getASTContext();
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 

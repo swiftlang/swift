@@ -3673,8 +3673,8 @@ public:
   bool isCached() const { return true; }
 };
 
-class SynthesizeTypeWrapperInitializer
-    : public SimpleRequest<SynthesizeTypeWrapperInitializer,
+class SynthesizeTypeWrappedTypeMemberwiseInitializer
+    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializer,
                            ConstructorDecl *(NominalTypeDecl *),
                            RequestFlags::Cached> {
 public:
@@ -3689,8 +3689,8 @@ public:
   bool isCached() const { return true; }
 };
 
-class SynthesizeTypeWrapperInitializerBody
-    : public SimpleRequest<SynthesizeTypeWrapperInitializerBody,
+class SynthesizeTypeWrappedTypeMemberwiseInitializerBody
+    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
                            BraceStmt *(ConstructorDecl *),
                            RequestFlags::Cached> {
 public:
