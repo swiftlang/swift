@@ -186,13 +186,32 @@ public:
     auto knownTypeInfo = getKnownTypeInfo(typeDecl, typeMapping, languageMode);
     if (!knownTypeInfo)
       return false;
-    os << knownTypeInfo->name;
-    if (knownTypeInfo->canBeNullable) {
-      printNullability(optionalKind);
-    }
+    bool shouldPrintOptional = optionalKind && *optionalKind != OTK_None &&
+                               !knownTypeInfo->canBeNullable;
+    if (!isInOutParam && shouldPrintOptional &&
+        typeUseKind == FunctionSignatureTypeUse::ParamType)
+      os << "const ";
+    printOptional(shouldPrintOptional ? optionalKind : llvm::None, [&]() {
+      os << knownTypeInfo->name;
+      if (knownTypeInfo->canBeNullable) {
+        printNullability(optionalKind);
+      }
+    });
+    if (!isInOutParam && shouldPrintOptional &&
+        typeUseKind == FunctionSignatureTypeUse::ParamType)
+      os << '&';
     if (isInOutParam)
       printInoutTypeModifier();
     return true;
+  }
+
+  void printOptional(Optional<OptionalTypeKind> optionalKind,
+                     llvm::function_ref<void()> body) {
+    if (!optionalKind || optionalKind == OTK_None)
+      return body();
+    os << "Swift::Optional<";
+    body();
+    os << '>';
   }
 
   ClangRepresentation visitType(TypeBase *Ty,
@@ -241,14 +260,18 @@ public:
                                      bool isInOutParam) {
     // FIXME: handle optionalKind.
     if (languageMode != OutputLanguageMode::Cxx) {
-      os << "void * _Nonnull";
+      os << "void * "
+         << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
+                                                        : "_Nullable");
       if (isInOutParam)
         os << " * _Nonnull";
       return ClangRepresentation::representable;
     }
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
-    ClangSyntaxPrinter(os).printBaseName(CT->getDecl());
+    printOptional(optionalKind, [&]() {
+      ClangSyntaxPrinter(os).printBaseName(CT->getDecl());
+    });
     if (typeUseKind == FunctionSignatureTypeUse::ParamType)
       os << "&";
     return ClangRepresentation::representable;
@@ -298,9 +321,6 @@ public:
     if (!declPrinter.shouldInclude(decl))
       return ClangRepresentation::unsupported; // FIXME: propagate why it's not
                                                // exposed.
-    // FIXME: Support Optional<T>.
-    if (optionalKind && *optionalKind != OTK_None)
-      return ClangRepresentation::unsupported;
     // Only C++ mode supports struct types.
     if (languageMode != OutputLanguageMode::Cxx)
       return ClangRepresentation::unsupported;
@@ -312,22 +332,27 @@ public:
       if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
           !isInOutParam)
         os << "const ";
-      handler.printTypeName(os);
+      printOptional(optionalKind, [&]() { handler.printTypeName(os); });
       if (typeUseKind == FunctionSignatureTypeUse::ParamType)
         os << '&';
       return ClangRepresentation::representable;
     }
 
-    // FIXME: Handle optional structures.
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       if (!isInOutParam) {
         os << "const ";
       }
-      ClangSyntaxPrinter(os).printPrimaryCxxTypeName(decl, moduleContext);
-      auto result = visitGenericArgs(genericArgs);
+      ClangRepresentation result = ClangRepresentation::representable;
+      printOptional(optionalKind, [&]() {
+        ClangSyntaxPrinter(os).printPrimaryCxxTypeName(decl, moduleContext);
+        result = visitGenericArgs(genericArgs);
+      });
       os << '&';
       return result;
-    } else {
+    }
+
+    ClangRepresentation result = ClangRepresentation::representable;
+    printOptional(optionalKind, [&]() {
       ClangValueTypePrinter printer(os, cPrologueOS, interopContext);
       printer.printValueTypeReturnType(
           decl, languageMode,
@@ -336,9 +361,9 @@ public:
                     ClangValueTypePrinter::TypeUseKind::CxxTypeName)
               : ClangValueTypePrinter::TypeUseKind::CxxTypeName,
           moduleContext);
-      return visitGenericArgs(genericArgs);
-    }
-    return ClangRepresentation::representable;
+      result = visitGenericArgs(genericArgs);
+    });
+    return result;
   }
 
   Optional<ClangRepresentation>
@@ -396,13 +421,10 @@ public:
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             Optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
-    // FIXME: Support Optional<T>.
-    if (optionalKind && *optionalKind != OTK_None)
-      return ClangRepresentation::unsupported;
     bool isParam = typeUseKind == FunctionSignatureTypeUse::ParamType;
     if (isParam && !isInOutParam)
       os << "const ";
-    // FIXME: handle optionalKind.
+
     if (languageMode != OutputLanguageMode::Cxx) {
       // Note: This can happen for UnsafeMutablePointer<T>.
       if (typeUseKind != FunctionSignatureTypeUse::ParamType)
@@ -412,7 +434,9 @@ public:
       os << "void * _Nonnull";
       return ClangRepresentation::representable;
     }
-    ClangSyntaxPrinter(os).printGenericTypeParamTypeName(genericTpt);
+    printOptional(optionalKind, [&]() {
+      ClangSyntaxPrinter(os).printGenericTypeParamTypeName(genericTpt);
+    });
     // Pass a reference to the template type.
     if (isParam)
       os << '&';
