@@ -30,6 +30,7 @@ class AbstractFunctionDecl;
 class AccessorDecl;
 class AnyFunctionType;
 class FuncDecl;
+class GenericTypeParamType;
 class ModuleDecl;
 class NominalTypeDecl;
 class LoweredFunctionSignature;
@@ -134,6 +135,11 @@ public:
   printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
                                ModuleDecl *moduleContext,
                                OutputLanguageMode outputLang);
+
+  static void printGenericReturnSequence(
+      raw_ostream &os, const GenericTypeParamType *gtpt,
+      llvm::function_ref<void(StringRef)> invocationPrinter,
+      Optional<StringRef> initializeWithTakeFromValue = llvm::None);
 
   using PrinterTy =
       llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;
