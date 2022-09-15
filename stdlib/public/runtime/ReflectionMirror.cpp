@@ -12,7 +12,6 @@
 
 #ifdef SWIFT_ENABLE_REFLECTION
 
-#include "../SwiftShims/Reflection.h"
 #include "ImageInspection.h"
 #include "Private.h"
 #include "WeakReference.h"
@@ -27,6 +26,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Reflection.h"
+#include "swift/shims/Reflection.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
