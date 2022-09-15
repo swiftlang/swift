@@ -15,7 +15,7 @@ import StdlibUnittest
 let longTaggedTests = TestSuite("NonContiguousTaggedStrings")
 var constant = "Send Message to different Team"
 //doesn't fit in a tagged pointer because of ', but does fit in a SmallString
-var shortNonTagged = "Don't Save"
+var shortNonTagged = "Don\u{2019}t Save"
 
 func runEqualLongTagged() {
   
