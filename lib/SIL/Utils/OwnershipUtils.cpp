@@ -25,6 +25,62 @@
 
 using namespace swift;
 
+bool swift::hasEscaped(BorrowedValue value) {
+  GraphNodeWorklist<Operand *, 8> worklist;
+  for (Operand *use : value->getUses()) {
+    if (use->getOperandOwnership() != OperandOwnership::NonUse)
+      worklist.insert(use);
+  }
+
+  while (Operand *op = worklist.pop()) {
+    switch (op->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      llvm_unreachable("this operand cannot handle an inner guaranteed use");
+
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+    case OperandOwnership::BitwiseEscape:
+      return true;
+
+    case OperandOwnership::Borrow:
+    case OperandOwnership::EndBorrow:
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::InteriorPointer:
+      break;
+
+    case OperandOwnership::Reborrow: {
+      SILArgument *phi = cast<BranchInst>(op->getUser())
+                             ->getDestBB()
+                             ->getArgument(op->getOperandNumber());
+      for (auto *use : phi->getUses()) {
+        if (use->getOperandOwnership() != OperandOwnership::NonUse)
+          worklist.insert(use);
+      }
+      break;
+    }
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result->getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            worklist.insert(resultUse);
+          }
+        }
+        return true;
+      });
+      break;
+    }
+    }
+  }
+  return false;
+}
+
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
          v->getOwnershipKind() == OwnershipKind::None;
