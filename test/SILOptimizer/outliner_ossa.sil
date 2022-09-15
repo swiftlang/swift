@@ -292,7 +292,7 @@ class Sub : Super {
 
 // We used to assert here because of an over-strong expectation about the location
 // of destroy_value instructions.
-sil hidden [ossa] @destroy_after_borrow : $@convention(thin) () -> @owned Sub {
+sil [Osize] [ossa] @destroy_after_borrow : $@convention(thin) () -> @owned Sub {
   %104 = apply undef() : $@convention(objc_method) () -> @owned Super
   %107 = unchecked_ref_cast %104 : $Super to $Sub
   %158 = begin_borrow %107 : $Sub
