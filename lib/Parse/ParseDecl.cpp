@@ -8863,11 +8863,12 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
-    SyntaxParsingContext ListCtxt(SyntaxContext, SyntaxKind::IdentifierList);
-
     (void)parseIdentifier(groupName, groupLoc,
                           diag::operator_decl_expected_precedencegroup,
                           /*diagnoseDollarPrefix=*/false);
+
+    SyntaxParsingContext ListCtxt(SyntaxContext,
+                                  SyntaxKind::DesignatedTypeList);
 
     if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       // Designated types have been removed; consume the list (mainly for source
@@ -8885,9 +8886,17 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         typesEndLoc = groupLoc;
       }
 
-      while (consumeIf(tok::comma, typesEndLoc)) {
-        if (Tok.isNot(tok::eof))
+      while (Tok.isNot(tok::eof)) {
+        SyntaxParsingContext ElementCtxt(SyntaxContext,
+                                         SyntaxKind::DesignatedTypeElement);
+        if (!consumeIf(tok::comma, typesEndLoc)) {
+          ElementCtxt.setTransparent();
+          break;
+        }
+
+        if (Tok.isNot(tok::eof)) {
           typesEndLoc = consumeToken();
+        }
       }
 
       if (typesEndLoc.isValid())
