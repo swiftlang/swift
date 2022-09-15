@@ -15,6 +15,7 @@
 
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILLocation.h"
 #include <stdbool.h>
@@ -203,12 +204,6 @@ typedef enum {
 
 // AST bridging
 
-typedef enum {
-  UnknownBuiltin = 0,
-#define BUILTIN(Id, Name, Attrs) Id##Builtin,
-#include "swift/AST/Builtins.def"
-} BridgedBuiltinID;
-
 struct BridgedEffectInfo {
   SwiftInt argumentIndex;
   bool isDerived;
@@ -352,7 +347,7 @@ BridgedMultiValueResult
 BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
 
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi);
-BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi);
+swift::BuiltinValueKind BuiltinInst_getID(BridgedInstruction bi);
 SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp);
 SwiftInt IndexAddrInst_needsStackProtection(BridgedInstruction ia);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);

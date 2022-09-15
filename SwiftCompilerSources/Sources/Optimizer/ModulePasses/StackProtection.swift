@@ -124,7 +124,7 @@ private struct StackProtectionOptimization {
                                 mustFixStackNesting: inout Bool, _ context: PassContext) {
 
     // `withUnsafeTemporaryAllocation(of:capacity:_:)` is compiled to a `builtin "stackAlloc"`.
-    if let bi = instruction as? BuiltinInst, bi.id == .stackAlloc {
+    if let bi = instruction as? BuiltinInst, bi.id == .StackAlloc {
       function.setNeedsStackProtection(context)
       return
     }

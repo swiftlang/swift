@@ -319,19 +319,10 @@ final public class LoadUnownedInst : SingleValueInstruction, UnaryInstruction {}
 final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
-  // TODO: find a way to directly reuse the BuiltinValueKind enum
-  public enum ID  {
-    case none
-    case destroyArray
-    case stackAlloc
-  }
+  public typealias ID = swift.BuiltinValueKind
 
   public var id: ID {
-    switch BuiltinInst_getID(bridged) {
-      case DestroyArrayBuiltin: return .destroyArray
-      case StackAllocBuiltin: return .stackAlloc
-      default: return .none
-    }
+    return BuiltinInst_getID(bridged)
   }
 }
 

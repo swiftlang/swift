@@ -751,8 +751,8 @@ llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi) {
   return castToInst<CondFailInst>(cfi)->getMessage();
 }
 
-BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
-  return (BridgedBuiltinID)castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
+BuiltinValueKind BuiltinInst_getID(BridgedInstruction bi) {
+  return castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
 }
 
 SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp) {
