@@ -258,6 +258,16 @@ public:
   ClangRepresentation visitClassType(ClassType *CT,
                                      Optional<OptionalTypeKind> optionalKind,
                                      bool isInOutParam) {
+    auto *cd = CT->getDecl();
+    if (cd->hasClangNode()) {
+        ClangSyntaxPrinter(os).printIdentifier(       cast<clang::NamedDecl>(cd->getClangDecl())->getName());
+        os << " *" << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
+                       : "_Nullable");
+        if (isInOutParam)
+          os << " * _Nonnull";
+        // FIXME: Mark that this is only ObjC representable.
+        return ClangRepresentation::representable;
+    }
     // FIXME: handle optionalKind.
     if (languageMode != OutputLanguageMode::Cxx) {
       os << "void * "
@@ -900,6 +910,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     }
 
     if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      if (classDecl->hasClangNode()) {
+        if (isInOut)
+          os << '&';
+        namePrinter();
+        return;
+      }
       ClangClassTypePrinter::printParameterCxxtoCUseScaffold(
           os, classDecl, moduleContext, namePrinter, isInOut);
       return;
@@ -1109,6 +1125,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       return;
     }
     if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
+      if (classDecl->hasClangNode()) {
+          os << "return ";
+          printCallToCFunc(/*additionalParam=*/None);
+          os << ";\n";
+          return;
+      }
       ClangClassTypePrinter::printClassTypeReturnScaffold(
           os, classDecl, moduleContext,
           [&]() { printCallToCFunc(/*additionalParam=*/None); });
