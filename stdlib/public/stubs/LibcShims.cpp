@@ -23,7 +23,7 @@
 
 #include <stdio.h>
 
-#include "SwiftShims/LibcShims.h"
+#include "swift/shims/LibcShims.h"
 
 #if defined(_WIN32)
 static void __attribute__((__constructor__))

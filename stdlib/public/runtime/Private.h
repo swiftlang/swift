@@ -23,7 +23,7 @@
 #include "swift/Demangling/TypeLookupError.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 #if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #include <TargetConditionals.h>
