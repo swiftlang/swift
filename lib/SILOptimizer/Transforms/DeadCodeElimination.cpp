@@ -301,8 +301,15 @@ void DCE::markLive() {
           }
           continue;
         }
-        // If not populate reborrowDependencies for this borrow
+        // Populate reborrowDependencies for this borrow
         findReborrowDependencies(borrowInst);
+        if (hasEscaped(BorrowedValue(borrowInst))) {
+          // Visit all end_borrows and mark them live
+          visitTransitiveEndBorrows(borrowInst, [&](EndBorrowInst *endBorrow) {
+            markInstructionLive(endBorrow);
+          });
+          continue;
+        }
         break;
       }
       default:
