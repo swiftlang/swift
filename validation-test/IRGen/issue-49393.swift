@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s -import-objc-header %S/Inputs/sr6844.h | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -module-name M -import-objc-header %S/Inputs/issue-49393.h | %FileCheck %s
 // REQUIRES: objc_interop
+
+// https://github.com/apple/swift/issues/49393
 
 import Foundation
 
@@ -10,9 +12,9 @@ import Foundation
 // CHECK-SAME: [[OBJC_PROPNAME]]
 // CHECK-SAME: [[PROPKIND]]
 
-// CHECK-LABEL: @_PROTOCOL_INSTANCE_METHODS__TtP6sr684418MyJSONSerializing2_ = {{.+}} @"\01L_selector_data(JSONKeyPathsByPropertyKey2)"
+// CHECK-LABEL: @_PROTOCOL_INSTANCE_METHODS__TtP1M18MyJSONSerializing2_ = {{.+}} @"\01L_selector_data(JSONKeyPathsByPropertyKey2)"
 // CHECK: [[SWIFT_PROPNAME:@.+]] = private unnamed_addr constant [{{.+}} x i8] c"JSONKeyPathsByPropertyKey2\00"
-// CHECK: @_PROTOCOL_PROPERTIES__TtP6sr684418MyJSONSerializing2_ =
+// CHECK: @_PROTOCOL_PROPERTIES__TtP1M18MyJSONSerializing2_ =
 // CHECK-SAME: [[SWIFT_PROPNAME]]
 // CHECK-SAME: [[PROPKIND]]
 
