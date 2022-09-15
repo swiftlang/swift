@@ -41,47 +41,47 @@ static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
   return false;
 }
 
-/// Check whether a root AST node is unmapped, i.e not profiled.
-static bool isUnmapped(ASTNode N) {
-  // Do not map AST nodes with invalid source locations.
+/// Check whether a root AST node should be profiled.
+static bool shouldProfile(ASTNode N) {
+  // Do not profile AST nodes with invalid source locations.
   if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Skipping ASTNode: invalid start/end locations\n");
-    return true;
+    return false;
   }
 
   if (auto *E = N.dyn_cast<Expr *>()) {
     if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-      // Only map closure expressions with bodies.
+      // Only profile closure expressions with bodies.
       if (!doesClosureHaveBody(CE)) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: closure without body\n");
-        return true;
+        return false;
       }
 
-      // Don't map implicit closures, unless they're autoclosures.
+      // Don't profile implicit closures, unless they're autoclosures.
       if (!isa<AutoClosureExpr>(CE) && CE->isImplicit()) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
-        return true;
+        return false;
       }
     }
 
-    // Map all other kinds of expressions.
-    return false;
+    // Profile all other kinds of expressions.
+    return true;
   }
 
   auto *D = N.get<Decl *>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // Don't map functions without bodies.
+    // Don't profile functions without bodies.
     if (!AFD->hasBody()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
-      return true;
+      return false;
     }
 
-    // Map implicit getters for lazy variables.
+    // Profile implicit getters for lazy variables.
     if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
       if (accessor->isImplicit() && accessor->isGetter() &&
           accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
-        return false;
+        return true;
       }
     }
   }
@@ -89,15 +89,20 @@ static bool isUnmapped(ASTNode N) {
   // Skip any remaining implicit, or otherwise unsupported decls.
   if (D->isImplicit() || isa<EnumCaseDecl>(D)) {
     LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit/unsupported decl\n");
-    return true;
+    return false;
   }
 
-  return false;
+  return true;
 }
 
 namespace swift {
 bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
-  return M.getOptions().GenerateProfile && !isUnmapped(N);
+  // If profiling isn't enabled, don't profile anything.
+  auto &Opts = M.getOptions();
+  if (Opts.UseProfile.empty() && !Opts.GenerateProfile)
+    return false;
+
+  return shouldProfile(N);
 }
 } // namespace swift
 
@@ -152,7 +157,7 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
 
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
   const auto &Opts = M.getOptions();
-  if (!doesASTRequireProfiling(M, N) && Opts.UseProfile.empty())
+  if (!doesASTRequireProfiling(M, N))
     return nullptr;
 
   if (!canCreateProfilerForAST(N, Ref)) {
@@ -185,29 +190,34 @@ visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
   return ASTWalker::Action::SkipChildren();
 }
 
-/// Whether to skip visitation of an expression. If the expression should be
-/// skipped, a walker action is returned that determines whether or not the
-/// children should also be skipped.
-static Optional<ASTWalker::PreWalkResult<Expr *>>
-shouldSkipExpr(Expr *E, ASTWalker::ParentTy Parent) {
+/// Whether to walk the children of a given expression.
+ASTWalker::PreWalkResult<Expr *>
+shouldWalkIntoExpr(Expr *E, ASTWalker::ParentTy Parent, SILDeclRef Constant) {
   using Action = ASTWalker::Action;
-  using Result = ASTWalker::PreWalkResult<Expr *>;
 
   // Profiling for closures should be handled separately. Do not visit
   // closure expressions twice.
-  if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
-    return Result(Action::SkipChildren(E));
-
-  // Expressions with no location should be skipped, but we still want to visit
-  // their children.
-  if (E->getStartLoc().isInvalid() || E->getEndLoc().isInvalid())
-    return Result(Action::Continue(E));
-
-  return None;
+  if (isa<AbstractClosureExpr>(E)) {
+    // A non-null parent means we have a closure child, which we will visit
+    // separately. Even if the parent is null, don't walk into a closure if the
+    // SILDeclRef is not for a closure, as it could be for a property
+    // initializer instead.
+    if (!Parent.isNull() || !Constant || !Constant.getAbstractClosureExpr())
+      return Action::SkipChildren(E);
+  }
+  return Action::Continue(E);
 }
 
-/// Whether the children of an unmapped decl should still be walked.
-static bool shouldWalkUnmappedDecl(const Decl *D) {
+/// Whether to skip visitation of an expression. The children may however still
+/// be visited
+bool shouldSkipExpr(Expr *E) {
+  // Expressions with no location should be skipped.
+  return E->getStartLoc().isInvalid() || E->getEndLoc().isInvalid();
+}
+
+/// Whether the children of a decl that isn't explicitly handled should be
+/// walked.
+static bool shouldWalkIntoUnhandledDecl(const Decl *D) {
   // We want to walk into the initializer for a pattern binding decl. This
   // allows us to map LazyInitializerExprs.
   return isa<PatternBindingDecl>(D);
@@ -215,14 +225,18 @@ static bool shouldWalkUnmappedDecl(const Decl *D) {
 
 /// An ASTWalker that maps ASTNodes to profiling counters.
 struct MapRegionCounters : public ASTWalker {
+  /// The SIL function being profiled.
+  SILDeclRef Constant;
+
   /// The next counter value to assign.
   unsigned NextCounter = 0;
 
   /// The map of statements to counters.
   llvm::DenseMap<ASTNode, unsigned> &CounterMap;
 
-  MapRegionCounters(llvm::DenseMap<ASTNode, unsigned> &CounterMap)
-      : CounterMap(CounterMap) {}
+  MapRegionCounters(SILDeclRef Constant,
+                    llvm::DenseMap<ASTNode, unsigned> &CounterMap)
+      : Constant(Constant), CounterMap(CounterMap) {}
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
     // We want to walk lazy initializers present in the synthesized getter for
@@ -247,15 +261,13 @@ struct MapRegionCounters : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (isUnmapped(D))
-      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
-
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       mapRegion(TLCD->getBody());
+      return Action::Continue();
     }
-    return Action::Continue();
+    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
@@ -283,8 +295,8 @@ struct MapRegionCounters : public ASTWalker {
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto SkipAction = shouldSkipExpr(E, Parent))
-      return *SkipAction;
+    if (shouldSkipExpr(E))
+      return shouldWalkIntoExpr(E, Parent, Constant);
 
     // If AST visitation begins with an expression, the counter map must be
     // empty. Set up a counter for the root.
@@ -300,7 +312,7 @@ struct MapRegionCounters : public ASTWalker {
     if (isa<LazyInitializerExpr>(E))
       mapRegion(E);
 
-    return Action::Continue(E);
+    return shouldWalkIntoExpr(E, Parent, Constant);
   }
 };
 
@@ -520,6 +532,9 @@ public:
 /// CoverageMapping walker to recompute the correct counter information
 /// for this walker.
 struct PGOMapping : public ASTWalker {
+  /// The SIL function being profiled.
+  SILDeclRef Constant;
+
   /// The counter indices for AST nodes.
   const llvm::DenseMap<ASTNode, unsigned> &CounterMap;
 
@@ -530,11 +545,12 @@ struct PGOMapping : public ASTWalker {
   llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap;
   llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
 
-  PGOMapping(const llvm::DenseMap<ASTNode, unsigned> &CounterMap,
+  PGOMapping(SILDeclRef Constant,
+             const llvm::DenseMap<ASTNode, unsigned> &CounterMap,
              const llvm::InstrProfRecord &LoadedCounts,
              llvm::DenseMap<ASTNode, ProfileCounter> &LoadedCounterMap,
              llvm::DenseMap<ASTNode, ASTNode> &RegionCondToParentMap)
-      : CounterMap(CounterMap), LoadedCounts(LoadedCounts),
+      : Constant(Constant), CounterMap(CounterMap), LoadedCounts(LoadedCounts),
         LoadedCounterMap(LoadedCounterMap),
         CondToParentMap(RegionCondToParentMap) {}
 
@@ -596,17 +612,16 @@ struct PGOMapping : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (isUnmapped(D))
-      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
         setKnownExecutionCount(AFD->getBody());
       });
     }
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       setKnownExecutionCount(TLCD->getBody());
-
-    return Action::Continue();
+      return Action::Continue();
+    }
+    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
@@ -671,8 +686,8 @@ struct PGOMapping : public ASTWalker {
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto SkipAction = shouldSkipExpr(E, Parent))
-      return *SkipAction;
+    if (shouldSkipExpr(E))
+      return shouldWalkIntoExpr(E, Parent, Constant);
 
     unsigned parent = getParentCounter();
 
@@ -701,7 +716,7 @@ struct PGOMapping : public ASTWalker {
     if (isa<LazyInitializerExpr>(E))
       setKnownExecutionCount(E);
 
-    return Action::Continue(E);
+    return shouldWalkIntoExpr(E, Parent, Constant);
   }
 };
 
@@ -711,6 +726,9 @@ struct PGOMapping : public ASTWalker {
 struct CoverageMapping : public ASTWalker {
 private:
   const SourceManager &SM;
+
+  /// The SIL function being profiled.
+  SILDeclRef Constant;
 
   /// Storage for counter expressions.
   std::forward_list<CounterExpr> Exprs;
@@ -935,7 +953,8 @@ private:
   }
 
 public:
-  CoverageMapping(const SourceManager &SM) : SM(SM) {}
+  CoverageMapping(const SourceManager &SM, SILDeclRef Constant)
+      : SM(SM), Constant(Constant) {}
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
     // We want to walk lazy initializers present in the synthesized getter for
@@ -969,9 +988,6 @@ public:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (isUnmapped(D))
-      return Action::VisitChildrenIf(shouldWalkUnmappedDecl(D));
-
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
         assignCounter(AFD->getBody());
@@ -979,8 +995,9 @@ public:
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       assignCounter(TLCD->getBody());
       ImplicitTopLevelBody = TLCD->getBody();
+      return Action::Continue();
     }
-    return Action::Continue();
+    return Action::VisitChildrenIf(shouldWalkIntoUnhandledDecl(D));
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
@@ -1176,8 +1193,8 @@ public:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto SkipAction = shouldSkipExpr(E, Parent))
-      return *SkipAction;
+    if (shouldSkipExpr(E))
+      return shouldWalkIntoExpr(E, Parent, Constant);
 
     // If we're in an 'incomplete' region, update it to include this node. This
     // ensures we only create the region if needed.
@@ -1205,11 +1222,19 @@ public:
       assignCounter(IE->getElseExpr(),
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));
     }
-    return Action::Continue(E);
+    auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
+    if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
+      // We need to manually pop the region here as the ASTWalker won't call
+      // the post-visitation.
+      // FIXME: The ASTWalker should do a post-visit.
+      if (hasCounter(E))
+        popRegions(E);
+    }
+    return WalkResult;
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-    if (shouldSkipExpr(E, Parent))
+    if (shouldSkipExpr(E))
       return Action::Continue(E);
 
     if (hasCounter(E))
@@ -1248,7 +1273,7 @@ void SILProfiler::assignRegionCounters() {
 
   CurrentFileName = getCurrentFileName(Root, forDecl);
 
-  MapRegionCounters Mapper(RegionCounterMap);
+  MapRegionCounters Mapper(forDecl, RegionCounterMap);
 
   std::string CurrentFuncName;
   FormalLinkage CurrentFuncLinkage;
@@ -1284,7 +1309,7 @@ void SILProfiler::assignRegionCounters() {
   PGOFuncHash = 0x0;
 
   if (EmitCoverageMapping) {
-    CoverageMapping Coverage(SM);
+    CoverageMapping Coverage(SM, forDecl);
     Root.walk(Coverage);
     CovMap =
         Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
@@ -1301,7 +1326,7 @@ void SILProfiler::assignRegionCounters() {
       llvm::dbgs() << PGOFuncName << "\n";
       return;
     }
-    PGOMapping pgoMapper(RegionCounterMap, LoadedCounts.get(),
+    PGOMapping pgoMapper(forDecl, RegionCounterMap, LoadedCounts.get(),
                          RegionLoadedCounterMap, RegionCondToParentMap);
     Root.walk(pgoMapper);
   }
