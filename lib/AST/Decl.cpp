@@ -1471,23 +1471,32 @@ bool ExtensionDecl::isObjCImplementation() const {
 
 const clang::ObjCContainerDecl *
 ExtensionDecl::getInterfaceForObjCImplementation() const {
-  assert(isObjCImplementation());
-
-  auto attr = getAttrs().getAttribute<ObjCImplementationAttr>();
-  if (attr->isCategoryNameInvalid())
+  auto categoryName = getCategoryNameForObjCImplementation();
+  if (!categoryName)
     return nullptr;
 
   auto CD = dyn_cast_or_null<ClassDecl>(getExtendedNominal());
   if (!CD)
     return nullptr;
 
-  auto importedDecl = CD->getImportedObjCCategory(attr->CategoryName);
+  auto importedDecl = CD->getImportedObjCCategory(*categoryName);
   if (!importedDecl)
     return nullptr;
 
   assert(importedDecl->hasClangNode() &&
          "@interface imported as clang-node-less decl?");
   return cast<clang::ObjCContainerDecl>(importedDecl->getClangDecl());
+}
+
+Optional<Identifier>
+ExtensionDecl::getCategoryNameForObjCImplementation() const {
+  assert(isObjCImplementation());
+
+  auto attr = getAttrs().getAttribute<ObjCImplementationAttr>();
+  if (attr->isCategoryNameInvalid())
+    return None;
+
+  return attr->CategoryName;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,

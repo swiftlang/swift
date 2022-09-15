@@ -1501,6 +1501,11 @@ public:
   /// behaviors for its members.
   bool isObjCImplementation() const;
 
+  /// Returns the name of the category specified by the \c \@_objcImplementation
+  /// attribute, or \c None if the name is invalid. Do not call unless
+  /// \c isObjCImplementation() returns \c true.
+  Optional<Identifier> getCategoryNameForObjCImplementation() const;
+
   /// Returns the \c clang::ObjCCategoryDecl or \c clang::ObjCInterfaceDecl
   /// implemented by this extension.
   ///

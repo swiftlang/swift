@@ -5032,6 +5032,31 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   return result;
 }
 
+IterableDeclContext *IterableDeclContext::getImplementationContext() {
+  // Only ClangNodes have @_objcImplementation extensions.
+  if (!getDecl()->hasClangNode())
+    return this;
+
+  ClassDecl *classDecl = getAsGenericContext()->getSelfClassDecl();
+  if (!classDecl)
+    return this;
+
+  // Figure out the category name of the extension that will match this decl.
+  Identifier categoryName{};
+  if (getIterableContextKind() == IterableDeclContextKind::ExtensionDecl) {
+    auto category = cast<clang::ObjCCategoryDecl>(getDecl()->getClangDecl());
+    categoryName = getASTContext().getIdentifier(category->getName());
+  }
+
+  for (ExtensionDecl *ext : classDecl->getExtensions()) {
+    if (ext->isObjCImplementation()
+        && ext->getCategoryNameForObjCImplementation() == categoryName)
+      return ext;
+  }
+
+  return this;
+}
+
 Decl *ClangCategoryLookupRequest::
 evaluate(Evaluator &evaluator, ClangCategoryLookupDescriptor desc) const {
   const ClassDecl *CD = desc.classDecl;

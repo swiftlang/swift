@@ -824,6 +824,11 @@ public:
   /// abstractions on top of member loading, such as a name lookup table.
   DeclRange getCurrentMembersWithoutLoading() const;
 
+  /// Return the context that contains the actual implemented members. This
+  /// is \em usually just \c this, but if \c this is an imported class or
+  /// category, it may be a Swift extension instead.
+  IterableDeclContext *getImplementationContext();
+
   /// Add a member to this context.
   ///
   /// If the hint decl is specified, the new decl is inserted immediately

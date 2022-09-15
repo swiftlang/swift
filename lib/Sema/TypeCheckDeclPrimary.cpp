@@ -1217,10 +1217,24 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
 /// extension, it is either `final` or `@objc` (which may have been inferred by
 /// checking whether it shadows an imported declaration).
 static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
-  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  if (!ED || !ED->isObjCImplementation()) return;
+  // We check the properties instead of their accessors.
+  if (isa<AccessorDecl>(VD))
+    return;
 
-  if (VD->isSemanticallyFinal() || VD->isObjC()) return;
+  // Are we in an @_objcImplementation extension?
+  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ED || !ED->isObjCImplementation())
+    return;
+
+  assert(ED->getSelfClassDecl() &&
+         !ED->getSelfClassDecl()->hasKnownSwiftImplementation() &&
+         "@_objcImplementation on non-class or Swift class?");
+
+  if (VD->isSemanticallyFinal() || VD->isObjC()) {
+    assert(!VD->isObjC() || VD->isDynamic() &&
+           "@objc decls in @_objcImplementations should be dynamic!");
+    return;
+  }
 
   auto &diags = VD->getASTContext().Diags;
   diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
