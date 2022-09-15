@@ -1,5 +1,7 @@
 // RUN: not %target-swift-frontend %s -typecheck
 
+// https://github.com/apple/swift/issues/44121
+
 public struct CollectionWrapper<C:RangeReplaceableCollection where C.Index:Comparable> {
 
 	public private(set) var collection : C

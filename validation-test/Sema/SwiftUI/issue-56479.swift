@@ -3,6 +3,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
+// https://github.com/apple/swift/issues/56479
+
 import SwiftUI
 import Foundation
 

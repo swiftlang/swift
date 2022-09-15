@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/sr9644-helper.swift -import-objc-header %S/Inputs/sr9644.h -verify
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/issue-52088-helper.swift -import-objc-header %S/Inputs/issue-52088.h -verify
 
 // REQUIRES: objc_interop
 // expected-no-warning
+
+// https://github.com/apple/swift/issues/52088
 
 protocol HasAssoc {
   associatedtype Assoc: TestProto

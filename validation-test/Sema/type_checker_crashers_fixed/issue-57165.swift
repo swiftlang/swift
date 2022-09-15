@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/57165
+
 @resultBuilder
 struct MyResultBuilder {
   static func buildBlock(_ elements: Int...) -> Int { fatalError() }

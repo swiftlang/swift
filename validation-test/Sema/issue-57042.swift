@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/57042
+
 enum Foo { case foo }
 enum Bar { case bar }
 

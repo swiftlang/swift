@@ -3,6 +3,8 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
+// https://github.com/apple/swift/issues/56591
+
 import SwiftUI
 
 struct Experiment: View {

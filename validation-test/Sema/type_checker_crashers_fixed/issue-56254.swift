@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/56254
+
 protocol OptionalType {
   associatedtype Wrapped
   var wrapped: Wrapped? { get }

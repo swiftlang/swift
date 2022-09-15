@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -typecheck
 
+// https://github.com/apple/swift/issues/45240
+
 //
 //  main.swift
 //  TypeBasics

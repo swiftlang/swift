@@ -2,6 +2,8 @@
 
 // REQUIRES: OS=macosx
 
+// https://github.com/apple/swift/issues/57240
+
 enum Category {
 case first
 }

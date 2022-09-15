@@ -1,4 +1,7 @@
 // RUN: not %target-swift-frontend %s -typecheck
+
+// https://github.com/apple/swift/issues/44511
+
 struct A {
     var a: Int32 { return 0 }
 }
