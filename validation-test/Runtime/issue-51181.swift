@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// https://github.com/apple/swift/issues/51181
+
 private protocol AnyChangeTracker {
     var myVariable: Any? { get }
     var isModified: Bool { get }
