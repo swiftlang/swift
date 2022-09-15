@@ -177,7 +177,7 @@ import _Concurrency
 /// Instead, we present their signatures that a conforming type has to implement here:
 ///
 /// > Note: Although the `remoteCall` methods are not expressed as protocol requirements in source,
-/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+/// > the compiler will provide the same errors as-if it was declared explicitly in this protocol.
 ///
 /// ```swift
 ///  /// Invoked by the Swift runtime when making a remote call.
@@ -705,11 +705,11 @@ func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 /// ### Protocol requirements
 /// Similar to the ``DistributedActorSystem`` and its `remoteCall` and `remoteCallVoid` protocol requirements,
 /// the `DistributedTargetInvocationEncoder` contains a few methods which are not possible to express in source due to
-/// advanced use generics combined with associated types. Specifically, the `recordArgument` and `recordReturnType`
+/// advanced use of generics combined with associated types. Specifically, the `recordArgument` and `recordReturnType`
 /// methods are not expressed in source as protocol requirements, but will be treated by the compiler as-if they were.
 ///
 /// > Note: Although the `recordArgument` method is not expressed as protocol requirement in source,
-/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+/// > the compiler will provide the same errors as-if it was declared explicitly in this protocol.
 ///
 /// In addition to the compiler offering compile errors if those witnesses are missing in an adopting type,
 /// we present their signatures here for reference:
@@ -824,11 +824,11 @@ public struct RemoteCallArgument<Value> {
 /// ### Protocol requirements
 /// Similar to the ``DistributedTargetInvocationEncoder`` and its `recordArgument` and `recordReturnType` protocol requirements,
 /// the `DistributedTargetInvocationDecoder` contains a method which is not possible to express in source due to
-/// advanced use generics combined with associated types. Specifically, the `decodeNextArgument`
+/// advanced use of generics combined with associated types. Specifically, the `decodeNextArgument`
 /// method is not expressed in source as protocol requirement, but will be treated by the compiler as-if it was.
 ///
 /// > Note: Although the `decodeNextArgument` method is not expressed as protocol requirement in source,
-/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+/// > the compiler will provide the same errors as-if it was declared explicitly in this protocol.
 ///
 /// In addition to the compiler offering compile errors if this witness is missing in an adopting type,
 /// we present its signature here for reference:
@@ -902,11 +902,11 @@ public protocol DistributedTargetInvocationDecoder {
 /// ### Protocol requirements
 /// Similar to the ``DistributedActorSystem`` and its `remoteCall` and `remoteCallVoid` protocol requirements,
 /// the `DistributedTargetInvocationResultHandler` contains a method which is not possible to express in source due to
-/// advanced use generics combined with associated types. Specifically, the `onReturn` method is not expressed in
+/// advanced use of generics combined with associated types. Specifically, the `onReturn` method is not expressed in
 /// source as protocol requirement, but will be treated by the compiler as-if they were.
 ///
 /// > Note: Although the `onReturn` method is not expressed as protocol requirement in source,
-/// > the compiler will provide the same errors as-if they were declared explicitly in this protocol.
+/// > the compiler will provide the same errors as-if it was declared explicitly in this protocol.
 ///
 /// In addition to the compiler offering compile errors if this witnesses is missing in an adopting type,
 /// we present its signature here for reference:
@@ -914,7 +914,7 @@ public protocol DistributedTargetInvocationDecoder {
 /// ```swift
 /// /// Ad-hoc protocol requirement
 /// ///
-/// /// Invoked when the distributed target execution returned successfully.
+/// /// Invoked when the distributed target execution returns successfully.
 /// /// The `value` is the return value of the executed distributed invocation target.
 /// func onReturn<Success: SerializationRequirement>(value: Success) async throws
 /// ```
@@ -925,7 +925,7 @@ public protocol DistributedTargetInvocationResultHandler {
 
 //  /// Ad-hoc protocol requirement
 //  ///
-//  /// Invoked when the distributed target execution returned successfully.
+//  /// Invoked when the distributed target execution returns successfully.
 //  /// The `value` is the return value of the executed distributed invocation target.
 //  func onReturn<Success: SerializationRequirement>(value: Success) async throws
 
