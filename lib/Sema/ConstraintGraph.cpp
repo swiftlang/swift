@@ -1651,7 +1651,7 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
     for (const auto &constraint : addedConstraints) {
       out.indent(indent + 4);
       out << "> ";
-      constraint->print(out, &CS.getASTContext().SourceMgr);
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
       out << '\n';
     }
     out.indent(indent + 2);
@@ -1665,7 +1665,7 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
     for (const auto &constraint : removedConstraints) {
       out.indent(indent + 4);
       out << "> ";
-      constraint->print(out, &CS.getASTContext().SourceMgr);
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
       out << '\n';
     }
     out.indent(indent + 2);

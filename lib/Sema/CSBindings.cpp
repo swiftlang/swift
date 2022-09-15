@@ -1656,8 +1656,6 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
 
-  out.indent(indent);
-  out << "(";
   if (auto typeVar = getTypeVariable()) {
     typeVar->print(out, PO);
     out << " ";
@@ -1814,7 +1812,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     }
     out << "]";
   }
-  out << ")";
+  
 }
 
 // Given a possibly-Optional type, return the direct superclass of the
