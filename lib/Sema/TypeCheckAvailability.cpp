@@ -4276,7 +4276,8 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
 void swift::checkExplicitAvailability(Decl *decl) {
   // Skip if the command line option was not set and
   // accessors as we check the pattern binding decl instead.
-  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability ||
+  auto DiagLevel = decl->getASTContext().LangOpts.RequireExplicitAvailability;
+  if (!DiagLevel ||
       isa<AccessorDecl>(decl))
     return;
 
@@ -4320,6 +4321,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
   if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
+    diag.limitBehavior(*DiagLevel);
 
     auto suggestPlatform =
       decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
