@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
-// REQUIRES: executable_test
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
+// RUN: %target-run %t/a.out | %FileCheck `cat %t/prefix-option` %s
 
 class MyLabel {
   var text = "label"
@@ -56,6 +59,7 @@ extension Container where V: Controller {
 }
 
 // CHECK: label
+// CHECK-58: label
 print(Container(Controller()).test())
 
 public class GenericController<U> {
@@ -73,20 +77,28 @@ public func generic_class_constrained_keypath<U, V>(_ c: V) where V : GenericCon
   print(c[keyPath: kp].text)
 }
 
-// CHECK: GenericController<Int>.label
+if #available(SwiftStdlib 5.8, *) {
+  print("-check-prefix=CHECK-58")
+} else {
+  print("-check-prefix=CHECK")
+}
+
+// CHECK: Swift.KeyPath<main.GenericController<Swift.Int>, main.MyLabel>
 // CHECK: label
+// CHECK-58: GenericController<Int>.label
+// CHECK-58: label
 generic_class_constrained_keypath(GenericController(5))
 
-// CHECK: {{\\Controller\.secondLabel!\.text|\\Controller\.<computed 0x.* \(Optional<MyLabel>\)>!\.<computed 0x.* \(String\)>}}
+// CHECK-58: {{\\Controller\.secondLabel!\.text|\\Controller\.<computed 0x.* \(Optional<MyLabel>\)>!\.<computed 0x.* \(String\)>}}
 print(\Controller.secondLabel!.text)
 
-// CHECK: {{\\Controller\.subscript\(_: String\)|\\Controller\.<computed 0x.* \(String\)>}}
+// CHECK-58: {{\\Controller\.subscript\(_: String\)|\\Controller\.<computed 0x.* \(String\)>}}
 print(\Controller["abc"])
-// CHECK: \S.a
+// CHECK-58: \S.a
 print(\S.a)
-// CHECK: {{\\Controller\.subscript\(int: Int, str: String, _: Int\)|\\Controller\.<computed 0x.* \(Int\)>}}
+// CHECK-58: {{\\Controller\.subscript\(int: Int, str: String, _: Int\)|\\Controller\.<computed 0x.* \(Int\)>}}
 print(\Controller[int: 0, str: "", 0])
-// CHECK: {{\\Controller\.thirdLabel|\\Controller\.<computed 0x.* \(Optional<MyLabel>\)>}}
+// CHECK-58: {{\\Controller\.thirdLabel|\\Controller\.<computed 0x.* \(Optional<MyLabel>\)>}}
 print(\Controller.thirdLabel)
-// CHECK: {{\\Controller\.subscript\(\)|\\Controller\.<computed 0x.* \(Int\)>}}
+// CHECK-58: {{\\Controller\.subscript\(\)|\\Controller\.<computed 0x.* \(Int\)>}}
 print(\Controller.[])
