@@ -263,10 +263,26 @@ bool PrunedLiveness::areUsesOutsideBoundaryOfDef(
 // uses with no holes in the liverange. The lifetime-ending uses are also
 // recorded--destroy_value or end_borrow. However destroy_values may not
 // jointly-post dominate if dead-end blocks are present.
+//
+// Note: Uses with OperandOwnership::NonUse cannot be considered normal uses for
+// liveness. Otherwise, liveness would need to separately track non-uses
+// everywhere. Non-uses cannot be treated like normal non-lifetime-ending uses
+// because they can occur on both applies, which need to extend liveness to the
+// return point, and on forwarding instructions, like init_existential_ref,
+// which need to consume their use even when type-dependent operands exist.
 void PrunedLiveness::computeSSALiveness(SILValue def) {
   initializeDefBlock(def->getParentBlock());
   for (Operand *use : def->getUses()) {
-    updateForUse(use->getUser(), use->isLifetimeEnding());
+    switch (use->getOperandOwnership()) {
+    default:
+      updateForUse(use->getUser(), use->isLifetimeEnding());
+      break;
+    case OperandOwnership::NonUse:
+      break;
+    case OperandOwnership::Borrow:
+      updateForBorrowingOperand(use);
+      break;
+    }
   }
 }
 
