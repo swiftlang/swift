@@ -50,6 +50,8 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
   let someValue3: String = ""
   let someValue4: String = ""
 
+  public var throwRemoteCallVoid: Bool = true
+
   public init() {
     print("Initialized new FakeActorSystem")
   }
@@ -101,6 +103,10 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
     where Act: DistributedActor,
           Act.ID == ActorID,
           Err: Error {
+    guard self.throwRemoteCallVoid else {
+      return
+    }
+
     throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
