@@ -99,7 +99,9 @@ void *SwiftStringLiteralExpr_create(void *ctx, const char *_Nullable string,
 void *SwiftIntegerLiteralExpr_create(void *ctx, const char *_Nullable string,
                                     long len, void *TokenLoc);
 
-void *SwiftVarDecl_create(void *ctx, const char *_Nullable name,
+void *SwiftBooleanLiteralExpr_create(void *ctx, _Bool value, void *TokenLoc);
+
+    void *SwiftVarDecl_create(void *ctx, const char *_Nullable name,
                           void *loc, _Bool isStatic, _Bool isLet, void *dc);
 
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, void *_Nullable elseLoc,

@@ -21,4 +21,10 @@ extension ASTGenVisitor {
       return SwiftIntegerLiteralExpr_create(ctx, id, buf.count, loc)
     }
   }
+
+  public func visit(_ node: BooleanLiteralExprSyntax) -> UnsafeMutableRawPointer {
+    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+    let value = node.booleanLiteral == .trueKeyword()
+    return SwiftBooleanLiteralExpr_create(ctx, value, loc)
+  }
 }
