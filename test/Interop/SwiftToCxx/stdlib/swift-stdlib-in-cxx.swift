@@ -2,7 +2,9 @@
 // RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
 // RUN: %FileCheck %s < %t/Swift.h
 
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/Swift.h -Wno-unused-private-field -Wno-unused-function)
+// RUN: %check-generic-interop-cxx-header-in-clang(%t/Swift.h -Wno-unused-private-field -Wno-unused-function -Wno-shadow)
+
+// FIXME: remove need for -Wno-shadow
 
 // CHECK: namespace Swift {
 
@@ -23,6 +25,26 @@
 // CHECK: inline T_0_0 operator [](swift::Int index) const;
 // CHECK: inline swift::Int getCount() const;
 // CHECK: inline swift::Int getCapacity() const;
+
+// CHECK: template<class T_0_0>
+// CHECK: template<class T_0_0>
+
+// CHECK: template<class T_0_0>
+// CHECK: template<class T_0_0>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: class Optional final {
+// CHECK-NEXT: public:
+// CHECK-NEXT: inline ~Optional() {
+// CHECK: }
+// CHECK-NEXT: inline Optional(const Optional &other) {
+// CHECK: }
+// CHECK:   enum class cases {
+// CHECK-NEXT: some,
+// CHECK-NEXT: none
+// CHECK-NEXT: };
+// CHECK: inline bool isSome() const;
+// CHECK: inline bool isNone() const;
+// CHECK: inline T_0_0 getUnsafelyUnwrapped() const;
 
 // CHECK: class String final {
 // CHECK-NEXT: public:

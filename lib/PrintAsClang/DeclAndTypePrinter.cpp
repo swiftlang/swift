@@ -2571,6 +2571,8 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
       return true;
     if (VD == VD->getASTContext().getArrayDecl())
       return true;
+    if (VD == VD->getASTContext().getOptionalDecl() && !isExtension)
+      return true;
     return false;
   }
   if (VD->getAttrs().hasAttribute<ExposeAttr>())
