@@ -382,10 +382,10 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 Optional<llvm::VersionTuple>
-Decl::getBackDeployBeforeOSVersion(PlatformKind Kind) const {
+Decl::getBackDeployBeforeOSVersion(ASTContext &Ctx) const {
   for (auto *attr : getAttrs()) {
     if (auto *backDeployAttr = dyn_cast<BackDeployAttr>(attr)) {
-      if (backDeployAttr->Platform == Kind && backDeployAttr->Version) {
+      if (backDeployAttr->isActivePlatform(Ctx) && backDeployAttr->Version) {
         return backDeployAttr->Version;
       }
     }
@@ -393,7 +393,8 @@ Decl::getBackDeployBeforeOSVersion(PlatformKind Kind) const {
 
   // Accessors may inherit `@_backDeploy`.
   if (getKind() == DeclKind::Accessor) {
-    return cast<AccessorDecl>(this)->getStorage()->getBackDeployBeforeOSVersion(Kind);
+    return cast<AccessorDecl>(this)->getStorage()->getBackDeployBeforeOSVersion(
+        Ctx);
   }
 
   return None;
@@ -937,14 +938,20 @@ bool Decl::isStdlibDecl() const {
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
+  ASTContext &ctx = getASTContext();
+
+  // When computing availability for linkage, use the "before" version from
+  // the @_backDeploy attribute, if present.
+  if (auto backDeployVersion = getBackDeployBeforeOSVersion(ctx))
+    return AvailabilityContext{VersionRange::allGTE(*backDeployVersion)};
+
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
   if (containingContext.hasValue()) {
-    // If this entity comes from the concurrency module, adjust it's
+    // If this entity comes from the concurrency module, adjust its
     // availability for linkage purposes up to Swift 5.5, so that we use
     // weak references any time we reference those symbols when back-deploying
     // concurrency.
-    ASTContext &ctx = getASTContext();
     if (getModuleContext()->getName() == ctx.Id_Concurrency) {
       containingContext->intersectWith(ctx.getConcurrencyAvailability());
     }

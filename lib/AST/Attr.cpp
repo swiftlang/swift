@@ -1695,6 +1695,10 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
+bool BackDeployAttr::isActivePlatform(const ASTContext &ctx) const {
+  return isPlatformActive(Platform, ctx.LangOpts);
+}
+
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
   return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
                                implicit ? SourceRange() : getRange(),
