@@ -1194,7 +1194,7 @@ else()
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
-    add_subdirectory(stdlib/public/SwiftShims)
+    add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
 endif()
 
