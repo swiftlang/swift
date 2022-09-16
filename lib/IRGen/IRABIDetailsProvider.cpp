@@ -302,7 +302,8 @@ void LoweredFunctionSignature::visitParameterList(
   for (auto param : *FD->getParameters()) {
     // FIXME: tuples map to more than one sil param (but they're not yet
     // representable by the consumer).
-    silParamMapping.push_back(param);
+    if (!param->getInterfaceType()->isVoid())
+      silParamMapping.push_back(param);
   }
   size_t currentSilParam = 0;
   for (const auto &abiParam : abiDetails.parameters) {
