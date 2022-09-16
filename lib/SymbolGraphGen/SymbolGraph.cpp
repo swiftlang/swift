@@ -29,26 +29,21 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
-SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker,
-                         ModuleDecl &M,
+SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
                          Optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
                          Optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
-: Walker(Walker),
-  M(M),
-  ExtendedModule(ExtendedModule),
-  Ctx(Ctx),
-  ModuleVersion(ModuleVersion),
-  IsForSingleNode(IsForSingleNode) {
-    if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
-      DeclaringModule = DM;
-      SmallVector<Identifier, 1> Bystanders;
-      if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
-        BystanderModules = Bystanders;
-      }
+    : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
+      ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {
+  if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
+    DeclaringModule = DM;
+    SmallVector<Identifier, 1> Bystanders;
+    if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
+      BystanderModules = Bystanders;
     }
   }
+}
 
 // MARK: - Utilities
 
@@ -224,7 +219,7 @@ void SymbolGraph::recordEdge(Symbol Source,
 }
 
 void SymbolGraph::recordMemberRelationship(Symbol S) {
-  const auto *DC = S.getSymbolDecl()->getDeclContext();
+  const auto *DC = S.getLocalSymbolDecl()->getDeclContext();
   switch (DC->getContextKind()) {
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
@@ -242,12 +237,25 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
       if (isRequirementOrDefaultImplementation(S.getSymbolDecl())) {
         return;
       }
+
       if (DC->getSelfNominalTypeDecl() == nullptr) {
         // If we couldn't look up the type the member is declared on (e.g.
         // because the member is declared in an extension whose extended type
         // doesn't exist), don't record a memberOf relationship.
         return;
       }
+
+      // If this is an extension to an external type, we use the extension
+      // symbol itself as the target.
+      if (auto const *Extension =
+              dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
+
+        if (this->Walker.shouldBeRecordedAsExtension(Extension)) {
+          return recordEdge(S, Symbol(this, Extension, nullptr),
+                            RelationshipKind::MemberOf());
+        }
+      }
+
       return recordEdge(S,
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
@@ -289,11 +297,11 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   if (!Walker.Options.EmitSynthesizedMembers) {
     return;
   }
-  const auto VD = S.getSymbolDecl();
+  const auto D = S.getLocalSymbolDecl();
   const NominalTypeDecl *OwningNominal = nullptr;
-  if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(VD)) {
+  if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(D)) {
     OwningNominal = ThisNominal;
-  } else if (const auto *Extension = dyn_cast<ExtensionDecl>(VD)) {
+  } else if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       if (!ExtendedNominal->getModuleContext()->getNameStr()
           .equals(M.getNameStr())) {
@@ -328,6 +336,12 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
           continue;
       }
 
+      // If D is not the OwningNominal, it is an ExtensionDecl. In that case
+      // we only want to get members that were enabled by this exact extension.
+      if (D != OwningNominal && Info.EnablingExt != D) {
+        continue;
+      }
+  
       for (const auto ExtensionMember : Info.Ext->getMembers()) {
         if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
           if (SynthMember->isObjC()) {
@@ -352,11 +366,10 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
           auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
 
           Symbol Source(this, SynthMember, OwningNominal);
-          Symbol Target(this, OwningNominal, nullptr);
 
           ExtendedSG->Nodes.insert(Source);
 
-          ExtendedSG->recordEdge(Source, Target, RelationshipKind::MemberOf());
+          ExtendedSG->recordEdge(Source, S, RelationshipKind::MemberOf());
          }
       }
     }
@@ -447,27 +460,24 @@ void SymbolGraph::recordOptionalRequirementRelationships(Symbol S) {
   }
 }
 
-void
-SymbolGraph::recordConformanceRelationships(Symbol S) {
-  const auto VD = S.getSymbolDecl();
-  if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
+void SymbolGraph::recordConformanceRelationships(Symbol S) {
+  const auto D = S.getLocalSymbolDecl();
+  if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
       PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
         if (inherited != PD) {
-          recordEdge(Symbol(this, VD, nullptr),
-            Symbol(this, inherited, nullptr),
-            RelationshipKind::ConformsTo(),
-            nullptr);
+          recordEdge(S, Symbol(this, inherited, nullptr),
+                     RelationshipKind::ConformsTo(), nullptr);
         }
 
         return TypeWalker::Action::Continue;
       });
     } else {
       for (const auto *Conformance : NTD->getAllConformances()) {
-        recordEdge(Symbol(this, VD, nullptr),
-          Symbol(this, Conformance->getProtocol(), nullptr),
-          RelationshipKind::ConformsTo(),
-          dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+        recordEdge(
+            S, Symbol(this, Conformance->getProtocol(), nullptr),
+            RelationshipKind::ConformsTo(),
+            dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
       }
     }
   }
@@ -546,7 +556,7 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key,
     Options.setBaseType(S.getBaseType());
     Options.PrintAsMember = true;
   }
-  S.getSymbolDecl()->print(Printer, Options);
+  S.getLocalSymbolDecl()->print(Printer, Options);
 }
 
 void
@@ -565,7 +575,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(this, OS, Key);
 
-  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
+  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getLocalSymbolDecl())) {
     Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
   } else {
     auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
@@ -573,7 +583,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
       Options.setBaseType(S.getBaseType());
       Options.PrintAsMember = true;
     }
-    S.getSymbolDecl()->print(Printer, Options);
+    S.getLocalSymbolDecl()->print(Printer, Options);
   }
 }
 
@@ -637,7 +647,9 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
   if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *Nominal = Extension->getExtendedNominal()) {
-      return isImplicitlyPrivate(Nominal, IgnoreContext);
+      return isImplicitlyPrivate(Nominal, IgnoreContext) ||
+             Symbol::getEffectiveAccessLevel(Extension) <
+                 Walker.Options.MinimumAccessLevel;
     }
   }
 

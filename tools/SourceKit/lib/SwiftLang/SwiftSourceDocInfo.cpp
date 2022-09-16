@@ -1004,7 +1004,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         /*PrintMessages=*/false,
         /*SkipInheritedDocs=*/false,
         /*IncludeSPISymbols=*/true,
-        /*IncludeClangDocs=*/true
+        /*IncludeClangDocs=*/true,
+        /*EmitExtensionBlockSymbols=*/false,
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
