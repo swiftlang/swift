@@ -1141,9 +1141,17 @@ public:
         !isa<ProtocolDecl>(cd->getDeclContext()))
       SGM.emitObjCConstructorThunk(cd);
   }
+
   void visitDestructorDecl(DestructorDecl *dd) {
-    assert(isa<ClassDecl>(theType) && "destructor in a non-class type");
-    SGM.emitDestructor(cast<ClassDecl>(theType), dd);
+    if (auto *cd = dyn_cast<ClassDecl>(theType))
+      return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
+    if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
+      if (nom->isMoveOnly()) {
+        return SGM.emitMoveOnlyDestructor(nom, dd);
+      }
+    }
+    assert(isa<ClassDecl>(theType) &&
+           "destructor in a non-class, non-moveonly type");
   }
 
   void visitEnumCaseDecl(EnumCaseDecl *ecd) {}
