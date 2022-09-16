@@ -101,13 +101,14 @@ void *SwiftIntegerLiteralExpr_create(void *ctx, const char *_Nullable string,
 
 void *SwiftBooleanLiteralExpr_create(void *ctx, _Bool value, void *TokenLoc);
 
-    void *SwiftVarDecl_create(void *ctx, const char *_Nullable name,
+void *SwiftVarDecl_create(void *ctx, const char *_Nullable name,
                           void *loc, _Bool isStatic, _Bool isLet, void *dc);
 
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, void *_Nullable elseLoc,
                     void *_Nullable elseStmt);
 
-void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
+void *BraceStmt_createExpr(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
+void *BraceStmt_createStmt(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
 
 void *BridgedSourceLoc_advanced(void *loc, long len);
 

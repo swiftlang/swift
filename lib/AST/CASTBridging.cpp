@@ -145,10 +145,23 @@ void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, vo
                               (Stmt *)elseStmt, None, Context);
 }
 
-void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc) {
-  return BraceStmt::create(*static_cast<ASTContext *>(ctx), *(SourceLoc *)&lbloc,
-                               getArrayRef<ASTNode>(elements),
-                              *(SourceLoc *)&rbloc);
+void *BraceStmt_createExpr(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return BraceStmt::create(Context, *(SourceLoc *)&lbloc,
+                           getArrayRef<ASTNode>(elements),
+                           *(SourceLoc *)&rbloc);
+}
+
+void *BraceStmt_createStmt(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc) {
+  llvm::SmallVector<ASTNode, 6> nodes;
+  for (auto stmt : getArrayRef<Stmt *>(elements)) {
+    nodes.push_back(stmt);
+  }
+
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return BraceStmt::create(Context, *(SourceLoc *)&lbloc,
+                           Context.AllocateCopy(nodes),
+                           *(SourceLoc *)&rbloc);
 }
 
 void *ParamDecl_create(void *ctx, void *loc,

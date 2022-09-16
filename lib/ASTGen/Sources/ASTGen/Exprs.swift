@@ -9,7 +9,7 @@ extension ASTGenVisitor {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
 
     let body = statements.withBridgedArrayRef { ref in
-      BraceStmt_create(ctx, loc, ref, loc)
+        BraceStmt_createExpr(ctx, loc, ref, loc)
     }
     
     return ClosureExpr_create(ctx, body, declContext)
