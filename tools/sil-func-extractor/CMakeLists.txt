@@ -4,6 +4,8 @@ add_swift_host_tool(sil-func-extractor
 )
 target_link_libraries(sil-func-extractor
                       PRIVATE
+                        ASTGen
+                        swiftCore
                         swiftClangImporter
                         swiftDemangling
                         swiftFrontend

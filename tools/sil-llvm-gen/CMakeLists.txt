@@ -4,6 +4,8 @@ add_swift_host_tool(sil-llvm-gen
 )
 target_link_libraries(sil-llvm-gen
                       PRIVATE
+                        ASTGen
+                        swiftCore
                         swiftFrontend
                         swiftIRGen
                         swiftSILGen
