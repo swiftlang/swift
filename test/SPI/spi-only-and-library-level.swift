@@ -25,7 +25,6 @@ public struct LibStruct {}
 @_spiOnly import Lib
 
 public func publicClient() -> LibStruct { fatalError() } // expected-error {{cannot use struct 'LibStruct' here; 'Lib' was imported for SPI only}}
-// expected-warning @-1 {{public declarations should have an availability attribute with an introduction version}}
 @_spi(X) public func spiClient() -> LibStruct { fatalError() }
 
 //--- SPILib.swift
