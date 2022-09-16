@@ -2855,12 +2855,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (ext->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   const auto resolution = TypeResolution::forStructural(
-      ext->getDeclContext(), options,
-      [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      },
+      ext->getDeclContext(), options, nullptr,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
       PlaceholderType::get);

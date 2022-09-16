@@ -924,7 +924,8 @@ enum class UnsupportedMemberTypeAccessKind : uint8_t {
 /// member of the given base type.
 UnsupportedMemberTypeAccessKind
 isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
-                              bool hasUnboundOpener);
+                              bool hasUnboundOpener,
+                              bool isExtensionBinding = false);
 
 /// @}
 
