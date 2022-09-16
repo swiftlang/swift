@@ -427,6 +427,9 @@ public:
   // Emit info that describes the entry point to the module, if it has one.
   void emitEntryPointInfo();
 
+  /// Emit coverage mapping info.
+  void emitCoverageMapping();
+
   /// Checks if metadata for this type can be emitted lazily. This is true for
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
