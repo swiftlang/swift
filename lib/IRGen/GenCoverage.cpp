@@ -43,22 +43,40 @@ static std::string getInstrProfSection(IRGenModule &IGM,
 }
 
 void IRGenModule::emitCoverageMapping() {
+  SmallVector<llvm::Constant *, 4> UnusedFuncNames;
   std::vector<const SILCoverageMap *> Mappings;
   for (const auto &M : getSILModule().getCoverageMaps()) {
+    auto FuncName = M.second->getPGOFuncName();
+    auto VarLinkage = llvm::GlobalValue::LinkOnceAnyLinkage;
+    auto FuncNameVarName = llvm::getPGOFuncNameVarName(FuncName, VarLinkage);
+
     // Check whether this coverage mapping can reference its name data within
-    // the profile symbol table. If the name global is gone, this function has
-    // been optimized out.
-    StringRef PGOFuncName = M.second->getPGOFuncName();
-    std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
-        PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
-    if (!Module.getNamedGlobal(PGOFuncNameVar))
-      continue;
+    // the profile symbol table. If the name global isn't there, this function
+    // has been optimized out. We need to tell LLVM about it by emitting the
+    // name data separately.
+    if (!Module.getNamedGlobal(FuncNameVarName)) {
+      auto *Var = llvm::createPGOFuncNameVar(Module, VarLinkage, FuncName);
+      UnusedFuncNames.push_back(llvm::ConstantExpr::getBitCast(Var, Int8PtrTy));
+    }
     Mappings.push_back(M.second);
   }
 
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())
     return;
+
+  // Emit the name data for any unused functions.
+  if (!UnusedFuncNames.empty()) {
+    auto NamePtrsTy = llvm::ArrayType::get(Int8PtrTy, UnusedFuncNames.size());
+    auto NamePtrs = llvm::ConstantArray::get(NamePtrsTy, UnusedFuncNames);
+
+    // Note we don't mark this variable as used, as doesn't need to be present
+    // in the object file, it gets picked up by the LLVM instrumentation
+    // lowering pass.
+    new llvm::GlobalVariable(Module, NamePtrsTy, /*IsConstant*/ true,
+                             llvm::GlobalValue::InternalLinkage, NamePtrs,
+                             llvm::getCoverageUnusedNamesVarName());
+  }
 
   std::vector<StringRef> Files;
   for (const auto &M : Mappings)
