@@ -19,6 +19,7 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include <memory>
 #include <vector>
 
@@ -63,6 +64,7 @@ public:
   SILFunction *lookupSILFunction(StringRef Name, Optional<SILLinkage> linkage);
   bool hasSILFunction(StringRef Name, Optional<SILLinkage> linkage = None);
   SILVTable *lookupVTable(const ClassDecl *C);
+  SILMoveOnlyDeinit *lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
   SILDifferentiabilityWitness *

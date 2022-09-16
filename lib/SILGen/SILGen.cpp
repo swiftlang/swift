@@ -1087,7 +1087,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
   case SILDeclRef::Kind::Deallocator: {
     auto *dd = cast<DestructorDecl>(constant.getDecl());
-    auto *nom = dd->getDeclContext();
+    auto *nom = dd->getDeclContext()->getSelfNominalTypeDecl();
 
     if (auto *cd = dyn_cast<ClassDecl>(nom)) {
       if (usesObjCAllocator(cd)) {
@@ -1104,6 +1104,11 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f, dd).emitDeallocatingDestructor(dd);
+
+    // If we have a move only type, create the table for this type.
+    if (nom->isMoveOnly())
+      SILMoveOnlyDeinit::create(f->getModule(), nom, IsNotSerialized, f);
+
     postEmitFunction(constant, f);
     return;
   }

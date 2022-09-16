@@ -18,6 +18,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILLinkage.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallSet.h"
@@ -245,9 +247,6 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(loc);
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(loc);
-
-  if (!maybeReturnValue)
-    return;
 
   // Clean up our members, consuming our +1 self value as we do it.
   emitMoveOnlyMemberDestruction(selfValue,

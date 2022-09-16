@@ -251,6 +251,7 @@ bool Parser::parseTopLevelSIL() {
     CASE_SIL(sil, DeclSIL)
     CASE_SIL(sil_stage, DeclSILStage)
     CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_moveonlydeinit, SILMoveOnlyDeinit)
     CASE_SIL(sil_global, SILGlobal)
     CASE_SIL(sil_witness_table, SILWitnessTable)
     CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
@@ -4593,6 +4594,7 @@ bool Parser::isStartOfSILDecl() {
   case tok::kw_sil_stage:
   case tok::kw_sil_property:
   case tok::kw_sil_vtable:
+  case tok::kw_sil_moveonlydeinit:
   case tok::kw_sil_global:
   case tok::kw_sil_witness_table:
   case tok::kw_sil_default_witness_table:
