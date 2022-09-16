@@ -481,15 +481,25 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
+  // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
+  // (std) if available.
   if (Context.LangOpts.EnableCXXInterop) {
-    if (Context.LangOpts.Target.isOSDarwin())
+    const llvm::Triple &target = Context.LangOpts.Target;
+    if (target.isOSDarwin())
       this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
-    else if (Context.LangOpts.Target.isOSLinux())
+    else if (target.isOSLinux())
       this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
 
     // Do not try to link Cxx with itself.
     if (!getSwiftModule()->getName().is("Cxx"))
       this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
+
+    // Only link with std on platforms where the overlay is available.
+    // Do not try to link std with itself.
+    if ((target.isOSDarwin() || target.isOSLinux()) &&
+        !getSwiftModule()->getName().is("Cxx") &&
+        !getSwiftModule()->getName().is("std"))
+      this->addLinkLibrary(LinkLibrary("swiftstd", LibraryKind::Library));
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that
