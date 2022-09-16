@@ -14,21 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/ParsedSyntaxRecorder.h"
-#include "swift/Parse/ParseSILSupport.h"
-#include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxKind.h"
-#include "swift/Subsystems.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/GenericParamList.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
@@ -36,13 +29,21 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "swift/Parse/Parser.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Strings.h"
+#include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxKind.h"
+#include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Twine.h"
 #include <algorithm>
 
 using namespace swift;
@@ -5111,9 +5112,7 @@ static Parser::ParseDeclOptions getMemberParseDeclOptions(
         Parser::PD_InProtocol);
 
   case DeclKind::Class:
-    return ParseDeclOptions(
-        Parser::PD_HasContainerType | Parser::PD_AllowDestructor |
-        Parser::PD_InClass);
+    return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InClass);
 
   case DeclKind::Struct:
     return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InStruct);
@@ -8748,8 +8747,13 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   DD->getAttrs() = Attributes;
 
-  // Reject 'destructor' functions outside of classes
-  if (!(Flags & PD_AllowDestructor)) {
+  // Reject 'destructor' functions outside of structs, enums, and classes.
+  //
+  // Later in the type checker, we validate that structs/enums only do this if
+  // they are move only.
+  auto *nom = dyn_cast<NominalTypeDecl>(CurDeclContext);
+  if (!nom ||
+      (!isa<StructDecl>(nom) && !isa<EnumDecl>(nom) && !isa<ClassDecl>(nom))) {
     diagnose(DestructorLoc, diag::destructor_decl_outside_class);
 
     // Tell the type checker not to touch this destructor.
