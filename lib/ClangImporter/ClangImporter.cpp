@@ -2006,7 +2006,7 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
   if (path.front().Item == ctx.Id_CxxStdlib) {
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
-    path = adjustedPath.get().getModulePath(ImportKind::Module);
+    path = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
   }
 
   if (!DisableSourceImport)
