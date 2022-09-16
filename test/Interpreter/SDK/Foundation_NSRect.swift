@@ -4,7 +4,9 @@
 // iOS doesn't have NSRect. iOS and OS X CGRect is tested elsewhere.
 // REQUIRES: OS=macosx
 
-import Foundation
+import Coreimage
+
+_ = JSONDecoder()
 
 func printRect(_ r: NSRect) {
   // FIXME: Constraint checker takes too long to typecheck this as an
