@@ -6577,5 +6577,15 @@ ERROR(type_wrapper_ignored_on_static_properties,none,
 ERROR(type_wrapper_ignored_on_lazy_properties,none,
       "%0 must not be used on lazy properties", (DeclAttribute))
 
+//------------------------------------------------------------------------------
+// MARK: #_hasSymbol
+//------------------------------------------------------------------------------
+
+WARNING(has_symbol_decl_must_be_weak,none,
+        "%0 %1 is not a weakly linked declaration",
+        (DescriptiveDeclKind, DeclName))
+ERROR(has_symbol_invalid_expr,none,
+      "#_hasSymbol condition must refer to a declaration", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
