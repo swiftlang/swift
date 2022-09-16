@@ -124,6 +124,11 @@ void *SwiftIntegerLiteralExpr_create(void *ctx, const char *_Nullable string,
                                          *(SourceLoc *)&TokenLoc);
 }
 
+void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) BooleanLiteralExpr(value, *(SourceLoc *)&TokenLoc);
+}
+
 void *SwiftVarDecl_create(void *ctx, const char *_Nullable nameId,
                           void *loc, bool isStatic, bool isLet, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
