@@ -46,7 +46,7 @@ longTaggedTests.test("EqualNonASCIISubsetSmall") {
     return //no tagged pointers
   }
   
-  let native = shortNonTagged.withUTF8 { String(decoding: $0, as: UTF8.self) }
+  var native = shortNonTagged.withUTF8 { String(decoding: $0, as: UTF8.self) }
   native.reserveCapacity(30) //force into non-small form so we can reverse bridge below
   let longTagged = NSSlowTaggedLocalizedString.createTest()!
   shortNonTagged.withCString {
