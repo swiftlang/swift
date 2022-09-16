@@ -518,7 +518,6 @@ static bool hasTypeForCompletion(Solution &solution,
   if (contextAnalyzer.hasCompletionExpr()) {
     return solution.hasType(contextAnalyzer.getCompletionExpr());
   } else {
-    assert(contextAnalyzer.hasCompletionKeyPathComponent());
     return solution.hasType(
         contextAnalyzer.getKeyPathContainingCompletionComponent(),
         contextAnalyzer.getKeyPathCompletionComponentIndex());
@@ -578,8 +577,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
   // If there was no completion expr (e.g. if the code completion location was
   // among tokens that were skipped over during parser error recovery) bail.
-  if (!contextAnalyzer.hasCompletionExpr() &&
-      !contextAnalyzer.hasCompletionKeyPathComponent())
+  if (!contextAnalyzer.hasCompletion())
     return false;
 
   // Interpolation components are type-checked separately.
