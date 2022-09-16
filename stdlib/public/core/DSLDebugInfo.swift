@@ -11,7 +11,7 @@
 
 /// A type that can be called as a function to trigger breakpoints
 /// that are set on the associated result builder component.
-// TODO: ApolloZhu @available(SwiftStdlib 5.8, *)
+@available(SwiftStdlib 5.8, *)
 @frozen
 public struct DSLDebugInfoProvider {
   @usableFromInline
@@ -61,7 +61,7 @@ public struct DSLDebugInfoProvider {
 
 /// A mechanism for DSLs to specify where a stack frame is for,
 /// and the debugging context to show for such stack frame.
-// TODO: ApolloZhu @available(SwiftStdlib 5.8, *)
+@available(SwiftStdlib 5.8, *)
 @frozen
 public struct DSLDebugStackFrame {
   /// The debug info provider specifying the source location.
