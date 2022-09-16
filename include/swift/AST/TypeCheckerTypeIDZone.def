@@ -437,3 +437,6 @@ SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
 SWIFT_REQUEST(TypeChecker, SynthesizeLocalVariableForTypeWrapperStorage,
               VarDecl *(ConstructorDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
+              ConstructorDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)

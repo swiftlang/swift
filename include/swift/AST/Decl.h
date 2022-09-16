@@ -3780,6 +3780,10 @@ public:
   /// by the wrapper.
   NominalTypeDecl *getTypeWrapperStorageDecl() const;
 
+  /// If this declaration is a type wrapper, retrieve
+  /// its required initializer - `init(storage:)`.
+  ConstructorDecl *getTypeWrapperInitializer() const;
+
   /// Get a memberwise initializer that could be used to instantiate a
   /// type wrapped type.
   ConstructorDecl *getTypeWrappedTypeMemberwiseInitializer() const;

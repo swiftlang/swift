@@ -512,3 +512,24 @@ VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
                      VarDecl::Introducer::Var);
   return PBD->getSingleVar();
 }
+
+ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetTypeWrapperInitializer{mutableSelf}, nullptr);
+}
+
+ConstructorDecl *
+GetTypeWrapperInitializer::evaluate(Evaluator &evaluator,
+                                    NominalTypeDecl *typeWrapper) const {
+  auto &ctx = typeWrapper->getASTContext();
+  assert(typeWrapper->getAttrs().hasAttribute<TypeWrapperAttr>());
+
+  auto ctors = typeWrapper->lookupDirect(
+      DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_memberwise}));
+
+  if (ctors.size() != 1)
+    return nullptr;
+
+  return cast<ConstructorDecl>(ctors.front());
+}
