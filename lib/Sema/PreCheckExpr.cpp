@@ -761,26 +761,29 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           UDRE->getNameLoc(), NTD, BaseDC,
           DC->mapTypeIntoContext(NTD->getInterfaceType()));
     } else {
-      // If this is an implicit self reference, we replace the `DeclRefExpr`
-      // with an `UnresolvedDeclRefExpr` to make the type checker take another
-      // pass on the expr. This causes `getParentPatternStmt()` to be populated,
-      // which is required later to validate conditions for permitting
-      // implicit self for `[weak self]` captures.
+      BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
+                                           /*Implicit=*/true);
+      
+      // Implicit self references default to always being `ParamDecl`s
+      // that reference the function or closure's `self` param.
+      // This isn't necessarily the case though, if `self` has been rebound
+      // (e.g. unwrapping a closure's `weak self` capture via `guard let self`).
+      // To find the actual `VarDecl` that the base refers to, we resolve the
+      // `DeclRefExpr` for `self` and return that instead.
       bool isClosureImplicitSelfParameter = false;
       if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr)
         if (auto varDecl = dyn_cast<VarDecl>(Base))
           if (varDecl->isSelfParameter())
             isClosureImplicitSelfParameter = true;
-          
+
       if (isClosureImplicitSelfParameter) {
-        auto selfNameRef = new DeclNameRef(Base->getBaseIdentifier());
-        BaseExpr = new (Context) UnresolvedDeclRefExpr(*selfNameRef,
-                                                       DeclRefKind::Ordinary,
-                                                       UDRE->getNameLoc());
-        BaseExpr->setImplicit();
-      } else {
-        BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
-                                             /*Implicit=*/true);
+        auto &ctx = DC->getASTContext();
+        auto *unresolvedExpr = new (Context) UnresolvedDeclRefExpr(DeclNameRef(ctx.Id_self),
+                                                                   DeclRefKind::Ordinary,
+                                                                   UDRE->getNameLoc());
+        unresolvedExpr->setImplicit();
+        if (auto *resolvedExpr = resolveDeclRefExpr(unresolvedExpr, DC, replaceInvalidRefsWithErrors))
+          BaseExpr = resolvedExpr;
       }
     }
 
