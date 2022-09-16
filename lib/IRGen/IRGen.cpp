@@ -1358,6 +1358,11 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       irgen.emitDynamicReplacements();
     }
 
+    // Emit coverage mapping info. This needs to happen after we've emitted
+    // any lazy definitions, as we need to know whether or not we emitted a
+    // profiler increment for a given coverage map.
+    IGM.emitCoverageMapping();
+
     // Emit symbols for eliminated dead methods.
     IGM.emitVTableStubs();
 
@@ -1607,6 +1612,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();
+
+  // Emit coverage mapping info. This needs to happen after we've emitted
+  // any lazy definitions, as we need to know whether or not we emitted a
+  // profiler increment for a given coverage map.
+  irgen.emitCoverageMapping();
 
   IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
 

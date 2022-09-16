@@ -192,3 +192,8 @@ void IRGenModule::emitCoverageMapping() {
   CovData->setAlignment(llvm::Align(8));
   addUsedGlobal(CovData);
 }
+
+void IRGenerator::emitCoverageMapping() {
+  for (auto &IGM : *this)
+    IGM.second->emitCoverageMapping();
+}
