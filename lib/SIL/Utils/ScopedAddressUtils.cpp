@@ -86,7 +86,7 @@ bool ScopedAddressValue::visitScopeEndingUses(
   }
 }
 
-bool ScopedAddressValue::computeLiveness(PrunedLiveness &liveness) const {
+bool ScopedAddressValue::computeLiveness(SSAPrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
@@ -123,7 +123,7 @@ void ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
 }
 
 void ScopedAddressValue::endScopeAtLivenessBoundary(
-    PrunedLiveness *liveness) const {
+    SSAPrunedLiveness *liveness) const {
   // If no users exist, create scope ending instruction immediately after the
   // scoped address value.
   if (liveness->empty()) {
@@ -133,7 +133,7 @@ void ScopedAddressValue::endScopeAtLivenessBoundary(
   }
 
   PrunedLivenessBoundary scopedAddressBoundary;
-  scopedAddressBoundary.compute(*liveness);
+  liveness->computeBoundary(scopedAddressBoundary);
   // Go over the boundary and create scope ending instructions.
   scopedAddressBoundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
@@ -142,7 +142,7 @@ void ScopedAddressValue::endScopeAtLivenessBoundary(
 }
 
 bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
-                                           PrunedLiveness *liveness,
+                                           SSAPrunedLiveness *liveness,
                                            DeadEndBlocks *deadEndBlocks) {
   SmallVector<StoreBorrowInst *, 4> otherStoreBorrows;
   // Collect all other store_borrows to the destination of \p storeBorrow
@@ -157,7 +157,7 @@ bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
 
   for (auto *otherStoreBorrow : otherStoreBorrows) {
     // Return true, if otherStoreBorrow was in \p storeBorrow's scope
-    if (liveness->isWithinBoundaryOfDef(otherStoreBorrow, storeBorrow)) {
+    if (liveness->isWithinBoundary(otherStoreBorrow)) {
       return true;
     }
   }
@@ -171,7 +171,7 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
   ScopedAddressValue scopedAddress(sbi);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness storeBorrowLiveness(&discoveredBlocks);
+  SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
   bool success = scopedAddress.computeLiveness(storeBorrowLiveness);
 
   // If all new uses are within store_borrow boundary, no need for extension.

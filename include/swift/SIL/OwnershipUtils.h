@@ -16,6 +16,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -567,7 +568,7 @@ struct BorrowedValue {
   bool isLocalScope() const { return kind.isLocalScope(); }
 
   /// Add this scopes live blocks into the PrunedLiveness result.
-  void computeLiveness(PrunedLiveness &liveness) const;
+  void computeLiveness(SSAPrunedLiveness &liveness) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.

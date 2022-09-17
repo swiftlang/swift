@@ -329,7 +329,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
                            : SILValue();
 
   BorrowedValue borrowedValue(lbi);
-  PrunedLiveness borrowLiveness;
+  SSAPrunedLiveness borrowLiveness;
   borrowedValue.computeLiveness(borrowLiveness);
 
   // Then for each write...
@@ -346,7 +346,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
         continue;
     }
 
-    if (borrowLiveness.isWithinBoundaryOfDef(write, lbi)) {
+    if (borrowLiveness.isWithinBoundary(write)) {
       llvm::errs() << "Write: " << *write;
       return false;
     }

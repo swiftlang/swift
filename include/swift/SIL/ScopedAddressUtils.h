@@ -83,20 +83,20 @@ struct ScopedAddressValue {
   SILValue operator*() { return value; }
   SILValue operator*() const { return value; }
 
-  /// Returns true if \p op is a scope edning use of the scoped address value.
+  /// Returns true if \p op is a scope ending use of the scoped address value.
   bool isScopeEndingUse(Operand *op) const;
   /// Pass all scope ending instructions to the visitor.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
   /// Returns false, if liveness cannot be computed due to pointer escape or
-  /// unkown address use. Add this scope's live blocks into the PrunedLiveness
-  /// result.
-  bool computeLiveness(PrunedLiveness &liveness) const;
+  /// unkown address use. Add this scope's live blocks into the SSA
+  /// PrunedLiveness result.
+  bool computeLiveness(SSAPrunedLiveness &liveness) const;
 
   /// Create appropriate scope ending instruction at \p insertPt.
   void createScopeEnd(SILBasicBlock::iterator insertPt, SILLocation loc) const;
 
   /// Create scope ending instructions at \p liveness boundary.
-  void endScopeAtLivenessBoundary(PrunedLiveness *liveness) const;
+  void endScopeAtLivenessBoundary(SSAPrunedLiveness *liveness) const;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -105,7 +105,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// Returns true if there are other store_borrows enclosed within a store_borrow
 /// \p sbi's scope
 bool hasOtherStoreBorrowsInLifetime(StoreBorrowInst *sbi,
-                                    PrunedLiveness *liveness,
+                                    SSAPrunedLiveness *liveness,
                                     DeadEndBlocks *deadEndBlocks);
 
 /// Extend the store_borrow \p sbi's scope such that it encloses \p newUsers.

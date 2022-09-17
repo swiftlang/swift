@@ -575,11 +575,12 @@ namespace {
 struct ClosureArgDataflowState {
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
-  PrunedLiveness livenessForConsumes;
+  MultiDefPrunedLiveness livenessForConsumes;
   UseState &useState;
 
 public:
-  ClosureArgDataflowState(UseState &useState) : useState(useState) {}
+  ClosureArgDataflowState(SILFunction *function, UseState &useState)
+      : livenessForConsumes(function), useState(useState) {}
 
   bool process(
       SILArgument *arg, ClosureOperandState &state,
@@ -752,6 +753,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
+      livenessForConsumes.initializeDef(cast<SILNode>(user));
       initBlocks.insert(user->getParent());
     }
   }
@@ -1961,7 +1963,7 @@ struct MoveKillsCopyableAddressesChecker {
       : fn(fn), useState(),
         dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
                       closureConsumes),
-        closureUseState(), closureUseDataflowState(closureUseState),
+        closureUseState(), closureUseDataflowState(fn, closureUseState),
         funcBuilder(funcBuilder) {}
 
   void cloneDeferCalleeAndRewriteUses(

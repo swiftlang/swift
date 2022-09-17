@@ -753,8 +753,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 }
 
 /// Add this scopes live blocks into the PrunedLiveness result.
-void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
-  liveness.initializeDefBlock(value->getParentBlock());
+void BorrowedValue::computeLiveness(SSAPrunedLiveness &liveness) const {
+  liveness.initializeDef(value);
   visitTransitiveLifetimeEndingUses([&](Operand *endOp) {
     if (endOp->getOperandOwnership() == OperandOwnership::EndBorrow) {
       liveness.updateForUse(endOp->getUser(), /*lifetimeEnding*/ true);
@@ -779,7 +779,7 @@ bool BorrowedValue::areUsesWithinTransitiveScope(
     return true;
 
   // Compute the local scope's liveness.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
   computeLiveness(liveness);
   return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
 }
@@ -1085,8 +1085,9 @@ bool AddressOwnership::areUsesWithinLifetime(
   // --- A reference no borrow scope. Currently happens for project_box.
 
   // Compute the reference value's liveness.
-  PrunedLiveness liveness;
-  liveness.computeSSALiveness(root);
+  SSAPrunedLiveness liveness;
+  liveness.initializeDef(root);
+  liveness.compute();
   return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
 }
 

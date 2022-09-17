@@ -58,13 +58,16 @@ struct CheckerLivenessInfo {
   SmallSetVector<Operand *, 8> consumingUse;
   SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
-  PrunedLiveness liveness;
+  DiagnosticPrunedLiveness liveness;
 
   CheckerLivenessInfo()
       : nonLifetimeEndingUsesInLiveOut(),
         liveness(nullptr, &nonLifetimeEndingUsesInLiveOut) {}
 
-  void initDef(SILValue def) { defUseWorklist.insert(def); }
+  void initDef(SILValue def) {
+    liveness.initializeDef(def);
+    defUseWorklist.insert(def);
+  }
 
   /// Compute the liveness for any value currently in the defUseWorklist.
   ///

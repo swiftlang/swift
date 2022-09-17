@@ -64,7 +64,7 @@ class DiagnoseLifetimeIssues {
   static constexpr int maxCallDepth = 8;
 
   /// The liveness of the object in question, computed in visitUses.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
 
   /// All weak stores of the object, which are found in visitUses.
   llvm::SmallVector<SILInstruction *, 8> weakStores;
@@ -305,7 +305,7 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
 }
 
 /// Returns true if \p inst is outside the pruned \p liveness.
-static bool isOutOfLifetime(SILInstruction *inst, PrunedLiveness &liveness) {
+static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // Check if the lifetime of the stored object ends at the store_weak.
   //
   // A more sophisticated analysis would be to check if there are no
@@ -325,7 +325,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
   weakStores.clear();
 
   SILValue storedDef = cast<SingleValueInstruction>(allocationInst);
-  liveness.initializeDefBlock(storedDef->getParentBlock());
+  liveness.initializeDef(storedDef);
 
   // Compute the canonical lifetime of storedDef, like the copy-propagation pass
   // would do.

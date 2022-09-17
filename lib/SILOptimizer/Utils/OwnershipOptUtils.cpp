@@ -140,12 +140,13 @@ bool swift::computeGuaranteedBoundary(SILValue value,
   bool noEscape = findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(&discoveredBlocks);
+  liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding());
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
-  boundary.compute(liveness);
+  liveness.computeBoundary(boundary);
 
   return noEscape;
 }
@@ -239,7 +240,7 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
   if (ownershipKind != OwnershipKind::Owned)
     return Invalid;
 
-  ownedLifetime.initializeDefBlock(ownedValue->getParentBlock());
+  ownedLifetime.initializeDef(ownedValue);
   for (Operand *use : ownedValue->getUses()) {
     auto *user = use->getUser();
     if (use->isConsuming()) {
@@ -260,17 +261,17 @@ void GuaranteedOwnershipExtension::transform(Status status) {
     return;
   case ExtendBorrow: {
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedBoundary.compute(guaranteedLiveness, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
   case ExtendLifetime: {
     ownedLifetime.extendAcrossLiveness(guaranteedLiveness);
     PrunedLivenessBoundary ownedBoundary;
-    ownedBoundary.compute(ownedLifetime, ownedConsumeBlocks);
+    ownedLifetime.computeBoundary(ownedBoundary, ownedConsumeBlocks);
     extendOwnedLifetime(beginBorrow->getOperand(), ownedBoundary, deleter);
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedBoundary.compute(guaranteedLiveness, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
@@ -437,7 +438,7 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
     return true;
 
   if (auto borrowedValue = BorrowedValue(value)) {
-    PrunedLiveness liveness;
+    SSAPrunedLiveness liveness;
     auto *function = value->getFunction();
     borrowedValue.computeLiveness(liveness);
     DeadEndBlocks deadEndBlocks(function);

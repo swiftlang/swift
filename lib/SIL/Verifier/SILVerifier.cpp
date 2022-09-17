@@ -2260,7 +2260,7 @@ public:
   }
 
   bool checkScopedAddressUses(ScopedAddressValue scopedAddress,
-                              PrunedLiveness *scopedAddressLiveness,
+                              SSAPrunedLiveness *scopedAddressLiveness,
                               DeadEndBlocks *deadEndBlocks) {
     SmallVector<Operand *, 4> uses;
     findTransitiveUsesForAddress(scopedAddress.value, &uses);
@@ -2444,7 +2444,7 @@ public:
     require(isa<AllocStackInst>(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
 
-    PrunedLiveness scopedAddressLiveness;
+    SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
     bool success = scopedAddress.computeLiveness(scopedAddressLiveness);
 

@@ -100,8 +100,8 @@ class GuaranteedOwnershipExtension {
   DeadEndBlocks &deBlocks;
 
   // --- analysis state
-  PrunedLiveness guaranteedLiveness;
-  PrunedLiveness ownedLifetime;
+  SSAPrunedLiveness guaranteedLiveness;
+  SSAPrunedLiveness ownedLifetime;
   SmallVector<SILBasicBlock *, 4> ownedConsumeBlocks;
   BeginBorrowInst *beginBorrow = nullptr;
 
