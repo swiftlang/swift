@@ -207,6 +207,16 @@ ASTContext &SILDeclRef::getASTContext() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
+Optional<AvailabilityContext> SILDeclRef::getAvailabilityForLinkage() const {
+  // Back deployment thunks and fallbacks don't have availability since they
+  // are non-ABI.
+  // FIXME: Generalize this check to all kinds of non-ABI functions.
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return None;
+
+  return getDecl()->getAvailabilityForLinkage();
+}
+
 bool SILDeclRef::isThunk() const {
   return isForeignToNativeThunk() || isNativeToForeignThunk() ||
          isDistributedThunk() || isBackDeploymentThunk();

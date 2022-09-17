@@ -311,7 +311,9 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    if (auto availability = constant.getAvailabilityForLinkage())
+      F->setAvailabilityForLinkage(*availability);
+
     F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {

@@ -2197,6 +2197,9 @@ public:
   /// The earliest platform version that may use the back deployed implementation.
   const llvm::VersionTuple Version;
 
+  /// Returns true if this attribute is active given the current platform.
+  bool isActivePlatform(const ASTContext &ctx) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_BackDeploy;
   }

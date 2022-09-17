@@ -6,13 +6,13 @@
 // REQUIRES: OS=macosx
 
 // -- Fallback definition of throwingFunc()
-// CHECK-LABEL: sil non_abi [serialized] [available 10.51] [ossa] @$s11back_deploy12throwingFuncyyKFTwB : $@convention(thin) () -> @error Error
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy12throwingFuncyyKFTwB : $@convention(thin) () -> @error Error
 // CHECK: bb0:
 // CHECK:   [[RESULT:%.*]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for throwingFunc()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [available 10.51] [ossa] @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error Error
+// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error Error
 // CHECK: bb0:
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
@@ -49,7 +49,7 @@
 // CHECK:   throw [[RETHROW_BB_ARG]] : $Error
 
 // -- Original definition of throwingFunc()
-// CHECK-LABEL: sil [available 10.51] [ossa] @$s11back_deploy12throwingFuncyyKF : $@convention(thin) () -> @error Error
+// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy12throwingFuncyyKF : $@convention(thin) () -> @error Error
 @available(macOS 10.51, *)
 @_backDeploy(before: macOS 10.52)
 public func throwingFunc() throws {}
