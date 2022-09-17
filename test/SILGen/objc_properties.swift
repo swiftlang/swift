@@ -226,9 +226,9 @@ class NonObjCBaseClass : NSObject {
 // CHECK-LABEL: sil private [thunk] [ossa] @$s15objc_properties12ObjCSubclassC8propertySivsTo
 
 // Make sure lazy properties that witness @objc protocol requirements are
-// correctly formed
+// correctly formed.
 //
-// <https://bugs.swift.org/browse/SR-1825>
+// https://github.com/apple/swift/issues/44434
 
 @objc protocol HasProperty {
     @objc var window: NSObject? { get set }
