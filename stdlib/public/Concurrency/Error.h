@@ -19,7 +19,7 @@
 
 #include "swift/Basic/Compiler.h"
 
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 #include <cstdarg>
 #include <cstdint>
 #include <cstdlib>

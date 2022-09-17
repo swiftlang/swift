@@ -12,6 +12,10 @@
 
 import SILBridging
 
+// Need to export "Basic" to make `Basic.assert` available in the Optimizer module.
+// Otherwise The Optimizer would fall back to Swift's assert implementation.
+@_exported import Basic
+
 //===----------------------------------------------------------------------===//
 //                              Lists
 //===----------------------------------------------------------------------===//

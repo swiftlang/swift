@@ -125,7 +125,7 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   var (innerRange, outerBlockRange) = computeInnerAndOuterLiferanges(instruction: allocRef, in: outerDominatingBlock, domTree: domTree, context: context)
   defer { innerRange.deinitialize(); outerBlockRange.deinitialize() }
   
-  precondition(innerRange.blockRange.isValid, "inner range should be valid because we did a dominance check")
+  assert(innerRange.blockRange.isValid, "inner range should be valid because we did a dominance check")
 
   if !outerBlockRange.isValid {
     // This happens if we fail to find a correct outerDominatingBlock.
@@ -282,7 +282,7 @@ private extension BasicBlockRange {
     }
 
     for lifeBlock in inclusiveRange {
-      precondition(otherRange.inclusiveRangeContains(lifeBlock), "range must be a subset of other range")
+      assert(otherRange.inclusiveRangeContains(lifeBlock), "range must be a subset of other range")
       for succ in lifeBlock.successors {
         if isOnlyInOtherRange(succ) {
           return true

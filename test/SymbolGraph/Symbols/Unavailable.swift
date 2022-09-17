@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name Unavailable -emit-module -emit-module-path %t/
-// RUN: %target-swift-symbolgraph-extract -module-name Unavailable -I %t -pretty-print -output-dir %t
+// RUN: %target-swift-symbolgraph-extract -module-name Unavailable -I %t -pretty-print -output-dir %t -emit-extension-block-symbols
 // RUN: %FileCheck %s --input-file %t/Unavailable.symbols.json
+// RUN: %{python} -c 'import os.path; import sys; sys.exit(1 if os.path.exists(sys.argv[1]) else 0)' %t/Unavailable@Swift.symbols.json
 
 // REQUIRES: OS=macosx
 
@@ -26,3 +27,13 @@ extension ShouldAppear {
 }
 
 // CHECK-NOT: shouldntAppear
+
+@available(OSX, unavailable)
+extension String {
+  public func shouldntAppear1() { }
+}
+
+@available(OSX, obsoleted: 10.9)
+extension String {
+  public func shouldntAppear2() {}
+}

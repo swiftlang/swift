@@ -78,6 +78,8 @@ inline bool isForwardingConsume(SILValue value) {
   return canOpcodeForwardOwnedValues(value);
 }
 
+bool hasPointerEscape(BorrowedValue value);
+
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
 /// requirement. Return true if no PointerEscape use was found.
 ///

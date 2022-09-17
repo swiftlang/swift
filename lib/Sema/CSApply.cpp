@@ -8116,7 +8116,8 @@ bool swift::exprNeedsParensInsideFollowingOperator(
     DeclContext *DC, Expr *expr,
     PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
-    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, expr);
+    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+        DC, expr, /*diagnose=*/false);
     if (!exprPG) return true;
 
     return DC->getASTContext().associateInfixOperators(exprPG, followingPG)
@@ -8166,8 +8167,8 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
     return false;
 
   if (parent->isInfixOperator()) {
-    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
-                                                                       parent);
+    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+        DC, parent, /*diagnose=*/false);
     if (!parentPG) return true;
 
     // If the index is 0, this is on the LHS of the parent.

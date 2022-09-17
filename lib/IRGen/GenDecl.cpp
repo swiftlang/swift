@@ -1158,21 +1158,13 @@ void IRGenModule::emitGlobalLists() {
                  /*isConstant*/false, /*asContiguousArray*/true);
 }
 
-static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
-  return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
-}
-
-// Eagerly emit functions that are externally visible. Functions with code
-// coverage instrumentation must also be eagerly emitted. So must functions
-// that are a dynamic replacement for another.
+// Eagerly emit functions that are externally visible. Functions that are
+// dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   if (f.isPossiblyUsedExternally())
     return false;
 
   if (f.getDynamicallyReplacedFunction())
-    return false;
-
-  if (hasCodeCoverageInstrumentation(f, m))
     return false;
 
   // Needed by lldb to print global variables which are propagated by the
@@ -1256,12 +1248,6 @@ void IRGenerator::emitGlobalTopLevel(
     CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction());
 
     IGM->emitSILDifferentiabilityWitness(&dw);
-  }
-
-  // Emit code coverage mapping data for all modules
-  for (auto Iter : *this) {
-    IRGenModule *IGM = Iter.second;
-    IGM->emitCoverageMapping();
   }
 
   for (auto Iter : *this) {

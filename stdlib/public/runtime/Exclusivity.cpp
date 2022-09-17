@@ -24,7 +24,7 @@
 #endif
 
 #include "swift/Runtime/Exclusivity.h"
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 #include "SwiftTLSContext.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"

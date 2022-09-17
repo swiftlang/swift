@@ -107,73 +107,84 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  auto *op = DC->lookupInfixOperator(name).getSingleOrDiagnose(loc);
+  auto result = DC->lookupInfixOperator(name);
+  auto *op =
+      loc.isValid() ? result.getSingleOrDiagnose(loc) : result.getSingle();
   return op ? op->getPrecedenceGroup() : nullptr;
 }
 
 PrecedenceGroupDecl *
-TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
+TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
+                                                   bool diagnose) {
   /// Look up the builtin precedence group with the given name.
 
   auto getBuiltinPrecedenceGroup = [&](DeclContext *DC, Identifier name,
                                        SourceLoc loc) -> PrecedenceGroupDecl * {
     auto groups = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
-    return groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true);
+    return loc.isValid() ? groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true)
+                         : groups.getSingle();
   };
   
   auto &Context = DC->getASTContext();
   if (auto ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_TernaryPrecedence,
-                                     ifExpr->getQuestionLoc());
+                                     diagnose ? ifExpr->getQuestionLoc()
+                                              : SourceLoc());
   }
 
   if (auto assignExpr = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_AssignmentPrecedence,
-                                     assignExpr->getEqualLoc());
+                                     diagnose ? assignExpr->getEqualLoc()
+                                              : SourceLoc());
   }
 
   if (auto castExpr = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_CastingPrecedence,
-                                     castExpr->getAsLoc());
+                                     diagnose ? castExpr->getAsLoc()
+                                              : SourceLoc());
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     Identifier name = DRE->getDecl()->getBaseIdentifier();
-    return lookupPrecedenceGroupForOperator(DC, name, DRE->getLoc());
+    return lookupPrecedenceGroupForOperator(
+        DC, name, diagnose ? DRE->getLoc() : SourceLoc());
   }
 
   if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     Identifier name = OO->getDecls()[0]->getBaseIdentifier();
-    return lookupPrecedenceGroupForOperator(DC, name, OO->getLoc());
+    return lookupPrecedenceGroupForOperator(
+        DC, name, diagnose ? OO->getLoc() : SourceLoc());
   }
 
   if (auto arrowExpr = dyn_cast<ArrowExpr>(E)) {
-    return getBuiltinPrecedenceGroup(DC,
-                                     Context.Id_FunctionArrowPrecedence,
-                                     arrowExpr->getArrowLoc());
+    return getBuiltinPrecedenceGroup(DC, Context.Id_FunctionArrowPrecedence,
+                                     diagnose ? arrowExpr->getArrowLoc()
+                                              : SourceLoc());
   }
 
   // An already-folded binary operator comes up for non-primary use cases
   // of this function.
   if (auto binaryExpr = dyn_cast<BinaryExpr>(E)) {
-    return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn());
+    return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn(),
+                                                 diagnose);
   }
 
   if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
-    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn());
+    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn(), diagnose);
   }
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     Identifier name = MRE->getDecl().getDecl()->getBaseIdentifier();
-    return lookupPrecedenceGroupForOperator(DC, name, MRE->getLoc());
+    return lookupPrecedenceGroupForOperator(
+        DC, name, diagnose ? MRE->getLoc() : SourceLoc());
   }
 
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
-  if (!isa<ErrorExpr>(E))
+  if (diagnose && !isa<ErrorExpr>(E))
     Context.Diags.diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
@@ -203,7 +214,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
       continue;
     }
 
-    auto left = lookupPrecedenceGroupForInfixOperator(DC, E);
+    auto left = lookupPrecedenceGroupForInfixOperator(DC, E, /*diagnose=*/true);
     if (!left)
       // LHS is not binary expression.
       return E;
@@ -425,7 +436,8 @@ static Expr *foldSequence(DeclContext *DC,
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
-    auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, op);
+    auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+        DC, op, /*diagnose=*/true);
     if (!precedenceBound.shouldConsider(opPrecedence))
       return {nullptr, nullptr};
     return {op, opPrecedence};
@@ -457,7 +469,8 @@ static Expr *foldSequence(DeclContext *DC,
     }
     
     // Pull out the next binary operator.
-    Op op2{ S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
+    Op op2{S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(
+                     DC, S[0], /*diagnose=*/true)};
 
     // If the second operator's precedence is lower than the
     // precedence bound, break out of the loop.

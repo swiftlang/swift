@@ -26,6 +26,8 @@
 #include "WeakReference.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/InstrumentsSupport.h"
+#include "swift/shims/GlobalObjects.h"
+#include "swift/shims/RuntimeShims.h"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -33,8 +35,6 @@
 #include <cstdlib>
 #include <new>
 #include <thread>
-#include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/RuntimeShims.h"
 #if SWIFT_OBJC_INTEROP
 # include <objc/NSObject.h>
 # include <objc/runtime.h>

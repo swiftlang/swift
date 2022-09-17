@@ -1836,7 +1836,6 @@ public func closureClassUseAfterConsumeArg(_ argX: inout Klass) {
 public func closureCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     x2 = Klass()
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -1849,7 +1848,6 @@ public func closureCaptureClassUseAfterConsume() {
 public func closureCaptureClassUseAfterConsumeError() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     x2 = Klass()
     let f = {
         classUseMoveOnlyWithoutEscaping(x2)
@@ -1925,9 +1923,8 @@ public func deferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 public func closureAndDeferCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{'x2' consumed but not reinitialized before end of function}}
-    // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-2 {{'x2' consumed but not reinitialized before end of function}}
+    // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
         defer {
@@ -1946,8 +1943,7 @@ public func closureAndDeferCaptureClassUseAfterConsume2() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
         classConsume(x2)
@@ -1967,8 +1963,7 @@ public func closureAndDeferCaptureClassUseAfterConsume3() {
     var x2 = Klass()
     // expected-error @-1 {{'x2' consumed but not reinitialized before end of function}}
     // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-3 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-4 {{'x2' consumed more than once}}
+    // expected-error @-3 {{'x2' consumed more than once}}
     x2 = Klass()
     let f = {
         classConsume(x2)
@@ -2008,7 +2003,6 @@ public func closureAndDeferCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
 public func closureAndClosureCaptureClassUseAfterConsume() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     x2 = Klass()
     let f = {
         let g = {
@@ -2024,7 +2018,6 @@ public func closureAndClosureCaptureClassUseAfterConsume() {
 public func closureAndClosureCaptureClassUseAfterConsume2() {
     var x2 = Klass()
     // expected-error @-1 {{Usage of a move only type that the move checker does not know how to check!}}
-    // expected-error @-2 {{Usage of a move only type that the move checker does not know how to check!}}
     x2 = Klass()
     let f = {
         let g = {

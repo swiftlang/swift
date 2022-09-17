@@ -113,6 +113,12 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   /// Returns whether the given module is the main module, or is an `@_exported import` module.
   virtual bool isOurModule(const ModuleDecl *M) const;
+
+public:
+  /// Returns whether the given ExtensionDecl is to be recorded as an extra
+  /// extension block symbol, or if its members should be directly associated
+  /// with its extended nominal.
+  virtual bool shouldBeRecordedAsExtension(const ExtensionDecl *ED) const;
 };
 
 } // end namespace symbolgraphgen

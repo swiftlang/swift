@@ -39,6 +39,7 @@ def unrpathize(filename):
             ['xcrun', 'dyld_info', '-dependents', filename],
             universal_newlines=True)
     except subprocess.CalledProcessError:
+        sys.stderr.write("falling back to 'xcrun dyldinfo' ...\n")
         dylibsOutput = subprocess.check_output(
             ['xcrun', 'dyldinfo', '-dylibs', filename],
             universal_newlines=True)

@@ -40,7 +40,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Basic/Unreachable.h"
-#include "../../../stdlib/public/SwiftShims/HeapObject.h"
+#include "swift/shims/HeapObject.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 

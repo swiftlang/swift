@@ -159,7 +159,7 @@ BridgedFunction NodeSet_getFunction(BridgedNodeSet set);
 
 void AllocRefInstBase_setIsStackAllocatable(BridgedInstruction arb);
 
-BridgedSubstitutionMap
+swift::SubstitutionMap
 PassContext_getContextSubstitutionMap(BridgedPassContext context,
                                       BridgedType bridgedType);
 

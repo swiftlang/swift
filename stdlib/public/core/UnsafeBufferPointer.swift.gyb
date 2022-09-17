@@ -729,7 +729,7 @@ extension Unsafe${Mutable}BufferPointer {
       return startIndex.advanced(by: count)
     }
 
-    var (iterator, copied) = source._copySequenceContents(initializing: self)
+    var (iterator, copied) = source._copyContents(initializing: self)
     _precondition(
       iterator.next() == nil,
       "buffer cannot contain every element from source."

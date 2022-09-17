@@ -21,8 +21,8 @@
 
 #if !defined(__MACH__)
 
-#include "../SwiftShims/Visibility.h"
-#include "../SwiftShims/MetadataSections.h"
+#include "swift/shims/Visibility.h"
+#include "swift/shims/MetadataSections.h"
 #include "ImageInspection.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrent.h"

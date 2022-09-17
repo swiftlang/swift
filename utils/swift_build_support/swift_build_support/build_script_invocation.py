@@ -129,6 +129,7 @@ class BuildScriptInvocation(object):
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
             "--build-jobs", str(args.build_jobs),
+            "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in cmake.common_options()),
             "--build-args=%s" % ' '.join(
@@ -249,6 +250,14 @@ class BuildScriptInvocation(object):
                                         "swift-syntax")
         args.extra_cmake_options.append(
             '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+
+        if args.build_early_swiftsyntax:
+            early_swiftsyntax_build_dir = os.path.join(
+                self.workspace.build_root,
+                '%s-%s' % ('earlyswiftsyntax', self.args.host_target))
+            args.extra_cmake_options.append(
+                '-DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH={}'
+                .format(early_swiftsyntax_build_dir))
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
