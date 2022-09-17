@@ -1,7 +1,8 @@
 // RUN: %target-swift-emit-silgen -module-name main %s -verify | %FileCheck %s --check-prefix=FRAGILE
 // RUN: %target-swift-emit-silgen -module-name main %s -verify -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
 
-// SR-9425
+// https://github.com/apple/swift/issues/51889
+
 public enum MyState : String {
     case closed = "closed"
     case opened = "opened"
