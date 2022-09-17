@@ -4,7 +4,7 @@
 // iOS doesn't have NSRect. iOS and OS X CGRect is tested elsewhere.
 // REQUIRES: OS=macosx
 
-import Coreimage
+import CoreImage
 
 _ = JSONDecoder()
 
