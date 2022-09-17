@@ -837,7 +837,7 @@ public:
   /// Returns the OS version in which the decl became ABI as specified by the
   /// @_backDeploy attribute.
   Optional<llvm::VersionTuple>
-  getBackDeployBeforeOSVersion(PlatformKind Kind) const;
+  getBackDeployBeforeOSVersion(ASTContext &Ctx) const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
