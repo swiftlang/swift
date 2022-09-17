@@ -728,7 +728,22 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   ValueDecl *Base = nullptr;
   DeclContext *BaseDC = nullptr;
   for (auto Result : Lookup) {
-    auto ThisBase = Result.getBaseDecl();
+    // Perform an unqualified lookup for the base decl. This handles cases
+    // where self was rebound (e.g. `guard let self = self`) earlier in this scope.
+    // Only do this in closures, since implicit self isn't allowed to be rebound
+    // in other contexts.
+    ValueDecl* ThisBase = nullptr;
+    if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr) {
+      auto &ctx = DC->getASTContext();
+      auto localDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                                       DeclName(ctx.Id_self),
+                                                       UDRE->getLoc());
+      if (localDecl)
+        ThisBase = localDecl;
+    }
+    
+    if (!ThisBase)
+      ThisBase = Result.getBaseDecl();
 
     // Track the base for member declarations.
     if (ThisBase && !isa<ModuleDecl>(ThisBase)) {
@@ -763,28 +778,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);
-      
-      // Implicit self references default to always being `ParamDecl`s
-      // that reference the function or closure's `self` param.
-      // This isn't necessarily the case though, if `self` has been rebound
-      // (e.g. unwrapping a closure's `weak self` capture via `guard let self`).
-      // To find the actual `VarDecl` that the base refers to, we resolve the
-      // `DeclRefExpr` for `self` and return that instead.
-      bool isClosureImplicitSelfParameter = false;
-      if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr)
-        if (auto varDecl = dyn_cast<VarDecl>(Base))
-          if (varDecl->isSelfParameter())
-            isClosureImplicitSelfParameter = true;
-
-      if (isClosureImplicitSelfParameter) {
-        auto &ctx = DC->getASTContext();
-        auto *unresolvedExpr = new (Context) UnresolvedDeclRefExpr(DeclNameRef(ctx.Id_self),
-                                                                   DeclRefKind::Ordinary,
-                                                                   UDRE->getNameLoc());
-        unresolvedExpr->setImplicit();
-        if (auto *resolvedExpr = resolveDeclRefExpr(unresolvedExpr, DC, replaceInvalidRefsWithErrors))
-          BaseExpr = resolvedExpr;
-      }
     }
 
     auto isInClosureContext = [&](ValueDecl *decl) -> bool {
@@ -878,14 +871,14 @@ namespace {
   /// Update a direct callee expression node that has a function reference kind
   /// based on seeing a call to this callee.
   template<typename E,
-           typename = decltype(((E*)nullptr)->getFunctionRefKind())> 
+           typename = decltype(((E*)nullptr)->getFunctionRefKind())>
   void tryUpdateDirectCalleeImpl(E *callee, int) {
     callee->setFunctionRefKind(addingDirectCall(callee->getFunctionRefKind()));
   }
 
   /// Version of tryUpdateDirectCalleeImpl for when the callee
   /// expression type doesn't carry a reference.
-  template<typename E> 
+  template<typename E>
   void tryUpdateDirectCalleeImpl(E *callee, ...) { }
 
   /// The given expression is the direct callee of a call expression; mark it to
