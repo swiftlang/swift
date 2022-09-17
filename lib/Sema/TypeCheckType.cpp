@@ -2260,21 +2260,23 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       return ty;
     };
 
-    if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
-      if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
-        return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
-    }
-    
-    // Check whether any of the generic parameters in the context represents
-    // this opaque type. If so, return that generic parameter.
-    if (options.isConstraintImplicitExistential()) {
-      if (auto declDC = DC->getAsDecl()) {
-        if (auto genericContext = declDC->getAsGenericContext()) {
-          if (auto genericParams = genericContext->getGenericParams()) {
-            for (auto genericParam : *genericParams) {
-              if (genericParam->getOpaqueTypeRepr() == repr)
-                return diagnoseDisallowedExistential(
-                                                     genericParam->getDeclaredInterfaceType());
+    if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+      if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
+          return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+      }
+
+      // Check whether any of the generic parameters in the context represents
+      // this opaque type. If so, return that generic parameter.
+      if (options.isConstraintImplicitExistential()) {
+        if (auto declDC = DC->getAsDecl()) {
+          if (auto genericContext = declDC->getAsGenericContext()) {
+            if (auto genericParams = genericContext->getGenericParams()) {
+              for (auto genericParam : *genericParams) {
+                if (genericParam->getOpaqueTypeRepr() == repr)
+                  return diagnoseDisallowedExistential(
+                                                       genericParam->getDeclaredInterfaceType());
+              }
             }
           }
         }
@@ -2321,8 +2323,32 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
 
-  case TypeReprKind::Composition:
-    return resolveCompositionType(cast<CompositionTypeRepr>(repr), options);
+    case TypeReprKind::Composition: {
+      auto *DC = getDeclContext();
+      auto diagnoseDisallowedExistential = [&](Type ty) {
+        if (!(options & TypeResolutionFlags::SilenceErrors) &&
+            options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
+          // We're specifically looking at an existential type `any P<some Q>`,
+          // so emit a tailored diagnostic. We don't emit an ErrorType here
+          // for better recovery.
+          diagnose(repr->getLoc(),
+                   diag::unsupported_opaque_type_in_existential);
+          // FIXME: We shouldn't have to invalid the type repr here, but not
+          // doing so causes a double-diagnostic.
+          repr->setInvalid();
+        }
+        return ty;
+      };
+
+      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+        if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+          if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
+            return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+        }
+      }
+
+      return resolveCompositionType(cast<CompositionTypeRepr>(repr), options);
+    }
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);

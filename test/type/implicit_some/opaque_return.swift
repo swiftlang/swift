@@ -1,5 +1,15 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-implicit-some
 
+protocol Eatery {
+  func lunch()
+  func dinner()
+  func dessert()
+}
+
+protocol Shop {
+  func coffee ()
+}
+
 // Access Return Type Constraint
 protocol Cafe {
   func breakfast()
@@ -23,7 +33,7 @@ cafe.treats()
 typealias Snack = Shop & Cafe
 typealias Meal = Eatery
 
-struct CoffeeBar: Snack {
+struct CoffeeShop(): Snack {
   func coffee(){ }
   func breakfast() { }
   func treats(){ }
@@ -41,33 +51,34 @@ class TopTier: Eatery {
   func dessert() { }
 }
 
-func list(_: Snack) {}
-
-func find( _: Snack) -> Snack { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-
-// tuple types
-func list(_: (Meal, Meal)) {}
-
-func highestRated() -> (Eatery, Eatery) {
-   return (Best(), TopTier())
-}
-
-func highestRated() -> (some Snack, some Snack) { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
-
-// opaque compostion types
-func find() -> Shop & Cafe {
-  return CoffeeBar()
-}
+func find() -> Eatery { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
 
 func find() -> AnyObject {
-  return CoffeeBar() //  expected-error {{Return expression of type 'CoffeeBar' expected to be an instance of a class or class-constrained type}} 
+  return CoffeeShop() // expected-error {{return expression of type 'CoffeeBar' expected to be an instance of a class or class-constrained type}}
 }
 
 func find() -> Any {
-  return CoffeeBar()
+  return CoffeeShop()
 }
 
-// protocol with associated type constraint
+// tuple types
+func highestRated() -> (Eatery, Eatery) { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
+// type alias
+func inspect( _ snack: some Snack) -> some Snack {
+  return CoffeeShop();
+}
+// tuple type alias
+func highestRated() -> (some Snack, some Snack) { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
+// TO-DO: Fix type alias for plain protocols; resolves as an existential type
+func list(_: (Meal, Meal)) -> (Meal, Meal){ }
+func find() -> Snack { }
+
+// opaque compostion types
+func search() -> Shop & Cafe { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+
+// associated type constraint
 protocol Basket {
   associatedtype Fruit
   associatedtype MiniBasket: Basket where MiniBasket.Fruit == Fruit

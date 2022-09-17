@@ -2774,7 +2774,10 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
 
 bool TypeRepr::isProtocol(DeclContext *dc){
   auto &ctx = dc->getASTContext();
-  return findIf([&ctx, dc](TypeRepr *ty) { return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc)); });
+  return findIf([&ctx, dc](TypeRepr *ty) {
+    return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc));
+
+  });
 }
 
 
@@ -2819,7 +2822,6 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
       }
       
       if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-
         if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
           auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
           if(generic)
@@ -2833,11 +2835,9 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
             Reprs.push_back(compositionRepr);
           return Action::SkipChildren();
         } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
-          if (!Reprs.empty()){
-            if(isa<ExistentialTypeRepr>(Reprs.front())){
+          if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
               Reprs.clear();
               Action::Continue();
-            }
           }
           Reprs.push_back(generic);
         } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
