@@ -7,11 +7,11 @@ func takeDoubleAndBool(_: Double, _: Bool) { }
 
 func testTernaryOneWay(b: Bool, b2: Bool) {
   // CHECK: ---Connected components---
-  // CHECK-NEXT: 3: $T10 depends on 1
-  // CHECK-NEXT: 1: $T5 $T8 $T9 depends on 0, 2
-  // CHECK-NEXT: 2: $T7
-  // CHECK-NEXT: 0: $T4
-  // CHECK-NEXT: 4: $T11 $T13 $T14
+  // CHECK-NEXT: 3: $T{{[0-9]+}} depends on 1
+  // CHECK-NEXT: 1: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}} depends on 0, 2
+  // CHECK-NEXT: 2: $T{{[0-9]+}}
+  // CHECK-NEXT: 0: $T{{[0-9]+}}
+  // CHECK-NEXT: 4: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}}
   takeDoubleAndBool(
     Builtin.one_way(
       b ? Builtin.one_way(3.14159) : Builtin.one_way(2.71828)),
@@ -23,22 +23,25 @@ func int8Or16(_ x: Int16) -> Int16 { return x }
 
 func testTernaryOneWayOverload(b: Bool) {
   // CHECK: ---Connected components---
-  // CHECK: 1: $T5 $T10 $T11 depends on 0, 2
-  // CHECK: 2: $T7 $T8 $T9
-  // CHECK: 0: $T2 $T3 $T4
+  // CHECK: 1: [[A:\$T[0-9]+]] [[B:\$T[0-9]+]] [[C:\$T[0-9]+]] depends on 0, 2
+  // CHECK: 2: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}}
+  // CHECK: 0: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}}
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable $T11 := Int8
+  // CHECK: (attempting type variable [[C]] := Int8
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable $T11 := Int8
+  // CHECK: (attempting type variable [[C]] := Int8
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable $T11 := Int8
+  // CHECK: (attempting type variable [[C]] := Int8
 
   // CHECK: solving component #1
-  // CHECK: (attempting type variable $T11 := Int8 
-  // CHECK: (found solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2]) 
+  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: (considering -> $T{{[0-9]+}} conv [[C]]
+  // CHECK: (considering -> $T{{[0-9]+}} conv [[C]]
+  // CHECK: (considering -> [[C]] conv Int8
+  // CHECK: (found solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
 
   // CHECK: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
   // CHECK-NOT: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])

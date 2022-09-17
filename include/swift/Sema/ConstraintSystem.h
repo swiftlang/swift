@@ -4421,7 +4421,7 @@ public:
 
     if (isDebugMode()) {
       auto &log = llvm::errs();
-      log.indent(solverState ? solverState->getCurrentIndent() : 0)
+      log.indent(solverState ? solverState->getCurrentIndent() + 4 : 0)
           << "(failed constraint ";
       constraint->print(log, &getASTContext().SourceMgr);
       log << ")\n";
@@ -4444,6 +4444,14 @@ public:
     // Add this constraint to the constraint graph.
     CG.addConstraint(constraint);
 
+    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent() + 4) << "(added constraint: ";
+      constraint->print(log, &getASTContext().SourceMgr,
+                        solverState->getCurrentIndent() + 4);
+      log << ")\n";
+    }
+
     // Record this as a newly-generated constraint.
     if (solverState)
       solverState->addGeneratedConstraint(constraint);
@@ -4453,6 +4461,15 @@ public:
   void removeInactiveConstraint(Constraint *constraint) {
     CG.removeConstraint(constraint);
     InactiveConstraints.erase(constraint);
+
+    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent() + 4)
+          << "(removed constraint: ";
+      constraint->print(log, &getASTContext().SourceMgr,
+                        solverState->getCurrentIndent() + 4);
+      log << ")\n";
+    }
 
     if (solverState)
       solverState->retireConstraint(constraint);
