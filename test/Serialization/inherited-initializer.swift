@@ -36,7 +36,7 @@ func testGeneric() {
   // CHECK: apply [[DEFAULT]]<Reinitializable<Int8>>({{%.+}})
   // CHECK: [[INIT:%.+]] = function_ref @$s4main10GenericSubCyACyxGxcfC
   // CHECK: apply [[INIT]]<Reinitializable<Int8>>({{%.+}}, [[TYPE]])
-  _ = GenericSub<Reinitializable<Int8>>.init() // works around SR-3806
+  _ = GenericSub<Reinitializable<Int8>>.init() // works around https://github.com/apple/swift/issues/46391
 
   // CHECK: [[TYPE:%.+]] = metatype $@thick ModifiedGenericSub<Int16>.Type
   // CHECK: [[DEFAULT:%.+]] = function_ref @$s24InheritedInitializerBase07GenericC0CyACyxGxcfcfA_

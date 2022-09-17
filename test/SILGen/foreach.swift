@@ -603,7 +603,8 @@ func unusedArgPattern(_ xx: [Int]) {
   }
 }
 
-// Test for SR-11269. Make sure that the sil contains the needed upcast.
+// https://github.com/apple/swift/issues/53670
+// Make sure that the SIL contains the needed upcast.
 //
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach25genericFuncWithConversion4listySayxG_tAA1CCRbzlF
 // CHECK: bb2([[ITER_VAL:%.*]] : @owned $T):
@@ -614,9 +615,10 @@ func genericFuncWithConversion<T: C>(list : [T]) {
   }
 }
 
-// SR-8688: Check that branch on result of next() precedes optional injection.
-// If we branch on the converted result of next(), the loop won't terminate.
-//
+// https://github.com/apple/swift/issues/51201
+// Check that branch on result of 'next()' precedes optional injection.
+// If we branch on the converted result of 'next()', the loop won't terminate.
+
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySaySiGF
 // CHECK: [[NEXT_RESULT:%.*]] = load [trivial] {{.*}} : $*Optional<Int>
 // CHECK: switch_enum [[NEXT_RESULT]] : $Optional<Int>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
@@ -627,9 +629,6 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
   for x : Int? in xs {}
 }
 
-// SR-8688: Check that branch on result of next() precedes optional injection.
-// If we branch on the converted result of next(), the loop won't terminate.
-//
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySayxGlF
 // CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [initialization] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
 // CHECK: switch_enum_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case

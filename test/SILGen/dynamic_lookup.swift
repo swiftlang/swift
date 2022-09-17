@@ -393,7 +393,8 @@ func getIUOPropertyDynamically(x: AnyObject) -> Any {
   return x.iuoProperty
 }
 
-// SR-11648
+// https://github.com/apple/swift/issues/54059
+//
 // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup24testAnyObjectWithDefaultyyyXlF
 func testAnyObjectWithDefault(_ x: AnyObject) {
   // CHECK: function_ref default argument 0 of X.hasDefaultParam(_:)

@@ -50,7 +50,8 @@ func copyRightToLeft(p: inout P) {
   p.left = p.right
 }
 
-// SR-5919
+// https://github.com/apple/swift/issues/48478
+
 func stupidGames() -> ((), ()) {
   return ((), ())
 }
