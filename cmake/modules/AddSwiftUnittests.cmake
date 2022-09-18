@@ -81,6 +81,7 @@ function(add_swift_unittest test_dirname)
 
   if (SWIFT_SWIFT_PARSER)
     _add_swift_runtime_link_flags(${test_dirname} "../../lib" "")
+    set_property(TARGET ${test_dirname} PROPERTY BUILD_WITH_INSTALL_RPATH OFF)
   endif()
 endfunction()
 

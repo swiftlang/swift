@@ -872,8 +872,14 @@ endif()
 
 # When we have the early SwiftSyntax build, we can include its parser.
 if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
-  set(SWIFT_SWIFT_PARSER TRUE)
-  include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
+  set(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS
+    ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
+  if(NOT EXISTS "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS}")
+    message(STATUS "Skipping Swift Swift parser integration due to missing early SwiftSyntax")
+  else()
+    set(SWIFT_SWIFT_PARSER TRUE)
+    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
+  endif()
 endif()
 
 
