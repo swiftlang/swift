@@ -18,6 +18,10 @@
 #define SWIFT_AST_LAZYRESOLVER_H
 
 #include "llvm/ADT/PointerEmbeddedInt.h"
+#include "llvm/ADT/TinyPtrVector.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/Requirement.h"
+#include "swift/AST/Attr.h"
 
 namespace swift {
 
@@ -83,7 +87,7 @@ public:
 
   /// Populates a vector with all members of \p IDC that have DeclName
   /// matching \p N.
-  virtual TinyPtrVector<ValueDecl *>
+  virtual llvm::TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) = 0;
 
@@ -92,7 +96,7 @@ public:
   /// The implementation should \em not call setConformances on \p D.
   virtual void
   loadAllConformances(const Decl *D, uint64_t contextData,
-                      SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
+                      llvm::SmallVectorImpl<ProtocolConformance *> &Conformances) = 0;
 
   /// Returns the default definition type for \p ATD.
   virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
@@ -101,18 +105,18 @@ public:
   /// Loads the requirement signature for a protocol.
   virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
-                           SmallVectorImpl<Requirement> &requirements,
-                           SmallVectorImpl<ProtocolTypeAlias> &typeAliases) = 0;
+                           llvm::SmallVectorImpl<Requirement> &requirements,
+                           llvm::SmallVectorImpl<ProtocolTypeAlias> &typeAliases) = 0;
 
   /// Loads the associated types of a protocol.
   virtual void
   loadAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
-                      SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
+                      llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
 
   /// Loads the primary associated types of a protocol.
   virtual void
   loadPrimaryAssociatedTypes(const ProtocolDecl *proto, uint64_t contextData,
-                             SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
+                             llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) = 0;
 
   /// Returns the replaced decl for a given @_dynamicReplacement(for:) attribute.
   virtual ValueDecl *
