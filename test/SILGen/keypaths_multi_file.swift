@@ -38,7 +38,7 @@ func bar<T>(_: T) {
   // _ = \P[0]
 }
 
-// https://bugs.swift.org/browse/SR-8643
+// https://github.com/apple/swift/issues/51158
 class MM<T: P> : PP {}
 func foo<T3: BB, T4: MM<T3>>(t: T3, u: T4) {
   let _ = \CC<T4>.x

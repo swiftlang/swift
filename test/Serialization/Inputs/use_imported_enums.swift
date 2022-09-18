@@ -8,7 +8,8 @@ import Foundation
   return compareToSelf(e)
 }
 
-// SR-6105
+// https://github.com/apple/swift/issues/48660
+
 open class EVC<EnumType : EVT> where EnumType.RawValue : Hashable {
 }
 

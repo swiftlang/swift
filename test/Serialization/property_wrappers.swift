@@ -6,8 +6,8 @@
 
 @testable import def_property_wrappers
 
-// SR-10844
-func testSR10844() {
+// https://github.com/apple/swift/issues/53234
+do {
   let holder = Holder()
   holder.b = 100
 }

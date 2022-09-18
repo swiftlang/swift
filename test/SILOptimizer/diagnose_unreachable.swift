@@ -344,12 +344,15 @@ while true {
  // no warning!
 
 
-// SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
-struct SR1010<T> {
+// rdar://25278336
+// https://github.com/apple/swift/issues/43622
+// Spurious 'will never be executed' warnings when building standard library
+
+struct S_43622<T> {
   var a : T
 }
 
-extension SR1010 {
+extension S_43622 {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   init(_ base: Int) {
     fatalError("unavailable function can't be called")
@@ -373,7 +376,7 @@ class FailingClass {
   }
 }
 
-// <https://bugs.swift.org/browse/SR-2729>
+// https://github.com/apple/swift/issues/45333
 // We should not report unreachable code inside protocol witness thunks
 
 protocol Fooable {
@@ -437,7 +440,7 @@ func sillyGenericExample() -> Never {
   }
 }
 
-// https://bugs.swift.org/browse/SR-7472
+// https://github.com/apple/swift/issues/50015
 
 protocol P {
     static var theThing: Self { get }

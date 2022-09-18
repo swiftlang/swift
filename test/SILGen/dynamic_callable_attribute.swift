@@ -61,7 +61,9 @@ class C {
 
 // CHECK-LABEL: sil hidden [ossa] @$s26dynamic_callable_attribute05test_A10_callablesyyAA1SV_AA2P1_pAA2P2_pxtAA1CCRbzlF : $@convention(thin) <T where T : C> (S, @in_guaranteed any P1, @in_guaranteed any P2, @guaranteed T) -> ()
 func test_dynamic_callables<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
-  // SR-12615: Compiler crash on @dynamicCallable IUO.
+  // https://github.com/apple/swift/issues/55059
+  // Compiler crash on '@dynamicCallable' IUO.
+  //
   // CHECK: function_ref @$s26dynamic_callable_attribute1SV15dynamicallyCall13withArgumentsSiSgSaySiG_tF : $@convention(method) (@guaranteed Array<Int>, S) -> Optional<Int>
   // CHECK: switch_enum %{{.+}} : $Optional<Int>
   let _: Int = s(0)

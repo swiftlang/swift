@@ -482,7 +482,10 @@ bb0(%0 : $*T, %1 : $*T):
   return %r1 : $()
 }
 
-// <rdar://problem/43888666> [SR-8526]: Memory leak after switch in release configuration
+// rdar://problem/43888666
+// https://github.com/apple/swift/issues/51046
+// Memory leak after switch in release configuration
+//
 // CHECK-LABEL: sil [ossa] @testGlobalHoistToStoredValue : $@convention(thin) (@owned AClass, @inout AClass) -> () {
 // CHECK: bb0(%0 : @owned $AClass, %1 : $*AClass):
 // CHECK-NEXT:   [[LOCAL:%.*]] = alloc_stack $AClass
