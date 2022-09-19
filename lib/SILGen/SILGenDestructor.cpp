@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILValue.h"
@@ -490,24 +491,89 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
                                                    CleanupLocation cleanupLoc,
                                                    SILBasicBlock *finishBB) {
   if (selfValue->getType().isAddress()) {
-    for (VarDecl *vd : nom->getStoredProperties()) {
-      const TypeLowering &ti = getTypeLowering(vd->getType());
-      if (ti.isTrivial())
-        continue;
+    if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
+      for (VarDecl *vd : nom->getStoredProperties()) {
+        const TypeLowering &ti = getTypeLowering(vd->getType());
+        if (ti.isTrivial())
+          continue;
 
-      SILValue addr = B.createStructElementAddr(
-          cleanupLoc, selfValue, vd, ti.getLoweredType().getAddressType());
-      addr = B.createBeginAccess(
-          cleanupLoc, addr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
-          false /*noNestedConflict*/, false /*fromBuiltin*/);
-      B.createDestroyAddr(cleanupLoc, addr);
-      B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+        SILValue addr = B.createStructElementAddr(
+            cleanupLoc, selfValue, vd, ti.getLoweredType().getAddressType());
+        addr = B.createBeginAccess(cleanupLoc, addr, SILAccessKind::Deinit,
+                                   SILAccessEnforcement::Static,
+                                   false /*noNestedConflict*/,
+                                   false /*fromBuiltin*/);
+        B.createDestroyAddr(cleanupLoc, addr);
+        B.createEndAccess(cleanupLoc, addr, false /*is aborting*/);
+      }
+    } else {
+      auto *origBlock = B.getInsertionBB();
+      auto *enumDecl = cast<EnumDecl>(nom);
+      SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8>
+          caseCleanups;
+      auto *contBlock = createBasicBlock();
+
+      for (auto *enumElt : enumDecl->getAllElements()) {
+        auto *enumBlock = createBasicBlock();
+        SILBuilder builder(enumBlock, enumBlock->begin());
+
+        if (enumElt->hasAssociatedValues()) {
+          auto *take = builder.createUncheckedTakeEnumDataAddr(
+              cleanupLoc, selfValue, enumElt);
+          builder.createDestroyAddr(cleanupLoc, take);
+        }
+
+        // Branch to the continue trampoline block.
+        builder.createBranch(cleanupLoc, contBlock);
+        caseCleanups.emplace_back(enumElt, enumBlock);
+
+        // Set the insertion point to after this enum block so we insert the
+        // next new block after this block.
+        B.setInsertionPoint(enumBlock);
+      }
+
+      B.setInsertionPoint(origBlock);
+      B.createSwitchEnumAddr(cleanupLoc, selfValue, nullptr, caseCleanups);
+      B.setInsertionPoint(contBlock);
     }
   } else {
-    auto *d =
-        B.createDestructureStruct(cleanupLoc, selfValue, OwnershipKind::Owned);
-    for (auto result : d->getResults()) {
-      B.emitDestroyValueOperation(cleanupLoc, result);
+    if (isa<StructDecl>(nom)) {
+      auto *d = B.createDestructureStruct(cleanupLoc, selfValue,
+                                          OwnershipKind::Owned);
+      for (auto result : d->getResults()) {
+        B.emitDestroyValueOperation(cleanupLoc, result);
+      }
+    } else {
+      auto *origBlock = B.getInsertionBB();
+      auto *enumDecl = dyn_cast<EnumDecl>(nom);
+      SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8>
+          caseCleanups;
+      auto *contBlock = createBasicBlock();
+
+      for (auto *enumElt : enumDecl->getAllElements()) {
+        auto *enumBlock = createBasicBlock();
+        SILBuilder builder(enumBlock, enumBlock->begin());
+
+        if (enumElt->hasAssociatedValues()) {
+          auto caseType = selfValue->getType().getEnumElementType(
+              enumElt, enumBlock->getParent());
+          auto *phiArg =
+              enumBlock->createPhiArgument(caseType, OwnershipKind::Owned);
+          builder.emitDestroyValueOperation(cleanupLoc, phiArg);
+        }
+
+        // Branch to the continue trampoline block.
+        builder.createBranch(cleanupLoc, contBlock);
+        caseCleanups.emplace_back(enumElt, enumBlock);
+
+        // Set the insertion point to after this enum block so we insert the
+        // next new block after this block.
+        B.setInsertionPoint(enumBlock);
+      }
+
+      B.setInsertionPoint(origBlock);
+      B.createSwitchEnum(cleanupLoc, selfValue, nullptr, caseCleanups);
+      B.setInsertionPoint(contBlock);
     }
   }
 
