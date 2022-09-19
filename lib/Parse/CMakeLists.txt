@@ -57,7 +57,7 @@ if (SWIFT_SWIFT_PARSER)
 
   target_include_directories(swiftParse
     PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../swift-syntax/Sources/SwiftParser
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../swift-syntax/Sources/SwiftCompilerSupport
   )
 
   target_compile_definitions(swiftParse

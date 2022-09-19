@@ -2945,6 +2945,10 @@ static bool usesFeatureParserValidation(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureParserSequenceFolding(Decl *decl) {
+  return false;
+}
+
 static void suppressingFeatureSpecializeAttributeWithAvailability(
                                         PrintOptions &options,
                                         llvm::function_ref<void()> action) {
