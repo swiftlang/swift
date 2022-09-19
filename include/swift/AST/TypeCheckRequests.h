@@ -3489,6 +3489,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class IsSemanticallyUnavailableRequest
+    : public SimpleRequest<IsSemanticallyUnavailableRequest,
+                           bool(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ClosureEffectsRequest
     : public SimpleRequest<ClosureEffectsRequest,
                            FunctionType::ExtInfo(ClosureExpr *),

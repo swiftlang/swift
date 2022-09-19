@@ -300,6 +300,11 @@ struct SILDeclRef {
   /// Retrieves the ASTContext from the underlying AST node being stored.
   ASTContext &getASTContext() const;
 
+  /// Retrieve the innermost declaration context corresponding to the underlying
+  /// node, which will either be the node itself (if it's also a declaration
+  /// context) or its parent context.
+  DeclContext *getInnermostDeclContext() const;
+
   llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
 
   SILLocation getAsRegularLocation() const;
