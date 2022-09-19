@@ -236,17 +236,17 @@ final class CustomStorage<T>: BaseStorage<T> { // Ok - no crash typechecking inh
 
 // https://github.com/apple/swift/issues/61061
 
-struct S61061<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S'}}
+struct S61061<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S61061'}}
   init(x:[[T: T]] = [:]) {} // expected-error{{default argument value of type '[AnyHashable : Any]' cannot be converted to type '[[T : T]]'}}
   // expected-error@-1{{generic parameter 'T' could not be inferred}}
 }
 
-struct S61061_1<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S1'}}
+struct S61061_1<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S61061_1'}}
   init(x:[(T, T)] = [:]) {} // expected-error{{default argument value of type '[AnyHashable : Any]' cannot be converted to type '[(T, T)]'}}
   // expected-error@-1{{generic parameter 'T' could not be inferred}}
 }
 
 // TODO(diagnostics): Should produce a conflicting types inferred for generic argument 'T'
-struct S61061_1<T> where T:Hashable {
+struct S61061_2<T> where T:Hashable {
   init(x:[(T, T)] = [(1, "")]) {} // expected-error{{type of expression is ambiguous without more context}}
 }
