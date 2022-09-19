@@ -91,6 +91,10 @@ public:
     return CompletionNode.dyn_cast<const KeyPathExpr *>() != nullptr;
   }
 
+  bool hasCompletion() const {
+    return !CompletionNode.isNull();
+  }
+
   /// If we are completing in a key path, returns the \c KeyPath that contains
   /// the code completion component.
   const KeyPathExpr *getKeyPathContainingCompletionComponent() const {

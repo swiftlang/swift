@@ -419,6 +419,52 @@ LabeledStmt *swift::findBreakOrContinueStmtTarget(
   return nullptr;
 }
 
+static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
+  // Strip coercions, which are necessary in source to disambiguate overloaded
+  // functions or generic functions, e.g.
+  //
+  //   if #_hasSymbol(foo as () -> ()) { ... }
+  //
+  if (auto CE = dyn_cast<CoerceExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(CE->getSubExpr());
+
+  // Unwrap curry thunks which are injected into the AST to wrap some forms of
+  // unapplied method references, e.g.
+  //
+  //   if #_hasSymbol(SomeStruct.foo(_:)) { ... }
+  //
+  if (auto ACE = dyn_cast<AutoClosureExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(
+        ACE->getUnwrappedCurryThunkExpr());
+
+  // Drill into the function expression for a DotSyntaxCallExpr. These sometimes
+  // wrap or are wrapped by an AutoClosureExpr.
+  //
+  //   if #_hasSymbol(someStruct.foo(_:)) { ... }
+  //
+  if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(E))
+    return getDeclRefProvidingExpressionForHasSymbol(DSCE->getFn());
+
+  return E;
+}
+
+static ConcreteDeclRef
+getReferencedDeclForHasSymbolCondition(ASTContext &Context, Expr *E) {
+  // Match DotSelfExprs (e.g. `SomeStruct.self`) when the type is static.
+  if (auto DSE = dyn_cast<DotSelfExpr>(E)) {
+    if (DSE->isStaticallyDerivedMetatype())
+      return DSE->getType()->getMetatypeInstanceType()->getAnyNominal();
+  }
+
+  if (auto declRefExpr = getDeclRefProvidingExpressionForHasSymbol(E)) {
+    if (auto CDR = declRefExpr->getReferencedDecl())
+      return CDR;
+  }
+
+  Context.Diags.diagnose(E->getLoc(), diag::has_symbol_invalid_expr);
+  return ConcreteDeclRef();
+}
+
 bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
                                                 bool &isFalsable,
                                                 DeclContext *dc) {
@@ -450,15 +496,29 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
 
   // Typecheck a #_hasSymbol condition.
   if (elt.getKind() == StmtConditionElement::CK_HasSymbol) {
-    auto Info = elt.getHasSymbolInfo();
-    auto E = Info->getSymbolExpr();
-    if (E) {
-      // FIXME: Implement #_hasSymbol typechecking.
-      (void)TypeChecker::typeCheckExpression(E, dc);
-      Info->setSymbolExpr(E);
-    }
     isFalsable = true;
 
+    auto Info = elt.getHasSymbolInfo();
+    auto E = Info->getSymbolExpr();
+    if (!E)
+      return false;
+
+    auto exprTy = TypeChecker::typeCheckExpression(E, dc);
+    Info->setSymbolExpr(E);
+
+    if (!exprTy)
+      return true;
+
+    auto CDR = getReferencedDeclForHasSymbolCondition(Context, E);
+    if (!CDR)
+      return true;
+
+    auto decl = CDR.getDecl();
+    if (!decl->isWeakImported(dc->getParentModule())) {
+      Context.Diags.diagnose(E->getLoc(), diag::has_symbol_decl_must_be_weak,
+                             decl->getDescriptiveKind(), decl->getName());
+    }
+    Info->setReferencedDecl(CDR);
     return false;
   }
 

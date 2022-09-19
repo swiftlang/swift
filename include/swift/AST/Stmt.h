@@ -397,6 +397,7 @@ public:
 ///
 class PoundHasSymbolInfo final : public ASTAllocated<PoundHasSymbolInfo> {
   Expr *SymbolExpr;
+  ConcreteDeclRef ReferencedDecl;
 
   SourceLoc PoundLoc;
   SourceLoc LParenLoc;
@@ -404,8 +405,8 @@ class PoundHasSymbolInfo final : public ASTAllocated<PoundHasSymbolInfo> {
 
   PoundHasSymbolInfo(SourceLoc PoundLoc, SourceLoc LParenLoc, Expr *SymbolExpr,
                      SourceLoc RParenLoc)
-      : SymbolExpr(SymbolExpr), PoundLoc(PoundLoc), LParenLoc(LParenLoc),
-        RParenLoc(RParenLoc){};
+      : SymbolExpr(SymbolExpr), ReferencedDecl(), PoundLoc(PoundLoc),
+        LParenLoc(LParenLoc), RParenLoc(RParenLoc){};
 
 public:
   static PoundHasSymbolInfo *create(ASTContext &Ctx, SourceLoc PoundLoc,
@@ -414,6 +415,9 @@ public:
 
   Expr *getSymbolExpr() const { return SymbolExpr; }
   void setSymbolExpr(Expr *E) { SymbolExpr = E; }
+
+  ConcreteDeclRef getReferencedDecl() { return ReferencedDecl; }
+  void setReferencedDecl(ConcreteDeclRef CDR) { ReferencedDecl = CDR; }
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }

@@ -1,7 +1,18 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/Library.swiftmodule -parse-as-library %t/Library.swift -enable-library-evolution
+// RUN: %target-swift-frontend -typecheck -verify %t/Client.swift -I %t
 
-func foo() {}
-func bar() {}
+// UNSUPPORTED: OS=windows-msvc
+
+//--- Library.swift
+
+public func foo() {}
+public func bar() {}
+
+//--- Client.swift
+
+@_weakLinked import Library
 
 if #_hasSymbol(foo) {}
 if #_hasSymbol(foo), #_hasSymbol(bar) {}
