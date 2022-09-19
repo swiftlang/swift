@@ -1900,8 +1900,10 @@ public:
 #endif
 
         bool isImportOfUnderlying = importer->getName() == target->getName();
+        auto *SF = ID->getDeclContext()->getParentSourceFile();
         bool treatAsError = enableTreatAsError &&
-                            !isImportOfUnderlying;
+                            !isImportOfUnderlying &&
+                            SF->Kind != SourceFileKind::Interface;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
