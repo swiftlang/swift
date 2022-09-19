@@ -146,7 +146,9 @@ private:
       os << "return *storageObjectPtr;\n";
       return;
     }
-    os << fullQualifiedType << " result(std::move(*storageObjectPtr));\n";
+    // Force a `std::move` on the resulting object.
+    os << fullQualifiedType << " result(static_cast<" << fullQualifiedType
+       << " &&>(*storageObjectPtr));\n";
     os << "storageObjectPtr->~" << typeName << "();\n";
     os << "return result;\n";
   }
