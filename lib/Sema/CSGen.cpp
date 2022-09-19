@@ -4365,9 +4365,15 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
   for (const auto &condElement : condition) {
     switch (condElement.getKind()) {
     case StmtConditionElement::CK_Availability:
-    case StmtConditionElement::CK_HasSymbol:
       // Nothing to do here.
       continue;
+
+    case StmtConditionElement::CK_HasSymbol: {
+      ASTContext &ctx = getASTContext();
+      ctx.Diags.diagnose(condElement.getStartLoc(),
+                         diag::has_symbol_unsupported_in_closures);
+      return true;
+    }
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
