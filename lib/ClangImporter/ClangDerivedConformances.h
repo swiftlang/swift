@@ -32,6 +32,18 @@ void conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                                   NominalTypeDecl *decl,
                                   const clang::CXXRecordDecl *clangDecl);
 
+/// If the decl provides an operator<, synthesize a conformance to the Comparable
+/// protocol.
+void conformToComparableIfNeeded(ClangImporter::Implementation &impl,
+                                 NominalTypeDecl *decl,
+                                 const clang::CXXRecordDecl *clangDecl);
+
+/// If the decl is a C++ collection, synthesize a conformance to the CxxCollection
+/// protocol, which is defined in the Cxx module.
+void conformToCxxCollectionIfNeeded(ClangImporter::Implementation &impl,
+                                    NominalTypeDecl *decl,
+                                    const clang::CXXRecordDecl *clangDecl);
+
 } // namespace swift
 
 #endif // SWIFT_CLANG_DERIVED_CONFORMANCES_H

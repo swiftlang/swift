@@ -38,9 +38,6 @@ public:
   bool operator!=(const ConstIterator &other) const {
     return value != other.value;
   }
-  bool operator<(const ConstIterator &other) const {
-    return value < other.value;
-  }
 };
 
 /// Same as ConstIterator, but also defines `operator<`.

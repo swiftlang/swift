@@ -53,9 +53,7 @@ getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   return dyn_cast_or_null<clang::TypeDecl>(iteratorCategory);
 }
 
-static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
-  auto id = decl->getASTContext().Id_EqualsOperator;
-
+static ValueDecl *getOperator(NominalTypeDecl *decl, Identifier id) {
   auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
     auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
     if (!equalEqual || !equalEqual->hasParameterList())
@@ -175,7 +173,7 @@ void swift::conformToCxxIteratorIfNeeded(
     return;
 
   // Check if present: `func ==`
-  auto equalEqual = getEqualEqualOperator(decl);
+  auto equalEqual = getOperator(decl, decl->getASTContext().Id_EqualsOperator);
   if (!equalEqual)
     return;
 
@@ -260,4 +258,63 @@ void swift::conformToCxxSequenceIfNeeded(
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSequence});
+}
+
+/// If the decl provides an operator<, synthesize a conformance to the Comparable
+/// protocol.
+void swift::conformToComparableIfNeeded(ClangImporter::Implementation &impl,
+                                        NominalTypeDecl *decl,
+                                        const clang::CXXRecordDecl *clangDecl) {
+  auto lessThan = getOperator(decl, decl->getASTContext().Id_LessThanOperator);
+  if (!lessThan)
+    return;
+
+  impl.addSynthesizedProtocolAttrs(decl,
+                                   {KnownProtocolKind::Comparable});
+}
+
+/// If the decl is a C++ collection, synthesize a conformance to the CxxCollection
+/// protocol, which is defined in the Cxx module.
+void swift::conformToCxxCollectionIfNeeded(ClangImporter::Implementation &impl,
+                                           NominalTypeDecl *decl,
+                                           const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxCollection", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  ProtocolDecl *cxxSequenceProto =
+      ctx.getProtocol(KnownProtocolKind::CxxSequence);
+  ProtocolDecl *cxxCollectionProto =
+      ctx.getProtocol(KnownProtocolKind::CxxCollection);
+  ProtocolDecl *comparableProto =
+      ctx.getProtocol(KnownProtocolKind::Comparable);
+  // If the Cxx module is missing, or does not include one of the necessary
+  // protocols, bail.
+  if (!cxxSequenceProto || !comparableProto || !cxxCollectionProto)
+    return;
+
+  auto sequenceConformance = decl->getModuleContext()->lookupConformance(
+      decl->getDeclaredInterfaceType(), cxxSequenceProto);
+  if (!sequenceConformance.isConcrete())
+    return;
+
+  // Check if present: `mutating func __beginUnsafe() -> RawIterator`
+  auto beginId = ctx.getIdentifier("__beginUnsafe");
+  auto begins = lookupDirectWithoutExtensions(decl, beginId);
+  if (begins.size() != 1)
+    return;
+  auto begin = dyn_cast<FuncDecl>(begins.front());
+  if (!begin)
+    return;
+  auto rawIteratorTy = begin->getResultInterfaceType();
+
+  auto rawIteratorConformanceRef = decl->getModuleContext()->lookupConformance(
+      rawIteratorTy, comparableProto);
+  if (!rawIteratorConformanceRef.isConcrete())
+    return;
+
+  impl.addSynthesizedProtocolAttrs(decl,
+                                   {KnownProtocolKind::CxxCollection});
 }
