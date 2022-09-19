@@ -2820,31 +2820,28 @@ CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext
         if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
           return Action::SkipChildren();
       }
-      
-      if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-        if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
-          auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
-          if(generic)
-            Reprs.push_back(existential);
-          auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
-          Action::VisitChildrenIf(meta || generic);
-        }
 
-        if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
-          if (!compositionRepr->isTypeReprAny())
-            Reprs.push_back(compositionRepr);
-          return Action::SkipChildren();
-        } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
-          if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
-              Reprs.clear();
-              Action::Continue();
-          }
-          Reprs.push_back(generic);
-        } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
-          if (identRepr->isProtocol(dc))
-            Reprs.push_back(identRepr);
+      if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
+        return Action::Continue();
+      
+      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+        auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
+        auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
+        if(generic)
+          Reprs.push_back(existential);
+        return Action::VisitChildrenIf(meta || generic);
+      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
+        if (!compositionRepr->isTypeReprAny())
+          Reprs.push_back(compositionRepr);
+        return Action::SkipChildren();
+      } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
+        // prevent any P<some P>
+        if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
+          Reprs.clear();
         }
- 
+      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
+        if (identRepr->isProtocol(dc))
+          Reprs.push_back(identRepr);
       }
       return Action::Continue();
     }

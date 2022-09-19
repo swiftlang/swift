@@ -11,26 +11,14 @@ protocol Q {
 
 extension Int: P { }
 extension String: P { }
+extension Array: P { }
+extension Set: Q {
+  typealias A = String
 
-// expected-note@+1{{requirement from conditional conformance of '[Double]' to 'Q'}}
-extension Array: Q where Element: P, Element: Equatable {
-  func f() -> Element {
-    return first!
-  }
-
-  func takesA(_: Element) {}
+  func f() -> String { }
+  func takesA(_: String) { }
 }
 
-extension Set: Q where Element: P, Element: Equatable { // expected-warning {{redundant conformance constraint 'Element' : 'Equatable'}}
-  func f() -> Element {
-    return first!
-  }
-
-  func takesA(_: Element) {}
-}
-
-// expected-note@+2{{where 'Q' = 'Int'}}
-// expected-note@+1{{in call to function 'takesImplicitQ'}}
 func takesImplicitQ(_ q: Q) -> Bool {
   // expected-error@+1 {{cannot convert value of type 'Int' to expected argument type '(Q).A'}}
   q.takesA(1)
@@ -38,25 +26,23 @@ func takesImplicitQ(_ q: Q) -> Bool {
   return q.f() == q.f()
 }
 
-func testTakesImplicitQ(arrayOfInts: [Int], setOfStrings: Set<String>, i: Int) {
-  _ = takesImplicitQ(arrayOfInts)
-  _ = takesImplicitQ(setOfStrings)
-  _ = takesImplicitQ(i) // expected-error{{global function 'takesImplicitQ' requires that 'Int' conform to 'Q'}}
-
-  let f = takesImplicitQ // expected-error{{generic parameter 'Q' could not be inferred}}
-  let _: ([String]) -> Bool = takesImplicitQ
-  let _: ([Double]) -> Bool = takesImplicitQ // expected-error{{global function 'takesImplicitQ' requires that 'Double' conform to 'P'}}
-  _ = f
+func testParam(_ a: Collection) -> Bool  {
+  a.isEmpty
 }
 
-// expected-note@+1{{where 'some P' = '[Int]'}}
-func takeMultiple<T>(_: T, _: some Q, _: some P) { }
+func testMultiple(_ a: Collection, _ b: Collection) -> Bool  {
+  a.count == b.count
+}
+
+// expected-note@+1{{where 'P' = 'Set<String>'}}
+func takeMultiple<T>(_: T, _: Q, _: P) { }
 
 func testTakeMultiple(
   arrayOfInts: [Int], setOfStrings: Set<String>, i: Int, d: Double
 ) {
-  takeMultiple(d, arrayOfInts, i)
-  takeMultiple(d, arrayOfInts, arrayOfInts) // expected-error{{global function 'takeMultiple' requires that '[Int]' conform to 'P'}}
+  takeMultiple(d, setOfStrings, i)
+  takeMultiple(d,setOfStrings, arrayOfInts)
+  takeMultiple(d, setOfStrings, setOfStrings) // expected-error{{global function 'takeMultiple' requires that 'Set<String>' conform to 'P'}}
 }
 
 // inout
@@ -67,15 +53,17 @@ func testInOut() {
   implicitInOut(&i)
 }
 
-// Combine with parameterized protocol types
-protocol PrimaryCollection<Element>: Collection {}
+// Prohibit use of opaque parameters in consuming positions.
+typealias FnType<T> = (T) -> Void
 
-extension Array: PrimaryCollection { }
-extension Set: PrimaryCollection { }
+func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
+func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
 
+
+// TO-DO Handle plain generic opaque parameters
 func takePrimaryCollections(
-  _ strings: PrimaryCollection<String>,
-  _ ints : PrimaryCollection<Int>
+  _ strings:some  Collection<String>,
+  _ ints : some Collection<Int>
 ) {
   for s in strings {
     let _: String = s
@@ -85,9 +73,9 @@ func takePrimaryCollections(
     let _: Int = i
   }
 }
-
+// TO-DO Handle plain generic opaque parameters
 func takeMatchedPrimaryCollections<T: Equatable>(
-  _ first: PrimaryCollection<T>, _ second: PrimaryCollection<T>
+  _ first: some Collection<T>, _ second: some Collection<T>
 ) -> Bool {
   first.elementsEqual(second)
 }
@@ -100,9 +88,3 @@ func testPrimaries(
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
 }
-
-// Prohibit use of opaque parameters in consuming positions.
-typealias FnType<T> = (T) -> Void
-
-func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
-func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}

@@ -31,15 +31,12 @@
 
 namespace swift {
 class ASTContext;
-class ASTWalker;
 class DeclName;
 class Type;
 class TypeDecl;
 class ValueDecl;
 struct SelfBounds;
 class NominalTypeDecl;
-class Evaluator;
-
 namespace ast_scope {
 class ASTSourceFileScope;
 class ASTScopeImpl;
@@ -644,7 +641,8 @@ private:
   void visitDoCatchStmt(DoCatchStmt *S);
   
 };
-  
+
+
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {

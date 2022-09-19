@@ -21,7 +21,7 @@ class SeasonalMenu : Cafe {
   func treats()  {}
 }
 
-func getCurrentMenu () -> some Cafe {
+func getCurrentMenu() -> some Cafe {
   return SeasonalMenu()
 }
 
@@ -29,11 +29,11 @@ var cafe = getCurrentMenu()
 cafe.breakfast()
 cafe.treats()
 
-// Type alias + custom protocols
+// Type alias + protocols
 typealias Snack = Shop & Cafe
 typealias Meal = Eatery
 
-struct CoffeeShop(): Snack {
+struct CoffeeShop: Snack {
   func coffee(){ }
   func breakfast() { }
   func treats(){ }
@@ -54,7 +54,7 @@ class TopTier: Eatery {
 func find() -> Eatery { } // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
 
 func find() -> AnyObject {
-  return CoffeeShop() // expected-error {{return expression of type 'CoffeeBar' expected to be an instance of a class or class-constrained type}}
+  return CoffeeShop() // expected-error {{return expression of type 'CoffeeShop' expected to be an instance of a class or class-constrained type}}
 }
 
 func find() -> Any {
@@ -83,23 +83,23 @@ protocol Basket {
   associatedtype Fruit
   associatedtype MiniBasket: Basket where MiniBasket.Fruit == Fruit
   
-  var fruits: [Fruit] { get set }
-  var minibaskets: [MiniBasket] { get set }
+  var fruit: [Fruit] { get set }
+  var minifruitbasket: [MiniBasket] { get set }
 }
 
 struct MyFruit : Basket {
-  var fruits: [String]
-  var minibaskets: [FruitforFriend]
+  var fruit: [String]
+  var minifruitbasket: [OtherFruit]
 }
 
-struct FruitforFriend : Basket {
-  var fruits: [String]
-  var minibaskets: [FruitforFriend]
+struct OtherFruit : Basket {
+  var fruit: [String]
+  var minifruitbasket: [OtherFruit]
 }
 
 func eat(_ myfruit: inout Basket) -> Basket {
-  myfruit.fruits.removeLast()
-  myfruit.minibaskets.removeLast()
+  myfruit.fruit.removeLast()
+  myfruit.minifruitbasket.removeLast()
   return myfruit
 }
 
