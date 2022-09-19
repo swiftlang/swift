@@ -155,6 +155,9 @@ static void splitConcreteEquivalenceClasses(
     TypeArrayView<GenericTypeParamType> genericParams,
     SmallVectorImpl<StructuralRequirement> &splitRequirements,
     unsigned &attempt) {
+  bool debug = machine->getDebugOptions().contains(
+      DebugFlags::SplitConcreteEquivalenceClass);
+
   unsigned maxAttempts =
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
 
@@ -172,6 +175,10 @@ static void splitConcreteEquivalenceClasses(
 
   splitRequirements.clear();
 
+  if (debug) {
+    llvm::dbgs() << "\n# Splitting concrete equivalence classes:\n";
+  }
+
   for (auto req : requirements) {
     if (shouldSplitConcreteEquivalenceClass(req, proto, machine)) {
       auto concreteType = machine->getConcreteType(
@@ -183,10 +190,24 @@ static void splitConcreteEquivalenceClasses(
                             req.getSecondType(), concreteType);
       splitRequirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
       splitRequirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
+
+      if (debug) {
+        llvm::dbgs() << "- First split: ";
+        firstReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n- Second split: ";
+        secondReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
       continue;
     }
 
     splitRequirements.push_back({req, SourceLoc(), /*inferred=*/false});
+
+    if (debug) {
+      llvm::dbgs() << "- Not split: ";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
   }
 }
 
