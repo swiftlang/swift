@@ -1430,6 +1430,24 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   SILDeclRef constant(decl);
   DeclContext *declCtx = decl->getDeclContext();
 
+  // Make sure that memberwise initializer of $Storage
+  // in a type wrapped type is always emitted because
+  // it would later be used to initialize $storage property.
+  if (auto *SD = declCtx->getSelfStructDecl()) {
+    auto &ctx = SD->getASTContext();
+    if (SD->getName() == ctx.Id_TypeWrapperStorage &&
+        decl->isMemberwiseInitializer()) {
+#ifndef NDEBUG
+        auto *wrapped = SD->getDeclContext()->getSelfNominalTypeDecl();
+        assert(wrapped->hasTypeWrapper());
+#endif
+
+      emitOrDelayFunction(*this, constant,
+                          /*forceEmission=*/true);
+      return;
+    }
+  }
+
   if (declCtx->getSelfClassDecl()) {
     // Designated initializers for classes, as well as @objc convenience
     // initializers, have have separate entry points for allocation and
