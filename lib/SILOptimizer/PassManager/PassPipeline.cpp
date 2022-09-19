@@ -133,15 +133,18 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Begin Ownership Optimizations
   //
 
-  P.addMoveOnlyAddressChecker(); // Check noImplicitCopy and move only types for
-                                 // addresses.
-  P.addMoveKillsCopyableAddressesChecker(); // Check _move for addresses.
-  P.addMoveOnlyObjectChecker();          // Check noImplicitCopy and move only
-                                         // types for objects
-  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
-                                         // value.
-  P.addTrivialMoveOnlyTypeEliminator();  // Lower move only wrapped trivial
-                                         // types.
+  // Check noImplicitCopy and move only types for addresses.
+  P.addMoveOnlyAddressChecker();
+  // Check noImplicitCopy and move only types for objects
+  P.addMoveOnlyObjectChecker();
+  // Convert last destroy_value to deinits.
+  P.addMoveOnlyDeinitInsertion();
+  // Lower move only wrapped trivial types.
+  P.addTrivialMoveOnlyTypeEliminator();
+  // Check no uses after _move of a value in an address.
+  P.addMoveKillsCopyableAddressesChecker();
+  // No uses after _move of copyable value.
+  P.addMoveKillsCopyableValuesChecker();
 
   //
   // End Ownership Optimizations
