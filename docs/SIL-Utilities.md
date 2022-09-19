@@ -40,6 +40,20 @@ To be used for all kind of basic-block work-list algorithms.
 **Related C++ utilities:** `BasicBlockWorklist`
 **Status:** done
 
+## SIL data structures
+
+#### `SmallProjectionPath`
+Describes a path of projections.
+
+**Related C++ utilities:** `AccessPath`, `ProjectionPath`  
+**Status:** done
+
+### `ProjectedValue`
+A projected value is defined by the original value and a projection path.
+
+**Related C++ utilities:** `AccessPath`
+**Status:** done
+
 ## Building SIL
 
 #### `static Builder.insert(after:, insertFunc: (Builder) -> ())`
@@ -59,12 +73,6 @@ This consists of four protocols, which can be implemented to walk up or down the
 
 **Uses:** instruction classifications  
 **Related C++ utilities:** `AccessPath`, `RCIdentityAnalysis`, various def-use/use-def walkers in optimization passes.  
-**Status:** done
-
-#### `SmallProjectionPath`
-Describes a path of projections.
-
-**Related C++ utilities:** `AccessPath`, `ProjectionPath`  
 **Status:** done
 
 #### `EscapeInfo`

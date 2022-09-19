@@ -15,12 +15,12 @@
 // - `AccessPath`: a pair of an `AccessBase` and `SmallProjectionPath` with the
 //   the path describing the specific address (in terms of projections) of the
 //   access.
-// - `AccessStoragePath`: identifies the reference (or a value which contains a
-//   reference) an address originates from.
+// - Access storage path (which is of type `ProjectedValue`): identifies the
+//   reference (or a value which contains a reference) an address originates from.
 //
 // The snippet below shows the relationship between the access concepts.
 // ```
-// %ref = struct_extract %value, #f1                                         AccessStoragePath
+// %ref = struct_extract %value, #f1                                        access storage path
 // %base = ref_element_addr %ref, #f2         AccessBase       AccessPath            |
 // %scope = begin_access %base                AccessScope          |                 |
 // %t = tuple_element_addr %scope, 0                               |                 |
@@ -251,22 +251,6 @@ struct AccessPath : CustomStringConvertible {
     }
     return false
   }
-}
-
-/// An `AccessStoragePath` is the reference (or a value which contains a reference)
-/// an address originates from.
-/// In the following example the `storage` is `contains_ref` with `path` `"s0.c0.s0"`
-/// ```
-///   %ref = struct_extract %contains_ref : $S, #S.l
-///   %base = ref_element_addr %ref : $List, #List.x
-///   %addr = struct_element_addr %base : $X, #X.e
-///   store %v to [trivial] %addr : $*Int
-/// ```
-struct AccessStoragePath {
-  let storage: Value
-
-  /// Only valid paths are: `"<sequence of value projections>.<one reference projection>.<sequence of address projections>"`
-  let path: SmallProjectionPath
 }
 
 private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
@@ -506,10 +490,19 @@ extension Value {
   }
 }
 
-/// A ValueUseDef walker that identifies which values a reference of an access path might
-/// originate from.
+/// A ValueUseDef walker that that visits access storage paths of an address.
+///
+/// An access storage path is the reference (or a value which contains a reference)
+/// an address originates from.
+/// In the following example the `storage` is `contains_ref` with `path` `"s0.c0.s0"`
+/// ```
+///   %ref = struct_extract %contains_ref : $S, #S.l
+///   %base = ref_element_addr %ref : $List, #List.x
+///   %addr = struct_element_addr %base : $X, #X.e
+///   store %v to [trivial] %addr : $*Int
+/// ```
 protocol AccessStoragePathWalker : ValueUseDefWalker where Path == SmallProjectionPath {
-  mutating func visit(access: AccessStoragePath)
+  mutating func visit(accessStoragePath: ProjectedValue)
 }
 
 extension AccessStoragePathWalker {
@@ -534,7 +527,7 @@ extension AccessStoragePathWalker {
   }
 
   mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
-    visit(access: AccessStoragePath(storage: value, path: path))
+    visit(accessStoragePath: value.at(path))
     return .continueWalk
   }
 }
