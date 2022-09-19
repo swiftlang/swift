@@ -144,8 +144,6 @@ struct WalkerCache<Path : WalkingPath> {
     return cache[value.hashable, default: CacheEntry()].needWalk(path: path)
   }
 
-  var isEmpty: Bool { cache.isEmpty }
-  
   mutating func clear() {
     inlineEntry0 = nil
     inlineEntry1 = nil

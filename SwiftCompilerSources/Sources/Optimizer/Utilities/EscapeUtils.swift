@@ -12,13 +12,154 @@
 
 import SIL
 
-/// This protocol is used to customize `EscapeInfo` by implementing `visitUse` and
-/// `visitDef` which are called for all uses and definitions ("direct" and "transitive") encountered
-/// during a walk.
-protocol EscapeInfoVisitor {
-  typealias UseResult = EscapeInfo<Self>.UseVisitResult
-  typealias DefResult = EscapeInfo<Self>.DefVisitResult
-  typealias EscapePath = EscapeInfo<Self>.EscapePath
+extension ProjectedValue {
+
+  /// Returns true if the projected value escapes.
+  ///
+  /// This function finds potential escape points by starting a walk at the value and
+  /// alternately walking in two directions:
+  /// * Starting at allocations, walks down from defs to uses ("Where does the value go to?")
+  /// * Starting at stores, walks up from uses to defs ("Were does the value come from?")
+  ///
+  /// The value "escapes" if the walk reaches a point where the further flow of the value
+  /// cannot be tracked anymore.
+  /// Example:
+  /// \code
+  ///   %1 = alloc_ref $X    // 1. initial value: walk down to the `store`
+  ///   %2 = alloc_stack $X  // 3. walk down to %3
+  ///   store %1 to %2       // 2. walk up to `%2`
+  ///   %3 = load %2         // 4. continue walking down to the `return`
+  ///   return %3            // 5. The value is escaping!
+  /// \endcode
+  ///
+  /// The traversal stops at points where the current path doesn't match the original projection.
+  /// For example, let's assume this function is called on a projected value with path `s0.c1`.
+  /// \code
+  ///    %value : $Struct<X>                         // current path == s0.c1, the initial value
+  ///    %ref = struct_extract %value, #field0       // current path == c1
+  ///    %addr = ref_element_addr %ref, #field2      // mismatch: `c1` != `c2` -> ignored
+  /// \endcode
+  ///
+  /// Trivial values are ignored, even if the path matches.
+  ///
+  /// The algorithm doesn't distinguish between addresses and values. Addresses are considered
+  /// as escaping if either:
+  /// * the address escapes (e.g. to an inout parameter of an unknown function)
+  /// * or if the value, which is stored at the address, escapes.
+  ///
+  /// The provided `visitor` can be used to override the handling a certain defs and uses during
+  /// the walk. See `EscapeVisitor` for details.
+  ///
+  /// By default, the walk starts in upward direction. This makes sense most of the time. But for
+  /// some use cases, e.g. to check if an argument escapes inside the function (without
+  /// considering potential escapes in the caller), the walk must start downwards - by setting
+  /// `startWalkingDown` to true.
+  ///
+  func isEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
+                                    startWalkingDown: Bool = false,
+                                    _ context: PassContext) -> Bool {
+    var walker = EscapeWalker(visitor: visitor, analyzeAddresses: false, context)
+    return walker.isEscaping(self, startWalkingDown: startWalkingDown)
+  }
+
+  /// Returns true if the projected address value escapes.
+  ///
+  /// This function is similar to the non-address version: `isEscaping() -> Bool`, but
+  /// the projected value (which is expected to be an address) is handled differently:
+  /// * Loads from the addresss are ignored. So it's really about the _address_ and
+  ///   not the value stored at the address.
+  /// * Addresses with trivial types are _not_ ignored.
+  ///
+  func isAddressEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
+                                           startWalkingDown: Bool = false,
+                                           _ context: PassContext) -> Bool {
+    var walker = EscapeWalker(visitor: visitor, analyzeAddresses: true, context)
+    return walker.isEscaping(self, startWalkingDown: startWalkingDown)
+  }
+
+  /// Returns the result of the visitor if the projected value does not escape.
+  ///
+  /// This function is similar to `isEscaping() -> Bool`, but instead of returning a Bool,
+  /// it returns the `result` of the `visitor`, if the projected value does not escape.
+  /// Returns nil, if the projected value escapes.
+  ///
+  func visit<V: EscapeVisitorWithResult>(using visitor: V,
+                                         startWalkingDown: Bool = false,
+                                         _ context: PassContext) -> V.Result? {
+    var walker = EscapeWalker(visitor: visitor, analyzeAddresses: false, context)
+    if walker.isEscaping(self, startWalkingDown: startWalkingDown) {
+      return nil
+    }
+    return walker.visitor.result
+  }
+
+  /// Returns the result of the visitor if the projected address value does not escape.
+  ///
+  /// This function is similar to `isAddressEscaping() -> Bool`, but instead of returning a Bool,
+  /// it returns the `result` of the `visitor`, if the projected address does not escape.
+  /// Returns nil, if the projected address escapes.
+  ///
+  func visitAddress<V: EscapeVisitorWithResult>(using visitor: V,
+                                         startWalkingDown: Bool = false,
+                                         _ context: PassContext) -> V.Result? {
+    var walker = EscapeWalker(visitor: visitor, analyzeAddresses: true, context)
+    if walker.isEscaping(self, startWalkingDown: startWalkingDown) {
+      return nil
+    }
+    return walker.visitor.result
+  }
+  
+  /// Returns true if the address can alias with `rhs`.
+  ///
+  /// Example:
+  ///   %1 = struct_element_addr %s, #field1
+  ///   %2 = struct_element_addr %s, #field2
+  ///
+  /// `%s`.canAddressAlias(with: `%1`) -> true
+  /// `%s`.canAddressAlias(with: `%2`) -> true
+  /// `%1`.canAddressAlias(with: `%2`) -> false
+  ///
+  func canAddressAlias(with rhs: ProjectedValue, _ context: PassContext) -> Bool {
+    // self -> rhs will succeed (= return false) if self is a non-escaping "local" object,
+    // but not necessarily rhs.
+    if !isAddressEscaping(using: EscapesToValueVisitor(target: rhs), context) {
+      return false
+    }
+    // The other way round: rhs -> self will succeed if rhs is a non-escaping "local" object,
+    // but not necessarily self.
+    if !rhs.isAddressEscaping(using: EscapesToValueVisitor(target: self), context) {
+      return false
+    }
+    return true
+  }
+
+}
+
+extension Value {
+  /// The un-projected version of `ProjectedValue.isEscaping()`.
+  func isEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
+                                    _ context: PassContext) -> Bool {
+    return self.at(SmallProjectionPath()).isEscaping(using: visitor, context)
+  }
+
+  /// The un-projected version of `ProjectedValue.visit()`.
+  func visit<V: EscapeVisitorWithResult>(using visitor: V,
+                                         _ context: PassContext) -> V.Result? {
+    return self.at(SmallProjectionPath()).visit(using: visitor, context)
+  }
+}
+
+private func escapePath(_ path: SmallProjectionPath) -> EscapeUtilityTypes.EscapePath {
+  EscapeUtilityTypes.EscapePath(projectionPath: path, followStores: false, knownType: nil)
+}
+
+/// This protocol is used to customize `ProjectedValue.isEscaping` (and similar functions)
+/// by implementing `visitUse` and `visitDef` which are called for all uses and definitions
+/// encountered during a walk.
+protocol EscapeVisitor {
+  typealias UseResult = EscapeUtilityTypes.UseVisitResult
+  typealias DefResult = EscapeUtilityTypes.DefVisitResult
+  typealias EscapePath = EscapeUtilityTypes.EscapePath
   
   /// Called during the DefUse walk for each use
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult
@@ -27,7 +168,7 @@ protocol EscapeInfoVisitor {
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult
 }
 
-extension EscapeInfoVisitor {
+extension EscapeVisitor {
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     return .continueWalk
   }
@@ -36,35 +177,52 @@ extension EscapeInfoVisitor {
   }
 }
 
-/// A utility for checking if a value escapes and for finding the escape points.
-///
-/// The EscapeInfo starts at the initial value and alternately walks in two directions:
-/// * Starting at allocations, walks down from defs to uses ("Where does the value go to?")
-/// * Starting at stores, walks up from uses to defs ("Were does the value come from?")
-///
-/// The result of the walk indicates if the initial value "escapes" or not.
-/// The value escapes if the walk reaches a point where the further flow of the
-/// value cannot be tracked anymore.
-/// Example:
-/// \code
-///   %1 = alloc_ref $X    // 1. initial value: walk down to the `store`
-///   %2 = alloc_stack $X  // 3. walk down to %3
-///   store %1 to %2       // 2. walk up to `%2`
-///   %3 = load %2         // 4. continue walking down to the `return`
-///   return %3            // 5. The value is escaping!
-/// \endcode
-///
-/// The algorithm doesn't distinguish between addresses and values, i.e. loads
-/// and stores are treated as simple forwarding instructions, like casts.
-/// For escaping it doesn't make a difference if a value or an address pointing to
-/// the value, escapes.
-/// An exception are `isEscaping(address: Value)` and similar functions: they ignore
-/// values which are loaded from the address in question.
-struct EscapeInfo<V: EscapeInfoVisitor> {
+/// A visitor which returns a `result`.
+protocol EscapeVisitorWithResult : EscapeVisitor {
+  associatedtype Result
+  var result: Result { get }
+}
+
+/// Lets `ProjectedValue.isEscaping` return true if the value is "escaping" to the `target` value.
+struct EscapesToValueVisitor : EscapeVisitor {
+  let target: ProjectedValue
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
+      return .abort
+    }
+    if operand.instruction is ReturnInst {
+      // Anything which is returned cannot escape to an instruction inside the function.
+      return .ignore
+    }
+    return .continueWalk
+  }
+}
+
+/// Lets `ProjectedValue.isEscaping` return true if the value is "escaping" to the `target` instruction.
+struct EscapesToInstructionVisitor : EscapeVisitor {
+  let target: Instruction
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    let user = operand.instruction
+    if user == target {
+      return .abort
+    }
+    if user is ReturnInst {
+      // Anything which is returned cannot escape to an instruction inside the function.
+      return .ignore
+    }
+    return .continueWalk
+  }
+}
+
+private struct DefaultVisitor : EscapeVisitor {}
+
+struct EscapeUtilityTypes {
 
   /// The EscapePath is updated and maintained during the up-walk and down-walk.
   ///
-  /// It's passed to the EscapeInfoVisitor's `visitUse` and `visitDef`.
+  /// It's passed to the EscapeVisitor's `visitUse` and `visitDef`.
   struct EscapePath: SmallProjectionWalkingPath {
     /// During the walk, a projection path indicates where the initial value is
     /// contained in an aggregate.
@@ -155,181 +313,46 @@ struct EscapeInfo<V: EscapeInfoVisitor> {
     case continueWalk
     case abort
   }
-  
-  //===--------------------------------------------------------------------===//
-  //                           The top-level API
-  //===--------------------------------------------------------------------===//
-
-  init(calleeAnalysis: CalleeAnalysis, visitor: V) {
-    self.walker = EscapeInfoWalker(calleeAnalysis: calleeAnalysis, visitor: visitor)
-  }
-  private var walker: EscapeInfoWalker<V>
-  
-  /// Returns the visitor passed as argument during initialization.
-  /// It is also possible to mutate the visitor to reuse it for performance. See ``EscapeAliasAnalysis/canReferenceSameField``.
-  var visitor: V {
-    get { walker.visitor }
-    
-    _modify { yield &walker.visitor }
-  }
-  
-  /// Returns true if `object`, or any sub-objects which are selected by `path`, can escape.
-  ///
-  /// For example, let's assume this function is called with a struct, containing a reference,
-  /// and a path of `s0.c*`:
-  /// \code
-  ///    %value : $Struct<X>                         // path == s0.c*, the initial `object`
-  ///    %ref = struct_extract %value, #field0       // path == c*
-  ///    %ref1 = struct_extract %value, #field1      // ignored - not selected by path
-  ///    %addr = ref_element_addr %ref, #some_field  // path is empty
-  ///    %v = load %addr                             // path is empty
-  ///    return %v                                   // escaping!
-  /// \endcode
-  ///
-  /// Trivial values are ignored, even if they are selected by `path`.
-  mutating func isEscaping(object: Value, path: SmallProjectionPath = SmallProjectionPath()) -> Bool {
-    walker.start(forAnalyzingAddresses: false)
-    defer { walker.cleanup() }
-    
-    let escPath = EscapePath(projectionPath: path, followStores: false, knownType: nil)
-    if let p = walker.walkUpCache.needWalk(for: object, path: escPath) {
-      return walker.walkUp(addressOrValue: object, path: p) == .abortWalk
-    }
-    return false
-  }
-
-  /// Returns true if the definition of `value` is escaping.
-  ///
-  /// In contrast to `isEscaping`, this function starts with a walk-down instead of a walk-up from `value`.
-  mutating func isEscapingWhenWalkingDown(object: Value, path: SmallProjectionPath = SmallProjectionPath()) -> Bool {
-    walker.start(forAnalyzingAddresses: false)
-    defer { walker.cleanup() }
-    
-    let escPath = EscapePath(projectionPath: path, followStores: false, knownType: nil)
-    return walker.cachedWalkDown(addressOrValue: object, path: escPath) == .abortWalk
-  }
-
-  /// Returns true if any address of `value`, which is selected by `path`, can escape.
-  ///
-  /// For example, let's assume this function is called with a struct, containing a reference,
-  /// and a path of `s0.c*.v**`:
-  /// \code
-  ///    %value : $Struct<X>                         // path == s0.c*.v**, the initial `value`
-  ///    %ref = struct_extract %value, #field0       // path == c*.v**
-  ///    %selected_addr = ref_element_addr %ref, #x  // path == v**,       the selected address
-  ///    apply %f(%selected_addr)                    // escaping!
-  /// \endcode
-  ///
-  /// There are two differences to `isEscaping(object:)`:
-  /// * Loads from the selected address(es) are ignored. So it's really about the _address_ and
-  ///   not the value stored at the address.
-  /// * Addresses with trivial types are _not_ ignored.
-  mutating
-  func isEscaping(addressesOf value: Value, path: SmallProjectionPath = SmallProjectionPath(.anyValueFields)) -> Bool {
-    walker.start(forAnalyzingAddresses: true)
-    defer { walker.cleanup() }
-    
-    let escPath = EscapePath(projectionPath: path, followStores: false, knownType: nil)
-    if let p = walker.walkUpCache.needWalk(for: value, path: escPath) {
-      return walker.walkUp(addressOrValue: value, path: p) == .abortWalk
-    }
-    return false
-  }
 }
 
-/// A lightweight form of AliasAnalysis that checks whether given two addresses can alias
-/// by checking that the addresses don't escape and that during a walk of one of
-/// the values, a use does not result in the other value.
-struct EscapeAliasAnalysis {
-  private struct Visitor : EscapeInfoVisitor {
-    // TODO: maybe we can create an empty value instead of option?
-    var target: Value?
-    func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      // Note: since we are checking the value of an operand, we are ignoring address
-      // projections with no uses. This is no problem. It just requires a fix_lifetime for
-      // each address to test in alias-analysis test files.
-      if operand.value == target! { return .abort }
-      if operand.instruction is ReturnInst { return .ignore }
-      return .continueWalk
-    }
-  }
+/// EscapeWalker is both a DefUse walker and UseDef walker. It implements both, the up-, and down-walk.
+fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
+                                                    AddressDefUseWalker,
+                                                    ValueUseDefWalker,
+                                                    AddressUseDefWalker {
+  typealias Path = EscapeUtilityTypes.EscapePath
   
-  private var calleeAnalysis: CalleeAnalysis
-  private var walker: EscapeInfo<Visitor>
-  init(calleeAnalysis: CalleeAnalysis) {
-    self.calleeAnalysis = calleeAnalysis
-    self.walker = EscapeInfo(calleeAnalysis: calleeAnalysis, visitor: Visitor())
-  }
-  
-  /// Returns true if the selected address(es) of `lhs`/`lhsPath` can reference the same field as
-  /// the selected address(es) of `rhs`/`rhsPath`.
-  ///
-  /// Example:
-  ///   %1 = struct_element_addr %s, #field1    // true for (%1, %s)
-  ///   %2 = struct_element_addr %s, #field2    // true for (%2, %s), false for (%1,%2)
-  ///
-  mutating func canReferenceSameField(_ lhs: Value, path lhsPath: SmallProjectionPath = SmallProjectionPath(.anyValueFields),
-                                      _ rhs: Value, path rhsPath: SmallProjectionPath = SmallProjectionPath(.anyValueFields)) -> Bool {
-    
-    // lhs -> rhs will succeed (= return false) if lhs is a non-escaping "local" object,
-    // but not necessarily rhs.
-    walker.visitor.target = rhs
-    if !walker.isEscaping(addressesOf: lhs, path: lhsPath) {
-      return false
-    }
-    // The other way round: rhs -> lhs will succeed if rhs is a non-escaping "local" object,
-    // but not necessarily lhs.
-    walker.visitor.target = lhs
-    if !walker.isEscaping(addressesOf: rhs, path: rhsPath) {
-      return false
-    }
-    return true
-  }
-}
-
-
-/// The walker used by `EscapeInfo` to check whether a value escapes.
-/// It is both a DefUse walker and UseDef walker. If during a walkDown a store or copy
-/// is reached then
-fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
-                                                            AddressDefUseWalker,
-                                                            ValueUseDefWalker,
-                                                            AddressUseDefWalker {
-  typealias Path = EscapeInfo<V>.EscapePath
-  
-  init(calleeAnalysis: CalleeAnalysis, visitor: V) {
-    self.calleeAnalysis = calleeAnalysis
+  init(visitor: V, analyzeAddresses: Bool, _ context: PassContext) {
+    self.calleeAnalysis = context.calleeAnalysis
     self.visitor = visitor
-  }
-  
-  mutating func start(forAnalyzingAddresses: Bool) {
-    assert(walkDownCache.isEmpty && walkUpCache.isEmpty)
-    analyzeAddresses = forAnalyzingAddresses
+    self.analyzeAddresses = analyzeAddresses
   }
 
-  mutating func cleanup() {
-    walkDownCache.clear()
-    walkUpCache.clear()
+  mutating func isEscaping(_ projValue: ProjectedValue, startWalkingDown: Bool) -> Bool {
+    if startWalkingDown {
+      return walkDown(addressOrValue: projValue.value, path: escapePath(projValue.path)) == .abortWalk
+    } else {
+      return walkUp(addressOrValue: projValue.value, path: escapePath(projValue.path)) == .abortWalk
+    }
   }
 
   //===--------------------------------------------------------------------===//
   //                                   Walking down
   //===--------------------------------------------------------------------===//
   
-  /// Main entry point called by ``EscapeInfo``
-  mutating func cachedWalkDown(addressOrValue: Value, path: Path) -> WalkResult {
-    if let path = walkDownCache.needWalk(for: addressOrValue, path: path) {
-      return walkDown(addressOrValue: addressOrValue, path: path)
-    } else {
-      return .continueWalk
-    }
-  }
-  
   mutating func walkDown(addressOrValue: Value, path: Path) -> WalkResult {
     if addressOrValue.type.isAddress {
       return walkDownUses(ofAddress: addressOrValue, path: path)
     } else {
       return walkDownUses(ofValue: addressOrValue, path: path)
+    }
+  }
+  
+  mutating func cachedWalkDown(addressOrValue: Value, path: Path) -> WalkResult {
+    if let path = walkDownCache.needWalk(for: addressOrValue, path: path) {
+      return walkDown(addressOrValue: addressOrValue, path: path)
+    } else {
+      return .continueWalk
     }
   }
   
@@ -656,7 +679,6 @@ fileprivate struct EscapeInfoWalker<V: EscapeInfoVisitor> : ValueDefUseWalker,
   //                                   Walking up
   //===--------------------------------------------------------------------===//
   
-  /// Main entry point called by ``EscapeInfo``
   mutating func walkUp(addressOrValue: Value, path: Path) -> WalkResult {
     if addressOrValue.type.isAddress {
       return walkUp(address: addressOrValue, path: path)

@@ -75,10 +75,15 @@ This consists of four protocols, which can be implemented to walk up or down the
 **Related C++ utilities:** `AccessPath`, `RCIdentityAnalysis`, various def-use/use-def walkers in optimization passes.  
 **Status:** done
 
-#### `EscapeInfo`
+#### Escape Utilities
 Escape analysis, which is used e.g. in stack promotion or alias analysis.
+Escape analysis is usable through the following methods of `ProjectedValue` and `Value`:
+* `isEscaping()`
+* `isAddressEscaping()`
+* `visit()`
+* `visitAddress()`
 
-**Uses:** Walk Utils, `SmallProjectionPath`  
+**Uses:** Walk Utilities, `ProjectedValue`
 **Related C++ utilities:** `EscapeAnalysis`, various def-use walkers in optimization passes.  
 **Status:** done
 
@@ -86,7 +91,7 @@ Escape analysis, which is used e.g. in stack promotion or alias analysis.
 A set of utilities for analyzing memory accesses. It defines the following concepts:
 * `AccessBase`: represents the base address of a memory access.
 * `AccessPath`: a pair of an `AccessBase` and `SmallProjectionPath` with the path describing the specific address (in terms of projections) of the access.
-* `AccessStoragePath`: identifies the reference (or a value which contains a reference) an address originates from.
+* Access storage path (which is of type `ProjectedValue`): identifies the reference - or a value which contains a reference - an address originates from.
 
 **Uses:** Walk utils
 **Related C++ utilities:** `AccessPath`  and other access utilities.

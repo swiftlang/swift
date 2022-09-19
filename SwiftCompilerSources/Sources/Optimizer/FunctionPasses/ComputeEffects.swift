@@ -30,12 +30,11 @@ let computeEffects = FunctionPass(name: "compute-effects", {
   (function: Function, context: PassContext) in
   var argsWithDefinedEffects = getArgIndicesWithDefinedEffects(of: function)
 
-  struct IgnoreRecursiveCallVisitor : EscapeInfoVisitor {
+  struct IgnoreRecursiveCallVisitor : EscapeVisitor {
     func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       return isOperandOfRecursiveCall(operand) ? .ignore : .continueWalk
     }
   }
-  var escapeInfo = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: IgnoreRecursiveCallVisitor())
   var newEffects = Stack<ArgumentEffect>(context)
   let returnInst = function.returnInstruction
 
@@ -47,7 +46,8 @@ let computeEffects = FunctionPass(name: "compute-effects", {
     if argsWithDefinedEffects.contains(arg.index) { continue }
     
     // First check: is the argument (or a projected value of it) escaping at all?
-    if !escapeInfo.isEscapingWhenWalkingDown(object: arg, path: SmallProjectionPath(.anything)) {
+    if !arg.at(.anything).isEscaping(using: IgnoreRecursiveCallVisitor(),
+                                     startWalkingDown: true, context) {
       newEffects.push(ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: SmallProjectionPath(.anything)))
       continue
     }
@@ -78,7 +78,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
   
-  struct ArgEffectsVisitor : EscapeInfoVisitor {
+  struct ArgEffectsVisitor : EscapeVisitorWithResult {
     enum EscapeDestination {
       case notSet
       case toReturn(SmallProjectionPath)
@@ -131,8 +131,8 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
     }
   }
   
-  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: ArgEffectsVisitor())
-  if walker.isEscapingWhenWalkingDown(object: arg, path: argPath) {
+  guard let result = arg.at(argPath).visit(using: ArgEffectsVisitor(),
+                                           startWalkingDown: true, context) else {
     return false
   }
   
@@ -142,7 +142,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   }
 
   let effect: ArgumentEffect
-  switch walker.visitor.result {
+  switch result {
   case .notSet:
     effect = ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: argPath)
   case .toReturn(let toPath):
@@ -200,7 +200,7 @@ private
 func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjectionPath,
                                toPath: SmallProjectionPath,
                                returnInst: ReturnInst, _ context: PassContext) -> Bool {
-  struct IsExclusiveReturnEscapeVisitor : EscapeInfoVisitor {
+  struct IsExclusiveReturnEscapeVisitor : EscapeVisitor {
     let fromArgument: Argument
     let fromPath: SmallProjectionPath
     let toPath: SmallProjectionPath
@@ -228,14 +228,13 @@ func isExclusiveEscapeToReturn(fromArgument: Argument, fromPath: SmallProjection
     }
   }
   let visitor = IsExclusiveReturnEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath, toPath: toPath)
-  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: visitor)
-  return !walker.isEscaping(object: returnInst.operand, path: toPath)
+  return !returnInst.operand.at(toPath).isEscaping(using: visitor, context)
 }
 
 private
 func isExclusiveEscapeToArgument(fromArgument: Argument, fromPath: SmallProjectionPath,
                                  toArgumentIndex: Int, toPath: SmallProjectionPath, _ context: PassContext) -> Bool {
-  struct IsExclusiveArgumentEscapeVisitor : EscapeInfoVisitor {
+  struct IsExclusiveArgumentEscapeVisitor : EscapeVisitor {
     let fromArgument: Argument
     let fromPath: SmallProjectionPath
     let toArgumentIndex: Int
@@ -253,8 +252,7 @@ func isExclusiveEscapeToArgument(fromArgument: Argument, fromPath: SmallProjecti
   }
   let visitor = IsExclusiveArgumentEscapeVisitor(fromArgument: fromArgument, fromPath: fromPath,
                                                  toArgumentIndex: toArgumentIndex, toPath: toPath)
-  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: visitor)
   let toArg = fromArgument.function.arguments[toArgumentIndex]
-  return !walker.isEscaping(object: toArg, path: toPath)
+  return !toArg.at(toPath).isEscaping(using: visitor, startWalkingDown: true, context)
 }
 

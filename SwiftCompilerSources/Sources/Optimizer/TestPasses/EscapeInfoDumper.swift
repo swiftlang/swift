@@ -22,12 +22,12 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
 
   print("Escape information for \(function.name):")
   
-  struct Visitor : EscapeInfoVisitor {
-    var results: Set<String> =  Set()
+  struct Visitor : EscapeVisitorWithResult {
+    var result: Set<String> =  Set()
     
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       if operand.instruction is ReturnInst {
-        results.insert("return[\(path.projectionPath)]")
+        result.insert("return[\(path.projectionPath)]")
         return .ignore
       }
       return .continueWalk
@@ -37,7 +37,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
       guard let arg = def as? FunctionArgument else {
         return .continueWalkUp
       }
-      results.insert("arg\(arg.index)[\(path.projectionPath)]")
+      result.insert("arg\(arg.index)[\(path.projectionPath)]")
       return .walkDown
     }
   }
@@ -46,19 +46,17 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info", {
   for inst in function.instructions {
     if let allocRef = inst as? AllocRefInst {
       
-      var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor())
-      let escapes = walker.isEscaping(object: allocRef)
-      let results = walker.visitor.results
-      
-      let res: String
-      if escapes {
-        res = "global"
-      } else if results.isEmpty {
-        res = " -    "
+      let resultStr: String
+      if let result = allocRef.visit(using: Visitor(), context) {
+        if result.isEmpty {
+          resultStr = " -    "
+        } else {
+          resultStr = Array(result).sorted().joined(separator: ",")
+        }
       } else {
-        res = Array(results).sorted().joined(separator: ",")
+        resultStr = "global"
       }
-      print("\(res): \(allocRef)")
+      print("\(resultStr): \(allocRef)")
     }
   }
   print("End function \(function.name)\n")
@@ -90,7 +88,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
     }
   }
   
-  struct Visitor : EscapeInfoVisitor {
+  struct Visitor : EscapeVisitor {
     let apply: Instruction
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       let user = operand.instruction
@@ -111,13 +109,14 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
     for apply in applies {
       let path = AliasAnalysis.getPtrOrAddressPath(for: value)
       
-      var escapeInfo = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor(apply: apply))
-      let escaping = escapeInfo.isEscaping(addressesOf: value, path: path)
-      print("  \(escaping ? "==>" : "-  ") \(apply)")
+      if value.at(path).isAddressEscaping(using: Visitor(apply: apply), context) {
+        print("  ==> \(apply)")
+      } else {
+        print("  -   \(apply)")
+      }
     }
   }
   
-  var eaa = EscapeAliasAnalysis(calleeAnalysis: context.calleeAnalysis)
   // test `canReferenceSameField` for each pair of `fix_lifetime`.
   if !valuesToCheck.isEmpty {
     for lhsIdx in 0..<(valuesToCheck.count - 1) {
@@ -127,9 +126,14 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info", {
         let rhs = valuesToCheck[rhsIdx]
         print(lhs)
         print(rhs)
-        if eaa.canReferenceSameField(
-            lhs, path: AliasAnalysis.getPtrOrAddressPath(for: lhs),
-            rhs, path: AliasAnalysis.getPtrOrAddressPath(for: rhs)) {
+
+        let projLhs = lhs.at(AliasAnalysis.getPtrOrAddressPath(for: lhs))
+        let projRhs = rhs.at(AliasAnalysis.getPtrOrAddressPath(for: rhs))
+        let mayAlias = projLhs.canAddressAlias(with: projRhs, context)
+        assert(mayAlias == projRhs.canAddressAlias(with: projLhs, context),
+               "canAddressAlias(with:) must be symmetric")
+
+        if mayAlias {
           print("may alias")
         } else {
           print("no alias")
