@@ -134,6 +134,10 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation)
 
+/// Whether to fold sequence expressions in the syntax tree produced by the
+/// Swift Swift parser.
+EXPERIMENTAL_FEATURE(ParserSequenceFolding)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
