@@ -50,16 +50,9 @@ extension ProjectedValue {
   /// The provided `visitor` can be used to override the handling a certain defs and uses during
   /// the walk. See `EscapeVisitor` for details.
   ///
-  /// By default, the walk starts in upward direction. This makes sense most of the time. But for
-  /// some use cases, e.g. to check if an argument escapes inside the function (without
-  /// considering potential escapes in the caller), the walk must start downwards - by setting
-  /// `startWalkingDown` to true.
-  ///
-  func isEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
-                                    startWalkingDown: Bool = false,
-                                    _ context: PassContext) -> Bool {
+  func isEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(), _ context: PassContext) -> Bool {
     var walker = EscapeWalker(visitor: visitor, analyzeAddresses: false, context)
-    return walker.isEscaping(self, startWalkingDown: startWalkingDown)
+    return walker.walkUp(addressOrValue: value, path: escapePath(path)) == .abortWalk
   }
 
   /// Returns true if the projected address value escapes.
@@ -70,11 +63,21 @@ extension ProjectedValue {
   ///   not the value stored at the address.
   /// * Addresses with trivial types are _not_ ignored.
   ///
-  func isAddressEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
-                                           startWalkingDown: Bool = false,
-                                           _ context: PassContext) -> Bool {
+  func isAddressEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(), _ context: PassContext) -> Bool {
     var walker = EscapeWalker(visitor: visitor, analyzeAddresses: true, context)
-    return walker.isEscaping(self, startWalkingDown: startWalkingDown)
+    return walker.walkUp(addressOrValue: value, path: escapePath(path)) == .abortWalk
+  }
+
+  /// Returns true if the function argument escapes, but ignoring any potential escapes in the caller.
+  ///
+  /// This function is similar to `ProjectedValue.isEscaping()`, but it ignores any potential
+  /// escapes which might have happened before the argument's function is called.
+  /// Technically, this means that the walk starts downwards instead of upwards.
+  ///
+  func isEscapingWhenWalkingDown<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
+                                                   _ context: PassContext) -> Bool {
+    var walker = EscapeWalker(visitor: visitor, analyzeAddresses: false, context)
+    return walker.walkDown(addressOrValue: value, path: escapePath(path)) == .abortWalk
   }
 
   /// Returns the result of the visitor if the projected value does not escape.
@@ -83,11 +86,9 @@ extension ProjectedValue {
   /// it returns the `result` of the `visitor`, if the projected value does not escape.
   /// Returns nil, if the projected value escapes.
   ///
-  func visit<V: EscapeVisitorWithResult>(using visitor: V,
-                                         startWalkingDown: Bool = false,
-                                         _ context: PassContext) -> V.Result? {
+  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, analyzeAddresses: false, context)
-    if walker.isEscaping(self, startWalkingDown: startWalkingDown) {
+    if walker.walkUp(addressOrValue: value, path: escapePath(path)) == .abortWalk {
       return nil
     }
     return walker.visitor.result
@@ -99,16 +100,29 @@ extension ProjectedValue {
   /// it returns the `result` of the `visitor`, if the projected address does not escape.
   /// Returns nil, if the projected address escapes.
   ///
-  func visitAddress<V: EscapeVisitorWithResult>(using visitor: V,
-                                         startWalkingDown: Bool = false,
-                                         _ context: PassContext) -> V.Result? {
+  func visitAddress<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, analyzeAddresses: true, context)
-    if walker.isEscaping(self, startWalkingDown: startWalkingDown) {
+    if walker.walkUp(addressOrValue: value, path: escapePath(path)) == .abortWalk {
       return nil
     }
     return walker.visitor.result
   }
   
+  /// Returns the result of the visitor if the projected value does not escape - ignoring
+  /// any potential escapes in the caller.
+  ///
+  /// This function is similar to `isEscapingIgnoringCallerEscapes() -> Bool`, but instead
+  /// of returning a Bool, it returns the `result` of the `visitor`.
+  ///
+  func visitByWalkingDown<V: EscapeVisitorWithResult>(using visitor: V,
+                                                      _ context: PassContext) -> V.Result? {
+    var walker = EscapeWalker(visitor: visitor, analyzeAddresses: false, context)
+    if walker.walkDown(addressOrValue: value, path: escapePath(path)) == .abortWalk {
+      return nil
+    }
+    return walker.visitor.result
+  }
+
   /// Returns true if the address can alias with `rhs`.
   ///
   /// Example:
@@ -132,19 +146,16 @@ extension ProjectedValue {
     }
     return true
   }
-
 }
 
 extension Value {
   /// The un-projected version of `ProjectedValue.isEscaping()`.
-  func isEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
-                                    _ context: PassContext) -> Bool {
+  func isEscaping<V: EscapeVisitor>(using visitor: V = DefaultVisitor(), _ context: PassContext) -> Bool {
     return self.at(SmallProjectionPath()).isEscaping(using: visitor, context)
   }
 
   /// The un-projected version of `ProjectedValue.visit()`.
-  func visit<V: EscapeVisitorWithResult>(using visitor: V,
-                                         _ context: PassContext) -> V.Result? {
+  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
     return self.at(SmallProjectionPath()).visit(using: visitor, context)
   }
 }
@@ -326,14 +337,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     self.calleeAnalysis = context.calleeAnalysis
     self.visitor = visitor
     self.analyzeAddresses = analyzeAddresses
-  }
-
-  mutating func isEscaping(_ projValue: ProjectedValue, startWalkingDown: Bool) -> Bool {
-    if startWalkingDown {
-      return walkDown(addressOrValue: projValue.value, path: escapePath(projValue.path)) == .abortWalk
-    } else {
-      return walkUp(addressOrValue: projValue.value, path: escapePath(projValue.path)) == .abortWalk
-    }
   }
 
   //===--------------------------------------------------------------------===//
