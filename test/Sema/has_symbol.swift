@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol_helper.swift -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
 
 // UNSUPPORTED: OS=windows-msvc
 
@@ -99,4 +99,36 @@ func testInvalidExpressionsDiagnostics() {
   if #_hasSymbol(C.classFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
   if #_hasSymbol(1 as Int) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
   if #_hasSymbol(1 as S) {} // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
+}
+
+func testMultiStatementClosure() {
+  let _: () -> Void = { // expected-error {{unable to infer closure type in the current context}}
+    if #_hasSymbol(global) {} // expected-error 2 {{#_hasSymbol is not supported in closures}}
+  }
+  
+  let _: () -> Void = { // expected-error {{unable to infer closure type in the current context}}
+    if #_hasSymbol(global) {} // expected-error 2 {{#_hasSymbol is not supported in closures}}
+    localFunc()
+  }
+}
+
+protocol View {}
+
+@resultBuilder struct ViewBuilder {
+  static func buildBlock<Content>(_ content: Content) -> Content where Content : View { fatalError() }
+  static func buildEither<Content>(first content: Content) -> Content where Content : View { fatalError() }
+  static func buildEither<Content>(second content: Content) -> Content where Content : View { fatalError() }
+}
+
+struct Image : View {
+}
+
+struct MyView {
+  @ViewBuilder var body: some View {
+    if #_hasSymbol(global) { // expected-error {{#_hasSymbol is not supported in closures}}
+      Image()
+    } else {
+      Image()
+    }
+  }
 }
