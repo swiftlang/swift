@@ -42,12 +42,29 @@ static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
 }
 
 /// Check whether a root AST node should be profiled.
-static bool shouldProfile(ASTNode N) {
+static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   // Do not profile AST nodes with invalid source locations.
   if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Skipping ASTNode: invalid start/end locations\n");
     return false;
+  }
+  if (!Constant) {
+    // We should only ever have a null SILDeclRef for top-level code, which is
+    // always user-written, and should always be profiled.
+    // FIXME: Once top-level code is unified under a single SILProfiler, this
+    // case can be eliminated.
+    assert(isa<TopLevelCodeDecl>(N.get<Decl *>()));
+    return true;
+  }
+
+  // Do not profile AST nodes in unavailable contexts.
+  auto *DC = Constant.getInnermostDeclContext();
+  if (auto *D = DC->getInnermostDeclarationDeclContext()) {
+    if (D->isSemanticallyUnavailable()) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: unavailable context\n");
+      return false;
+    }
   }
 
   if (auto *E = N.dyn_cast<Expr *>()) {
@@ -96,13 +113,13 @@ static bool shouldProfile(ASTNode N) {
 }
 
 namespace swift {
-bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
+bool doesASTRequireProfiling(SILModule &M, ASTNode N, SILDeclRef Constant) {
   // If profiling isn't enabled, don't profile anything.
   auto &Opts = M.getOptions();
   if (Opts.UseProfile.empty() && !Opts.GenerateProfile)
     return false;
 
-  return shouldProfile(N);
+  return shouldProfile(N, Constant);
 }
 } // namespace swift
 
@@ -157,7 +174,7 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
 
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
   const auto &Opts = M.getOptions();
-  if (!doesASTRequireProfiling(M, N))
+  if (!doesASTRequireProfiling(M, N, Ref))
     return nullptr;
 
   if (!canCreateProfilerForAST(N, Ref)) {
