@@ -14,6 +14,11 @@
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
 
+// rdar://99714807
+// UNSUPPORTED: OS=ios
+// UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=watchos
+
 import Distributed
 import FakeDistributedActorSystems
 
