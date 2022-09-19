@@ -1,4 +1,4 @@
-//===--- EscapeInfo.swift - Finds escape points of a value ----------------===//
+//===--- EscapeUtils.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
