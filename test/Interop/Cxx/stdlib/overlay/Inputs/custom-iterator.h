@@ -38,6 +38,47 @@ public:
   bool operator!=(const ConstIterator &other) const {
     return value != other.value;
   }
+  bool operator<(const ConstIterator &other) const {
+    return value < other.value;
+  }
+};
+
+/// Same as ConstIterator, but also defines `operator<`.
+struct ComparableIterator {
+private:
+  int value;
+
+public:
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  ComparableIterator(int value) : value(value) {}
+  ComparableIterator(const ComparableIterator &other) = default;
+
+  const int &operator*() const { return value; }
+
+  ComparableIterator &operator++() {
+    value++;
+    return *this;
+  }
+  ComparableIterator operator++(int) {
+    auto tmp = ComparableIterator(value);
+    value++;
+    return tmp;
+  }
+
+  bool operator==(const ComparableIterator &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const ComparableIterator &other) const {
+    return value != other.value;
+  }
+  bool operator<(const ComparableIterator &other) const {
+    return value < other.value;
+  }
 };
 
 /// Same as ConstIterator, but defines `operator==` as a non-member.

@@ -9,6 +9,11 @@ struct SimpleSequence {
   ConstIterator end() const { return ConstIterator(5); }
 };
 
+struct SimpleCollection {
+  ComparableIterator begin() const { return ComparableIterator(1); }
+  ComparableIterator end() const { return ComparableIterator(5); }
+};
+
 struct SimpleSequenceWithOutOfLineEqualEqual {
   ConstIteratorOutOfLineEq begin() const { return ConstIteratorOutOfLineEq(1); }
   ConstIteratorOutOfLineEq end() const { return ConstIteratorOutOfLineEq(5); }
