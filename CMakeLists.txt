@@ -740,6 +740,7 @@ get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(SWIFT_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
+set(SWIFT_SHIMS_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/stdlib/public/SwiftShims")
 set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
@@ -790,6 +791,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories(BEFORE
   ${SWIFT_MAIN_INCLUDE_DIR}
   ${SWIFT_INCLUDE_DIR}
+  ${SWIFT_SHIMS_INCLUDE_DIR}
   )
 
 # Configuration flags passed to all of our invocations of gyb.  Try to
@@ -1197,7 +1199,7 @@ else()
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
-    add_subdirectory(stdlib/public/SwiftShims)
+    add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
 endif()
 

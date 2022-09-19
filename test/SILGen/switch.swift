@@ -1050,7 +1050,8 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   }
 }
 
-// SR-3518
+// https://github.com/apple/swift/issues/46106
+//
 // CHECK-LABEL: sil hidden [ossa] @$s6switch43testMultiPatternsWithOuterScopeSameNamedVar4base6filterySiSg_AEtF
 func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
@@ -1288,10 +1289,11 @@ func partial_address_only_tuple_dispatch_with_fail_case(_ name: Klass, _ value: 
 }
 
 // This was crashing the ownership verifier at some point and was reported in
-// SR-6664. Just make sure that we still pass the ownership verifier.
-
+// https://github.com/apple/swift/issues/49213. Just make sure that we still
+// pass the ownership verifier.
+//
 // `indirect` is necessary; generic parameter is necessary.
-indirect enum SR6664_Base<Element> {
+indirect enum IndirectGenericEnum<Element> {
   // Tuple associated value is necessary; one element must be a function,
   // the other must be a non-function using the generic parameter.
   // (The original associated value was `(where: (Element) -> Bool, of: Element?)`,

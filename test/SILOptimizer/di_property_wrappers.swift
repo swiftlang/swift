@@ -64,7 +64,7 @@ struct IntStruct {
   }
 
   // Check that we don't crash if the function has unrelated generic parameters.
-  // SR-11484
+  // https://github.com/apple/swift/issues/53884
   mutating func setit<V>(_ v: V) {
     wrapped = 5
   }
@@ -435,54 +435,49 @@ func testComposed() {
   // CHECK-NEXT: .. init Wrapper2<Int>(wrappedValue: 17)
 }
 
-// SR-11477
-
-@propertyWrapper
-struct SR_11477_W {
-  let name: String
-
-  init(name: String = "DefaultParamInit") {
-    self.name = name
-  }
-
-  var wrappedValue: Int {
-    get { return 0 }
-  }
-}
-
-@propertyWrapper
- struct SR_11477_W1 {
-   let name: String
-
-   init() {
-     self.name = "Init"
-   }
-
-   init(name: String = "DefaultParamInit") {
-     self.name = name
-   }
-
-   var wrappedValue: Int {
-     get { return 0 }
-   }
- }
-
-struct SR_11477_C {
-  @SR_11477_W var property: Int
-  @SR_11477_W1 var property1: Int
-
-  init() {}
-  func foo() { print(_property.name) }
-  func foo1() { print(_property1.name) }
-}
-
+// https://github.com/apple/swift/issues/53877
 func testWrapperInitWithDefaultArg() {
+  @propertyWrapper
+  struct W1 {
+    let name: String
+
+    init(name: String = "DefaultParamInit") {
+      self.name = name
+    }
+
+    var wrappedValue: Int { 0 }
+  }
+
+  @propertyWrapper
+  struct W2 {
+    let name: String
+
+    init() {
+      self.name = "Init"
+    }
+
+    init(name: String = "DefaultParamInit") {
+      self.name = name
+    }
+
+    var wrappedValue: Int { 0 }
+  }
+
+  struct S {
+    @W1 var property1: Int
+    @W2 var property2: Int
+
+    init() {}
+    func foo1() { print(_property1.name) }
+    func foo2() { print(_property2.name) }
+  }
+
   // CHECK: ## InitWithDefaultArg
   print("\n## InitWithDefaultArg")
-  let use = SR_11477_C()
+  let use = S()
   
-  use.foo()
   use.foo1()
+  use.foo2()
   // CHECK-NEXT: DefaultParamInit
   // CHECK-NEXT: Init
 }
@@ -514,37 +509,37 @@ public final class Synchronized<Value> {
   }
 }
 
+// https://github.com/apple/swift/issues/54775
+func test54775() {
+  struct S {
+    @Wrapper var wrapped: Int = 10
+    var str: String
 
-struct SR_12341 {
-  @Wrapper var wrapped: Int = 10
-  var str: String
+    init() {
+       wrapped = 42
+       str = ""
+       wrapped = 27
+    }
 
-  init() {
-     wrapped = 42
-     str = ""
-     wrapped = 27
+    init(condition: Bool) {
+      wrapped = 42
+      wrapped = 27
+      str = ""
+    }
   }
 
-  init(condition: Bool) {
-    wrapped = 42
-    wrapped = 27
-    str = ""
-  }
-}
-
-func testSR_12341() {
-  // CHECK: ## SR_12341
-  print("\n## SR_12341")
+  // CHECK: ## issue-54775
+  print("n## issue-54775")
 
   // CHECK-NEXT:   .. init 10
   // CHECK-NEXT:   .. init 42
   // CHECK-NEXT:   .. set 27
-  _ = SR_12341()
+  _ = S()
 
   // CHECK-NEXT:   .. init 10
   // CHECK-NEXT:   .. init 42
   // CHECK-NEXT:   .. init 27
-  _ = SR_12341(condition: true)
+  _ = S(condition: true)
 }
 
 @propertyWrapper
@@ -628,6 +623,6 @@ testOptIntStruct()
 testDefaultNilOptIntStruct()
 testComposed()
 testWrapperInitWithDefaultArg()
-testSR_12341()
+test54775()
 testNonMutatingSetterStruct()
 testStructWithClassWrapper()

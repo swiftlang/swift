@@ -10,7 +10,7 @@ func foo(baz: Never) -> Int { // expected-note {{'baz' is of type 'Never' which 
 
 func bar(baz: Never) -> Int {} // ok
 
-// SR-13432
+// https://github.com/apple/swift/issues/55873
 func map<T>(_ block: (Never) -> T) {}
 map { arg in // expected-note {{'arg' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
   5 // expected-warning {{will never be executed}}

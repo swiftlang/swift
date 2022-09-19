@@ -46,3 +46,17 @@ func testAsync() async {
   }
   mutableVariable += 1
 }
+
+// rdar://99518344 - @Sendable in nested positions
+@preconcurrency typealias OtherHandler = @Sendable () -> Void
+@preconcurrency typealias Handler = (@Sendable () -> OtherHandler?)?
+@preconcurrency func f(arg: Int, withFn: Handler?) {}
+
+class C {
+  func test() {
+    f(arg: 5, withFn: { [weak self] () -> OtherHandler? in
+        _ = self
+        return nil
+      })
+  }
+}

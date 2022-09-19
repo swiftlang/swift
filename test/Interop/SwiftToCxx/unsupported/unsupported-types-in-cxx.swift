@@ -4,9 +4,11 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK:     takesFloat
-// CHECK-NOT: takesTuple
+// CHECK:     takeFloat
+// CHECK-NOT: takes
 
-public func takesFloat(_ x: Float) {}
+public func takeFloat(_ x: Float) {}
 
 public func takesTuple(_ x: (Float, Float)) {}
+
+public func takesVoid(_ x: ()) {}

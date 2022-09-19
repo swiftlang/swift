@@ -12,6 +12,8 @@
 // Adds Symbol Graph JSON serialization to other types.
 //===----------------------------------------------------------------------===//
 
+#include "JSON.h"
+#include "Symbol.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileUnit.h"
@@ -21,7 +23,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "JSON.h"
 
 void swift::symbolgraphgen::serialize(const llvm::VersionTuple &VT,
                                       llvm::json::OStream &OS) {
@@ -69,6 +70,8 @@ void swift::symbolgraphgen::serialize(const ExtensionDecl *Extension,
       if (const auto *ExtendedModule = ExtendedNominal->getModuleContext()) {
         OS.attribute("extendedModule", ExtendedModule->getNameStr());
       }
+
+      OS.attribute("typeKind", Symbol::getKind(ExtendedNominal).first);
     }
 
     SmallVector<Requirement, 4> FilteredRequirements;

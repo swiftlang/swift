@@ -257,6 +257,7 @@ getConcurrencyFixBehavior(
   switch (constraintKind) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::Subtype:
     break;
 
   default:

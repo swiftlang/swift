@@ -2104,8 +2104,9 @@ namespace {
         return handleInfinite(structType, properties);
       }
 
-      if (handleResilience(structType, D, properties))
+      if (handleResilience(structType, D, properties)) {
         return handleAddressOnly(structType, properties);
+      }
 
       if (D->isCxxNonTrivial()) {
         properties.setAddressOnly();
@@ -2140,6 +2141,13 @@ namespace {
       // Type-level annotations override inferred behavior.
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
+
+      if (D->isMoveOnly()) {
+        properties.setNonTrivial();
+        if (properties.isAddressOnly())
+          return handleMoveOnlyAddressOnly(structType, properties);
+        return handleMoveOnlyReference(structType, properties);
+      }
 
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
@@ -2210,6 +2218,13 @@ namespace {
       // Type-level annotations override inferred behavior.
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
+
+      if (D->isMoveOnly()) {
+        properties.setNonTrivial();
+        if (properties.isAddressOnly())
+          return handleMoveOnlyAddressOnly(enumType, properties);
+        return handleMoveOnlyReference(enumType, properties);
+      }
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);

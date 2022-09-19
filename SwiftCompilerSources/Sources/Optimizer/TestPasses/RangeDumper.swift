@@ -29,7 +29,7 @@ let rangeDumper = FunctionPass(name: "dump-ranges", {
     if let sli = inst as? StringLiteralInst {
       switch sli.string {
         case "begin":
-          precondition(begin == nil, "more than one begin instruction")
+          assert(begin == nil, "more than one begin instruction")
           begin = sli
         case "end":
           ends.append(sli)
@@ -62,16 +62,16 @@ let rangeDumper = FunctionPass(name: "dump-ranges", {
   verify(instRange.blockRange, context)
   
   for i in ins {
-    precondition(instRange.contains(i))
-    precondition(instRange.inclusiveRangeContains(i))
+    assert(instRange.contains(i))
+    assert(instRange.inclusiveRangeContains(i))
   }
   for e in ends {
-    precondition(!instRange.contains(e))
-    precondition(instRange.inclusiveRangeContains(e))
+    assert(!instRange.contains(e))
+    assert(instRange.inclusiveRangeContains(e))
   }
   for o in outs {
-    precondition(!instRange.contains(o))
-    precondition(!instRange.inclusiveRangeContains(o))
+    assert(!instRange.contains(o))
+    assert(!instRange.inclusiveRangeContains(o))
   }
 })
 
@@ -89,8 +89,8 @@ private func verify(_ blockRange: BasicBlockRange, _ context: PassContext) {
   }
 
   for b in blockRange.begin.function.blocks {
-    precondition(blockRange.contains(b) == inRange.contains(b))
-    precondition(blockRange.inclusiveRangeContains(b) == inInclusiveRange.contains(b))
+    assert(blockRange.contains(b) == inRange.contains(b))
+    assert(blockRange.inclusiveRangeContains(b) == inInclusiveRange.contains(b))
   }
 }
 

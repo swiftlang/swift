@@ -588,13 +588,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
-  if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
-    Opts.RequireExplicitAvailability = true;
-    if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
-      Opts.RequireExplicitAvailabilityTarget = A->getValue();
-    }
-  }
-
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
@@ -720,6 +713,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
+    StringRef diagLevel = A->getValue();
+    if (diagLevel == "warn") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+    } else if (diagLevel == "error") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
+    } else if (diagLevel == "ignore") {
+      Opts.RequireExplicitAvailability = None;
+    } else {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unknown_require_explicit_availability,
+                     diagLevel);
+    }
+  } else if (Args.getLastArg(OPT_require_explicit_availability,
+                             OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailabilityTarget = A->getValue();
   }
 
   Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
@@ -1284,6 +1299,8 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+  Opts.EmitExtensionBlockSymbols =
+      Args.hasArg(OPT_emit_extension_block_symbols);
 
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =

@@ -247,6 +247,20 @@ performOptimizationsUsingLegacyPassManger(const IRGenOptions &Opts,
   // Set up a pipeline.
   PassManagerBuilderWrapper PMBuilder(Opts);
 
+  // If we're generating a profile, add the lowering pass now.
+  if (Opts.GenerateProfile) {
+    // TODO: Surface the option to emit atomic profile counter increments at
+    // the driver level.
+    // Configure the module passes.
+    legacy::PassManager ModulePasses;
+    ModulePasses.add(createTargetTransformInfoWrapperPass(
+        TargetMachine->getTargetIRAnalysis()));
+    InstrProfOptions Options;
+    Options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
+    ModulePasses.add(createInstrProfilingLegacyPass(Options));
+    ModulePasses.run(*Module);
+  }
+
   if (Opts.shouldOptimize() && !Opts.DisableLLVMOptzns) {
     PMBuilder.OptLevel = 2; // -Os
     PMBuilder.SizeLevel = 1; // -Os
@@ -356,15 +370,6 @@ performOptimizationsUsingLegacyPassManger(const IRGenOptions &Opts,
   legacy::PassManager ModulePasses;
   ModulePasses.add(createTargetTransformInfoWrapperPass(
       TargetMachine->getTargetIRAnalysis()));
-
-  // If we're generating a profile, add the lowering pass now.
-  if (Opts.GenerateProfile) {
-    // TODO: Surface the option to emit atomic profile counter increments at
-    // the driver level.
-    InstrProfOptions Options;
-    Options.Atomic = bool(Opts.Sanitizers & SanitizerKind::Thread);
-    ModulePasses.add(createInstrProfilingLegacyPass(Options));
-  }
 
   PMBuilder.populateModulePassManager(ModulePasses);
 
@@ -1355,6 +1360,11 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       irgen.emitDynamicReplacements();
     }
 
+    // Emit coverage mapping info. This needs to happen after we've emitted
+    // any lazy definitions, as we need to know whether or not we emitted a
+    // profiler increment for a given coverage map.
+    IGM.emitCoverageMapping();
+
     // Emit symbols for eliminated dead methods.
     IGM.emitVTableStubs();
 
@@ -1604,6 +1614,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();
+
+  // Emit coverage mapping info. This needs to happen after we've emitted
+  // any lazy definitions, as we need to know whether or not we emitted a
+  // profiler increment for a given coverage map.
+  irgen.emitCoverageMapping();
 
   IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
 

@@ -4057,6 +4057,21 @@ generateForEachStmtConstraints(
           AwaitExpr::createImplicit(ctx, /*awaitLoc=*/SourceLoc(), nextCall);
     }
 
+    // The iterator type must conform to IteratorProtocol.
+    {
+      ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
+          cs.getASTContext(), stmt->getForLoc(),
+          isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+                  : KnownProtocolKind::IteratorProtocol);
+      if (!iteratorProto)
+        return None;
+
+      cs.setContextualType(
+          nextRef->getBase(),
+          TypeLoc::withoutLoc(iteratorProto->getDeclaredInterfaceType()),
+          CTP_ForEachSequence);
+    }
+
     SolutionApplicationTarget nextTarget(nextCall, dc, CTP_Unused,
                                          /*contextualType=*/Type(),
                                          /*isDiscarded=*/false);

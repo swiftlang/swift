@@ -5,8 +5,8 @@
 
 import Lib
 
-// CHECK: sil{{.*}} @[[TESTSR6874:[^ ]+10testSR6874[^ ]+]] :
-func testSR6874() {
+// CHECK: sil{{.*}} @[[TEST1:[^ ]+5test1[^ ]+]] :
+func test1() {
   // The important lines in this test are the strong_retains, which refer to
   // private types defined in LibCore. Normally we shouldn't have references to
   // non-public declarations in inlinable code, but because SIL passes can break
@@ -20,9 +20,9 @@ func testSR6874() {
   // reference a private type, but to *resolve a cross-reference to a private
   // type.*
   //
-  // This is the situation in SR-6874 (simplified). I'm not sure of a simpler
-  // way to reliably trigger the issue. But if this test breaks, please try to
-  // find one.
+  // This is the situation in https://github.com/apple/swift/issues/49423
+  // (simplified). I'm not sure of a simpler way to reliably trigger the issue.
+  // But if this test breaks, please try to find one.
   //
   // (We may want to revisit this whole thing later, as it violates the model.
   // But it's also useful for performance in non-resilient code.)
@@ -47,5 +47,5 @@ func testSR6874() {
   // CHECK: strong_retain [[REF]] : $Baz.NestedInternalClass.DoublyNestedInternalClass
   // CHECK: apply {{%.+}}([[LOADED]])
   testBaz()
-} // CHECK: end sil function '[[TESTSR6874]]'
+} // CHECK: end sil function '[[TEST1]]'
 

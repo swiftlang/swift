@@ -411,7 +411,13 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
 
 def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Require explicit availability on public declarations">;
+  HelpText<"Warn on public declarations without an availability attribute">;
+
+def require_explicit_availability_EQ : Joined<["-"], "require-explicit-availability=">,
+  MetaVarName<"<error,warn,ignore>">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Set diagnostic level to report public declarations without an availability attribute">;
+
 def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
@@ -1350,6 +1356,11 @@ def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-acc
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Pretty-print the output JSON">;
+
+def emit_extension_block_symbols: Flag<["-"], "emit-extension-block-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+        NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit 'swift.extension' symbols for extensions to external types instead of directly associating members and conformances with the extended nominal when generating symbol graphs">;
 
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,

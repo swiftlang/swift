@@ -149,9 +149,22 @@ public:
   /// A namespace for ASTWalker actions that may be returned from pre-walk and
   /// post-walk functions.
   ///
-  /// Each action returns a separate underscored type, which is then consumed
-  /// by PreWalkAction/PreWalkResult/PostWalkAction/PostWalkAction. It is
-  /// designed this way to achieve a pseudo form of return type overloading,
+  /// Only certain AST nodes support being replaced during a walk. The
+  /// visitation methods for such nodes use the PreWalkResult/PostWalkResult
+  /// types, which store both the action to take, along with the AST node to
+  /// splice into the tree in place of the old node. The node must be provided
+  /// to \c Action::<action> function, e.g \c Action::Continue(E) or
+  /// \c Action::SkipChildren(E). The only exception is \c Action::Stop(),
+  /// which never accepts a node.
+  ///
+  /// AST nodes that do not support being replaced during a walk use visitation
+  /// methods that return PreWalkAction/PostWalkAction. These just store the
+  /// walking action to perform, and you return e.g \c Action::Continue() or
+  /// \c Action::SkipChildren().
+  ///
+  /// Each function here returns a separate underscored type, which is then
+  /// consumed by PreWalkAction/PreWalkResult/PostWalkAction/PostWalkAction. It
+  /// is designed this way to achieve a pseudo form of return type overloading,
   /// where e.g \c Action::Continue() can become either a pre-walk action or a
   /// post-walk action, but \c Action::SkipChildren() can only become a pre-walk
   /// action.
@@ -225,6 +238,9 @@ public:
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
+  ///
+  /// A pre-visitation action for AST nodes that do not support being replaced
+  /// while walking.
   struct PreWalkAction {
     enum Kind { Stop, SkipChildren, Continue };
     Kind Action;
@@ -242,6 +258,9 @@ public:
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
+  ///
+  /// A post-visitation action for AST nodes that do not support being replaced
+  /// while walking.
   struct PostWalkAction {
     enum Kind { Stop, Continue };
     Kind Action;
@@ -256,6 +275,10 @@ public:
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
+  ///
+  /// A pre-visitation result for AST nodes that support being replaced while
+  /// walking. Stores both the walking action to take, along with the node to
+  /// splice into the AST in place of the old node.
   template <typename T>
   struct PreWalkResult {
     PreWalkAction Action;
@@ -297,6 +320,10 @@ public:
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
+  ///
+  /// A post-visitation result for AST nodes that support being replaced while
+  /// walking. Stores both the walking action to take, along with the node to
+  /// splice into the AST in place of the old node.
   template <typename T>
   struct PostWalkResult {
     PostWalkAction Action;
