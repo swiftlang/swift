@@ -14,7 +14,9 @@ class Y {
   @_hasStorage var i: Int
 }
 
-// CHECK-LABEL: sil [escapes %0 => %r.0.s0.s0.s0, %0.c*.v** -> %r.**] @array_adopt_storage
+// CHECK-LABEL: sil @array_adopt_storage
+// CHECK-NEXT:  [%0: escape => %r.0.s0.s0.s0, escape c*.v** -> %r.**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Y>) -> (@owned Array<Y>, UnsafeMutablePointer<Y>) {
 bb0(%0 : $_ContiguousArrayStorage<Y>):
   %3 = upcast %0 : $_ContiguousArrayStorage<Y> to $__ContiguousArrayStorageBase
@@ -29,7 +31,9 @@ bb0(%0 : $_ContiguousArrayStorage<Y>):
   return %19 : $(Array<Y>, UnsafeMutablePointer<Y>)
 }
 
-// CHECK-LABEL: sil [escapes !%0, !%0.c*.v**] @array_destructor
+// CHECK-LABEL: sil @array_destructor
+// CHECK-NEXT:  [%0: noescape, noescape c*.v**]
+// CHECK-NEXT:  {{^[^[]}}
 sil @array_destructor : $@convention(method) <Element> (@owned _ContiguousArrayStorage<Element>) -> () {
 bb0(%0 : $_ContiguousArrayStorage<Element>):
   %1 = ref_tail_addr %0 : $_ContiguousArrayStorage<Element>, $Element

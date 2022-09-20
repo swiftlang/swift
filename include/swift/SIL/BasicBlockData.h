@@ -213,6 +213,32 @@ public:
     }
     return data[getIndex(block)];
   }
+
+  /// Look up the state associated with \p block. Returns nullptr upon failure.
+  NullablePtr<Data> get(SILBasicBlock *block) const {
+    if (block->index < 0)
+      return {nullptr};
+    Data *d = &const_cast<BasicBlockData *>(this)->data[getIndex(block)];
+    return NullablePtr<Data>(d);
+  }
+
+  /// If \p block is a new block, i.e. created after this BasicBlockData was
+  /// constructed, creates a new Data by calling
+  /// Data(std::forward<ArgTypes>(Args)...).
+  template <typename... ArgTypes>
+  std::pair<Data *, bool> try_emplace(SILBasicBlock *block,
+                                      ArgTypes &&...Args) {
+    if (block->index != 0) {
+      return {&data[getIndex(block)], false};
+    }
+
+    assert(validForBlockOrder == function->BlockListChangeIdx &&
+           "BasicBlockData invalid because the function's block list changed");
+    validForBlockOrder = ++function->BlockListChangeIdx;
+    block->index = data.size();
+    data.emplace_back(std::forward<ArgTypes>(Args)...);
+    return {&data.back(), true};
+  }
 };
 
 } // end swift namespace

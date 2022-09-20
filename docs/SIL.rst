@@ -956,7 +956,7 @@ Functions
   decl ::= sil-function
   sil-function ::= 'sil' sil-linkage? sil-function-attribute+
                      sil-function-name ':' sil-type
-                     '{' sil-basic-block+ '}'
+                     '{' argument-effect* sil-basic-block* '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
 SIL functions are defined with the ``sil`` keyword. SIL function names
@@ -966,6 +966,8 @@ and is usually the mangled name of the originating Swift declaration.
 The ``sil`` syntax declares the function's name and SIL type, and
 defines the body of the function inside braces. The declared type must
 be a function type, which may be generic.
+If there are no `sil-basic-block`s contained in the body, the function
+is an external declaration.
 
 
 Function Attributes
@@ -1096,30 +1098,6 @@ from the command line.
 The specified memory effects of the function.
 ::
 
-  sil-function-attribute ::= '[' 'escapes' escape-list ']'
-  sil-function-attribute ::= '[' 'defined_escapes' escape-list ']'
-  escape-list ::= (escape-list ',')? escape
-  escape ::= '!' arg-selection                 // not-escaping
-  escape ::= arg-selection '=>' arg-selection  // exclusive escaping
-  escape ::= arg-selection '->' arg-selection  // not-exclusive escaping
-  arg-selection ::= arg-or-return ('.' projection-path)?
-  arg-or-return ::= '%' [0-9]+
-  arg-or-return ::= '%r'
-  projection-path ::= (projection-path '.')? path-component
-  path-component ::= 's' [0-9]+        // struct field
-  path-component ::= 'c' [0-9]+        // class field
-  path-component ::= 'ct'              // class tail element
-  path-component ::= 'e' [0-9]+        // enum case
-  path-component ::= [0-9]+            // tuple element
-  path-component ::= 'v**'             // any value fields
-  path-component ::= 'c*'              // any class field
-  path-component ::= '**'              // anything
-
-The escaping effects for function arguments. For details see the documentation
-in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
-
-::
-
   sil-function-attribute ::= '[_semantics "' [A-Za-z._0-9]+ '"]'
 
 The specified high-level semantics of the function. The optimizer can use this
@@ -1146,6 +1124,34 @@ The clang node owner.
 Specifies the performance constraints for the function, which defines which type
 of runtime functions are allowed to be called from the function.
 
+
+Argument Effects
+````````````````
+
+The effects for function arguments. For details see the documentation
+in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+::
+
+  argument-effect ::= '[' argument-name defined-effect? ':' effect (',' effect)*]'
+  argument-name ::= '%' [0-9]+
+  defined-effect ::= '!'    // the effect is defined in the source code and not
+                            // derived by the optimizer
+
+  effect ::= 'noescape' projection-path?
+  effect ::= 'escape' projection-path? '=>' arg-or-return  // exclusive escape
+  effect ::= 'escape' projection-path? '->' arg-or-return  // not-exclusive escape
+  arg-or-return ::= argument-name ('.' projection-path)?
+  arg-or-return ::= '%r' ('.' projection-path)?
+
+  projection-path ::= path-component ('.' path-component)* 
+  path-component ::= 's' [0-9]+        // struct field
+  path-component ::= 'c' [0-9]+        // class field
+  path-component ::= 'ct'              // class tail element
+  path-component ::= 'e' [0-9]+        // enum case
+  path-component ::= [0-9]+            // tuple element
+  path-component ::= 'v**'             // any value fields
+  path-component ::= 'c*'              // any class field
+  path-component ::= '**'              // anything
 
 Basic Blocks
 ~~~~~~~~~~~~
@@ -2593,9 +2599,9 @@ only values" that are guaranteed to never be copied. This is enforced by:
 * Having SILGen emit copies as it normally does.
 
 * Use OSSA canonicalization to eliminate copies that aren't needed semantically
-  due to consuming uses of the value. This is implemented by the pass guaranteed
-  pass "MoveOnlyChecker". Emit errors on any of the consuming uses that we found
-  in said pass.
+  due to consuming uses of the value. This is implemented by the guaranteed
+  passes "MoveOnlyObjectChecker" and "MoveOnlyAddressChecker". We will emit
+  errors on any of the consuming uses that we found in said pass.
 
 Assuming that no errors are emitted, we can then conclude before we reach
 canonical SIL that the value was never copied and thus is a "move only value"
@@ -2667,7 +2673,7 @@ rather than a viral type level annotation that would constrain the type system.
 As mentioned above trivial move only wrapped types are actually
 non-trivial. This is because in SIL ownership is tied directly to
 non-trivialness so unless we did that we could not track ownership
-accurately. This is loss of triviality is not an issue for most of the pipeline
+accurately. This loss of triviality is not an issue for most of the pipeline
 since we eliminate all move only wrapper types for trivial types during the
 guaranteed optimizations after we have run various ownership checkers but before
 we have run diagnostics for trivial types (e.x.: DiagnosticConstantPropagation).

@@ -746,9 +746,13 @@ class C_44203 {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
     _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns false}}
+    _ = (self === .none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns false}}
+    _ = (self === Optional.none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
     _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns true}}
+    _ = (self !== .none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns true}}
+    _ = (self !== Optional.none) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'Optional.none' always returns true}}
   }
 }
 
@@ -757,6 +761,11 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns false}}
   _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
   _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
+
+  _ = i == Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns false}}
+  _ = Optional.none == i // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns false}}
+  _ = i != Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns true}}
+  _ = Optional.none != i // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns true}}
   
   // FIXME(integers): uncomment these tests once the < is no longer ambiguous
   // _ = i < nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}

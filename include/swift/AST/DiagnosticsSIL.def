@@ -727,12 +727,24 @@ ERROR(noimplicitcopy_used_on_generic_or_existential, none,
 // move only checker diagnostics
 ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
+ERROR(sil_moveonlychecker_value_used_after_consume, none,
+      "'%0' used after consume. Lifetime extension of variable requires a copy", (StringRef))
 ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
       "'%0' has guaranteed ownership but was consumed", (StringRef))
+ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
+      "'%0' consumed but not reinitialized before end of function", (StringRef))
+ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
+      "'%0' consumed by a use in a loop", (StringRef))
+
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
-ERROR(sil_moveonlychecker_not_understand_mark_move, none,
+NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
+     "non-consuming use", ())
+ERROR(sil_moveonlychecker_not_understand_no_implicit_copy, none,
       "Usage of @noImplicitCopy that the move checker does not know how to "
+      "check!", ())
+ERROR(sil_moveonlychecker_not_understand_moveonly, none,
+      "Usage of a move only type that the move checker does not know how to "
       "check!", ())
 
 // move kills copyable values checker diagnostics

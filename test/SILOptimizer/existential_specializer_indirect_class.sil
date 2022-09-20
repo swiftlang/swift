@@ -8,10 +8,9 @@ protocol ClassProtocol: AnyObject { func method() }
 
 class C: ClassProtocol { func method() {} }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] {{.*}}@test_indirect_class_protocol : $@convention(thin) (@in any ClassProtocol) -> ()
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @test_indirect_class_protocol : $@convention(thin) (@in any ClassProtocol) -> ()
 sil @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> () {
-// CHECK-NEXT: //
-// CHECK-NEXT: bb0(%0 : $*any ClassProtocol):
+// CHECK: bb0(%0 : $*any ClassProtocol):
 bb0(%0 : $*ClassProtocol):
   // CHECK-NEXT: %1 = load %0
   // CHECK-NEXT: strong_release %1
@@ -41,8 +40,7 @@ bb0(%0 : $*ClassProtocol):
 
 // Check that a specialization of test_indirect_class_protocol is created.
 // CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] {{.*}}@$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5 : $@convention(thin) (@owned C) -> ()
-// CHECK-NEXT: //
-// CHECK-NEXT: bb0(%0 : $C):
+// CHECK:      bb0(%0 : $C):
 // CHECK-NEXT: strong_release %0
 // CHECK-NEXT: return undef
 // CHECK-LABEL: end sil function '$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5'

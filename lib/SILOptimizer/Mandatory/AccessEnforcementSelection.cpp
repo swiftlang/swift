@@ -31,6 +31,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "access-enforcement-selection"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
@@ -194,7 +195,8 @@ public:
 
 private:
   void analyzeUsesOfBox(SingleValueInstruction *source);
-  void analyzeProjection(ProjectBoxInst *projection);
+  // Used for project_box and mark_must_initialize.
+  void analyzeProjection(SingleValueInstruction *project);
 
   /// Note that the given instruction is a use of the box (or a use of
   /// a projection from it) in which the address escapes.
@@ -237,13 +239,13 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
   for (auto use : source->getUses()) {
     auto user = use->getUser();
 
-    if (auto BBI = dyn_cast<BeginBorrowInst>(user)) {
-      analyzeUsesOfBox(BBI);
+    if (auto bbi = dyn_cast<BeginBorrowInst>(user)) {
+      analyzeUsesOfBox(bbi);
       continue;
     }
 
-    if (auto MUI = dyn_cast<MarkUninitializedInst>(user)) {
-      analyzeUsesOfBox(MUI);
+    if (auto mui = dyn_cast<MarkUninitializedInst>(user)) {
+      analyzeUsesOfBox(mui);
       continue;
     }
 
@@ -281,9 +283,15 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
 #endif
 }
 
-void SelectEnforcement::analyzeProjection(ProjectBoxInst *projection) {
+void SelectEnforcement::analyzeProjection(SingleValueInstruction *projection) {
   for (auto *use : projection->getUses()) {
     auto user = use->getUser();
+
+    // Look through mark must check.
+    if (auto *mmi = dyn_cast<MarkMustCheckInst>(user)) {
+      analyzeProjection(mmi);
+      continue;
+    }
 
     // Collect accesses.
     if (auto *access = dyn_cast<BeginAccessInst>(user)) {
@@ -687,8 +695,12 @@ AccessEnforcementSelection::getAccessKindForBox(ProjectBoxInst *projection) {
 
 SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
   // Recurse through MarkUninitializedInst.
-  if (auto *MUI = dyn_cast<MarkUninitializedInst>(address))
-    return getSourceAccess(MUI->getOperand());
+  if (auto *mui = dyn_cast<MarkUninitializedInst>(address))
+    return getSourceAccess(mui->getOperand());
+
+  // Recurse through mark must check.
+  if (auto *mmci = dyn_cast<MarkMustCheckInst>(address))
+    return getSourceAccess(mmci->getOperand());
 
   if (auto box = dyn_cast<ProjectBoxInst>(address))
     return getAccessKindForBox(box);

@@ -1306,9 +1306,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     /// Return true if this is a 'nil' literal.  This looks
     /// like this if the type is Optional<T>:
     ///
-    ///   (dot_syntax_call_expr implicit type='Int?'
-    ///     (declref_expr implicit decl=Optional.none)
-    ///     (type_expr type=Int?))
+    ///   (dot_syntax_call_expr type='String?'
+    ///     (declref_expr type='(Optional<String>.Type) -> Optional<String>'
+    ///      decl=Swift.(file).Optional.none function_ref=unapplied)
+    ///     (argument_list implicit
+    ///       (argument
+    ///         (type_expr implicit type='String?.Type' typerepr='String?'))))
     ///
     /// Or like this if it is any other ExpressibleByNilLiteral type:
     ///
@@ -1317,13 +1320,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool isTypeCheckedOptionalNil(Expr *E) {
       if (dyn_cast<NilLiteralExpr>(E)) return true;
 
-      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
-      if (!CE || !CE->isImplicit())
-        return false;
-
-      // First case -- Optional.none
-      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
-        return DRE->getDecl() == Ctx.getOptionalNoneDecl();
+      if (auto *DSCE = dyn_cast_or_null<DotSyntaxCallExpr>(E->getSemanticsProvidingExpr())) {
+        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getSemanticFn()))
+          return DRE->getDecl() == Ctx.getOptionalNoneDecl();
+      }
 
       return false;
     }
@@ -1371,9 +1371,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             (isTypeCheckedOptionalNil(lhs) &&
              (subExpr = isImplicitPromotionToOptional(rhs)))) {
           bool isTrue = calleeName == "!=" || calleeName == "!==";
+          bool isNilLiteral = isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs);
               
           Ctx.Diags.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
-                             subExpr->getType(), isTrue)
+                             subExpr->getType(), isNilLiteral, isTrue)
             .highlight(lhs->getSourceRange())
             .highlight(rhs->getSourceRange());
           return;
