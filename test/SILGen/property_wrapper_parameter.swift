@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/def_structA.swift
-// RUN: %target-swift-emit-silgen %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
 import def_structA
 
 public struct Projection<T> {

@@ -284,6 +284,67 @@ bool SILDeclRef::isImplicit() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
+bool SILDeclRef::hasUserWrittenCode() const {
+  // Non-implicit decls generally have user-written code.
+  if (!isImplicit()) {
+    switch (kind) {
+    case Kind::PropertyWrapperBackingInitializer: {
+      // Only has user-written code if any of the property wrappers have
+      // arguments to apply. Otherwise, it's just a forwarding initializer for
+      // the wrappedValue.
+      auto *var = cast<VarDecl>(getDecl());
+      return llvm::any_of(var->getAttachedPropertyWrappers(), [&](auto *attr) {
+        return attr->hasArgs();
+      });
+    }
+    case Kind::PropertyWrapperInitFromProjectedValue:
+      // Never has user-written code, is just a forwarding initializer.
+      return false;
+    default:
+      return true;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
+  // Implicit decls generally don't have user-written code, but some splice
+  // user code into their body.
+  switch (kind) {
+  case Kind::Func: {
+    if (getAbstractClosureExpr()) {
+      // Auto-closures may have user-written code.
+      if (auto *ACE = getAutoClosureExpr())
+        return !ACE->getSingleExpressionBody()->isImplicit();
+
+      // Otherwise, assume an implicit closure doesn't have user code.
+      return false;
+    }
+
+    // Lazy getters splice in the user-written initializer expr.
+    if (auto *accessor = dyn_cast<AccessorDecl>(getFuncDecl())) {
+      auto *storage = accessor->getStorage();
+      if (accessor->isGetter() && !storage->isImplicit() &&
+          storage->getAttrs().hasAttribute<LazyAttr>()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  case Kind::StoredPropertyInitializer: {
+    // Property wrapper initializers for the backing storage can have
+    // user-written code.
+    auto *var = cast<VarDecl>(getDecl());
+    if (auto *originalProperty = var->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
+        return true;
+    }
+    return false;
+  }
+  default:
+    return false;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
 namespace {
 enum class LinkageLimit {
   /// No limit.

@@ -1185,7 +1185,7 @@ static void emitOrDelayFunction(SILGenModule &SGM,
   // Implicit decls may be delayed if they can't be used externally.
   auto linkage = constant.getLinkage(ForDefinition);
   bool mayDelay = !forceEmission &&
-             (constant.isImplicit() &&
+             (!constant.hasUserWrittenCode() &&
               !constant.isDynamicallyReplaceable() &&
               !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
 

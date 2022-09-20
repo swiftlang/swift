@@ -556,6 +556,12 @@ struct SILDeclRef {
 
   bool isImplicit() const;
 
+  /// Whether the referenced function contains user code. This is always true
+  /// for a non-implicit reference, but may also be true for an implicit
+  /// reference if the decl itself is implicit, but explicit code has been
+  /// spliced into the body. This is the case for e.g a lazy variable getter.
+  bool hasUserWrittenCode() const;
+
   /// Return the scope in which the parent class of a method (i.e. class
   /// containing this declaration) can be subclassed, returning NotApplicable if
   /// this is not a method, there is no such class, or the class cannot be
