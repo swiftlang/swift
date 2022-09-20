@@ -75,11 +75,8 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
   if allocRef.isObjC || allocRef.canAllocOnStack {
     return false
   }
-  struct DefaultVisitor : EscapeInfoVisitor {}
-  var ei = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: DefaultVisitor())
-  
   // The most important check: does the object escape the current function?
-  if ei.isEscaping(object:allocRef) {
+  if allocRef.isEscaping(context) {
     return false
   }
 
@@ -196,21 +193,19 @@ func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
 private func getDominatingBlockOfAllUsePoints(context: PassContext,
                                               _ value: SingleValueInstruction,
                                               domTree: DominatorTree) -> BasicBlock {
-  struct Visitor : EscapeInfoVisitor {
-    var dominatingBlock: BasicBlock
+  struct FindDominatingBlock : EscapeVisitorWithResult {
+    var result: BasicBlock
     let domTree: DominatorTree
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       let defBlock = operand.value.definingBlock
-      if defBlock.dominates(dominatingBlock, domTree) {
-        dominatingBlock = defBlock
+      if defBlock.dominates(result, domTree) {
+        result = defBlock
       }
       return .continueWalk
     }
   }
   
-  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis, visitor: Visitor(dominatingBlock: value.block, domTree: domTree))
-  _ = walker.isEscaping(object: value)
-  return walker.visitor.dominatingBlock
+  return value.visit(using: FindDominatingBlock(result: value.block, domTree: domTree), context)!
 }
 
 
@@ -219,10 +214,12 @@ func computeInnerAndOuterLiferanges(instruction: SingleValueInstruction, in domB
   /// All uses which are dominated by the `innerInstRange`s begin-block are included
   /// in both, the `innerInstRange` and the `outerBlockRange`.
   /// All _not_ dominated uses are only included in the `outerBlockRange`.
-  struct Visitor : EscapeInfoVisitor {
+  struct Visitor : EscapeVisitorWithResult {
     var innerRange: InstructionRange
     var outerBlockRange: BasicBlockRange
     let domTree: DominatorTree
+    
+    var result: (InstructionRange, BasicBlockRange) { (innerRange, outerBlockRange) }
     
     init(instruction: Instruction, domBlock: BasicBlock, domTree: DominatorTree, context: PassContext) {
       innerRange = InstructionRange(begin: instruction, context)
@@ -245,7 +242,7 @@ func computeInnerAndOuterLiferanges(instruction: SingleValueInstruction, in domB
       outerBlockRange.insert(defBlock)
       
       // We need to explicitly add predecessor blocks of phi-arguments becaues they
-      // are not necesesarily visited by `EscapeInfo.walkDown`.
+      // are not necesesarily visited during the down-walk in `isEscaping()`.
       // This is important for the special case where there is a back-edge from the
       // inner range to the inner rage's begin-block:
       //
@@ -261,16 +258,11 @@ func computeInnerAndOuterLiferanges(instruction: SingleValueInstruction, in domB
       return .continueWalk
     }
   }
-  
-  var walker = EscapeInfo(calleeAnalysis: context.calleeAnalysis,
-                                visitor: Visitor(
-                                  instruction: instruction,
-                                  domBlock: domBlock,
-                                  domTree: domTree,
-                                  context: context
-                                ))
-  _ = walker.isEscaping(object: instruction)
-  return (walker.visitor.innerRange, walker.visitor.outerBlockRange)
+
+  return instruction.visit(using: Visitor(instruction: instruction,
+                                          domBlock: domBlock,
+                                          domTree: domTree,
+                                          context: context), context)!
 }
 
 private extension BasicBlockRange {
