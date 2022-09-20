@@ -242,7 +242,11 @@ class BuilderClosureVisitor
   /// Produce a builder call to buildDebuggable when DSL debugging is supported,
   /// or else return the original expression.
   Expr *buildDebuggableIfWanted(Expr *expr, Identifier label) {
-    if (cs && builder.supports(ctx.Id_buildDebuggable, {label}) &&
+    if (cs &&
+        // Because DSLDebugInfoProvider is @available(SwiftStdlib 5.8, *),
+        // the buildDebuggables are also likely to have limited availability.
+        builder.supports(ctx.Id_buildDebuggable, {label},
+                         /*checkAvailability*/ true) &&
         (ctx.SILOpts.OptMode <= OptimizationMode::NoOptimization)) {
       Expr *debugInfoProvider = builder.buildDebugInfoProvider(expr);
       return buildCallIfWanted(SourceLoc(), ctx.Id_buildDebuggable,
