@@ -10,8 +10,6 @@
 #
 # ----------------------------------------------------------------------------
 
-import os
-
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
