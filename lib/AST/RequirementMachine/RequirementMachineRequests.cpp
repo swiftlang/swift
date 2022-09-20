@@ -155,6 +155,9 @@ static void splitConcreteEquivalenceClasses(
     TypeArrayView<GenericTypeParamType> genericParams,
     SmallVectorImpl<StructuralRequirement> &splitRequirements,
     unsigned &attempt) {
+  bool debug = machine->getDebugOptions().contains(
+      DebugFlags::SplitConcreteEquivalenceClass);
+
   unsigned maxAttempts =
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
 
@@ -172,6 +175,10 @@ static void splitConcreteEquivalenceClasses(
 
   splitRequirements.clear();
 
+  if (debug) {
+    llvm::dbgs() << "\n# Splitting concrete equivalence classes:\n";
+  }
+
   for (auto req : requirements) {
     if (shouldSplitConcreteEquivalenceClass(req, proto, machine)) {
       auto concreteType = machine->getConcreteType(
@@ -183,10 +190,24 @@ static void splitConcreteEquivalenceClasses(
                             req.getSecondType(), concreteType);
       splitRequirements.push_back({firstReq, SourceLoc(), /*inferred=*/false});
       splitRequirements.push_back({secondReq, SourceLoc(), /*inferred=*/false});
+
+      if (debug) {
+        llvm::dbgs() << "- First split: ";
+        firstReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n- Second split: ";
+        secondReq.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
       continue;
     }
 
     splitRequirements.push_back({req, SourceLoc(), /*inferred=*/false});
+
+    if (debug) {
+      llvm::dbgs() << "- Not split: ";
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
   }
 }
 
@@ -299,20 +320,6 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
       requirements.push_back(req);
     for (auto req : proto->getTypeAliasRequirements())
       requirements.push_back({req, SourceLoc(), /*inferred=*/false});
-
-    // Preprocess requirements to eliminate conformances on type parameters
-    // which are made concrete.
-    if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
-      SmallVector<StructuralRequirement, 4> contractedRequirements;
-
-      bool debug = rewriteCtx.getDebugOptions()
-                             .contains(DebugFlags::ConcreteContraction);
-
-      if (performConcreteContraction(requirements, contractedRequirements,
-                                     errors, debug)) {
-        std::swap(contractedRequirements, requirements);
-      }
-    }
   }
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
@@ -335,6 +342,24 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   unsigned attempt = 0;
   for (;;) {
+    for (const auto *proto : component) {
+      auto &requirements = protos[proto];
+
+      // Preprocess requirements to eliminate conformances on type parameters
+      // which are made concrete.
+      if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
+        SmallVector<StructuralRequirement, 4> contractedRequirements;
+
+        bool debug = rewriteCtx.getDebugOptions()
+                               .contains(DebugFlags::ConcreteContraction);
+
+        if (performConcreteContraction(requirements, contractedRequirements,
+                                       errors, debug)) {
+          std::swap(contractedRequirements, requirements);
+        }
+      }
+    }
+
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
         rewriteCtx));
@@ -639,20 +664,20 @@ AbstractGenericSignatureRequest::evaluate(
     llvm::dbgs() << "\n";
   }
 
-  // Preprocess requirements to eliminate conformances on generic parameters
-  // which are made concrete.
-  if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
-    SmallVector<StructuralRequirement, 4> contractedRequirements;
-    bool debug = rewriteCtx.getDebugOptions()
-                           .contains(DebugFlags::ConcreteContraction);
-    if (performConcreteContraction(requirements, contractedRequirements,
-                                   errors, debug)) {
-      std::swap(contractedRequirements, requirements);
-    }
-  }
-
   unsigned attempt = 0;
   for (;;) {
+    // Preprocess requirements to eliminate conformances on generic parameters
+    // which are made concrete.
+    if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
+      SmallVector<StructuralRequirement, 4> contractedRequirements;
+      bool debug = rewriteCtx.getDebugOptions()
+                             .contains(DebugFlags::ConcreteContraction);
+      if (performConcreteContraction(requirements, contractedRequirements,
+                                     errors, debug)) {
+        std::swap(contractedRequirements, requirements);
+      }
+    }
+
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
         rewriteCtx));
@@ -834,20 +859,20 @@ InferredGenericSignatureRequest::evaluate(
     llvm::dbgs() << "\n";
   }
 
-  // Preprocess requirements to eliminate conformances on generic parameters
-  // which are made concrete.
-  if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
-    SmallVector<StructuralRequirement, 4> contractedRequirements;
-    bool debug = rewriteCtx.getDebugOptions()
-                           .contains(DebugFlags::ConcreteContraction);
-    if (performConcreteContraction(requirements, contractedRequirements,
-                                   errors, debug)) {
-      std::swap(contractedRequirements, requirements);
-    }
-  }
-
   unsigned attempt = 0;
   for (;;) {
+    // Preprocess requirements to eliminate conformances on generic parameters
+    // which are made concrete.
+    if (ctx.LangOpts.EnableRequirementMachineConcreteContraction) {
+      SmallVector<StructuralRequirement, 4> contractedRequirements;
+      bool debug = rewriteCtx.getDebugOptions()
+                             .contains(DebugFlags::ConcreteContraction);
+      if (performConcreteContraction(requirements, contractedRequirements,
+                                     errors, debug)) {
+        std::swap(contractedRequirements, requirements);
+      }
+    }
+
     // Heap-allocate the requirement machine to save stack space.
     std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
         rewriteCtx));
