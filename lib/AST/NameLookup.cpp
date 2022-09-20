@@ -55,6 +55,9 @@ void VectorDeclConsumer::anchor() {}
 ValueDecl *LookupResultEntry::getBaseDecl() const {
   if (BaseDC == nullptr)
     return nullptr;
+  
+  if (BaseDecl)
+    return BaseDecl;
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(BaseDC))
     return AFD->getImplicitSelfDecl();

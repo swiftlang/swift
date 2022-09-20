@@ -728,22 +728,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   ValueDecl *Base = nullptr;
   DeclContext *BaseDC = nullptr;
   for (auto Result : Lookup) {
-    // Perform an unqualified lookup for the base decl. This handles cases
-    // where self was rebound (e.g. `guard let self = self`) earlier in this scope.
-    // Only do this in closures, since implicit self isn't allowed to be rebound
-    // in other contexts.
-    ValueDecl* ThisBase = nullptr;
-    if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr) {
-      auto &ctx = DC->getASTContext();
-      auto localDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                       DeclName(ctx.Id_self),
-                                                       UDRE->getLoc());
-      if (localDecl)
-        ThisBase = localDecl;
-    }
-    
-    if (!ThisBase)
-      ThisBase = Result.getBaseDecl();
+    auto ThisBase = Result.getBaseDecl();
 
     // Track the base for member declarations.
     if (ThisBase && !isa<ModuleDecl>(ThisBase)) {

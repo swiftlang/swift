@@ -343,8 +343,22 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   SmallVector<ValueDecl *, 4> Lookup;
   contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
   for (auto Result : Lookup) {
-    results.emplace_back(const_cast<DeclContext *>(whereValueIsMember(Result)),
-                         Result);
+    auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
+    
+    // Perform an unqualified lookup for the base decl of this result. This handles cases
+    // where self was rebound (e.g. `guard let self = self`) earlier in the scope.
+    // Only do this in closures, since implicit self isn't allowed to be rebound
+    // in other contexts. Otherwise, we use the `ParamDecl` from `baseDC` if applicable.
+    ValueDecl* localBaseDecl = nullptr;
+    if (factory->DC->getContextKind() == DeclContextKind::AbstractClosureExpr && baseDC) {
+      auto *localDecl = ASTScope::lookupSingleLocalDecl(factory->DC->getParentSourceFile(),
+                                                       DeclName(factory->Ctx.Id_self),
+                                                       factory->Loc);
+      if (localDecl)
+        localBaseDecl = localDecl;
+    }
+    
+    results.emplace_back(baseDC, localBaseDecl, Result);
 #ifndef NDEBUG
     factory->addedResult(results.back());
 #endif
