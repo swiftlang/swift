@@ -22,3 +22,78 @@ struct R : Codable {
 enum E : Int {
   case a
 }
+
+// We don't profile unavailable functions, as they don't provide useful coverage
+// info.
+
+@available(*, unavailable)
+public func unavailableFunction() -> Int {
+  .random() ? 1 : 2
+}
+
+struct TypeWithUnavailableMethods {
+  @available(*, unavailable)
+  func foo() -> Int {
+    .random() ? 1 : 2
+  }
+}
+
+@available(*, unavailable)
+extension TypeWithUnavailableMethods {
+  func bar() -> Int {
+    .random() ? 1 : 2
+  }
+  public func baz() -> Int {
+    .random() ? 1 : 2
+  }
+}
+
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+}
+
+@available(*, unavailable)
+struct UnavailableType {
+  func foo() -> Int { .random() ? 1 : 2 }
+  public func bar() -> Int { .random() ? 1 : 2 }
+
+  var qux: Int {
+    // The && is here to test autoclosures.
+    .random() && .random() ? 1 : 2
+  }
+
+  var quux: Int {
+    get { .random() ? 1 : 2 }
+    set { _ = newValue }
+  }
+
+  subscript(_ x: Int) -> Int {
+    get { .random() ? 1 : 2 }
+    set { quux = newValue }
+  }
+
+  func baz(_ x: Int = .random() ? 0 : 1) {
+    _ = {
+      struct Nested {
+        func evenMoreNested() -> () -> Int { { .random() ? 1 : 2 } }
+      }
+      func nested() -> () -> Int { { .random() ? 1 : 2 } }
+    }
+  }
+
+  var stored: Int = .random() ? 0 : 1
+
+  var storedClosure: Int = { .random() ? 0 : 1 }()
+
+  @Wrapper
+  var wrappered = .random() ? 0 : 1
+
+  @Wrapper(wrappedValue: .random() ? 0 : 1)
+  var alsoWrappered: Int
+}
+
+@available(*, unavailable)
+class UnavailableClass {
+  deinit {}
+}

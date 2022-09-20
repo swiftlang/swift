@@ -43,6 +43,10 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps SwiftUnitTests)
   endif()
 
+  if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+    list(APPEND deps sdk-overlay)
+  endif()
+
   set(deps_binaries)
 
   if (SWIFT_INCLUDE_TOOLS)

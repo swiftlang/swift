@@ -1436,7 +1436,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   if (fd->hasBody()) {
     SILDeclRef constant(decl);
-    bool ForCoverageMapping = doesASTRequireProfiling(M, fd);
+    bool ForCoverageMapping = doesASTRequireProfiling(M, fd, constant);
     emitOrDelayFunction(*this, constant,
                         /*forceEmission=*/ForCoverageMapping);
   }

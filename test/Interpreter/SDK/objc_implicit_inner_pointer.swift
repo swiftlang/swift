@@ -7,6 +7,10 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+import Foundation
+
+_ = JSONDecoder()
+
 do {
   // The lifetime of Foo() currently gets extended using autorelease.
   autoreleasepool {

@@ -27,7 +27,7 @@
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 
 #ifdef SWIFT_SWIFT_PARSER
-#include "SwiftParserCompilerSupport.h"
+#include "SwiftCompilerSupport.h"
 #endif
 
 using namespace swift;
@@ -202,11 +202,14 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     unsigned int flags = 0;
 
     if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip))
-      flags |= SPCC_RoundTrip;
+      flags |= SCC_RoundTrip;
 
     if (!ctx.Diags.hadAnyError() &&
         ctx.LangOpts.hasFeature(Feature::ParserValidation))
-      flags |= SPCC_ParseDiagnostics;
+      flags |= SCC_ParseDiagnostics;
+
+    if (ctx.LangOpts.hasFeature(Feature::ParserSequenceFolding))
+      flags |= SCC_FoldSequences;
 
     int roundTripResult =
       swift_parser_consistencyCheck(

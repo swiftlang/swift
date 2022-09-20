@@ -71,7 +71,6 @@ CompletionContextFinder::walkToExprPost(Expr *E) {
 }
 
 size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
-  assert(hasCompletionKeyPathComponent());
   size_t ComponentIndex = 0;
   auto Components = getKeyPathContainingCompletionComponent()->getComponents();
   for (auto &Component : Components) {

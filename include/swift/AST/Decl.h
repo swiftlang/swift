@@ -1049,6 +1049,12 @@ public:
 
   bool isAvailableAsSPI() const;
 
+  /// Whether the declaration is considered unavailable through either being
+  /// explicitly marked as such, or has a parent decl that is semantically
+  /// unavailable. This is a broader notion of unavailability than is checked by
+  /// \c AvailableAttr::isUnavailable.
+  bool isSemanticallyUnavailable() const;
+
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
   // SPI groups are inherited from the parent contexts only if the local decl

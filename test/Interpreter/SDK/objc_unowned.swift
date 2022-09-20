@@ -5,6 +5,8 @@
 
 import Foundation
 
+_ = JSONDecoder()
+
 let x = NSObject()
 unowned let y = x
 

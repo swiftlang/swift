@@ -2361,9 +2361,11 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     cs.solveForCodeCompletion(solutions);
 
     CompletionContextFinder analyzer(func, func->getDeclContext());
-    filterSolutionsForCodeCompletion(solutions, analyzer);
-    for (const auto &solution : solutions) {
-      cs.getASTContext().CompletionCallback->sawSolution(solution);
+    if (analyzer.hasCompletion()) {
+      filterSolutionsForCodeCompletion(solutions, analyzer);
+      for (const auto &solution : solutions) {
+        cs.getASTContext().CompletionCallback->sawSolution(solution);
+      }
     }
     return nullptr;
   }
