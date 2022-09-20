@@ -1269,11 +1269,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_NoMetadata: {
-    Printer.printAttrName("@_noMetadata");
-    break;
-  }
-
   case DAK_UnavailableFromAsync: {
     Printer.printAttrName("@_unavailableFromAsync");
     const UnavailableFromAsyncAttr *attr = cast<UnavailableFromAsyncAttr>(this);
@@ -1461,8 +1456,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_TypeSequence:
     return "_typeSequence";
-  case DAK_NoMetadata:
-    return "_noMetadata";
   case DAK_UnavailableFromAsync:
     return "_unavailableFromAsync";
   case DAK_BackDeploy:
@@ -2303,15 +2296,6 @@ TypeSequenceAttr *TypeSequenceAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                            SourceRange range) {
   void *mem = Ctx.Allocate(sizeof(TypeSequenceAttr), alignof(TypeSequenceAttr));
   return new (mem) TypeSequenceAttr(atLoc, range);
-}
-
-NoMetadataAttr::NoMetadataAttr(SourceLoc atLoc, SourceRange range)
-    : DeclAttribute(DAK_NoMetadata, atLoc, range, /*Implicit=*/false) {}
-
-NoMetadataAttr *NoMetadataAttr::create(ASTContext &Ctx, SourceLoc atLoc,
-                                       SourceRange range) {
-  void *mem = Ctx.Allocate(sizeof(NoMetadataAttr), alignof(NoMetadataAttr));
-  return new (mem) NoMetadataAttr(atLoc, range);
 }
 
 const DeclAttribute *

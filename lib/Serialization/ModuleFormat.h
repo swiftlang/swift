@@ -2064,7 +2064,6 @@ namespace decls_block {
   >;
 
   using TypeSequenceDeclAttrLayout = BCRecordLayout<TypeSequence_DECL_ATTR>;
-  using NoMetadataDeclAttrLayout = BCRecordLayout<NoMetadata_DECL_ATTR>;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \

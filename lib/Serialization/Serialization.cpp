@@ -2863,12 +2863,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_NoMetadata: {
-      auto abbrCode = S.DeclTypeAbbrCodes[NoMetadataDeclAttrLayout::Code];
-      NoMetadataDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
-      return;
-    }
-
     case DAK_UnavailableFromAsync: {
       auto abbrCode =
           S.DeclTypeAbbrCodes[UnavailableFromAsyncDeclAttrLayout::Code];

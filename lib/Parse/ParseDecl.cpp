@@ -3097,12 +3097,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_NoMetadata: {
-    auto range = SourceRange(Loc, Tok.getRange().getStart());
-    Attributes.add(NoMetadataAttr::create(Context, AtLoc, range));
-    break;
-  }
-
   case DAK_UnavailableFromAsync: {
     StringRef message;
     if (consumeIf(tok::l_paren)) {
