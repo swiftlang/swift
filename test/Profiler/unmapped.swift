@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name unmapped %s | %FileCheck %s
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
+// This uses '-primary-file' to ensure we're conservative with lazy SIL emission.
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -suppress-warnings -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name unmapped -primary-file %s %S/Inputs/unmapped_secondary.swift | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s %S/Inputs/unmapped_secondary.swift
 
 // This test is exclusively for AST that we should never profile, as there is
 // no interesting user-written code.
@@ -18,10 +19,19 @@ struct R : Codable {
   var y: Int
 }
 
+struct Q {
+  // Don't profile the backing initializer.
+  @Wrapper
+  var x: Int
+}
+
 // Don't profile the implicit rawValue.
 enum E : Int {
   case a
 }
+
+@available(*, unavailable)
+func hasExternalPropertyWrapper(@WrapperWithProjectedValue x: Int) {}
 
 // We don't profile unavailable functions, as they don't provide useful coverage
 // info.
@@ -46,11 +56,6 @@ extension TypeWithUnavailableMethods {
   public func baz() -> Int {
     .random() ? 1 : 2
   }
-}
-
-@propertyWrapper
-struct Wrapper<T> {
-  var wrappedValue: T
 }
 
 @available(*, unavailable)

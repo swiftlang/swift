@@ -67,17 +67,17 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
     }
   }
 
+  // Do not profile code that hasn't been written by the user.
+  if (!Constant.hasUserWrittenCode()) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: no user-written code\n");
+    return false;
+  }
+
   if (auto *E = N.dyn_cast<Expr *>()) {
     if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
       // Only profile closure expressions with bodies.
       if (!doesClosureHaveBody(CE)) {
         LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: closure without body\n");
-        return false;
-      }
-
-      // Don't profile implicit closures, unless they're autoclosures.
-      if (!isa<AutoClosureExpr>(CE) && CE->isImplicit()) {
-        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
         return false;
       }
     }
@@ -93,20 +93,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
       return false;
     }
-
-    // Profile implicit getters for lazy variables.
-    if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-      if (accessor->isImplicit() && accessor->isGetter() &&
-          accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
-        return true;
-      }
-    }
-  }
-
-  // Skip any remaining implicit, or otherwise unsupported decls.
-  if (D->isImplicit() || isa<EnumCaseDecl>(D)) {
-    LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit/unsupported decl\n");
-    return false;
   }
 
   return true;
