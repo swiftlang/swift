@@ -653,19 +653,9 @@ std::string SILWitnessTableEntry_debugDescription(BridgedWitnessTableEntry entry
   return str;
 }
 
-SILWitnessTableEntryKind SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry) {
-  switch (castToWitnessTableEntry(entry)->getKind()) {
-    case SILWitnessTable::Invalid:
-      return SILWitnessTableEntry_Invalid;
-    case SILWitnessTable::Method:
-      return SILWitnessTableEntry_Method;
-    case SILWitnessTable::AssociatedType:
-      return SILWitnessTableEntry_AssociatedType;
-    case SILWitnessTable::AssociatedTypeProtocol:
-      return SILWitnessTableEntry_AssociatedTypeProtocol;
-    case SILWitnessTable::BaseProtocol:
-      return SILWitnessTableEntry_BaseProtocol;
-  }
+SILWitnessTable::WitnessKind
+SILWitnessTableEntry_getKind(BridgedWitnessTableEntry entry) {
+  return castToWitnessTableEntry(entry)->getKind();
 }
 
 OptionalBridgedFunction SILWitnessTableEntry_getMethodFunction(BridgedWitnessTableEntry entry) {
@@ -751,8 +741,8 @@ llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi) {
   return castToInst<CondFailInst>(cfi)->getMessage();
 }
 
-BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
-  return (BridgedBuiltinID)castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
+BuiltinValueKind BuiltinInst_getID(BridgedInstruction bi) {
+  return castToInst<BuiltinInst>(bi)->getBuiltinInfo().ID;
 }
 
 SwiftInt AddressToPointerInst_needsStackProtection(BridgedInstruction atp) {
@@ -877,18 +867,8 @@ SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
 }
 
-BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) {
-  auto kind = castToInst<BeginAccessInst>(beginAccess)->getAccessKind();
-  switch (kind) {
-    case SILAccessKind::Init:
-      return BridgedAccessKind::AccessKind_Init;
-    case SILAccessKind::Read:
-      return BridgedAccessKind::AccessKind_Read;
-    case SILAccessKind::Modify:
-      return BridgedAccessKind::AccessKind_Modify;
-    case SILAccessKind::Deinit:
-      return BridgedAccessKind::AccessKind_Deinit;
-  }
+SILAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) {
+  return castToInst<BeginAccessInst>(beginAccess)->getAccessKind();
 }
 
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {
