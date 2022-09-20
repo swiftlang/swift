@@ -460,3 +460,11 @@ struct WeirdUMEInitCase {
 
 let _: WeirdUMEInitCase = .ty()
 let _: WeirdUMEInitCase = .ty(5)
+
+struct KeyPathLiteralAsFunctionDefaultArg {
+    var x: Int
+
+    func doStuff(with prop: (KeyPathLiteralAsFunctionDefaultArg) -> Int = \.x) {}
+}
+
+KeyPathLiteralAsFunctionDefaultArg(x: 1738).doStuff()
