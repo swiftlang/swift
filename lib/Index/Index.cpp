@@ -834,7 +834,7 @@ private:
       return true;
 
     IndexSymbol Info;
-    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
+    std::tie(Info.line, Info.column) = getLineCol(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
@@ -949,13 +949,10 @@ private:
 
   bool indexComment(const Decl *D);
 
-  std::tuple<unsigned, unsigned, Optional<unsigned>>
-  getLineColAndOffset(SourceLoc Loc) {
+  std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
-      return std::make_tuple(0, 0, None);
-    auto lineAndColumn = SrcMgr.getLineAndColumnInBuffer(Loc, BufferID);
-    unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
-    return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
+      return std::make_pair(0, 0);
+    return SrcMgr.getLineAndColumnInBuffer(Loc, BufferID);
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
@@ -1618,6 +1615,10 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   // Cannot be extension, which is not a ValueDecl.
 
+  if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
+    return true;
+  std::tie(Info.line, Info.column) = getLineCol(Loc);
+
   if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
     addContainedByRelationIfContained(Info);
@@ -1625,16 +1626,10 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     Info.roles |= (unsigned)SymbolRole::Definition;
     if (D->isImplicit())
       Info.roles |= (unsigned)SymbolRole::Implicit;
-  }
-
-  if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
-    return true;
-
-  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
-  if (!IsRef) {
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
   }
+
   return false;
 }
 
@@ -1651,7 +1646,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
   if (getNameAndUSR(ExtendedD, ExtD, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
+  std::tie(Info.line, Info.column) = getLineCol(Loc);
   if (auto Group = ExtD->getGroupName())
     Info.group = Group.getValue();
   return false;
@@ -1786,7 +1781,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
       OS << "t:" << tagName;
       Info.USR = stringStorage.copyString(OS.str());
     }
-    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(loc);
+    std::tie(Info.line, Info.column) = getLineCol(loc);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
       Cancelled = true;
       break;
