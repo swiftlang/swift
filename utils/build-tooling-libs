@@ -271,6 +271,8 @@ class Builder(object):
             "-DEXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=" +
             os.path.join(SWIFT_SOURCE_ROOT,
                          "swift-experimental-string-processing"),
+            "-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=" +
+            os.path.join(SWIFT_SOURCE_ROOT, "swift-syntax"),
         ]
 
         llvm_src_path = os.path.join(SWIFT_SOURCE_ROOT, "llvm") \
