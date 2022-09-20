@@ -26,11 +26,9 @@ struct PlainStruct { }
 class BadInSwift4 {
   @IBInspectable var badIBInspectable: PlainStruct?
   // expected-error@-1{{property cannot be marked @IBInspectable because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   @GKInspectable var badGKInspectable: PlainStruct?
   // expected-error@-1{{property cannot be marked @GKInspectable because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 }
 
 // CHECK-LABEL: class InitsInheritObjCAttrBase
