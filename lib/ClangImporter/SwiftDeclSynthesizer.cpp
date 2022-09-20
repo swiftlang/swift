@@ -981,6 +981,7 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
       Ctx, structDecl->getDeclContext(), clang::SourceLocation(),
       clang::SourceLocation(), cGetterName, cGetterType, cGetterTypeInfo,
       clang::SC_Static);
+  cGetterDecl->setImplicit();
   cGetterDecl->setImplicitlyInline();
   assert(!cGetterDecl->isExternallyVisible());
 
@@ -1002,6 +1003,7 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
       Ctx, structDecl->getDeclContext(), clang::SourceLocation(),
       clang::SourceLocation(), cSetterName, cSetterType, cSetterTypeInfo,
       clang::SC_Static);
+  cSetterDecl->setImplicit();
   cSetterDecl->setImplicitlyInline();
   assert(!cSetterDecl->isExternallyVisible());
 
@@ -1017,6 +1019,7 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
     auto cGetterSelf = clang::ParmVarDecl::Create(
         Ctx, cGetterDecl, clang::SourceLocation(), clang::SourceLocation(),
         cGetterSelfId, recordType, recordTypeInfo, clang::SC_None, nullptr);
+    cGetterSelf->setImplicit();
     cGetterDecl->setParams(cGetterSelf);
 
     auto cGetterSelfExpr = new (Ctx)
@@ -1040,6 +1043,7 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
         Ctx, cSetterDecl, clang::SourceLocation(), clang::SourceLocation(),
         /* nameID? */ nullptr, fieldType, fieldTypeInfo, clang::SC_None,
         nullptr);
+    cSetterValue->setImplicit();
     cSetterParams.push_back(cSetterValue);
     auto recordPointerTypeInfo =
         Ctx.getTrivialTypeSourceInfo(recordPointerType);
@@ -1047,6 +1051,7 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
         Ctx, cSetterDecl, clang::SourceLocation(), clang::SourceLocation(),
         /* nameID? */ nullptr, recordPointerType, recordPointerTypeInfo,
         clang::SC_None, nullptr);
+    cSetterSelf->setImplicit();
     cSetterParams.push_back(cSetterSelf);
     cSetterDecl->setParams(cSetterParams);
 
