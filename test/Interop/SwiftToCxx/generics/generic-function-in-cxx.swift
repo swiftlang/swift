@@ -154,7 +154,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:    alignas(alignof(T_0_0)) char storage[sizeof(T_0_0)];
 // CHECK-NEXT:    auto * _Nonnull storageObjectPtr = reinterpret_cast<T_0_0 *>(storage);
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(storage, swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
-// CHECK-NEXT:    T_0_0 result(std::move(*storageObjectPtr));
+// CHECK-NEXT:    T_0_0 result(static_cast<T_0_0 &&>(*storageObjectPtr));
 // CHECK-NEXT:    storageObjectPtr->~T_0_0();
 // CHECK-NEXT:    return result;
 // CHECK-NEXT:    } else {
@@ -185,7 +185,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:    alignas(alignof(T_0_0)) char storage[sizeof(T_0_0)];
 // CHECK-NEXT:    auto * _Nonnull storageObjectPtr = reinterpret_cast<T_0_0 *>(storage);
 // CHECK-NEXT:    _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(storage, swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata())
-// CHECK-NEXT:    T_0_0 result(std::move(*storageObjectPtr));
+// CHECK-NEXT:    T_0_0 result(static_cast<T_0_0 &&>(*storageObjectPtr));
 // CHECK-NEXT:    storageObjectPtr->~T_0_0();
 // CHECK-NEXT:    return result;
 // CHECK-NEXT:   } else {
