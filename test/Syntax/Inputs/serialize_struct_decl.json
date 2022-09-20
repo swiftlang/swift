@@ -1,15 +1,20 @@
 {
   "kind": "SourceFile",
   "layout": [
+    null,
     {
       "kind": "CodeBlockItemList",
       "layout": [
         {
           "kind": "CodeBlockItem",
           "layout": [
+            null,
             {
               "kind": "StructDecl",
               "layout": [
+                null,
+                null,
+                null,
                 null,
                 null,
                 {
@@ -20,6 +25,7 @@
                   "trailingTrivia": " ",
                   "presence": "Present"
                 },
+                null,
                 {
                   "tokenKind": {
                     "kind": "identifier",
@@ -32,9 +38,14 @@
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 {
                   "kind": "MemberDeclBlock",
                   "layout": [
+                    null,
                     {
                       "tokenKind": {
                         "kind": "l_brace"
@@ -43,15 +54,20 @@
                       "trailingTrivia": "",
                       "presence": "Present"
                     },
+                    null,
                     {
                       "kind": "MemberDeclList",
                       "layout": [
                         {
                           "kind": "MemberDeclListItem",
                           "layout": [
+                            null,
                             {
                               "kind": "VariableDecl",
                               "layout": [
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 {
@@ -62,15 +78,18 @@
                                   "trailingTrivia": "   ",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "kind": "PatternBindingList",
                                   "layout": [
                                     {
                                       "kind": "PatternBinding",
                                       "layout": [
+                                        null,
                                         {
                                           "kind": "IdentifierPattern",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "identifier",
@@ -83,9 +102,11 @@
                                           ],
                                           "presence": "Present"
                                         },
+                                        null,
                                         {
                                           "kind": "TypeAnnotation",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "colon"
@@ -94,9 +115,11 @@
                                               "trailingTrivia": " ",
                                               "presence": "Present"
                                             },
+                                            null,
                                             {
                                               "kind": "SimpleTypeIdentifier",
                                               "layout": [
+                                                null,
                                                 {
                                                   "tokenKind": {
                                                     "kind": "identifier",
@@ -106,6 +129,7 @@
                                                   "trailingTrivia": "",
                                                   "presence": "Present"
                                                 },
+                                                null,
                                                 null
                                               ],
                                               "presence": "Present"
@@ -113,6 +137,9 @@
                                           ],
                                           "presence": "Present"
                                         },
+                                        null,
+                                        null,
+                                        null,
                                         null,
                                         null,
                                         null
@@ -125,6 +152,7 @@
                               ],
                               "presence": "Present"
                             },
+                            null,
                             null
                           ],
                           "presence": "Present"
@@ -132,9 +160,13 @@
                         {
                           "kind": "MemberDeclListItem",
                           "layout": [
+                            null,
                             {
                               "kind": "VariableDecl",
                               "layout": [
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 {
@@ -145,15 +177,18 @@
                                   "trailingTrivia": " ",
                                   "presence": "Present"
                                 },
+                                null,
                                 {
                                   "kind": "PatternBindingList",
                                   "layout": [
                                     {
                                       "kind": "PatternBinding",
                                       "layout": [
+                                        null,
                                         {
                                           "kind": "IdentifierPattern",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "identifier",
@@ -166,9 +201,11 @@
                                           ],
                                           "presence": "Present"
                                         },
+                                        null,
                                         {
                                           "kind": "TypeAnnotation",
                                           "layout": [
+                                            null,
                                             {
                                               "tokenKind": {
                                                 "kind": "colon"
@@ -177,9 +214,11 @@
                                               "trailingTrivia": " ",
                                               "presence": "Present"
                                             },
+                                            null,
                                             {
                                               "kind": "SimpleTypeIdentifier",
                                               "layout": [
+                                                null,
                                                 {
                                                   "tokenKind": {
                                                     "kind": "identifier",
@@ -189,9 +228,11 @@
                                                   "trailingTrivia": " ",
                                                   "presence": "Present"
                                                 },
+                                                null,
                                                 {
                                                   "kind": "GenericArgumentClause",
                                                   "layout": [
+                                                    null,
                                                     {
                                                       "tokenKind": {
                                                         "kind": "l_angle"
@@ -200,15 +241,18 @@
                                                       "trailingTrivia": " ",
                                                       "presence": "Present"
                                                     },
+                                                    null,
                                                     {
                                                       "kind": "GenericArgumentList",
                                                       "layout": [
                                                         {
                                                           "kind": "GenericArgument",
                                                           "layout": [
+                                                            null,
                                                             {
                                                               "kind": "SimpleTypeIdentifier",
                                                               "layout": [
+                                                                null,
                                                                 {
                                                                   "tokenKind": {
                                                                     "kind": "identifier",
@@ -218,10 +262,12 @@
                                                                   "trailingTrivia": " ",
                                                                   "presence": "Present"
                                                                 },
+                                                                null,
                                                                 null
                                                               ],
                                                               "presence": "Present"
                                                             },
+                                                            null,
                                                             null
                                                           ],
                                                           "presence": "Present"
@@ -229,6 +275,7 @@
                                                       ],
                                                       "presence": "Present"
                                                     },
+                                                    null,
                                                     {
                                                       "tokenKind": {
                                                         "kind": "r_angle"
@@ -248,6 +295,9 @@
                                         },
                                         null,
                                         null,
+                                        null,
+                                        null,
+                                        null,
                                         null
                                       ],
                                       "presence": "Present"
@@ -258,6 +308,7 @@
                               ],
                               "presence": "Present"
                             },
+                            null,
                             null
                           ],
                           "presence": "Present"
@@ -265,6 +316,7 @@
                       ],
                       "presence": "Present"
                     },
+                    null,
                     {
                       "tokenKind": {
                         "kind": "r_brace"
@@ -280,6 +332,8 @@
               "presence": "Present"
             },
             null,
+            null,
+            null,
             null
           ],
           "presence": "Present"
@@ -287,6 +341,7 @@
       ],
       "presence": "Present"
     },
+    null,
     {
       "tokenKind": {
         "kind": "eof",

@@ -18,12 +18,12 @@ class Value;
 
 namespace swift {
 
+struct GenericRequirement;
 class SILArgument;
 
 namespace irgen {
 
 class Explosion;
-struct GenericRequirement;
 class LoadableTypeInfo;
 class TypeInfo;
 

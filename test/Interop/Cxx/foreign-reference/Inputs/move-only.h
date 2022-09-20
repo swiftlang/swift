@@ -17,7 +17,9 @@ _Tp &&move(_Tp &t) {
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-struct __attribute__((swift_attr("import_as_ref"))) MoveOnly {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) MoveOnly {
   MoveOnly() = default;
   MoveOnly(const MoveOnly &) = delete;
   MoveOnly(MoveOnly &&) = default;
@@ -32,7 +34,9 @@ struct __attribute__((swift_attr("import_as_ref"))) MoveOnly {
 
 MoveOnly moveIntoResult(MoveOnly &x) { return move(x); }
 
-struct __attribute__((swift_attr("import_as_ref"))) NoCopyMove {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) NoCopyMove {
   NoCopyMove() = default;
   NoCopyMove(const NoCopyMove &) = delete;
   NoCopyMove(NoCopyMove &&) = delete;
@@ -45,7 +49,9 @@ struct __attribute__((swift_attr("import_as_ref"))) NoCopyMove {
   }
 };
 
-struct __attribute__((swift_attr("import_as_ref"))) HasMoveOnlyChild {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) HasMoveOnlyChild {
   MoveOnly child;
 
   static HasMoveOnlyChild *create() {
@@ -55,7 +61,9 @@ struct __attribute__((swift_attr("import_as_ref"))) HasMoveOnlyChild {
 
 HasMoveOnlyChild moveIntoResult(HasMoveOnlyChild &x) { return move(x); }
 
-struct __attribute__((swift_attr("import_as_ref"))) PrivateCopyCtor {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) PrivateCopyCtor {
   PrivateCopyCtor() = default;
   PrivateCopyCtor(PrivateCopyCtor &&) = default;
 
@@ -72,7 +80,9 @@ private:
 
 PrivateCopyCtor moveIntoResult(PrivateCopyCtor &x) { return move(x); }
 
-struct __attribute__((swift_attr("import_as_ref"))) BadCopyCtor {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) BadCopyCtor {
   BadCopyCtor() = default;
   BadCopyCtor(BadCopyCtor &&) = default;
   BadCopyCtor(const BadCopyCtor &) { __builtin_trap(); }

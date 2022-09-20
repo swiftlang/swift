@@ -546,8 +546,8 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
       let address = _buffer.subscriptBaseAddress + index
+      defer { _endMutation() }
       yield &address.pointee
-      _endMutation();
     }
   }
 

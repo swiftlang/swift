@@ -26,6 +26,9 @@
 // REQUIRES: shell
 // REQUIRES: reflection
 
+// rdar://96439408
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 
 

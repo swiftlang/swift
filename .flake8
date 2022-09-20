@@ -51,9 +51,6 @@ ignore =
     # compliant (https://github.com/psf/black#slices).
     E203,
 
-    # FIXME: We should not have trailing whitespace.
-    W291,
-
     # Line breaks before binary operators are not explicitly disallowed in
     # PEP8, rather it should be consistent throughout the project. The black
     # tool puts them on new lines which is to be considered a best practice

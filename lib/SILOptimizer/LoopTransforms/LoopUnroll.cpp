@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -48,6 +49,8 @@ public:
   /// Clone the basic blocks in the loop.
   void cloneLoop();
 
+  void sinkAddressProjections();
+
   // Update SSA helper.
   void collectLoopLiveOutValues(
       DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues);
@@ -69,10 +72,33 @@ protected:
 
 } // end anonymous namespace
 
+void LoopCloner::sinkAddressProjections() {
+  SinkAddressProjections sinkProj;
+  for (auto *bb : Loop->getBlocks()) {
+    for (auto &inst : *bb) {
+      for (auto res : inst.getResults()) {
+        if (!res->getType().isAddress()) {
+          continue;
+        }
+        for (auto use : res->getUses()) {
+          auto *user = use->getUser();
+          if (Loop->contains(user)) {
+            continue;
+          }
+          bool canSink = sinkProj.analyzeAddressProjections(&inst);
+          assert(canSink);
+          sinkProj.cloneProjections();
+        }
+      }
+    }
+  }
+}
+
 void LoopCloner::cloneLoop() {
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Loop->getExitBlocks(ExitBlocks);
 
+  sinkAddressProjections();
   // Clone the entire loop.
   cloneReachableBlocks(Loop->getHeader(), ExitBlocks,
                        /*insertAfter*/Loop->getLoopLatch());
@@ -335,7 +361,7 @@ updateSSA(SILModule &M, SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.initialize(OrigValue->getType(), OrigValue.getOwnershipKind());
+    SSAUp.initialize(OrigValue->getType(), OrigValue->getOwnershipKind());
     SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);

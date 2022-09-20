@@ -35,6 +35,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -42,6 +43,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -416,19 +418,19 @@ void verifyKeyPathComponent(SILModule &M,
     break;
   }
   case KeyPathPatternComponent::Kind::TupleElement: {
-    require(loweredBaseTy.is<TupleType>(),
+    require(baseTy->is<TupleType>(),
             "invalid baseTy, should have been a TupleType");
       
-    auto tupleTy = loweredBaseTy.castTo<TupleType>();
+    auto tupleTy = baseTy->castTo<TupleType>();
     auto eltIdx = component.getTupleIndex();
       
     require(eltIdx < tupleTy->getNumElements(),
             "invalid element index, greater than # of tuple elements");
 
-    auto eltTy = tupleTy.getElementType(eltIdx)
-      .getReferenceStorageReferent();
+    auto eltTy = tupleTy->getElementType(eltIdx)
+      ->getReferenceStorageReferent();
     
-    require(eltTy == componentTy,
+    require(eltTy->isEqual(componentTy),
             "tuple element type should match the type of the component");
 
     break;
@@ -983,24 +985,6 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
-  // FIXME: For sanity, address-type phis should be prohibited at all SIL
-  // stages. However, the optimizer currently breaks the invariant in three
-  // places:
-  // 1. Normal Simplify CFG during conditional branch simplification
-  //    (sneaky jump threading).
-  // 2. Simplify CFG via Jump Threading.
-  // 3. Loop Rotation.
-  //
-  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
-  // designed to avoid this issue, we just need to make sure all passes use it
-  // correctly.
-  //
-  // Minimally, we must prevent address-type phis as long as access markers are
-  // preserved. A goal is to preserve access markers in OSSA.
-  bool prohibitAddressPhis() {
-    return F.hasOwnership();
-  }
-
   void visitSILPhiArgument(SILPhiArgument *arg) {
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
@@ -1024,7 +1008,7 @@ public:
                 "All phi argument inputs must be from branches.");
       }
     }
-    if (arg->isPhi() && prohibitAddressPhis()) {
+    if (arg->isPhi()) {
       // As a property of well-formed SIL, we disallow address-type
       // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
@@ -1094,7 +1078,7 @@ public:
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
     if (!F->hasOwnership()) {
-      require(SILValue(V).getOwnershipKind() == OwnershipKind::None,
+      require(SILValue(V)->getOwnershipKind() == OwnershipKind::None,
               "Once ownership is gone, all values should have none ownership");
       return;
     }
@@ -2015,22 +1999,6 @@ public:
       return;
     }
 
-    if (builtinKind == BuiltinValueKind::Move) {
-      // We expect that this builtin will be specialized during transparent
-      // inlining into move_value if we inline into a non-generic context. If
-      // the builtin still remains and is not in the specific move semantic
-      // function (which is the only function marked with
-      // semantics::LIFETIMEMANAGEMENT_MOVE), then we know that we did
-      // transparent inlining into a function that did not result in the Builtin
-      // being specialized out which is user error.
-      //
-      // NOTE: Once we have opaque values, this restriction will go away. This
-      // is just so we can call Builtin.move outside of the stdlib.
-      auto semanticName = semantics::LIFETIMEMANAGEMENT_MOVE;
-      require(BI->getFunction()->hasSemanticsAttr(semanticName),
-              "_move used within a generic context");
-    }
-
     if (builtinKind == BuiltinValueKind::Copy) {
       // We expect that this builtin will be specialized during transparent
       // inlining into explicit_copy_value if we inline into a non-generic
@@ -2189,6 +2157,10 @@ public:
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
+      require(LI->getModule().getStage() == SILStage::Raw ||
+                  !LI->getOperand()->getType().isMoveOnly(),
+              "'MoveOnly' types can only be copied in Raw SIL?!");
+      [[fallthrough]];
     case LoadOwnershipQualifier::Take:
       require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
@@ -2221,6 +2193,31 @@ public:
                     "Load operand type and result type mismatch");
     require(loadBorrowImmutabilityAnalysis.isImmutable(LBI),
             "Found load borrow that is invalidated by a local write?!");
+  }
+
+  void checkBeginBorrowInst(BeginBorrowInst *bbi) {
+    if (!bbi->isLexical())
+      return;
+    // Lexical begin_borrows of instances of some SILBoxType must derive from
+    // alloc_boxes or captures.
+    auto value = bbi->getOperand();
+    if (!value->getType().is<SILBoxType>())
+      return;
+    while (true) {
+      // Inlining may introduce additional begin_borrow instructions.
+      if (auto bbi = dyn_cast<BeginBorrowInst>(value))
+        value = bbi->getOperand();
+      // SILGen introduces copy_value instructions.
+      else if (auto cvi = dyn_cast<CopyValueInst>(value))
+        value = cvi->getOperand();
+      // SILGen inserts mark_uninitialized instructions of alloc_boxes.
+      else if (auto *mui = dyn_cast<MarkUninitializedInst>(value))
+        value = mui->getOperand();
+      else
+        break;
+    }
+    require(isa<AllocBoxInst>(value) || isa<SILFunctionArgument>(value),
+            "Lexical borrows of SILBoxTypes must be of vars or captures.");
   }
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
@@ -2260,6 +2257,29 @@ public:
       require(AccessInst->getEnforcement() != SILAccessEnforcement::Unknown,
               "access must have known enforcement outside raw stage");
     }
+  }
+
+  bool checkScopedAddressUses(ScopedAddressValue scopedAddress,
+                              PrunedLiveness *scopedAddressLiveness,
+                              DeadEndBlocks *deadEndBlocks) {
+    SmallVector<Operand *, 4> uses;
+    findTransitiveUsesForAddress(scopedAddress.value, &uses);
+
+    // Check if the collected uses are well-scoped.
+    for (auto *use : uses) {
+      auto *user = use->getUser();
+      if (deadEndBlocks->isDeadEnd(user->getParent())) {
+        continue;
+      }
+      if (scopedAddress.isScopeEndingUse(use)) {
+        continue;
+      }
+      if (!scopedAddressLiveness->isWithinBoundary(user)) {
+        llvm::errs() << "User found outside scope: " << *user;
+        return false;
+      }
+    }
+    return true;
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
@@ -2398,7 +2418,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(*SI->getFunction()) ||
-                  Src.getOwnershipKind() == OwnershipKind::None,
+                  Src->getOwnershipKind() == OwnershipKind::None,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -2414,6 +2434,8 @@ public:
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
+    require(isa<AllocStackInst>(SI->getDest()),
+            "store_borrow destination should be alloc_stack");
     requireSameType(SI->getDest()->getType().getObjectType(),
                     SI->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
@@ -2421,6 +2443,27 @@ public:
     // Note: This is the current implementation and the design is not final.
     require(isa<AllocStackInst>(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
+
+    PrunedLiveness scopedAddressLiveness;
+    ScopedAddressValue scopedAddress(SI);
+    bool success = scopedAddress.computeLiveness(scopedAddressLiveness);
+
+    require(!success || checkScopedAddressUses(
+                            scopedAddress, &scopedAddressLiveness, &DEBlocks),
+            "Ill formed store_borrow scope");
+
+    require(!success || !hasOtherStoreBorrowsInLifetime(
+                            SI, &scopedAddressLiveness, &DEBlocks),
+            "A store_borrow cannot be nested within another "
+            "store_borrow to its destination");
+
+    for (auto *use : SI->getDest()->getUses()) {
+      auto *user = use->getUser();
+      require(
+          user == SI || isa<StoreBorrowInst>(user) ||
+              isa<DeallocStackInst>(user),
+          "A store_borrow destination can be used only via its return address");
+    }
   }
 
   void checkAssignInst(AssignInst *AI) {
@@ -2655,15 +2698,17 @@ public:
       require(Elt->getType().isAddress(), "MFE must refer to variable addrs");
   }
 
-  void checkCopyAddrInst(CopyAddrInst *SI) {
-    require(SI->getSrc()->getType().isAddress(),
-            "Src value should be lvalue");
-    require(SI->getDest()->getType().isAddress(),
+  void checkCopyAddrInst(CopyAddrInst *cai) {
+    require(cai->getSrc()->getType().isAddress(), "Src value should be lvalue");
+    require(cai->getDest()->getType().isAddress(),
             "Dest address should be lvalue");
-    requireSameType(SI->getDest()->getType(), SI->getSrc()->getType(),
+    requireSameType(cai->getDest()->getType(), cai->getSrc()->getType(),
                     "Store operand type and dest type mismatch");
-    require(F.isTypeABIAccessible(SI->getDest()->getType()),
+    require(F.isTypeABIAccessible(cai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
+    require(cai->getModule().getStage() == SILStage::Raw ||
+                (cai->isTakeOfSrc() || !cai->getSrc()->getType().isMoveOnly()),
+            "'MoveOnly' types can only be copied in Raw SIL?!");
   }
 
   void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {
@@ -2701,8 +2746,8 @@ public:
             "copy_value is only valid in functions with qualified "
             "ownership");
     require(I->getModule().getStage() == SILStage::Raw ||
-                !I->getOperand()->getType().isMoveOnlyWrapped(),
-            "@moveOnly types can only be copied in Raw SIL?!");
+                !I->getOperand()->getType().isMoveOnly(),
+            "'MoveOnly' types can only be copied in Raw SIL?!");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
@@ -4113,13 +4158,13 @@ public:
       auto succOwnershipKind =
           CBI->getSuccessBB()->args_begin()[0]->getOwnershipKind();
       require(succOwnershipKind.isCompatibleWith(
-                  CBI->getOperand().getOwnershipKind()),
+                  CBI->getOperand()->getOwnershipKind()),
               "succ dest block argument must have ownership compatible with "
               "the checked_cast_br operand");
       auto failOwnershipKind =
           CBI->getFailureBB()->args_begin()[0]->getOwnershipKind();
       require(failOwnershipKind.isCompatibleWith(
-                  CBI->getOperand().getOwnershipKind()),
+                  CBI->getOperand()->getOwnershipKind()),
               "failure dest block argument must have ownership compatible with "
               "the checked_cast_br operand");
 
@@ -4131,12 +4176,12 @@ public:
       // boxed AnyHashable (ClassType). This breaks with the guarantees of
       // checked_cast_br guaranteed, so we ban it.
       require(!CBI->getOperand()->getType().isAnyObject() ||
-                  CBI->getOperand().getOwnershipKind() !=
+                  CBI->getOperand()->getOwnershipKind() !=
                       OwnershipKind::Guaranteed,
               "checked_cast_br with an AnyObject typed source cannot forward "
               "guaranteed ownership");
       require(CBI->preservesOwnership() ||
-                  CBI->getOperand().getOwnershipKind() !=
+                  CBI->getOperand()->getOwnershipKind() !=
                       OwnershipKind::Guaranteed,
               "If checked_cast_br is not directly forwarding, it can not have "
               "guaranteed ownership");
@@ -4681,8 +4726,18 @@ public:
         if (F.getModule().getStage() != SILStage::Lowered) {
           // During the lowered stage, a function type might have different
           // signature
-          require(eltArgTy == bbArgTy,
-                  "switch_enum destination bbarg must match case arg type");
+          //
+          // We allow for move only wrapped enums to have trivial payloads that
+          // are not move only wrapped. This occurs since we want to lower
+          // trivial move only wrapped types earlier in the pipeline than
+          // non-trivial types.
+          if (bbArgTy.isTrivial(F)) {
+            require(eltArgTy == bbArgTy.copyingMoveOnlyWrapper(eltArgTy),
+                    "switch_enum destination bbarg must match case arg type");
+          } else {
+            require(eltArgTy == bbArgTy,
+                    "switch_enum destination bbarg must match case arg type");
+          }
         }
         require(!dest->getArguments()[0]->getType().isAddress(),
                 "switch_enum destination bbarg type must not be an address");
@@ -5398,6 +5453,11 @@ public:
 
   void checkCopyableToMoveOnlyWrapperValueInst(
       CopyableToMoveOnlyWrapperValueInst *cvt) {
+    require(cvt->getInitialKind() ==
+                    CopyableToMoveOnlyWrapperValueInst::Owned ||
+                !cvt->getOperand()->getType().isTrivial(*cvt->getFunction()),
+            "To convert from a trivial value to a move only wrapper value use "
+            "TrivialToGuaranteedMoveOnlyWrapperValueInst");
     require(cvt->getOperand()->getType().isObject(),
             "Operand value should be an object");
     require(cvt->getType().isMoveOnlyWrapped(), "Output should be move only");
@@ -5527,7 +5587,8 @@ public:
           }
           state.Stack.pop_back();
 
-        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i)) {
+        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
+                   isa<StoreBorrowInst>(i)) {
           bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
                   "operation was not ended before re-beginning it");
@@ -5537,6 +5598,13 @@ public:
           if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
             bool present = state.ActiveOps.erase(beginOp);
             require(present, "operation has already been ended");
+          }
+        } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
+          if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
+            if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
+              bool present = state.ActiveOps.erase(beginOp);
+              require(present, "operation has already been ended");
+            }
           }
         } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
           require(!state.GotAsyncContinuation,
@@ -5940,8 +6008,8 @@ void SILProperty::verify(const SILModule &M) const {
   // TODO: base type for global/static descriptors
   auto sig = dc->getGenericSignatureOfContext();
   auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
-                  ->getCanonicalType(sig);
-  auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
+                  ->getReducedType(sig);
+  auto leafTy = decl->getValueInterfaceType()->getReducedType(sig);
   SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();

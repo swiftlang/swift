@@ -206,8 +206,11 @@ template <class Fn>
 static bool withStatusRecordLock(AsyncTask *task,
                                  LockContext lockContext,
                                  Fn &&fn) {
+  auto loadOrdering = getLoadOrdering(lockContext);
   ActiveTaskStatus status =
-    task->_private()._status().load(getLoadOrdering(lockContext));
+    task->_private()._status().load(loadOrdering);
+  if (loadOrdering == std::memory_order_acquire)
+    _swift_tsan_acquire(task);
   return withStatusRecordLock(task, lockContext, status, [&] {
     fn(status);
   });
@@ -242,6 +245,7 @@ bool swift::addStatusRecord(
       // We have to use a release on success to make the initialization of
       // the new record visible to an asynchronous thread trying to modify the
       // status records
+      _swift_tsan_release(task);
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
@@ -460,9 +464,19 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     // Set cancelled bit even if oldStatus.isStatusRecordLocked()
     newStatus = oldStatus.withCancelled();
 
+    // Perform an acquire operation on success, which pairs with the release
+    // operation in addStatusRecord. This ensures that the contents of the
+    // status records are visible to this thread, as well as the contents of any
+    // cancellation handlers and the data they access. We place this acquire
+    // barrier here, because the subsequent call to `withStatusRecordLock` might
+    // not have its own acquire barrier. We're calling the four-argument version
+    // which relies on the caller to have performed the first load, and if the
+    // compare_exchange operation in withStatusRecordLock succeeds the first
+    // time, then it won't perform an acquire.
     if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
-            /*success*/ std::memory_order_relaxed,
+            /*success*/ std::memory_order_acquire,
             /*failure*/ std::memory_order_relaxed)) {
+      _swift_tsan_acquire(task);
       break;
     }
   }

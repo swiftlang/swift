@@ -37,7 +37,7 @@
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
-// SR-13362
+// https://github.com/apple/swift/issues/55803
 // We currently only have a baseline for Intel CPUs on macOS.
 // REQUIRES: OS=macosx && CPU=x86_64
 
@@ -57,6 +57,11 @@ Func MutableCollection.moveSubranges(_:to:) has been removed
 Func MutableCollection.removeSubranges(_:) has been removed
 Func RangeReplaceableCollection.removeSubranges(_:) has been removed
 Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
+Class AnyKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
+Class KeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
+Class PartialKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
+Class ReferenceWritableKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
+Class WritableKeyPath has added a conformance to an existing protocol CustomDebugStringConvertible
 Struct DiscontiguousSlice has been removed
 Struct RangeSet has been removed
 Subscript Collection.subscript(_:) has been removed
@@ -65,6 +70,8 @@ Protocol CodingKey has added inherited protocol Sendable
 Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
 Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
+Constructor _SmallString.init(taggedCocoa:) has mangled name changing from 'Swift._SmallString.init(taggedCocoa: Swift.AnyObject) -> Swift._SmallString' to 'Swift._SmallString.init(taggedCocoa: Swift.AnyObject) -> Swift.Optional<Swift._SmallString>'
+Constructor _SmallString.init(taggedCocoa:) has return type change from Swift._SmallString to Swift._SmallString?
 Enum Never has added a conformance to an existing protocol Identifiable
 
 // These haven't actually been removed; they are simply marked unavailable.
@@ -93,5 +100,25 @@ Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has been removed
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
+Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
+Func UnsafeMutableBufferPointer.update(repeating:) is a new API without @available attribute
+Func UnsafeMutablePointer.assign(from:count:) has been removed
+Func UnsafeMutablePointer.update(from:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.assign(repeating:count:) has been removed
+Func UnsafeMutablePointer.update(repeating:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.moveAssign(from:count:) has been removed
+Func UnsafeMutablePointer.moveUpdate(from:count:) is a new API without @available attribute
+
+// These haven't actually been removed; they were renamed at the source level while
+// retaining their old mangled name. The source break was accepted as part of se-0370.
+Func UnsafeMutableBufferPointer.initialize(from:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (A1.Iterator, Swift.Int)' to 'Swift.UnsafeMutableBufferPointer.initialize<A where A == A1.Element, A1: Swift.Sequence>(from: A1) -> (unwritten: A1.Iterator, index: Swift.Int)'
+Func UnsafeMutableBufferPointer.initialize(from:) has return type change from (τ_1_0.Iterator, Swift.Int) to (unwritten: τ_1_0.Iterator, index: Swift.Int)
+
+// These haven't actually been removed; they are simply marked unavailable.
+// This seems to be a false positive in the ABI checker. This is not an ABI
+// break because the symbols are still present.
+Var _StringGuts._isContiguousUTF16 has been removed
+Var _StringGuts.startUTF16 has been removed
+Func _persistCString(_:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

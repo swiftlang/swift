@@ -59,7 +59,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
 
   // these do need await, regardless of reference or value type
-  _ = await (formance as MainCounter).counter
+  _ = await (formance as any MainCounter).counter
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon

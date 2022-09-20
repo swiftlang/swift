@@ -22,6 +22,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -397,7 +398,8 @@ bool SILCombiner::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType ptrType = SILType::getRawPointerType(Builder.getASTContext());
     SILValue offsetPtr;
     projector->project(KeyPathProjector::AccessType::Get, [&](SILValue addr) {
-      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType);
+      offsetPtr = Builder.createAddressToPointer(loc, addr, ptrType,
+                                          /*needsStackProtection=*/ false);
     });
 
     // The result of the _storedInlineOffset call should be Optional<Int>. If
@@ -1556,17 +1558,17 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
   if (!recursivelyCollectARCUsers(AcceptedUses, ErrorBB->getArgument(0)))
     return false;
 
-  SmallPtrSet<SILInstruction *, 8> UsesSet;
+  InstructionSet UsesSet(NormalBB->getFunction());
   for (auto *I : AcceptedUses)
     UsesSet.insert(I);
 
   // Check if the normal and error blocks are empty, except the ARC uses.
   for (auto &I : *NormalBB) {
-    if (!UsesSet.count(&I) && !isa<TermInst>(&I))
+    if (!UsesSet.contains(&I) && !isa<TermInst>(&I))
       return false;
   }
   for (auto &I : *ErrorBB) {
-    if (!UsesSet.count(&I) && !isa<TermInst>(&I))
+    if (!UsesSet.contains(&I) && !isa<TermInst>(&I))
       return false;
   }
   return true;

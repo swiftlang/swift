@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
 
+// https://github.com/apple/swift/issues/52072
+
 class BaseClass {}
 class SubClass: BaseClass {}
 struct Box<T> { init(_: T.Type) {} }

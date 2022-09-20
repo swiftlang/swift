@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "swift/IRGen/Linking.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -62,13 +63,14 @@ static void printKnownType(
   printKnownStruct(typeMapping, os, name, typeRecord);
 }
 
-static void printValueWitnessTableFunctionType(raw_ostream &os, StringRef name,
-                                               StringRef returnType,
-                                               std::string paramTypes,
-                                               uint16_t ptrauthDisc) {
-  os << "using ValueWitness" << name << "Ty = " << returnType
+static void
+printValueWitnessTableFunctionType(raw_ostream &os, StringRef prefix,
+                                   StringRef name, StringRef returnType,
+                                   std::string paramTypes,
+                                   uint16_t ptrauthDisc) {
+  os << "using " << prefix << name << "Ty = " << returnType
      << "(* __ptrauth_swift_value_witness_function_pointer(" << ptrauthDisc
-     << "))(" << paramTypes << ");\n";
+     << "))(" << paramTypes << ") SWIFT_NOEXCEPT_FUNCTION_PTR;\n";
 }
 
 static std::string makeParams(const char *arg) { return arg; }
@@ -82,12 +84,19 @@ static void printValueWitnessTable(raw_ostream &os) {
   std::string members;
   llvm::raw_string_ostream membersOS(members);
 
+  // C++ only supports noexcept on `using` function types in C++17.
+  os << "#if __cplusplus > 201402L\n";
+  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept\n";
+  os << "#else\n";
+  os << "#  define SWIFT_NOEXCEPT_FUNCTION_PTR\n";
+  os << "#endif\n\n";
+
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
   membersOS << "  " << type << " " << #lowerId << ";\n";
 #define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
   printValueWitnessTableFunctionType(                                          \
-      os, #upperId, returnType, makeParams paramTypes,                         \
+      os, "ValueWitness", #upperId, returnType, makeParams paramTypes,         \
       SpecialPointerAuthDiscriminators::upperId);                              \
   membersOS << "  ValueWitness" << #upperId << "Ty _Nonnull " << #lowerId      \
             << ";\n";
@@ -102,7 +111,36 @@ static void printValueWitnessTable(raw_ostream &os) {
 #define VOID_TYPE "void"
 #include "swift/ABI/ValueWitness.def"
 
-  os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n";
+  membersOS << "\n  constexpr size_t getAlignment() const { return (flags & "
+            << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1; }\n";
+  os << "\nstruct ValueWitnessTable {\n" << membersOS.str() << "};\n\n";
+  membersOS.str().clear();
+
+#define WANT_ONLY_ENUM_VALUE_WITNESSES
+#define DATA_VALUE_WITNESS(lowerId, upperId, type)                             \
+  membersOS << "  " << type << " " << #lowerId << ";\n";
+#define FUNCTION_VALUE_WITNESS(lowerId, upperId, returnType, paramTypes)       \
+  printValueWitnessTableFunctionType(                                          \
+      os, "EnumValueWitness", #upperId, returnType, makeParams paramTypes,     \
+      SpecialPointerAuthDiscriminators::upperId);                              \
+  membersOS << "  EnumValueWitness" << #upperId << "Ty _Nonnull " << #lowerId  \
+            << ";\n";
+#define MUTABLE_VALUE_TYPE "void * _Nonnull"
+#define IMMUTABLE_VALUE_TYPE "const void * _Nonnull"
+#define MUTABLE_BUFFER_TYPE "void * _Nonnull"
+#define IMMUTABLE_BUFFER_TYPE "const void * _Nonnull"
+#define TYPE_TYPE "void * _Nonnull"
+#define SIZE_TYPE "size_t"
+#define INT_TYPE "int"
+#define UINT_TYPE "unsigned"
+#define VOID_TYPE "void"
+#include "swift/ABI/ValueWitness.def"
+
+  os << "\nstruct EnumValueWitnessTable {\n"
+     << "  ValueWitnessTable vwTable;\n"
+     << membersOS.str() << "};\n\n";
+
+  os << "#undef SWIFT_NOEXCEPT_FUNCTION_PTR\n\n";
 }
 
 static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
@@ -118,64 +156,74 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
                  funcSig.parameterTypes[0]);
 }
 
-static void printOpaqueAllocFee(raw_ostream &os) {
-  os << R"text(inline void * _Nonnull opaqueAlloc(size_t size, size_t align) {
-#if defined(_WIN32)
-  void *r = _aligned_malloc(size, align);
-#else
-  if (align < sizeof(void *)) align = sizeof(void *);
-  void *r = nullptr;
-  int res = posix_memalign(&r, align, size);
-  (void)res;
-#endif
-  return r;
-}
-inline void opaqueFree(void * _Nonnull p) {
-#if defined(_WIN32)
-  _aligned_free(p);
-#else
-  free(p);
-#endif
-}
-)text";
-}
-
-static void printSwiftResilientStorageClass(raw_ostream &os) {
-  auto name = cxx_synthesis::getCxxOpaqueStorageClassName();
-  static_assert(TargetValueWitnessFlags<uint64_t>::AlignmentMask ==
-                    TargetValueWitnessFlags<uint32_t>::AlignmentMask,
-                "alignment mask doesn't match");
-  os << "/// Container for an opaque Swift value, like resilient struct.\n";
-  os << "class " << name << " {\n";
+void printCxxNaiveException(raw_ostream &os) {
+  os << "/// Naive exception class that should be thrown\n";
+  os << "class NaiveException : public swift::Error {\n";
   os << "public:\n";
-  os << "  inline " << name << "() noexcept : storage(nullptr) { }\n";
-  os << "  inline " << name
-     << "(ValueWitnessTable * _Nonnull vwTable) noexcept : storage("
-        "reinterpret_cast<char *>(opaqueAlloc(vwTable->size, (vwTable->flags &"
-     << TargetValueWitnessFlags<uint64_t>::AlignmentMask << ") + 1))) { }\n";
-  os << "  inline " << name << "(" << name
-     << "&& other) noexcept : storage(other.storage) { other.storage = "
-        "nullptr; }\n";
-  os << "  inline " << name << "(const " << name << "&) noexcept = delete;\n";
-  os << "  inline ~" << name
-     << "() noexcept { if (storage) { opaqueFree(static_cast<char "
-        "* _Nonnull>(storage)); } }\n";
-  os << "  void operator =(" << name
-     << "&& other) noexcept { auto temp = storage; storage = other.storage; "
-        "other.storage = temp; }\n";
-  os << "  void operator =(const " << name << "&) noexcept = delete;\n";
-  os << "  inline char * _Nonnull getOpaquePointer() noexcept { return "
-        "static_cast<char "
-        "* _Nonnull>(storage); }\n";
-  os << "  inline const char * _Nonnull getOpaquePointer() const noexcept { "
-        "return "
-        "static_cast<char * _Nonnull>(storage); }\n";
+  os << "  inline NaiveException(const char * _Nonnull msg) noexcept : "
+     << "msg_(msg) { }\n";
+  os << "  inline NaiveException(NaiveException&& other) noexcept : "
+        "msg_(other.msg_) { other.msg_ = nullptr; }\n";
+  os << "  inline ~NaiveException() noexcept { }\n";
+  os << "  void operator =(NaiveException&& other) noexcept { auto temp = msg_;"
+     << " msg_ = other.msg_; other.msg_ = temp; }\n";
+  os << "  void operator =(const NaiveException&) noexcept = delete;";
+  os << "\n";
+  os << "  inline const char * _Nonnull getMessage() const noexcept { "
+     << "return(msg_); }\n";
   os << "private:\n";
-  os << "  char * _Nullable storage;\n";
+  os << "  const char * _Nonnull msg_;\n";
   os << "};\n";
 }
 
+void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
+                                     PrimitiveTypeMapping &typeMapping,
+                                     bool isCForwardDefinition) {
+  Type supportedPrimitiveTypes[] = {
+      astContext.getBoolType(),
+
+      // Primitive integer, C integer and Int/UInt mappings.
+      astContext.getInt8Type(), astContext.getUInt8Type(),
+      astContext.getInt16Type(), astContext.getUInt16Type(),
+      astContext.getInt32Type(), astContext.getUInt32Type(),
+      astContext.getInt64Type(), astContext.getUInt64Type(),
+
+      // Primitive floating point type mappings.
+      astContext.getFloatType(), astContext.getDoubleType(),
+
+      // Pointer types.
+      // FIXME: support raw pointers?
+      astContext.getOpaquePointerType()};
+
+  for (Type type : llvm::makeArrayRef(supportedPrimitiveTypes)) {
+    auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
+        type->getNominalOrBoundGenericNominal());
+
+    auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadata(
+        type->getCanonicalType(), irgen::TypeMetadataAddress::AddressPoint);
+    std::string typeMetadataVarName = typeMetadataFunc.mangleAsString();
+
+    if (isCForwardDefinition) {
+      os << "// type metadata address for " << type.getString() << ".\n";
+      os << "SWIFT_IMPORT_STDLIB_SYMBOL extern size_t " << typeMetadataVarName
+         << ";\n";
+      continue;
+    }
+
+    os << "template<>\n";
+    os << "static inline const constexpr bool isUsableInGenericContext<"
+       << typeInfo.name << "> = true;\n\n";
+
+    os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
+       << "  static inline void * _Nonnull getTypeMetadata() {\n"
+       << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::" << typeMetadataVarName << ";\n"
+       << "  }\n};\n\n";
+  }
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
+                                          ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
   ClangSyntaxPrinter printer(os);
@@ -186,11 +234,19 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             printTypeMetadataResponseType(ctx, typeMapping, os);
             os << "\n";
             printValueWitnessTable(os);
+            os << "\n";
+            printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                            /*isCForwardDefinition=*/true);
           });
           os << "\n";
-          printOpaqueAllocFee(os);
-          os << "\n";
-          printSwiftResilientStorageClass(os);
+          printCxxNaiveException(os);
         });
+    os << "\n";
+    // C++ only supports inline variables from C++17.
+    // FIXME: silence the warning instead?
+    os << "#if __cplusplus > 201402L\n";
+    printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                    /*isCForwardDefinition=*/false);
+    os << "#endif\n";
   });
 }

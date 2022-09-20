@@ -17,12 +17,14 @@
 
 namespace swift {
 
+class ASTContext;
 class PrimitiveTypeMapping;
 class SwiftToClangInteropContext;
 
 /// Print out the core declarations required by C/C++ that are part of the core
 /// Swift stdlib code.
 void printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
+                                   ASTContext &astContext,
                                    PrimitiveTypeMapping &typeMapping,
                                    llvm::raw_ostream &os);
 

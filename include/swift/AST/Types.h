@@ -58,6 +58,7 @@ class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
+class BuiltinTupleDecl;
 class ClassDecl;
 class ClangModuleLoader;
 class DependentMemberType;
@@ -363,11 +364,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 8 };
-  SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
-    /// Whether there is an original type.
-    Flags : NumFlagBits
-  );
+  SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
 
   SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+16,
     /// Extra information which affects how the function is called, like
@@ -429,11 +426,7 @@ protected:
     ArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 1+32,
-    /// Whether an element of the tuple is inout, __shared or __owned.
-    /// Values cannot have such tuple types in the language.
-    HasElementWithOwnership : 1,
-
+  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
     : NumPadBits,
 
     /// The number of elements of the tuple.
@@ -511,9 +504,9 @@ public:
     return const_cast<TypeBase*>(this)->computeCanonicalType();
   }
 
-  /// getCanonicalType - Stronger canonicalization which folds away equivalent
+  /// getReducedType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature sig);
+  CanType getReducedType(GenericSignature sig);
 
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
@@ -662,6 +655,11 @@ public:
   void getRootOpenedExistentials(
       SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
+  /// Retrieve the set of type sequence generic parameters that occur
+  /// within this type.
+  void getTypeSequenceParameters(
+      SmallVectorImpl<Type> &rootTypeSequenceParams) const;
+
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
   Type typeEraseOpenedArchetypesWithRoot(const OpenedArchetypeType *root,
@@ -724,8 +722,8 @@ public:
     return getRecursiveProperties().isLValue();
   }
   
-  /// Is this a first-class value type, meaning it is not an InOutType or a
-  /// tuple type containing an InOutType?
+  /// Is this a first-class value type, meaning it is not an LValueType or an
+  /// InOutType.
   bool isMaterializable();
 
   /// Is this a non-escaping type, that is, a non-escaping function type or a
@@ -902,26 +900,35 @@ public:
   bool satisfiesClassConstraint();
 
   /// Determine whether this type can be used as a base type for AST
-  /// name lookup, which is the case for nominal types, protocol compositions
-  /// and archetypes.
+  /// name lookup, which is the case for nominal types, existential types,
+  /// archetypes, and tuples.
   ///
   /// Generally, the static vs instance and mutating vs nonmutating distinction
   /// is handled elsewhere, so metatypes, lvalue types and inout types are not
   /// allowed here.
   ///
-  /// Similarly, tuples formally have members, but this does not go through
-  /// name lookup.
+  /// Tuples have formal members to project elements by index or by label; these
+  /// are handled directly by Sema and do not go through name lookup.
+  ///
+  /// Bona fide members on tuples are defined on extensions of
+  /// Builtin.TheTupleType.
   bool mayHaveMembers() {
     return (is<ArchetypeType>() ||
             is<ModuleType>() ||
             isExistentialType() ||
-            getAnyNominal());
+            getAnyNominal() ||
+            is<TupleType>());
   }
+
+  /// Checks whether this type may potentially be callable. This returns true
+  /// for function types, metatypes, nominal types that support being called,
+  /// and types that have not been inferred yet.
+  bool mayBeCallable(DeclContext *dc);
 
   /// Checks whether this is a type that supports being called through the
   /// implementation of a \c callAsFunction method. Note that this does not
   /// check access control.
-  bool isCallableNominalType(DeclContext *dc);
+  bool isCallAsFunctionType(DeclContext *dc);
 
   /// Return true if the specified type or a super-class/super-protocol has the
   /// @dynamicMemberLookup attribute on it.
@@ -1256,6 +1263,9 @@ public:
   /// Return the type T after looking through all of the optional
   /// types.
   Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
+
+  /// Return the number of optionals this type is wrapped with.
+  unsigned int getOptionalityDepth();
 
   /// Remove concurrency-related types and constraints from the given
   /// type
@@ -1990,11 +2000,6 @@ public:
   }
 };
 
-// TODO: As part of AST modernization, replace with a proper
-// 'ParameterTypeElt' or similar, and have FunctionTypes only have a list
-// of 'ParameterTypeElt's. Then, this information can be removed from
-// TupleTypeElt.
-//
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
@@ -2118,6 +2123,28 @@ public:
   uint16_t toRaw() const { return value.toRaw(); }
 };
 
+/// A type that indicates how parameter flags should be handled in an operation
+/// that requires the conversion into a type that doesn't support them, such as
+/// tuples.
+enum class ParameterFlagHandling {
+  /// Ignores any parameter flags that may be present, dropping them from the
+  /// result. This should only be used in specific cases, including e.g:
+  ///
+  /// - The flags have already been handled, and unsuitable flags have been
+  ///   rejected or asserted to not be present.
+  /// - The flags aren't relevant for the particular conversion (e.g for type
+  ///   printing or compatibility logic).
+  /// - The conversion is only interested in the 'internal argument' of a
+  ///   parameter, in which case only the type and label are relevant.
+  ///
+  /// In all other cases, you ought to verify that unsuitable flags are not
+  /// present, or add assertions to that effect.
+  IgnoreNonEmpty,
+
+  /// Asserts that no parameter flags are present.
+  AssertEmpty
+};
+
 class YieldTypeFlags {
   enum YieldFlags : uint8_t {
     None        = 0,
@@ -2191,21 +2218,12 @@ public:
 
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public SugarType {
-  friend class ASTContext;
-  
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
-            ParameterTypeFlags flags);
+  ParenType(Type UnderlyingType, RecursiveTypeProperties properties);
 
 public:
+  static ParenType *get(const ASTContext &C, Type underlying);
+
   Type getUnderlyingType() const { return getSinglyDesugaredType(); }
-
-  static ParenType *get(const ASTContext &C, Type underlying,
-                        ParameterTypeFlags flags = {});
-
-  /// Get the parameter flags
-  ParameterTypeFlags getParameterFlags() const {
-    return ParameterTypeFlags::fromRaw(Bits.ParenType.Flags);
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2221,37 +2239,17 @@ class TupleTypeElt {
   /// This is the type of the field.
   Type ElementType;
 
-  /// Flags that are specific to and relevant for parameter types
-  ParameterTypeFlags Flags;
-
   friend class TupleType;
   
 public:
   TupleTypeElt() = default;
-  TupleTypeElt(Type ty, Identifier name = Identifier(),
-               ParameterTypeFlags fl = {});
-  
+  TupleTypeElt(Type ty, Identifier name = Identifier());
+
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
-  
-  Type getRawType() const { return ElementType; }
-  Type getType() const;
 
-  ParameterTypeFlags getParameterFlags() const { return Flags; }
+  Type getType() const { return ElementType; }
 
-  /// Determine whether this field is variadic.
-  bool isVararg() const { return Flags.isVariadic(); }
-
-  /// Determine whether this field is an autoclosure parameter closure.
-  bool isAutoClosure() const { return Flags.isAutoClosure(); }
-
-  /// Determine whether this field is marked 'inout'.
-  bool isInOut() const { return Flags.isInOut(); }
-  
-  /// Remove the type of this varargs element designator, without the array
-  /// type wrapping it.
-  Type getVarargBaseTy() const;
-  
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const;
 
@@ -2282,10 +2280,11 @@ class TupleType final : public TypeBase, public llvm::FoldingSetNode,
   
 public:
   /// get - Return the uniqued tuple type with the specified elements.
-  /// Returns a ParenType instead if there is exactly one element which
-  /// is unlabeled and not varargs, so it doesn't accidentally construct
-  /// a tuple which is impossible to write.
-  static Type get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
+  ///
+  /// This can construct one-element tuple types, which are impossible to
+  /// write in the source language. The caller should check for that case
+  /// first it a bona fide 'r-value' type is desired.
+  static TupleType *get(ArrayRef<TupleTypeElt> Elements, const ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
   static CanTypeWrapper<TupleType> getEmpty(const ASTContext &C);
@@ -2313,11 +2312,6 @@ public:
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
-  
-  /// Returns true if this tuple has inout, __shared or __owned elements.
-  bool hasElementWithOwnership() const {
-    return static_cast<bool>(Bits.TupleType.HasElementWithOwnership);
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2332,13 +2326,11 @@ public:
   
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
-            RecursiveTypeProperties properties,
-            bool hasElementWithOwnership)
-     : TypeBase(TypeKind::Tuple, CanCtx, properties) {
-     Bits.TupleType.HasElementWithOwnership = hasElementWithOwnership;
-     Bits.TupleType.Count = elements.size();
-     std::uninitialized_copy(elements.begin(), elements.end(),
-                             getTrailingObjects<TupleTypeElt>());
+            RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
+    Bits.TupleType.Count = elements.size();
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            getTrailingObjects<TupleTypeElt>());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -3122,10 +3114,9 @@ protected:
 public:
   /// Take an array of parameters and turn it into a tuple or paren type.
   ///
-  /// \param wantParamFlags Whether to preserve the parameter flags from the
-  /// given set of parameters.
+  /// \param paramFlagHandling How to handle the parameter flags.
   static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                           bool wantParamFlags = true);
+                           ParameterFlagHandling paramFlagHandling);
 
   /// Given two arrays of parameters determine if they are equal in their
   /// canonicalized form. Internal labels and type sugar is *not* taken into
@@ -5004,7 +4995,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
 
 class SILMoveOnlyWrappedType;
 class SILModule; // From SIL
-typedef CanTypeWrapper<SILMoveOnlyWrappedType> CanMoveOnlyType;
+typedef CanTypeWrapper<SILMoveOnlyWrappedType> CanSILMoveOnlyWrappedType;
 
 /// A wrapper type that marks an inner type as being a move only value. Can not
 /// be written directly at the Swift level, instead it is triggered by adding
@@ -5022,7 +5013,7 @@ class SILMoveOnlyWrappedType final : public TypeBase,
 public:
   CanType getInnerType() const { return innerType; }
 
-  static CanMoveOnlyType get(CanType innerType);
+  static CanSILMoveOnlyWrappedType get(CanType innerType);
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILMoveOnlyWrapped;
@@ -5502,6 +5493,23 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialType, Type)
   static CanExistentialType get(CanType constraint);
   PROXY_CAN_TYPE_SIMPLE_GETTER(getConstraintType)
 END_CAN_TYPE_WRAPPER(ExistentialType, Type)
+
+
+/// BuiltinTupleType - A singleton nominal type which serves as the declared
+/// interface type of Builtin.TheTupleType.
+class BuiltinTupleType : public NominalType {
+public:
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinTuple;
+  }
+
+private:
+  friend class ASTContext;
+  BuiltinTupleType(BuiltinTupleDecl *TheDecl, const ASTContext &Ctx);
+};
+BEGIN_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
+END_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
 
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value
@@ -6398,7 +6406,7 @@ public:
   }
 
 public:
-  void Profile(llvm::FoldingSetNodeID &ID) {
+  void Profile(llvm::FoldingSetNodeID &ID) const {
     Profile(ID, getElementTypes());
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Elements);
@@ -6447,24 +6455,33 @@ class PackExpansionType : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   Type patternType;
+  Type countType;
 
 public:
   /// Create a pack expansion type from the given pattern type.
   ///
-  /// It is not required that the pattern type actually contain a reference to
-  /// a variadic generic parameter.
-  static PackExpansionType *get(Type pattern);
+  /// It is not required that \p pattern actually contain a reference to
+  /// a variadic generic parameter, but any variadic generic parameters
+  /// appearing in the pattern type must have the same count as \p countType.
+  ///
+  /// As for \p countType itself, it must be a type sequence generic parameter
+  /// type, or a sequence archetype type.
+  static PackExpansionType *get(Type pattern, Type countType);
 
 public:
   /// Retrieves the pattern type of this pack expansion.
   Type getPatternType() const { return patternType; }
 
+  /// Retrieves the count type of this pack expansion.
+  Type getCountType() const { return countType; }
+
 public:
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getPatternType());
+    Profile(ID, getPatternType(), getCountType());
   }
 
-  static void Profile(llvm::FoldingSetNodeID &ID, Type patternType);
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      Type patternType, Type countType);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -6472,15 +6489,17 @@ public:
   }
 
 private:
-  PackExpansionType(Type patternType, const ASTContext *CanCtx)
-    : TypeBase(TypeKind::PackExpansion, CanCtx,
-               patternType->getRecursiveProperties()), patternType(patternType) {
-      assert(patternType);
-    }
+  PackExpansionType(Type patternType, Type countType,
+                    RecursiveTypeProperties properties,
+                    const ASTContext *ctx);
 };
 BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
   CanType getPatternType() const {
     return CanType(getPointer()->getPatternType());
+  }
+
+  CanType getCountType() const {
+    return CanType(getPointer()->getCountType());
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 
@@ -6528,17 +6547,9 @@ inline bool TypeBase::isTypeSequenceParameter() {
          t->castTo<GenericTypeParamType>()->isTypeSequence();
 }
 
+// TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
-  if (hasLValueType())
-    return false;
-
-  if (is<InOutType>())
-    return false;
-
-  if (auto *TTy = getAs<TupleType>())
-    return !TTy->hasElementWithOwnership();
-
-  return true;
+  return !(hasLValueType() || is<InOutType>());
 }
 
 inline GenericTypeParamType *TypeBase::getRootGenericParam() {
@@ -6750,26 +6761,12 @@ inline bool CanType::isActuallyCanonicalOrNull() const {
          getPointer()->isCanonical();
 }
 
-inline Type TupleTypeElt::getVarargBaseTy() const {
-  TypeBase *T = getType().getPointer();
-  if (auto *AT = dyn_cast<VariadicSequenceType>(T))
-    return AT->getBaseType();
-  if (auto *BGT = dyn_cast<BoundGenericType>(T)) {
-    // It's the stdlib Array<T>.
-    return BGT->getGenericArgs()[0];
-  }
-  assert(T->hasError());
-  return T;
-}
-
 inline TupleTypeElt TupleTypeElt::getWithName(Identifier name) const {
-  assert(getParameterFlags().isInOut() == getType()->is<InOutType>());
-  return TupleTypeElt(getRawType(), name, getParameterFlags());
+  return TupleTypeElt(getType(), name);
 }
 
 inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
-  auto flags = getParameterFlags().withInOut(T->is<InOutType>());
-  return TupleTypeElt(T->getInOutObjectType(), getName(), flags);
+  return TupleTypeElt(T, getName());
 }
 
 /// Create one from what's present in the parameter decl and type

@@ -20,8 +20,7 @@ namespace swift {
 namespace ide {
 
 struct SwiftCompletionInfo {
-  swift::ASTContext *swiftASTContext = nullptr;
-  const swift::CompilerInvocation *invocation = nullptr;
+  std::shared_ptr<CompilerInstance> compilerInstance = nullptr;
   CodeCompletionContext *completionContext = nullptr;
 };
 

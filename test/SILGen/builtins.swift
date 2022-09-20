@@ -217,11 +217,11 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins34class_existential_to_native_object{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassProto):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any ClassProto):
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG_COPY]] : $ClassProto
-// CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
+// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG_COPY]] : $any ClassProto
+// CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}, any ClassProto) Self to $Builtin.NativeObject
 // CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   return Builtin.unsafeCastToNativeObject(t as ClassProto)
@@ -326,8 +326,8 @@ func gep_raw32(_ p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins3gep{{[_0-9a-zA-Z]*}}F
 func gep<Elem>(_ p: Builtin.RawPointer, i: Builtin.Word, e: Elem.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0
-  // CHECK: [[GEP:%.*]] = index_addr [[P2A]] : $*Elem, %1 : $Builtin.Word
-  // CHECK: [[A2P:%.*]] = address_to_pointer [[GEP]]
+  // CHECK: [[GEP:%.*]] = index_addr [stack_protection] [[P2A]] : $*Elem, %1 : $Builtin.Word
+  // CHECK: [[A2P:%.*]] = address_to_pointer [stack_protection] [[GEP]]
   // CHECK: return [[A2P]]
   return Builtin.gep_Word(p, i, e)
 }
@@ -385,6 +385,40 @@ func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Typ
   // CHECK: return [[A2P]]
   return Builtin.getTailAddr_Word(start, i, ty1, ty2)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins18protectedAddressOfyBpxzlF
+func protectedAddressOf<T>(_ x: inout T) -> Builtin.RawPointer {
+  // CHECK: [[A:%.*]] = begin_access [modify] [unknown] %0
+  // CHECK: [[P:%.*]] = address_to_pointer [stack_protection] [[A]]
+  // CHECK: return [[P]]
+  return Builtin.addressof(&x)
+}
+// CHECK: } // end sil function '$s8builtins18protectedAddressOfyBpxzlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20unprotectedAddressOfyBpxzlF
+func unprotectedAddressOf<T>(_ x: inout T) -> Builtin.RawPointer {
+  // CHECK: [[A:%.*]] = begin_access [modify] [unknown] %0
+  // CHECK: [[P:%.*]] = address_to_pointer [[A]]
+  // CHECK: return [[P]]
+  return Builtin.unprotectedAddressOf(&x)
+}
+// CHECK: } // end sil function '$s8builtins20unprotectedAddressOfyBpxzlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins24protectedAddressOfBorrowyBpxlF
+func protectedAddressOfBorrow<T>(_ x: T) -> Builtin.RawPointer {
+  // CHECK: [[P:%.*]] = address_to_pointer [stack_protection] %0
+  // CHECK: return [[P]]
+  return Builtin.addressOfBorrow(x)
+}
+// CHECK: } // end sil function '$s8builtins24protectedAddressOfBorrowyBpxlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins26unprotectedAddressOfBorrowyBpxlF
+func unprotectedAddressOfBorrow<T>(_ x: T) -> Builtin.RawPointer {
+  // CHECK: [[P:%.*]] = address_to_pointer %0
+  // CHECK: return [[P]]
+  return Builtin.unprotectedAddressOfBorrow(x)
+}
+// CHECK: } // end sil function '$s8builtins26unprotectedAddressOfBorrowyBpxlF'
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins25beginUnpairedModifyAccess{{[_0-9a-zA-Z]*}}F
 func beginUnpairedModifyAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
@@ -716,15 +750,15 @@ func refcast_class_any(_ o: A) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20refcast_punknown_any{{[_0-9a-zA-Z]*}}F
-// CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}} : $*PUnknown to AnyObject in %{{.*}} : $*AnyObject
+// CHECK: unchecked_ref_cast_addr any PUnknown in %{{.*}} : $*any PUnknown to AnyObject in %{{.*}} : $*AnyObject
 func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
   return Builtin.castReference(o as PUnknown)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF :
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $PClass):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any PClass):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:   [[ARG_CAST:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $PClass to $AnyObject
+// CHECK:   [[ARG_CAST:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $any PClass to $AnyObject
 // CHECK:   return [[ARG_CAST]]
 // CHECK: } // end sil function '$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
@@ -732,61 +766,9 @@ func refcast_pclass_any(_ o: PClass) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins20refcast_any_punknown{{[_0-9a-zA-Z]*}}F
-// CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}} : $*AnyObject to PUnknown in %{{.*}} : $*PUnknown
+// CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}} : $*AnyObject to any PUnknown in %{{.*}} : $*any PUnknown
 func refcast_any_punknown(_ o: AnyObject) -> PUnknown {
   return Builtin.castReference(o)
-}
-
-// => SEMANTIC ARC TODO: This function is missing a borrow + extract + copy.
-//
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins22unsafeGuaranteed_class{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @guaranteed $A):
-// CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
-// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<A>([[P_COPY]] : $A)
-// CHECK:   ([[R:%.*]], [[K:%.*]]) = destructure_tuple [[T]]
-// CHECK:   destroy_value [[R]]
-// CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
-// CHECK:   return [[P_COPY]] : $A
-// CHECK: }
-func unsafeGuaranteed_class(_ a: A) -> A {
-  Builtin.unsafeGuaranteed(a)
-  return a
-}
-
-// CHECK-LABEL: $s8builtins24unsafeGuaranteed_generic{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @guaranteed $T):
-// CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
-// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
-// CHECK:   ([[R:%.*]], [[K:%.*]]) = destructure_tuple [[T]]
-// CHECK:   destroy_value [[R]]
-// CHECK:   [[P_RETURN:%.*]] = copy_value [[P]]
-// CHECK:   return [[P_RETURN]] : $T
-// CHECK: }
-func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
-  Builtin.unsafeGuaranteed(a)
-  return a
-}
-
-// CHECK_LABEL: sil hidden [ossa] @$s8builtins31unsafeGuaranteed_generic_return{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @guaranteed $T):
-// CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
-// CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
-// CHECK:   ([[R:%.*]], [[K:%.*]]) = destructure_tuple [[T]]
-// CHECK:   [[S:%.*]] = tuple ([[R]] : $T, [[K]] : $Builtin.Int8)
-// CHECK:   return [[S]] : $(T, Builtin.Int8)
-// CHECK: }
-func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8) {
-  return Builtin.unsafeGuaranteed(a)
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s8builtins19unsafeGuaranteedEnd{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : $Builtin.Int8):
-// CHECK:   builtin "unsafeGuaranteedEnd"([[P]] : $Builtin.Int8)
-// CHECK:   [[S:%.*]] = tuple ()
-// CHECK:   return [[S]] : $()
-// CHECK: }
-func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
-  Builtin.unsafeGuaranteedEnd(t)
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins10bindMemory{{[_0-9a-zA-Z]*}}F

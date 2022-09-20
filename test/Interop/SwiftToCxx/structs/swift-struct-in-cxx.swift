@@ -48,9 +48,44 @@
 // CHECK-NEXT:   callable(result._getOpaquePointer());
 // CHECK-NEXT:   return result;
 // CHECK-NEXT:  }
+// CHECK-NEXT: static inline void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// CHECK-NEXT:   auto metadata = _impl::$s7Structs18StructWithIntFieldVMa(0);
+// CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
+// CHECK-NEXT: #ifdef __arm64e__
+// CHECK-NEXT:   auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
+// CHECK-NEXT: #else
+// CHECK-NEXT:   auto *vwTable = *vwTableAddr;
+// CHECK-NEXT: #endif
+// CHECK-NEXT:   vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
+// CHECK-NEXT: }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK-NEXT: } // end namespace
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct TypeMetadataTrait<Structs::StructWithIntField>
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   return Structs::_impl::$s7Structs18StructWithIntFieldVMa(0)._0;
+// CHECK-NEXT: }
+// CHECK-NEXT: };
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::StructWithIntField> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct implClassFor<Structs::StructWithIntField> { using type = Structs::_impl::_impl_StructWithIntField; };
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace Structs {
+
 public struct StructWithIntField {
   let field: Int64
 }

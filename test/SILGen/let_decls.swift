@@ -233,8 +233,7 @@ struct WeirdPropertyTest {
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box ${ var WeirdPropertyTest }
-  // CHECK: [[VLIFETIME:%[^,]+]] = begin_borrow [lexical] [[VBOX]]
-  // CHECK: [[PB:%.*]] = project_box [[VLIFETIME]]
+  // CHECK: [[PB:%.*]] = project_box [[VBOX]]
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
@@ -285,7 +284,7 @@ protocol SimpleProtocol {
 // methods on protocol and archetypes calls.
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetProtocolBases
-// CHECK: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $*any SimpleProtocol):
 func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: debug_value {{.*}} expr op_deref
   // CHECK-NEXT: open_existential_addr
@@ -320,9 +319,9 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testDebugValue
-// CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $Int, %1 : $*any SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
-// CHECK-NEXT: debug_value %1 : $*SimpleProtocol, let, name "b", {{.*}} expr op_deref
+// CHECK-NEXT: debug_value %1 : $*any SimpleProtocol, let, name "b", {{.*}} expr op_deref
 func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
@@ -340,14 +339,14 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
-// CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
-// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
-// CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
-// CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*SimpleProtocol
-// CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
+// CHECK:       bb0(%0 : $*any SimpleProtocol, %1 : $Int):
+// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
+// CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 0
+// CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*any SimpleProtocol
+// CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
-// CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
-// CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    destroy_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int)
+// CHECK-NEXT:    dealloc_stack %2 : $*(start: any SimpleProtocol, pastEnd: Int)
 }
 
 
@@ -466,13 +465,11 @@ struct LetPropertyStruct {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
-// CHECK:  [[ALIFETIME:%[^,]+]] = begin_borrow [lexical] [[ABOX]]
-// CHECK:  [[A:%[0-9]+]] = project_box [[ALIFETIME]]
+// CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[A]]
 // CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[READ]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   end_borrow [[ALIFETIME]]
 // CHECK:   destroy_value [[ABOX]] : ${ var LetPropertyStruct }
 // CHECK:   return [[PROP]] : $Int
 func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
@@ -484,10 +481,10 @@ func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
-// CHECK: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $*any SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @$s9let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pvg
-// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
+// CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out any SimpleProtocol
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()
 // CHECK-NEXT: }

@@ -9,7 +9,7 @@ public class B: A {
   // CHECK:         switch_enum {{%.*}} : $Optional<Int>
   public lazy var x: Int = 0
   // CHECK-LABEL: sil [lazy_getter] [noinline] [ossa] @$s16optional_to_bool1BC1y{{[_0-9a-zA-Z]*}}vg
-  // CHECK:         switch_enum_addr {{%.*}} : $*Optional<P>
+  // CHECK:         switch_enum_addr {{%.*}} : $*Optional<any P>
   public lazy var y: P = 0
 }
 

@@ -705,7 +705,7 @@ using swift::SILFunctionType;
 using swift::DifferentiabilityKind;
 using swift::SILDifferentiabilityWitnessKey;
 
-template <typename T> struct DenseMapInfo;
+template <typename T, typename Enable> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {

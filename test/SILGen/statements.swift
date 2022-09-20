@@ -526,12 +526,10 @@ func defer_mutable(_ x: Int) {
   var x = x
   // expected-warning@-1 {{variable 'x' was never mutated; consider changing to 'let' constant}}
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
-  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
-  // CHECK-NEXT: project_box [[LIFETIME]]
-  // CHECK-NOT: [[LIFETIME]]
+  // CHECK-NEXT: project_box [[BOX]]
+  // CHECK-NOT: [[BOX]]
   // CHECK: function_ref @$s10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
-  // CHECK-NOT: [[LIFETIME]]
-  // CHECK: end_borrow [[LIFETIME]]
+  // CHECK-NOT: [[BOX]]
   // CHECK: destroy_value [[BOX]]
   defer { _ = x } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
 }

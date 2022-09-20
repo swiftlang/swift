@@ -259,11 +259,11 @@ bb0(%0 : $UInt8):
 
 // CHECK-LABEL:  @tryapply_allocstack_and_copyaddr
 // CHECK:        PAIR #2.
-// CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error Error), normal bb1, error bb2
+// CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error any Error), normal bb1, error bb2
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
 // CHECK:        PAIR #3.
-// CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error Error), normal bb1, error bb2
+// CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error any Error), normal bb1, error bb2
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
 sil @tryapply_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {

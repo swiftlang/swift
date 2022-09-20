@@ -43,6 +43,9 @@ namespace index {
 /// \param skipStdlib If indexing system modules, don't index the standard
 /// library.
 ///
+/// \param includeLocals If true, emit index data for local definitions and
+/// references.
+///
 /// \param isDebugCompilation true for non-optimized compiler invocation.
 ///
 /// \param targetTriple The target for this compilation.
@@ -53,7 +56,8 @@ namespace index {
 bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
                     StringRef indexStorePath, bool indexClangModules,
                     bool indexSystemModules, bool skipStdlib,
-                    bool isDebugCompilation, StringRef targetTriple,
+                    bool includeLocals, bool isDebugCompilation,
+                    StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 
@@ -81,6 +85,9 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 /// \param skipStdlib If indexing system modules, don't index the standard
 /// library.
 ///
+/// \param includeLocals If true, emit index data for local definitions and
+/// references.
+///
 /// \param isDebugCompilation true for non-optimized compiler invocation.
 ///
 /// \param targetTriple The target for this compilation.
@@ -91,8 +98,8 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 bool indexAndRecord(ModuleDecl *module, ArrayRef<std::string> indexUnitTokens,
                     StringRef moduleUnitToken, StringRef indexStorePath,
                     bool indexClangModules, bool indexSystemModules,
-                    bool skipStdlib, bool isDebugCompilation,
-                    StringRef targetTriple,
+                    bool skipStdlib, bool includeLocals,
+                    bool isDebugCompilation, StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 // FIXME: indexUnitTokens could be StringRef, but that creates an impedance

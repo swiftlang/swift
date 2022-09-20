@@ -104,7 +104,17 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <cstdbool>\n"
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
-        out << "#if defined(_WIN32)\n#include <malloc.h>\n#endif\n";
+        out << "#include <new>\n";
+        out << "#include <type_traits>\n";
+        // FIXME: Look for the header in the SDK.
+        out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
+        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";
+        out << "#if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <../../../swift/shims/_SwiftCxxInteroperability.h>\n";
+        out << "// Alternatively, allow user to find the header using additional include path into 'swift'.\n";
+        out << "#elif __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <shims/_SwiftCxxInteroperability.h>\n";
+        out << "#endif\n";
       },
       [&] {
         out << "#include <stdint.h>\n"
@@ -320,19 +330,20 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   emitMacro("SWIFT_CALL", "__attribute__((swiftcall))");
   emitMacro("SWIFT_INDIRECT_RESULT", "__attribute__((swift_indirect_result))");
   emitMacro("SWIFT_CONTEXT", "__attribute__((swift_context))");
+  emitMacro("SWIFT_ERROR_RESULT", "__attribute__((swift_error_result))");
+  if (ctx.getStdlibModule()->isStaticLibrary()) {
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
+  } else {
+    out << "#if defined(_WIN32)\n";
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL", "__declspec(dllimport)");
+    out << "#else\n";
+    emitMacro("SWIFT_IMPORT_STDLIB_SYMBOL");
+    out << "#endif\n";
+  }
   // SWIFT_NOEXCEPT applies 'noexcept' in C++ mode only.
   emitCxxConditional(
       out, [&] { emitMacro("SWIFT_NOEXCEPT", "noexcept"); },
       [&] { emitMacro("SWIFT_NOEXCEPT"); });
-  emitCxxConditional(out, [&] {
-    out << "#if !defined(SWIFT_CXX_INT_DEFINED)\n";
-    out << "#define SWIFT_CXX_INT_DEFINED\n";
-    out << "namespace swift {\n";
-    out << "using Int = ptrdiff_t;\n";
-    out << "using UInt = size_t;\n";
-    out << "}\n";
-    out << "#endif\n";
-  });
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 }
@@ -384,8 +395,11 @@ static int compareImportModulesByName(const ImportModuleTy *left,
 
 static void writeImports(raw_ostream &out,
                          llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                         ModuleDecl &M, StringRef bridgingHeader) {
-  out << "#if __has_feature(modules)\n";
+                         ModuleDecl &M, StringRef bridgingHeader,
+                         bool useCxxImport = false) {
+  // Note: we can't use has_feature(modules) as it's always enabled in C++20
+  // mode.
+  out << "#if __has_feature(objc_modules)\n";
 
   out << "#if __has_warning(\"-Watimport-in-framework-header\")\n"
       << "#pragma clang diagnostic ignored \"-Watimport-in-framework-header\"\n"
@@ -409,6 +423,8 @@ static void writeImports(raw_ostream &out,
   // Track printed names to handle overlay modules.
   llvm::SmallPtrSet<Identifier, 8> seenImports;
   bool includeUnderlying = false;
+  StringRef importDirective =
+      useCxxImport ? "#pragma clang module import" : "@import";
   for (auto import : sortedImports) {
     if (auto *swiftModule = import.dyn_cast<ModuleDecl *>()) {
       auto Name = swiftModule->getName();
@@ -417,12 +433,12 @@ static void writeImports(raw_ostream &out,
         continue;
       }
       if (seenImports.insert(Name).second)
-        out << "@import " << Name.str() << ";\n";
+        out << importDirective << ' ' << Name.str() << ";\n";
     } else {
       const auto *clangModule = import.get<const clang::Module *>();
       assert(clangModule->isSubModule() &&
              "top-level modules should use a normal swift::ModuleDecl");
-      out << "@import ";
+      out << importDirective << ' ';
       ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
       out << ";\n";
     }
@@ -478,14 +494,14 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
   return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
 }
 
-static std::string
-getModuleContentsCxxString(ModuleDecl &M,
-                           SwiftToClangInteropContext &interopContext) {
-  SmallPtrSet<ImportModuleTy, 8> imports;
+static std::string getModuleContentsCxxString(
+    ModuleDecl &M, SmallPtrSet<ImportModuleTy, 8> &imports,
+    SwiftToClangInteropContext &interopContext, bool requiresExposedAttribute) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-  printModuleContentsAsCxx(moduleContents, imports, M, interopContext);
-  return moduleContents.str();
+  printModuleContentsAsCxx(moduleContents, imports, M, interopContext,
+                           requiresExposedAttribute);
+  return std::move(moduleContents.str());
 }
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
@@ -507,8 +523,15 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
-    if (ExposePublicDeclsInClangHeader) {
-      os << getModuleContentsCxxString(*M, interopContext);
+    if (ExposePublicDeclsInClangHeader ||
+        M->DeclContext::getASTContext().LangOpts.EnableCXXInterop) {
+      SmallPtrSet<ImportModuleTy, 8> imports;
+      auto contents = getModuleContentsCxxString(
+          *M, imports, interopContext,
+          /*requiresExposedAttribute=*/!ExposePublicDeclsInClangHeader);
+      // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
+      writeImports(os, imports, *M, bridgingHeader, /*useCxxImport=*/true);
+      os << contents;
     }
   });
   writeEpilogue(os);

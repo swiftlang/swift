@@ -11,3 +11,7 @@
 
 // CHECK: func numberOfMutableMethodsCalled() -> Int32
 // CHECK: mutating func numberOfMutableMethodsCalledMutating() -> Int32
+
+// CHECK: struct HasAmbiguousMethods2
+// CHECK: func increment(_ a: Int32) -> Int32
+// CHECK-NOT: mutating func incrementMutating(_ a: Int32) -> Int32

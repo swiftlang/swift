@@ -324,10 +324,8 @@ bool swift::isInstrumentation(SILInstruction *Instruction) {
   if (isSanitizerInstrumentation(Instruction))
     return true;
 
-  if (BuiltinInst *bi = dyn_cast<BuiltinInst>(Instruction)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::IntInstrprofIncrement)
-      return true;
-  }
+  if (isa<IncrementProfilerCounterInst>(Instruction))
+    return true;
 
   return false;
 }
@@ -482,6 +480,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::EndCOWMutationInst:
     return RuntimeEffect::NoEffect;
 
@@ -596,6 +595,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::AllocGlobalInst: {
     SILType glTy = cast<AllocGlobalInst>(inst)->getReferencedGlobal()->
                       getLoweredType();
+    if (glTy.isLoadable(*inst->getFunction()))
+      return RuntimeEffect::NoEffect;
     if (glTy.hasOpaqueArchetype()) {
       impactType = glTy;
       return RuntimeEffect::Allocating | RuntimeEffect::MetaData;
@@ -621,6 +622,15 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
 
   case SILInstructionKind::CopyAddrInst: {
     auto *ca = cast<CopyAddrInst>(inst);
+    impactType = ca->getSrc()->getType();
+    if (!ca->isInitializationOfDest())
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    if (!ca->isTakeOfSrc())
+      return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+    return RuntimeEffect::MetaData;
+  }
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *ca = cast<ExplicitCopyAddrInst>(inst);
     impactType = ca->getSrc()->getType();
     if (!ca->isInitializationOfDest())
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;

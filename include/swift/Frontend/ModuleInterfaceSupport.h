@@ -53,6 +53,9 @@ struct ModuleInterfaceOptions {
   /// when PrintSPIs is true.
   bool ExperimentalSPIImports = false;
 
+  /// Print imports that are missing from the source and used in API.
+  bool PrintMissingImports = true;
+
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
 

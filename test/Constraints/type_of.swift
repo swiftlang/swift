@@ -79,8 +79,11 @@ foo(type(of: G.T.self)) // Ok
 let _: Any = type(of: G.T.self) // Ok
 foo(type(of: bar())) // expected-error {{ambiguous use of 'bar()'}}
 
-struct SR10696 {
-  func bar(_ s: SR10696.Type) {
-    type(of: s)() // expected-error {{type 'SR10696.Type' has no member 'init'}}
+// https://github.com/apple/swift/issues/53093
+do {
+  struct S {
+    func bar(_ s: S.Type) {
+      type(of: s)() // expected-error {{type 'S.Type' has no member 'init'}}
+    }
   }
 }

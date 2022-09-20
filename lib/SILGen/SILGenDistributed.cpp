@@ -86,12 +86,12 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
 ///   <isLocalBB>
 /// }
 /// \endverbatim
-static void emitDistributedIfRemoteBranch(SILGenFunction &SGF, SILLocation Loc,
-                                          ManagedValue selfValue, Type selfTy,
-                                          SILBasicBlock *isRemoteBB,
-                                          SILBasicBlock *isLocalBB) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto &B = SGF.B;
+void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
+                                                   ManagedValue selfValue,
+                                                   Type selfTy,
+                                                   SILBasicBlock *isRemoteBB,
+                                                   SILBasicBlock *isLocalBB) {
+  ASTContext &ctx = getASTContext();
 
   FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
@@ -99,15 +99,15 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF, SILLocation Loc,
 
   ManagedValue selfAnyObject = B.createInitExistentialRef(
       Loc,
-      /*existentialType=*/SGF.getLoweredType(ctx.getAnyObjectType()),
+      /*existentialType=*/getLoweredType(ctx.getAnyObjectType()),
       /*formalConcreteType=*/selfValue.getType().getASTType(),
       selfValue, {});
-  auto result = SGF.emitApplyOfLibraryIntrinsic(
+  auto result = emitApplyOfLibraryIntrinsic(
       Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
 
-  SILValue isRemoteResult = std::move(result).forwardAsSingleValue(SGF, Loc);
+  SILValue isRemoteResult = std::move(result).forwardAsSingleValue(*this, Loc);
   SILValue isRemoteResultUnwrapped =
-      SGF.emitUnwrapIntegerResult(Loc, isRemoteResult);
+      emitUnwrapIntegerResult(Loc, isRemoteResult);
 
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
 }
@@ -511,9 +511,12 @@ void
 SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
                                                   ClassDecl *actorDecl,
                                                   ManagedValue actorSelf,
-                                                  SILBasicBlock *continueBB) {
+                                                  SILBasicBlock *continueBB,
+                                                  SILBasicBlock *finishBB) {
   assert(actorDecl->isDistributedActor() &&
-  "only distributed actors have actorSystem lifecycle hooks in deinit");
+         "only distributed actors have actorSystem lifecycle hooks in deinit");
+  assert(continueBB && finishBB &&
+         "need valid continue and finish basic blocks");
 
   auto selfTy = F.mapTypeIntoContext(actorDecl->getDeclaredInterfaceType());
 
@@ -527,15 +530,15 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
   // } else {
   //   ...
   // }
-  emitDistributedIfRemoteBranch(*this, loc,
+  emitDistributedIfRemoteBranch(loc,
                                 actorSelf, selfTy,
                                 /*if remote*/isRemoteBB,
                                 /*if local*/isLocalBB);
 
-  // if remote, do nothing.
+  // if remote, return early; the user defined deinit should not run.
   {
     B.emitBlock(isRemoteBB);
-    B.createBranch(loc, continueBB);
+    B.createBranch(loc, finishBB);
   }
 
   // if local, resign identity.
@@ -554,20 +557,21 @@ SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
 
 void SILGenFunction::emitDistributedActorClassMemberDestruction(
     SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
-    SILBasicBlock *normalMemberDestroyBB, SILBasicBlock *finishBB) {
+    SILBasicBlock *normalMemberDestroyBB,
+    SILBasicBlock *remoteMemberDestroyBB,
+    SILBasicBlock *finishBB) {
   auto selfTy = cd->getDeclaredInterfaceType();
 
   Scope scope(Cleanups, CleanupLocation(cleanupLoc));
 
   auto isLocalBB = createBasicBlock("isLocalBB");
-  auto remoteMemberDestroyBB = createBasicBlock("remoteMemberDestroyBB");
 
   // if __isRemoteActor(self) {
   //   ...
   // } else {
   //   ...
   // }
-  emitDistributedIfRemoteBranch(*this, cleanupLoc,
+  emitDistributedIfRemoteBranch(cleanupLoc,
                                 selfValue, selfTy,
                                 /*if remote*/remoteMemberDestroyBB,
                                 /*if local*/isLocalBB);

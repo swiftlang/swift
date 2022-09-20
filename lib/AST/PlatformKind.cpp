@@ -58,18 +58,37 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
       .Default(Optional<PlatformKind>());
 }
 
+static bool isApplicationExtensionPlatform(PlatformKind Platform) {
+  switch (Platform) {
+  case PlatformKind::macOSApplicationExtension:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::macCatalystApplicationExtension:
+  case PlatformKind::tvOSApplicationExtension:
+  case PlatformKind::watchOSApplicationExtension:
+    return true;
+  case PlatformKind::macOS:
+  case PlatformKind::iOS:
+  case PlatformKind::macCatalyst:
+  case PlatformKind::tvOS:
+  case PlatformKind::watchOS:
+  case PlatformKind::OpenBSD:
+  case PlatformKind::Windows:
+  case PlatformKind::none:
+    return false;
+  }
+  llvm_unreachable("bad PlatformKind");
+}
+
 static bool isPlatformActiveForTarget(PlatformKind Platform,
                                       const llvm::Triple &Target,
                                       bool EnableAppExtensionRestrictions) {
   if (Platform == PlatformKind::none)
     return true;
-  
-  if (Platform == PlatformKind::macOSApplicationExtension ||
-      Platform == PlatformKind::iOSApplicationExtension ||
-      Platform == PlatformKind::macCatalystApplicationExtension)
-    if (!EnableAppExtensionRestrictions)
-      return false;
-  
+
+  if (!EnableAppExtensionRestrictions &&
+      isApplicationExtensionPlatform(Platform))
+    return false;
+
   // FIXME: This is an awful way to get the current OS.
   switch (Platform) {
     case PlatformKind::macOS:

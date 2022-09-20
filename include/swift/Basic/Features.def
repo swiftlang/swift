@@ -48,8 +48,8 @@
   LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #endif
 
-#ifndef FUTURE_FEATURE
-#  define FUTURE_FEATURE(FeatureName, SENumber, Version)   \
+#ifndef UPCOMING_FEATURE
+#  define UPCOMING_FEATURE(FeatureName, SENumber, Version)   \
      LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName, \
                       langOpts.hasFeature(#FeatureName))
 #endif
@@ -79,9 +79,10 @@ LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
 LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
-LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
+LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
+LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
@@ -89,9 +90,10 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(PrimaryAssociatedTypes2, 346, "Primary associated 
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnavailableFromAsync, 0, "@_unavailableFromAsync", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(NoAsyncAvailability, 340, "@available(*, noasync)", true)
 
-FUTURE_FEATURE(ConciseMagicFile, 274, 6)
-FUTURE_FEATURE(ForwardTrailingClosures, 286, 6)
-FUTURE_FEATURE(BareSlashRegexLiterals, 354, 6)
+UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
+UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
+UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
+UPCOMING_FEATURE(ExistentialAny, 335, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)
@@ -100,13 +102,7 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
 EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
-
-/// Enable extensions of (sugared) bound generic types
-///
-/// \code
-/// extension [Int] { /**/ }
-/// \endcode
-EXPERIMENTAL_FEATURE(BoundGenericExtensions)
+EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
@@ -119,7 +115,30 @@ EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
 /// conformances.
 EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
 
+/// Whether Objective-C completion handler parameters are imported as
+/// @Sendable.
+EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
+
+/// Enables opaque type erasure without also enabling implict dynamic
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
+
+/// Whether to enable experimental @typeWrapper feature which allows to
+/// declare a type that controls access to all stored properties of the
+/// wrapped type.
+EXPERIMENTAL_FEATURE(TypeWrappers)
+
+/// Whether to perform round-trip testing of the Swift Swift parser.
+EXPERIMENTAL_FEATURE(ParserRoundTrip)
+
+/// Whether to perform validation of the parse tree produced by the Swift
+/// Swift parser.
+EXPERIMENTAL_FEATURE(ParserValidation)
+
+/// Whether to fold sequence expressions in the syntax tree produced by the
+/// Swift Swift parser.
+EXPERIMENTAL_FEATURE(ParserSequenceFolding)
+
 #undef EXPERIMENTAL_FEATURE
-#undef FUTURE_FEATURE
+#undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef LANGUAGE_FEATURE

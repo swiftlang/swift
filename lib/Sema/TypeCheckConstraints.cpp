@@ -54,7 +54,27 @@ using namespace constraints;
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, PrintOptions());
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  getTypeVariable()->print(OS, PO);
+  
+  SmallVector<TypeVariableOptions, 4> bindingOptions;
+  if (canBindToLValue())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
+  if (canBindToInOut())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
+  if (canBindToNoEscape())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
+  if (canBindToHole())
+    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
+  if (!bindingOptions.empty()) {
+    OS << " [allows bindings to: ";
+    interleave(bindingOptions, OS,
+               [&](TypeVariableOptions option) {
+                  (OS << getTypeVariableOptions(option));},
+               ", ");
+               OS << "]";
+  }
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
@@ -196,7 +216,6 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 
     // Otherwise, assign this input to the next output element.
     const auto &elt2 = toTuple[i];
-    assert(!elt2.isVararg());
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
@@ -252,20 +271,20 @@ class FunctionSyntacticDiagnosticWalker : public ASTWalker {
 public:
   FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
         dcStack.push_back(closure);
-        return {true, expr};
+        return Action::Continue(expr);
       }
     }
 
-    return {false, expr};
+    return Action::SkipChildren(expr);
   }
 
-  Expr *walkToExprPost(Expr *expr) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
         assert(dcStack.back() == closure);
@@ -273,20 +292,23 @@ public:
       }
     }
 
-    return expr;
+    return Action::Continue(expr);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     performStmtDiagnostics(stmt, dcStack.back());
-    return {true, stmt};
+    return Action::Continue(stmt);
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
-    return {false, pattern};
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+    return Action::SkipChildren(pattern);
   }
-
-  bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
-  bool walkToParameterListPre(ParameterList *params) override { return false; }
+  PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToParameterListPre(ParameterList *params) override {
+    return Action::SkipChildren();
+  }
 };
 } // end anonymous namespace
 
@@ -623,6 +645,9 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       auto &requirement = requirements[reqIdx];
 
       switch (requirement.getKind()) {
+      case RequirementKind::SameCount:
+        llvm_unreachable("Same-count requirement not supported here");
+
       case RequirementKind::SameType: {
         auto lhsTy = requirement.getFirstType();
         auto rhsTy = requirement.getSecondType();
@@ -810,11 +835,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
 
   if (hadError)
     PBD->setInvalid();
-
   PBD->setInitializerChecked(patternNumber);
-
-  checkPatternBindingDeclAsyncUsage(PBD);
-
   return hadError;
 }
 
@@ -1090,27 +1111,27 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
     LoadAdder(ASTContext &ctx, GetTypeFn getType, SetTypeFn setType)
         : Ctx(ctx), getType(getType), setType(setType) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ParenExpr>(E) || isa<ForceValueExpr>(E))
-        return { true, E };
+        return Action::Continue(E);
 
       // Since load expression is created by walker,
       // it's safe to stop as soon as it encounters first one
       // because it would be the one it just created.
       if (isa<LoadExpr>(E))
-        return { false, nullptr };
+        return Action::Stop();
 
-      return { false, createLoadExpr(E) };
+      return Action::SkipChildren(createLoadExpr(E));
     }
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto *FVE = dyn_cast<ForceValueExpr>(E))
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
         setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
 
-      return E;
+      return Action::Continue(E);
     }
 
   private:
@@ -1208,6 +1229,43 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 //===----------------------------------------------------------------------===//
 #pragma mark Debugging
 
+void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
+                          raw_ostream &out) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  out << " with ";
+
+  switch (getKind()) {
+  case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    getDecl()->dumpRef(out);
+    out << " as ";
+    if (getBaseType())
+      out << getBaseType()->getString(PO) << ".";
+
+    out << getDecl()->getBaseName() << ": "
+        << adjustedOpenedType->getString(PO);
+    break;
+
+  case OverloadChoiceKind::KeyPathApplication:
+    out << "key path application root " << getBaseType()->getString(PO);
+    break;
+
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+    out << "dynamic member lookup root " << getBaseType()->getString(PO)
+        << " name='" << getName();
+    break;
+
+  case OverloadChoiceKind::TupleIndex:
+    out << "tuple " << getBaseType()->getString(PO) << " index "
+        << getTupleIndex();
+    break;
+  }
+}
+
 void Solution::dump() const {
   dump(llvm::errs());
 }
@@ -1218,9 +1276,10 @@ void Solution::dump(raw_ostream &out) const {
 
   SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
-  out << "Fixed score: " << FixedScore << "\n";
+  out << "Fixed score:";
+  FixedScore.print(out);
 
-  out << "Type variables:\n";
+  out << "\nType variables:\n";
   std::vector<std::pair<TypeVariableType *, Type>> bindings(
       typeBindings.begin(), typeBindings.end());
   llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
@@ -1240,77 +1299,54 @@ void Solution::dump(raw_ostream &out) const {
     out << "\n";
   }
 
-  out << "\n";
-  out << "Overload choices:\n";
-  for (auto ovl : overloadChoices) {
-    out.indent(2);
-    if (ovl.first)
-      ovl.first->dump(sm, out);
-    out << " with ";
+  if (!overloadChoices.empty()) {
+    out << "\nOverload choices:";
+    for (auto ovl : overloadChoices) {
+      if (ovl.first) {
+        out << "\n";
+        out.indent(2);
+        ovl.first->dump(sm, out);
+      }
 
-    auto choice = ovl.second.choice;
-    switch (choice.getKind()) {
-    case OverloadChoiceKind::Decl:
-    case OverloadChoiceKind::DeclViaDynamic:
-    case OverloadChoiceKind::DeclViaBridge:
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      choice.getDecl()->dumpRef(out);
-      out << " as ";
-      if (choice.getBaseType())
-        out << choice.getBaseType()->getString(PO) << ".";
-
-      out << choice.getDecl()->getBaseName() << ": "
-          << ovl.second.adjustedOpenedType->getString(PO) << "\n";
-      break;
-
-    case OverloadChoiceKind::KeyPathApplication:
-      out << "key path application root "
-          << choice.getBaseType()->getString(PO) << "\n";
-      break;
-
-    case OverloadChoiceKind::DynamicMemberLookup:
-    case OverloadChoiceKind::KeyPathDynamicMemberLookup:
-      out << "dynamic member lookup root "
-          << choice.getBaseType()->getString(PO)
-          << " name='" << choice.getName() << "'\n";
-      break;
-  
-    case OverloadChoiceKind::TupleIndex:
-      out << "tuple " << choice.getBaseType()->getString(PO) << " index "
-        << choice.getTupleIndex() << "\n";
-      break;
+      auto choice = ovl.second.choice;
+      choice.dump(ovl.second.adjustedOpenedType, sm, out);
     }
     out << "\n";
   }
 
-  out << "\n";
-  out << "Constraint restrictions:\n";
-  for (auto &restriction : ConstraintRestrictions) {
-    out.indent(2) << restriction.first.first
-                  << " to " << restriction.first.second
-                  << " is " << getName(restriction.second) << "\n";
-  }
 
-  out << "\n";
-  out << "Trailing closure matching:\n";
-  for (auto &argumentMatching : argumentMatchingChoices) {
-    out.indent(2);
-    argumentMatching.first->dump(sm, out);
-    switch (argumentMatching.second.trailingClosureMatching) {
-    case TrailingClosureMatching::Forward:
-      out << ": forward\n";
-      break;
-    case TrailingClosureMatching::Backward:
-      out << ": backward\n";
-      break;
+  if (!ConstraintRestrictions.empty()) {
+    out << "\nConstraint restrictions:\n";
+    for (auto &restriction : ConstraintRestrictions) {
+      out.indent(2) << restriction.first.first
+                    << " to " << restriction.first.second
+                    << " is " << getName(restriction.second) << "\n";
     }
   }
 
-  out << "\nDisjunction choices:\n";
-  for (auto &choice : DisjunctionChoices) {
-    out.indent(2);
-    choice.first->dump(sm, out);
-    out << " is #" << choice.second << "\n";
+  if (!argumentMatchingChoices.empty()) {
+    out << "\nTrailing closure matching:\n";
+    for (auto &argumentMatching : argumentMatchingChoices) {
+      out.indent(2);
+      argumentMatching.first->dump(sm, out);
+      switch (argumentMatching.second.trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        out << ": forward\n";
+        break;
+      case TrailingClosureMatching::Backward:
+        out << ": backward\n";
+        break;
+      }
+    }
+  }
+
+  if (!DisjunctionChoices.empty()) {
+    out << "\nDisjunction choices:\n";
+    for (auto &choice : DisjunctionChoices) {
+      out.indent(2);
+      choice.first->dump(sm, out);
+      out << " is #" << choice.second << "\n";
+    }
   }
 
   if (!OpenedTypes.empty()) {
@@ -1322,9 +1358,25 @@ void Solution::dump(raw_ostream &out) const {
       llvm::interleave(
           opened.second.begin(), opened.second.end(),
           [&](OpenedType opened) {
+            out << "'";
+            opened.second->getImpl().getGenericParameter()->print(out);
+            out << "' (";
             Type(opened.first).print(out, PO);
+            out << ")";
             out << " -> ";
-            Type(opened.second).print(out, PO);
+            // Let's check whether the type variable has been bound.
+            // This is important when solver is working on result
+            // builder transformed code, because dependent sub-components
+            // would not have parent type variables but `OpenedTypes`
+            // cannot be erased, so we'll just print them as unbound.
+            if (hasFixedType(opened.second)) {
+              out << getFixedType(opened.second);
+              out << " [from ";
+              Type(opened.second).print(out, PO);
+              out << "]";
+            } else {
+              Type(opened.second).print(out, PO);
+            }
           },
           [&]() { out << ", "; });
       out << "\n";
@@ -1393,20 +1445,22 @@ void ConstraintSystem::print(raw_ostream &out) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
-  
-  out << "Score: " << CurrentScore << "\n";
+
+  out << "Score:";
+  CurrentScore.print(out);
 
   for (const auto &contextualTypeEntry : contextualTypes) {
     auto info = contextualTypeEntry.second.first;
-    out << "Contextual Type: " << info.getType().getString(PO);
-    if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
-      out << " at ";
-      TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+    if (!info.getType().isNull()) {
+      out << "\nContextual Type: " << info.getType().getString(PO);
+      if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
+        out << " at ";
+        TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
+      }
     }
-    out << "\n";
   }
 
-  out << "Type Variables:\n";
+  out << "\nType Variables:\n";
   std::vector<TypeVariableType *> typeVariables(getTypeVariables().begin(),
                                                 getTypeVariables().end());
   llvm::sort(typeVariables,
@@ -1415,24 +1469,17 @@ void ConstraintSystem::print(raw_ostream &out) const {
              });
   for (auto tv : typeVariables) {
     out.indent(2);
-    Type(tv).print(out, PO);
-    if (tv->getImpl().canBindToLValue())
-      out << " [lvalue allowed]";
-    if (tv->getImpl().canBindToInOut())
-      out << " [inout allowed]";
-    if (tv->getImpl().canBindToNoEscape())
-      out << " [noescape allowed]";
-    if (tv->getImpl().canBindToHole())
-      out << " [hole allowed]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
+        tv->getImpl().print(out);
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
         const_cast<ConstraintSystem *>(this)->getBindingsFor(tv).dump(out, 1);
       }
     } else {
+      tv->getImpl().print(out);
       out << " equivalent to ";
       Type(rep).print(out, PO);
     }
@@ -1445,18 +1492,22 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\n";
   }
 
-  out << "\nActive Constraints:\n";
-  for (auto &constraint : ActiveConstraints) {
-    out.indent(2);
-    constraint.print(out, &getASTContext().SourceMgr);
-    out << "\n";
+  if (!ActiveConstraints.empty()) {
+    out << "\nActive Constraints:\n";
+    for (auto &constraint : ActiveConstraints) {
+      out.indent(2);
+      constraint.print(out, &getASTContext().SourceMgr);
+      out << "\n";
+    }
   }
 
-  out << "\nInactive Constraints:\n";
-  for (auto &constraint : InactiveConstraints) {
-    out.indent(2);
-    constraint.print(out, &getASTContext().SourceMgr);
-    out << "\n";
+  if (!InactiveConstraints.empty()) {
+    out << "\nInactive Constraints:\n";
+     for (auto &constraint : InactiveConstraints) {
+       out.indent(2);
+       constraint.print(out, &getASTContext().SourceMgr);
+       out << "\n";
+     }
   }
 
   if (solverState && solverState->hasRetiredConstraints()) {
@@ -1469,7 +1520,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!ResolvedOverloads.empty()) {
-    out << "Resolved overloads:\n";
+    out << "\nResolved overloads:\n";
 
     // Otherwise, report the resolved overloads.
     for (auto elt : ResolvedOverloads) {
@@ -1509,7 +1560,6 @@ void ConstraintSystem::print(raw_ostream &out) const {
       elt.first->dump(&getASTContext().SourceMgr, out);
       out << "\n";
     }
-    out << "\n";
   }
 
   if (!DisjunctionChoices.empty()) {
@@ -1530,7 +1580,11 @@ void ConstraintSystem::print(raw_ostream &out) const {
       llvm::interleave(
           opened.second.begin(), opened.second.end(),
           [&](OpenedType opened) {
+            out << "'";
+            opened.second->getImpl().getGenericParameter()->print(out);
+            out << "' (";
             Type(opened.first).print(out, PO);
+            out << ")";
             out << " -> ";
             Type(opened.second).print(out, PO);
           },
@@ -1550,7 +1604,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   }
 
   if (!DefaultedConstraints.empty()) {
-    out << "\nDefaulted constraints: ";
+    out << "\nDefaulted constraints:\n";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
       locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {
@@ -2189,98 +2243,6 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
-bool
-IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
-                                       DeclContext *dc) const {
-  auto options = defaultMemberLookupOptions;
-  options |= NameLookupFlags::IgnoreAccessControl;
-
-  // Look for a callAsFunction method.
-  auto &ctx = ty->getASTContext();
-  auto results =
-      TypeChecker::lookupMember(dc, ty, DeclNameRef(ctx.Id_callAsFunction),
-                                options);
-  return llvm::any_of(results, [](LookupResultEntry entry) -> bool {
-    if (auto *fd = dyn_cast<FuncDecl>(entry.getValueDecl()))
-      return fd->isCallAsFunctionMethod();
-    return false;
-  });
-}
-
-template <class DynamicAttribute>
-static bool checkForDynamicAttribute(CanType ty,
-                                     llvm::function_ref<bool (Type)> hasAttribute) {
-  // If this is an archetype type, check if any types it conforms to
-  // (superclass or protocols) have the attribute.
-  if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
-    for (auto proto : archetype->getConformsTo()) {
-      if (hasAttribute(proto->getDeclaredInterfaceType()))
-        return true;
-    }
-    if (auto superclass = archetype->getSuperclass()) {
-      if (hasAttribute(superclass))
-        return true;
-    }
-  }
-
-  // If this is an existential type, check if its constraint type
-  // has the attribute.
-  if (auto existential = ty->getAs<ExistentialType>()) {
-    return hasAttribute(existential->getConstraintType());
-  }
-
-  // If this is a protocol composition, check if any of its members have the
-  // attribute.
-  if (auto protocolComp = dyn_cast<ProtocolCompositionType>(ty)) {
-    for (auto member : protocolComp->getMembers()) {
-      if (hasAttribute(member))
-        return true;
-    }
-  }
-
-  // Otherwise, this must be a nominal type.
-  // Neither Dynamic member lookup nor Dynamic Callable doesn't
-  // work for tuples, etc.
-  auto nominal = ty->getAnyNominal();
-  if (!nominal)
-    return false;
-
-  // If this type has the attribute on it, then yes!
-  if (nominal->getAttrs().hasAttribute<DynamicAttribute>())
-    return true;
-
-  // Check the protocols the type conforms to.
-  for (auto proto : nominal->getAllProtocols()) {
-    if (hasAttribute(proto->getDeclaredInterfaceType()))
-      return true;
-  }
-
-  // Check the superclass if present.
-  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-    if (auto superclass = classDecl->getSuperclass()) {
-      if (hasAttribute(superclass))
-        return true;
-    }
-  }
-  return false;
-}
-
-bool
-HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
-                                                 CanType ty) const {
-  return checkForDynamicAttribute<DynamicMemberLookupAttr>(ty, [](Type type) {
-    return type->hasDynamicMemberLookupAttribute();
-  });
-}
-
-bool
-HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
-                                             CanType ty) const {
-  return checkForDynamicAttribute<DynamicCallableAttr>(ty, [](Type type) {
-    return type->hasDynamicCallableAttribute();
-  });
-}
-
 void ConstraintSystem::forEachExpr(
     Expr *expr, llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
@@ -2291,19 +2253,27 @@ void ConstraintSystem::forEachExpr(
                 llvm::function_ref<Expr *(Expr *)> callback)
         : CS(CS), callback(callback) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *NewE = callback(E);
+      if (!NewE)
+        return Action::Stop();
+
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         if (!CS.participatesInInference(closure))
-          return { false, callback(E) };
+          return Action::SkipChildren(NewE);
       }
-      return { true, callback(E) };
+      return Action::Continue(NewE);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::SkipChildren(P);
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
 
   expr->walk(ChildWalker(*this, callback));

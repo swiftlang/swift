@@ -18,15 +18,15 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckProtocol.h"
 #include "TypoCorrection.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -35,7 +35,9 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
@@ -103,6 +105,22 @@ template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnosticAt(ArgTypes &&... Args) const {
   auto &DE = getASTContext().Diags;
+  DiagnosticBehavior behaviorLimit;
+  switch (fixBehavior) {
+  case FixBehavior::Error:
+  case FixBehavior::AlwaysWarning:
+    behaviorLimit = DiagnosticBehavior::Unspecified;
+    break;
+
+  case FixBehavior::DowngradeToWarning:
+    behaviorLimit = DiagnosticBehavior::Warning;
+    break;
+
+  case FixBehavior::Suppress:
+    behaviorLimit = DiagnosticBehavior::Ignore;
+    break;
+  }
+
   return std::move(DE.diagnose(std::forward<ArgTypes>(Args)...)
                      .limitBehavior(behaviorLimit));
 }
@@ -129,7 +147,7 @@ Expr *FailureDiagnostic::getBaseExprFor(const Expr *anchor) const {
     return MRE->getBase();
   else if (auto *call = dyn_cast<CallExpr>(anchor)) {
     auto fnType = getType(call->getFn());
-    if (fnType->isCallableNominalType(getDC())) {
+    if (fnType->isCallAsFunctionType(getDC())) {
       return call->getFn();
     }
   }
@@ -791,6 +809,20 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
         }
       }
 
+      if (purpose == CTP_ReturnStmt) {
+        if (auto *DRE = getAsExpr<DeclRefExpr>(anchor)) {
+          auto *decl = DRE->getDecl();
+          if (decl && decl->hasName()) {
+            auto baseName = DRE->getDecl()->getBaseIdentifier();
+            if (baseName.str().startswith("$__builder")) {
+              diagnostic =
+                  diag::cannot_convert_result_builder_result_to_return_type;
+              break;
+            }
+          }
+        }
+      }
+
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
@@ -1008,9 +1040,9 @@ bool AttributedFuncToTypeConversionFailure::
 
   auto declRepr = decl->getTypeReprOrParentPatternTypeRepr();
   class TopLevelFuncReprFinder : public ASTWalker {
-    bool walkToTypeReprPre(TypeRepr *TR) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
       FnRepr = dyn_cast<FunctionTypeRepr>(TR);
-      return FnRepr == nullptr;
+      return Action::VisitChildrenIf(FnRepr == nullptr);
     }
 
   public:
@@ -1437,7 +1469,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
   VarDecl *varDecl;
   int count;
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (DRE->getDecl() == varDecl)
         ++count;
@@ -1460,7 +1492,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
       }
     }
 
-    return { true, E };
+    return Action::Continue(E);
   }
 
 public:
@@ -1534,6 +1566,26 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   emitDiagnosticAt(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
                    baseType, unwrappedType);
 
+  // If this is a function type, suggest using optional chaining to
+  // call it.
+  if (unwrappedType->lookThroughAllOptionalTypes()->is<FunctionType>()) {
+    bool isDeclRefExpr = false;
+    if (isa<DeclRefExpr>(unwrappedExpr)) {
+      isDeclRefExpr = true;
+    } else if (auto fve = dyn_cast<ForceValueExpr>(unwrappedExpr)) {
+      isDeclRefExpr = isa<DeclRefExpr>(fve->getSubExpr());
+    } else if (auto boe = dyn_cast<BindOptionalExpr>(unwrappedExpr)) {
+      isDeclRefExpr = isa<DeclRefExpr>(boe->getSubExpr());
+    }
+    if (isDeclRefExpr) {
+      auto depth = baseType->getOptionalityDepth();
+      auto diag = emitDiagnosticAt(unwrappedExpr->getLoc(),
+                                   diag::perform_optional_chain_on_function_type);
+      auto fixItString = std::string(depth, '?');
+      diag.fixItInsertAfter(unwrappedExpr->getEndLoc(), fixItString);
+    }
+  }
+
   // If the expression we're unwrapping is the only reference to a
   // local variable whose type isn't explicit in the source, then
   // offer unwrapping fixits on the initializer as well.
@@ -1543,7 +1595,8 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
       AbstractFunctionDecl *AFD = nullptr;
       if ((AFD = dyn_cast<AbstractFunctionDecl>(varDecl->getDeclContext()))) {
         auto checker = VarDeclMultipleReferencesChecker(getDC(), varDecl);
-        AFD->getBody()->walk(checker);
+        if (auto *body = AFD->getBody())
+          body->walk(checker);
         singleUse = checker.referencesCount() == 1;
       }
 
@@ -3563,7 +3616,7 @@ bool InvalidProjectedValueArgument::diagnoseAsError() {
   if (!param->hasAttachedPropertyWrapper()) {
     param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
   } else if (!param->hasImplicitPropertyWrapper() &&
-             param->getAttachedPropertyWrappers().front()->hasArgs()) {
+             param->getOutermostAttachedPropertyWrapper()->hasArgs()) {
     param->diagnose(diag::property_wrapper_param_attr_arg);
   } else {
     Type backingType;
@@ -3635,6 +3688,49 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
     return true;
   }
   return false;
+}
+
+static void diagnoseUnsafeCxxMethod(SourceLoc loc, Type baseType,
+                                    DeclName name) {
+  auto &ctx = baseType->getASTContext();
+
+  if (baseType->getAnyNominal() == nullptr ||
+      // Don't waist time on non-cxx-methods.
+      !isa_and_nonnull<clang::CXXRecordDecl>(
+          baseType->getAnyNominal()->getClangDecl()))
+    return;
+
+  auto unsafeId =
+      ctx.getIdentifier("__" + name.getBaseIdentifier().str().str() + "Unsafe");
+  for (auto found :
+       baseType->getAnyNominal()->lookupDirect(DeclBaseName(unsafeId))) {
+    auto cxxMethod =
+        dyn_cast_or_null<clang::CXXMethodDecl>(found->getClangDecl());
+    if (!cxxMethod)
+      continue;
+
+    if (name.getBaseIdentifier().str() == "begin" ||
+        name.getBaseIdentifier().str() == "end") {
+      ctx.Diags.diagnose(loc, diag::dont_use_iterator_api,
+                         name.getBaseIdentifier().str());
+    } else if (cxxMethod->getReturnType()->isPointerType())
+      ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                         name.getBaseIdentifier().str(), "pointer");
+    else if (cxxMethod->getReturnType()->isReferenceType())
+      ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                         name.getBaseIdentifier().str(), "reference");
+    else if (cxxMethod->getReturnType()->isRecordType()) {
+      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
+              cxxMethod->getReturnType()->getAsRecordDecl())) {
+        assert(evaluateOrDefault(ctx.evaluator,
+                                 CxxRecordSemantics({cxxRecord, ctx}), {}) ==
+               CxxRecordSemanticsKind::UnsafePointerMember);
+        ctx.Diags.diagnose(loc, diag::projection_not_imported,
+                           name.getBaseIdentifier().str(),
+                           cxxRecord->getNameAsString());
+      }
+    }
+  }
 }
 
 /// When a user refers a enum case with a wrong member name, we try to find a
@@ -3711,6 +3807,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (!ctx.LangOpts.DisableExperimentalClangImporterDiagnostics) {
       ctx.getClangModuleLoader()->diagnoseMemberValue(getName().getFullName(),
                                                       baseType);
+      diagnoseUnsafeCxxMethod(getLoc(), baseType, getName().getFullName());
     }
   };
 
@@ -3880,16 +3977,13 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   if (!parentExpr)
     return false;
 
-  auto parentType = getType(parentExpr);
-
-  if (!parentType->isKnownStdlibCollectionType() && !parentType->is<TupleType>())
-    return false;
-
-  if (isa<TupleExpr>(parentExpr)) {
+  // This could happen if collection is a dictionary literal i.e.
+  // ["a": .test] - the element is a tuple - ("a", .test).
+  if (isExpr<TupleExpr>(parentExpr))
     parentExpr = findParentExpr(parentExpr);
-    if (!parentExpr)
-      return false;
-  }
+
+  if (!isExpr<CollectionExpr>(parentExpr))
+    return false;
 
   if (auto *defaultableVar =
           getRawType(parentExpr)->getAs<TypeVariableType>()) {
@@ -4201,7 +4295,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     }
   }
 
-  if (BaseType->is<AnyMetatypeType>() && !Member->isStatic()) {
+  bool isStaticOrTypeMember = Member->isStatic() || isa<TypeDecl>(Member);
+  if (BaseType->is<AnyMetatypeType>() && !isStaticOrTypeMember) {
     auto instanceTy = BaseType;
 
     if (auto *AMT = instanceTy->getAs<AnyMetatypeType>()) {
@@ -4309,10 +4404,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // static members doesn't make a whole lot of sense
         if (isa<TypeAliasDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::typealias_outside_of_protocol, Name));
+              emitDiagnostic(diag::typealias_outside_of_protocol, Name, instanceTy));
         } else if (isa<AssociatedTypeDecl>(Member)) {
           Diag.emplace(
-              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name));
+              emitDiagnostic(diag::assoc_type_outside_of_protocol, Name, instanceTy));
         } else if (isa<ConstructorDecl>(Member)) {
           Diag.emplace(
               emitDiagnostic(diag::construct_protocol_by_name, instanceTy));
@@ -5325,7 +5420,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
           ParamRefFinder(DiagnosticEngine &diags, ParameterList *params)
               : D(diags), Params(params) {}
 
-          std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+          PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
             if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
               if (llvm::is_contained(Params->getArray(), DRE->getDecl())) {
                 auto *P = cast<ParamDecl>(DRE->getDecl());
@@ -5333,7 +5428,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
                            P->getName());
               }
             }
-            return {true, E};
+            return Action::Continue(E);
           }
         };
 
@@ -5996,28 +6091,28 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
                            Callback callback)
         : Params(params.begin(), params.end()), Fn(callback) {}
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (Params.empty())
-        return false;
+        return Action::SkipChildren();
 
       auto *ident = dyn_cast<ComponentIdentTypeRepr>(T);
       if (!ident)
-        return true;
+        return Action::Continue();
 
       auto *decl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
       if (!decl)
-        return true;
+        return Action::Continue();
 
       auto *paramList = decl->getGenericParams();
       if (!paramList)
-        return true;
+        return Action::Continue();
 
       // There could a situation like `S<S>()`, so we need to be
       // careful not to point at first `S` because it has all of
       // its generic parameters specified.
       if (auto *generic = dyn_cast<GenericIdentTypeRepr>(ident)) {
         if (paramList->size() == generic->getNumGenericArgs())
-          return true;
+          return Action::Continue();
       }
 
       for (auto *candidate : paramList->getParams()) {
@@ -6033,7 +6128,7 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
       }
 
       // Keep walking.
-      return true;
+      return Action::Continue();
     }
 
     bool allParamsAssigned() const { return Params.empty(); }
@@ -6212,6 +6307,27 @@ void SkipUnhandledConstructInResultBuilderFailure::diagnosePrimary(
 }
 
 bool SkipUnhandledConstructInResultBuilderFailure::diagnoseAsError() {
+  // Following errors are already diagnosed:
+  //  - brace statement - error related to absence of appropriate buildBlock
+  //  - switch/case statements - empty body
+  if (auto *stmt = unhandled.dyn_cast<Stmt *>()) {
+    if (isa<BraceStmt>(stmt))
+      return true;
+
+    if (auto *switchStmt = getAsStmt<SwitchStmt>(stmt)) {
+      auto caseStmts = switchStmt->getCases();
+      if (caseStmts.empty())
+        return true;
+    }
+
+    // Empty case statements are diagnosed by parser.
+    if (auto *caseStmt = getAsStmt<CaseStmt>(stmt)) {
+      auto *body = caseStmt->getBody();
+      if (body->getNumElements() == 0)
+        return true;
+    }
+  }
+
   diagnosePrimary(/*asNote=*/false);
   emitDiagnosticAt(builder, diag::kind_declname_declared_here,
                    builder->getDescriptiveKind(), builder->getName());
@@ -6926,20 +7042,6 @@ bool ExtraneousCallFailure::diagnoseAsError() {
         removeParensFixIt(diagnostic);
         return true;
       }
-    }
-  }
-
-  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-    auto *baseExpr = UDE->getBase();
-    auto *call = castToExpr<CallExpr>(getRawAnchor());
-
-    if (getType(baseExpr)->isAnyObject()) {
-      auto argsTy = call->getArgs()->composeTupleOrParenType(
-          getASTContext(), [&](Expr *E) { return getType(E); });
-      emitDiagnostic(diag::cannot_call_with_params,
-                     UDE->getName().getBaseName().userFacingName(),
-                     argsTy.getString(), isa<TypeExpr>(baseExpr));
-      return true;
     }
   }
 

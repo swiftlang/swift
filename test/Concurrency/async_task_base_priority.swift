@@ -8,6 +8,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
+// UNSUPPORTED: threading_none
 
 import StdlibUnittest
 import Dispatch

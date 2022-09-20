@@ -45,13 +45,13 @@ bb0:
 // CHECK: return
 sil @process : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("4C22C24E-6BAA-11E6-B904-B8E856428C60") P
+  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("4C22C24E-6BAA-11E6-B904-B8E856428C60", P) Self
   %3 = function_ref @invokeClosure : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @error Error, @in_guaranteed τ_0_0) -> @error Error
   // function_ref (process(s : P) -> ()).(closure #1)
   %4 = function_ref @closure : $@convention(thin) () -> ()
   %5 = thin_to_thick_function %4 : $@convention(thin) () -> () to $@callee_owned () -> ()
   %6 = convert_function %5 : $@callee_owned () -> () to $@callee_owned () -> @error Error
-  try_apply %3<@opened("4C22C24E-6BAA-11E6-B904-B8E856428C60") P>(%6, %2) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+  try_apply %3<@opened("4C22C24E-6BAA-11E6-B904-B8E856428C60", P) Self>(%6, %2) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @error Error, @in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
 
 bb1(%8 : $()):
   destroy_addr %0 : $*P
@@ -120,9 +120,9 @@ bb0(%0 : $*Self):
 sil @testAllocRefWithOpenArchetype: $@convention(method) (@in View, @thin DynamicItem.Type) -> @owned DynamicItem {
 bb0(%0 : $*View, %1 : $@thin DynamicItem.Type):
   %2 = alloc_stack $DynamicItem, var, name "self"
-  %4 = open_existential_addr immutable_access %0 : $*View to $*@opened("50960F66-26E4-11E7-BC37-A45E60E99281") View
+  %4 = open_existential_addr immutable_access %0 : $*View to $*@opened("50960F66-26E4-11E7-BC37-A45E60E99281", View) Self
   %5 = function_ref @function_with_generic_alloc_ref : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
-  %6 = apply %5<@opened("50960F66-26E4-11E7-BC37-A45E60E99281") View>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
+  %6 = apply %5<@opened("50960F66-26E4-11E7-BC37-A45E60E99281", View) Self>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
   %7 = struct_element_addr %2 : $*DynamicItem, #DynamicItem.storage
   store %6 to %7 : $*DynamicStorage
   %9 = struct $DynamicItem (%6 : $DynamicStorage)
@@ -221,10 +221,10 @@ sil hidden_external @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // CHECK: end sil function 'bar' 
 sil @bar : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("C08045E0-2779-11E7-970E-A45E60E99281") P
+  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("C08045E0-2779-11E7-970E-A45E60E99281", P) Self
   // function_ref P.foo()
   %3 = function_ref @P_foo : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %4 = apply %3<@opened("C08045E0-2779-11E7-970E-A45E60E99281") P>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened("C08045E0-2779-11E7-970E-A45E60E99281", P) Self>(%2) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*P
   %6 = tuple ()
   return %6 : $()
@@ -252,10 +252,10 @@ bb0(%0 : $Int32):
 // CHECK: end sil function 'check_removal_of_unregistered_archetype_def'
 sil @check_removal_of_unregistered_archetype_def : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
-  %1 = open_existential_ref %0 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32(%2 : $Builtin.Int32)
-  %4 = mark_dependence %3 : $Int32 on %1 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %4 = mark_dependence %3 : $Int32 on %1 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
   %5 = function_ref @dont_use_arguments : $@convention(thin) (Int32) -> ()
   %6 = apply %5(%4) : $@convention(thin) (Int32) -> ()
   strong_release %0 : $AnyObject

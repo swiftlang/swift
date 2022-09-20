@@ -187,19 +187,19 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
 
       AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
 
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (E == Target)
-          return {false, E};
+          return Action::SkipChildren(E);
 
         if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
           if (conversionExpr->getSubExpr() == Target) {
             if (conversionExpr->getType()->is<AnyFunctionType>() &&
                 conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
               Result = true;
-            return {false, E};
+            return Action::SkipChildren(E);
           }
         }
-        return {true, E};
+        return Action::Continue(E);
       }
     } checker(closure);
     closure->getParent()->walkContext(checker);
@@ -755,8 +755,18 @@ void CompletionLookup::analyzeActorIsolation(
     }
     LLVM_FALLTHROUGH;
   case ActorIsolation::GlobalActor: {
-    auto contextIsolation =
-        getActorIsolationOfContext(const_cast<DeclContext *>(CurrDeclContext));
+    auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
+      // Prefer solution-specific actor-isolations and fall back to the one
+      // recorded in the AST.
+      auto isolation = ClosureActorIsolations.find(CE);
+      if (isolation != ClosureActorIsolations.end()) {
+        return isolation->second;
+      } else {
+        return CE->getActorIsolation();
+      }
+    };
+    auto contextIsolation = getActorIsolationOfContext(
+        const_cast<DeclContext *>(CurrDeclContext), getClosureActorIsolation);
     if (contextIsolation != isolation) {
       implicitlyAsync = true;
     }
@@ -824,14 +834,15 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   }
   bool implicitlyAsync = false;
   analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
-  if (!isForCaching() && !NotRecommended && implicitlyAsync &&
-      !CanCurrDeclContextHandleAsync) {
-    NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
+  bool explicitlyAsync = false;
+  if (auto accessor = VD->getEffectfulGetAccessor()) {
+    explicitlyAsync = accessor->hasAsync();
   }
-
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(VD, Reason, dynamicLookupInfo));
+  Builder.setIsAsync(explicitlyAsync || implicitlyAsync);
+  Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
   addLeadingDot(Builder);
   addValueBaseName(Builder, Name);
@@ -1228,11 +1239,8 @@ void CompletionLookup::addFunctionCallPattern(
     else
       addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-    if (!isForCaching() && AFT->hasExtInfo() && AFT->isAsync() &&
-        !CanCurrDeclContextHandleAsync) {
-      Builder.setContextualNotRecommended(
-          ContextualNotRecommendedReason::InvalidAsyncContext);
-    }
+    Builder.setIsAsync(AFT->hasExtInfo() && AFT->isAsync());
+    Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
   if (!AFD || !AFD->getInterfaceType()->is<AnyFunctionType>()) {
@@ -1346,19 +1354,17 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
   bool implictlyAsync = false;
   analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
-  if (!isForCaching() && !NotRecommended &&
-      !IsImplicitlyCurriedInstanceMethod &&
-      ((AFT && AFT->isAsync()) || implictlyAsync) &&
-      !CanCurrDeclContextHandleAsync) {
-    NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
-  }
-
   // Add the method, possibly including any default arguments.
   auto addMethodImpl = [&](bool includeDefaultArgs = true,
                            bool trivialTrailingClosure = false) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResultKind::Declaration,
         getSemanticContext(FD, Reason, dynamicLookupInfo));
+    Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
+    Builder.setHasAsyncAlternative(
+        FD->getAsyncAlternative() &&
+        !FD->getAsyncAlternative()->shouldHideFromEditor());
+    Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
     Builder.setAssociatedDecl(FD);
 
     if (IsSuperRefExpr && CurrentMethod &&
@@ -1547,11 +1553,9 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
       addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
     }
 
-    if (!isForCaching() && ConstructorType->isAsync() &&
-        !CanCurrDeclContextHandleAsync) {
-      Builder.setContextualNotRecommended(
-          ContextualNotRecommendedReason::InvalidAsyncContext);
-    }
+    Builder.setIsAsync(ConstructorType->hasExtInfo() &&
+                       ConstructorType->isAsync());
+    Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
   if (ConstructorType && shouldAddItemWithoutDefaultArgs(CD))
@@ -1610,14 +1614,11 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   bool implictlyAsync = false;
   analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
-  if (!isForCaching() && !NotRecommended && implictlyAsync &&
-      !CanCurrDeclContextHandleAsync) {
-    NotRecommended = ContextualNotRecommendedReason::InvalidAsyncContext;
-  }
-
   CodeCompletionResultBuilder Builder(
       Sink, CodeCompletionResultKind::Declaration,
       getSemanticContext(SD, Reason, dynamicLookupInfo));
+  Builder.setIsAsync(implictlyAsync);
+  Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(SD);
 
   if (NotRecommended)
@@ -2090,9 +2091,7 @@ bool CompletionLookup::handleEnumElement(ValueDecl *D,
                       /*HasTypeContext=*/true);
     return true;
   } else if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    llvm::DenseSet<EnumElementDecl *> Elements;
-    ED->getAllElements(Elements);
-    for (auto *Ele : Elements) {
+    for (auto *Ele : ED->getAllElements()) {
       addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
     }
@@ -2492,7 +2491,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
   // The literal can produce any type that conforms to its ExpressibleBy
   // protocol. Figure out as which type we want to show it in code completion.
-  auto *P = Ctx.getProtocol(protocolForLiteralKind(kind));
+  auto *PD = Ctx.getProtocol(protocolForLiteralKind(kind));
   for (auto T : expectedTypeContext.getPossibleTypes()) {
     if (!T)
       continue;
@@ -2506,9 +2505,8 @@ void CompletionLookup::addTypeRelationFromProtocol(
     }
 
     // Check for conformance to the literal protocol.
-    if (auto *NTD = T->getAnyNominal()) {
-      SmallVector<ProtocolConformance *, 2> conformances;
-      if (NTD->lookupConformance(P, conformances)) {
+    if (T->getAnyNominal()) {
+      if (CurrModule->lookupConformance(T, PD)) {
         literalType = T;
         break;
       }
@@ -3180,9 +3178,9 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
     LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
         : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return {false, S};
+        return Action::SkipChildren(S);
 
       if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
         if (LS->getLabelInfo()) {
@@ -3194,15 +3192,17 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
         }
       }
 
-      return {true, S};
+      return Action::Continue(S);
     }
 
-    Stmt *walkToStmtPost(Stmt *S) override { return nullptr; }
+    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+      return Action::Stop();
+    }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return {false, E};
-      return {true, E};
+        return Action::SkipChildren(E);
+      return Action::Continue(E);
     }
   } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
   const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);

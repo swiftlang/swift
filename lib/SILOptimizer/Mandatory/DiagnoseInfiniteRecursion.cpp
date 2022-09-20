@@ -45,6 +45,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -178,11 +179,11 @@ class Invariants {
   /// Recursively walks the use-def chain starting at \p value and returns
   /// true if all visited values are invariant.
   bool isInvariantValue(SILValue value,
-                        SmallPtrSetImpl<SILInstruction *> &visited) const {
+                        InstructionSet &visited) const {
     if (SILInstruction *inst = value->getDefiningInstruction()) {
       // Avoid exponential complexity in case a value is used by multiple
       // operands.
-      if (!visited.insert(inst).second)
+      if (!visited.insert(inst))
         return true;
 
       if (!isMemoryInvariant() && inst->mayReadFromMemory())
@@ -245,7 +246,7 @@ public:
     case TermKind::SwitchValueInst:
     case TermKind::SwitchEnumInst:
     case TermKind::CheckedCastBranchInst: {
-      SmallPtrSet<SILInstruction *, 16> visited;
+      InstructionSet visited(term->getFunction());
       return isInvariantValue(term->getOperand(0), visited);
     }
     default:

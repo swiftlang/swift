@@ -40,7 +40,7 @@ bool SemanticARCOptVisitor::visitUncheckedOwnershipConversionInst(
     return false;
 
   auto op = uoci->getOperand();
-  auto opKind = op.getOwnershipKind();
+  auto opKind = op->getOwnershipKind();
   if (opKind != OwnershipKind::Owned && opKind != OwnershipKind::Guaranteed)
     return false;
 

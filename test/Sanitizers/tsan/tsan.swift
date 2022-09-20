@@ -5,6 +5,7 @@
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: CPU=powerpc64le
+// UNSUPPORTED: threading_none
 
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.

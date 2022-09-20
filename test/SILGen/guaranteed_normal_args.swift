@@ -200,18 +200,6 @@ extension FakeDictionary {
   }
 }
 
-extension Unmanaged {
-  // Just make sure that we do not crash on this.
-  func unsafeGuaranteedTest<Result>(
-    _ body: (Instance) -> Result
-  ) -> Result {
-    let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
-    let result = body(guaranteedInstance)
-    Builtin.unsafeGuaranteedEnd(token)
-    return result
-  }
-}
-
 // Make sure that we properly forward x into memory and don't crash.
 public func forwardIntoMemory(fromNative x: AnyObject, y: Builtin.Word) -> Builtin.BridgeObject {
   // y would normally be 0._builtinWordValue. We don't want to define that

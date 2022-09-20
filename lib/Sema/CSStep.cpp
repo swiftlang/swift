@@ -241,8 +241,12 @@ bool SplitterStep::mergePartialSolutions() const {
       // Finalize this solution.
       auto solution = CS.finalize();
       solutionMemory += solution.getTotalMemory();
-      if (CS.isDebugMode())
-        getDebugLogger() << "(composed solution " << CS.CurrentScore << ")\n";
+      if (CS.isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(composed solution:";
+        CS.CurrentScore.print(log);
+        log << ")\n";
+      }
 
       // Save this solution.
       Solutions.push_back(std::move(solution));
@@ -342,8 +346,52 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
+  SmallString<64> potentialBindings;
+  llvm::raw_svector_ostream bos(potentialBindings);
+
+  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
+    if (CS.isDebugMode() && bindings.hasViableBindings()) {
+      bos.indent(CS.solverState->getCurrentIndent() + 2);
+      bos << "(";
+      bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
+      bos << ")\n";
+    }
+  });
+
   auto *disjunction = CS.selectDisjunction();
-  auto bestBindings = CS.determineBestBindings();
+
+  if (CS.isDebugMode()) {
+    if (!potentialBindings.empty()) {
+      auto &log = getDebugLogger();
+      log << "(Potential Binding(s): " << '\n';
+      log << potentialBindings;
+    }
+
+    SmallVector<Constraint *, 4> disjunctions;
+    CS.collectDisjunctions(disjunctions);
+    std::vector<std::string> overloadDisjunctions;
+    for (const auto &disjunction : disjunctions) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+
+      auto constraints = disjunction->getNestedConstraints();
+      if (constraints[0]->getKind() == ConstraintKind::BindOverload)
+        overloadDisjunctions.push_back(
+            constraints[0]->getFirstType()->getString(PO));
+    }
+    if (!overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
+      log.indent(2);
+      log << "Disjunction(s) = [";
+      interleave(overloadDisjunctions, log, ", ");
+      log << "]\n";
+
+      if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+        auto &log = getDebugLogger();
+        log << ")\n";
+      }
+    }
+  }
 
   if (CS.shouldAttemptFixes()) {
     if ((bestBindings &&
@@ -429,8 +477,12 @@ StepResult ComponentStep::take(bool prevFailed) {
   }
 
   auto solution = CS.finalize();
-  if (CS.isDebugMode())
-    getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
+  if (CS.isDebugMode()) {
+    auto &log = getDebugLogger();
+    log << "(found solution:";
+    getCurrentScore().print(log);
+    log << ")\n";
+  }
 
   Solutions.push_back(std::move(solution));
   return finalize(/*isSuccess=*/true);
@@ -478,23 +530,6 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 
 void TypeVariableStep::setup() {
   ++CS.solverState->NumTypeVariablesBound;
-  if (CS.isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    auto &log = getDebugLogger();
-
-    auto initialBindings = Producer.getCurrentBindings();
-    log << "Initial bindings: ";
-    interleave(
-        initialBindings.begin(), initialBindings.end(),
-        [&](const Binding &binding) {
-          log << TypeVar->getString(PO)
-              << " := " << binding.BindingType->getString(PO);
-        },
-        [&log] { log << ", "; });
-
-    log << '\n';
-  }
 }
 
 bool TypeVariableStep::attempt(const TypeVariableBinding &choice) {
@@ -843,9 +878,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
   if (Snapshot && Snapshot->isScoped()) {
+    Snapshot.reset();
     if (CS.isDebugMode())
       getDebugLogger() << ")\n";
-
+    
     return done(/*isSuccess=*/!prevFailed);
   }
 
@@ -960,7 +996,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
           // Transform all of the unbound outer variables into
           // placeholders since we are not going to solve for
-          // each ambguous solution.
+          // each ambiguous solution.
           {
             unsigned numHoles = 0;
             for (auto *typeVar : CS.getTypeVariables()) {

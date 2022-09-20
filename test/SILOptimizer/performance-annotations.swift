@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations -emit-sil %s -o /dev/null -verify
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: rdar90495704
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -32,6 +31,8 @@ struct AllocatingStr : P {
   }
 }
 
+/* Currently disabled: rdar://90495704
+
 func noRTCallsForArrayGet(_ a: [Str], _ i: Int) -> Int {
   return a[i].x
 }
@@ -40,6 +41,7 @@ func noRTCallsForArrayGet(_ a: [Str], _ i: Int) -> Int {
 func callArrayGet(_ a: [Str]) -> Int {
   return noRTCallsForArrayGet(a, 0)
 }
+*/
 
 @_noLocks
 func arcOperations(_ x: Cl) -> Cl {
@@ -127,5 +129,87 @@ func testGlobal() -> Int {
 @_noLocks
 func testGlobalWithComplexInit() -> Int {
   return Str.s3 // expected-note {{called from here}}
+}
+
+func metatypeArg<T>(_ t: T.Type, _ b: Bool) { // expected-error {{Using type 'Int' can cause metadata allocation or locks}}
+}
+
+@_noAllocation
+func callFuncWithMetatypeArg() {
+  metatypeArg(Int.self, false)                // expected-note {{called from here}}
+}
+
+@_noAllocation
+func intConversion() {
+  let x = 42
+  _ = UInt(x)
+}
+
+@_noAllocation
+func integerRange() {
+  for _ in 0 ..< 10 {
+  }
+}
+
+struct GenStruct<A> {
+  var a: A
+}
+
+@_noAllocation
+func memoryLayout() -> Int? {
+  return MemoryLayout<GenStruct<Int>>.size
+}
+
+class H {
+  var hash: Int { 27 }
+}
+
+struct MyStruct {
+  static var v: Int = {  // expected-note {{called from here}}
+    return H().hash      // expected-error {{Using type 'H' can cause metadata allocation or locks}}
+  }()
+}
+
+@_noAllocation
+func globalWithInitializer(x: MyStruct) {
+  _ = MyStruct.v         // expected-note {{called from here}}
+}
+
+@_noAllocation
+func callBadClosure(closure: ()->Int) -> Int {
+  return closure()
+}
+
+@_noAllocation
+func badClosure() {
+  _ = callBadClosure(closure: { // expected-note {{called from here}}
+     _ = Cl()                   // expected-error {{Using type 'Cl' can cause metadata allocation or locks}}
+     return 42
+    })
+}
+
+func badClosure2() {
+  _ = callBadClosure(closure: { // expected-note {{called from here}}
+     _ = Cl()                   // expected-error {{Using type 'Cl' can cause metadata allocation or locks}}
+     return 42
+    })
+}
+
+@_noAllocation
+func callGoodClosure(closure: ()->Int) -> Int {
+  return closure()
+}
+
+@_noAllocation
+func goodClosure() {
+  _ = callBadClosure(closure: {
+     return 42
+    })
+}
+
+func goodClosure2() {
+  _ = callBadClosure(closure: {
+     return 42
+    })
 }
 

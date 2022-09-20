@@ -50,6 +50,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/TargetInfo.h"
+#include "swift/ConstExtract/ConstExtract.h"
 #include "swift/Option/Options.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
@@ -421,14 +422,26 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
-    .SupplementaryOutputs.ABIDescriptorOutputPath;
-  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
+                          .SupplementaryOutputs.ABIDescriptorOutputPath;
+
+  // If an explicit interface build was requested, bypass the creation of a new
+  // sub-instance from the interface which will build it in a separate thread,
+  // and isntead directly use the current \c Instance for compilation.
+  if (FEOpts.ExplicitInterfaceBuild)
+    return ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
+        Instance, Invocation.getClangModuleCachePath(),
+        FEOpts.BackupModuleInterfaceDir, PrebuiltCachePath, ABIPath, InputPath,
+        Invocation.getOutputFilename(),
+        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        Invocation.getSearchPathOptions().CandidateCompiledModules);
+  else
+    return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
-      FEOpts.BackupModuleInterfaceDir,
-      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(), ABIPath,
+      FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
+      Invocation.getOutputFilename(), ABIPath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
       RequireOSSAModules_t(Invocation.getSILOptions()));
@@ -693,6 +706,66 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
+static bool emitConstValuesForWholeModuleIfNeeded(
+    CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  auto constExtractProtocolListPath =
+      Instance.getASTContext().SearchPathOpts.ConstGatherProtocolListFilePath;
+  if (constExtractProtocolListPath.empty())
+    return false;
+  if (!frontendOpts.InputsAndOutputs.hasConstValuesOutputPath())
+    return false;
+  assert(frontendOpts.InputsAndOutputs.isWholeModule() &&
+         "'emitConstValuesForWholeModule' only makes sense when the whole module can be seen");
+  auto ConstValuesFilePath = frontendOpts.InputsAndOutputs
+    .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
+    .ConstValuesOutputPath;
+
+  // List of protocols whose conforming nominal types
+  // we should extract compile-time-known values from
+  std::unordered_set<std::string> Protocols;
+  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
+                                                     Instance.getDiags(), Protocols);
+  if (!inputParseSuccess)
+    return true;
+  auto ConstValues = gatherConstValuesForModule(Protocols,
+                                                Instance.getMainModule());
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
+  writeAsJSONToFile(ConstValues, OS);
+  return false;
+}
+
+static void emitConstValuesForAllPrimaryInputsIfNeeded(
+    CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  auto constExtractProtocolListPath =
+      Instance.getASTContext().SearchPathOpts.ConstGatherProtocolListFilePath;
+  if (constExtractProtocolListPath.empty())
+    return;
+
+  // List of protocols whose conforming nominal types
+  // we should extract compile-time-known values from
+  std::unordered_set<std::string> Protocols;
+  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
+                                                     Instance.getDiags(), Protocols);
+  if (!inputParseSuccess)
+    return;
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &ConstValuesFilePath =
+        Invocation.getConstValuesFilePathForPrimary(
+            SF->getFilename());
+    if (ConstValuesFilePath.empty())
+      continue;
+
+    auto ConstValues = gatherConstValuesForPrimary(Protocols, SF);
+    std::error_code EC;
+    llvm::raw_fd_ostream OS(ConstValuesFilePath, EC, llvm::sys::fs::OF_None);
+    writeAsJSONToFile(ConstValues, OS);
+  }
+}
+
 static bool writeModuleSemanticInfoIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
@@ -900,6 +973,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   {
     hadAnyError |= writeModuleSemanticInfoIfNeeded(Instance);
   }
+
+  {
+    hadAnyError |= emitConstValuesForWholeModuleIfNeeded(Instance);
+  }
   return hadAnyError;
 }
 
@@ -1072,6 +1149,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
                                Instance.getDependencyTracker(), opts);
+
+  // Emit extracted constant values for every file in the batch
+  emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
 }
 
 static bool printSwiftVersion(const CompilerInvocation &Invocation) {
@@ -1356,7 +1436,7 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   assert(!moduleOutputPath.empty() && "must have an output path");
 
   SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = moduleOutputPath.c_str();
+  serializationOpts.OutputPath = moduleOutputPath;
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
 
@@ -1775,7 +1855,9 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  opts.IndexStorePath,
                                  !opts.IndexIgnoreClangModules,
                                  opts.IndexSystemModules,
-                                 opts.IndexIgnoreStdlib, isDebugCompilation,
+                                 opts.IndexIgnoreStdlib,
+                                 opts.IndexIncludeLocals,
+                                 isDebugCompilation,
                                  Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker(),
                                  Invocation.getIRGenOptions().FilePrefixMap);
@@ -1792,6 +1874,7 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
                                  !opts.IndexIgnoreClangModules,
                                  opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib,
+                                 opts.IndexIncludeLocals,
                                  isDebugCompilation,
                                  Invocation.getTargetTriple(),
                                  *Instance.getDependencyTracker(),

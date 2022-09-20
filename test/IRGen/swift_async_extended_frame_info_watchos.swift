@@ -6,6 +6,7 @@
 
 // REQUIRES: OS=watchos
 // REQUIRES: CPU=armv7k || CPU=arm64_32
+// REQUIRES: rdar97790231
 
 public func someAsyncFunction() async {
 }

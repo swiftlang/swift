@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-bound-generic-extensions %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 struct Tree<T> {
   struct Branch<B> {

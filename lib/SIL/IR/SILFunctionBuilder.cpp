@@ -140,7 +140,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
     for (const EffectsAttr *effectsAttr : llvm::reverse(customEffects)) {
       auto error = F->parseEffects(effectsAttr->getCustomString(),
-                            /*fromSIL*/ false, /*isDerived*/ false, paramNames);
+        /*fromSIL*/ false, /*argumentIndex*/ -1, /*isDerived*/ false, paramNames);
       if (error.first) {
         SourceLoc loc = effectsAttr->getCustomStringLocation();
         if (loc.isValid())
@@ -311,8 +311,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
-    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
+    if (auto availability = constant.getAvailabilityForLinkage())
+      F->setAvailabilityForLinkage(*availability);
+
+    F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();

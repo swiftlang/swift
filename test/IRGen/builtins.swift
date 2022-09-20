@@ -779,37 +779,6 @@ func is_same_metatype_test(_ t1: Any.Type, _ t2: Any.Type) {
   var t = Builtin.is_same_metatype(t1, t2)
 }
 
-// CHECK-LABEL: define {{.*}} @{{.*}}generic_unsafeGuaranteed_test
-// CHECK:  call {{.*}}* @{{.*}}swift_{{.*}}etain({{.*}}* returned %0)
-// CHECK:  ret {{.*}}* %0
-func generic_unsafeGuaranteed_test<T: AnyObject>(_ t : T) -> T {
-  let (g, _) = Builtin.unsafeGuaranteed(t)
-  return g
-}
-
-// CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteed_test
-// CHECK:  [[LOCAL1:%.*]] = alloca %swift.refcounted*
-// CHECK:  [[LOCAL2:%.*]] = alloca %swift.refcounted*
-// CHECK:  call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
-// CHECK:  store %swift.refcounted* %0, %swift.refcounted** [[LOCAL2]]
-// CHECK-NOT:  call void @swift_release(%swift.refcounted* %0)
-// CHECK:  ret %swift.refcounted* %0
-func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
-  var (g,t) = Builtin.unsafeGuaranteed(x)
-  Builtin.unsafeGuaranteedEnd(t)
-  return g
-}
-
-// CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
-// CHECK-NEXT: {{.*}}:
-// CHECK-NEXT: alloca
-// CHECK-NEXT: memset
-// CHECK-NEXT: store
-// CHECK-NEXT: ret void
-func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
-  Builtin.unsafeGuaranteedEnd(x)
-}
-
 // CHECK-LABEL: define {{.*}} @{{.*}}atomicload
 func atomicload(_ p: Builtin.RawPointer) {
   // CHECK: [[A:%.*]] = load atomic i8*, i8** {{%.*}} unordered, align 8

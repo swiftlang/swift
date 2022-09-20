@@ -123,6 +123,17 @@ public:
                             const ModuleDecl *importedModule,
                             SmallSetVector<Identifier, 4> &spiGroups) const {};
 
+  /// Checks whether this file imports \c module as \c @_weakLinked.
+  virtual bool importsModuleAsWeakLinked(const ModuleDecl *module) const {
+    // For source files, this should be overridden to inspect the import
+    // declarations in the file. Other kinds of file units, like serialized
+    // modules, can just use this default implementation since the @_weakLinked
+    // attribute is not transitive. If module C is imported @_weakLinked by
+    // module B, that does not imply that module A imports module C @_weakLinked
+    // if it imports module B.
+    return false;
+  }
+
   virtual Optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const { return None; }
 
@@ -259,6 +270,10 @@ public:
   virtual void
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
+
+  /// Lists modules that are not imported from this file and used in API.
+  virtual void
+  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const {}
 
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(

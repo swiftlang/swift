@@ -195,16 +195,34 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
-ASTContext &SILDeclRef::getASTContext() const {
+DeclContext *SILDeclRef::getInnermostDeclContext() const {
+  if (!loc)
+    return nullptr;
   switch (getLocKind()) {
   case LocKind::Decl:
-    return getDecl()->getASTContext();
+    return getDecl()->getInnermostDeclContext();
   case LocKind::Closure:
-    return getAbstractClosureExpr()->getASTContext();
+    return getAbstractClosureExpr();
   case LocKind::File:
-    return getFileUnit()->getASTContext();
+    return getFileUnit();
   }
   llvm_unreachable("Unhandled case in switch");
+}
+
+ASTContext &SILDeclRef::getASTContext() const {
+  auto *DC = getInnermostDeclContext();
+  assert(DC && "Must have a decl context");
+  return DC->getASTContext();
+}
+
+Optional<AvailabilityContext> SILDeclRef::getAvailabilityForLinkage() const {
+  // Back deployment thunks and fallbacks don't have availability since they
+  // are non-ABI.
+  // FIXME: Generalize this check to all kinds of non-ABI functions.
+  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return None;
+
+  return getDecl()->getAvailabilityForLinkage();
 }
 
 bool SILDeclRef::isThunk() const {

@@ -13,21 +13,51 @@
 @_exported import BasicBridging
 import std
 
+/// The assert function to be used in the compiler.
+///
+/// This overrides the standard Swift assert for two reasons:
+/// * We also like to check for assert failures in release builds. Although this could be
+///   achieved with `precondition`, it's easy to forget about it and use `assert` instead.
+/// * We need to see the error message in crashlogs of release builds. This is even not the
+///   case for `precondition`.
+@_transparent
+public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
+                   file: StaticString = #fileID, line: UInt = #line) {
+  if !condition {
+    print("### basic")
+    fatalError(message(), file: file, line: line)
+  }
+}
+
+/// The assert function (without a message) to be used in the compiler.
+///
+/// Unforuntately it's not possible to just add a default argument to `message` in the
+/// other `assert` function. We need to defined this overload.
+@_transparent
+public func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt = #line) {
+  if !condition {
+    fatalError("", file: file, line: line)
+  }
+}
+
+
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, CustomReflectable {
-  let _bridged : BridgedStringRef
+  let _bridged: llvm.StringRef
 
-  public init(bridged: BridgedStringRef) { self._bridged = bridged }
+  public init(bridged: llvm.StringRef) { self._bridged = bridged }
 
   public var string: String { _bridged.string }
   public var description: String { string }
   public var customMirror: Mirror { Mirror(self, children: []) }
   
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: Int(lhs._bridged.length))
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(
+      start: lhs._bridged.__bytes_beginUnsafe(),
+      count: Int(lhs._bridged.__bytes_endUnsafe() - lhs._bridged.__bytes_beginUnsafe()))
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
@@ -41,31 +71,26 @@ public struct StringRef : CustomStringConvertible, CustomReflectable {
 //                            Bridging Utilities
 //===----------------------------------------------------------------------===//
 
-extension BridgedStringRef {
+extension llvm.StringRef {
   public var string: String {
-    let buffer = UnsafeBufferPointer<UInt8>(start: data, count: Int(length))
-    return String(decoding: buffer, as: UTF8.self)
-  }
-
-  public func takeString() -> String {
-    let str = string
-    freeBridgedStringRef(self)
-    return str
+    String(_cxxString: self.str())
   }
 }
 
 extension String {
-  public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
+  /// Underscored to avoid name collision with Swift LLVM Bindings.
+  /// To be replaced with a bindings call once bindings are a dependency.
+  public func _withStringRef<T>(_ c: (llvm.StringRef) -> T) -> T {
     var str = self
     return str.withUTF8 { buffer in
-      return c(BridgedStringRef(data: buffer.baseAddress, length: buffer.count))
+      return c(llvm.StringRef(buffer.baseAddress, buffer.count))
     }
   }
 
   /// Underscored to avoid name collision with the std overlay.
   /// To be replaced with an overlay call once the CI uses SDKs built with Swift 5.8.
   public init(_cxxString s: std.string) {
-    self.init(cString: s.c_str())
+    self.init(cString: s.__c_strUnsafe())
     withExtendedLifetime(s) {}
   }
 }

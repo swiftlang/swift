@@ -45,19 +45,19 @@ struct AliasAnalysis {
   }
 
   /// Returns the correct path for address-alias functions.
-  static func getPtrOrAddressPath(for value: Value) -> EscapeInfo.Path {
+  static func getPtrOrAddressPath(for value: Value) -> SmallProjectionPath {
     let ty = value.type
     if ty.isAddress {
       // This is the regular case: the path selects any sub-fields of an address.
-      return EscapeInfo.Path(.anyValueFields)
+      return SmallProjectionPath(.anyValueFields)
     }
     // Some optimizations use the address-alias APIs with non-address SIL values.
     // TODO: this is non-intuitive and we should eliminate those API uses.
     if ty.isClass {
     // If the value is a (non-address) reference it means: all addresses within the class instance.
-      return EscapeInfo.Path(.anyValueFields).push(.anyClassField)
+      return SmallProjectionPath(.anyValueFields).push(.anyClassField)
     }
     // Any other non-address value means: all addresses of any referenced class instances within the value.
-    return EscapeInfo.Path(.anyValueFields).push(.anyClassField).push(.anyValueFields)
+    return SmallProjectionPath(.anyValueFields).push(.anyClassField).push(.anyValueFields)
   }
 }

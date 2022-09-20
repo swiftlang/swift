@@ -470,7 +470,11 @@ public:
     return Info.AssociatedCodeCompletionToken;
   }
 
-  LiteralBindingKind getLiteralKind() const;
+  void forEachLiteralRequirement(
+      llvm::function_ref<void(KnownProtocolKind)> callback) const;
+
+  /// Return a literal requirement that has the most impact on the binding score.
+  LiteralBindingKind getLiteralForScore() const;
 
   /// Check if this binding is favored over a disjunction e.g.
   /// if it has only concrete types or would resolve a closure.
@@ -542,8 +546,6 @@ public:
   }
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
-  void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
 
 private:
   void addBinding(PotentialBinding binding);
@@ -558,6 +560,18 @@ private:
   /// Check whether the given binding set covers any of the
   /// literal protocols associated with this type variable.
   void determineLiteralCoverage();
+  
+  StringRef getLiteralBindingKind(LiteralBindingKind K) const {
+  #define ENTRY(Kind, String) case LiteralBindingKind::Kind: return String
+    switch (K) {
+    ENTRY(None, "none");
+    ENTRY(Collection, "collection");
+    ENTRY(Float, "float");
+    ENTRY(Atom, "atom");
+    }
+  #undef ENTRY
+  }
+  
 };
 
 } // end namespace inference

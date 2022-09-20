@@ -200,6 +200,14 @@ public class PartialKeyPath<Root>: AnyKeyPath { }
 internal enum KeyPathKind { case readOnly, value, reference }
 
 /// A key path from a specific root type to a specific resulting value type.
+///
+/// The most common way to make an instance of this type
+/// is by using a key-path expression like `\SomeClass.someProperty`.
+/// For more information,
+/// see [Key-Path Expressions][keypath] in *[The Swift Programming Language][tspl]*.
+///
+/// [keypath]: https://docs.swift.org/swift-book/ReferenceManual/Expressions.html#ID563
+/// [tspl]: https://docs.swift.org/swift-book/
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   @usableFromInline
   internal final override class var _rootAndValueType: (
@@ -1943,7 +1951,9 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
       keyPath: _unsafeUncheckedDowncast(keyPath,
         to: ReferenceWritableKeyPath<Root, Value>.self))
   }
-  return keyPath._projectMutableAddress(from: &root)
+  return _withUnprotectedUnsafePointer(to: &root) {
+    keyPath._projectMutableAddress(from: $0)
+  }
 }
 
 // The release that ends the access scope is guaranteed to happen
@@ -1972,7 +1982,9 @@ func _setAtWritableKeyPath<Root, Value>(
       value: value)
   }
   // TODO: we should be able to do this more efficiently than projecting.
-  let (addr, owner) = keyPath._projectMutableAddress(from: &root)
+  let (addr, owner) = _withUnprotectedUnsafePointer(to: &root) {
+    keyPath._projectMutableAddress(from: $0)
+  }
   addr.pointee = value
   _fixLifetime(owner)
   // FIXME: this needs a deallocation barrier to ensure that the
@@ -3269,7 +3281,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     _internalInvariant(_isPOD(T.self))
     let size = MemoryLayout<T>.size
     let (baseAddress, misalign) = adjustDestForAlignment(of: T.self)
-    withUnsafeBytes(of: value) {
+    _withUnprotectedUnsafeBytes(of: value) {
       _memcpy(dest: baseAddress, src: $0.baseAddress.unsafelyUnwrapped,
               size: UInt(size))
     }
@@ -3703,3 +3715,121 @@ internal func _instantiateKeyPathBuffer(
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
+
+@_silgen_name("swift_keyPath_dladdr")
+fileprivate func keypath_dladdr(_: UnsafeRawPointer) -> UnsafePointer<CChar>?
+
+@_silgen_name("swift_keyPathSourceString")
+fileprivate func demangle(
+  name: UnsafePointer<CChar>
+) -> UnsafeMutablePointer<CChar>?
+
+fileprivate func dynamicLibraryAddress<Base, Leaf>(
+  of pointer: ComputedAccessorsPtr,
+  _: Base.Type,
+  _ leaf: Leaf.Type
+) -> String {
+  let getter: ComputedAccessorsPtr.Getter<Base, Leaf> = pointer.getter()
+  let pointer = unsafeBitCast(getter, to: UnsafeRawPointer.self)
+  if let cString = keypath_dladdr(UnsafeRawPointer(pointer)) {
+    if let demangled = demangle(name: cString)
+      .map({ pointer in
+        defer {
+          pointer.deallocate()
+        }
+        return String(cString: pointer)
+    }) {
+      return demangled
+    }
+  }
+  return "<computed \(pointer) (\(leaf))>"
+}
+
+#endif
+
+@available(SwiftStdlib 5.8, *)
+extension AnyKeyPath: CustomDebugStringConvertible {
+  
+#if SWIFT_ENABLE_REFLECTION
+  @available(SwiftStdlib 5.8, *)
+  public var debugDescription: String {
+    var description = "\\\(String(describing: Self.rootType))"
+    return withBuffer {
+      var buffer = $0
+      if buffer.data.isEmpty {
+        _internalInvariantFailure("key path has no components")
+      }
+      var valueType: Any.Type = Self.rootType
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        let hasEnded = optNextType == nil
+        let nextType = optNextType ?? Self.valueType
+        switch rawComponent.value {
+        case .optionalForce, .optionalWrap, .optionalChain:
+          break
+        default:
+          description.append(".")
+        }
+        switch rawComponent.value {
+        case .class(let offset),
+            .struct(let offset):
+          let count = _getRecursiveChildCount(valueType)
+          let index = (0..<count)
+            .first(where: { i in
+              _getChildOffset(
+                valueType,
+                index: i
+              ) == offset
+            })
+          if let index = index {
+            var field = _FieldReflectionMetadata()
+            _ = _getChildMetadata(
+              valueType,
+              index: index,
+              fieldMetadata: &field
+            )
+            defer {
+              field.freeFunc?(field.name)
+            }
+            description.append(String(cString: field.name))
+          } else {
+            description.append("<offset \(offset) (\(nextType))>")
+          }
+        case .get(_, let accessors, _),
+            .nonmutatingGetSet(_, let accessors, _),
+            .mutatingGetSet(_, let accessors, _):
+          func project<Base>(base: Base.Type) -> String {
+            func project2<Leaf>(leaf: Leaf.Type) -> String {
+              dynamicLibraryAddress(
+                of: accessors,
+                base,
+                leaf
+              )
+            }
+            return _openExistential(nextType, do: project2)
+          }
+          description.append(
+            _openExistential(valueType, do: project)
+          )
+        case .optionalChain, .optionalWrap:
+          description.append("?")
+        case .optionalForce:
+          description.append("!")
+        }
+        if hasEnded {
+          break
+        }
+        valueType = nextType
+      }
+      return description
+    }
+  }
+#else
+  @available(SwiftStdlib 5.8, *)
+  public var debugDescription: String {
+    "(value cannot be printed without reflection)"
+  }
+#endif
+  
+}

@@ -114,6 +114,13 @@ void swift::copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   defUseWorklist.initialize(currentDef);
   while (SILValue value = defUseWorklist.pop()) {
+    SILPhiArgument *arg;
+    if ((arg = dyn_cast<SILPhiArgument>(value)) && arg->isPhi()) {
+      visitAdjacentReborrowsOfPhi(arg, [&](SILPhiArgument *reborrow) {
+        defUseWorklist.insert(reborrow);
+        return true;
+      });
+    }
     for (Operand *use : value->getUses()) {
       auto *user = use->getUser();
 
@@ -155,8 +162,10 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         liveness.updateForUse(user, /*lifetimeEnding*/ true);
         break;
       case OperandOwnership::DestroyingConsume:
-        // destroy_value does not force pruned liveness (but store etc. does).
-        if (!isa<DestroyValueInst>(user)) {
+        if (isa<DestroyValueInst>(user)) {
+          destroys.insert(user);
+        } else {
+          // destroy_value does not force pruned liveness (but store etc. does).
           liveness.updateForUse(user, /*lifetimeEnding*/ true);
         }
         recordConsumingUse(use);
@@ -168,8 +177,33 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::ForwardingBorrow:
       case OperandOwnership::EndBorrow:
+        // Guaranteed values are considered uses of the value when the value is
+        // an owned phi and the guaranteed values are adjacent reborrow phis or
+        // reborrow of such.
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        break;
       case OperandOwnership::Reborrow:
-        llvm_unreachable("operand kind cannot take an owned value");
+        BranchInst *branch;
+        if (!(branch = dyn_cast<BranchInst>(user))) {
+          // Non-phi reborrows (tuples, etc) never end the lifetime of the owned
+          // value.
+          liveness.updateForUse(user, /*lifetimeEnding*/ false);
+          defUseWorklist.insert(cast<SingleValueInstruction>(user));
+          break;
+        }
+        if (is_contained(user->getOperandValues(), currentDef)) {
+          // An adjacent phi consumes the value being reborrowed.  Although this
+          // use doesn't end the lifetime, this user does.
+          liveness.updateForUse(user, /*lifetimeEnding*/ true);
+          break;
+        }
+        // No adjacent phi consumes the value.  This use is not lifetime ending.
+        liveness.updateForUse(user, /*lifetimeEnding*/ false);
+        // This branch reborrows a guaranteed phi whose lifetime is dependent on
+        // currentDef.  Uses of the reborrowing phi extend liveness.
+        auto *reborrow = branch->getArgForOperand(use);
+        defUseWorklist.insert(reborrow);
+        break;
       }
     }
   }
@@ -303,18 +337,33 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
   bool changed = true;
   while (changed) {
     changed = false;
-    blockWorklist.initializeRange(consumingBlocks);
-    while (auto *bb = blockWorklist.pop()) {
+    // The blocks in which we may have to extend liveness over access scopes.
+    //
+    // It must be populated first so that we can test membership during the loop
+    // (see findLastConsume).
+    BasicBlockSetVector blocksToVisit(currentDef->getFunction());
+    for (auto *block : consumingBlocks) {
+      blocksToVisit.insert(block);
+    }
+    for (auto iterator = blocksToVisit.begin(); iterator != blocksToVisit.end();
+         ++iterator) {
+      auto *bb = *iterator;
+      // If the block isn't dead, then we won't need to extend liveness within
+      // any of its predecessors (though we may within it).
+      if (liveness.getBlockLiveness(bb) != PrunedLiveBlocks::Dead)
+        continue;
+      // Continue searching upward to find the pruned liveness boundary.
+      for (auto *predBB : bb->getPredecessorBlocks()) {
+        blocksToVisit.insert(predBB);
+      }
+    }
+    for (auto *bb : blocksToVisit) {
       auto blockLiveness = liveness.getBlockLiveness(bb);
       // Ignore blocks within pruned liveness.
       if (blockLiveness == PrunedLiveBlocks::LiveOut) {
         continue;
       }
       if (blockLiveness == PrunedLiveBlocks::Dead) {
-        // Continue searching upward to find the pruned liveness boundary.
-        for (auto *predBB : bb->getPredecessorBlocks()) {
-          blockWorklist.insert(predBB);
-        }
         // Otherwise, ignore dead blocks with no nonlocal end_access.
         if (!accessBlocks->containsNonLocalEndAccess(bb)) {
           continue;
@@ -324,7 +373,23 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
       // Find the latest partially overlapping access scope, if one exists:
       //     use %def // pruned liveness ends here
       //     end_access
+
+      // Whether to look for the last consume in the block.
+      //
+      // We need to avoid extending liveness over end_accesses that occur after
+      // original liveness ended.
+      bool findLastConsume =
+          consumingBlocks.contains(bb) &&
+          llvm::none_of(bb->getSuccessorBlocks(), [&](auto *successor) {
+            return blocksToVisit.contains(successor) &&
+                   liveness.getBlockLiveness(successor) ==
+                       PrunedLiveBlocks::Dead;
+          });
       for (auto &inst : llvm::reverse(*bb)) {
+        if (findLastConsume) {
+          findLastConsume = !destroys.contains(&inst);
+          continue;
+        }
         // Stop at the latest use. An earlier end_access does not overlap.
         if (blockHasUse && liveness.isInterestingUser(&inst)) {
           break;
@@ -590,7 +655,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
 /// copies and destroys for deletion. Insert new copies for interior uses that
 /// require ownership of the used operand.
 void CanonicalizeOSSALifetime::rewriteCopies() {
-  assert(currentDef.getOwnershipKind() == OwnershipKind::Owned);
+  assert(currentDef->getOwnershipKind() == OwnershipKind::Owned);
 
   SmallSetVector<SILInstruction *, 8> instsToDelete;
   defUseWorklist.clear();
@@ -770,7 +835,7 @@ static bool shouldCanonicalizeWithPoison(SILValue def) {
 
 /// Canonicalize a single extended owned lifetime.
 bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
-  if (def.getOwnershipKind() != OwnershipKind::Owned)
+  if (def->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
   if (def->isLexical())

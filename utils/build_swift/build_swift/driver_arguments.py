@@ -153,6 +153,10 @@ def _apply_default_arguments(args):
     if not args.android or not args.build_android:
         args.build_android = False
 
+    # By default use the same number of lit workers as build jobs.
+    if not args.lit_jobs:
+        args.lit_jobs = args.build_jobs
+
     # --test-paths implies --test and/or --validation-test
     # depending on what directories/files have been specified.
     if args.test_paths:
@@ -352,7 +356,7 @@ def create_argument_parser():
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
 
-    option('--swift-disable-dead-stripping', toggle_true, 
+    option('--swift-disable-dead-stripping', toggle_true,
            help="Turn off Darwin-specific dead stripping for Swift host tools")
 
     option('--build-subdir', store,
@@ -379,6 +383,8 @@ def create_argument_parser():
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),
            help='the number of parallel build jobs to use')
+    option(['--lit-jobs'], store_int('lit_jobs'),
+           help='the number of workers to use when testing with lit')
 
     option('--darwin-xcrun-toolchain', store,
            help='the name of the toolchain to use on Darwin')
@@ -580,6 +586,11 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--infer-cross-compile-hosts-on-darwin', toggle_true,
+           help="When building on Darwin, automatically populate cross-compile-hosts "
+                "based on the architecture build-script is running on. "
+                "Has precedence over cross-compile-hosts")
+
     option('--cross-compile-deps-path', store_path,
            help='The path to a directory that contains prebuilt cross-compiled '
                 'library dependencies of the corelibs and other Swift repos, '
@@ -650,6 +661,10 @@ def create_argument_parser():
 
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
+
+    option(['--skip-early-swiftsyntax'],
+           toggle_false('build_early_swiftsyntax'),
+           help='skip building early SwiftSyntax')
 
     option(['--skstresstester'], toggle_true('build_skstresstester'),
            help='build the SourceKit stress tester')
@@ -1103,10 +1118,6 @@ def create_argument_parser():
     option('--skip-test-ios-simulator',
            toggle_false('test_ios_simulator'),
            help='skip testing iOS simulator targets')
-    option('--skip-test-ios-32bit-simulator',
-           toggle_false('test_ios_32bit_simulator'),
-           default=False,
-           help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-watchos-32bit-simulator',
            toggle_false('test_watchos_32bit_simulator'),
            default=False,

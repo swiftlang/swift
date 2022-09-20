@@ -1,17 +1,9 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
-//
-// REQUIRES: OS=macosx || OS=linux-gnu
 
 import CustomSequence
 import Cxx
 
-// === SimpleSequence ===
-
-extension SimpleSequence.ConstIterator: UnsafeCxxInputIterator {}
-extension SimpleSequence: CxxSequence {}
-
-func checkSimpleSequence() {
-  let seq = SimpleSequence()
+func checkIntSequence<S>(_ seq: S) where S: Sequence, S.Element == Int32 {
   let contains = seq.contains(where: { $0 == 3 })
   print(contains)
 
@@ -20,14 +12,26 @@ func checkSimpleSequence() {
   }
 }
 
+// === SimpleSequence ===
+// Conformance to UnsafeCxxInputIterator is synthesized.
+// Conformance to CxxSequence is synthesized.
+checkIntSequence(SimpleSequence())
+
+// === SimpleSequenceWithOutOfLineEqualEqual ===
+// Conformance to CxxSequence is synthesized.
+checkIntSequence(SimpleSequenceWithOutOfLineEqualEqual())
+
 // === SimpleArrayWrapper ===
 // No UnsafeCxxInputIterator conformance required, since the iterators are actually UnsafePointers here.
-extension SimpleArrayWrapper: CxxSequence {}
+// Conformance to CxxSequence is synthesized.
+checkIntSequence(SimpleArrayWrapper())
 
 // === SimpleArrayWrapperNullableIterators ===
 // No UnsafeCxxInputIterator conformance required, since the iterators are actually optional UnsafePointers here.
-extension SimpleArrayWrapperNullableIterators: CxxSequence {}
+// Conformance to CxxSequence is synthesized.
+checkIntSequence(SimpleArrayWrapperNullableIterators())
 
 // === SimpleEmptySequence ===
 // No UnsafeCxxInputIterator conformance required, since the iterators are actually optional UnsafePointers here.
-extension SimpleEmptySequence: CxxSequence {}
+// Conformance to CxxSequence is synthesized.
+checkIntSequence(SimpleEmptySequence())

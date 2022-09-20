@@ -14,40 +14,41 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
+#include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
-#include "MiscDiagnostics.h"
-#include "swift/AST/AccessScope.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessScope.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
-#include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -497,20 +498,20 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                                ASTContext &ctx)
         : Decl(decl), ctx(ctx) { }
 
-    bool walkToDeclPre(class Decl *D) override {
+    PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      return !isa<NominalTypeDecl>(D);
+      return Action::SkipChildrenIf(isa<NominalTypeDecl>(D));
     }
     
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
-        return { false, E };
+        return Action::SkipChildren(E);
       
       // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)
-        return { true, E };
+        return Action::Continue(E);
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
@@ -524,12 +525,12 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
         if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
-          return { true, E };
+          return Action::Continue(E);
 
         arg = dotExpr->getBase();
       } else {
         // Not a constructor call.
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // Look for a base of 'self' or 'super'.
@@ -558,13 +559,13 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       }
       
       if (myKind == BodyInitKind::None)
-        return { true, E };
+        return Action::Continue(E);
 
       if (Kind == BodyInitKind::None) {
         Kind = myKind;
 
         InitExpr = apply;
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // If the kind changed, complain.
@@ -575,13 +576,14 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                            Kind == BodyInitKind::Chained);
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 
   auto &ctx = decl->getASTContext();
   FindReferenceToInitializer finder(decl, ctx);
-  decl->getBody()->walk(finder);
+  if (auto *body = decl->getBody())
+    body->walk(finder);
 
   // get the kind out of the finder.
   auto Kind = finder.Kind;
@@ -707,6 +709,10 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 bool
 ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::ExistentialAny))
+    return true;
+
   // ObjC protocols do not require `any`.
   if (decl->isObjC())
     return false;
@@ -895,6 +901,13 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->getAttrs().hasAttribute<FinalAttr>())
     return true;
 
+  return false;
+}
+
+bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  // For now only do this for nominal type decls.
+  if (isa<NominalTypeDecl>(decl))
+    return decl->getAttrs().hasAttribute<MoveOnlyAttr>();
   return false;
 }
 
@@ -1814,6 +1827,8 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
+  if (typeAlias->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
 
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
@@ -1934,25 +1949,10 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   }
 
   if (!op) {
-    SourceLoc insertionLoc;
-    if (isa<SourceFile>(FD->getParent())) {
-      // Parent context is SourceFile, insertion location is start of func
-      // declaration or unary operator
-      if (FD->isUnaryOperator()) {
-        insertionLoc = FD->getAttrs().getStartLoc();
-      } else {
-        insertionLoc = FD->getStartLoc();
-      }
-    } else {
-      // Find the topmost non-file decl context and insert there.
-      for (DeclContext *CurContext = FD->getLocalContext();
-           !isa<SourceFile>(CurContext);
-           CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expressions)
-        if (auto *D = CurContext->getAsDecl())
-            insertionLoc = D->getStartLoc();
-      }
-    }
+    // We want to insert at the start of the top-most declaration, taking
+    // attributes into consideration.
+    auto *insertionDecl = FD->getTopmostDeclarationDeclContext();
+    auto insertionLoc = insertionDecl->getSourceRangeIncludingAttrs().Start;
 
     SmallString<128> insertion;
     {
@@ -2094,8 +2094,11 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
             : ErrorType::get(ctx));
   }
 
-  const auto options =
+  auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
+  if (decl->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
+
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
@@ -2196,48 +2199,79 @@ static Type validateParameterType(ParamDecl *decl) {
     options = TypeResolutionOptions(TypeResolverContext::EnumElementDecl);
   }
 
-  // If the element is a variadic parameter, resolve the parameter type as if
-  // it were in non-parameter position, since we want functions to be
-  // @escaping in this case.
-  options.setContext(decl->isVariadic() ?
-                       TypeResolverContext::VariadicFunctionInput :
-                       TypeResolverContext::FunctionInput);
-  options |= TypeResolutionFlags::Direct;
+  // Set the "preconcurrency" flag if this is a parameter of a preconcurrency
+  // declaration.
+  if (auto decl = dc->getAsDecl()) {
+    if (decl->preconcurrency())
+      options |= TypeResolutionFlags::Preconcurrency;
+  }
 
   if (dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
-  const auto resolution =
-      TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get);
-  auto Ty = resolution.resolveType(decl->getTypeRepr());
+  Type Ty;
+
+  auto *nestedRepr = decl->getTypeRepr();
+  while (true) {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+      nestedRepr = attrTypeRepr->getTypeRepr();
+      continue;
+    }
+    if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      nestedRepr = specifierTypeRepr->getBase();
+      continue;
+    }
+    break;
+  }
+
+  if (auto *packExpansionRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    options.setContext(TypeResolverContext::VariadicFunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    // FIXME: This duplicates code found elsewhere
+    auto *patternRepr = packExpansionRepr->getPatternType();
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(patternRepr);
+
+    // Find the first type sequence parameter and use that as the count type.
+    SmallVector<Type, 2> rootTypeSequenceParams;
+    Ty->getTypeSequenceParameters(rootTypeSequenceParams);
+
+    // Handle the monovariadic/polyvariadic interface type split.
+    if (!rootTypeSequenceParams.empty()) {
+      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
+      Ty = PackExpansionType::get(Ty, rootTypeSequenceParams[0]);
+    } else {
+      // Monovariadic types (T...) for <T> resolve to [T].
+      Ty = VariadicSequenceType::get(Ty);
+
+      // Set the old-style variadic bit.
+      decl->setVariadic();
+      if (!ctx.getArrayDecl()) {
+        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                           diag::sugar_type_not_found, 0);
+        return ErrorType::get(ctx);
+      }
+    }
+  } else {
+    options.setContext(TypeResolverContext::FunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(decl->getTypeRepr());
+  }
 
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
-  }
-
-  if (decl->isVariadic()) {
-    // Handle the monovariadic/polyvariadic interface type split.
-    if (Ty->hasTypeSequence()) {
-      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty);
-    } else {
-      // Monovariadic types (T...) for <T> resolve to [T].
-      Ty = VariadicSequenceType::get(Ty);
-    }
-    if (!ctx.getArrayDecl()) {
-      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                         diag::sugar_type_not_found, 0);
-      return ErrorType::get(ctx);
-    }
-
-    // Disallow variadic parameters in enum elements.
-    if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
-      decl->diagnose(diag::enum_element_ellipsis);
-      decl->setInvalid();
-      return ErrorType::get(ctx);
-    }
   }
 
   return Ty;
@@ -2265,6 +2299,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
+  case DeclKind::BuiltinTuple:
     llvm_unreachable("should not get here");
     return Type();
 
@@ -2332,6 +2367,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
+
+    if (auto clangDecl = VD->getClangDecl()) {
+      auto clangVarDecl = cast<clang::VarDecl>(clangDecl);
+
+      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(
+          clangVarDecl, VD, VD->getDeclContext());
+    }
+
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
       return ErrorType::get(Context);
@@ -2795,14 +2838,6 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
                     });
 }
 
-static bool isNonGenericTypeAliasType(Type type) {
-  // A non-generic typealias can extend a specialized type.
-  if (auto *aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
-    return aliasType->getDecl()->getGenericContextDepth() == (unsigned)-1;
-
-  return false;
-}
-
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
@@ -2880,18 +2915,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (extendedType->hasPlaceholder()) {
     diags.diagnose(ext->getLoc(), diag::extension_placeholder)
       .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
-  // By default, the user cannot extend a bound generic type, unless it's
-  // referenced via a non-generic typealias type.
-  if (!ext->getASTContext().LangOpts.hasFeature(
-          Feature::BoundGenericExtensions) &&
-      extendedType->isSpecialized() &&
-      !isNonGenericTypeAliasType(extendedType)) {
-    diags.diagnose(ext->getLoc(), diag::extension_specialization,
-                   extendedType->getAnyNominal()->getName())
-         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 

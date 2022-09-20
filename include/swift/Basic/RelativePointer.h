@@ -347,11 +347,7 @@ private:
 
 public:
   const ValueTy *getPointer() const & {
-    static_assert(alignof(ValueTy) >= 2 && alignof(Offset) >= 2,
-                  "alignment of value and offset must be at least 2 to "
-                  "make room for indirectable flag");
-
-    Offset offset = (RelativeOffsetPlusIndirectAndInt & ~getIntMask());
+    Offset offset = getUnresolvedOffset();
 
     // Check for null.
     if (Nullable && offset == 0)
@@ -370,10 +366,17 @@ public:
     }
   }
 
+  Offset getUnresolvedOffset() const & {
+    static_assert(alignof(ValueTy) >= 2 && alignof(Offset) >= 2,
+                  "alignment of value and offset must be at least 2 to "
+                  "make room for indirectable flag");
+    Offset offset = (RelativeOffsetPlusIndirectAndInt & ~getIntMask());
+    return offset;
+  }
+
   /// A zero relative offset encodes a null reference.
   bool isNull() const & {
-    Offset offset = (RelativeOffsetPlusIndirectAndInt & ~getIntMask());
-    return offset == 0;
+    return getUnresolvedOffset() == 0;
   }
 
   IntTy getInt() const & {

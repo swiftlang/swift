@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
-// https://bugs.swift.org/browse/SR-1660
+// https://github.com/apple/swift/issues/44269
 
 enum DayOfTheWeek : Int {
   case monday = 0

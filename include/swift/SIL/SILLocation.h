@@ -169,7 +169,7 @@ private:
   /// Contains the LocationKind, StorageKind and some extra flags.
   /// This fits nicely in a single byte. If for some reason we need more flags
   /// it's possible to extend this to e.g. a uint16_t.
-  /// But SILNode::Bits.LocationKindAndFlags must be updated accordingly.
+  /// But SILNode::locationKindAndFlags must be updated accordingly.
   union KindAndFlags {
     KindAndFlags() : packedKindAndFlags(0) {}
     KindAndFlags(LocationKind kind, StorageKind storageKind)

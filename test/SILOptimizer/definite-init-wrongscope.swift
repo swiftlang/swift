@@ -28,7 +28,7 @@ public class M {
 
 // Make sure the expanded sequence gets the right scope.
 
-// CHECK-LABEL: sil [ossa] @$s3del1MC4fromAcA12WithDelegate_p_tKcfc : $@convention(method) (@in WithDelegate, @owned M) -> (@owned M, @error Error)
+// CHECK-LABEL: sil [ossa] @$s3del1MC4fromAcA12WithDelegate_p_tKcfc : $@convention(method) (@in any WithDelegate, @owned M) -> (@owned M, @error any Error)
 
 // CHECK:   [[I:%.*]] = integer_literal $Builtin.Int2, 1, loc {{.*}}:20:12, scope 6
 // CHECK:   [[V:%.*]] = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
@@ -38,10 +38,10 @@ public class M {
 
 // Make sure the dealloc_stack gets the same scope of the instructions surrounding it.
 
-// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:26:5, scope 6
+// CHECK:   destroy_addr %0 : $*any WithDelegate, loc {{.*}}:26:5, scope 6
 // CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
 
-// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:26:5, scope 6
+// CHECK:   destroy_addr %0 : $*any WithDelegate, loc {{.*}}:26:5, scope 6
 // CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 6
-// CHECK-NEXT:   throw %{{.*}} : $Error, loc {{.*}}:26:5, scope 6
+// CHECK-NEXT:   throw %{{.*}} : $any Error, loc {{.*}}:26:5, scope 6
 // CHECK: end sil function '$s3del1MC4fromAcA12WithDelegate_p_tKcfc'

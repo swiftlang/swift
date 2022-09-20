@@ -295,10 +295,7 @@ public:
   /// the callee.
   ///
   /// TODO: Summarize ArraySemanticsCall accesses.
-  bool summarizeCall(FullApplySite fullApply) {
-    assert(accessResult.isEmpty() && "expected uninitialized results.");
-    return false;
-  }
+  bool summarizeCall(FullApplySite fullApply);
 
   /// Merge effects directly from \p RHS.
   bool mergeFrom(const FunctionAccessStorage &RHS) {

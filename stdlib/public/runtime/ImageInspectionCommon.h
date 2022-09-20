@@ -46,7 +46,7 @@
 #define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"
 #endif // defined(__ELF__)
 
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 #include <cstdint>
 #include <cstddef>
 

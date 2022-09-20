@@ -13,12 +13,14 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -59,14 +61,22 @@ class SwiftPassInvocation {
   /// Non-null if this is an instruction pass, invoked from SILCombine.
   SILCombiner *silCombiner = nullptr;
 
+  /// Change notifications, collected during a pass run.
+  SILAnalysis::InvalidationKind changeNotifications =
+      SILAnalysis::InvalidationKind::Nothing;
+
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
   static constexpr int BlockSetCapacity = 8;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
   bool aliveBlockSets[BlockSetCapacity];
-
   int numBlockSetsAllocated = 0;
+
+  static constexpr int NodeSetCapacity = 8;
+  char nodeSetStorage[sizeof(NodeSet) * NodeSetCapacity];
+  bool aliveNodeSets[NodeSetCapacity];
+  int numNodeSetsAllocated = 0;
 
   void endPassRunChecks();
 
@@ -92,11 +102,18 @@ public:
 
   void freeBlockSet(BasicBlockSet *set);
 
+  NodeSet *allocNodeSet();
+
+  void freeNodeSet(NodeSet *set);
+
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);
 
   /// Called by the pass when changes are made to the SIL.
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
+
+  /// Called by the pass manager before the pass starts running.
+  void startModulePassRun(SILModuleTransform *transform);
 
   /// Called by the pass manager before the pass starts running.
   void startFunctionPassRun(SILFunctionTransform *transform);
@@ -105,10 +122,17 @@ public:
   void startInstructionPassRun(SILInstruction *inst);
 
   /// Called by the pass manager when the pass has finished.
+  void finishedModulePassRun();
+
+  /// Called by the pass manager when the pass has finished.
   void finishedFunctionPassRun();
 
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
+  
+  void beginTransformFunction(SILFunction *function);
+
+  void endTransformFunction();
 };
 
 /// The SIL pass manager.
@@ -156,10 +180,6 @@ class SILPassManager {
   /// For invoking Swift passes.
   SwiftPassInvocation swiftPassInvocation;
 
-  /// Change notifications, collected during a bridged pass run.
-  SILAnalysis::InvalidationKind changeNotifications =
-      SILAnalysis::InvalidationKind::Nothing;
-
   /// A mask which has one bit for each pass. A one for a pass-bit means that
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
@@ -193,6 +213,8 @@ class SILPassManager {
   /// bare pointer to ensure that we can deregister the notification after this
   /// pass manager is destroyed.
   DeserializationNotificationHandler *deserializationNotificationHandler;
+
+  std::chrono::nanoseconds totalPassRuntime = std::chrono::nanoseconds(0);
 
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def. This is private as it should only be used by
@@ -311,11 +333,6 @@ public:
     CompletedPassesMap[F].reset();
   }
 
-  void notifyPassChanges(SILAnalysis::InvalidationKind invalidationKind) {
-    changeNotifications = (SILAnalysis::InvalidationKind)
-        (changeNotifications | invalidationKind);
-  }
-
   /// Reset the state of the pass manager and remove all transformation
   /// owned by the pass manager. Analysis passes will be kept.
   void resetAndRemoveTransformations();
@@ -410,7 +427,8 @@ private:
 
 inline void SwiftPassInvocation::
 notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
-  passManager->notifyPassChanges(invalidationKind);
+    changeNotifications = (SILAnalysis::InvalidationKind)
+        (changeNotifications | invalidationKind);
 }
 
 } // end namespace swift

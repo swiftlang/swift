@@ -2523,8 +2523,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
         mv = SGF.emitManagedRValueWithCleanup(found->second);
       } else {
         SILValue arg = caseBB->getArgument(argIndex++);
-        assert(arg.getOwnershipKind() == OwnershipKind::Owned ||
-               arg.getOwnershipKind() == OwnershipKind::None);
+        assert(arg->getOwnershipKind() == OwnershipKind::Owned ||
+               arg->getOwnershipKind() == OwnershipKind::None);
         mv = SGF.emitManagedRValueWithCleanup(arg);
       }
 
@@ -2607,7 +2607,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue();
   if (!diagnoseFailure) {
-    SGF.B.createBuiltinTrap(loc);
+    SGF.B.createUnconditionalFail(loc, "unexpected enum case");
     return;
   }
 
@@ -2642,7 +2642,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   ASTContext &ctx = SGF.getASTContext();
   auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase();
   if (!diagnoseFailure) {
-    SGF.B.createBuiltinTrap(loc);
+    SGF.B.createUnconditionalFail(loc, "unexpected enum case");
     return;
   }
 
@@ -2814,7 +2814,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emission.emitAddressOnlyAllocations();
 
   SILBasicBlock *contBB = createBasicBlock();
-  emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
   LexicalScope switchScope(*this, CleanupLocation(S));
@@ -2835,9 +2834,13 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   auto subject = ([&]() -> ConsumableManagedValue {
     // If we have a move only value, ensure plus one and convert it. Switches
     // always consume move only values.
-    if (subjectMV.getType().isMoveOnlyWrapped()) {
-      subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
-          S, subjectMV.ensurePlusOne(*this, S));
+    if (subjectMV.getType().isMoveOnly() && subjectMV.getType().isObject()) {
+      if (subjectMV.getType().isMoveOnlyWrapped()) {
+        subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
+            S, subjectMV.ensurePlusOne(*this, S));
+      } else {
+        subjectMV = B.createMoveValue(S, subjectMV.ensurePlusOne(*this, S));
+      }
     }
 
     // If we have a plus one value...

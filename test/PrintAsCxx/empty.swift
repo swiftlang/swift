@@ -30,8 +30,15 @@
 // CHECK-NEXT:  #include <cstdbool>
 // CHECK-NEXT:  #include <cstring>
 // CHECK-NEXT:  #include <stdlib.h>
-// CHECK-NEXT:  #if defined(_WIN32)
-// CHECK-NEXT:  #include <malloc.h>
+// CHECK-NEXT:  #include <new>
+// CHECK-NEXT:  #include <type_traits>
+// CHECK-NEXT:  // Look for the C++ interop support header relative to clang's resource dir:
+// CHECK-NEXT:  // '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.
+// CHECK-NEXT:  #if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)
+// CHECK-NEXT:  #include <../../../swift/shims/_SwiftCxxInteroperability.h>
+// CHECK-NEXT:  // Alternatively, allow user to find the header using additional include path into 'swift'.
+// CHECK-NEXT:  #elif __has_include(<shims/_SwiftCxxInteroperability.h>)
+// CHECK-NEXT:  #include <shims/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #else
 // CHECK-NEXT:  #include <stdint.h>
@@ -80,14 +87,16 @@
 // CHECK-LABEL: # define SWIFT_CALL __attribute__((swiftcall))
 // CHECK:       # define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
 // CHECK:       # define SWIFT_CONTEXT __attribute__((swift_context))
+// CHECK:       # define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 
 // CHECK-LABEL: #if defined(__OBJC__)
-// CHECK-NEXT:  #if __has_feature(modules)
+// CHECK-NEXT:  #if __has_feature(objc_modules)
 
 // CHECK-LABEL: #if defined(__OBJC__)
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
-// CHECK-NEXT:  #ifndef SWIFT_PRINTED_CORE
+// CHECK-NEXT:  #if __has_feature(objc_modules)
+// CHECK:       #ifndef SWIFT_PRINTED_CORE
 // CHECK:       } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif

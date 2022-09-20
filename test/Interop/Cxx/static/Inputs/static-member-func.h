@@ -5,7 +5,8 @@ class WithStaticMemberFunc {
 public:
   static int staticMemberFunc();
   typedef int (*Func)();
-  static Func getStaticMemberFuncAddress();
+  static Func getStaticMemberFuncAddress()
+      __attribute__((swift_attr("import_unsafe")));
 };
 
 #endif

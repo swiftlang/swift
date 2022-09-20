@@ -137,7 +137,7 @@ public:
   /// Find all keys that begin with the given symbol. Fn must take a single
   /// argument of type ValueType.
   template<typename Fn>
-  void findAll(Symbol symbol, Fn fn) {
+  void findAll(Symbol symbol, Fn fn) const {
     auto found = Root.Entries.find(symbol);
     if (found == Root.Entries.end())
       return;
@@ -157,7 +157,7 @@ public:
   /// [begin,end) matches a prefix of the key. Fn must take a single
   /// argument of type ValueType.
   template<typename Iter, typename Fn>
-  void findAll(Iter begin, Iter end, Fn fn) {
+  void findAll(Iter begin, Iter end, Fn fn) const {
     assert(begin != end);
     auto *node = &Root;
 
@@ -189,7 +189,7 @@ private:
   /// Depth-first traversal of all children of the given node, including
   /// the node itself. Fn must take a single argument of type ValueType.
   template<typename Fn>
-  void visitChildren(Node *node, Fn fn) {
+  void visitChildren(const Node *node, Fn fn) const {
     for (const auto &pair : node->Entries) {
       const auto &entry = pair.second;
       if (entry.Value)

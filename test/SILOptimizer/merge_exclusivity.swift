@@ -377,13 +377,13 @@ private struct EscapedTransforme<T>: WriteProt {
 
 // TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity14run_MergeTest9yySiF : $@convention(thin)
 // TESTSIL: [[REFADDR:%.*]] = ref_element_addr {{.*}} : $StreamClass, #StreamClass.buffer
-// TESTSIL-NEXT: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFADDR]]
+// TESTSIL-NEXT: [[B1:%.*]] = begin_access [modify] [{{.*}}] [no_nested_conflict] [[REFADDR]]
 // TESTSIL: end_access [[B1]]
-// TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
+// TESTSIL: [[BCONF:%.*]] = begin_access [modify] [{{.*}}] [[REFADDR]]
 // TESTSIL: end_access [[BCONF]]
-// TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
+// TESTSIL: [[BCONF:%.*]] = begin_access [modify] [{{.*}}] [[REFADDR]]
 // TESTSIL: end_access [[BCONF]]
-// TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
+// TESTSIL: [[BCONF:%.*]] = begin_access [modify] [{{.*}}] [[REFADDR]]
 // TESTSIL: end_access [[BCONF]]
 // TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity14run_MergeTest9yySiF'
 @inline(never)

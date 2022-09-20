@@ -308,6 +308,16 @@ public:
             swiftPointer.getPointer()));
   }
 
+  /// Retrieve a reference to the protocol.
+  int32_t getUnresolvedProtocolAddress() const {
+#if SWIFT_OBJC_INTEROP
+    if (isObjC()) {
+      return objcPointer.getUnresolvedOffset();
+    }
+#endif
+    return swiftPointer.getUnresolvedOffset();
+  }
+
   operator TargetProtocolDescriptorRef<Runtime>() const {
     return getProtocol();
   }

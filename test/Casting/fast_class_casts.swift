@@ -28,6 +28,7 @@ final class DerivedFromResilient : ResilientClasses.OpenBase {
 }
 
 final class Generic<T> : Classes.OpenBase {
+   final class Inner : Classes.OpenBase {}
 }
 
 // CHECK-LABEL: define {{.*}} @"$s4Main14castToNonfinaly7Classes0D0CSgAC4BaseCF"
@@ -102,6 +103,15 @@ func castToGeneric(_ b: Classes.OpenBase) -> Generic<Int>? {
   return b as? Generic<Int>
 }
 
+// CHECK-LABEL: define {{.*}} @"$s4Main18castToGenericInneryAA0D0C0E0CySi_GSg7Classes8OpenBaseCF"
+// CHECK:         @swift_dynamicCastClass
+// CHECK:       }
+@inline(never)
+func castToGenericInner(_ b: Classes.OpenBase) -> Generic<Int>.Inner? {
+  return b as? Generic<Int>.Inner
+}
+
+
 // CHECK-LABEL: define {{.*}} @"$s4Main14getAnyHashableys0cD0VAA8InternalCF"
 @inline(never)
 func getAnyHashable(_ i: Internal) -> AnyHashable {
@@ -153,6 +163,11 @@ func test() {
   print(castToGeneric(Classes.OpenBase()) as Any)
   // CHECK-OUTPUT: Optional(Main.Generic<Swift.Int>)
   print(castToGeneric(Generic<Int>()) as Any)
+
+  // CHECK-OUTPUT: nil
+  print(castToGenericInner(Classes.OpenBase()) as Any)
+  // CHECK-OUTPUT: Optional(Main.Generic<Swift.Int>.Inner)
+  print(castToGenericInner(Generic<Int>.Inner()) as Any)
 }
 
 test()

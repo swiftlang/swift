@@ -46,12 +46,12 @@ struct InstructionRange : CustomStringConvertible, CustomReflectable {
   /// The underlying block range.
   private(set) var blockRange: BasicBlockRange
 
-  private var insertedInsts: Set<Instruction>
+  private var insertedInsts: InstructionSet
 
   init(begin beginInst: Instruction, _ context: PassContext) {
     self.begin = beginInst
-    self.insertedInsts = Set<Instruction>()
     self.blockRange = BasicBlockRange(begin: beginInst.block, context)
+    self.insertedInsts = InstructionSet(context)
   }
 
   /// Insert a potential end instruction.
@@ -143,6 +143,7 @@ struct InstructionRange : CustomStringConvertible, CustomReflectable {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
+    insertedInsts.deinitialize()
     blockRange.deinitialize()
   }
 }

@@ -25,6 +25,10 @@ func testSimpleExistentialOpening(p: any P, pq: any P & Q, c: any Collection) {
   let pa = acceptGeneric(p)
   let _: Int = pa // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 
+  var vp = p
+  let vpa = acceptGeneric(vp)
+  let _: Int = vpa // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
+
   let pqa = acceptGeneric(pq)
   let _: Int = pqa  // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 

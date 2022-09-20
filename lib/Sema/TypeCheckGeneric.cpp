@@ -356,6 +356,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     Type second;
 
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
       second = req.getSecondType();
@@ -634,16 +635,22 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           continue;
 
         auto paramOptions = baseOptions;
-        paramOptions.setContext(param->isVariadic()
-                                    ? TypeResolverContext::VariadicFunctionInput
-                                    : TypeResolverContext::FunctionInput);
+
+        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
+          typeRepr = specifier->getBase();
+
+        if (auto *packExpansion = dyn_cast<PackExpansionTypeRepr>(typeRepr)) {
+          typeRepr = packExpansion->getPatternType();
+
+          paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
+        } else {
+          paramOptions.setContext(TypeResolverContext::FunctionInput);
+        }
+
         paramOptions |= TypeResolutionFlags::Direct;
 
         const auto type =
             resolution.withOptions(paramOptions).resolveType(typeRepr);
-
-        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
-          typeRepr = specifier->getBase();
 
         inferenceSources.emplace_back(typeRepr, type);
       }
@@ -786,6 +793,9 @@ void TypeChecker::diagnoseRequirementFailure(
 
   const auto reqKind = req.getKind();
   switch (reqKind) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),
                                substReq.getProtocolDecl(), module, errorLoc);
@@ -868,9 +878,10 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       Requirement substReq = req;
       if (isPrimaryReq) {
         // Primary requirements do not have substitutions applied.
-        if (auto resolved =
-                req.subst(substitutions, LookUpConformanceInModule(module))) {
-          substReq = *resolved;
+        auto resolved =
+            req.subst(substitutions, LookUpConformanceInModule(module));
+        if (!resolved.hasError()) {
+          substReq = resolved;
         } else {
           // Another requirement might fail later; just continue.
           hadSubstFailure = true;
@@ -912,9 +923,10 @@ CheckGenericArgumentsResult::Kind TypeChecker::checkGenericArguments(
   bool valid = true;
 
   for (auto req : requirements) {
-    if (auto resolved = req.subst(substitutions,
-                                  LookUpConformanceInModule(module), options)) {
-      worklist.push_back(*resolved);
+    auto resolved = req.subst(substitutions,
+                              LookUpConformanceInModule(module), options);
+    if (!resolved.hasError()) {
+      worklist.push_back(resolved);
     } else {
       valid = false;
     }

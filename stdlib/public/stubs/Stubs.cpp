@@ -70,9 +70,9 @@
 
 #include "swift/Threading/Thread.h"
 
-#include "SwiftShims/LibcShims.h"
-#include "SwiftShims/RuntimeShims.h"
-#include "SwiftShims/RuntimeStubs.h"
+#include "swift/shims/LibcShims.h"
+#include "swift/shims/RuntimeShims.h"
+#include "swift/shims/RuntimeStubs.h"
 
 #include "llvm/ADT/StringExtras.h"
 

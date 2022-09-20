@@ -22,6 +22,7 @@
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
+#include <tuple>
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -159,6 +160,15 @@ bool SILType::isNoReturnFunction(SILModule &M,
     return funcTy->isNoReturnFunction(M, context);
 
   return false;
+}
+
+Lifetime SILType::getLifetime(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  const auto &lowering = F.getTypeLowering(contextType);
+  auto properties = lowering.getRecursiveProperties();
+  if (properties.isTrivial())
+    return Lifetime::None;
+  return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
 }
 
 std::string SILType::getMangledName() const {
@@ -923,4 +933,12 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
   }
 
   return SILType();
+}
+
+// TODO: Create isPureMoveOnly.
+bool SILType::isMoveOnly() const {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    if (nom->isMoveOnly())
+      return true;
+  return isMoveOnlyWrapped();
 }

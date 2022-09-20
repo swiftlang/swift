@@ -14,8 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/BridgingUtils.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/BridgingUtils.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/Parser.h"
@@ -51,8 +49,7 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
       regexLiteralParsingFn(regexText.str().c_str(), &version,
                             /*captureStructureOut*/ capturesBuf.data(),
                             /*captureStructureSize*/ capturesBuf.size(),
-                            /*diagBaseLoc*/ Tok.getLoc(),
-                            getBridgedDiagnosticEngine(&Diags));
+                            /*diagBaseLoc*/ Tok.getLoc(), Diags);
   auto loc = consumeToken();
   SourceMgr.recordRegexLiteralStartLoc(loc);
 

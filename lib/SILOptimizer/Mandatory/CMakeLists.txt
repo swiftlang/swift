@@ -22,10 +22,10 @@ target_sources(swiftSILOptimizer PRIVATE
   LowerHopToActor.cpp
   MandatoryInlining.cpp
   MovedAsyncVarDebugInfoPropagator.cpp
-  MoveFunctionCanonicalization.cpp
   MoveKillsCopyableAddressesChecker.cpp
   MoveKillsCopyableValuesChecker.cpp
-  MoveOnlyChecker.cpp
+  MoveOnlyObjectChecker.cpp
+  MoveOnlyAddressChecker.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp
@@ -36,5 +36,5 @@ target_sources(swiftSILOptimizer PRIVATE
   YieldOnceCheck.cpp
   MandatoryCombine.cpp
   OSLogOptimization.cpp
-  MoveOnlyTypeEliminator.cpp
+  MoveOnlyWrappedTypeEliminator.cpp
   OwnershipModelEliminator.cpp)

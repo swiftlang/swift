@@ -57,6 +57,12 @@ namespace objc_translation {
 
 namespace cxx_translation {
 
+using objc_translation::CustomNamesOnly_t;
+
+StringRef
+getNameForCxx(const ValueDecl *VD,
+              CustomNamesOnly_t customNamesOnly = objc_translation::Normal);
+
 /// Returns true if the given value decl D is visible to C++ of its
 /// own accord (i.e. without considering its context)
 bool isVisibleToCxx(const ValueDecl *VD, AccessLevel minRequiredAccess,

@@ -38,9 +38,9 @@ public struct ConformingNonTrivialStruct : ResilientProtocol {
 // CHECK-LABEL: sil shared [ossa] @$s8defaultA4main26ConformingNonTrivialStructV_TB5
 // CHECK:       bb0(%0 : @guaranteed $ConformingNonTrivialStruct):
 // CHECK-NEXT:    [[TMP:%.*]] = alloc_stack $ConformingNonTrivialStruct
-// CHECK-NEXT:    store_borrow %0 to [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK-NEXT:    [[SB:%.*]] = store_borrow %0 to [[TMP]] : $*ConformingNonTrivialStruct
 // CHECK:         [[FN:%.*]] = function_ref @$s8defaultB4main26ConformingNonTrivialStructV_TB5
-// CHECK-NEXT:    [[LOAD:%.*]] = load_borrow [[TMP]] : $*ConformingNonTrivialStruct
+// CHECK-NEXT:    [[LOAD:%.*]] = load_borrow [[SB]] : $*ConformingNonTrivialStruct
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[FN]]([[LOAD]])
 // CHECK:         dealloc_stack [[TMP]] : $*ConformingNonTrivialStruct
 // CHECK } // end sil function 's8defaultA4main16ConformingNonTrivialStructV_TB5'

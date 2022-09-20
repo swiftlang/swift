@@ -23,7 +23,7 @@ config.llvm_code_generators = "@LLVM_TARGETS_TO_BUILD@".split(";")
 config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.swift_src_root = lit_config.params.get("swift_src_root", "@SWIFT_SOURCE_DIR@")
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
-config.target_triple = "@TARGET_TRIPLE@"
+config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
@@ -98,11 +98,6 @@ if "@SWIFT_OPTIMIZED@" == "TRUE":
 
 if "@SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY@" == "TRUE":
     config.available_features.add("single_threaded_concurrency")
-
-if "@SWIFT_THREADING_PACKAGE@" != "none":
-    # This is not called "threading" because we might want that later
-    config.available_features.add("thread_safe_runtime")
-    config.available_features.add("threading_@SWIFT_THREADING_PACKAGE@")
 
 if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
     config.available_features.add("reflection")

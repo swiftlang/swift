@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "TypeCheckRegex.h"
 #include "TypeChecker.h"
@@ -93,9 +94,9 @@ namespace {
     LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs)
         : LinkedExprs(linkedExprs) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (isa<ClosureExpr>(expr))
-        return {false, expr};
+        return Action::SkipChildren(expr);
 
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
@@ -112,31 +113,35 @@ namespace {
           // we look at the assignment.
           isa<AssignExpr>(expr)) {
         LinkedExprs.push_back(expr);
-        return {false, expr};
+        return Action::SkipChildren(expr);
       }
       
-      return { true, expr };
+      return Action::Continue(expr);
     }
     
-    Expr *walkToExprPost(Expr *expr) override {
-      return expr;
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+      return Action::Continue(expr);
     }
     
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
     
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
 
     /// Ignore patterns.
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
-      return { false, pat };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+      return Action::SkipChildren(pat);
     }
 
     /// Ignore types.
-     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
   
   /// Given a collection of "linked" expressions, analyzes them for
@@ -152,14 +157,14 @@ namespace {
     LinkedExprAnalyzer(LinkedTypeInfo &lti, ConstraintSystem &cs) :
         LTI(lti), CS(cs) {}
     
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (isa<LiteralExpr>(expr)) {
         LTI.hasLiteral = true;
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       if (isa<CollectionExpr>(expr)) {
-        return { true, expr };
+        return Action::Continue(expr);
       }
       
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
@@ -168,17 +173,17 @@ namespace {
           LTI.collectedTypes.insert(CS.getType(UDE).getPointer());
         
         // Don't recurse into the base expression.
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
 
       if (isa<ClosureExpr>(expr)) {
-        return {false, expr};
+        return Action::SkipChildren(expr);
       }
 
       if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
         LTI.collectedTypes.insert(CS.getType(FVE).getPointer());
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
@@ -186,7 +191,7 @@ namespace {
           if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
-          return { false, expr };
+          return Action::SkipChildren(expr);
         } 
       }             
 
@@ -196,7 +201,7 @@ namespace {
       if (isa<ApplyExpr>(expr) &&
           !(isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr) ||
             isa<PostfixUnaryExpr>(expr))) {      
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
@@ -206,7 +211,7 @@ namespace {
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
 
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       // Optimize branches of a conditional expression separately.
@@ -214,13 +219,13 @@ namespace {
         CS.optimizeConstraints(IE->getCondExpr());
         CS.optimizeConstraints(IE->getThenExpr());
         CS.optimizeConstraints(IE->getElseExpr());
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }      
 
       // For exprs of a tuple, avoid favoring. (We need to allow for cases like
       // (Int, Int32).)
       if (isa<TupleExpr>(expr)) {
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       // Coercion exprs have a rigid type, so there's no use in gathering info
@@ -231,7 +236,7 @@ namespace {
         // because that might lead to overly eager type variable merging.
         if (!coercion->isLiteralInit())
           LTI.collectedTypes.insert(CS.getType(expr).getPointer());
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       // Don't walk into subscript expressions - to do so would risk factoring
@@ -239,34 +244,38 @@ namespace {
       // if the index expression is a literal type that differs from the return
       // type of the subscript operation.)
       if (isa<SubscriptExpr>(expr) || isa<DynamicLookupExpr>(expr)) {
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
       
       // Don't walk into unresolved member expressions - we avoid merging type
       // variables inside UnresolvedMemberExpr and those outside, since they
       // should be allowed to behave independently in CS.
       if (isa<UnresolvedMemberExpr>(expr)) {
-        return {false, expr };
+        return Action::SkipChildren(expr);
       }
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
     
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
     
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
 
     /// Ignore patterns.
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
-      return { false, pat };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+      return Action::SkipChildren(pat);
     }
 
     /// Ignore types.
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
   
   /// For a given expression, given information that is global to the
@@ -773,9 +782,9 @@ namespace {
     ConstraintOptimizer(ConstraintSystem &cs) :
       CS(cs) {}
     
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
-        return {false, expr};
+        return Action::SkipChildren(expr);
       }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
@@ -802,22 +811,24 @@ namespace {
       }
 
       if (isa<ClosureExpr>(expr))
-        return {false, expr};
+        return Action::SkipChildren(expr);
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
     
-    Expr *walkToExprPost(Expr *expr) override {
-      return expr;
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
+      return Action::Continue(expr);
     }
     
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
     
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
   };
 } // end anonymous namespace
 
@@ -868,7 +879,7 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getRawType(), elt.getName());
+          result.emplace_back(elt.getType(), elt.getName());
         return;
       }
       case TypeKind::Paren: {
@@ -890,6 +901,11 @@ namespace {
       // that member through the base returns a value convertible to the type
       // of this expression.
       auto baseTy = CS.getType(base);
+      if (isa<ErrorExpr>(base)) {
+        return CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::Member),
+            TVO_CanBindToHole);
+      }
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   TVO_CanBindToLValue | TVO_CanBindToNoEscape);
@@ -1068,19 +1084,11 @@ namespace {
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      if (!CS.isForCodeCompletion())
-        return nullptr;
+      CS.recordFix(
+          IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(E)));
 
-      // For code completion, treat error expressions that don't contain
-      // the completion location itself as holes. If an ErrorExpr contains the
-      // code completion location, a fallback typecheck is called on the
-      // ErrorExpr's OriginalExpr (valid sub-expression) if it had one,
-      // independent of the wider expression containing the ErrorExpr, so
-      // there's no point attempting to produce a solution for it.
-      if (CS.containsCodeCompletionLoc(E))
-        return nullptr;
-
-      return PlaceholderType::get(CS.getASTContext(), E);
+      return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                   TVO_CanBindToHole);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1374,7 +1382,11 @@ namespace {
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, resCtx, genericOpener, placeholderHandler);
       if (result->hasError()) {
-        return Type();
+        CS.recordFix(
+            IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
+
+        return CS.createTypeVariable(CS.getConstraintLocator(repr),
+                                     TVO_CanBindToHole);
       }
       // Diagnose top-level usages of placeholder types.
       if (isa<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1600,7 +1612,11 @@ namespace {
 
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = CS.getType(expr->getSubExpr());
-      
+
+      if (baseTy->isTypeVariableOrMember()) {
+        return baseTy;
+      }
+
       // We currently only support explicit specialization of generic types.
       // FIXME: We could support explicit function specialization.
       auto &de = CS.getASTContext().Diags;
@@ -1757,11 +1773,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-
-      auto &ctx = CS.getASTContext();
-      auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
-      auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
-      return ParenType::get(ctx, parenType, parenFlags);
+      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -2160,6 +2172,8 @@ namespace {
 
           closureParams.push_back(param->toFunctionParam(externalType));
         }
+
+        checkVariadicParameters(paramList, closure);
       }
 
       auto extInfo = CS.closureEffects(closure);
@@ -2264,9 +2278,11 @@ namespace {
               ->getUnderlyingType();
         }
 
-        auto underlyingType =
-            getTypeForPattern(paren->getSubPattern(), locator,
-                              externalPatternType, bindPatternVarsOneWay);
+        auto *subPattern = paren->getSubPattern();
+        auto underlyingType = getTypeForPattern(
+            subPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+            externalPatternType, bindPatternVarsOneWay);
 
         if (!underlyingType)
           return Type();
@@ -2285,11 +2301,34 @@ namespace {
         return setType(type);
       }
       case PatternKind::Any: {
-        return setType(
-            externalPatternType
-                ? externalPatternType
-                : CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        TVO_CanBindToNoEscape));
+        Type type;
+
+        // If this is a situation like `[let] _ = <expr>`, return
+        // initializer expression.
+        auto getInitializerExpr = [&locator]() -> Expr * {
+          auto last = locator.last();
+          if (!last)
+            return nullptr;
+
+          auto contextualTy = last->getAs<LocatorPathElt::ContextualType>();
+          return (contextualTy && contextualTy->isFor(CTP_Initialization))
+                     ? locator.trySimplifyToExpr()
+                     : nullptr;
+        };
+
+        // Always prefer a contextual type when it's available.
+        if (externalPatternType) {
+          type = externalPatternType;
+        } else if (auto *initializer = getInitializerExpr()) {
+          // For initialization always assume a type of initializer.
+          type = CS.getType(initializer)->getRValueType();
+        } else {
+          type = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      ConstraintLocator::AnyPatternDecl),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
+        }
+        return setType(type);
       }
 
       case PatternKind::Named: {
@@ -2322,8 +2361,10 @@ namespace {
         }
 
         if (!varType) {
-          varType = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                          TVO_CanBindToNoEscape);
+          varType = CS.createTypeVariable(
+              CS.getConstraintLocator(pattern,
+                                      LocatorPathElt::NamedPatternDecl()),
+              TVO_CanBindToNoEscape | TVO_CanBindToHole);
 
           // If this is either a `weak` declaration or capture e.g.
           // `weak var ...` or `[weak self]`. Let's wrap type variable
@@ -2668,7 +2709,9 @@ namespace {
           // and we're matching the type of that subpattern to the parameter
           // types.
           Type subPatternType = getTypeForPattern(
-              subPattern, locator, Type(), bindPatternVarsOneWay);
+              subPattern,
+              locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
+              Type(), bindPatternVarsOneWay);
 
           if (!subPatternType)
             return Type();
@@ -2741,7 +2784,7 @@ namespace {
 
         bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+        PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
           // If there are any error expressions in this closure
           // it wouldn't be possible to infer its type.
           if (isa<ErrorExpr>(expr))
@@ -2774,7 +2817,7 @@ namespace {
             }
           }
 
-          return { true, expr };
+          return Action::Continue(expr);
         }
       } collectVarRefs(CS);
 
@@ -3517,6 +3560,26 @@ namespace {
       return tv;
     }
 
+    Type visitTypeJoinExpr(TypeJoinExpr *expr) {
+      auto *locator = CS.getConstraintLocator(expr);
+      SmallVector<std::pair<Type, ConstraintLocator *>, 4> elements;
+      elements.reserve(expr->getNumElements());
+
+      for (auto *element : expr->getElements()) {
+        elements.emplace_back(CS.getType(element),
+                              CS.getConstraintLocator(element));
+      }
+
+      auto resultTy = CS.getType(expr->getVar());
+      // The type of a join expression is obtained by performing
+      // a "join-meet" operation on deduced types of its elements
+      // and the underlying variable.
+      auto joinedTy = CS.addJoinConstraint(locator, elements);
+
+      CS.addConstraint(ConstraintKind::Equal, resultTy, joinedTy, locator);
+      return resultTy;
+    }
+
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
                                                    ASTContext &Context) {
       auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());
@@ -3666,12 +3729,12 @@ namespace {
   public:
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       auto &CS = CG.getConstraintSystem();
 
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         CG.setTypeForArgumentIgnoredForCompletion(expr);
-        return {false, expr};
+        return Action::SkipChildren(expr);
       }
 
       // Note that the subexpression of a #selector expression is
@@ -3698,7 +3761,7 @@ namespace {
         for (const auto &capture : captureList->getCaptureList()) {
           SolutionApplicationTarget target(capture.PBD);
           if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
-            return {false, nullptr};
+            return Action::Stop();
         }
       }
 
@@ -3708,10 +3771,10 @@ namespace {
         auto &CS = CG.getConstraintSystem();
         auto closureType = CG.visitClosureExpr(closure);
         if (!closureType)
-          return {false, nullptr};
+          return Action::Stop();
 
         CS.setType(expr, closureType);
-        return {false, expr};
+        return Action::SkipChildren(expr);
       }
 
       // Don't visit CoerceExpr with an empty sub expression. They may occur
@@ -3719,7 +3782,7 @@ namespace {
       // of an error in the closure's signature.
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
         if (!coerceExpr->getSubExpr()) {
-          return { false, expr };
+          return Action::SkipChildren(expr);
         }
       }
 
@@ -3728,7 +3791,7 @@ namespace {
       // of an error in the closure's signature.
       if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
         if (!ifExpr->getThenExpr() || !ifExpr->getElseExpr())
-          return { false, expr };
+          return Action::SkipChildren(expr);
       }
 
       if (CS.isForCodeCompletion()) {
@@ -3739,12 +3802,12 @@ namespace {
         }
       }
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
     /// Once we've visited the children of the given expression,
     /// generate constraints from the expression.
-    Expr *walkToExprPost(Expr *expr) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       auto &CS = CG.getConstraintSystem();
       // Translate special type-checker Builtin calls into simpler expressions.
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
@@ -3776,29 +3839,27 @@ namespace {
             DSE->setImplicit();
             CS.cacheType(DSE);
 
-            return DSE;
+            return Action::Continue(DSE);
           }
         }
       }
-
       if (auto type = CG.visit(expr)) {
         auto simplifiedType = CS.simplifyType(type);
-
         CS.setType(expr, simplifiedType);
-
-        return expr;
+        return Action::Continue(expr);
       }
-
-      return nullptr;
+      return Action::Stop();
     }
 
     /// Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return Action::SkipChildren(stmt);
     }
 
     /// Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
   };
 } // end anonymous namespace
 
@@ -3996,6 +4057,21 @@ generateForEachStmtConstraints(
           AwaitExpr::createImplicit(ctx, /*awaitLoc=*/SourceLoc(), nextCall);
     }
 
+    // The iterator type must conform to IteratorProtocol.
+    {
+      ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
+          cs.getASTContext(), stmt->getForLoc(),
+          isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+                  : KnownProtocolKind::IteratorProtocol);
+      if (!iteratorProto)
+        return None;
+
+      cs.setContextualType(
+          nextRef->getBase(),
+          TypeLoc::withoutLoc(iteratorProto->getDeclaredInterfaceType()),
+          CTP_ForEachSequence);
+    }
+
     SolutionApplicationTarget nextTarget(nextCall, dc, CTP_Unused,
                                          /*contextualType=*/Type(),
                                          /*isDiscarded=*/false);
@@ -4157,6 +4233,7 @@ bool ConstraintSystem::generateConstraints(
       print(log, expr);
       log << "\n";
       print(log);
+      log << "\n";
     }
 
     return false;
@@ -4290,6 +4367,13 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
     case StmtConditionElement::CK_Availability:
       // Nothing to do here.
       continue;
+
+    case StmtConditionElement::CK_HasSymbol: {
+      ASTContext &ctx = getASTContext();
+      ctx.Diags.diagnose(condElement.getStartLoc(),
+                         diag::has_symbol_unsupported_in_closures);
+      return true;
+    }
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();

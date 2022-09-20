@@ -40,9 +40,9 @@
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/CompletionOverrideLookup.h"
-#include "swift/IDE/DotExprCompletion.h"
 #include "swift/IDE/ExprCompletion.h"
 #include "swift/IDE/KeyPathCompletion.h"
+#include "swift/IDE/PostfixCompletion.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/IDE/UnresolvedMemberCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -184,7 +184,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
         ParsedTypeLoc.getTypeRepr(), P.Context,
         /*isSILMode=*/false,
         /*isSILType=*/false,
-        CurDeclContext->getGenericEnvironmentOfContext(),
+        CurDeclContext->getGenericSignatureOfContext(),
         /*GenericParams=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
@@ -242,6 +242,7 @@ public:
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
+  void completeForEachInKeyword() override;
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
@@ -363,6 +364,12 @@ void CodeCompletionCallbacksImpl::completeForEachSequenceBeginning(
   Kind = CompletionKind::ForEachSequence;
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
+}
+
+void CodeCompletionCallbacksImpl::completeForEachInKeyword() {
+  assert(P.Tok.is(tok::code_complete));
+  Kind = CompletionKind::ForEachInKw;
+  CurDeclContext = P.CurDeclContext;
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
@@ -1069,6 +1076,9 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
       addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
     addKeyword(Sink, "var", CodeCompletionKeywordKind::kw_var);
     addKeyword(Sink, "case", CodeCompletionKeywordKind::kw_case);
+    break;
+  case CompletionKind::ForEachInKw:
+    addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in);
   }
 }
 
@@ -1291,6 +1301,16 @@ void swift::ide::deliverCompletionResults(
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
+        llvm::SmallVector<std::string, 2> spiGroups;
+        for (auto Import : SF.getImports()) {
+          if (Import.module.importedModule == TheModule) {
+            for (auto SpiGroup : Import.spiGroups) {
+              spiGroups.push_back(SpiGroup.str().str());
+            }
+            break;
+          }
+        }
+        llvm::sort(spiGroups);
         CodeCompletionCache::Key K{
             ModuleFilename.str(),
             std::string(TheModule->getName()),
@@ -1302,6 +1322,7 @@ void swift::ide::deliverCompletionResults(
             SF.hasTestableOrPrivateImport(
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
+            spiGroups,
             CompletionContext.getAddInitsToTopLevel(),
             CompletionContext.addCallWithNoDefaultArgs(),
             CompletionContext.getAnnotateResult()};
@@ -1341,9 +1362,12 @@ void swift::ide::deliverCompletionResults(
       // Add results for all imported modules.
       SmallVector<ImportedModule, 4> Imports;
       SF.getImportedModules(
-          Imports, {ModuleDecl::ImportFilterKind::Exported,
-                    ModuleDecl::ImportFilterKind::Default,
-                    ModuleDecl::ImportFilterKind::ImplementationOnly});
+          Imports, {
+                       ModuleDecl::ImportFilterKind::Exported,
+                       ModuleDecl::ImportFilterKind::Default,
+                       ModuleDecl::ImportFilterKind::ImplementationOnly,
+                       ModuleDecl::ImportFilterKind::SPIAccessControl,
+                   });
 
       for (auto Imported : Imports) {
         for (auto Import : namelookup::getAllImports(Imported.importedModule))
@@ -1359,7 +1383,8 @@ void swift::ide::deliverCompletionResults(
                                /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   Lookup.getExpectedTypeContext(), DC);
+                                   Lookup.getExpectedTypeContext(), DC,
+                                   Lookup.canCurrDeclContextHandleAsync());
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
@@ -1402,8 +1427,7 @@ bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
     assert(CodeCompleteTokenExpr);
     assert(CurDeclContext);
 
-    DotExprTypeCheckCompletionCallback Lookup(CodeCompleteTokenExpr,
-                                              CurDeclContext);
+    PostfixCompletionCallback Lookup(CodeCompleteTokenExpr, CurDeclContext);
     typeCheckWithLookup(Lookup);
 
     addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
@@ -1960,6 +1984,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::CaseStmtKeyword:
   case CompletionKind::EffectsSpecifier:
   case CompletionKind::ForEachPatternBeginning:
+  case CompletionKind::ForEachInKw:
     // Handled earlier by keyword completions.
     break;
   }

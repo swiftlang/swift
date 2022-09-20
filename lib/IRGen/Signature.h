@@ -18,10 +18,13 @@
 #ifndef SWIFT_IRGEN_SIGNATURE_H
 #define SWIFT_IRGEN_SIGNATURE_H
 
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/CallingConv.h"
+#include "MetadataSource.h"
+#include "swift/AST/GenericRequirement.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Attributes.h"
+#include "llvm/IR/CallingConv.h"
 
 namespace llvm {
   class FunctionType;
@@ -42,6 +45,7 @@ namespace irgen {
 
 class FunctionPointerKind;
 class IRGenModule;
+class TypeInfo;
 
 /// An encapsulation of different foreign calling-convention lowering
 /// information we might have.  Should be interpreted according to the
@@ -94,6 +98,75 @@ public:
   uint32_t AsyncResumeFunctionSwiftSelfIdx = 0;
 };
 
+/// Represents the source of the corresponding type pointer computed
+/// during the expansion of the polymorphic signature.
+///
+/// The source is either a \c GenericRequirement, or a \c MetadataSource.
+class PolymorphicSignatureExpandedTypeSource {
+public:
+  inline PolymorphicSignatureExpandedTypeSource(
+      const GenericRequirement &requirement)
+      : requirement(requirement){};
+  inline PolymorphicSignatureExpandedTypeSource(
+      const MetadataSource &metadataSource)
+      : metadataSource(metadataSource) {}
+
+  inline void
+  visit(llvm::function_ref<void(const GenericRequirement &)> requirementVisitor,
+        llvm::function_ref<void(const MetadataSource &)> metadataSourceVisitor)
+      const {
+    if (requirement)
+      return requirementVisitor(*requirement);
+    return metadataSourceVisitor(*metadataSource);
+  }
+
+private:
+  llvm::Optional<GenericRequirement> requirement;
+  llvm::Optional<MetadataSource> metadataSource;
+};
+
+/// Recorded information about the specific ABI details.
+class SignatureExpansionABIDetails {
+public:
+  /// Recorded information about the direct result type convention.
+  struct DirectResult {
+    std::reference_wrapper<const irgen::TypeInfo> typeInfo;
+    inline DirectResult(const irgen::TypeInfo &typeInfo) : typeInfo(typeInfo) {}
+  };
+  /// The direct result, or \c None if direct result is void.
+  llvm::Optional<DirectResult> directResult;
+  /// Recorded information about the indirect result parameters convention.
+  struct IndirectResult {
+    /// Does this indirect result parameter have the `sret` attribute?
+    bool hasSRet;
+  };
+  /// The indirect results passed as parameters to the call.
+  llvm::SmallVector<IndirectResult, 1> indirectResults;
+  /// Recorded information about the parameter convention.
+  struct Parameter {
+    std::reference_wrapper<const irgen::TypeInfo> typeInfo;
+    ParameterConvention convention;
+    bool isSelf;
+
+    inline Parameter(const irgen::TypeInfo &typeInfo,
+                     ParameterConvention convention)
+        : typeInfo(typeInfo), convention(convention), isSelf(false) {}
+  };
+  /// The parameters passed to the call.
+  llvm::SmallVector<Parameter, 8> parameters;
+  /// Type sources added to the signature during expansion.
+  llvm::SmallVector<PolymorphicSignatureExpandedTypeSource, 2>
+      polymorphicSignatureExpandedTypeSources;
+  /// True if a trailing self parameter is passed to the call.
+  bool hasTrailingSelfParam = false;
+  /// True if a context parameter passed to the call.
+  bool hasContextParam = false;
+  /// True if an error result value indirect parameter is passed to the call.
+  bool hasErrorResult = false;
+  /// The number of LLVM IR parameters in the LLVM IR function signature.
+  size_t numParamIRTypesInSignature = 0;
+};
+
 /// A signature represents something which can actually be called.
 class Signature {
   using ExtraData =
@@ -104,6 +177,7 @@ class Signature {
   llvm::CallingConv::ID CallingConv;
   ExtraData::Kind ExtraDataKind; // packed with above
   ExtraData ExtraDataStorage;
+  llvm::Optional<SignatureExpansionABIDetails> ABIDetails;
   static_assert(ExtraData::union_is_trivially_copyable,
                 "not trivially copyable");
 
@@ -127,6 +201,10 @@ public:
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
                                FunctionPointerKind kind);
+
+  static SignatureExpansionABIDetails
+  getUncachedABIDetails(IRGenModule &IGM, CanSILFunctionType formalType,
+                        FunctionPointerKind kind);
 
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
@@ -193,6 +271,11 @@ public:
   llvm::AttributeList &getMutableAttributes() & {
     assert(isValid());
     return Attributes;
+  }
+
+  const SignatureExpansionABIDetails &getABIDetails() {
+    assert(ABIDetails.hasValue());
+    return *ABIDetails;
   }
 };
 

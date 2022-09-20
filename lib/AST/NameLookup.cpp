@@ -36,6 +36,7 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Strings.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1043,7 +1044,8 @@ namespace {
 /// the given parsed type representation.
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
-                            TypeRepr *typeRepr, DeclContext *dc);
+                            TypeRepr *typeRepr, DeclContext *dc,
+                            bool allowUsableFromInline=false);
 
 /// Retrieve the set of type declarations that are directly referenced from
 /// the given type.
@@ -1716,14 +1718,30 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
-/// Is the new method an async alternative of any existing method, or vice
-/// versa?
-static bool isAnAsyncAlternative(AbstractFunctionDecl *newDecl,
-                                 llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
-  return llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
-  });
+/// If there is an apparent conflict between \p newDecl and one of the methods
+/// in \p vec, should we diagnose it?
+static bool
+shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
+                       llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
+  // Are all conflicting methods imported from ObjC and in our ObjC half or a
+  // bridging header? Some code bases implement ObjC methods in Swift even
+  // though it's not exactly supported.
+  auto newDeclModuleName = newDecl->getModuleContext()->getName();
+  auto newDeclPrivateModuleName = newDecl->getASTContext().getIdentifier(
+                     (llvm::Twine(newDeclModuleName.str()) + "_Private").str());
+  auto bridgingHeaderModuleName = newDecl->getASTContext().getIdentifier(
+                                                     CLANG_HEADER_MODULE_NAME);
+  if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
+    if (!oldDecl->hasClangNode())
+      return false;
+    auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
+    return oldDeclModuleName == newDeclModuleName
+               || oldDeclModuleName == newDeclPrivateModuleName
+               || oldDeclModuleName == bridgingHeaderModuleName;
+  }))
+    return false;
+
+  return true;
 }
 
 void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
@@ -1743,7 +1761,7 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (auto *sf = method->getParentSourceFile()) {
     if (vec.empty()) {
       sf->ObjCMethodList.push_back(method);
-    } else if (!isa<ProtocolDecl>(this) || !isAnAsyncAlternative(method, vec)) {
+    } else if (shouldDiagnoseConflict(this, method, vec)) {
       // We have a conflict.
       sf->ObjCMethodConflicts.insert({ this, selector, isInstanceMethod });
     }
@@ -1876,7 +1894,18 @@ void namelookup::extractDirectlyReferencedNominalTypes(
     return;
   }
 
+  if (type->is<TupleType>()) {
+    decls.push_back(type->getASTContext().getBuiltinTupleDecl());
+    return;
+  }
+
   llvm_unreachable("Not a type containing nominal types?");
+}
+
+void namelookup::tryExtractDirectlyReferencedNominalTypes(
+    Type type, SmallVectorImpl<NominalTypeDecl *> &decls) {
+  if (!type->is<ModuleType>() && type->mayHaveMembers())
+    namelookup::extractDirectlyReferencedNominalTypes(type, decls);
 }
 
 bool DeclContext::lookupQualified(Type type,
@@ -2028,8 +2057,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     // step.
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
-
-    SmallVector<ProtocolDecl *, 4> protocols;
 
     if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
       // If we haven't seen a class declaration yet, look into the protocol.
@@ -2298,7 +2325,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 static DirectlyReferencedTypeDecls
 directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
-                                         LookupOuterResults lookupOuter) {
+                                         LookupOuterResults lookupOuter,
+                                         bool allowUsableFromInline=false) {
   // In a protocol or protocol extension, the 'where' clause can refer to
   // associated types without 'Self' qualification:
   //
@@ -2332,6 +2360,9 @@ directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
   if (lookupOuter == LookupOuterResults::Included)
     options |= UnqualifiedLookupFlags::IncludeOuterResults;
 
+  if (allowUsableFromInline)
+    options |= UnqualifiedLookupFlags::IncludeUsableFromInline;
+
   auto &ctx = dc->getASTContext();
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
   auto lookup = evaluateOrDefault(ctx.evaluator,
@@ -2361,7 +2392,8 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ASTContext &ctx,
                                        ArrayRef<TypeDecl *> baseTypes,
                                        DeclNameRef name,
-                                       DeclContext *dc) {
+                                       DeclContext *dc,
+                                       bool allowUsableFromInline=false) {
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
     for (auto decl : found){
@@ -2375,6 +2407,9 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
     // Look into the base types.
     SmallVector<ValueDecl *, 4> members;
     auto options = NL_RemoveNonVisible | NL_OnlyTypes;
+
+    if (allowUsableFromInline)
+      options |= NL_IncludeUsableFromInline;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -2406,7 +2441,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
 static DirectlyReferencedTypeDecls
 directReferencesForIdentTypeRepr(Evaluator &evaluator,
                                  ASTContext &ctx, IdentTypeRepr *ident,
-                                 DeclContext *dc) {
+                                 DeclContext *dc, bool allowUsableFromInline) {
   DirectlyReferencedTypeDecls current;
 
   for (const auto &component : ident->getComponentRange()) {
@@ -2422,7 +2457,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
         directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
                                                  component->getLoc(),
                                                  dc,
-                                                 LookupOuterResults::Excluded);
+                                                 LookupOuterResults::Excluded,
+                                                 allowUsableFromInline);
 
       // If we didn't find anything, fail now.
       if (current.empty())
@@ -2434,7 +2470,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For subsequent components, perform qualified name lookup.
     current =
         directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
-                                               component->getNameRef(), dc);
+                                               component->getNameRef(), dc,
+                                               allowUsableFromInline);
     if (current.empty())
       return current;
   }
@@ -2445,7 +2482,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
-                            DeclContext *dc) {
+                            DeclContext *dc, bool allowUsableFromInline) {
   switch (typeRepr->getKind()) {
   case TypeReprKind::Array:
     return {1, ctx.getArrayDecl()};
@@ -2453,7 +2490,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
-                                       attributed->getTypeRepr(), dc);
+                                       attributed->getTypeRepr(), dc,
+                                       allowUsableFromInline);
   }
 
   case TypeReprKind::Composition: {
@@ -2461,7 +2499,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
       auto componentResult =
-          directReferencesForTypeRepr(evaluator, ctx, component, dc);
+          directReferencesForTypeRepr(evaluator, ctx, component, dc,
+                                      allowUsableFromInline);
       result.insert(result.end(),
                     componentResult.begin(),
                     componentResult.end());
@@ -2473,7 +2512,8 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
     return directReferencesForIdentTypeRepr(evaluator, ctx,
-                                            cast<IdentTypeRepr>(typeRepr), dc);
+                                            cast<IdentTypeRepr>(typeRepr), dc,
+                                            allowUsableFromInline);
 
   case TypeReprKind::Dictionary:
     return { 1, ctx.getDictionaryDecl()};
@@ -2482,9 +2522,17 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     auto tupleRepr = cast<TupleTypeRepr>(typeRepr);
     if (tupleRepr->isParenType()) {
       return directReferencesForTypeRepr(evaluator, ctx,
-                                         tupleRepr->getElementType(0), dc);
+                                         tupleRepr->getElementType(0), dc,
+                                         allowUsableFromInline);
     }
     return { };
+  }
+
+  case TypeReprKind::PackExpansion: {
+    auto packExpansionRepr = cast<PackExpansionTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getPatternType(), dc,
+                                       allowUsableFromInline);
   }
 
   case TypeReprKind::Error:
@@ -2688,7 +2736,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = ext->getASTContext();
   DirectlyReferencedTypeDecls referenced =
-    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent());
+    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent(),
+                                ext->isInSpecializeExtensionContext());
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
@@ -2758,10 +2807,6 @@ createOpaqueParameterGenericParams(
   SmallVector<GenericTypeParamDecl *, 2> implicitGenericParams;
   auto dc = value->getInnermostDeclContext();
   for (auto param : *params) {
-    // Don't permit variadic parameters.
-    if (param->isVariadic())
-      continue;
-
     auto typeRepr = param->getTypeRepr();
     if (!typeRepr)
       continue;
@@ -2790,6 +2835,19 @@ createOpaqueParameterGenericParams(
 
 GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
+  if (auto *tupleDecl = dyn_cast<BuiltinTupleDecl>(value)) {
+    auto &ctx = value->getASTContext();
+
+    // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
+    auto *genericParam = GenericTypeParamDecl::create(
+        tupleDecl->getDeclContext(), ctx.Id_Elements, SourceLoc(),
+        /*isTypeSequence=*/true, /*depth=*/0, /*depth=*/0,
+        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+
+    return GenericParamList::create(ctx, SourceLoc(), genericParam,
+                                    SourceLoc());
+  }
+
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
     // generic parameter lists of the nominal and any of its parent types.
@@ -3025,6 +3083,109 @@ swift::getDirectlyInheritedNominalTypeDecls(
     result.emplace_back(inheritedNominal, loc, SourceLoc());
 
   return result;
+}
+
+bool IsCallAsFunctionNominalRequest::evaluate(Evaluator &evaluator,
+                                              NominalTypeDecl *decl,
+                                              DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+
+  // Do a qualified lookup for `callAsFunction`. We want to ignore access, as
+  // that will be checked when we actually try to solve with a `callAsFunction`
+  // member access.
+  SmallVector<ValueDecl *, 4> results;
+  auto opts = NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreAccessControl;
+  dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction), opts, results);
+
+  return llvm::any_of(results, [](ValueDecl *decl) -> bool {
+    if (auto *fd = dyn_cast<FuncDecl>(decl))
+      return fd->isCallAsFunctionMethod();
+    return false;
+  });
+}
+
+bool TypeBase::isCallAsFunctionType(DeclContext *dc) {
+  // We can perform the lookup at module scope to allow us to better cache the
+  // result across different contexts. Given we'll be doing a qualified lookup,
+  // this shouldn't make a difference.
+  dc = dc->getModuleScopeContext();
+
+  // Note this excludes AnyObject.
+  SmallVector<NominalTypeDecl *, 4> decls;
+  tryExtractDirectlyReferencedNominalTypes(this, decls);
+
+  auto &ctx = dc->getASTContext();
+  return llvm::any_of(decls, [&](auto *decl) {
+    IsCallAsFunctionNominalRequest req(decl, dc);
+    return evaluateOrDefault(ctx.evaluator, req, false);
+  });
+}
+
+template <class DynamicAttribute, class Req>
+static bool checkForDynamicAttribute(Evaluator &eval, NominalTypeDecl *decl) {
+  // If this type has the attribute on it, then yes!
+  if (decl->getAttrs().hasAttribute<DynamicAttribute>())
+    return true;
+
+  auto hasAttribute = [&](NominalTypeDecl *decl) -> bool {
+    return evaluateOrDefault(eval, Req{decl}, false);
+  };
+
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    // Check inherited protocols of a protocol.
+    for (auto *otherProto : proto->getInheritedProtocols())
+      if (hasAttribute(otherProto))
+        return true;
+  } else {
+    // Check the protocols the type conforms to.
+    for (auto *otherProto : decl->getAllProtocols()) {
+      if (hasAttribute(otherProto))
+        return true;
+    }
+  }
+
+  // Check the superclass if present.
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (auto *superclass = classDecl->getSuperclassDecl()) {
+      if (hasAttribute(superclass))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool HasDynamicMemberLookupAttributeRequest::evaluate(
+    Evaluator &eval, NominalTypeDecl *decl) const {
+  using Req = HasDynamicMemberLookupAttributeRequest;
+  return checkForDynamicAttribute<DynamicMemberLookupAttr, Req>(eval, decl);
+}
+
+bool TypeBase::hasDynamicMemberLookupAttribute() {
+  SmallVector<NominalTypeDecl *, 4> decls;
+  tryExtractDirectlyReferencedNominalTypes(this, decls);
+
+  auto &ctx = getASTContext();
+  return llvm::any_of(decls, [&](auto *decl) {
+    HasDynamicMemberLookupAttributeRequest req(decl);
+    return evaluateOrDefault(ctx.evaluator, req, false);
+  });
+}
+
+bool HasDynamicCallableAttributeRequest::evaluate(Evaluator &eval,
+                                                  NominalTypeDecl *decl) const {
+  using Req = HasDynamicCallableAttributeRequest;
+  return checkForDynamicAttribute<DynamicCallableAttr, Req>(eval, decl);
+}
+
+bool TypeBase::hasDynamicCallableAttribute() {
+  SmallVector<NominalTypeDecl *, 4> decls;
+  tryExtractDirectlyReferencedNominalTypes(this, decls);
+
+  auto &ctx = getASTContext();
+  return llvm::any_of(decls, [&](auto *decl) {
+    HasDynamicCallableAttributeRequest req(decl);
+    return evaluateOrDefault(ctx.evaluator, req, false);
+  });
 }
 
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {

@@ -8,5 +8,6 @@ class MyClass: NSObject {
   func f() {
     let url = URL(url) // expected-error{{use of local variable 'url' before its declaration}}
     // expected-note@-1 {{'url' declared here}}
+    // expected-error@-2 {{missing argument label 'string:' in call}}
   }
 }

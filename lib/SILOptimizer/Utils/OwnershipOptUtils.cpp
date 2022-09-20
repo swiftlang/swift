@@ -129,7 +129,7 @@ void swift::extendLocalBorrow(BeginBorrowInst *beginBorrow,
 
 bool swift::computeGuaranteedBoundary(SILValue value,
                                       PrunedLivenessBoundary &boundary) {
-  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
 
   // Place end_borrows that cover the load_borrow uses. It is not necessary to
   // cover the outer borrow scope of the extract's operand. If a lexical
@@ -173,7 +173,7 @@ GuaranteedOwnershipExtension::checkAddressOwnership(SILValue parentAddress,
   SILValue referenceRoot = addressOwnership.getOwnershipReferenceRoot();
   assert(referenceRoot && "expect to find a reference to Box/Class/Tail");
 
-  if (referenceRoot.getOwnershipKind() != OwnershipKind::Guaranteed) {
+  if (referenceRoot->getOwnershipKind() != OwnershipKind::Guaranteed) {
     // Note: Addresses are normally guarded by a borrow scope. But eventually,
     // an address base can be considered an implicit borrow. This current
     // handles project_box, which is not in a borrow scope (it is sadly modeled
@@ -230,7 +230,7 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
     SILValue ownedValue, ArrayRef<Operand *> newUses) {
   assert(ownedLifetime.empty());
 
-  auto ownershipKind = ownedValue.getOwnershipKind();
+  auto ownershipKind = ownedValue->getOwnershipKind();
   if (ownershipKind == OwnershipKind::None)
     return Valid;
 
@@ -289,7 +289,7 @@ static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
       continue;
     }
 
-    switch (op.get().getOwnershipKind()) {
+    switch (op.get()->getOwnershipKind()) {
     case OwnershipKind::Any:
       llvm_unreachable("Invalid ownership for value");
     case OwnershipKind::Owned: {
@@ -322,7 +322,7 @@ static void cleanupOperandsBeforeDeletion(SILInstruction *oldValue,
 bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
                                                 SILValue newValue,
                                                 ArrayRef<Operand *> oldUses) {
-  auto newOwnershipKind = newValue.getOwnershipKind();
+  auto newOwnershipKind = newValue->getOwnershipKind();
 
   // If the either value is lexical, replacing its uses may result in
   // shortening or lengthening its lifetime in ways that don't respect lexical
@@ -359,7 +359,7 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   // oldValue is a trivial payloaded or no-payload non-trivially typed
   // enum. That doesn't occur that often so we just bail on it today until we
   // implement this functionality.
-  if (oldValue.getOwnershipKind() == OwnershipKind::None)
+  if (oldValue->getOwnershipKind() == OwnershipKind::None)
     return false;
 
   // First check if oldValue is SILUndef. If it is, then we know that:
@@ -391,7 +391,7 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
 // extend the lifetime of \p oldValue to cover the new uses.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
                                      OwnershipFixupContext &context) {
-  switch (oldValue.getOwnershipKind()) {
+  switch (oldValue->getOwnershipKind()) {
   case OwnershipKind::Guaranteed: {
     // Check that the old lifetime can be extended and record the necessary
     // book-keeping in the OwnershipFixupContext.
@@ -977,8 +977,8 @@ SILValue
 OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
                                            SILValue guaranteedValue) {
   // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue)
-      && newValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+  if (isa<SILFunctionArgument>(newValue) &&
+      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
     return newValue;
   }
   auto borrowedValue = BorrowedValue(guaranteedValue);
@@ -1015,8 +1015,8 @@ SILValue
 OwnershipLifetimeExtender::borrowOverSingleUse(SILValue newValue,
                                                Operand *singleGuaranteedUse) {
   // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue)
-      && newValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+  if (isa<SILFunctionArgument>(newValue) &&
+      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
     return newValue;
   }
   if (!singleGuaranteedUse->isLifetimeEnding()) {
@@ -1055,7 +1055,7 @@ SILValue OwnershipLifetimeExtender::borrowOverSingleNonLifetimeEndingUser(
     SILValue newValue, SILInstruction *nonLifetimeEndingUser) {
   // Avoid borrowing guaranteed function arguments.
   if (isa<SILFunctionArgument>(newValue) &&
-      newValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
     return newValue;
   }
   auto borrowPt = newValue->getNextInstruction()->getIterator();
@@ -1109,7 +1109,7 @@ private:
 
 SILValue OwnershipRAUWPrepare::prepareUnowned(SILValue newValue) {
   auto &callbacks = ctx.callbacks;
-  switch (newValue.getOwnershipKind()) {
+  switch (newValue->getOwnershipKind()) {
   case OwnershipKind::None:
     llvm_unreachable("Should have been handled elsewhere");
   case OwnershipKind::Any:
@@ -1204,12 +1204,12 @@ SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
   // and return.
   //
   // NOTE: This handles RAUWing with undef.
-  if (newValue.getOwnershipKind() == OwnershipKind::None)
+  if (newValue->getOwnershipKind() == OwnershipKind::None)
     return newValue;
-  
-  assert(oldValue.getOwnershipKind() != OwnershipKind::None);
 
-  switch (oldValue.getOwnershipKind()) {
+  assert(oldValue->getOwnershipKind() != OwnershipKind::None);
+
+  switch (oldValue->getOwnershipKind()) {
   case OwnershipKind::None:
     // If our old value was none and our new value is not, we need to do
     // something more complex that we do not support yet, so bail. We should
@@ -1497,7 +1497,7 @@ struct SingleUseReplacementUtility {
 
 SILBasicBlock::iterator SingleUseReplacementUtility::handleUnowned() {
   auto &callbacks = ctx.callbacks;
-  switch (newValue.getOwnershipKind()) {
+  switch (newValue->getOwnershipKind()) {
   case OwnershipKind::None:
     llvm_unreachable("Should have been handled elsewhere");
   case OwnershipKind::Any:
@@ -1610,12 +1610,12 @@ SILBasicBlock::iterator SingleUseReplacementUtility::perform() {
   // and return.
   //
   // NOTE: This handles RAUWing with undef.
-  if (newValue.getOwnershipKind() == OwnershipKind::None)
+  if (newValue->getOwnershipKind() == OwnershipKind::None)
     return replaceSingleUse(use, newValue, ctx.callbacks);
 
-  assert(SILValue(oldValue).getOwnershipKind() != OwnershipKind::None);
+  assert(SILValue(oldValue)->getOwnershipKind() != OwnershipKind::None);
 
-  switch (SILValue(oldValue).getOwnershipKind()) {
+  switch (SILValue(oldValue)->getOwnershipKind()) {
   case OwnershipKind::None:
     // If our old value was none and our new value is not, we need to do
     // something more complex that we do not support yet, so bail. We should
@@ -1716,8 +1716,8 @@ public:
 protected:
   bool phiOperandNeedsBorrow(Operand *operand) {
     SILValue inVal = operand->get();
-    if (inVal.getOwnershipKind() != OwnershipKind::Guaranteed) {
-      assert(inVal.getOwnershipKind() == OwnershipKind::None);
+    if (inVal->getOwnershipKind() != OwnershipKind::Guaranteed) {
+      assert(inVal->getOwnershipKind() == OwnershipKind::None);
       return false;
     }
     // This operand needs a nested borrow if inVal is not a BorrowedValue.

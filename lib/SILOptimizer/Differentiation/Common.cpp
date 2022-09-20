@@ -407,7 +407,7 @@ SILValue emitMemoryLayoutSize(
 SILValue emitProjectTopLevelSubcontext(
     SILBuilder &builder, SILLocation loc, SILValue context,
     SILType subcontextType) {
-  assert(context.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(context->getOwnershipKind() == OwnershipKind::Guaranteed);
   auto &ctx = builder.getASTContext();
   auto id = ctx.getIdentifier(
       getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext));

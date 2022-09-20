@@ -33,7 +33,7 @@ let r7 = #/(?:(?:(.(.(.)*)?))*?)?/#
 //               ^ 1
 //                 ^ 2
 //                   ^ 3
-let _: Regex<(Substring, Substring??, Substring???, Substring????)>.Type = type(of: r7)
+let _: Regex<(Substring, Substring?, Substring?, Substring?)>.Type = type(of: r7)
 
 let r8 = #/well(?<theres_no_single_element_tuple_what_can_we>do)/#
 let _: Regex<(Substring, theres_no_single_element_tuple_what_can_we: Substring)>.Type = type(of: r8)

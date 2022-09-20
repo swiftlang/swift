@@ -19,11 +19,9 @@ extension Double : P2 {
 }
 
 extension X<Int, Double, String> {
-// expected-error@-1{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
   let x = 0
   // expected-error@-1 {{extensions must not contain stored properties}}
   static let x = 0
-  // expected-error@-1 {{static stored properties not supported in generic types}}
   func f() -> Int {}
   class C<T> {}
 }
@@ -177,7 +175,7 @@ extension Array2 where QQQ : VVV {}
 // expected-error@-1 {{cannot find type 'QQQ' in scope}}
 // expected-error@-2 {{cannot find type 'VVV' in scope}}
 
-// https://bugs.swift.org/browse/SR-9009
+// https://github.com/apple/swift/issues/51512
 func foo() {
   extension Array where Element : P1 {
   // expected-error@-1 {{declaration is only valid at file scope}}

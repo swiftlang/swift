@@ -87,6 +87,10 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
+  if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+    list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
+  endif()
+
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
   set(sdk_option "")
@@ -122,6 +126,11 @@ function(add_swift_compiler_modules_library name)
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
 
+  # Let Swift discover SwiftShims headers which are included by some headers
+  # under `include/swift`.
+  get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+  set(sdk_option ${sdk_option} "-I" "${swift_exec_bin_dir}/../lib")
+
   set(all_obj_files)
   set(all_module_targets)
   set(syntaxparse_obj_files)
@@ -156,11 +165,27 @@ function(add_swift_compiler_modules_library name)
     if (add_to_syntaxparse)
       set(syntaxparse_obj_files ${syntaxparse_obj_files} ${module_obj_file})
     endif()
+    set(c_include_paths
+      # LLVM modules and headers.
+      "${LLVM_MAIN_INCLUDE_DIR}"
+      # Generated LLVM headers.
+      "${LLVM_INCLUDE_DIR}"
+      # Clang modules and headers.
+      ${CLANG_INCLUDE_DIRS}
+      # Bridging modules and headers.
+      "${SWIFT_MAIN_INCLUDE_DIR}"
+      # Generated C headers.
+      "${CMAKE_CURRENT_BINARY_DIR}/../include")
+    set(c_include_paths_args)
+    foreach(c_include_path ${c_include_paths})
+      list(APPEND c_include_paths_args "-Xcc" "-I" "-Xcc" "${c_include_path}")
+    endforeach()
 
     # Compile the module into an object file
     add_custom_command_target(dep_target OUTPUT ${module_obj_file}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
+        importedHeaderDependencies
       COMMAND ${ALS_SWIFT_EXEC} "-c" "-o" ${module_obj_file}
               ${sdk_option}
               "-target" ${target}
@@ -168,14 +193,7 @@ function(add_swift_compiler_modules_library name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${swift_compile_options}
-              # LLVM modules and headers.
-              "-Xcc" "-I" "-Xcc" "${LLVM_MAIN_INCLUDE_DIR}"
-              # Generated LLVM headers.
-              "-Xcc" "-I" "-Xcc" "${LLVM_INCLUDE_DIR}"
-              # Bridging modules and headers.
-              "-Xcc" "-I" "-Xcc" "${SWIFT_SOURCE_DIR}/include"
-              # Generated C headers.
-              "-Xcc" "-I" "-Xcc" "${CMAKE_BINARY_DIR}/include"
+              ${c_include_paths_args}
               # Generated swift modules.
               "-I" "${build_dir}"
       COMMENT "Building swift module ${module}")
@@ -225,6 +243,35 @@ else()
 
   add_subdirectory(Sources)
 
+  # TODO: generate this dynamically through the modulemap; this cannot use `sed`
+  # as that is not available on all paltforms (e.g. Windows).
+  #
+  # step 1: generate a dummy source file, which just includes all headers
+  # defined in include/swift/module.modulemap
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+       "
+#include \"Basic/BridgedSwiftObject.h\"
+#include \"Basic/BasicBridging.h\"
+#include \"Basic/SourceLoc.h\"
+
+#include \"AST/ASTBridging.h\"
+#include \"AST/DiagnosticEngine.h\"
+#include \"AST/DiagnosticConsumer.h\"
+
+#include \"SIL/SILBridging.h\"
+
+#include \"SILOptimizer/OptimizerBridging.h\"
+
+#include \"Parse/RegexParserBridging.h\"
+")
+
+  # step 2: build a library containing that source file. This library depends on all the included header files.
+  #         The swift modules can now depend on that target.
+  #         Note that this library is unused, i.e. not linked to anything.   
+  add_library(importedHeaderDependencies "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp")
+  add_dependencies(importedHeaderDependencies swift-ast-generated-headers)
+  target_include_directories(importedHeaderDependencies PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/swift")
+
   if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
     if (NOT SWIFT_EXEC_FOR_SWIFT_MODULES)
@@ -267,13 +314,14 @@ else()
         list(APPEND b1_deps copy-libstdcxx-modulemap-bootstrapping1 copy-libstdcxx-header-bootstrapping1)
       endif()
     endif()
-    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-      set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
-      set(compatibility_libs
-          "swiftCompatibility50-${platform}"
-          "swiftCompatibility51-${platform}"
-          "swiftCompatibilityDynamicReplacements-${platform}")
-
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+      # We cannot specify directly HostCompatibilityLibs
+      # because ultimately is used to specify a dependency for a
+      # custom target and, unlike `target_link_libraries`, such dependency
+      # would be lost at the generation of the build system.
+      get_property(compatibility_libs
+        TARGET HostCompatibilityLibs
+        PROPERTY INTERFACE_LINK_LIBRARIES)
       list(APPEND b0_deps ${compatibility_libs})
       list(APPEND b1_deps ${compatibility_libs})
     endif()

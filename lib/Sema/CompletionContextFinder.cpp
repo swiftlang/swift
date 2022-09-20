@@ -15,7 +15,8 @@
 using namespace swift;
 using Fallback = CompletionContextFinder::Fallback;
 
-std::pair<bool, Expr *> CompletionContextFinder::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkResult<Expr *>
+CompletionContextFinder::walkToExprPre(Expr *E) {
   if (auto *closure = dyn_cast<ClosureExpr>(E)) {
     Contexts.push_back({closure->hasSingleExpressionBody()
                             ? ContextKind::SingleStmtClosure
@@ -36,40 +37,40 @@ std::pair<bool, Expr *> CompletionContextFinder::walkToExprPre(Expr *E) {
     if (auto *OrigExpr = Error->getOriginalExpr()) {
       OrigExpr->walk(*this);
       if (hasCompletionExpr())
-        return std::make_pair(false, nullptr);
+        return Action::Stop();
     }
   }
 
   if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
     CompletionNode = CCE;
-    return std::make_pair(false, nullptr);
+    return Action::Stop();
   }
   if (auto *KeyPath = dyn_cast<KeyPathExpr>(E)) {
     for (auto &component : KeyPath->getComponents()) {
       if (component.getKind() == KeyPathExpr::Component::Kind::CodeCompletion) {
         CompletionNode = KeyPath;
-        return std::make_pair(false, nullptr);
+        return Action::Stop();
       }
     }
     // Code completion in key paths is modelled by a code completion component
     // Don't walk the key path's parsed expressions.
-    return std::make_pair(false, E);
+    return Action::SkipChildren(E);
   }
 
-  return std::make_pair(true, E);
+  return Action::Continue(E);
 }
 
-Expr *CompletionContextFinder::walkToExprPost(Expr *E) {
+ASTWalker::PostWalkResult<Expr *>
+CompletionContextFinder::walkToExprPost(Expr *E) {
   if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
       isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E)) {
     assert(Contexts.back().E == E);
     Contexts.pop_back();
   }
-  return E;
+  return Action::Continue(E);
 }
 
 size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
-  assert(hasCompletionKeyPathComponent());
   size_t ComponentIndex = 0;
   auto Components = getKeyPathContainingCompletionComponent()->getComponents();
   for (auto &Component : Components) {

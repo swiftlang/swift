@@ -1158,7 +1158,7 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
 
     // Ignore self-conformances; they're not interesting to show to users.
     auto normal = dyn_cast<NormalProtocolConformance>(conf->getRootConformance());
-    if (!normal)
+    if (!normal || !shouldIndex(normal->getProtocol(), /*IsRef=*/true))
       continue;
 
     normal->forEachValueWitness([&](ValueDecl *req, Witness witness) {

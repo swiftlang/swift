@@ -30,9 +30,9 @@ namespace swift {
 
 /// Returns true if this value requires OSSA cleanups.
 inline bool requiresOSSACleanup(SILValue v) {
-  return v->getFunction()->hasOwnership()
-    && v.getOwnershipKind() != OwnershipKind::None
-    && v.getOwnershipKind() != OwnershipKind::Unowned;
+  return v->getFunction()->hasOwnership() &&
+         v->getOwnershipKind() != OwnershipKind::None &&
+         v->getOwnershipKind() != OwnershipKind::Unowned;
 }
 
 /// Rewrite the lifetime of \p ownedValue to match \p lifetimeBoundary. This may

@@ -74,7 +74,7 @@ var values = getIntFloat()
 func wantFloat(_: Float) {}
 wantFloat(values.float)
 
-var e : (x: Int..., y: Int) // expected-error{{cannot create a variadic tuple}}
+var e : (x: Int..., y: Int) // expected-error{{variadic expansion 'Int' must contain at least one variadic generic parameter}}
 
 typealias Interval = (a:Int, b:Int)
 func takeInterval(_ x: Interval) {}
@@ -201,8 +201,9 @@ func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
 }
 
 
-// https://bugs.swift.org/browse/SR-596
-// Compiler crashes when accessing a non-existent property of a closure parameter
+// https://github.com/apple/swift/issues/43213
+// Compiler crashes when accessing a non-existent property of a closure
+// parameter
 func call(_ f: (C) -> Void) {}
 func makeRequest() {
   call { obj in
@@ -242,7 +243,9 @@ let _ = (x, (y, 0))
 takesRValue((x, (y, 0)))
 takesAny((x, (y, 0)))
 
-// SR-2600 - Closure cannot infer tuple parameter names
+// https://github.com/apple/swift/issues/45205
+// Closure cannot infer tuple parameter names
+
 typealias Closure<A, B> = ((a: A, b: B)) -> String
 
 func invoke<A, B>(a: A, b: B, _ closure: Closure<A,B>) {
@@ -321,7 +324,7 @@ struct DupLabelSubscript {
 let dupLabelSubscriptStruct = DupLabelSubscript()
 let _ = dupLabelSubscriptStruct[foo: 5, foo: 5] // ok
 
-// SR-12869
+// https://github.com/apple/swift/issues/55316
 
 var dict: [String: (Int, Int)] = [:]
 let bignum: Int64 = 1337

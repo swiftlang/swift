@@ -387,6 +387,7 @@ public:
   /// Print the graph.
   void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
   void dump(llvm::raw_ostream &out);
+  void dumpActiveScopeChanges(llvm::raw_ostream &out, unsigned indent = 0);
 
   // FIXME: Potentially side-effectful.
   SWIFT_DEBUG_HELPER(void dump());
@@ -458,6 +459,7 @@ private:
   /// Each change can be undone (once, and in reverse order) by calling the
   /// undo() method.
   class Change {
+  public:
     /// The kind of change.
     ChangeKind Kind;
 
@@ -482,7 +484,6 @@ private:
       } Binding;
     };
 
-  public:
     Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
 
     /// Create a change that added a type variable.

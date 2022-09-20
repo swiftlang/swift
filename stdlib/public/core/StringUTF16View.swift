@@ -597,11 +597,11 @@ extension String.UTF16View {
     
     while readPtr + MemoryLayout<U>.stride < endPtr {
       //Find the number of continuations (0b10xxxxxx)
-      let sValue = Builtin.loadRaw(readPtr._rawValue) as S
+      let sValue = readPtr.loadUnaligned(as: S.self)
       let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
             
       //Find the number of 4 byte code points (0b11110xxx)
-      let uValue = Builtin.loadRaw(readPtr._rawValue) as U
+      let uValue = readPtr.loadUnaligned(as: U.self)
       let fourBytes = S.zero.replacing(
         with: S.one,
         where: unsafeBitCast(

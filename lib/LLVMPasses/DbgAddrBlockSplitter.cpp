@@ -36,7 +36,7 @@ struct SwiftDbgAddrBlockSplitter : FunctionPass {
 
 } // namespace
 
-bool SwiftDbgAddrBlockSplitter::runOnFunction(Function &fn) {
+static bool split(Function &fn) {
   SmallVector<Instruction *, 32> breakBlockPoints;
 
   // If we are in the first block,
@@ -65,6 +65,10 @@ bool SwiftDbgAddrBlockSplitter::runOnFunction(Function &fn) {
   return madeChange;
 }
 
+bool SwiftDbgAddrBlockSplitter::runOnFunction(Function &fn) {
+  return split(fn);
+}
+
 char SwiftDbgAddrBlockSplitter::ID = 0;
 INITIALIZE_PASS_BEGIN(SwiftDbgAddrBlockSplitter,
                       "swift-dbg-addr-block-splitter",
@@ -78,4 +82,13 @@ llvm::FunctionPass *swift::createSwiftDbgAddrBlockSplitter() {
   initializeSwiftDbgAddrBlockSplitterPass(
       *llvm::PassRegistry::getPassRegistry());
   return new SwiftDbgAddrBlockSplitter();
+}
+
+llvm::PreservedAnalyses
+swift::SwiftDbgAddrBlockSplitterPass::run(llvm::Function &F,
+                                          llvm::FunctionAnalysisManager &AM) {
+  bool changed = split(F);
+  if (!changed)
+    return PreservedAnalyses::all();
+  return PreservedAnalyses::none();
 }

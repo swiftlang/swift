@@ -24,6 +24,7 @@
 // RUN: 	%target-rpath(@executable_path/SDK/Frameworks)
 
 // --- Run the executable
+// RUN: %target-codesign %t/SDK/Frameworks/HighLevel.framework/HighLevel
 // RUN: %target-codesign %t/HighlevelRunner
 // RUN: %target-run %t/HighlevelRunner %t/SDK/Frameworks/HighLevel.framework/HighLevel | %FileCheck %s -check-prefix=BEFORE_MOVE
 
@@ -41,6 +42,8 @@
 // RUN:     %S/Inputs/SymbolMove/HighLevel.swift -F %t/SDK/Frameworks -Xlinker -reexport_framework -Xlinker LowLevel -enable-library-evolution
 
 // --- Run the executable
+// RUN: %target-codesign %t/SDK/Frameworks/HighLevel.framework/HighLevel
+// RUN: %target-codesign %t/SDK/Frameworks/LowLevel.framework/LowLevel
 // RUN: %target-codesign %t/HighlevelRunner
 // RUN: %target-run %t/HighlevelRunner %t/SDK/Frameworks/HighLevel.framework/HighLevel %t/SDK/Frameworks/LowLevel.framework/LowLevel | %FileCheck %s -check-prefix=AFTER_MOVE
 

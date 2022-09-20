@@ -4,10 +4,11 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
-// CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
-// CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * x, ptrdiff_t * y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)
-// CHECK: SWIFT_EXTERN void $s9Functions13inOutTwoParamyySbz_SdztF(bool * x, double * y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoParam(_:_:)
-// CHECK: SWIFT_EXTERN void $s9Functions24inoutTypeWithNullabilityyySVzF(void const * _Nonnull * x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTypeWithNullability(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * _Nonnull x, ptrdiff_t * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions13inOutTwoParamyySbz_SdztF(bool * _Nonnull x, double * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoParam(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions24inoutTypeWithNullabilityyySVzF(void const * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTypeWithNullability(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions25inoutUnsafeGenericPointeryySPys5Int32VGzF(int32_t const * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutUnsafeGenericPointer(_:)
 
 // CHECK:      inline void inOutInt(swift::Int & x) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions8inOutIntyySizF(&x);
@@ -25,6 +26,9 @@
 // CHECK-NEXT:   return _impl::$s9Functions24inoutTypeWithNullabilityyySVzF(&x);
 // CHECK-NEXT: }
 
+// CHECK:      inline void inoutUnsafeGenericPointer(int32_t const * _Nonnull & x) noexcept {
+// CHECK-NEXT:   return _impl::$s9Functions25inoutUnsafeGenericPointeryySPys5Int32VGzF(&x);
+// CHECK-NEXT: }
 
 public func inOutInt(_ x: inout Int) { x = Int() }
 
@@ -39,5 +43,9 @@ public func inOutTwoParam(_ x: inout Bool, _ y: inout Double) {
 }
 
 public func inoutTypeWithNullability(_ x: inout UnsafeRawPointer) {
+    x += 1
+}
+
+public func inoutUnsafeGenericPointer(_ x: inout UnsafePointer<Int32>) {
     x += 1
 }

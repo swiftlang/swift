@@ -5,7 +5,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed CustomStringConvertible) -> ()
+// CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed any CustomStringConvertible) -> ()
 // XHECK-NOT: init_existential_addr
 // XHECK-NOT: inject_enum_addr
 // XHECK-NOT: select_enum_addr
@@ -47,7 +47,7 @@ bb2:
 }
 
 
-// CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed CustomStringConvertible) -> ()
+// CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout, @in_guaranteed any CustomStringConvertible) -> ()
 // XHECK-NOT: init_existential_addr
 // XHECK-NOT: inject_enum_addr
 // XHECK-NOT: switch_enum_addr

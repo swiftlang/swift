@@ -61,27 +61,6 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
-internal func _decodeScalar(
-  _ utf16: UnsafeBufferPointer<UInt16>, startingAt i: Int
-) -> (Unicode.Scalar, scalarLength: Int) {
-  let high = utf16[i]
-  if i + 1 >= utf16.count {
-    _internalInvariant(!UTF16.isLeadSurrogate(high))
-    _internalInvariant(!UTF16.isTrailSurrogate(high))
-    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
-  }
-
-  if !UTF16.isLeadSurrogate(high) {
-    _internalInvariant(!UTF16.isTrailSurrogate(high))
-    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
-  }
-
-  let low = utf16[i+1]
-  _internalInvariant(UTF16.isLeadSurrogate(high))
-  _internalInvariant(UTF16.isTrailSurrogate(low))
-  return (UTF16._decodeSurrogates(high, low), 2)
-}
-
 @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
@@ -207,7 +186,7 @@ extension _StringGuts {
   @inlinable
   internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
     _internalInvariant(isFastUTF8)
-    let len = _utf8ScalarLength(self.withFastUTF8 { $0[i] })
+    let len = _utf8ScalarLength(self.withFastUTF8 { $0[_unchecked: i] })
     _internalInvariant((1...4) ~= len)
     return len
   }

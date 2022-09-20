@@ -304,9 +304,18 @@ Runtime.test("isBridgedVerbatimToObjectiveC") {
 
 //===----------------------------------------------------------------------===//
 
+protocol SomeNativeProto {}
+
 class SomeClass {}
 @objc class SomeObjCClass {}
-class SomeNSObjectSubclass : NSObject {}
+
+class SomeNSObjectSubclass : NSObject, SomeNativeProto {}
+extension SomeNativeProto {
+  // https://github.com/apple/swift/issues/43154
+  func expectSelfTypeNameEqual(to typeName: String) {
+    expectEqual(typeName, _typeName(type(of: self)))
+  }
+}
 
 Runtime.test("typeName") {
   expectEqual("a.SomeObjCClass", _typeName(SomeObjCClass.self))
@@ -321,6 +330,8 @@ Runtime.test("typeName") {
 
   a = NSObject()
   expectEqual("NSObject", _typeName(type(of: a)))
+
+  SomeNSObjectSubclass().expectSelfTypeNameEqual(to: "a.SomeNSObjectSubclass")
 }
 
 class GenericClass<T> {}
@@ -571,7 +582,7 @@ Reflection.test("Class/ObjectiveCBase/Default") {
     expectEqual(expected, output)
   }
 }
-protocol SomeNativeProto {}
+
 @objc protocol SomeObjCProto {}
 extension SomeClass: SomeObjCProto {}
 

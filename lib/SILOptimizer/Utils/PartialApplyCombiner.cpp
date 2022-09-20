@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 
@@ -59,34 +60,44 @@ public:
 /// apply instructions.
 bool PartialApplyCombiner::copyArgsToTemporaries(
     ArrayRef<FullApplySite> applies) {
+  SmallVector<Operand *, 8> argsToHandle;
+
+  // Find args that need extension for a non-stack partial_apply
   // A partial_apply [stack]'s argument are not owned by the partial_apply and
   // therefore their lifetime must outlive any uses.
-  if (pai->isOnStack())
-    return true;
-
-  SmallVector<Operand *, 8> argsToHandle;
-  getConsumedPartialApplyArgs(pai, argsToHandle,
-                              /*includeTrivialAddrArgs*/ true);
-  if (argsToHandle.empty())
-    return true;
+  if (!pai->isOnStack()) {
+    getConsumedPartialApplyArgs(pai, argsToHandle,
+                                /*includeTrivialAddrArgs*/ true);
+  }
 
   // Compute the set of endpoints, which will be used to insert destroys of
   // temporaries.
-  SmallVector<SILInstruction *, 16> paiUsers;
+  SmallVector<Operand *, 16> paiUses;
 
   // Of course we must inlude all apply instructions which we want to optimize.
   for (FullApplySite ai : applies) {
-    paiUsers.push_back(ai.getInstruction());
+    paiUses.push_back(ai.getCalleeOperand());
   }
 
+  SmallVector<StoreBorrowInst *, 8> storeBorrowsToHandle;
+  for (auto arg : pai->getArguments()) {
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(arg)) {
+      storeBorrowsToHandle.push_back(sbi);
+    }
+  }
+
+  if (argsToHandle.empty() && storeBorrowsToHandle.empty()) {
+    return true;
+  }
   // Also include all destroys in the liferange for the arguments.
   // This is needed for later processing in tryDeleteDeadClosure: in case the
-  // pai gets dead after this optimization, tryDeleteDeadClosure relies on that
-  // we already copied the pai arguments to extend their lifetimes until the pai
-  // is finally destroyed.
-  collectDestroys(pai, paiUsers);
+  // pai gets dead after this optimization, tryDeleteDeadClosure relies on
+  // that we already copied the pai arguments to extend their lifetimes until
+  // the pai is finally destroyed.
+  collectDestroys(pai, paiUses);
 
-  ValueLifetimeAnalysis vla(pai, paiUsers);
+  ValueLifetimeAnalysis vla(pai,
+                            llvm::makeArrayRef(paiUses.begin(), paiUses.end()));
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
 
   // Computing the frontier may fail if the frontier is located on a critical
@@ -113,6 +124,23 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     // Destroy the argument value (either as SSA value or in the stack-
     // allocated temporary) at the end of the partial_apply's lifetime.
     endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
+  }
+
+  DeadEndBlocks deBlocks(pai->getFunction());
+  for (auto *storeBorrow : storeBorrowsToHandle) {
+    if (extendStoreBorrow(storeBorrow, paiUses, &deBlocks, callbacks)) {
+      continue;
+    }
+    SILBuilderWithScope builder(pai, builderCtxt);
+    // Copy address-arguments into a stack-allocated temporary.
+    auto *asi = builder.createAllocStack(pai->getLoc(), storeBorrow->getType());
+    builder.createCopyAddr(pai->getLoc(), storeBorrow, asi, IsTake_t::IsNotTake,
+                           IsInitialization_t::IsInitialization);
+    argToTmpCopy.insert(std::make_pair(storeBorrow, asi));
+
+    // Destroy the argument value (either as SSA value or in the stack-
+    // allocated temporary) at the end of the partial_apply's lifetime.
+    endLifetimeAtFrontier(asi, partialApplyFrontier, builderCtxt, callbacks);
   }
   return true;
 }

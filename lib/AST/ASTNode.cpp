@@ -109,7 +109,9 @@ void ASTNode::walk(ASTWalker &Walker) {
 }
 
 void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
-  if (auto S = dyn_cast<Stmt*>())
+  if (isNull())
+    OS << "(null)";
+  else if (auto S = dyn_cast<Stmt*>())
     S->dump(OS, /*context=*/nullptr, Indent);
   else if (auto E = dyn_cast<Expr*>())
     E->dump(OS, Indent);

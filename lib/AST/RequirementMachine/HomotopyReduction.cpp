@@ -61,6 +61,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include "PropertyMap.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 
@@ -176,6 +177,41 @@ void RewriteSystem::propagateRedundantRequirementIDs() {
 
   if (Debug.contains(DebugFlags::PropagateRequirementIDs)) {
     llvm::dbgs() << "\n}\n";
+  }
+}
+
+/// Find concrete type or superclass rules where the right hand side occurs as a
+/// proper prefix of one of its substitutions.
+///
+/// eg, (T.[concrete: G<T.[P:A]>] => T).
+void RewriteSystem::computeRecursiveRules() {
+  for (unsigned ruleID = FirstLocalRule, e = Rules.size();
+       ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
+
+    if (rule.isPermanent() ||
+        rule.isRedundant())
+      continue;
+
+    auto optSymbol = rule.isPropertyRule();
+    if (!optSymbol)
+      continue;
+
+    auto kind = optSymbol->getKind();
+    if (kind != Symbol::Kind::ConcreteType &&
+        kind != Symbol::Kind::Superclass) {
+      continue;
+    }
+
+    auto rhs = rule.getRHS();
+    for (auto term : optSymbol->getSubstitutions()) {
+      if (term.size() > rhs.size() &&
+          std::equal(rhs.begin(), rhs.end(), term.begin())) {
+        RecursiveRules.push_back(ruleID);
+        rule.markRecursive();
+        break;
+      }
+    }
   }
 }
 
@@ -452,7 +488,7 @@ void RewriteSystem::performHomotopyReduction(
 /// is deleted.
 ///
 /// Redundant rules are mutated to set their isRedundant() bit.
-void RewriteSystem::minimizeRewriteSystem() {
+void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
     llvm::dbgs() << "-----------------------------\n";
     llvm::dbgs() << "- Minimizing rewrite system -\n";
@@ -538,7 +574,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   // compute conformance access paths, instead of the current "brute force"
   // algorithm used for that purpose.
   llvm::DenseSet<unsigned> redundantConformances;
-  computeMinimalConformances(redundantConformances);
+  computeMinimalConformances(map, redundantConformances);
 
   // Third pass: Eliminate all non-minimal conformance rules.
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
@@ -579,6 +615,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   });
 
   propagateRedundantRequirementIDs();
+  computeRecursiveRules();
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();
@@ -628,7 +665,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
         rule.containsUnresolvedSymbols())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
-    if (rule.isConflicting())
+    if (rule.isConflicting() || rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (!rule.isRedundant())

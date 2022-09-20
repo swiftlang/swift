@@ -346,7 +346,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (Tok.is(tok::pound_if)) {
+    if (Tok.is(tok::pound_if) && !isStartOfSwiftDecl()) {
       auto IfConfigResult = parseIfConfig(
         [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
           parseBraceItems(Elements, Kind, IsActive
@@ -389,6 +389,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     IsAtStartOfLineOrPreviousHadSemi,
+                    /*IfConfigsAreDeclAttrs=*/true,
                     [&](Decl *D) {
                       TmpDecls.push_back(D);
 
@@ -524,21 +525,23 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 ParserResult<Stmt> Parser::parseStmt() {
   AssertParserMadeProgressBeforeLeavingScopeRAII apmp(*this);
 
+  // If this is a label on a loop/switch statement, consume it and pass it into
+  // parsing logic below.
+  SyntaxParsingContext LabelContext(SyntaxContext, SyntaxKind::LabeledStmt);
+  LabeledStmtInfo LabelInfo;
+  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
+                                      /*diagnoseDollarPrefix=*/true);
+    consumeToken(tok::colon);
+  } else {
+    LabelContext.setTransparent();
+  }
+
   SyntaxParsingContext LocalContext(SyntaxContext, SyntaxContextKind::Stmt);
 
   // Note that we're parsing a statement.
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
-  
-  LabeledStmtInfo LabelInfo;
-  
-  // If this is a label on a loop/switch statement, consume it and pass it into
-  // parsing logic below.
-  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelInfo.Loc = consumeIdentifier(LabelInfo.Name,
-                                      /*diagnoseDollarPrefix=*/true);
-    consumeToken(tok::colon);
-  }
 
   SourceLoc tryLoc;
   (void)consumeIf(tok::kw_try, tryLoc);
@@ -1466,6 +1469,33 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
   return Status;
 }
 
+// #_hasSymbol(...)
+ParserResult<PoundHasSymbolInfo> Parser::parseStmtConditionPoundHasSymbol() {
+  SyntaxParsingContext ConditionCtxt(SyntaxContext,
+                                     SyntaxKind::HasSymbolCondition);
+  SourceLoc PoundLoc = consumeToken(tok::pound__hasSymbol);
+
+  if (!Tok.isFollowingLParen()) {
+    diagnose(Tok, diag::has_symbol_expected_lparen);
+    return makeParserError();
+  }
+
+  SourceLoc LParenLoc = consumeToken(tok::l_paren);
+  ParserStatus status = makeParserSuccess();
+
+  auto ExprResult = parseExprBasic(diag::has_symbol_expected_expr);
+  status |= ExprResult;
+
+  SourceLoc RParenLoc;
+  if (parseMatchingToken(tok::r_paren, RParenLoc,
+                         diag::has_symbol_expected_rparen, LParenLoc))
+    status.setIsParseError();
+
+  auto *result = PoundHasSymbolInfo::create(
+      Context, PoundLoc, LParenLoc, ExprResult.getPtrOrNull(), RParenLoc);
+  return makeParserResult(status, result);
+}
+
 ParserStatus
 Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
                                   Diag<> DefaultID, StmtKind ParentKind,
@@ -1484,6 +1514,18 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   // Parse a leading #available/#unavailable condition if present.
   if (Tok.isAny(tok::pound_available, tok::pound_unavailable)) {
     auto res = parseStmtConditionPoundAvailable();
+    if (res.isNull() || res.hasCodeCompletion()) {
+      Status |= res;
+      return Status;
+    }
+    BindingKindStr = StringRef();
+    result.push_back({res.get()});
+    return Status;
+  }
+
+  // Parse a leading #_hasSymbol condition if present.
+  if (Tok.is(tok::pound__hasSymbol)) {
+    auto res = parseStmtConditionPoundHasSymbol();
     if (res.isNull() || res.hasCodeCompletion()) {
       Status |= res;
       return Status;
@@ -1688,6 +1730,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
 ///     expr-basic
 ///     ('var' | 'let' | 'case') pattern '=' expr-basic
 ///     '#available' '(' availability-spec (',' availability-spec)* ')'
+///     '#_hasSymbol' '(' expr ')'
 ///
 /// The use of expr-basic here disallows trailing closures, which are
 /// problematic given the curly braces around the if/while body.
@@ -2292,14 +2335,23 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     diagnose(LBraceLoc, diag::expected_foreach_container);
     Container = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
   } else if (Tok.is(tok::code_complete)) {
-    Container =
-        makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
-    Container.setHasCodeCompletionAndIsError();
-    Status |= Container;
-    if (CodeCompletion)
-      CodeCompletion->completeForEachSequenceBeginning(
-          cast<CodeCompletionExpr>(Container.get()));
-    consumeToken(tok::code_complete);
+    // If there is no "in" keyword, suggest it. Otherwise, complete the
+    // sequence.
+    if (InLoc.isInvalid()) {
+      if (CodeCompletion)
+        CodeCompletion->completeForEachInKeyword();
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    } else {
+      Container =
+          makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
+      Container.setHasCodeCompletionAndIsError();
+      Status |= Container;
+      if (CodeCompletion)
+        CodeCompletion->completeForEachSequenceBeginning(
+            cast<CodeCompletionExpr>(Container.get()));
+      consumeToken(tok::code_complete);
+    }
   } else {
     Container = parseExprBasic(diag::expected_foreach_container);
     Status |= Container;
@@ -2564,23 +2616,29 @@ struct FallthroughFinder : ASTWalker {
 
   // We walk through statements.  If we find a fallthrough, then we got what
   // we came for.
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *s) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *s) override {
     if (auto *f = dyn_cast<FallthroughStmt>(s)) {
       result = f;
     }
 
-    return {true, s};
+    return Action::Continue(s);
   }
 
   // Expressions, patterns and decls cannot contain fallthrough statements, so
   // there is no reason to walk into them.
-  std::pair<bool, Expr *> walkToExprPre(Expr *e) override { return {false, e}; }
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *p) override {
-    return {false, p};
+  PreWalkResult<Expr *> walkToExprPre(Expr *e) override {
+    return Action::SkipChildren(e);
+  }
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *p) override {
+    return Action::SkipChildren(p);
   }
 
-  bool walkToDeclPre(Decl *d) override { return false; }
-  bool walkToTypeReprPre(TypeRepr *t) override { return false; }
+  PreWalkAction walkToDeclPre(Decl *d) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToTypeReprPre(TypeRepr *t) override {
+    return Action::SkipChildren();
+  }
 
   static FallthroughStmt *findFallthrough(Stmt *s) {
     FallthroughFinder finder;

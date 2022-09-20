@@ -77,7 +77,7 @@ class NinjaBuilder(product.ProductBuilder):
         # Ninja can only be built in-tree.  Copy the source tree to the build
         # directory.
         shell.rmtree(self.build_dir)
-        shell.copytree(self.source_dir, self.build_dir)
+        shell.copytree(self.source_dir, self.build_dir, ignore_pattern=".git")
         with shell.pushd(self.build_dir):
             shell.call([sys.executable, 'configure.py', '--bootstrap'],
                        env=env)

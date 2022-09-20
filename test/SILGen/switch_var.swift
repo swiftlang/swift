@@ -47,14 +47,12 @@ func test_var_1() {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch foo() {
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%.+]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK:   [[X:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK-NOT: br bb
   case var x:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1a1xySi_tF
-  // CHECK:   end_borrow [[XLIFETIME]]
   // CHECK:   destroy_value [[XADDR]]
     a(x: x)
   }
@@ -67,8 +65,7 @@ func test_var_2() {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch foo() {
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%.*]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK:   [[X:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var6runced1xSbSi_tF
@@ -79,14 +76,12 @@ func test_var_2() {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1a1xySi_tF
-  // CHECK:   end_borrow [[XLIFETIME]]
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   // CHECK: [[NO_CASE1]]:
   // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[YLIFETIME:%[^,]+]] = begin_borrow [lexical] [[YADDR]]
-  // CHECK:   [[Y:%.*]] = project_box [[YLIFETIME]]
+  // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var6funged1xSbSi_tF
@@ -96,19 +91,16 @@ func test_var_2() {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1b1xySi_tF
-  // CHECK:   end_borrow [[YLIFETIME]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     b(x: y)
   case var z:
   // CHECK: [[NO_CASE2]]:
   // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[ZLIFETIME:%[^,]+]] = begin_borrow [lexical] [[ZADDR]]
-  // CHECK:   [[Z:%.*]] = project_box [[ZLIFETIME]]
+  // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1c1xySi_tF
-  // CHECK:   end_borrow [[ZLIFETIME]]
   // CHECK:   destroy_value [[ZADDR]]
   // CHECK:   br [[CONT]]
     c(x: z)
@@ -124,8 +116,7 @@ func test_var_3() {
   // CHECK:   function_ref @$s10switch_var3barSiyF
   switch (foo(), bar()) {
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var (Int, Int) }
-  // CHECK:   [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK:   [[X:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 0
   // CHECK:   function_ref @$s10switch_var6runced1xSbSi_tF
@@ -135,18 +126,15 @@ func test_var_3() {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var2aa1xySi_Sit_tF
-  // CHECK:   end_borrow [[XLIFETIME]]
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     aa(x: x)
 
   // CHECK: [[NO_CASE1]]:
   // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[YLIFETIME:%[^,]+]] = begin_borrow [lexical] [[YADDR]]
-  // CHECK:   [[Y:%.*]] = project_box [[YLIFETIME]]
+  // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
   // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[ZLIFETIME:%[^,]+]] = begin_borrow [lexical] [[ZADDR]]
-  // CHECK:   [[Z:%.*]] = project_box [[ZLIFETIME]]
+  // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var6funged1xSbSi_tF
@@ -159,17 +147,14 @@ func test_var_3() {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1b1xySi_tF
-  // CHECK:   end_borrow [[ZLIFETIME]]
   // CHECK:   destroy_value [[ZADDR]]
-  // CHECK:   end_borrow [[YLIFETIME]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     a(x: y)
     b(x: z)
   // CHECK: [[NO_CASE2]]:
   // CHECK:   [[WADDR:%.*]] = alloc_box ${ var (Int, Int) }
-  // CHECK:   [[WLIFETIME:%[^,]+]] = begin_borrow [lexical] [[WADDR]]
-  // CHECK:   [[W:%.*]] = project_box [[WLIFETIME]]
+  // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[W]]
   // CHECK:   tuple_element_addr [[READ]] : {{.*}}, 0
   // CHECK:   function_ref @$s10switch_var5ansed1xSbSi_tF
@@ -182,16 +167,13 @@ func test_var_3() {
   // CHECK:   br [[CONT]]
     bb(x: w)
   // CHECK: [[NO_CASE3]]:
-  // CHECK:   end_borrow [[WLIFETIME]]
   // CHECK:   destroy_value [[WADDR]]
   case var v:
   // CHECK:   [[VADDR:%.*]] = alloc_box ${ var (Int, Int) } 
-  // CHECK:   [[VLIFETIME:%[^,]+]] = begin_borrow [lexical] [[VADDR]]
-  // CHECK:   [[V:%.*]] = project_box [[VLIFETIME]]
+  // CHECK:   [[V:%.*]] = project_box [[VADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[V]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var2cc1xySi_Sit_tF
-  // CHECK:   end_borrow [[VLIFETIME]]
   // CHECK:   destroy_value [[VADDR]]
   // CHECK:   br [[CONT]]
     cc(x: v)
@@ -207,23 +189,22 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_41pyAA1P_p_tF : $@convention(thin) (@in_guaranteed P) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_41pyAA1P_p_tF : $@convention(thin) (@in_guaranteed any P) -> () {
 func test_var_4(p p: P) {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch (p, foo()) {
-  // CHECK:   [[PAIR:%.*]] = alloc_stack $(P, Int)
+  // CHECK:   [[PAIR:%.*]] = alloc_stack $(any P, Int)
   // CHECK:   store
-  // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
-  // CHECK:   [[T0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 1
+  // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(any P, Int), 0
+  // CHECK:   [[T0:%.*]] = tuple_element_addr [[PAIR]] : $*(any P, Int), 1
   // CHECK:   [[PAIR_1:%.*]] = load [trivial] [[T0]] : $*Int
   // CHECK:   [[TMP:%.*]] = alloc_stack $X
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[PAIR_0]] : $*P to X in [[TMP]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[PAIR_0]] : $*any P to X in [[TMP]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_X]]:
   // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*X
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[XLIFETIME:%.+]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK:   [[X:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   store [[PAIR_1]] to [trivial] [[X]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[X]]
   // CHECK:   load [trivial] [[READ]]
@@ -232,10 +213,9 @@ func test_var_4(p p: P) {
   case (is X, var x) where runced(x: x):
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @$s10switch_var1a1xySi_tF
-  // CHECK:   end_borrow [[XLIFETIME]]
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   dealloc_stack [[TMP]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   destroy_addr [[PAIR_0]] : $*any P
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
@@ -250,13 +230,12 @@ func test_var_4(p p: P) {
 
   // CHECK: [[NEXT]]:
   // CHECK:   [[TMP:%.*]] = alloc_stack $Y
-  // CHECK:   checked_cast_addr_br copy_on_success P in [[PAIR_0]] : $*P to Y in [[TMP]] : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_addr_br copy_on_success any P in [[PAIR_0]] : $*any P to Y in [[TMP]] : $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_Y]]:
   // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*Y
   // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[YLIFETIME:%.+]] = begin_borrow [lexical] [[YADDR]]
-  // CHECK:   [[Y:%.*]] = project_box [[YLIFETIME]]
+  // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
   // CHECK:   store [[PAIR_1]] to [trivial] [[Y]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
@@ -268,16 +247,14 @@ func test_var_4(p p: P) {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Y]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1b1xySi_tF
-  // CHECK:   end_borrow [[YLIFETIME]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
-  // CHECK:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK:   destroy_addr [[PAIR_0]] : $*any P
   // CHECK:   dealloc_stack [[PAIR]]
   // CHECK:   br [[CONT]]
     b(x: y)
 
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   end_borrow [[YLIFETIME]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   dealloc_stack [[TMP]]
   // CHECK:   br [[NEXT:bb[0-9]+]]
@@ -286,7 +263,7 @@ func test_var_4(p p: P) {
   // CHECK:   br [[NEXT]]
 
   // CHECK: [[NEXT]]:
-  // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var (P, Int) }
+  // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var (any P, Int) }
   // CHECK:   [[ZLIFETIME:%.+]] = begin_borrow [lexical] [[ZADDR]]
   // CHECK:   [[Z:%.*]] = project_box [[ZLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
@@ -310,16 +287,14 @@ func test_var_4(p p: P) {
   // CHECK-NEXT:   destroy_value [[ZADDR]]
   // CHECK-NOT: destroy_addr
   case (_, var w):
-  // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
+  // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(any P, Int), 0
   // CHECK:   [[WADDR:%.*]] = alloc_box ${ var Int }
-  // CHECK:   [[WLIFETIME:%.+]] = begin_borrow [lexical] [[WADDR]]
-  // CHECK:   [[W:%.*]] = project_box [[WLIFETIME]]
+  // CHECK:   [[W:%.*]] = project_box [[WADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[W]]
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1d1xySi_tF
-  // CHECK:   end_borrow [[WLIFETIME]]
   // CHECK:   destroy_value [[WADDR]]
-  // CHECK-NEXT:   destroy_addr [[PAIR_0]] : $*P
+  // CHECK-NEXT:   destroy_addr [[PAIR_0]] : $*any P
   // CHECK-NEXT:   dealloc_stack [[PAIR]]
   // CHECK-NEXT:   dealloc_stack
   // CHECK-NEXT:   br [[CONT]]
@@ -334,8 +309,7 @@ func test_var_5() {
   // CHECK:   function_ref @$s10switch_var3barSiyF
   switch (foo(), bar()) {
   // CHECK:   [[XADDR:%.*]] = alloc_box ${ var (Int, Int) }
-  // CHECK:   [[XLIFETIME:%.*]] = begin_borrow [lexical] [[XADDR]]
-  // CHECK:   [[X:%.*]] = project_box [[XLIFETIME]]
+  // CHECK:   [[X:%.*]] = project_box [[XADDR]]
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   case var x where runced(x: x.0):
   // CHECK: [[CASE1]]:
@@ -343,24 +317,18 @@ func test_var_5() {
     a()
   // CHECK: [[NO_CASE1]]:
   // CHECK:   [[YADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[YLIFETIME:%[^,]+]] = begin_borrow [lexical] [[YADDR]]
-  // CHECK:   [[Y:%[0-9]+]] = project_box [[YLIFETIME]]
+  // CHECK:   [[Y:%[0-9]+]] = project_box [[YADDR]]
   // CHECK:   [[ZADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[ZLIFETIME:%[^,]+]] = begin_borrow [lexical] [[ZADDR]]
-  // CHECK:   [[Z:%[0-9]+]] = project_box [[ZLIFETIME]]
+  // CHECK:   [[Z:%[0-9]+]] = project_box [[ZADDR]]
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case (var y, var z) where funged(x: y):
   // CHECK: [[CASE2]]:
-  // CHECK:   end_borrow [[ZLIFETIME]]
   // CHECK:   destroy_value [[ZADDR]]
-  // CHECK:   end_borrow [[YLIFETIME]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     b()
   // CHECK: [[NO_CASE2]]:
-  // CHECK:   end_borrow [[ZLIFETIME]]
   // CHECK:   destroy_value [[ZADDR]]
-  // CHECK:   end_borrow [[YLIFETIME]]
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   case (_, _) where runced():
@@ -381,49 +349,39 @@ func test_var_return() {
   switch (foo(), bar()) {
   case var x where runced():
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var (Int, Int) }
-    // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XADDR]]
-    // CHECK: [[X:%[0-9]+]] = project_box [[XLIFETIME]]
+    // CHECK: [[X:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: function_ref @$s10switch_var1ayyF
-    // CHECK: end_borrow [[XLIFETIME]]
     // CHECK: destroy_value [[XADDR]]
     // CHECK: br [[EPILOG:bb[0-9]+]]
     a()
     return
   // CHECK: [[YADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[YLIFETIME:%[^,]+]] = begin_borrow [lexical] [[YADDR]]
-  // CHECK: [[Y:%[0-9]+]] = project_box [[YLIFETIME]]
+  // CHECK: [[Y:%[0-9]+]] = project_box [[YADDR]]
   // CHECK: [[ZADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[ZLIFETIME:%[^,]+]] = begin_borrow [lexical] [[ZADDR]]
-  // CHECK: [[Z:%[0-9]+]] = project_box [[ZLIFETIME]]
+  // CHECK: [[Z:%[0-9]+]] = project_box [[ZADDR]]
   case (var y, var z) where funged():
     // CHECK: function_ref @$s10switch_var1byyF
-    // CHECK: end_borrow [[ZLIFETIME]]
     // CHECK: destroy_value [[ZADDR]]
-    // CHECK: end_borrow [[YLIFETIME]]
     // CHECK: destroy_value [[YADDR]]
     // CHECK: br [[EPILOG]]
     b()
     return
   case var w where ansed():
     // CHECK: [[WADDR:%[0-9]+]] = alloc_box ${ var (Int, Int) }
-    // CHECK: [[WLIFETIME:%[^,]+]] = begin_borrow [lexical] [[WADDR]]
-    // CHECK: [[W:%[0-9]+]] = project_box [[WLIFETIME]]
+    // CHECK: [[W:%[0-9]+]] = project_box [[WADDR]]
     // CHECK: function_ref @$s10switch_var1cyyF
     // CHECK-NOT: destroy_value [[ZADDR]]
     // CHECK-NOT: destroy_value [[YADDR]]
-    // CHECK: end_borrow [[WLIFETIME]]
     // CHECK: destroy_value [[WADDR]]
     // CHECK: br [[EPILOG]]
     c()
     return
   case var v:
     // CHECK: [[VADDR:%[0-9]+]] = alloc_box ${ var (Int, Int) }
-    // CHECK: [[VLIFETIME:%[^,]+]] = begin_borrow [lexical] [[VADDR]]
-    // CHECK: [[V:%[0-9]+]] = project_box [[VLIFETIME]]
+    // CHECK: [[V:%[0-9]+]] = project_box [[VADDR]]
     // CHECK: function_ref @$s10switch_var1dyyF
     // CHECK-NOT: destroy_value [[ZADDR]]
     // CHECK-NOT: destroy_value [[YADDR]]
-    // CHECK: end_borrow [[VLIFETIME]]
     // CHECK: destroy_value [[VADDR]]
     // CHECK: br [[EPILOG]]
     d()
@@ -472,8 +430,8 @@ func test_let() {
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[BORROWED_VAL_3]]
   // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [lexical] [[VAL_COPY_3]]
   // CHECK:   function_ref @$s10switch_var4barsSSyF
-  // CHECK:   store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
-  // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
+  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
+  // CHECK:   apply {{%.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   // ExprPatterns implicitly contain a 'let' binding.
   case bars():
@@ -548,8 +506,8 @@ func test_mixed_let_var() {
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [lexical] [[VAL_COPY]]
-  // CHECK:   store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
-  // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
+  // CHECK:   [[SB:%.*]] = store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[SB]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():
   // CHECK: [[CASE3]]:

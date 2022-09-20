@@ -195,6 +195,16 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return USRBasedType::null(Arena);
   }
 
+  // ParameterizedProtocolType should always be wrapped in ExistentialType and
+  // cannot be mangled on its own.
+  // But ParameterizedProtocolType can currently occur in 'typealias'
+  // declarations. rdar://99176683
+  // To avoid crashing in USR generation, simply return a null type until the
+  // underlying issue has been fixed.
+  if (Ty->is<ParameterizedProtocolType>()) {
+    return USRBasedType::null(Arena);
+  }
+
   SmallString<32> USR;
   llvm::raw_svector_ostream OS(USR);
   printTypeUSR(Ty, OS);
@@ -208,32 +218,45 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
   }
 
   SmallVector<const USRBasedType *, 2> Supertypes;
+  ;
   if (auto Nominal = Ty->getAnyNominal()) {
-    auto Conformances = Nominal->getAllConformances();
-    Supertypes.reserve(Conformances.size());
-    for (auto Conformance : Conformances) {
-      if (Conformance->getDeclContext()->getParentModule() !=
-          Nominal->getModuleContext()) {
-        // Only include conformances that are declared within the module of the
-        // type to avoid caching retroactive conformances which might not
-        // exist when using the code completion cache from a different module.
-        continue;
+    if (auto *Proto = dyn_cast<ProtocolDecl>(Nominal)) {
+      Proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+        if (Proto != inherited &&
+            !inherited->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+          Supertypes.push_back(USRBasedType::fromType(
+            inherited->getDeclaredInterfaceType(), Arena));
+        }
+
+        return TypeWalker::Action::Continue;
+      });
+    } else {
+      auto Conformances = Nominal->getAllConformances();
+      Supertypes.reserve(Conformances.size());
+      for (auto Conformance : Conformances) {
+        if (Conformance->getDeclContext()->getParentModule() !=
+            Nominal->getModuleContext()) {
+          // Only include conformances that are declared within the module of the
+          // type to avoid caching retroactive conformances which might not
+          // exist when using the code completion cache from a different module.
+          continue;
+        }
+        if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+          // FIXME: Sendable conformances are lazily synthesized as they are
+          // needed by the compiler. Depending on whether we checked whether a
+          // type conforms to Sendable before constructing the USRBasedType, we
+          // get different results for its conformance. For now, always drop the
+          // Sendable conformance.
+          continue;
+        }
+        Supertypes.push_back(USRBasedType::fromType(
+            Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
       }
-      if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-        // FIXME: Sendable conformances are lazily synthesized as they are
-        // needed by the compiler. Depending on whether we checked whether a
-        // type conforms to Sendable before constructing the USRBasedType, we
-        // get different results for its conformance. For now, always drop the
-        // Sendable conformance.
-        continue;
-      }
-      Supertypes.push_back(USRBasedType::fromType(
-          Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
     }
   }
 
   // You would think that superclass + conformances form a DAG. You are wrong!
-  // We can achieve a circular supertype hierarcy with
+  // We can achieve a circular supertype hierarchy with
   //
   // protocol Proto : Class {}
   // class Class : Proto {}

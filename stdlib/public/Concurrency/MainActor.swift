@@ -12,6 +12,36 @@
 
 import Swift
 
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+@globalActor public final actor MainActor: GlobalActor {
+  public static let shared = MainActor()
+
+  @inlinable
+  public nonisolated var unownedExecutor: UnownedSerialExecutor {
+    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
+    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
+  }
+
+  @inlinable
+  public static var sharedUnownedExecutor: UnownedSerialExecutor {
+    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
+    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
+  }
+
+  @inlinable
+  public nonisolated func enqueue(_ job: UnownedJob) {
+    _enqueueOnMain(job)
+  }
+}
+#else
 /// A singleton actor whose executor is equivalent to the main
 /// dispatch queue.
 @available(SwiftStdlib 5.1, *)
@@ -41,7 +71,9 @@ import Swift
     _enqueueOnMain(job)
   }
 }
+#endif
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
 extension MainActor {
   /// Execute the given body closure on the main actor.
@@ -66,3 +98,4 @@ extension MainActor {
     return try await body()
   }
 }
+#endif

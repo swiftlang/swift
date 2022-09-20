@@ -306,6 +306,29 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// isMoveOnly computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isMoveOnlyComputed)
+    return decl->LazySemanticInfo.isMoveOnly;
+
+  return None;
+}
+
+void IsMoveOnlyRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.isMoveOnlyComputed = true;
+  decl->LazySemanticInfo.isMoveOnly = value;
+
+  // Add an attribute for printing
+  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+    decl->getAttrs().add(new (decl->getASTContext())
+                             MoveOnlyAttr(/*Implicit=*/true));
+}
+
+//----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 
@@ -1214,10 +1237,7 @@ Optional<Type> DefaultArgumentTypeRequest::getCachedResult() const {
   if (!defaultInfo)
     return None;
 
-  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
-    return None;
-
-  return defaultInfo->ExprType;
+  return defaultInfo->ExprType ? defaultInfo->ExprType : Optional<Type>();
 }
 
 void DefaultArgumentTypeRequest::cacheResult(Type type) const {
@@ -1454,6 +1474,12 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << ")";
   }
 
+  if (import.options.contains(ImportFlags::Preconcurrency))
+    out << " preconcurrency";
+
+  if (import.options.contains(ImportFlags::WeakLinked))
+    out << " weak-linked";
+
   out << " ]";
 }
 
@@ -1503,6 +1529,10 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
 
   case CustomAttrTypeKind::PropertyWrapper:
     out << "property-wrapper";
+    return;
+
+  case CustomAttrTypeKind::TypeWrapper:
+    out << "type-wrapper";
     return;
 
   case CustomAttrTypeKind::GlobalActor:
@@ -1559,7 +1589,11 @@ void swift::simple_display(
     llvm::raw_ostream &out, const ActorIsolation &state) {
   switch (state) {
     case ActorIsolation::ActorInstance:
-      out << "actor-isolated to instance of " << state.getActor()->getName();
+      out << "actor-isolated to instance of ";
+      if (state.isDistributedActor()) {
+        out << "distributed ";
+      }
+      out << "actor " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

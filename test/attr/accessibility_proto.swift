@@ -105,7 +105,8 @@ public struct NonPublicMemberwiseInitStruct: PublicInitProto {
   public var value: Int
 }
 
-// SR-15273
+// https://github.com/apple/swift/issues/57595
+
 public protocol PublicEmptyInit {
   init()
 }

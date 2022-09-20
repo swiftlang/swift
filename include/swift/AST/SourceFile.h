@@ -26,12 +26,20 @@ namespace swift {
 class PersistentParserState;
 
 /// Kind of import affecting how a decl can be reexported.
+///
+/// This is sorted in order of priority in case the same module is imported
+/// differently. e.g. a normal import (None) offers more visibility than
+/// an @_spiOnly import, which offers more visibility than an
+/// @_implementationOnly import. The logic of \c getRestrictedImportKind relies
+/// on the order of this enum.
+///
 /// This is a subset of \c DisallowedOriginKind.
 ///
 /// \sa getRestrictedImportKind
 enum class RestrictedImportKind {
-  ImplementationOnly,
   Implicit,
+  ImplementationOnly,
+  SPIOnly,
   None // No restriction, i.e. the module is imported publicly.
 };
 
@@ -173,6 +181,16 @@ private:
   /// resume parsing at the code completion token in the file.
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
+
+  friend class HasImportsMatchingFlagRequest;
+
+  /// Indicates which import options have valid caches. Storage for
+  /// \c HasImportsMatchingFlagRequest.
+  ImportOptions validCachedImportOptions;
+
+  /// The cached computation of which import flags are present in the file.
+  /// Storage for \c HasImportsMatchingFlagRequest.
+  ImportOptions cachedImportOptions;
 
   friend ASTContext;
 
@@ -342,9 +360,9 @@ public:
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
 
-  /// Does this source file have any implementation-only imports?
+  /// Does this source file have any imports with \c flag?
   /// If not, we can fast-path module checks.
-  bool hasImplementationOnlyImports() const;
+  bool hasImportsWithFlag(ImportFlags flag) const;
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
@@ -355,6 +373,9 @@ public:
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
+
+  /// Is \p module imported as \c @_weakLinked by this file?
+  bool importsModuleAsWeakLinked(const ModuleDecl *module) const override;
 
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
@@ -385,6 +406,15 @@ public:
   }
 
   SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
+
+  llvm::SmallDenseSet<ImportedModule> MissingImportedModules;
+
+  void addMissingImportedModule(ImportedModule module) const {
+     const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
+  }
+
+  void getMissingImportedModules(
+         SmallVectorImpl<ImportedModule> &imports) const override;
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;

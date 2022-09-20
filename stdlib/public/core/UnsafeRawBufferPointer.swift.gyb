@@ -509,8 +509,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// memory referenced by this buffer are initialized to raw bytes. If the
   /// memory is bound to type `T`, then it contains values of type `T`.
   ///
-  /// - Parameter source: A buffer of raw bytes from which to copy.
-  ///   `source.count` must be less than or equal to this buffer's `count`.
+  /// - Parameter source: A buffer of raw bytes. `source.count` must
+  ///   be less than or equal to this buffer's `count`.
   @inlinable
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
@@ -522,28 +522,29 @@ extension Unsafe${Mutable}RawBufferPointer {
 
   /// Copies from a collection of `UInt8` into this buffer's memory.
   ///
-  /// If the `source.count` bytes of memory referenced by this buffer are bound
-  /// to a type `T`, then `T` must be a trivial type, the underlying pointer
-  /// must be properly aligned for accessing `T`, and `source.count` must be a
-  /// multiple of `MemoryLayout<T>.stride`.
+  /// If the first `source.count` bytes of memory referenced by this buffer
+  /// are bound to a type `T`, then `T` must be a trivial type,
+  /// the underlying pointer must be properly aligned for accessing `T`,
+  /// and `source.count` must be a multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyBytes(from:)`, the `source.count` bytes of memory
+  /// After calling `copyBytes(from:)`, the first `source.count` bytes of memory
   /// referenced by this buffer are initialized to raw bytes. If the memory is
   /// bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer's `count`.
   @inlinable
-  public func copyBytes<C: Collection>(from source: C
+  public func copyBytes<C: Collection>(
+    from source: C
   ) where C.Element == UInt8 {
-    _debugPrecondition(source.count <= self.count,
-      "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
       return
     }
     
     if source.withContiguousStorageIfAvailable({
-      (buffer: UnsafeBufferPointer<C.Element>) -> Void in
+      (buffer: UnsafeBufferPointer<UInt8>) -> Void in
+      _debugPrecondition(source.count <= self.count,
+        "${Self}.copyBytes source has too many elements")
       if let base = buffer.baseAddress {
         position.copyMemory(from: base, byteCount: buffer.count)
       }
@@ -552,6 +553,8 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
 
     for (index, byteValue) in source.enumerated() {
+      _debugPrecondition(index < self.count,
+        "${Self}.copyBytes source has too many elements")
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)
     }
@@ -695,10 +698,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// After calling this method on a raw buffer with non-nil `baseAddress` `b`, 
   /// the region starting at `b` and continuing up to
-  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound to type `T` and
-  /// initialized. If `T` is a nontrivial type, you must eventually deinitialize
-  /// or move the values in this region to avoid leaks. If `baseAddress` is 
-  /// `nil`, this function does nothing and returns an empty buffer pointer.
+  /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound
+  /// to type `T` and is initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize or move the values in this region to avoid leaks.
+  /// If `baseAddress` is `nil`, this function does nothing
+  /// and returns an empty buffer pointer.
   ///
   /// - Parameters:
   ///   - type: The type to bind this buffer’s memory to.
@@ -711,13 +715,14 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func initializeMemory<T>(as type: T.Type, repeating repeatedValue: T)
     -> UnsafeMutableBufferPointer<T> {
     guard let base = _position else {
-      return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
+      return .init(start: nil, count: 0)
     }
     
-    let count = (_end._unsafelyUnwrappedUnchecked - base) / MemoryLayout<T>.stride
-    let typed = base.initializeMemory(
-      as: type, repeating: repeatedValue, count: count)
-    return UnsafeMutableBufferPointer<T>(start: typed, count: count)
+    let count = (_end._unsafelyUnwrappedUnchecked-base) / MemoryLayout<T>.stride
+    let initialized = base.initializeMemory(
+      as: type, repeating: repeatedValue, count: count
+    )
+    return .init(start: initialized, count: count)
   }
 
   /// Initializes the buffer's memory with the given elements, binding the
@@ -730,14 +735,15 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// `source.underestimatedCount`.
   ///
   /// This method initializes the buffer with elements from `source` until
-  /// `source` is exhausted or, if `source` is a sequence but not a
-  /// collection, the buffer has no more room for its elements. After calling
+  /// `source` is exhausted or, if `source` is a sequence but not a collection,
+  /// the buffer has no more room for source's elements. After calling
   /// `initializeMemory(as:from:)`, the memory referenced by the returned
   /// `UnsafeMutableBufferPointer` instance is bound and initialized to type
-  /// `S.Element`.
+  /// `S.Element`. This method does not change
+  /// the binding state of the unused portion of `b`, if any.
   ///
   /// - Parameters:
-  ///   - type: The type of the elements to bind the buffer's memory to.
+  ///   - type: The type of element to which this buffer's memory will be bound.
   ///   - source: A sequence of elements with which to initialize the buffer.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and a typed buffer of the written elements. The returned
@@ -747,8 +753,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func initializeMemory<S: Sequence>(
     as type: S.Element.Type, from source: S
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
-    // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
-
     var it = source.makeIterator()
     var idx = startIndex
     let elementStride = MemoryLayout<S.Element>.stride
@@ -762,6 +766,11 @@ extension Unsafe${Mutable}RawBufferPointer {
         "no memory available to initialize from source")
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
     }  
+
+    _debugPrecondition(
+      Int(bitPattern: base) % MemoryLayout<S.Element>.stride == 0,
+      "buffer base address must be properly aligned to access S.Element"
+    )
 
     _internalInvariant(_end != nil)
     for p in stride(from: base, 
@@ -780,6 +789,185 @@ extension Unsafe${Mutable}RawBufferPointer {
                   start: base.assumingMemoryBound(to: S.Element.self), 
                   count: idx / elementStride))
   }
+
+  /// Initializes the buffer's memory with every element of the source,
+  /// binding the initialized memory to the elements' type.
+  ///
+  /// When calling the `initializeMemory(as:fromContentsOf:)` method,
+  /// the memory referenced by the buffer must be uninitialized, or initialized
+  /// to a trivial type. The buffer must reference enough memory to store
+  /// `source.count` elements, and its `baseAddress` must be properly aligned
+  /// for accessing `C.Element`.
+  ///
+  /// This method initializes the buffer with the contents of `source`
+  /// until `source` is exhausted.
+  /// After calling `initializeMemory(as:fromContentsOf:)`, the memory
+  /// referenced by the returned `UnsafeMutableBufferPointer` instance is bound
+  /// to the type `C.Element` and is initialized. This method does not change
+  /// the binding state of the unused portion of the buffer, if any.
+  ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     must not overlap.
+  ///
+  /// - Parameters:
+  ///   - type: The type of element to which this buffer's memory will be bound.
+  ///   - source: A collection of elements to be used to
+  ///     initialize the buffer's storage.
+  /// - Returns: A typed buffer referencing the initialized elements.
+  ///     The returned buffer references memory starting at the same
+  ///     base address as this buffer, and its count is equal to `source.count`
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func initializeMemory<C: Collection>(
+    as type: C.Element.Type,
+    fromContentsOf source: C
+  ) -> UnsafeMutableBufferPointer<C.Element> {
+    let buffer: UnsafeMutableBufferPointer<C.Element>?
+    buffer = source.withContiguousStorageIfAvailable {
+      guard let sourceAddress = $0.baseAddress, !$0.isEmpty else {
+        return .init(start: nil, count: 0)
+      }
+      _debugPrecondition(
+        Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+        "buffer base address must be properly aligned to access C.Element"
+      )
+      _precondition(
+        $0.count * MemoryLayout<C.Element>.stride < self.count,
+        "buffer cannot contain every element from source collection."
+      )
+      let start = baseAddress?.initializeMemory(
+        as: C.Element.self, from: sourceAddress, count: $0.count
+      )
+      return .init(start: start, count: $0.count)
+    }
+    if let buffer {
+      return buffer
+    }
+
+    guard let base = baseAddress else {
+      _precondition(
+        source.isEmpty,
+        "buffer cannot contain every element from source collection."
+      )
+      return .init(start: nil, count: 0)
+    }
+    _internalInvariant(_end != nil)
+    _debugPrecondition(
+      Int(bitPattern: baseAddress) % MemoryLayout<C.Element>.stride == 0,
+      "buffer base address must be properly aligned to access C.Element"
+    )
+    var iterator = source.makeIterator()
+    var element = base
+    var initialized = 0
+    let end = _end._unsafelyUnwrappedUnchecked - MemoryLayout<C.Element>.stride
+    while element <= end {
+      guard let value = iterator.next() else {
+        return .init(start: .init(base._rawValue), count: initialized)
+      }
+      element.initializeMemory(as: C.Element.self, to: value)
+      element = element.advanced(by: MemoryLayout<C.Element>.stride)
+      initialized += 1
+    }
+    _precondition(
+      iterator.next() == nil,
+      "buffer cannot contain every element from source collection."
+    )
+    return .init(start: .init(base._rawValue), count: initialized)
+  }
+
+  /// Moves every element of an initialized source buffer into the
+  /// uninitialized memory referenced by this buffer, leaving the source memory
+  /// uninitialized and this buffer's memory initialized.
+  ///
+  /// When calling the `moveInitializeMemory(as:fromContentsOf:)` method,
+  /// the memory referenced by the buffer must be uninitialized, or initialized
+  /// to a trivial type. The buffer must reference enough memory to store
+  /// `source.count` elements, and its `baseAddress` must be properly aligned
+  /// for accessing `C.Element`. After the method returns,
+  /// the memory referenced by the returned buffer is initialized and the
+  /// memory region underlying `source` is uninitialized.
+  ///
+  /// This method initializes the buffer with the contents of `source`
+  /// until `source` is exhausted.
+  /// After calling `initializeMemory(as:fromContentsOf:)`, the memory
+  /// referenced by the returned `UnsafeMutableBufferPointer` instance is bound
+  /// to the type `T` and is initialized. This method does not change
+  /// the binding state of the unused portion of the buffer, if any.
+  ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
+  /// - Parameters:
+  ///   - type: The type of element to which this buffer's memory will be bound.
+  ///   - source: A buffer referencing the values to copy.
+  ///     The memory region underlying `source` must be initialized.
+  /// - Returns: A typed buffer referencing the initialized elements.
+  ///     The returned buffer references memory starting at the same
+  ///     base address as this buffer, and its count is equal to `source.count`.
+  @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveInitializeMemory<T>(
+    as type: T.Type,
+    fromContentsOf source: UnsafeMutableBufferPointer<T>
+  ) -> UnsafeMutableBufferPointer<T> {
+    guard let sourceAddress = source.baseAddress, !source.isEmpty else {
+      return .init(start: nil, count: 0)
+    }
+    _debugPrecondition(
+      Int(bitPattern: baseAddress) % MemoryLayout<T>.stride == 0,
+      "buffer base address must be properly aligned to access T"
+    )
+    _precondition(
+      source.count * MemoryLayout<T>.stride <= self.count,
+      "buffer cannot contain every element from source."
+    )
+    let initialized = baseAddress?.moveInitializeMemory(
+      as: T.self, from: sourceAddress, count: source.count
+    )
+    return .init(start: initialized, count: source.count)
+  }
+
+  /// Moves every element of an initialized source buffer slice into the
+  /// uninitialized memory referenced by this buffer, leaving the source memory
+  /// uninitialized and this buffer's memory initialized.
+  ///
+  /// When calling the `moveInitializeMemory(as:fromContentsOf:)` method,
+  /// the memory referenced by the buffer must be uninitialized, or initialized
+  /// to a trivial type. The buffer must reference enough memory to store
+  /// `source.count` elements, and its `baseAddress` must be properly aligned
+  /// for accessing `C.Element`. After the method returns,
+  /// the memory referenced by the returned buffer is initialized and the
+  /// memory region underlying `source` is uninitialized.
+  ///
+  /// This method initializes the buffer with the contents of `source`
+  /// until `source` is exhausted.
+  /// After calling `initializeMemory(as:fromContentsOf:)`, the memory
+  /// referenced by the returned `UnsafeMutableBufferPointer` instance is bound
+  /// to the type `T` and is initialized. This method does not change
+  /// the binding state of the unused portion of the buffer, if any.
+  ///
+  /// - Note: The memory regions referenced by `source` and this buffer
+  ///     may overlap.
+  ///
+  /// - Parameters:
+  ///   - type: The type of element to which this buffer's memory will be bound.
+  ///   - source: A buffer referencing the values to copy.
+  ///     The memory region underlying `source` must be initialized.
+  /// - Returns: A typed buffer referencing the initialized elements.
+  ///     The returned buffer references memory starting at the same
+  ///     base address as this buffer, and its count is equal to `source.count`.
+  @discardableResult
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func moveInitializeMemory<T>(
+    as type: T.Type,
+    fromContentsOf source: Slice<UnsafeMutableBufferPointer<T>>
+  ) -> UnsafeMutableBufferPointer<T> {
+    let rebased = UnsafeMutableBufferPointer(rebasing: source)
+    return moveInitializeMemory(as: T.self, fromContentsOf: rebased)
+  }
+
   %  end # mutable
 
   /// Binds this buffer’s memory to the specified type and returns a typed buffer 
@@ -798,7 +986,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - type: The type `T` to bind the memory to.
   /// - Returns: A typed buffer of the newly bound memory. The memory in this
   ///   region is bound to `T`, but has not been modified in any other way.
-  ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
+  ///   instances of `T`.
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -850,7 +1039,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///     buffer.
   ///   - body: A closure that takes a typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -868,7 +1057,8 @@ extension Unsafe${Mutable}RawBufferPointer {
       return try body(.init(start: nil, count: 0))
     }
     _debugPrecondition(
-      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0
+      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0,
+      "baseAddress must be a properly aligned pointer for type T"
     )
     // initializer ensures _end is nil only when _position is nil.
     _internalInvariant(_end != nil)
@@ -1039,6 +1229,22 @@ public func withUnsafeBytes<T, Result>(
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
 /// the given argument.
 ///
+/// This function is similar to `withUnsafeBytes`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeBytes<T, Result>(
+  of value: inout T,
+  _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result
+{
+  return try _withUnprotectedUnsafePointer(to: &value) {
+    try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
+  }
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
 /// The buffer pointer argument to the `body` closure provides a collection
 /// interface to the raw bytes of `value`. The buffer is the size of the
 /// instance passed as `value` and does not include any remote storage.
@@ -1061,6 +1267,25 @@ public func withUnsafeBytes<T, Result>(
   _ body: (UnsafeRawBufferPointer) throws -> Result
 ) rethrows -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
+  let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
+  return try body(buffer)
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
+/// This function is similar to `withUnsafeBytes`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeBytes<T, Result>(
+  of value: T,
+  _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result {
+#if $BuiltinUnprotectedAddressOf
+  let addr = UnsafeRawPointer(Builtin.unprotectedAddressOfBorrow(value))
+#else
+  let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
+#endif
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }

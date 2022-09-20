@@ -496,7 +496,7 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
   // optimize such cases. Otherwise, we can eliminate our borrow and instead use
   // our operand.
   auto base = bbi->getOperand();
-  auto baseOwnership = base.getOwnershipKind();
+  auto baseOwnership = base->getOwnershipKind();
   SmallVector<EndBorrowInst *, 8> endBorrows;
   for (auto *use : getNonDebugUses(bbi)) {
     if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {

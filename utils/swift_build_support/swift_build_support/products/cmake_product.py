@@ -85,7 +85,7 @@ class CMakeProduct(product.Product):
                        + build_args + build_targets)
 
     def test_with_cmake(self, executable_target, results_targets,
-                        build_type, build_args):
+                        build_type, build_args, test_env=None):
         assert self.toolchain.cmake is not None
         cmake_build = []
 
@@ -117,7 +117,9 @@ class CMakeProduct(product.Product):
                 if test_target.startswith("check-swift") and self.args.test_paths:
                     test_target = test_target + "-custom"
 
-                shell.call(cmake_build + target_flag(test_target))
+                # note that passing variables via test_env won't affect lit tests -
+                # lit.cfg will filter environment variables out!
+                shell.call(cmake_build + target_flag(test_target), env=test_env)
 
                 print("--- %s finished ---" % target)
 

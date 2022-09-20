@@ -149,7 +149,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // divideNum<A where ...> (A, den : A) throws -> A
-sil [_specialize where T == Int] @$s16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
+sil [_specialize where T == Int] @$s16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error any Error) {
 bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   // function_ref static != infix<A where ...> (A, A) -> Bool
   %5 = function_ref @$ss2neoiySbx_xts9EquatableRzlFZ : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
@@ -183,14 +183,14 @@ bb2:
 }
 
 // specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK-LABEL: sil shared @$s16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil shared @$s16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error any Error) {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: return %{{.*}}
 // CHECK: throw %{{.*}}
 
 // Generic with specialized dispatch. No more [specialize] attribute.
 //
-// CHECK-LABEL: sil @$s16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
+// CHECK-LABEL: sil @$s16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlF : $@convention(thin) <T where T : SignedInteger, T : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error any Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type
 // CHECK:   %4 = metatype $@thick Int.Type
@@ -204,10 +204,10 @@ bb2:
 // CHECK:   cond_br %{{.*}}, bb5, bb3
 
 // CHECK: bb3:
-// CHECK:   br bb4(%{{.*}} : $Error)
+// CHECK:   br bb4(%{{.*}} : $any Error)
 
-// CHECK: bb4(%{{.*}} : $Error):
-// CHECK:   throw %{{.*}} : $Error
+// CHECK: bb4(%{{.*}} : $any Error):
+// CHECK:   throw %{{.*}} : $any Error
 
 // CHECK: bb5:
 // CHECK:   %{{.*}} = witness_method $T, #BinaryInteger."/" : {{.*}} : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
@@ -225,11 +225,11 @@ bb2:
 // CHECK:   %{{.*}} = unchecked_addr_cast %2 : $*T to $*Int
 // CHECK:   %{{.*}} = load %{{.*}} : $*Int
 // CHECK:   // function_ref specialized divideNum<A>(_:den:)
-// CHECK:   %{{.*}} = function_ref @$s16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error)
-// CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error Error), normal bb9, error bb8
+// CHECK:   %{{.*}} = function_ref @$s16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error any Error)
+// CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error any Error), normal bb9, error bb8
 
-// CHECK: bb8(%{{.*}} : $Error):
-// CHECK:   br bb4(%{{.*}} : $Error)
+// CHECK: bb8(%{{.*}} : $any Error):
+// CHECK:   br bb4(%{{.*}} : $any Error)
 
 // CHECK: bb9(%{{.*}} : $Int):
 // CHECK:   store %{{.*}} to %{{.*}} : $*Int
@@ -764,10 +764,10 @@ class ClassUsingThrowingP {
 }
 
 // Int64.action()
-sil @$ss5Int64V34eager_specialize_throwing_functionE6actionAByKF : $@convention(method) (Int64) -> (Int64, @error Error)
+sil @$ss5Int64V34eager_specialize_throwing_functionE6actionAByKF : $@convention(method) (Int64) -> (Int64, @error any Error)
 
 // protocol witness for ThrowingP.action() in conformance Int64
-sil @$ss5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW : $@convention(witness_method: ThrowingP) (@in_guaranteed Int64) -> (Int64, @error Error)
+sil @$ss5Int64V34eager_specialize_throwing_function9ThrowingPA2cDP6actionAByKFTW : $@convention(witness_method: ThrowingP) (@in_guaranteed Int64) -> (Int64, @error any Error)
 
 sil @$s34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc : $@convention(method) (@owned ClassUsingThrowingP) -> @owned ClassUsingThrowingP
 
@@ -784,12 +784,12 @@ sil @$s34eager_specialize_throwing_function19ClassUsingThrowingPCfD : $@conventi
 // It should dispatch to its specialized version, but use apply [nothrow] to invoke
 // the specialized version.
 
-// CHECK-LABEL: sil @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error Error)
-// CHECK: [[SPECIALIZED:%.*]] = function_ref @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZs5Int64V_Tg5 : $@convention(method) (Int64, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error Error)
+// CHECK-LABEL: sil @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error any Error)
+// CHECK: [[SPECIALIZED:%.*]] = function_ref @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZs5Int64V_Tg5 : $@convention(method) (Int64, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error any Error)
 // CHECK: apply [nothrow] [[SPECIALIZED]]
 // CHECK: // end sil function '$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZ'
 // static ClassUsingThrowingP.f<A>(_:)
-sil [_specialize exported: false, kind: full, where T == Int64] @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error Error) {
+sil [_specialize exported: false, kind: full, where T == Int64] @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1fyACXDxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (@owned ClassUsingThrowingP, @error any Error) {
 bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
   destroy_addr %0 : $*T
   %4 = unchecked_trivial_bit_cast %1 : $@thick ClassUsingThrowingP.Type to $@thick @dynamic_self ClassUsingThrowingP.Type
@@ -807,16 +807,16 @@ bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
 // It should dispatch to its specialized version and use try_apply to invoke
 // the specialized version.
 
-// CHECK-LABEL: sil @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error)
-// CHECK: [[SPECIALIZED:%.*]] = function_ref @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZAF_Tg5 : $@convention(method) (Int64, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error)
+// CHECK-LABEL: sil @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error any Error)
+// CHECK: [[SPECIALIZED:%.*]] = function_ref @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZAF_Tg5 : $@convention(method) (Int64, @thick ClassUsingThrowingP.Type) -> (Int64, @error any Error)
 // CHECK: try_apply [[SPECIALIZED]]
 // CHECK: // end sil function '$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ'
 
 // static ClassUsingThrowingP.g<A>(_:)
-sil [_specialize exported: false, kind: full, where T == Int64] @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error Error) {
+sil [_specialize exported: false, kind: full, where T == Int64] @$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ : $@convention(method) <T where T : ThrowingP> (@in T, @thick ClassUsingThrowingP.Type) -> (Int64, @error any Error) {
 bb0(%0 : $*T, %1 : $@thick ClassUsingThrowingP.Type):
-  %5 = witness_method $T, #ThrowingP.action : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error)
-  try_apply %5<T>(%0) : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error Error), normal bb1, error bb2
+  %5 = witness_method $T, #ThrowingP.action : <Self where Self : ThrowingP> (Self) -> () throws -> Int64 : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error any Error)
+  try_apply %5<T>(%0) : $@convention(witness_method: ThrowingP) <τ_0_0 where τ_0_0 : ThrowingP> (@in_guaranteed τ_0_0) -> (Int64, @error any Error), normal bb1, error bb2
 
 bb1(%7 : $Int64):                                 // Preds: bb0
   destroy_addr %0 : $*T

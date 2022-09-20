@@ -1022,10 +1022,11 @@ domain-specific language (just write ordinary swift code!) and its type safety
 problems (put the data right where it belongs!) but the following issues prevent
 it from being useful for localized formatting (among other jobs):
 
-  * [SR-2303](https://bugs.swift.org/browse/SR-2303) We are unable to restrict
-    types used in string interpolation.
-  * [SR-1260](https://bugs.swift.org/browse/SR-1260) String interpolation can't
-    distinguish (fragments of) the base string from the string substitutions.
+  * [#44910](https://github.com/apple/swift/issues/44910): We are unable to
+    restrict types used in string interpolation.
+  * [#43868](https://github.com/apple/swift/issues/43868): String interpolation
+    can't distinguish (fragments of) the base string
+    from the string substitutions.
 
 In the long run, we should improve Swift string interpolation to the point where
 it can participate in most any formatting job.  Mostly this centers around

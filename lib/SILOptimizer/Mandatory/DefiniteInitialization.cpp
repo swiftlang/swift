@@ -1838,9 +1838,11 @@ findMethodForStoreInitializationOfTemporary(const DIMemoryObjectInfo &TheMemory,
 
   ApplyInst *TheApply = nullptr;
 
+  auto addr =
+      isa<StoreBorrowInst>(SI) ? cast<StoreBorrowInst>(SI) : SI->getDest();
   // Check to see if the address of the alloc_stack is only passed to one
   // apply_inst and gather the apply while we are at it.
-  for (auto UI : SI->getDest()->getUses()) {
+  for (auto UI : addr->getUses()) {
     if (auto *ApplyUser = dyn_cast<ApplyInst>(UI->getUser())) {
       if (TheApply || UI->getOperandNumber() != 1) {
         return nullptr;

@@ -12,7 +12,8 @@ struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
   var x = S.x // expected-note {{candidate references itself}}
 }
 
+// https://github.com/apple/swift/issues/51713
 // FIXME: Lousy diagnostics on this case.
-protocol SR9224_Foo: SR9224_Foobar {} // expected-error {{protocol 'SR9224_Foo' refines itself}}
-protocol SR9224_Bar: SR9224_Foobar {}
-typealias SR9224_Foobar = SR9224_Foo & SR9224_Bar
+protocol P1_51713: P1P2_51713 {} // expected-error {{protocol 'P1_51713' refines itself}}
+protocol P2_51713: P1P2_51713 {}
+typealias P1P2_51713 = P1_51713 & P2_51713

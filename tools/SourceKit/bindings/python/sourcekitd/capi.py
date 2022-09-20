@@ -232,7 +232,7 @@ class Variant(Structure):
         elif var_ty == VariantType.UID:
             return UIdent(conf.lib.sourcekitd_variant_uid_get_value(self))
         else:
-            assert(var_ty == VariantType.BOOL)
+            assert var_ty == VariantType.BOOL
             return conf.lib.sourcekitd_variant_bool_get_value(self)
 
     def to_python_array(self):

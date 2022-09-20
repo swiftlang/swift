@@ -1390,7 +1390,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       }
       return false;
     }
-    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *BS = dyn_cast<BraceStmt>(S)) {
         for(auto Ele: BS->getElements()) {
           if (Ele.is<Expr*>() && isSuperExpr(Ele.get<Expr*>())) {
@@ -1399,7 +1399,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 	}
       }
       // We only handle top-level expressions, so avoid visiting further.
-      return {false, S};
+      return Action::SkipChildren(S);
     }
   };
 

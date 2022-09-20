@@ -18,6 +18,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -28,26 +29,21 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
-SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker,
-                         ModuleDecl &M,
+SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
                          Optional<ModuleDecl *> ExtendedModule,
                          markup::MarkupContext &Ctx,
                          Optional<llvm::VersionTuple> ModuleVersion,
                          bool IsForSingleNode)
-: Walker(Walker),
-  M(M),
-  ExtendedModule(ExtendedModule),
-  Ctx(Ctx),
-  ModuleVersion(ModuleVersion),
-  IsForSingleNode(IsForSingleNode) {
-    if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
-      DeclaringModule = DM;
-      SmallVector<Identifier, 1> Bystanders;
-      if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
-        BystanderModules = Bystanders;
-      }
+    : Walker(Walker), M(M), ExtendedModule(ExtendedModule), Ctx(Ctx),
+      ModuleVersion(ModuleVersion), IsForSingleNode(IsForSingleNode) {
+  if (auto *DM = M.getDeclaringModuleIfCrossImportOverlay()) {
+    DeclaringModule = DM;
+    SmallVector<Identifier, 1> Bystanders;
+    if (M.getRequiredBystandersIfCrossImportOverlay(DM, Bystanders)) {
+      BystanderModules = Bystanders;
     }
   }
+}
 
 // MARK: - Utilities
 
@@ -223,7 +219,7 @@ void SymbolGraph::recordEdge(Symbol Source,
 }
 
 void SymbolGraph::recordMemberRelationship(Symbol S) {
-  const auto *DC = S.getSymbolDecl()->getDeclContext();
+  const auto *DC = S.getLocalSymbolDecl()->getDeclContext();
   switch (DC->getContextKind()) {
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
@@ -241,12 +237,25 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
       if (isRequirementOrDefaultImplementation(S.getSymbolDecl())) {
         return;
       }
+
       if (DC->getSelfNominalTypeDecl() == nullptr) {
         // If we couldn't look up the type the member is declared on (e.g.
         // because the member is declared in an extension whose extended type
         // doesn't exist), don't record a memberOf relationship.
         return;
       }
+
+      // If this is an extension to an external type, we use the extension
+      // symbol itself as the target.
+      if (auto const *Extension =
+              dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
+
+        if (this->Walker.shouldBeRecordedAsExtension(Extension)) {
+          return recordEdge(S, Symbol(this, Extension, nullptr),
+                            RelationshipKind::MemberOf());
+        }
+      }
+
       return recordEdge(S,
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
@@ -288,11 +297,11 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   if (!Walker.Options.EmitSynthesizedMembers) {
     return;
   }
-  const auto VD = S.getSymbolDecl();
+  const auto D = S.getLocalSymbolDecl();
   const NominalTypeDecl *OwningNominal = nullptr;
-  if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(VD)) {
+  if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(D)) {
     OwningNominal = ThisNominal;
-  } else if (const auto *Extension = dyn_cast<ExtensionDecl>(VD)) {
+  } else if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *ExtendedNominal = Extension->getExtendedNominal()) {
       if (!ExtendedNominal->getModuleContext()->getNameStr()
           .equals(M.getNameStr())) {
@@ -321,10 +330,18 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
       // We are only interested in synthesized members that come from an
       // extension that we defined in our module.
-      if (Info.EnablingExt && Info.EnablingExt->getModuleContext() != &M) {
-        continue;
+      if (Info.EnablingExt) {
+        const auto *ExtM = Info.EnablingExt->getModuleContext();
+        if (!Walker.isOurModule(ExtM))
+          continue;
       }
 
+      // If D is not the OwningNominal, it is an ExtensionDecl. In that case
+      // we only want to get members that were enabled by this exact extension.
+      if (D != OwningNominal && Info.EnablingExt != D) {
+        continue;
+      }
+  
       for (const auto ExtensionMember : Info.Ext->getMembers()) {
         if (const auto SynthMember = dyn_cast<ValueDecl>(ExtensionMember)) {
           if (SynthMember->isObjC()) {
@@ -349,11 +366,10 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
           auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
 
           Symbol Source(this, SynthMember, OwningNominal);
-          Symbol Target(this, OwningNominal, nullptr);
 
           ExtendedSG->Nodes.insert(Source);
 
-          ExtendedSG->recordEdge(Source, Target, RelationshipKind::MemberOf());
+          ExtendedSG->recordEdge(Source, S, RelationshipKind::MemberOf());
          }
       }
     }
@@ -398,7 +414,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
           // If P is from a different module, and it's being added to a type
           // from the current module, add a `memberOf` relation to the extended
           // protocol.
-          if (MemberVD->getModuleContext()->getNameStr() != M.getNameStr() && VD->getDeclContext()) {
+          if (!Walker.isOurModule(MemberVD->getModuleContext()) && VD->getDeclContext()) {
             if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
               recordEdge(Symbol(this, VD, nullptr),
                          Symbol(this, ExP, nullptr),
@@ -444,15 +460,25 @@ void SymbolGraph::recordOptionalRequirementRelationships(Symbol S) {
   }
 }
 
-void
-SymbolGraph::recordConformanceRelationships(Symbol S) {
-  const auto VD = S.getSymbolDecl();
-  if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto *Conformance : NTD->getAllConformances()) {
-      recordEdge(Symbol(this, VD, nullptr),
-        Symbol(this, Conformance->getProtocol(), nullptr),
-        RelationshipKind::ConformsTo(),
-        dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+void SymbolGraph::recordConformanceRelationships(Symbol S) {
+  const auto D = S.getLocalSymbolDecl();
+  if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+      PD->walkInheritedProtocols([&](ProtocolDecl *inherited) {
+        if (inherited != PD) {
+          recordEdge(S, Symbol(this, inherited, nullptr),
+                     RelationshipKind::ConformsTo(), nullptr);
+        }
+
+        return TypeWalker::Action::Continue;
+      });
+    } else {
+      for (const auto *Conformance : NTD->getAllConformances()) {
+        recordEdge(
+            S, Symbol(this, Conformance->getProtocol(), nullptr),
+            RelationshipKind::ConformsTo(),
+            dyn_cast_or_null<ExtensionDecl>(Conformance->getDeclContext()));
+      }
     }
   }
 }
@@ -530,7 +556,7 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key,
     Options.setBaseType(S.getBaseType());
     Options.PrintAsMember = true;
   }
-  S.getSymbolDecl()->print(Printer, Options);
+  S.getLocalSymbolDecl()->print(Printer, Options);
 }
 
 void
@@ -549,7 +575,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
                                                      llvm::json::OStream &OS) {
   DeclarationFragmentPrinter Printer(this, OS, Key);
 
-  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getSymbolDecl())) {
+  if (const auto *TD = dyn_cast<GenericTypeDecl>(S.getLocalSymbolDecl())) {
     Printer.printAbridgedType(TD, /*PrintKeyword=*/true);
   } else {
     auto Options = getSubHeadingDeclarationFragmentsPrintOptions();
@@ -557,7 +583,7 @@ SymbolGraph::serializeSubheadingDeclarationFragments(StringRef Key,
       Options.setBaseType(S.getBaseType());
       Options.PrintAsMember = true;
     }
-    S.getSymbolDecl()->print(Printer, Options);
+    S.getLocalSymbolDecl()->print(Printer, Options);
   }
 }
 
@@ -574,56 +600,6 @@ SymbolGraph::serializeDeclarationFragments(StringRef Key, Type T,
   T->print(Printer, Options);
 }
 
-namespace {
-
-/// Returns the first satisfied protocol requirement for the given decl.
-const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
-  auto reqs = VD->getSatisfiedProtocolRequirements();
-
-  if (!reqs.empty())
-    return reqs.front();
-  else
-    return nullptr;
-}
-
-/// Returns the protocol that the given decl is a requirement or conformance of, if any.
-const ProtocolDecl *getSourceProtocol(const Decl *D) {
-  const auto *DC = D->getDeclContext();
-
-  // First check to see whether it's declared directly in the protocol decl
-  if (const auto *P = dyn_cast<ProtocolDecl>(DC))
-    return P;
-
-  // Next look at whether it's an extension on a protocol
-  if (const auto *Extension = dyn_cast<ExtensionDecl>(DC)) {
-    if (const auto *ExtendedProtocol = Extension->getExtendedProtocolDecl()) {
-      return ExtendedProtocol;
-    }
-  }
-
-  // Then check to see whether it's an implementation of a protocol requirement
-  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
-    if (const auto *Requirement = getProtocolRequirement(VD)) {
-      if (const auto *P = dyn_cast<ProtocolDecl>(Requirement->getDeclContext())) {
-        return P;
-      }
-    }
-  }
-
-  // If all those didn't work, there's no protocol to fetch
-  return nullptr;
-}
-
-/// Returns whether the given decl is from a protocol, and that protocol has an underscored name.
-bool isFromUnderscoredProtocol(const Decl *D) {
-  if (const auto *P = getSourceProtocol(D))
-    return P->hasUnderscoredNaming();
-
-  return false;
-}
-
-}
-
 bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
                                       bool IgnoreContext) const {
   // Don't record unconditionally private declarations
@@ -631,8 +607,14 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     return true;
   }
 
+  // If the decl has a `@_documentation(visibility: <access>)` attribute, override any other heuristic
+  auto DocVisibility = documentationVisibilityForDecl(D);
+  if (DocVisibility) {
+    return Walker.Options.MinimumAccessLevel > (*DocVisibility);
+  }
+
   // Don't record effectively internal declarations if specified
-  if (D->hasUnderscoredNaming() || isFromUnderscoredProtocol(D)) {
+  if (D->hasUnderscoredNaming()) {
     // Some implicit decls from Clang with underscored names sneak in, so throw those out
     if (const auto *clangD = D->getClangDecl()) {
       if (clangD->isImplicit())
@@ -665,7 +647,9 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
   if (const auto *Extension = dyn_cast<ExtensionDecl>(D)) {
     if (const auto *Nominal = Extension->getExtendedNominal()) {
-      return isImplicitlyPrivate(Nominal, IgnoreContext);
+      return isImplicitlyPrivate(Nominal, IgnoreContext) ||
+             Symbol::getEffectiveAccessLevel(Extension) <
+                 Walker.Options.MinimumAccessLevel;
     }
   }
 
@@ -676,6 +660,13 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     }
 
     // Special cases below.
+
+    // Symbols from exported-imported modules should only be included if they
+    // were originally public.
+    if (Walker.isFromExportedImportedModule(D) &&
+        VD->getFormalAccess() < AccessLevel::Public) {
+      return true;
+    }
 
     auto BaseName = VD->getBaseName().userFacingName();
 
@@ -732,7 +723,7 @@ bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) cons
 bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName() && !Walker.isFromExportedImportedModule(D)) {
+  if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
     return false;
   }
 

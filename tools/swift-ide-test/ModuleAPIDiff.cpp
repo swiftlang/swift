@@ -756,6 +756,7 @@ public:
                 convertToTypeName(Req.getSecondType())});
         break;
       case RequirementKind::Layout:
+      case RequirementKind::SameCount:
         // FIXME
         assert(false && "Not implemented");
         break;

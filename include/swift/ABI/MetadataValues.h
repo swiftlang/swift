@@ -22,6 +22,7 @@
 #include "swift/ABI/KeyPath.h"
 #include "swift/ABI/ProtocolDispatchStrategy.h"
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/FlagSet.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -531,8 +532,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 #endif
 };
 
@@ -1349,6 +1349,11 @@ namespace SpecialPointerAuthDiscriminators {
   /// Protocol conformance descriptors.
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
 
+  /// Pointer to value witness table stored in type metadata.
+  ///
+  /// Computed with ptrauth_string_discriminator("value_witness_table_t").
+  const uint16_t ValueWitnessTable = 0x2e3f;
+
   /// Extended existential type shapes.
   const uint16_t ExtendedExistentialTypeShape = 0x5a3d; // = 23101
   const uint16_t NonUniqueExtendedExistentialTypeShape = 0xe798; // = 59288
@@ -1422,6 +1427,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
+
+  // C type TaskContinuationFunction* descriminator.
+  const uint16_t ClangTypeTaskContinuationFunction = 0x2abe; // = 10942
 
   /// Dispatch integration.
   const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
@@ -2239,7 +2247,9 @@ public:
     RequestedPriority_width = 8,
 
     Task_IsChildTask                              = 8,
-    // bit 9 is unused
+    // Should only be set in task-to-thread model where Task.runInline is
+    // available
+    Task_IsInlineTask                             = 9,
     Task_CopyTaskLocals                           = 10,
     Task_InheritContext                           = 11,
     Task_EnqueueJob                               = 12,
@@ -2255,6 +2265,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsInlineTask,
+                                isInlineTask,
+                                setIsInlineTask)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_CopyTaskLocals,
                                 copyTaskLocals,
                                 setCopyTaskLocals)
@@ -2360,6 +2373,8 @@ enum class TaskOptionRecordKind : uint8_t {
   AsyncLet  = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
+  /// Request a child task for swift_task_run_inline.
+  RunInline = UINT8_MAX,
 };
 
 /// Flags for cancellation records.

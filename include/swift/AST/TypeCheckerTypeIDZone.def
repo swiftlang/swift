@@ -33,6 +33,10 @@ SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentImplementationOnlyImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInconsistentSPIOnlyImportsRequest,
+              evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInconsistentWeakLinkedImportsRequest,
+              evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
               evaluator::SideEffect(ValueDecl *),
               Uncached, NoLocationInfo)
@@ -169,12 +173,8 @@ SWIFT_REQUEST(TypeChecker, HasCircularInheritedProtocolsRequest,
               bool(ProtocolDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasCircularRawValueRequest,
               bool(EnumDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasDynamicMemberLookupAttributeRequest,
-              bool(CanType), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
-              bool(CanType), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
-              bool(SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasImportsMatchingFlagRequest,
+              bool(SourceFile *, ImportOptions), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
               LibraryLevel(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
@@ -201,11 +201,11 @@ SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsCallableNominalTypeRequest,
-              bool(CanType, DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsMoveOnlyRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest, bool(AbstractStorageDecl *),
               SeparatelyCached, NoLocationInfo)
@@ -259,6 +259,9 @@ SWIFT_REQUEST(TypeChecker, PropertyWrapperMutabilityRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperTypeInfoRequest,
               PropertyWrapperTypeInfo(NominalTypeDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ConstantValueInfoRequest,
+              ConstValueTypeInfo(NominalTypeDecl *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
               SeparatelyCached, NoLocationInfo)
@@ -390,11 +393,44 @@ SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
               ProtocolConformance *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
-              ValueDecl *(const ValueDecl *, const AvailableAttr *, bool),
+              ValueDecl *(const ValueDecl *, const AvailableAttr *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsSemanticallyUnavailableRequest,
+              bool(const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetSourceFileAsyncNode,
               AwaitExpr *(const SourceFile *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapper,
+              NominalTypeDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperType,
+              Type(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorage,
+              NominalTypeDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperProperty,
+              VarDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperStorageForProperty,
+              VarDecl *(VarDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedPropertyGetterBody,
+              BraceStmt *(AccessorDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedPropertySetterBody,
+              BraceStmt *(AccessorDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsPropertyAccessedViaTypeWrapper,
+              bool(VarDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrapperInitializer,
+              ConstructorDecl *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrapperInitializerBody,
+              BraceStmt *(ConstructorDecl *),
               Cached, NoLocationInfo)

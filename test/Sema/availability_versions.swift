@@ -839,6 +839,26 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
   }
 }
 
+@available(OSX, introduced: 10.51)
+class SubWithLimitedAvailablility : SuperWithAlwaysAvailableMembers {
+  override func shouldAlwaysBeAvailableMethod() {}
+  
+  override var shouldAlwaysBeAvailableProperty: Int {
+    get { return 10 }
+    set(newVal) {}
+  }
+  
+  override var setterShouldAlwaysBeAvailableProperty: Int {
+    get { return 9 }
+    set(newVal) {}
+  }
+
+  override var getterShouldAlwaysBeAvailableProperty: Int {
+    get { return 9 }
+    set(newVal) {}
+  }
+}
+
 class SuperWithLimitedMemberAvailability {
   @available(OSX, introduced: 10.51)
   func someMethod() {
@@ -876,6 +896,44 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
       return 9
       }
     set(newVal) {}
+  }
+}
+
+@available(OSX, introduced: 10.51)
+class SubWithLimitedAvailability : SuperWithLimitedMemberAvailability {
+  override func someMethod() {
+    super.someMethod()
+  }
+  
+  override var someProperty: Int {
+    get { super.someProperty }
+    set(newVal) { super.someProperty = newVal }
+  }
+}
+
+@available(OSX, introduced: 10.52)
+class SubWithMoreLimitedAvailability : SuperWithLimitedMemberAvailability {
+  override func someMethod() {
+    super.someMethod()
+  }
+  
+  override var someProperty: Int {
+    get { super.someProperty }
+    set(newVal) { super.someProperty = newVal }
+  }
+}
+
+@available(OSX, introduced: 10.52)
+class SubWithMoreLimitedAvailabilityAndRedundantMemberAvailability : SuperWithLimitedMemberAvailability {
+  @available(OSX, introduced: 10.52)
+  override func someMethod() {
+    super.someMethod()
+  }
+  
+  @available(OSX, introduced: 10.52)
+  override var someProperty: Int {
+    get { super.someProperty }
+    set(newVal) { super.someProperty = newVal }
   }
 }
 
@@ -1434,7 +1492,7 @@ protocol HasMethodF {
 
 class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF {
   @available(OSX, introduced: 10.51)
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50 and newer}}
 }
 
 
@@ -1450,7 +1508,7 @@ class SuperHasMethodF {
     func f(_ p: Int) { } // expected-note {{'f' declared here}}
 }
 
-class TriesToConformWithPotentiallyUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+class TriesToConformWithPotentiallyUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50 and newer}}
   // The conformance here is generating an error on f in the super class.
 }
 
@@ -1474,7 +1532,7 @@ class ConformsByOverridingFunctionInSuperClass : SuperHasMethodF, HasMethodF {
 class HasNoMethodF1 { }
 extension HasNoMethodF1 : HasMethodF {
   @available(OSX, introduced: 10.51)
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50 and newer}}
 }
 
 class HasNoMethodF2 { }

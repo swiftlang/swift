@@ -163,6 +163,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     // a dependent type.
 
     switch (req.getKind()) {
+    case RequirementKind::SameCount:
     case RequirementKind::Layout:
       continue;
 
@@ -353,7 +354,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
         return false;
       
       auto indexTy = index->getInterfaceType()
-                        ->getCanonicalType(sub->getGenericSignatureOfContext());
+                        ->getReducedType(sub->getGenericSignatureOfContext());
       
       // TODO: Handle reabstraction and tuple explosion in thunk generation.
       // This wasn't previously a concern because anything that was Hashable

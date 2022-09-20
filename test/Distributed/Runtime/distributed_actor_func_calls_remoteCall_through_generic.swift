@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color --dump-input=always
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --color
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -17,23 +18,45 @@
 import Distributed
 import FakeDistributedActorSystems
 
-
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
+
+protocol PlainWorker {
+  associatedtype WorkItem: Sendable & Codable
+  associatedtype WorkResult: Sendable & Codable
+
+  /// Can be witnessed by a distributed actor method:
+  func asyncThrows(work: WorkItem) async throws -> WorkResult
+}
 
 protocol DistributedWorker: DistributedActor where ActorSystem == DefaultDistributedActorSystem {
   associatedtype WorkItem: Sendable & Codable
   associatedtype WorkResult: Sendable & Codable
 
-  // distributed requirement currently is forced to be `async throws`...
-  // FIXME(distributed): requirements don't have to be async throws,
-  //                     distributed makes them implicitly async throws anyway...
-  distributed func submit(work: WorkItem) async throws -> WorkResult
+  distributed func dist_sync(work: WorkItem) -> WorkResult
+  distributed func dist_async(work: WorkItem) async -> WorkResult
+  distributed func dist_syncThrows(work: WorkItem) throws -> WorkResult
+  distributed func dist_asyncThrows(work: WorkItem) async throws -> WorkResult
 
   // non distributed requirements can be witnessed with _normal_ functions
   func sync(work: WorkItem) -> WorkResult
   func async(work: WorkItem) async -> WorkResult
   func syncThrows(work: WorkItem) throws -> WorkResult
   func asyncThrows(work: WorkItem) async throws -> WorkResult
+
+  func asyncThrowsReq_witnessDistributed_sync(work: WorkItem) async throws -> WorkResult
+  func asyncThrowsReq_witnessDistributed_async(work: WorkItem) async throws -> WorkResult
+  func asyncThrowsReq_witnessDistributed_syncThrows(work: WorkItem) async throws -> WorkResult
+  func asyncThrowsReq_witnessDistributed_asyncThrows(work: WorkItem) async throws -> WorkResult
+}
+
+distributed actor ThePlainWorker: PlainWorker {
+  typealias ActorSystem = DefaultDistributedActorSystem
+  typealias WorkItem = String
+  typealias WorkResult = String
+
+  distributed func asyncThrows(work: WorkItem) async throws -> WorkResult {
+    return "\(#function): \(work)"
+  }
 }
 
 distributed actor TheWorker: DistributedWorker {
@@ -41,7 +64,16 @@ distributed actor TheWorker: DistributedWorker {
   typealias WorkItem = String
   typealias WorkResult = String
 
-  distributed func submit(work: WorkItem) async throws -> WorkResult {
+  distributed func dist_sync(work: WorkItem) -> WorkResult {
+    "\(#function): \(work)"
+  }
+  distributed func dist_async(work: WorkItem) async -> WorkResult {
+    "\(#function): \(work)"
+  }
+  distributed func dist_syncThrows(work: WorkItem) throws -> WorkResult {
+    "\(#function): \(work)"
+  }
+  distributed func dist_asyncThrows(work: WorkItem) async throws -> WorkResult {
     "\(#function): \(work)"
   }
 
@@ -57,6 +89,20 @@ distributed actor TheWorker: DistributedWorker {
   func asyncThrows(work: WorkItem) async throws -> WorkResult {
     return "\(#function): \(work)"
   }
+
+  distributed func asyncThrowsReq_witnessDistributed_sync(work: WorkItem) -> WorkResult {
+    return "\(#function): \(work)"
+  }
+  distributed func asyncThrowsReq_witnessDistributed_async(work: WorkItem) async -> WorkResult {
+    return "\(#function): \(work)"
+  }
+  distributed func asyncThrowsReq_witnessDistributed_syncThrows(work: WorkItem) throws -> WorkResult {
+    return "\(#function): \(work)"
+  }
+  distributed func asyncThrowsReq_witnessDistributed_asyncThrows(work: WorkItem) async throws -> WorkResult {
+    return "\(#function): \(work)"
+  }
+
 }
 
 func test_generic(system: DefaultDistributedActorSystem) async throws {
@@ -65,24 +111,164 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   precondition(__isRemoteActor(remoteW))
 
   // direct calls work ok:
-  let replyDirect = try await remoteW.submit(work: "Direct")
-  print("reply direct: \(replyDirect)")
-  // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
-  // CHECK: reply direct: submit(work:): Direct
-
-  func callWorker<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
-    try await w.submit(work: "Hello")
+  do {
+    let reply = try await remoteW.dist_sync(work: "Direct")
+    print("replySync direct (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_sync(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: replySync direct (remote): dist_sync(work:): Direct
   }
-  let reply = try await callWorker(w: remoteW)
-  print("reply (remote): \(reply)")
-  // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.submit(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
-  // CHECK: << remoteCall return: submit(work:): Hello
-  // CHECK: reply (remote): submit(work:): Hello
+  print("==== ----------------------------------------------------------------")
 
-  let replyLocal = try await callWorker(w: localW)
-  print("reply (local): \(replyLocal)")
-  // CHECK-NOT: >> remoteCall
-  // CHECK: reply (local): submit(work:): Hello
+  do {
+    let reply = try await remoteW.dist_async(work: "Direct")
+    print("replyAsync direct (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_async(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: replyAsync direct (remote): dist_async(work:): Direct
+  }
+  print("==== ----------------------------------------------------------------")
+
+  do {
+    let reply = try await remoteW.dist_syncThrows(work: "Direct")
+    print("replyThrows direct (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_syncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: replyThrows direct (remote): dist_syncThrows(work:): Direct
+  }
+  print("==== ----------------------------------------------------------------")
+
+  do {
+    let reply = try await remoteW.dist_asyncThrows(work: "Direct")
+    print("replyAsyncThrows direct (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: replyAsyncThrows direct (remote): dist_asyncThrows(work:): Direct
+  }
+  print("==== ----------------------------------------------------------------")
+
+
+  func call_dist_sync<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.dist_sync(work: "Hello")
+  }
+  do {
+    let reply = try await call_dist_sync(w: remoteW)
+    print("reply (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_sync(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: << remoteCall return: dist_sync(work:): Hello
+    // CHECK: reply (remote): dist_sync(work:): Hello
+
+    let replyLocal = try await call_dist_sync(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): dist_sync(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_dist_async<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.dist_async(work: "Hello")
+  }
+  do {
+    let reply = try await call_dist_async(w: remoteW)
+    print("reply (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_async(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: nil), throwing:Swift.Never, returning:Swift.String
+    // CHECK: << remoteCall return: dist_async(work:): Hello
+    // CHECK: reply (remote): dist_async(work:): Hello
+
+    let replyLocal = try await call_dist_async(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): dist_async(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_dist_throws<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.dist_syncThrows(work: "Hello")
+  }
+  do {
+    let reply = try await call_dist_throws(w: remoteW)
+    print("reply (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_syncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: << remoteCall return: dist_syncThrows(work:): Hello
+    // CHECK: reply (remote): dist_syncThrows(work:): Hello
+
+    let replyLocal = try await call_dist_throws(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): dist_syncThrows(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_dist_asyncThrows<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.dist_asyncThrows(work: "Hello")
+  }
+  do {
+    let reply = try await call_dist_asyncThrows(w: remoteW)
+    print("reply (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.TheWorker, target:main.TheWorker.dist_asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: << remoteCall return: dist_asyncThrows(work:): Hello
+    // CHECK: reply (remote): dist_asyncThrows(work:): Hello
+
+    let replyLocal = try await call_dist_asyncThrows(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): dist_asyncThrows(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+  print("=====================================================================")
+
+  // These tests verify that we can call these methods if we "peel off" distributed
+  // isolation, and they'll end up invoking the distributed witnesses. Though the
+  // distributedness of those witnesses never actually is used remotely, but at
+  // least check we invoke the right methods.
+
+  func call_requirement_witnessedByDistributed_sync<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.whenLocal { __secretlyKnownToBeLocal in
+      try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_sync(work: "Hello")
+    }!
+  }
+  do {
+    let replyLocal = try await call_requirement_witnessedByDistributed_sync(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): asyncThrowsReq_witnessDistributed_sync(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_requirement_witnessedByDistributed_async<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.whenLocal { __secretlyKnownToBeLocal in
+      try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_async(work: "Hello")
+    }!
+  }
+  do {
+    let replyLocal = try await call_requirement_witnessedByDistributed_async(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): asyncThrowsReq_witnessDistributed_async(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_requirement_witnessedByDistributed_syncThrows<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.whenLocal { __secretlyKnownToBeLocal in
+      try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_syncThrows(work: "Hello")
+    }!
+  }
+  do {
+    let replyLocal = try await call_requirement_witnessedByDistributed_syncThrows(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): asyncThrowsReq_witnessDistributed_syncThrows(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_requirement_witnessedByDistributed_asyncThrows<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.whenLocal { __secretlyKnownToBeLocal in
+      try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_asyncThrows(work: "Hello")
+    }!
+  }
+  do {
+    let replyLocal = try await call_requirement_witnessedByDistributed_asyncThrows(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): asyncThrowsReq_witnessDistributed_asyncThrows(work:): Hello
+  }
+  print("==== ----------------------------------------------------------------")
 }
 
 func test_whenLocal(system: DefaultDistributedActorSystem) async throws {
@@ -119,11 +305,11 @@ func test_whenLocal(system: DefaultDistributedActorSystem) async throws {
 
   do {
     let replyDistSubmit = try await localW.whenLocal { __secretlyKnownToBeLocal in
-      try await __secretlyKnownToBeLocal.submit(work: "local-test")
+      try await __secretlyKnownToBeLocal.dist_sync(work: "local-test")
     }
-    print("replyDistSubmit (local): \(replyDistSubmit ?? "nil")")
+    print("replyDistSync (local): \(replyDistSubmit ?? "nil")")
     // CHECK-NOT: >> remoteCall
-    // CHECK: replyDistSubmit (local): submit(work:): local-test
+    // CHECK: replyDistSync (local): dist_sync(work:): local-test
 
     let replySyncLocal = await localW.whenLocal { __secretlyKnownToBeLocal in
       __secretlyKnownToBeLocal.sync(work: "local-test")
@@ -155,11 +341,45 @@ func test_whenLocal(system: DefaultDistributedActorSystem) async throws {
   }
 }
 
+func test_generic_plain(system: DefaultDistributedActorSystem) async throws {
+  let localW = ThePlainWorker(actorSystem: system)
+  let remoteW = try! ThePlainWorker.resolve(id: localW.id, using: system)
+  precondition(__isRemoteActor(remoteW))
+
+  // direct calls work ok:
+  do {
+    let reply = try await remoteW.asyncThrows(work: "Direct")
+    print("replySync direct (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.ThePlainWorker, target:main.ThePlainWorker.asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Direct"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: replySync direct (remote): asyncThrows(work:): Direct
+  }
+  print("==== ----------------------------------------------------------------")
+
+  func call_plainWorker<W: PlainWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
+    try await w.asyncThrows(work: "Hello")
+  }
+  do {
+    let reply = try await call_plainWorker(w: remoteW)
+    print("reply (remote): \(reply)")
+    // CHECK: >> remoteCall: on:main.ThePlainWorker, target:main.ThePlainWorker.asyncThrows(work:), invocation:FakeInvocationEncoder(genericSubs: [], arguments: ["Hello"], returnType: Optional(Swift.String), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.String
+    // CHECK: << remoteCall return: asyncThrows(work:): Hello
+    // CHECK: reply (remote): asyncThrows(work:): Hello
+
+    let replyLocal = try await call_plainWorker(w: localW)
+    print("reply (local): \(replyLocal)")
+    // CHECK-NOT: >> remoteCall
+    // CHECK: reply (local): asyncThrows(work:): Hello
+  }
+}
+
 @main struct Main {
   static func main() async {
     let system = DefaultDistributedActorSystem()
+    print("===================================================================")
     try! await test_generic(system: system)
-    print("==== ---------------------------------------------------")
+    print("===================================================================")
     try! await test_whenLocal(system: system)
+    print("===================================================================")
+    try! await test_generic_plain(system: system)
   }
 }

@@ -50,11 +50,13 @@ func moduleScoped() {
 // MODULE_SCOPED-NOT: ERROR
 // MODULE_SCOPED: End completions
 
+// https://github.com/apple/swift/issues/57800
+
 enum Foo {
     case bar
 }
 
-var sr15495: Void = {
+var _: Void = {
     let foo: Foo = .#^VAR_INITIALIZED_BY_CALLING_CLOSURE^#
 }()
 

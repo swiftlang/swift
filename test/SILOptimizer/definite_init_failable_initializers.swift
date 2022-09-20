@@ -320,7 +320,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failBeforeDelegation: Int) throws {
@@ -342,11 +342,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failBeforeOrDuringDelegation: Int) throws {
@@ -368,11 +368,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failBeforeOrDuringDelegation2: Int) throws {
@@ -390,7 +390,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failDuringDelegation: Int) throws {
@@ -411,7 +411,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK:         destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -441,12 +441,12 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    release_value [[NEW_SELF]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
@@ -486,12 +486,12 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    release_value [[NEW_SELF]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
@@ -513,7 +513,7 @@ struct ThrowStruct {
 // CHECK:       bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @$s35definite_init_failable_initializers11ThrowStructV20failDuringDelegationACSi_tKcfC
-// CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG1]], [[ARG2]]) : $@convention(method) (Int, @thin ThrowStruct.Type) -> (@owned ThrowStruct, @error Error), normal [[TRY_APPLY_SUCC_BB:bb[0-9]+]], error [[TRY_APPLY_FAIL_BB:bb[0-9]+]]
+// CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG1]], [[ARG2]]) : $@convention(method) (Int, @thin ThrowStruct.Type) -> (@owned ThrowStruct, @error any Error), normal [[TRY_APPLY_SUCC_BB:bb[0-9]+]], error [[TRY_APPLY_FAIL_BB:bb[0-9]+]]
 //
 // CHECK:       [[TRY_APPLY_SUCC_BB]]([[NEW_SELF:%.*]] : $ThrowStruct):
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[NEW_SELF]]
@@ -541,8 +541,8 @@ struct ThrowStruct {
 // CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<ThrowStruct>):
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<ThrowStruct>
 //
-// CHECK:       [[TRY_APPLY_FAIL_BB]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    strong_release [[ERROR]] : $Error
+// CHECK:       [[TRY_APPLY_FAIL_BB]]([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    strong_release [[ERROR]] : $any Error
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
 // CHECK-NEXT:    br [[TRY_APPLY_CONT]]([[NEW_SELF]] : $Optional<ThrowStruct>)
   init?(throwsToOptional: Int) {
@@ -583,7 +583,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failDuringSelfReplacement: Int) throws {
@@ -605,7 +605,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    release_value [[NEW_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -935,7 +935,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   required init() throws {
@@ -963,7 +963,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]] : $ThrowDerivedClass
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_partial_ref [[RELOAD_SELF]] : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
@@ -998,11 +998,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
@@ -1038,7 +1038,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[DERIVED_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1072,12 +1072,12 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[DERIVED_SELF]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
@@ -1125,12 +1125,12 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[DERIVED_SELF]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2) : $Builtin.Int1
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb10
@@ -1155,7 +1155,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb11:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
-// CHECK-NEXT:    throw [[ERROR]] : $Error
+// CHECK-NEXT:    throw [[ERROR]] : $any Error
   init(failBeforeFullInitialization: Int, failAfterFullInitialization: Int) throws {
     try unwrap(failBeforeFullInitialization)
     super.init(noFail: ())
@@ -1191,14 +1191,14 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb7([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb7([[ERROR]] : $Error)
-// CHECK:       bb6([[ERROR:%.*]] : $Error):
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb7([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb7([[ERROR]] : $any Error)
+// CHECK:       bb6([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[DERIVED_SELF]]
-// CHECK-NEXT:    br bb7([[ERROR]] : $Error)
-// CHECK:       bb7([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb7([[ERROR]] : $any Error)
+// CHECK:       bb7([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BITMAP]] : $Builtin.Int2)
 // CHECK-NEXT:    cond_br [[COND]], bb8, bb12
@@ -1247,7 +1247,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   convenience init(failBeforeDelegation: Int) throws {
@@ -1266,9 +1266,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    throw [[ERROR]] : $Error
+// CHECK-NEXT:    throw [[ERROR]] : $any Error
   convenience init(failDuringDelegation: Int) throws {
     try self.init()
   }
@@ -1287,11 +1287,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR1:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
-// CHECK:       bb4([[ERROR2:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
-// CHECK:       bb5([[ERROR3:%.*]] : $Error):
+// CHECK:       bb3([[ERROR1:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR1]] : $any Error)
+// CHECK:       bb4([[ERROR2:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR2]] : $any Error)
+// CHECK:       bb5([[ERROR3:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR3]]
   convenience init(failBeforeOrDuringDelegation: Int) throws {
@@ -1313,11 +1313,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
-// CHECK:       bb4([[ERROR2:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
-// CHECK:       bb5([[ERROR3:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR1]] : $any Error)
+// CHECK:       bb4([[ERROR2:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR2]] : $any Error)
+// CHECK:       bb5([[ERROR3:%.*]] : $any Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR3]]
   convenience init(failBeforeOrDuringDelegation2: Int) throws {
@@ -1337,7 +1337,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $Error):
+// CHECK:       bb2([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[NEW_SELF]]
 // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1367,12 +1367,12 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR1:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
-// CHECK:       bb4([[ERROR2:%.*]] : $Error):
+// CHECK:       bb3([[ERROR1:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR1]] : $any Error)
+// CHECK:       bb4([[ERROR2:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[NEW_SELF]]
-// CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
-// CHECK:       bb5([[ERROR3:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR2]] : $any Error)
+// CHECK:       bb5([[ERROR3:%.*]] : $any Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK:         cond_br {{.*}}, bb6, bb7
 // CHECK:       bb6:
@@ -1411,12 +1411,12 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK:       bb3([[ERROR:%.*]] : $any Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb4([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    strong_release [[NEW_SELF]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
-// CHECK:       bb5([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $any Error)
+// CHECK:       bb5([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK:         cond_br {{.*}}, bb6, bb7
 // CHECK:       bb6:

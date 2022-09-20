@@ -4,7 +4,7 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-// https://bugs.swift.org/browse/SR-10941
+// https://github.com/apple/swift/issues/53332
 
 public protocol SupportedPropertyType { }
 

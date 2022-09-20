@@ -45,7 +45,7 @@ bb3:
   return %3 : $()
 }
 
-sil @throwing_fun : $@convention(thin) () -> @error Error
+sil @throwing_fun : $@convention(thin) () -> @error any Error
 
 // CHECK-LABEL: sil @hoist_generic
 // CHECK: bb0({{.*}}):
@@ -63,7 +63,7 @@ sil @throwing_fun : $@convention(thin) () -> @error Error
 // CHECK:   dealloc_stack [[AS]]
 // CHECK:   throw
 
-sil @hoist_generic_throwing : $@convention(thin) <T> (@in T, Builtin.Int1) -> @error Error {
+sil @hoist_generic_throwing : $@convention(thin) <T> (@in T, Builtin.Int1) -> @error any Error {
 bb0(%0 : $*T, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
@@ -76,8 +76,8 @@ bb2:
   destroy_addr %0 : $*T
   br bb3
 bb3:
-  %3 = function_ref @throwing_fun : $@convention(thin) () -> @error Error
-  try_apply %3() : $@convention(thin) () -> @error Error, normal bb4, error bb5
+  %3 = function_ref @throwing_fun : $@convention(thin) () -> @error any Error
+  try_apply %3() : $@convention(thin) () -> @error any Error, normal bb4, error bb5
 
 bb4(%6: $()):
   %4 = tuple ()
@@ -165,11 +165,11 @@ sil @dont_hoist_opened_generic : $@convention(thin) (@in P, Builtin.Int1) -> () 
 bb0(%0 : $*P, %1: $Builtin.Int1):
   cond_br %1, bb1, bb2
 bb1:
-  %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-  %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-  destroy_addr %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
-  dealloc_stack %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+  %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+  destroy_addr %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+  dealloc_stack %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   br bb3
 bb2:
   destroy_addr %0 : $*P

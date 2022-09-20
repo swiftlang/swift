@@ -19,6 +19,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"
@@ -848,12 +849,12 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
       OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
   auto &Builder = Cloner.getBuilder();
 
-  llvm::SmallPtrSet<SILInstruction *, 16> Processed;
+  InstructionSet Processed(Inst->getFunction());
   // Now clone each candidate and replace the opened archetype
   // by a dominating one.
   while (!Candidates.empty()) {
     auto Candidate = Candidates.pop_back_val();
-    if (Processed.count(Candidate))
+    if (Processed.contains(Candidate))
       continue;
 
     // Compute if a candidate depends on the old opened archetype.

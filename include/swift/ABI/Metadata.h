@@ -40,7 +40,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Basic/Unreachable.h"
-#include "../../../stdlib/public/SwiftShims/HeapObject.h"
+#include "swift/shims/HeapObject.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 
@@ -429,8 +429,7 @@ public:
 #endif
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
 protected:
@@ -2710,8 +2709,7 @@ struct TargetContextDescriptor {
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
 private:
@@ -2976,8 +2974,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -3039,7 +3036,11 @@ public:
     return cd->getKind() == ContextDescriptorKind::OpaqueType;
   }
 };
-  
+
+template <template <typename Runtime> class ObjCInteropKind,
+          unsigned PointerSize>
+using ExternalOpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<
+    External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 using OpaqueTypeDescriptor = TargetOpaqueTypeDescriptor<InProcess>;
 
 /// The instantiation cache for generic metadata.  This must be guaranteed
@@ -4445,8 +4446,7 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 };
 

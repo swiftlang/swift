@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-bound-generic-extensions
+// RUN: %target-typecheck-verify-swift
 
 extension Array<Int> {
   func someIntFuncOnArray() {}
@@ -15,7 +15,7 @@ let _ = [1, 2, 3].makeString() // expected-error 3 {{cannot convert value of typ
 
 extension Set<_> {} // expected-error {{cannot extend a type that contains placeholders}}
 
-// https://bugs.swift.org/browse/SR-4875
+// https://github.com/apple/swift/issues/47452
 
 struct Foo<T, U> {
   var x: T

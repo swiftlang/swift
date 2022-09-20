@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/Projection.h"
@@ -146,7 +147,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
 
   // Collect all users of the temporary into a set. Also, for simplicity,
   // require that all users are within a single basic block.
-  SmallPtrSet<SILInstruction *, 8> users;
+  InstructionSet users(getFunction());
   SILBasicBlock *block = temporary->getParent();
   for (Operand *use : temporary->getUses()) {
     SILInstruction *user = use->getUser();
@@ -157,7 +158,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
 
   // Collect all address projections of the destination - in case we need to
   // hoist them.
-  SmallPtrSet<SILInstruction *, 4> projections;
+  InstructionSet projections(getFunction());
   SILValue destination = copyInst->getDest();
   SILValue destRootAddr = destination;
   while (SingleValueInstruction *projInst = isMovableProjection(destRootAddr)) {
@@ -166,7 +167,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
     // be an identity copy (source == destination).
     // Just to be on the safe side, bail if it's not the case (instead of an
     // assert).
-    if (users.count(projInst))
+    if (users.contains(projInst))
       return;
     projections.insert(projInst);
     destRootAddr = projInst->getOperand(0);
@@ -185,7 +186,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
     if (isa<DeallocStackInst>(inst) && inst->getOperand(0) == temporary)
       break;
 
-    if (users.count(inst) != 0) {
+    if (users.contains(inst) != 0) {
       // Check if the copyInst is the last user of the temporary (beside the
       // dealloc_stack).
       if (endOfLiferangeReached)
@@ -217,7 +218,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       // which is destroyed before the copyInst.
       if (AA->mayReadOrWriteMemory(inst, destination) &&
           // Needed to treat init_existential_addr as not-writing projection.
-          projections.count(inst) == 0)
+          projections.contains(inst) == 0)
         return;
     }
   }
@@ -228,7 +229,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   for (auto iter = beginOfLiferange->getIterator();
        iter != copyInst->getIterator();) {
     SILInstruction *inst = &*iter++;
-    if (projections.count(inst))
+    if (projections.contains(inst))
       inst->moveBefore(beginOfLiferange);
   }
 

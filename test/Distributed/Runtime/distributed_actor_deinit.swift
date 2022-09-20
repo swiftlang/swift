@@ -34,8 +34,7 @@ distributed actor DA_userDefined2 {
   }
 
   deinit {
-    print("Deinitializing \(self.id)")
-    return
+    print("Deinitializing \(self.id) remote:\(__isRemoteActor(self))")
   }
 }
 
@@ -48,7 +47,7 @@ distributed actor DA_state {
   }
 
   deinit {
-    print("Deinitializing \(self.id)")
+    print("Deinitializing \(self.id) remote:\(__isRemoteActor(self))")
     return
   }
 }
@@ -204,7 +203,7 @@ func test() {
   }()
   // CHECK: assign type:DA_userDefined2, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined2, address:ActorAddress(address: "[[ADDR3:addr-[0-9]]]")
-  // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]")
+  // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]") remote:false
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR3]]")
 
   // resign must happen as the _last thing_ after user-deinit completed
@@ -213,7 +212,7 @@ func test() {
   }()
   // CHECK: assign type:DA_state, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_state, address:ActorAddress(address: "[[ADDR4:addr-[0-9]]]")
-  // CHECK: Deinitializing ActorAddress(address: "[[ADDR4]]")
+  // CHECK: Deinitializing ActorAddress(address: "[[ADDR4]]") remote:false
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR4]]")
 
   // a remote actor should not resign it's address, it was never "assigned" it
@@ -222,7 +221,11 @@ func test() {
     try! DA_userDefined2.resolve(id: address, using: system)
   }()
   // CHECK-NEXT: resolve type:DA_userDefined2, address:ActorAddress(address: "[[ADDR5:remote-1]]")
-  // CHECK-NEXT: Deinitializing
+  // MUST NOT run deinit body for a remote distributed actor
+  // CHECK-NOT: Deinitializing ActorAddress(address: "remote-1") remote:true
+
+  print("DONE")
+  // CHECK-NEXT: DONE
 }
 
 @main struct Main {

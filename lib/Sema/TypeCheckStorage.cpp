@@ -60,9 +60,6 @@ Expr *TypeChecker::buildDefaultInitializer(Type type) {
   if (auto tupleType = type->getAs<TupleType>()) {
     SmallVector<Expr *, 2> inits;
     for (const auto &elt : tupleType->getElements()) {
-      if (elt.isVararg())
-        return nullptr;
-
       auto eltInit = TypeChecker::buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;
@@ -106,8 +103,13 @@ static bool hasStoredProperties(NominalTypeDecl *decl) {
 }
 
 static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+  // If declaration has a type wrapper, make sure that
+  // `$_storage` property is synthesized.
+  if (decl->hasTypeWrapper())
+    (void)decl->getTypeWrapperProperty();
+
   // Just walk over the members of the type, forcing backing storage
-  // for lazy properties and property wrappers to be synthesized.
+  // for lazy properties, property and type wrappers to be synthesized.
   for (auto *member : decl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
@@ -119,6 +121,10 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     if (var->hasAttachedPropertyWrapper()) {
       (void) var->getPropertyWrapperAuxiliaryVariables();
       (void) var->getPropertyWrapperInitializerInfo();
+    }
+
+    if (var->isAccessedViaTypeWrapper()) {
+      (void)var->getUnderlyingTypeWrapperStorage();
     }
   }
 
@@ -917,7 +923,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
       }
     }
-    semantics = AccessSemantics::DirectToStorage;
+    semantics = backing->isAccessedViaTypeWrapper()
+                    ? AccessSemantics::DirectToImplementation
+                    : AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
@@ -946,7 +954,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         { var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar,
           isLValue });
     }
-    semantics = AccessSemantics::DirectToStorage;
+    semantics = backing->isAccessedViaTypeWrapper()
+                    ? AccessSemantics::DirectToImplementation
+                    : AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
@@ -987,13 +997,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // Build self
   Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isBaseLValue,
                                      /*convertTy*/ selfTypeForAccess);
-  if (isBaseLValue)
-    selfTypeForAccess = LValueType::get(selfTypeForAccess);
-
-  if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
-    assert(selfAccessKind == SelfAccessorKind::Super);
-    selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
-  }
 
   // Build self.member or equivalent
 
@@ -1173,7 +1176,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   // Drop the self type
   copyMethodType = copyMethodType->getResult()->castTo<FunctionType>();
 
-  auto DSCE = DotSyntaxCallExpr::create(Ctx, DRE, SourceLoc(), Val);
+  auto DSCE = DotSyntaxCallExpr::create(Ctx, DRE, SourceLoc(),
+                                        Argument::unlabeled(Val));
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
   DSCE->setThrows(false);
@@ -1340,11 +1344,11 @@ namespace {
   public:
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
-        return { false, E };
+        return Action::SkipChildren(E);
       }
       
       if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
@@ -1365,12 +1369,16 @@ namespace {
           node.walk(RecontextualizeClosures(NewDC));
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
 
     /// We don't want to recurse into declarations or statements.
-    bool walkToDeclPre(Decl *) override { return false; }
-    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override { return {false,S}; }
+    PreWalkAction walkToDeclPre(Decl *) override {
+      return Action::SkipChildren();
+    }
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::SkipChildren(S);
+    }
   };
 } // end anonymous namespace
 
@@ -1507,12 +1515,35 @@ synthesizeInvalidAccessor(AccessorDecl *accessor, ASTContext &ctx) {
   return { BraceStmt::create(ctx, loc, ArrayRef<ASTNode>(), loc, true), true };
 }
 
+/// Synthesize the body of a getter for a stored property that belongs to
+/// a type wrapped type.
+static std::pair<BraceStmt *, bool>
+synthesizeTypeWrappedPropertyGetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  auto *body = evaluateOrDefault(
+      ctx.evaluator, SynthesizeTypeWrappedPropertyGetterBody{getter}, nullptr);
+  return body ? std::make_pair(body, /*isTypeChecked=*/false)
+              : synthesizeInvalidAccessor(getter, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeTypeWrappedPropertySetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  auto *body = evaluateOrDefault(
+      ctx.evaluator, SynthesizeTypeWrappedPropertySetterBody{getter}, nullptr);
+  return body ? std::make_pair(body, /*isTypeChecked=*/false)
+              : synthesizeInvalidAccessor(getter, ctx);
+}
+
 static std::pair<BraceStmt *, bool>
 synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   auto storage = getter->getStorage();
 
   // Synthesize the getter for a lazy property or property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
+    // If the type this stored property belongs to has a type wrapper
+    // we need to route getter/setter through the wrapper.
+    if (var->isAccessedViaTypeWrapper())
+      return synthesizeTypeWrappedPropertyGetterBody(getter, ctx);
+
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       auto *storage = var->getLazyStorageProperty();
       return synthesizeLazyGetterBody(getter, var, storage, ctx);
@@ -1657,10 +1688,9 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     }
 
     if (SelfDecl) {
-      auto *SelfDRE =
-          buildSelfReference(SelfDecl, SelfAccessorKind::Peer, IsSelfLValue);
-      SelfDRE = maybeWrapInOutExpr(SelfDRE, Ctx);
-      auto *DSCE = DotSyntaxCallExpr::create(Ctx, Callee, SourceLoc(), SelfDRE);
+      auto SelfArg = buildSelfArgument(SelfDecl, SelfAccessorKind::Peer,
+                                       /*isMutable*/ IsSelfLValue);
+      auto *DSCE = DotSyntaxCallExpr::create(Ctx, Callee, SourceLoc(), SelfArg);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -1750,6 +1780,11 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   // Synthesize the setter for a lazy property or property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
+    // If the type this stored property belongs to has a type wrapper
+    // we need to route getter/setter through the wrapper.
+    if (var->isAccessedViaTypeWrapper())
+      return synthesizeTypeWrappedPropertySetterBody(setter, ctx);
+
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
       if (var->hasObservers()) {
@@ -1839,10 +1874,10 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
     Callee->setType(type);
 
     if (SelfDecl) {
-      auto *SelfDRE = buildSelfReference(SelfDecl, SelfAccessorKind::Peer,
-                                         storage->isSetterMutating());
-      SelfDRE = maybeWrapInOutExpr(SelfDRE, ctx);
-      auto *DSCE = DotSyntaxCallExpr::create(ctx, Callee, SourceLoc(), SelfDRE);
+      auto SelfArg =
+          buildSelfArgument(SelfDecl, SelfAccessorKind::Peer,
+                            /*isMutable*/ storage->isSetterMutating());
+      auto *DSCE = DotSyntaxCallExpr::create(ctx, Callee, SourceLoc(), SelfArg);
 
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
@@ -2448,6 +2483,12 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+    // Synthesized getter for a type wrapped variable is never transparent.
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (var->isAccessedViaTypeWrapper())
+        return false;
+    }
+
     break;
 
   case AccessorKind::Set:
@@ -2466,6 +2507,10 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
                      PropertyWrapperSynthesizedPropertyKind::Projection)) {
           break;
         }
+
+        // Synthesized setter for a type wrapped variable is never transparent.
+        if (var->isAccessedViaTypeWrapper())
+          return false;
       }
 
       if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
@@ -2689,7 +2734,8 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 }
 
 static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
-                                                   Expr *&initializer) {
+                                                   Expr *&initializer,
+                                                   bool contextualize) {
   auto *dc = wrappedVar->getInnermostDeclContext();
   auto &ctx = wrappedVar->getASTContext();
   auto *initContext = new (ctx) PropertyWrapperInitializer(
@@ -2705,6 +2751,11 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
 
   initializer = result->getAsExpr();
 
+  // Contextualize the initializer which is a local variable with defaultInit or
+  // gets an independent initializer. The rest of initializer contextualizing
+  // will be done in visitPatternBindingDecl.
+  if (!contextualize)
+    return;
   TypeChecker::contextualizeInitializer(initContext, initializer);
   checkPropertyWrapperActorIsolation(wrappedVar, initializer);
   TypeChecker::checkInitializerEffects(initContext, initializer);
@@ -2934,7 +2985,8 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
 PropertyWrapperInitializerInfo
 PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
                                                 VarDecl *var) const {
-  if (!var->hasAttachedPropertyWrapper() || var->isImplicit())
+  if (!var->hasAttachedPropertyWrapper() ||
+      (var->isImplicit() && !isa<ParamDecl>(var)))
     return PropertyWrapperInitializerInfo();
 
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
@@ -2979,7 +3031,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         && !wrapperInfo.defaultInit) {
       auto ty = parentPBD->getPattern(patternNumber)->getType();
       if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty)) {
-        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit,
+                                               /*contextualize=*/false);
         parentPBD->setInit(0, defaultInit);
         parentPBD->setInitializerChecked(0);
       }
@@ -2997,7 +3050,9 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         // FIXME: Record this expression somewhere so that DI can perform the
         // initialization itself.
         Expr *defaultInit = nullptr;
-        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        // Only contextualize local wrapped property, the rest of wrapped
+        // property will be contextualized in visitPatternBindingDecl.
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit, dc->isLocalContext());
         pbd->setInit(0, defaultInit);
         pbd->setInitializerChecked(0);
 
@@ -3067,7 +3122,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
              !var->getName().hasDollarPrefix()) {
     wrappedValueInit = PropertyWrapperValuePlaceholderExpr::create(
         ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
-    typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit);
+    typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit,
+                                           /*contextualize=*/true);
   }
 
   return PropertyWrapperInitializerInfo(wrappedValueInit, projectedValueInit);
@@ -3249,6 +3305,8 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
       finishNSManagedImplInfo(var, info);
     } else if (var->hasAttachedPropertyWrapper()) {
       finishPropertyWrapperImplInfo(var, info);
+    } else if (var->isAccessedViaTypeWrapper()) {
+      info = StorageImplInfo::getMutableComputed();
     }
   }
 
@@ -3486,19 +3544,19 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   public:
     OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)
-        return {true, E};
+        return Action::Continue(E);
       if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
         if (auto decl = DRE->getDecl()) {
           if (decl == OldValueParam) {
             foundOldValueRef = true;
-            return {false, nullptr};
+            return Action::Stop();
           }
         }
       }
 
-      return {true, E};
+      return Action::Continue(E);
     }
 
     bool didFindOldValueRef() { return foundOldValueRef; }
@@ -3530,7 +3588,8 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   // If we find a reference to the implicit 'oldValue' parameter, then it is
   // not a "simple" didSet because we need to fetch it.
   auto walker = OldValueFinder(param);
-  decl->getTypecheckedBody()->walk(walker);
+  if (auto *body = decl->getTypecheckedBody())
+    body->walk(walker);
   auto hasOldValueRef = walker.didFindOldValueRef();
   if (!hasOldValueRef) {
     // If the body does not refer to implicit 'oldValue', it means we can

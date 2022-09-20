@@ -36,6 +36,8 @@ struct RequirementError {
     InvalidRequirementSubject,
     /// A pair of conflicting requirements, T == Int, T == String
     ConflictingRequirement,
+    /// A recursive requirement, e.g. T == G<T.A>.
+    RecursiveRequirement,
     /// A redundant requirement, e.g. T == T.
     RedundantRequirement,
   } kind;
@@ -85,6 +87,11 @@ public:
   static RequirementError forRedundantRequirement(Requirement req,
                                                   SourceLoc loc) {
     return {Kind::RedundantRequirement, req, loc};
+  }
+
+  static RequirementError forRecursiveRequirement(Requirement req,
+                                                  SourceLoc loc) {
+    return {Kind::RecursiveRequirement, req, loc};
   }
 };
 

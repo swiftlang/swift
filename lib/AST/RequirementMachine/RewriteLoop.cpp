@@ -514,16 +514,15 @@ unsigned RewriteLoop::getDecomposeCount(
   return DecomposeCount;
 }
 
-/// Returns true if the loop contains at least one concrete protocol typealias rule,
-/// which have the form ([P].A.[concrete: C] => [P].A).
+/// Returns true if the loop contains at least one concrete protocol typealias rule.
+/// See Rule::isDerivedFromConcreteProtocolTypeAliasRule().
 bool RewriteLoop::hasConcreteTypeAliasRule(
     const RewriteSystem &system) const {
   const_cast<RewriteLoop *>(this)->recompute(system);
   return HasConcreteTypeAliasRule;
 }
 
-/// The number of Decompose steps, used by the elimination order to prioritize
-/// loops that are not concrete simplifications.
+/// Returns true if the loop contains any rules in empty context.
 bool RewriteLoop::isUseful(
     const RewriteSystem &system) const {
   const_cast<RewriteLoop *>(this)->recompute(system);

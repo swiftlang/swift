@@ -752,9 +752,9 @@ bb0(%0 : @guaranteed $Klass):
   %0a = copy_value %0 : $Klass
   %1 = init_existential_ref %0a : $Klass : $Klass, $MyFakeAnyObject
   %1a = begin_borrow %1 : $MyFakeAnyObject
-  %2 = open_existential_ref %1a : $MyFakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject
-  %3 = witness_method $@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject, #MyFakeAnyObject.myFakeMethod, %2 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject : $@convention(witness_method: MyFakeAnyObject) <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
-  apply %3<@opened("A2E21C52-6089-11E4-9866-3C0754723233") MyFakeAnyObject>(%2) : $@convention(witness_method: MyFakeAnyObject)  <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
+  %2 = open_existential_ref %1a : $MyFakeAnyObject to $@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self
+  %3 = witness_method $@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self, #MyFakeAnyObject.myFakeMethod, %2 : $@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self : $@convention(witness_method: MyFakeAnyObject) <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
+  apply %3<@opened("A2E21C52-6089-11E4-9866-3C0754723233", MyFakeAnyObject) Self>(%2) : $@convention(witness_method: MyFakeAnyObject)  <τ_0_0 where τ_0_0 : MyFakeAnyObject> (@guaranteed τ_0_0) -> ()
   end_borrow %1a : $MyFakeAnyObject
   destroy_value %1 : $MyFakeAnyObject
   %9999 = tuple()

@@ -221,7 +221,7 @@ extension _SmallString {
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift.withUnsafeBytes(of: &raw) {
+    return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
       let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
@@ -241,22 +241,29 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &self._storage) {
-      (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      let len = try f(rawBufPtr)
-      UnsafeMutableRawBufferPointer(
-        rebasing: rawBufPtr[len...]
-      ).initializeMemory(as: UInt8.self, repeating: 0)
-      return len
-    }
-    if len == 0 {
+    let len = try withUnsafeMutableBytes(of: &_storage, f)
+
+    if len <= 0 {
+      _debugPrecondition(len == 0)
       self = _SmallString()
       return
     }
-    _internalInvariant(len <= _SmallString.capacity)
+    _SmallString.zeroTrailingBytes(of: &_storage, from: len)
+    self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
+  }
 
-    let (leading, trailing) = self.zeroTerminatedRawCodeUnits
-    self = _SmallString(leading: leading, trailing: trailing, count: len)
+  @inlinable
+  @_alwaysEmitIntoClient
+  internal static func zeroTrailingBytes(
+    of storage: inout RawBitPattern, from index: Int
+  ) {
+    _internalInvariant(index > 0)
+    _internalInvariant(index <= _SmallString.capacity)
+    //FIXME: Verify this on big-endian architecture
+    let mask0 = (UInt64(bitPattern: ~0) &>> (8 &* ( 8 &- Swift.min(index, 8))))
+    let mask1 = (UInt64(bitPattern: ~0) &>> (8 &* (16 &- Swift.max(index, 8))))
+    storage.0 &= (index <= 0) ? 0 : mask0.littleEndian
+    storage.1 &= (index <= 8) ? 0 : mask1.littleEndian
   }
 }
 
@@ -346,13 +353,22 @@ extension _SmallString {
   //
   @_effects(readonly) // @opaque
   @usableFromInline // testable
-  internal init(taggedCocoa cocoa: AnyObject) {
+  internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
+    var success = true
     self.withMutableCapacity {
-      let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _internalInvariant(len != nil && len! <= _SmallString.capacity,
-        "Internal invariant violated: large tagged NSStrings")
-      return len._unsafelyUnwrappedUnchecked
+      /*
+       For regular NSTaggedPointerStrings we will always succeed here, but
+       tagged NSLocalizedStrings may not fit in a SmallString
+       */
+      if let len = _bridgeTagged(cocoa, intoUTF8: $0) {
+        return len
+      }
+      success = false
+      return 0
+    }
+    if !success {
+      return nil
     }
     self._invariantCheck()
   }

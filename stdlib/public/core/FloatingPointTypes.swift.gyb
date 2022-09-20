@@ -41,8 +41,10 @@ def Availability(bits):
 
 if Self == 'Float16':
     SelfDocComment = '''\
-/// A half-precision (16b), floating-point value type.'''
-
+/// A half-precision (16b), floating-point value type.
+///
+/// `Float16` is available on Apple silicon,
+/// and unavailable on Intel when targeting macOS.'''
 elif Self == 'Float':
     SelfDocComment = '''\
 /// A single-precision, floating-point value type.'''
@@ -53,7 +55,11 @@ elif Self == 'Double':
 
 elif Self == 'Float80':
     SelfDocComment = '''\
-/// An extended-precision, floating-point value type.'''
+/// An extended-precision, floating-point value type.
+///
+/// `Float80` is available on Intel
+/// when the target system supports an 80-bit long double type,
+/// and unavailable on Apple silicon.'''
 
 else:
     raise ValueError('Unhandled float type.')

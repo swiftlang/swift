@@ -1,0 +1,261 @@
+// RUN: %target-sil-opt -verify-continue-on-failure -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s 
+
+import Builtin
+
+class Klass {}
+
+struct NonTrivialStruct {
+  var val: Klass
+}
+
+sil @use_owned : $@convention(thin) (@owned Klass) -> ()
+sil @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+sil @get_owned : $@convention(thin) () -> @owned Klass
+
+// CHECK: Begin Error in function test_missing_end_borrow_single
+// CHECK: SIL verification failed: return with operations still active: state.ActiveOps.empty()
+// CHECK: Verifying instruction:
+// CHECK:      %4 = tuple ()                                // user: %5
+// CHECK: ->   return %4 : $()                              // id: %5
+// CHECK: End Error in function test_missing_end_borrow_single
+sil [ossa] @test_missing_end_borrow_single : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra = store_borrow %0 to %stk : $*Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_missing_end_borrow
+// CHECK: SIL verification failed: return with operations still active: state.ActiveOps.empty()
+// CHECK: Verifying instruction:
+// CHECK:      %8 = tuple ()                                // user: %9
+// CHECK: ->   return %8 : $()                              // id: %9
+// CHECK: End Error in function test_missing_end_borrow
+sil [ossa] @test_missing_end_borrow : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra = store_borrow %0 to %stk : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %ra : $*Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_missing_end_borrow
+// CHECK: SIL verification failed: inconsistent active-operations sets entering basic block: state.ActiveOps == foundState.ActiveOps || isUnreachable()
+// CHECK: Verifying instruction:
+// CHECK: ->   br bb3                                       // id: %5
+// CHECK: End Error in function test_missing_end_borrow
+sil [ossa] @test_missing_end_borrow_dead : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra = store_borrow %0 to %stk : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %ra : $*Klass
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_load_borrow_from_stk
+// CHECK: SIL verification failed: A store_borrow destination can be used only via its return address: user == SI || isa<StoreBorrowInst>(user) || isa<DeallocStackInst>(user)
+// CHECK: Verifying instruction:
+// CHECK:      %2 = alloc_stack $Klass                      // users: %10, %7, %4
+// CHECK:      %3 = begin_borrow %1 : $Klass                // users: %6, %4
+// CHECK: ->   %4 = store_borrow %3 to %2 : $*Klass         // user: %5
+// CHECK:      end_borrow %4 : $*Klass                      // id: %5
+// CHECK: End Error in function test_load_borrow_from_stk
+sil [ossa] @test_load_borrow_from_stk : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %stk = alloc_stack $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %ra = store_borrow %borrow to %stk : $*Klass
+  end_borrow %ra : $*Klass
+  end_borrow %borrow : $Klass
+  %ld = load_borrow %stk : $*Klass
+  end_borrow %ld : $Klass
+  destroy_value %copy : $Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: User found outside scope:   end_borrow %3 : $Klass                          // id: %5
+// CHECK: Begin Error in function test_load_borrow_outside_scope
+// CHECK: SIL verification failed: Ill formed store_borrow scope
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // user: %2
+// CHECK:      %1 = alloc_stack $Klass                      // users: %6, %2
+// CHECK: ->   %2 = store_borrow %0 to %1 : $*Klass         // users: %4, %3
+// CHECK:      %3 = load_borrow %2 : $*Klass                // user: %5
+// CHECK:      end_borrow %2 : $*Klass                      // id: %4
+// CHECK: End Error in function test_load_borrow_outside_scope
+sil [ossa] @test_load_borrow_outside_scope : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra = store_borrow %0 to %stk : $*Klass
+  %ld = load_borrow %ra : $*Klass
+  end_borrow %ra : $*Klass
+  end_borrow %ld : $Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_load_borrow_store_borrow_nested
+// CHECK: SIL verification failed: A store_borrow cannot be nested within another store_borrow to its destination
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // user: %2
+// CHECK:      %1 = alloc_stack $Klass                      // users: %8, %4, %2
+// CHECK: ->   %2 = store_borrow %0 to %1 : $*Klass         // users: %7, %3
+// CHECK:      %3 = load_borrow %2 : $*Klass                // users: %6, %4
+// CHECK:      end_borrow %2 : $*Klass                      // id: %7
+// CHECK: End Error in function test_load_borrow_store_borrow_nested
+sil [ossa] @test_load_borrow_store_borrow_nested : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra1 = store_borrow %0 to %stk : $*Klass
+  %ld = load_borrow %ra1 : $*Klass
+  %ra2 = store_borrow %ld to %stk : $*Klass
+  end_borrow %ra2 : $*Klass
+  end_borrow %ld : $Klass
+  end_borrow %ra1 : $*Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_store_borrow_single_block
+// CHECK: SIL verification failed: A store_borrow destination can be used only via its return address: user == SI || isa<StoreBorrowInst>(user) || isa<DeallocStackInst>(user)
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // users: %6, %2
+// CHECK:      %1 = alloc_stack $Klass                      // users: %8, %6, %4, %3
+// CHECK: ->   %6 = store_borrow %0 to %1 : $*Klass         // user: %7
+// CHECK:      end_borrow %6 : $*Klass                      // id: %7
+// CHECK: End Error in function test_store_borrow_single_block
+sil [ossa] @test_store_borrow_single_block : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %copy = copy_value %0 : $Klass
+  store %copy to [init] %stk : $*Klass
+  %ld = load [take] %stk : $*Klass
+  destroy_value %ld : $Klass
+  %sb = store_borrow %0 to %stk : $*Klass
+  end_borrow %sb : $*Klass
+  dealloc_stack %stk : $*Klass
+  %8 = tuple ()
+  return %8 : $() 
+}
+
+// CHECK: Begin Error in function test_store_borrow_multi_block
+// CHECK: SIL verification failed: A store_borrow destination can be used only via its return address: user == SI || isa<StoreBorrowInst>(user) || isa<DeallocStackInst>(user)
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // users: %7, %2
+// CHECK:      %1 = alloc_stack $Klass                      // users: %9, %7, %4, %3
+// CHECK: ->   %7 = store_borrow %0 to %1 : $*Klass         // user: %8
+// CHECK:      end_borrow %7 : $*Klass                      // id: %8
+// CHECK: End Error in function test_store_borrow_multi_block
+sil [ossa] @test_store_borrow_multi_block : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %copy = copy_value %0 : $Klass
+  store %copy to [init] %stk : $*Klass
+  %ld = load [take] %stk : $*Klass
+  destroy_value %ld : $Klass
+  br bb1
+bb1:
+  %sb = store_borrow %0 to %stk : $*Klass
+  end_borrow %sb : $*Klass
+  dealloc_stack %stk : $*Klass
+  %8 = tuple ()
+  return %8 : $() 
+}
+
+// CHECK: Begin Error in function test_store_borrow_dest
+// CHECK: SIL verification failed: store_borrow destination should be alloc_stack: isa<AllocStackInst>(SI->getDest())
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // user: %3
+// CHECK:      %2 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val // user: %3
+// CHECK: ->   %3 = store_borrow %0 to %2 : $*Klass         // user: %4
+// CHECK:      end_borrow %3 : $*Klass                      // id: %4
+// CHECK: End Error in function test_store_borrow_dest
+sil [ossa] @test_store_borrow_dest : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $NonTrivialStruct
+  %addr = struct_element_addr %stk : $*NonTrivialStruct, #NonTrivialStruct.val
+  %ra = store_borrow %0 to %addr : $*Klass
+  end_borrow %ra : $*Klass
+  dealloc_stack %stk : $*NonTrivialStruct
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_store_borrow_within_store_borrow1
+// CHECK: SIL verification failed: A store_borrow cannot be nested within another store_borrow to its destination
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // users: %3, %2
+// CHECK:      %1 = alloc_stack $Klass                      // users: %6, %3, %2
+// CHECK: ->   %2 = store_borrow %0 to %1 : $*Klass         // user: %5
+// CHECK:      end_borrow %2 : $*Klass                      // id: %5
+// CHECK: End Error in function test_store_borrow_within_store_borrow1
+sil [ossa] @test_store_borrow_within_store_borrow1 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra1 = store_borrow %0 to %stk : $*Klass
+  %ra2 = store_borrow %0 to %stk : $*Klass
+  end_borrow %ra2 : $*Klass
+  end_borrow %ra1 : $*Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Begin Error in function test_store_borrow_within_store_borrow2
+// CHECK: SIL verification failed: A store_borrow cannot be nested within another store_borrow to its destination
+// CHECK: Verifying instruction:
+// CHECK:    %0 = argument of bb0 : $Klass                  // users: %3, %2
+// CHECK:      %1 = alloc_stack $Klass                      // users: %9, %3, %2
+// CHECK: ->   %2 = store_borrow %0 to %1 : $*Klass         // user: %6
+// CHECK:      end_borrow %2 : $*Klass                      // id: %6
+// CHECK: End Error in function test_store_borrow_within_store_borrow2
+sil [ossa] @test_store_borrow_within_store_borrow2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %stk = alloc_stack $Klass
+  %ra1 = store_borrow %0 to %stk : $*Klass
+  %ra2 = store_borrow %0 to %stk : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %ra2 : $*Klass
+  end_borrow %ra1 : $*Klass
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+

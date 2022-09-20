@@ -806,6 +806,62 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Computes whether this is a decl that supports being called through the
+/// implementation of a \c callAsFunction method.
+class IsCallAsFunctionNominalRequest
+    : public SimpleRequest<IsCallAsFunctionNominalRequest,
+                           bool(NominalTypeDecl *, DeclContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Computes whether the specified decl or a super-class/super-protocol has the
+/// @dynamicMemberLookup attribute on it.
+class HasDynamicMemberLookupAttributeRequest
+    : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
+                           bool(NominalTypeDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Computes whether the specified decl or a super-class/super-protocol has the
+/// @dynamicCallable attribute on it.
+class HasDynamicCallableAttributeRequest
+    : public SimpleRequest<HasDynamicCallableAttributeRequest,
+                           bool(NominalTypeDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

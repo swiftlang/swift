@@ -9,9 +9,6 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency
 
-// This test is disabled because it seems to require dedicated CPU access:
-// REQUIRES: rdar94451729
-
 import _Concurrency
 import StdlibUnittest
 
@@ -19,7 +16,9 @@ var tests = TestSuite("Time")
 
 @main struct Main {
   static func main() async {
-    tests.test("ContinuousClock sleep") {
+    tests.test("ContinuousClock sleep")
+    .skip(.always("failed despite increased timeout (rdar://94451729)"))
+    .code {
       let clock = ContinuousClock()
       let elapsed = await clock.measure {
         try! await clock.sleep(until: .now + .milliseconds(100))
@@ -29,7 +28,9 @@ var tests = TestSuite("Time")
       expectLT(elapsed, .milliseconds(1000))
     }
 
-    tests.test("ContinuousClock sleep with tolerance") {
+    tests.test("ContinuousClock sleep with tolerance")
+    .skip(.always("failed despite increased timeout (rdar://94451729)"))
+    .code {
       let clock = ContinuousClock()
       let elapsed = await clock.measure {
         try! await clock.sleep(until: .now + .milliseconds(100), tolerance: .milliseconds(100))
@@ -39,7 +40,9 @@ var tests = TestSuite("Time")
       expectLT(elapsed, .milliseconds(2000))
     }
 
-    tests.test("ContinuousClock sleep longer") {
+    tests.test("ContinuousClock sleep longer")
+    .skip(.always("failed despite increased timeout (rdar://94451729)"))
+    .code {
       let elapsed = await ContinuousClock().measure {
         try! await Task.sleep(until: .now + .seconds(1), clock: .continuous)
       }
@@ -47,7 +50,9 @@ var tests = TestSuite("Time")
       expectLT(elapsed, .seconds(1) + .milliseconds(1000))
     }
 
-    tests.test("SuspendingClock sleep") {
+    tests.test("SuspendingClock sleep")
+    .skip(.always("failed despite increased timeout (rdar://94451729)"))
+    .code {
       let clock = SuspendingClock()
       let elapsed = await clock.measure {
         try! await clock.sleep(until: .now + .milliseconds(100))
@@ -57,7 +62,9 @@ var tests = TestSuite("Time")
       expectLT(elapsed, .milliseconds(1000))
     }
 
-    tests.test("SuspendingClock sleep with tolerance") {
+    tests.test("SuspendingClock sleep with tolerance")
+    .skip(.always("failed despite increased timeout (rdar://94451729)"))
+    .code {
       let clock = SuspendingClock()
       let elapsed = await clock.measure {
         try! await clock.sleep(until: .now + .milliseconds(100), tolerance: .milliseconds(100))
@@ -67,7 +74,9 @@ var tests = TestSuite("Time")
       expectLT(elapsed, .milliseconds(2000))
     }
 
-    tests.test("SuspendingClock sleep longer") {
+    tests.test("SuspendingClock sleep longer")
+    .skip(.always("failed despite increased timeout (rdar://94451729)"))
+    .code {
       let elapsed = await SuspendingClock().measure {
         try! await Task.sleep(until: .now + .seconds(1), clock: .suspending)
       }
@@ -108,6 +117,44 @@ var tests = TestSuite("Time")
       let d1 = Duration.seconds(1)
       let twoSeconds = d1 * 2
       expectEqual(twoSeconds, .seconds(2))
+    }
+
+    tests.test("Duration components/whole second increments") {
+      for i in 0 ..< 1_000_000 {
+        let d = Duration.seconds(i)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(i))
+        expectEqual(comps.attoseconds, 0)
+      }
+    }
+
+    tests.test("Duration components/1ms increments") {
+      for i in 0 ..< 1_000_000 {
+        let d = Duration.milliseconds(i)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(i / 1000))
+        expectEqual(comps.attoseconds, Int64(i % 1000) * 1_000_000_000_000_000)
+      }
+    }
+
+    tests.test("Duration components/100µs increments") {
+      for i in 0 ..< 1_000_000 {
+        let ms = 100 * i
+        let d = Duration.microseconds(ms)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(ms / 1_000_000))
+        expectEqual(comps.attoseconds, Int64(ms % 1_000_000) * 1_000_000_000_000)
+      }
+    }
+
+    tests.test("Duration components/200ns increments") {
+      for i in 0 ..< 1_000_000 {
+        let ns = 200 * i
+        let d = Duration.nanoseconds(ns)
+        let comps = d.components
+        expectEqual(comps.seconds, Int64(ns / 1_000_000_000))
+        expectEqual(comps.attoseconds, Int64(ns % 1_000_000_000) * 1_000_000_000)
+      }
     }
 
     await runAllTestsAsync()

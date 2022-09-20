@@ -11,14 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/BlotMapVector.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -27,6 +29,7 @@
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,9 +56,9 @@ static llvm::cl::opt<bool> AllocBoxToStackAnalyzeApply(
 //                 SIL Utilities for alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
-static SILValue stripOffCopyValue(SILValue V) {
-  while (auto *CVI = dyn_cast<CopyValueInst>(V)) {
-    V = CVI->getOperand();
+static SILValue stripOffCopyAndBorrow(SILValue V) {
+  while (isa<CopyValueInst>(V) || isa<BeginBorrowInst>(V)) {
+    V = cast<SingleValueInstruction>(V)->getOperand(0);
   }
   return V;
 }
@@ -127,7 +130,7 @@ static bool addLastRelease(SILValue V, SILBasicBlock *BB,
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I) ||
         isa<DestroyValueInst>(*I)) {
-      if (stripOffCopyValue(I->getOperand(0)) != V)
+      if (stripOffCopyAndBorrow(I->getOperand(0)) != V)
         continue;
 
       Releases.push_back(&*I);
@@ -538,13 +541,35 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   SILBuilderWithScope Builder(ABI);
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
-  auto &mod = ABI->getFunction()->getModule();
-  bool isLexical = mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
-  auto *ASI = Builder.createAllocStack(
-      ABI->getLoc(),
-      getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
-                         ABI->getBoxType(), ABI->getModule().Types, 0),
-      ABI->getVarInfo(), ABI->hasDynamicLifetime(), isLexical);
+  auto ty = getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
+                               ABI->getBoxType(), ABI->getModule().Types, 0);
+  auto isLexical = [&]() -> bool {
+    auto &mod = ABI->getFunction()->getModule();
+    bool lexicalLifetimesEnabled =
+        mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
+    if (!lexicalLifetimesEnabled)
+      return false;
+    // Look for lexical borrows of the alloc_box.
+    GraphNodeWorklist<Operand *, 4> worklist;
+    worklist.initializeRange(ABI->getUses());
+    while (auto *use = worklist.pop()) {
+      // See through mark_uninitialized and non-lexical begin_borrow
+      // instructions.  It's verified that lexical begin_borrows of SILBoxType
+      // values originate either from AllocBoxInsts or SILFunctionArguments.
+      if (auto *mui = dyn_cast<MarkUninitializedInst>(use->getUser())) {
+        for (auto *use : mui->getUses())
+          worklist.insert(use);
+      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
+        if (bbi->isLexical())
+          return true;
+        for (auto *use : bbi->getUses())
+          worklist.insert(use);
+      }
+    }
+    return false;
+  };
+  auto *ASI = Builder.createAllocStack(ABI->getLoc(), ty, ABI->getVarInfo(),
+                                       ABI->hasDynamicLifetime(), isLexical());
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;
@@ -567,9 +592,16 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   for (auto LastRelease : FinalReleases) {
     SILBuilderWithScope Builder(LastRelease);
     if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
+      // If we have a mark_must_check use of our stack box, we want to destroy
+      // that.
+      SILValue valueToDestroy = StackBox;
+      if (auto *mmci = StackBox->getSingleUserOfType<MarkMustCheckInst>()) {
+        valueToDestroy = mmci;
+      }
+
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
-      Builder.emitDestroyAddrAndFold(Loc, StackBox);
+      Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
     }
     Builder.createDeallocStack(Loc, ASI);
   }

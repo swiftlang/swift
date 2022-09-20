@@ -464,14 +464,14 @@ sil @testThrows : $@convention(thin) <τ_0_0> (τ_0_0) -> (@error Error)
 // CHECK-LABEL: sil [ossa] @testTryApply : {{.*}} {
 // CHECK: bb0:
 // CHECK:   [[INSTANCE:%[^,]+]] = apply
-// CHECK:   function_ref @testThrows : $@convention(thin) <τ_0_0> (τ_0_0) -> @error Error
-// CHECK:   try_apply %{{.*}}<T>([[INSTANCE]]) : $@convention(thin) <τ_0_0> (τ_0_0) -> @error Error, normal bb1, error bb2
+// CHECK:   function_ref @testThrows : $@convention(thin) <τ_0_0> (τ_0_0) -> @error any Error
+// CHECK:   try_apply %{{.*}}<T>([[INSTANCE]]) : $@convention(thin) <τ_0_0> (τ_0_0) -> @error any Error, normal bb1, error bb2
 // CHECK: bb1({{%[^,]+}} : $()):
 // CHECK:   destroy_value [[INSTANCE]] : $T
 // CHECK:   br bb3
-// CHECK: bb2(%{{.*}} : @owned $Error):
+// CHECK: bb2(%{{.*}} : @owned $any Error):
 // CHECK:   destroy_value [[INSTANCE]] : $T
-// CHECK:   destroy_value %{{.*}} : $Error
+// CHECK:   destroy_value %{{.*}} : $any Error
 // CHECK:   br bb3
 // CHECK: bb3:
 // CHECK-NOT: destroy
@@ -511,16 +511,16 @@ sil @takeClosure : $@convention(thin) <T> (@noescape @callee_guaranteed @substit
 // CHECK-LABEL: sil [ossa] @testConvertFunction : $@convention(thin) <T> (@in_guaranteed T) -> @owned AnyObject {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK: [[CLOSURE:%.*]] = apply %{{.*}}<T>(%{{.*}}) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <τ_0_0, τ_0_0>
-// CHECK: [[CONVERT:%.*]] = convert_function [[CLOSURE]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <T, T> to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
-// CHECK: [[COPY:%.*]] = copy_value [[CONVERT]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
-// CHECK: [[NOESCAPE:%.*]] = convert_escape_to_noescape [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
-// CHECK: try_apply %{{.*}}<T>([[NOESCAPE]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <τ_0_0, τ_0_0>) -> (@owned AnyObject, @error Error), normal bb1, error bb2
+// CHECK: [[CONVERT:%.*]] = convert_function [[CLOSURE]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Bool for <T, T> to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T>
+// CHECK: [[COPY:%.*]] = copy_value [[CONVERT]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T>
+// CHECK: [[NOESCAPE:%.*]] = convert_escape_to_noescape [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T>
+// CHECK: try_apply %{{.*}}<T>([[NOESCAPE]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <τ_0_0, τ_0_0>) -> (@owned AnyObject, @error any Error), normal bb1, error bb2
 // CHECK: bb1
-// CHECK:   destroy_value [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
-// CHECK:   destroy_value [[CONVERT]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK:   destroy_value [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T>
+// CHECK:   destroy_value [[CONVERT]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T>
 // CHECK:   return
 // CHECK: bb2
-// CHECK:   destroy_value [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+// CHECK:   destroy_value [[COPY]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <T, T>
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testConvertFunction'
 sil [ossa] @testConvertFunction : $@convention(thin) <T> (@in_guaranteed T) -> @owned AnyObject {

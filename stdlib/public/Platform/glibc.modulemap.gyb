@@ -42,12 +42,16 @@ module SwiftGlibc [system] {
 % end
 
   header "SwiftGlibc.h"
+
+  // <assert.h>'s use of NDEBUG requires textual inclusion. 
+  textual header "assert.h"
+
   export *
 }
 
 % if CMAKE_SDK != "WASI" and CMAKE_SDK != "ANDROID":
 module CUUID [system] {
-  header "${GLIBC_INCLUDE_PATH}/uuid/uuid.h"
+  header "uuid/uuid.h"
   link "uuid"
   export *
 }

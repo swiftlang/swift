@@ -10,7 +10,8 @@ class WithInlineStaticMember {
     // inline static int staticMemberInitializedAtRuntime = init();
 
     static int getStaticMemberFromCxx();
-    static int *getStaticMemberAddress();
+    static int *getStaticMemberAddress()
+        __attribute__((swift_attr("import_unsafe")));
     static void setStaticMemberFromCxx(int);
 };
 

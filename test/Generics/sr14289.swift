@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s
 
+// https://github.com/apple/swift/issues/56648
+
 public protocol One {
     associatedtype MyType
 }

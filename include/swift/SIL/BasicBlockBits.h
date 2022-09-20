@@ -17,8 +17,7 @@
 #ifndef SWIFT_SIL_BASICBLOCKBITS_H
 #define SWIFT_SIL_BASICBLOCKBITS_H
 
-#include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/SmallVector.h"
+#include "swift/SIL/SILBitfield.h"
 
 namespace swift {
 
@@ -26,109 +25,38 @@ namespace swift {
 ///
 /// This can be used by transforms to store temporary flags or tiny values per
 /// basic block.
-/// The memory managed is a 32 bit field within each basic block (\see
-/// BasicBlock::customBits) and thus is very efficient: no memory allocation is
-/// needed, no hash set or map is needed for lookup and there is no
+/// The bits are stored in a 32 bit field within each basic block (\see
+/// SILBasicBlock::customBits) which is very efficient: no memory allocation
+/// is needed, no hash set or map is needed for lookup and there is no
 /// initialization cost (in contrast to BasicBlockData which needs to iterate
 /// over all blocks at initialization).
 ///
 /// Invariants:
 /// * BasicBlockBitfield instances must be allocated and deallocated
 ///   following a strict stack discipline, because bit-positions in
-///   BasicBlock::customBits are "allocated" and "freed" with a stack-allocation
+///   SILBasicBlock::customBits are "allocated" and "freed" with a stack-allocation
 ///   algorithm. This means, it's fine to use a BasicBlockBitfield as (or in)
 ///   local variables, e.g. in transformations. But it's not possible to store
 ///   a BasicBlockBitfield in an Analysis.
 /// * The total number of bits which are alive at the same time must not exceed
-///   32 (the size of BasicBlock::customBits).
-class BasicBlockBitfield {
-  /// The bitfield is "added" to the blocks of this function.
-  SILFunction *function;
+///   32 (the size of SILBasicBlock::customBits).
+class BasicBlockBitfield : public SILBitfield<BasicBlockBitfield, SILBasicBlock> {
+  template <class, class> friend class SILBitfield;
 
-  /// A single linked list of currently alive BasicBlockBitfields (oldest is
-  /// last, newest is first).
-  /// The head of the list is function->lastAllocatedBitfield.
-  BasicBlockBitfield *parent;
-  
-  /// Initialized with the monotonically increasing currentBitfieldID of the
-  /// function.
-  /// Used to check if the bitfield in a block is initialized.
-  /// If a block's lastInitializedBitfieldID is less than this ID, it means
-  /// that the bits of that block are not initialized yet.
-  /// See also: SILBasicBlock::lastInitializedBitfieldID,
-  ///           SILFunction::currentBitfieldID
-  unsigned bitfieldID;
-
-  short startBit;
-  short endBit;
-  uint32_t mask;
+  BasicBlockBitfield *insertInto(SILFunction *function) {
+    BasicBlockBitfield *oldParent = function->newestAliveBlockBitfield;
+    function->newestAliveBlockBitfield = this;
+    return oldParent;
+  }
 
 public:
   BasicBlockBitfield(SILFunction *function, int size) :
-      function(function),
-      parent(function->newestAliveBitfield),
-      bitfieldID(function->currentBitfieldID),
-      startBit(parent ? parent->endBit : 0),
-      endBit(startBit + size),
-      mask(0xffffffffu >> (32 - size) << startBit) {
-    assert(size > 0 && "bit field size must be > 0");
-    assert(endBit <= 32 && "too many/large bit fields allocated in function");
-    assert((!parent || bitfieldID > parent->bitfieldID) &&
-           "BasicBlockBitfield indices are not in order");
-    function->newestAliveBitfield = this;
-    ++function->currentBitfieldID;
-    assert(function->currentBitfieldID != 0 && "currentBitfieldID overflow");
-  }
+    SILBitfield(function, size, insertInto(function)) {}
 
   ~BasicBlockBitfield() {
-    assert(function->newestAliveBitfield == this &&
+    assert(function->newestAliveBlockBitfield == this &&
            "BasicBlockBitfield destructed too early");
-    function->newestAliveBitfield = parent;
-  }
-
-  BasicBlockBitfield(const BasicBlockBitfield &) = delete;
-  BasicBlockBitfield(BasicBlockBitfield &&) = delete;
-  BasicBlockBitfield &operator=(const BasicBlockBitfield &) = delete;
-  BasicBlockBitfield &operator=(BasicBlockBitfield &&) = delete;
-
-  SILFunction *getFunction() const { return function; }
-
-  unsigned get(SILBasicBlock *block) const {
-    assert(block->getParent() == function);
-    if (bitfieldID > block->lastInitializedBitfieldID) {
-      // The bitfield is not initialized yet in this block.
-      return 0;
-    }
-    return (block->customBits & mask) >> startBit;
-  }
-
-  void set(SILBasicBlock *block, unsigned value) {
-    assert(block->getParent() == function);
-    assert(((value << startBit) & ~mask) == 0 &&
-           "value too large for BasicBlockBitfield");
-    unsigned clearMask = mask;
-    if (bitfieldID > block->lastInitializedBitfieldID) {
-
-      // The bitfield is not initialized yet in this block.
-      // Initialize the bitfield, and also initialize all parent bitfields,
-      // which are not initialized, yet. Example:
-      //
-      //  This field   Last initialized field
-      //    |            |
-      //    V            V
-      //   EE DDD C BB AAA
-      //
-      // block->lastInitializedBitfieldID == AAA.bitfieldID
-      // -> we have to initialize the fields: BB, C, DDD and EE
-      //
-      BasicBlockBitfield *bf = parent;
-      while (bf && bf->bitfieldID > block->lastInitializedBitfieldID) {
-        clearMask |= bf->mask;
-        bf = bf->parent;
-      }
-      block->lastInitializedBitfieldID = bitfieldID;
-    }
-    block->customBits = (block->customBits & ~clearMask) | (value << startBit);
+    function->newestAliveBlockBitfield = parent;
   }
 };
 
@@ -161,6 +89,8 @@ class BasicBlockSet {
   BasicBlockFlag flag;
 
 public:
+  using Element = SILBasicBlock *;
+
   BasicBlockSet(SILFunction *function) : flag(function) {}
 
   SILFunction *getFunction() const { return flag.getFunction(); }
@@ -172,6 +102,8 @@ public:
 
   void erase(SILBasicBlock *block) { flag.reset(block); }
 };
+
+using BasicBlockSetWithSize = KnownSizeSet<BasicBlockSet>;
 
 } // namespace swift
 

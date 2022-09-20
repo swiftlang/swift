@@ -537,6 +537,28 @@ ${SelfName}TestSuite.test("pointer(to:)") {
 % end
 }
 
+${SelfName}TestSuite.test("pointer(to:).overflow") {
+  struct Example {
+    var a = false
+    var b = 0
+    var c: String { "\(a),\(b)" }
+    var d = 0.0
+  }
+  let o = MemoryLayout<Example>.offset(of: \.b)!
+  let p = UnsafePointer<Example>(bitPattern: -o)
+  expectNotNil(p)
+  guard let p else { fatalError() }
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  let intPointer = p.pointer(to: \.b)
+  expectNil(intPointer) // nil because of overflow
+  let stringPointer = p.pointer(to: \.c)
+  expectNil(stringPointer) // nil because c is a computed property
+  let doublePointer = p.pointer(to: \.d)
+  expectNotNil(doublePointer)
+}
+
 % end
 
 runAllTests()

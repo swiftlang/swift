@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/54705
+
 enum Time {
   case milliseconds(Int)
 }

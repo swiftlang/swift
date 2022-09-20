@@ -16,23 +16,14 @@
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILDefaultWitnessTable.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <string>
 
 namespace swift {
-
-inline SILLocation getSILLocation(BridgedLocation loc) {
-  return reinterpret_cast<SILDebugLocation *>(&loc)->getLocation();
-}
-
-inline RegularLocation getRegularLocation(BridgedLocation loc) {
-  return RegularLocation(getSILLocation(loc));
-}
-
-inline const SILDebugScope *getSILDebugScope(BridgedLocation loc) {
-  return reinterpret_cast<SILDebugLocation *>(&loc)->getScope();
-}
 
 inline SILType getSILType(BridgedType ty) {
   return SILType::getFromOpaqueValue(ty.typePtr);
@@ -48,10 +39,6 @@ inline SILValue castToSILValue(BridgedValue value) {
 
 inline SILType castToSILType(BridgedType type) {
   return SILType::getFromOpaqueValue(type.typePtr);
-}
-
-inline SubstitutionMap castToSubstitutionMap(BridgedSubstitutionMap subMap) {
-  return SubstitutionMap::getFromOpaqueValue(subMap.op);
 }
 
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
@@ -82,6 +69,28 @@ inline SILFunction *castToFunction(BridgedFunction function) {
 
 inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
+}
+
+inline const SILVTable *castToVTable(BridgedVTable vTable) {
+  return static_cast<const SILVTable *>(vTable.ptr);
+}
+
+inline const SILVTableEntry *castToVTableEntry(BridgedVTableEntry entry) {
+  return static_cast<const SILVTableEntry *>(entry.ptr);
+}
+
+inline const SILWitnessTable *castToWitnessTable(BridgedWitnessTable table) {
+  return static_cast<const SILWitnessTable *>(table.ptr);
+}
+
+inline const SILDefaultWitnessTable *
+castToDefaultWitnessTable(BridgedDefaultWitnessTable table) {
+  return static_cast<const SILDefaultWitnessTable *>(table.ptr);
+}
+
+inline const SILWitnessTable::Entry *
+castToWitnessTableEntry(BridgedWitnessTableEntry entry) {
+  return static_cast<const SILWitnessTable::Entry *>(entry.ptr);
 }
 
 inline ValueOwnershipKind castToOwnership(BridgedOwnership ownership) {

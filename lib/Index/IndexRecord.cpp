@@ -156,11 +156,14 @@ class IndexRecordingConsumer : public IndexDataConsumer {
   // we actually need it (once per Decl instead of once per occurrence).
   std::vector<IndexSymbol> symbolStack;
 
+  bool includeLocals;
+
   std::function<void(SymbolTracker &)> onFinish;
 
 public:
-  IndexRecordingConsumer(std::function<void(SymbolTracker &)> onFinish)
-      : onFinish(std::move(onFinish)) {}
+  IndexRecordingConsumer(bool includeLocals,
+                         std::function<void(SymbolTracker &)> onFinish)
+      : includeLocals(includeLocals), onFinish(std::move(onFinish)) {}
 
   void failed(StringRef error) override {
     // FIXME: expose errors?
@@ -183,6 +186,8 @@ public:
   }
 
   void finish() override { onFinish(record); }
+
+  bool indexLocals() override { return includeLocals; }
 };
 
 class StdlibGroupsIndexRecordingConsumer : public IndexDataConsumer {
@@ -323,10 +328,11 @@ static bool writeRecord(SymbolTracker &record, std::string Filename,
 
 static std::unique_ptr<IndexRecordingConsumer>
 makeRecordingConsumer(std::string Filename, std::string indexStorePath,
-                      DiagnosticEngine *diags,
+                      bool includeLocals, DiagnosticEngine *diags,
                       std::string *outRecordFile,
                       bool *outFailed) {
-  return std::make_unique<IndexRecordingConsumer>([=](SymbolTracker &record) {
+  return std::make_unique<IndexRecordingConsumer>(includeLocals,
+                                                  [=](SymbolTracker &record) {
     *outFailed = writeRecord(record, Filename, indexStorePath, diags,
                              *outRecordFile);
   });
@@ -334,13 +340,13 @@ makeRecordingConsumer(std::string Filename, std::string indexStorePath,
 
 static bool
 recordSourceFile(SourceFile *SF, StringRef indexStorePath,
-                 DiagnosticEngine &diags,
+                 bool includeLocals, DiagnosticEngine &diags,
                  llvm::function_ref<void(StringRef, StringRef)> callback) {
   std::string recordFile;
   bool failed = false;
   auto consumer =
       makeRecordingConsumer(SF->getFilename().str(), indexStorePath.str(),
-                            &diags, &recordFile, &failed);
+                            includeLocals, &diags, &recordFile, &failed);
   indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
@@ -379,6 +385,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexClangModules,
                                  bool indexSystemModules,
                                  bool skipStdlib,
+                                 bool includeLocals,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -391,6 +398,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   bool indexClangModules,
                                   bool indexSystemModules,
                                   bool skipStdlib,
+                                  bool includeLocals,
                                   StringRef targetTriple,
                                   const clang::CompilerInstance &clangCI,
                                   DiagnosticEngine &diags,
@@ -448,7 +456,8 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
               emitDataForSwiftSerializedModule(mod, indexStorePath,
                                                indexClangModules,
                                                indexSystemModules, skipStdlib,
-                                               targetTriple, clangCI, diags,
+                                               includeLocals, targetTriple,
+                                               clangCI, diags,
                                                unitWriter,
                                                pathRemapper,
                                                initialFile);
@@ -479,6 +488,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexClangModules,
                                  bool indexSystemModules,
                                  bool skipStdlib,
+                                 bool includeLocals,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
                                  DiagnosticEngine &diags,
@@ -514,7 +524,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     std::string recordFile;
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),
-                                          &diags, &recordFile, &failed);
+                                          includeLocals, &diags, &recordFile, &failed);
     indexModule(module, *consumer);
 
     if (failed)
@@ -602,9 +612,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                        ModuleDecl::ImportFilterKind::Default});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, targetTriple, clangCI,
-                        diags, unitWriter, moduleNameScratch, pathRemapper,
-                        initialFile);
+                        indexSystemModules, skipStdlib, includeLocals,
+                        targetTriple, clangCI, diags, unitWriter,
+                        moduleNameScratch, pathRemapper, initialFile);
 
   if (unitWriter.write(error)) {
     diags.diagnose(SourceLoc(), diag::error_write_index_unit, error);
@@ -618,7 +628,8 @@ static bool
 recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexClangModules,
                      bool indexSystemModules, bool skipStdlib,
-                     bool isDebugCompilation, StringRef targetTriple,
+                     bool includeLocals, bool isDebugCompilation,
+                     StringRef targetTriple,
                      ArrayRef<const clang::FileEntry *> fileDependencies,
                      const clang::CompilerInstance &clangCI,
                      const PathRemapper &pathRemapper,
@@ -645,15 +656,15 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                 ModuleDecl::ImportFilterKind::ImplementationOnly});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, targetTriple, clangCI,
-                        diags, unitWriter, moduleNameScratch, pathRemapper,
-                        primarySourceFile);
+                        indexSystemModules, skipStdlib, includeLocals,
+                        targetTriple, clangCI, diags, unitWriter,
+                        moduleNameScratch, pathRemapper, primarySourceFile);
 
   // File dependencies.
   for (auto *F : fileDependencies)
     unitWriter.addFileDependency(F, /*FIXME:isSystem=*/false, /*Module=*/nullptr);
 
-  recordSourceFile(primarySourceFile, indexStorePath, diags,
+  recordSourceFile(primarySourceFile, indexStorePath, includeLocals, diags,
                    [&](StringRef recordFile, StringRef filename) {
                      auto file = fileMgr.getFile(filename);
                      unitWriter.addRecordFile(
@@ -700,6 +711,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool indexClangModules,
                            bool indexSystemModules,
                            bool skipStdlib,
+                           bool includeLocals,
                            bool isDebugCompilation,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker,
@@ -729,7 +741,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
 
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
-                              indexSystemModules, skipStdlib,
+                              indexSystemModules, skipStdlib, includeLocals,
                               isDebugCompilation, targetTriple,
                               fileDependencies.getArrayRef(),
                               clangCI, pathRemapper, diags);
@@ -742,6 +754,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            bool indexClangModules,
                            bool indexSystemModules,
                            bool skipStdlib,
+                           bool includeLocals,
                            bool isDebugCompilation,
                            StringRef targetTriple,
                            const DependencyTracker &dependencyTracker,
@@ -779,7 +792,7 @@ bool index::indexAndRecord(ModuleDecl *module,
       }
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
                                indexStorePath, indexClangModules,
-                               indexSystemModules, skipStdlib,
+                               indexSystemModules, skipStdlib, includeLocals,
                                isDebugCompilation, targetTriple,
                                fileDependencies.getArrayRef(),
                                clangCI, pathRemapper, diags))

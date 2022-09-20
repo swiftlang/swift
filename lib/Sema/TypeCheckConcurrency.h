@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include <cassert>
@@ -60,16 +61,6 @@ void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
 void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
 
-/// Determine the isolation of a particular closure.
-///
-/// This forwards to \c ActorIsolationChecker::determineClosureActorIsolation
-/// and thus assumes that enclosing closures have already had their isolation
-/// checked.
-///
-/// This does not set the closure's actor isolation
-ClosureActorIsolation
-determineClosureActorIsolation(AbstractClosureExpr *closure);
-
 /// States the reason for checking the Sendability of a given declaration.
 enum class SendableCheckReason {
   /// A reference to an actor from outside that actor.
@@ -102,7 +93,8 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// code where strict checking has been enabled.
 bool contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency);
 
 /// Describes a referenced actor variable and whether it is isolated.
 struct ReferencedActor {
@@ -209,6 +201,9 @@ struct ActorReferenceResult {
     /// The declaration is being accessed from outside the actor and
     /// potentially from a different node, so it must be marked 'distributed'.
     Distributed = 1 << 2,
+
+    /// The declaration is being accessed from a @preconcurrency context.
+    Preconcurrency = 1 << 3,
   };
 
   using Options = OptionSet<Flags>;
@@ -240,13 +235,13 @@ public:
   /// provided when referencing the declaration. This can be either the base
   /// of a member access or a parameter passed to a function.
   static ActorReferenceResult forReference(
-      ConcreteDeclRef declRef,
-      SourceLoc declRefLoc,
-      const DeclContext *fromDC,
+      ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
       Optional<VarRefUseEnv> useKind = None,
       Optional<ReferencedActor> actorInstance = None,
       Optional<ActorIsolation> knownDeclIsolation = None,
-      Optional<ActorIsolation> knownContextIsolation = None);
+      Optional<ActorIsolation> knownContextIsolation = None,
+      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+          getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation);
 
   operator Kind() const { return kind; }
 };
@@ -417,7 +412,8 @@ Type getExplicitGlobalActor(ClosureExpr *closure);
 /// Adjust the type of the variable for concurrency.
 Type adjustVarTypeForConcurrency(
     Type type, VarDecl *var, DeclContext *dc,
-    llvm::function_ref<Type(const AbstractClosureExpr *)> getType);
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency);
 
 /// Adjust the given function type to account for concurrency-specific
 /// attributes whose affect on the type might differ based on context.
@@ -428,6 +424,7 @@ AnyFunctionType *adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
+    llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency,
     llvm::function_ref<Type(Type)> openType);
 
 /// Determine whether the given name is that of a DispatchQueue operation that

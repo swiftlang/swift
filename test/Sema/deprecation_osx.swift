@@ -165,3 +165,60 @@ func functionWithDeprecatedMethodInDeadElseBranch() {
     let _ = ClassDeprecatedIn10_9()  // no-warning
   }
 }
+
+// https://github.com/apple/swift/issues/59843
+class I59843_A {
+  @available(macOS, deprecated: 10.51, renamed: "configure(with:)")
+  static func configure(a: String, b: String) {}
+
+  static func configure(with: Int) {}
+
+  @available(macOS, deprecated: 10.51, renamed: "method(with:)")
+  func method(a: String, b: String) {}
+
+  func method(with: Int) {}
+
+  func f() {
+    self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 10.51: renamed to 'method(with:)'}}
+    // expected-note@-1{{use 'method(with:)' instead}} {{none}} 
+  }
+}
+
+class I59843_B {
+  @available(macOS, deprecated: 10.51, renamed: "configure(with:and:)")
+  static func configure(a: String, b: String) {}
+
+  static func configure(with: Int, and: Int) {}
+  
+  @available(macOS, deprecated: 10.51, renamed: "method(with:and:)")
+  func method(a: String, b: String) {}
+
+  func method(with: Int, and: Int) {}
+
+  // Context
+  @available(macOS, deprecated: 10.51, renamed: "I59843_B.context(with:and:)")
+  static func context(a: String, b: String) {}
+
+  static func context(with: Int, and: Int) {}
+
+  @available(macOS, deprecated: 10.51, renamed: "I59843_A.contextDiff(with:and:)")
+  static func contextDiff(a: String, b: String) {}
+
+  static func contextDiff(with: Int, and: Int) {}
+  
+  func f() {
+    self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 10.51: renamed to 'method(with:and:)'}}
+    // expected-note@-1{{use 'method(with:and:)' instead}} {{17-18=with}} {{25-26=and}}
+  }
+}
+
+func I59843_f() {
+  I59843_A.configure(a: "a", b: "b") // expected-warning{{'configure(a:b:)' was deprecated in macOS 10.51: renamed to 'configure(with:)'}}
+  // expected-note@-1{{use 'configure(with:)' instead}} {{none}}
+  I59843_B.configure(a: "a", b: "b") // expected-warning{{'configure(a:b:)' was deprecated in macOS 10.51: renamed to 'configure(with:and:)'}}
+  // expected-note@-1{{use 'configure(with:and:)' instead}} {{22-23=with}} {{30-31=and}}
+  I59843_B.context(a: "a", b: "b") // expected-warning{{'context(a:b:)' was deprecated in macOS 10.51: replaced by 'I59843_B.context(with:and:)'}}
+  // expected-note@-1{{use 'I59843_B.context(with:and:)' instead}} {{20-21=with}} {{28-29=and}}
+  I59843_B.contextDiff(a: "a", b: "b") // expected-warning{{'contextDiff(a:b:)' was deprecated in macOS 10.51: replaced by 'I59843_A.contextDiff(with:and:)'}}
+  // expected-note@-1{{use 'I59843_A.contextDiff(with:and:)' instead}} {{3-23=I59843_A.contextDiff}} {{24-25=with}} {{32-33=and}}
+}

@@ -21,6 +21,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -77,13 +78,13 @@ namespace {
 /// TODO: Check if we still need to handle stores when RLE supports OSSA.
 class TempRValueOptPass : public SILFunctionTransform {
   bool collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
-                    SmallPtrSetImpl<SILInstruction *> &loadInsts);
+                    InstructionSetWithSize &loadInsts);
   bool collectLoadsFromProjection(SingleValueInstruction *projection,
                                   CopyAddrInst *originalCopy,
-                                  SmallPtrSetImpl<SILInstruction *> &loadInsts);
+                                  InstructionSetWithSize &loadInsts);
 
   SILInstruction *getLastUseWhileSourceIsNotModified(
-    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts,
+    CopyAddrInst *copyInst, const InstructionSetWithSize &useInsts,
     AliasAnalysis *aa);
 
   bool
@@ -102,7 +103,7 @@ class TempRValueOptPass : public SILFunctionTransform {
 
 bool TempRValueOptPass::collectLoadsFromProjection(
     SingleValueInstruction *projection, CopyAddrInst *originalCopy,
-    SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+    InstructionSetWithSize &loadInsts) {
   // Transitively look through projections on stack addresses.
   for (auto *projUseOper : projection->getUses()) {
     auto *user = projUseOper->getUser();
@@ -130,7 +131,7 @@ bool TempRValueOptPass::collectLoadsFromProjection(
 /// that may write to memory at \p address.
 bool TempRValueOptPass::
 collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
-             SmallPtrSetImpl<SILInstruction *> &loadInsts) {
+             InstructionSetWithSize &loadInsts) {
   SILInstruction *user = addressUse->getUser();
   SILValue address = addressUse->get();
 
@@ -330,7 +331,7 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
 /// of the temporary and look for the last use, which effectively ends the
 /// lifetime.
 SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
-    CopyAddrInst *copyInst, const SmallPtrSetImpl<SILInstruction *> &useInsts,
+    CopyAddrInst *copyInst, const InstructionSetWithSize &useInsts,
     AliasAnalysis *aa) {
   if (useInsts.empty())
     return copyInst;
@@ -345,7 +346,7 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
   for (; iter != iterEnd; ++iter) {
     SILInstruction *inst = &*iter;
 
-    if (useInsts.count(inst))
+    if (useInsts.contains(inst))
       ++numLoadsFound;
 
     // If this is the last use of the temp we are ok. After this point,
@@ -399,10 +400,15 @@ bool TempRValueOptPass::extendAccessScopes(
       if (endAccessToMove)
         return false;
       // Is this the end of an access scope of the copy-source?
-      if (!aa->isNoAlias(copySrc, endAccess->getSource())) {
-        assert(endAccess->getBeginAccess()->getAccessKind() ==
-                 SILAccessKind::Read &&
-               "a may-write end_access should not be in the copysrc lifetime");
+      if (!aa->isNoAlias(copySrc, endAccess->getSource()) &&
+
+          // There cannot be any aliasing modifying accesses within the liferange
+          // of the temporary, because we would have cought this in
+          // `getLastUseWhileSourceIsNotModified`.
+          // But there are cases where `AliasAnalysis::isNoAlias` is less precise
+          // than `AliasAnalysis::mayWriteToMemory`. Therefore, just ignore any
+          // non-read accesses.
+          endAccess->getBeginAccess()->getAccessKind() == SILAccessKind::Read) {
 
         // Don't move instructions beyond the block's terminator.
         if (isa<TermInst>(lastUseInst))
@@ -500,11 +506,29 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   if (!tempObj)
     return;
 
-  // If the storage corresponds to a source-level var, do not optimize here.
-  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
-  // which will ensure that the value's lifetime isn't observably shortened.
-  if (tempObj->isLexical())
-    return;
+  // If the temporary storage is lexical, it either came from a source-level var
+  // or was marked lexical because it was passed to a function that has been
+  // inlined.
+  // TODO: [begin_borrow_addr] Once we can mark addresses as being borrowed, we
+  //       won't need to mark alloc_stacks lexical during inlining.  At that
+  //       point, the above comment should change, but the implementation
+  //       remains the same.
+  //
+  // In either case, we can eliminate the temporary if the source of the copy is
+  // lexical and it is live for longer than the temporary.
+  if (tempObj->isLexical()) {
+    // TODO: Determine whether the base of the copy_addr's source is lexical and
+    //       its live range contains the range in which the alloc_stack
+    //       contains the value copied into it via the copy_addr.
+    //
+    // For now, only look for guaranteed arguments.
+    auto storage = AccessStorageWithBase::compute(copyInst->getSrc());
+    if (!storage.base)
+      return;
+    if (auto *arg = dyn_cast<SILFunctionArgument>(storage.base))
+      if (arg->getOwnershipKind() != OwnershipKind::Guaranteed)
+        return;
+  }
 
   bool isOSSA = copyInst->getFunction()->hasOwnership();
   
@@ -520,7 +544,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
   // destroy_addr.
-  SmallPtrSet<SILInstruction *, 8> loadInsts;
+  InstructionSetWithSize loadInsts(getFunction());
   for (auto *useOper : tempObj->getUses()) {
     SILInstruction *user = useOper->getUser();
 
@@ -644,10 +668,20 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
     return std::next(si->getIterator());
   }
 
-  // If the storage corresponds to a source-level var, do not optimize here.
-  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
-  // which will ensure that the value's lifetime isn't observably shortened.
+  // If the temporary storage is lexical, it either came from a source-level var
+  // or was marked lexical because it was passed to a function that has been
+  // inlined.
+  // TODO: [begin_borrow_addr] Once we can mark addresses as being borrowed, we
+  //       won't need to mark alloc_stacks lexical during inlining.  At that
+  //       point, the above comment should change, but the implementation
+  //       remains the same.
+  //
+  // In either case, we can eliminate the temporary if the source of the store
+  // is lexical and it is live for longer than the temporary.
   if (tempObj->isLexical()) {
+    // TODO: Find the lexical root of the source, if any, and allow optimization
+    //       if its live range contains the range in which the alloc_stack
+    //       contains the value stored into it.
     return std::next(si->getIterator());
   }
 
@@ -664,7 +698,6 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
   // to the value initialized by this copy. It is sufficient to check that the
   // only users that modify memory are the copy_addr [initialization] and
   // destroy_addr.
-  SmallPtrSet<SILInstruction *, 8> loadInsts;
   for (auto *useOper : tempObj->getUses()) {
     SILInstruction *user = useOper->getUser();
 

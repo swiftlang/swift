@@ -589,6 +589,36 @@ public:
   }
 };
 
+class InlineAttributes final : public InlineContent, private llvm::TrailingObjects<Image, MarkupASTNode *> {
+  friend TrailingObjects;
+
+  // Note that inline attributes are like links, in that there are child inline nodes that are
+  // collectively styled by the attribute text. The child nodes are the text that should be
+  // displayed.
+
+  size_t NumChildren;
+  StringRef Attributes;
+
+  InlineAttributes(StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+
+public:
+  static InlineAttributes *create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+
+  StringRef getAttributes() const { return Attributes; }
+
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+  }
+
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+  }
+
+  static bool classof(const MarkupASTNode *N) {
+    return N->getKind() == ASTNodeKind::InlineAttributes;
+  }
+};
+
 #pragma mark Private Extensions
 
 class PrivateExtension : public MarkupASTNode {

@@ -229,10 +229,15 @@ public:
 
   void computeRedundantRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors);
 
-  void computeConflictDiagnostics(SmallVectorImpl<RequirementError> &errors,
-                                  SourceLoc signatureLoc,
-                                  const PropertyMap &map,
-                                  TypeArrayView<GenericTypeParamType> genericParams);
+  void computeConflictingRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                                SourceLoc signatureLoc,
+                                                const PropertyMap &map,
+                                                TypeArrayView<GenericTypeParamType> genericParams);
+
+  void computeRecursiveRequirementDiagnostics(SmallVectorImpl<RequirementError> &errors,
+                                              SourceLoc signatureLoc,
+                                              const PropertyMap &map,
+                                              TypeArrayView<GenericTypeParamType> genericParams);
 
 private:
   struct CriticalPair {
@@ -357,9 +362,17 @@ private:
   /// minimization.
   std::vector<std::pair<unsigned, unsigned>> ConflictingRules;
 
+  /// A 'recursive' rule is a concrete type or superclass rule where the right
+  /// hand side occurs as a prefix of one of its substitutions.
+  ///
+  /// Populated by computeRecursiveRules().
+  std::vector<unsigned> RecursiveRules;
+
   void propagateExplicitBits();
 
   void propagateRedundantRequirementIDs();
+
+  void computeRecursiveRules();
 
   using EliminationPredicate = llvm::function_ref<bool(unsigned loopID,
                                                        unsigned ruleID)>;
@@ -371,8 +384,26 @@ private:
 
   void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
 
+public:
+  // Utilities for minimal conformances algorithm, defined in
+  // MinimalConformances.cpp.
+
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term,
+      SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
+
+  void computeCandidateConformancePaths(
+      const PropertyMap &map,
+      llvm::MapVector<unsigned,
+                      std::vector<SmallVector<unsigned, 2>>> &paths) const;
+
+private:
   void computeMinimalConformances(
-      llvm::DenseSet<unsigned> &redundantConformances);
+      const PropertyMap &map,
+      llvm::DenseSet<unsigned> &redundantConformances) const;
 
 public:
   void recordRewriteLoop(MutableTerm basepoint,
@@ -386,7 +417,7 @@ public:
     return Loops;
   }
 
-  void minimizeRewriteSystem();
+  void minimizeRewriteSystem(const PropertyMap &map);
 
   GenericSignatureErrors getErrors() const;
 

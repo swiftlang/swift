@@ -191,6 +191,11 @@ public:
     bool isClosureResult() const {
       return getKind() == PathElementKind::ClosureResult;
     }
+
+    void dump(raw_ostream &out) const LLVM_ATTRIBUTE_USED;
+    SWIFT_DEBUG_DUMP {
+      dump(llvm::errs());
+    }
   };
 
   /// Return the summary flags for an entire path.
@@ -1071,6 +1076,39 @@ public:
   }
 };
 
+class LocatorPathElt::PatternDecl : public StoredIntegerElement<1> {
+public:
+  PatternDecl(ConstraintLocator::PathElementKind kind)
+      : StoredIntegerElement(kind, /*placeholder=*/0) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedPatternDecl ||
+           elt->getKind() == ConstraintLocator::AnyPatternDecl;
+  }
+};
+
+class LocatorPathElt::NamedPatternDecl final
+    : public LocatorPathElt::PatternDecl {
+public:
+  NamedPatternDecl() : PatternDecl(ConstraintLocator::NamedPatternDecl) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedPatternDecl;
+  }
+};
+
+class LocatorPathElt::AnyPatternDecl final
+    : public LocatorPathElt::PatternDecl {
+public:
+  AnyPatternDecl() : PatternDecl(ConstraintLocator::AnyPatternDecl) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::AnyPatternDecl;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {
@@ -1256,6 +1294,22 @@ public:
 
     return None;
   }
+
+  /// Check whether this locator has the given locator path element
+  /// at the end of its path.
+  template <class Kind>
+  bool endsWith() const {
+    if (auto lastElt = last()) {
+      return lastElt->is<Kind>();
+    }
+    return false;
+  }
+
+  /// Produce a debugging dump of this locator.
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
+
+  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 } // end namespace constraints

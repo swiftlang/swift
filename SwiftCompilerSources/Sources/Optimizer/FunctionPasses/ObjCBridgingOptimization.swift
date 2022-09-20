@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Basic
 import SIL
 
 /// Removes redundant ObjectiveC <-> Swift bridging calls.
@@ -48,12 +47,10 @@ let objCBridgingOptimization = FunctionPass(name: "objc-bridging-opt", {
   }
 
   // Now try to optimize non-optional and optional -> non-optional bridging.
-  for block in function.blocks {
-    for inst in block.instructions {
-      if let apply = inst as? ApplyInst {
-        if !optimizeNonOptionalBridging(apply, context) {
-          return
-        }
+  for inst in function.instructions {
+    if let apply = inst as? ApplyInst {
+      if !optimizeNonOptionalBridging(apply, context) {
+        return
       }
     }
   }

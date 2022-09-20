@@ -85,14 +85,14 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[THIS:%.*]] : @guaranteed $NSRuncing):
+// CHECK: bb0([[THIS:%.*]] : @guaranteed $any NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
-// CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
+// CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $any NSRuncing to $[[OPENED:@opened\(.*, any NSRuncing\) Self]]
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS1]] : $[[OPENED]], #NSRuncing.runce!foreign
 // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
-// CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
+// CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS]] : $any NSRuncing to $[[OPENED2:@opened\(.*, any NSRuncing\) Self]]
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS2]] : $[[OPENED2]], #NSRuncing.copyRuncing!foreign
 // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
 
@@ -102,9 +102,9 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@guaranteed NSRuncing) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@guaranteed any NSRuncing) -> () {
 func objc_protocol_partial_apply(_ x: NSRuncing) {
-  // CHECK: bb0([[ARG:%.*]] : @guaranteed $NSRuncing):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $any NSRuncing):
   // CHECK:   [[FN:%.*]] = function_ref @$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pFSo8NSObjectCycAaC_pcfu_
   // CHECK:   [[RESULT:%.*]] = apply [[FN]]([[ARG]])
   _ = x.runce
@@ -116,12 +116,12 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
-  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
+  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $any NSFunging & NSRuncing to $[[OPENED:@opened\(.*, any NSFunging & NSRuncing\) Self]]
   // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSRuncing.runce!foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.runce()
 
-  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
+  // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $any NSFunging & NSRuncing to $[[OPENED:@opened\(.*, any NSFunging & NSRuncing\) Self]]
   // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSFunging.funge!foreign
   // CHECK: apply [[METHOD]]<[[OPENED]]>([[THIS]])
   x.funge()
@@ -235,24 +235,24 @@ extension InformallyFunging: NSFunging { }
   init(int: Int)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick any Initializable.Type, Int) -> @owned any Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
-  // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
-  // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
+  // CHECK: bb0([[META:%[0-9]+]] : $@thick any Initializable.Type, [[I:%[0-9]+]] : $Int):
+  // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var any Initializable }
   // CHECK:   [[I2_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[I2_BOX]]
   // CHECK:   [[PB:%.*]] = project_box [[I2_LIFETIME]]
-  // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
-  // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
-  // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]]) Initializable).Type, $@opened([[N]]) Initializable
-  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]]) Initializable, #Initializable.init!initializer.foreign : {{.*}}
-  // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
-  // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
-  // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
-  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*Initializable
-  // CHECK:   [[I2:%[0-9]+]] = load [copy] [[READ]] : $*Initializable
+  // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick any Initializable.Type to $@thick (@opened([[N:".*"]], any Initializable) Self).Type
+  // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]], any Initializable) Self).Type to $@objc_metatype (@opened([[N]], any Initializable) Self).Type
+  // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]], any Initializable) Self).Type, $@opened([[N]], any Initializable) Self
+  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]], any Initializable) Self, #Initializable.init!initializer.foreign : {{.*}}
+  // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]], any Initializable) Self>([[I]], [[I2_ALLOC]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+  // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]], any Initializable) Self : $@opened([[N]], any Initializable) Self, $any Initializable
+  // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*any Initializable
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*any Initializable
+  // CHECK:   [[I2:%[0-9]+]] = load [copy] [[READ]] : $*any Initializable
   // CHECK:   end_borrow [[I2_LIFETIME]]
-  // CHECK:   destroy_value [[I2_BOX]] : ${ var Initializable }
-  // CHECK:   return [[I2]] : $Initializable
+  // CHECK:   destroy_value [[I2_BOX]] : ${ var any Initializable }
+  // CHECK:   return [[I2]] : $any Initializable
   var i2 = im.init(int: i)
   return i2
 }
@@ -291,8 +291,8 @@ public protocol DangerousEscaper {
 
 // Make sure we emit an withoutActuallyEscaping sentinel.
 
-// CHECK-LABEL: sil [ossa] @$s14objc_protocols19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
-// CHECK: bb0([[CLOSURE_ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (), [[SELF:%.*]] : @guaranteed $DangerousEscaper):
+// CHECK-LABEL: sil [ossa] @$s14objc_protocols19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed any DangerousEscaper) -> () {
+// CHECK: bb0([[CLOSURE_ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (), [[SELF:%.*]] : @guaranteed $any DangerousEscaper):
 // CHECK:  [[OE:%.*]] = open_existential_ref [[SELF]]
 // CHECK:  [[CLOSURE_COPY1:%.*]]  = copy_value [[CLOSURE_ARG]]
 // CHECK:  [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_COPY1]]
@@ -309,8 +309,8 @@ public protocol DangerousEscaper {
 // CHECK:  destroy_addr [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:  dealloc_stack [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
 // CHECK:  destroy_value [[CLOSURE_COPY1]] : $@callee_guaranteed () -> ()
-// CHECK:  [[METH:%.*]] = objc_method [[OE]] : {{.*}} DangerousEscaper, #DangerousEscaper.malicious!foreign
-// CHECK:  apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:  [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", any DangerousEscaper) Self, #DangerousEscaper.malicious!foreign
+// CHECK:  apply [[METH]]<@opened("{{.*}}", any DangerousEscaper) Self>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 // CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
 // CHECK:  return {{.*}} : $()
 

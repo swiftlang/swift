@@ -211,9 +211,10 @@ public:
     uint32_t ThreadPort;
   };
 
-  explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
-    : super(std::move(reader), *this)
-  {}
+  explicit ReflectionContext(
+      std::shared_ptr<MemoryReader> reader,
+      remote::ExternalTypeRefCache *externalCache = nullptr)
+      : super(std::move(reader), *this, externalCache) {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
@@ -227,7 +228,12 @@ public:
     return sizeof(StoredPointer) * 2;
   }
 
-  template <typename T> bool readMachOSections(RemoteAddress ImageStart) {
+  /// On success returns the ID of the newly registered Reflection Info.
+  template <typename T>
+  llvm::Optional<uint32_t>
+  readMachOSections(
+      RemoteAddress ImageStart,
+      llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
     if (!Buf)
@@ -337,17 +343,17 @@ public:
         MPEnumMdSec.first == nullptr)
       return false;
 
-    ReflectionInfo info = {
-        {FieldMdSec.first, FieldMdSec.second},
-        {AssocTySec.first, AssocTySec.second},
-        {BuiltinTySec.first, BuiltinTySec.second},
-        {CaptureSec.first, CaptureSec.second},
-        {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second},
-        {MPEnumMdSec.first, MPEnumMdSec.second}};
+    ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
 
-    this->addReflectionInfo(info);
+    auto InfoID = this->addReflectionInfo(info);
 
     // Find the __DATA segment.
     for (unsigned I = 0; I < NumCommands; ++I) {
@@ -371,10 +377,13 @@ public:
 
     savedBuffers.push_back(std::move(Buf));
     savedBuffers.push_back(std::move(Sections));
-    return true;
+    return InfoID;
   }
 
-  bool readPECOFFSections(RemoteAddress ImageStart) {
+  /// On success returns the ID of the newly registered Reflection Info.
+  llvm::Optional<uint32_t> readPECOFFSections(
+      RemoteAddress ImageStart,
+      llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto DOSHdrBuf = this->getReader().readBytes(
         ImageStart, sizeof(llvm::object::dos_header));
     if (!DOSHdrBuf)
@@ -463,20 +472,21 @@ public:
         MPEnumMdSec.first == nullptr)
       return false;
 
-    ReflectionInfo Info = {
-        {FieldMdSec.first, FieldMdSec.second},
-        {AssocTySec.first, AssocTySec.second},
-        {BuiltinTySec.first, BuiltinTySec.second},
-        {CaptureSec.first, CaptureSec.second},
-        {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second},
-        {MPEnumMdSec.first, MPEnumMdSec.second}};
-    this->addReflectionInfo(Info);
-    return true;
+    ReflectionInfo Info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
+    return this->addReflectionInfo(Info);
   }
 
-  bool readPECOFF(RemoteAddress ImageStart) {
+  /// On success returns the ID of the newly registered Reflection Info.
+  llvm::Optional<uint32_t> readPECOFF(RemoteAddress ImageStart,
+                  llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf = this->getReader().readBytes(ImageStart,
                                            sizeof(llvm::object::dos_header));
     if (!Buf)
@@ -495,12 +505,15 @@ public:
     if (memcmp(Buf.get(), llvm::COFF::PEMagic, sizeof(llvm::COFF::PEMagic)))
       return false;
 
-    return readPECOFFSections(ImageStart);
+    return readPECOFFSections(ImageStart, PotentialModuleNames);
   }
 
+  /// On success returns the ID of the newly registered Reflection Info.
   template <typename T>
-  bool readELFSections(RemoteAddress ImageStart,
-                       llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
+  llvm::Optional<uint32_t> readELFSections(
+      RemoteAddress ImageStart,
+      llvm::Optional<llvm::sys::MemoryBlock> FileBuffer,
+      llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // When reading from the FileBuffer we can simply return a pointer to
     // the underlying data.
     // When reading from the process, we need to keep the memory around
@@ -655,18 +668,17 @@ public:
         MPEnumMdSec.first == nullptr)
       return false;
 
-    ReflectionInfo info = {
-        {FieldMdSec.first, FieldMdSec.second},
-        {AssocTySec.first, AssocTySec.second},
-        {BuiltinTySec.first, BuiltinTySec.second},
-        {CaptureSec.first, CaptureSec.second},
-        {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        {ConformMdSec.first, ConformMdSec.second},
-        {MPEnumMdSec.first, MPEnumMdSec.second}};
+    ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
 
-    this->addReflectionInfo(info);
-    return true;
+    return this->addReflectionInfo(info);
   }
 
   /// Parses metadata information from an ELF image. Because the Section
@@ -685,34 +697,40 @@ public:
   ///     instance's memory reader.
   ///
   /// \return
-  ///     /b True if the metadata information was parsed successfully,
-  ///     /b false otherwise.
-  bool readELF(RemoteAddress ImageStart, llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
+  ///     \b  The newly added reflection info ID if successful,
+  ///     \b llvm::None otherwise.
+  llvm::Optional<uint32_t>
+  readELF(RemoteAddress ImageStart,
+          llvm::Optional<llvm::sys::MemoryBlock> FileBuffer,
+          llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
     if (!Buf)
-      return false;
+      return llvm::None;
 
     // Read the header.
     auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
 
     if (!Hdr->checkMagic())
-      return false;
+      return llvm::None;
 
     // Check if we have a ELFCLASS32 or ELFCLASS64
     unsigned char FileClass = Hdr->getFileClass();
     if (FileClass == llvm::ELF::ELFCLASS64) {
       return readELFSections<ELFTraits<llvm::ELF::ELFCLASS64>>(
-          ImageStart, FileBuffer);
+          ImageStart, FileBuffer, PotentialModuleNames);
     } else if (FileClass == llvm::ELF::ELFCLASS32) {
       return readELFSections<ELFTraits<llvm::ELF::ELFCLASS32>>(
-          ImageStart, FileBuffer);
+          ImageStart, FileBuffer, PotentialModuleNames);
     } else {
-      return false;
+      return llvm::None;
     }
   }
 
-  bool addImage(RemoteAddress ImageStart) {
+  /// On success returns the ID of the newly registered Reflection Info.
+  llvm::Optional<uint32_t>
+  addImage(RemoteAddress ImageStart,
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // Read the first few bytes to look for a magic header.
     auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
     if (!Magic)
@@ -723,18 +741,18 @@ public:
 
     // 32- and 64-bit Mach-O.
     if (MagicWord == llvm::MachO::MH_MAGIC) {
-      return readMachOSections<MachOTraits<4>>(ImageStart);
+      return readMachOSections<MachOTraits<4>>(ImageStart, PotentialModuleNames);
     }
 
     if (MagicWord == llvm::MachO::MH_MAGIC_64) {
-      return readMachOSections<MachOTraits<8>>(ImageStart);
+      return readMachOSections<MachOTraits<8>>(ImageStart, PotentialModuleNames);
     }
 
     // PE. (This just checks for the DOS header; `readPECOFF` will further
     // validate the existence of the PE header.)
     auto MagicBytes = (const char*)Magic.get();
     if (MagicBytes[0] == 'M' && MagicBytes[1] == 'Z') {
-      return readPECOFF(ImageStart);
+      return readPECOFF(ImageStart, PotentialModuleNames);
     }
 
 
@@ -743,11 +761,12 @@ public:
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
         && MagicBytes[2] == llvm::ELF::ElfMagic[2]
         && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
-      return readELF(ImageStart, llvm::Optional<llvm::sys::MemoryBlock>());
+      return readELF(ImageStart, llvm::Optional<llvm::sys::MemoryBlock>(),
+                     PotentialModuleNames);
     }
 
     // We don't recognize the format.
-    return false;
+    return llvm::None;
   }
 
   /// Adds an image using the FindSection closure to find the swift metadata
@@ -756,11 +775,13 @@ public:
   ///     of freeing the memory buffer in the RemoteRef return value.
   ///     process.
   /// \return
-  ///     \b True if any of the reflection sections were registered,
-  ///     \b false otherwise.
-  bool addImage(llvm::function_ref<
-                std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
-                    FindSection) {
+  ///     \b  The newly added reflection info ID if successful,
+  ///     \b llvm::None otherwise.
+  llvm::Optional<uint32_t>
+  addImage(llvm::function_ref<
+               std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
+               FindSection,
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Sections = {
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
@@ -782,19 +803,23 @@ public:
 
     // If we didn't find any sections, return.
     if (llvm::all_of(Pairs, [](const auto &Pair) { return !Pair.first; }))
-      return false;
+      return {};
 
-    ReflectionInfo Info = {
-        {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
-        {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
-        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second},
-        {Pairs[6].first, Pairs[6].second}, {Pairs[7].first, Pairs[7].second}};
-    this->addReflectionInfo(Info);
-    return true;
+    ReflectionInfo Info = {{Pairs[0].first, Pairs[0].second},
+                           {Pairs[1].first, Pairs[1].second},
+                           {Pairs[2].first, Pairs[2].second},
+                           {Pairs[3].first, Pairs[3].second},
+                           {Pairs[4].first, Pairs[4].second},
+                           {Pairs[5].first, Pairs[5].second},
+                           {Pairs[6].first, Pairs[6].second},
+                           {Pairs[7].first, Pairs[7].second},
+                           PotentialModuleNames};
+    return addReflectionInfo(Info);
   }
 
-  void addReflectionInfo(ReflectionInfo I) {
-    getBuilder().addReflectionInfo(I);
+  /// Adds the reflection info and returns it's id.
+  uint32_t addReflectionInfo(ReflectionInfo I) {
+    return getBuilder().addReflectionInfo(I);
   }
 
   bool ownsObject(RemoteAddress ObjectAddress) {

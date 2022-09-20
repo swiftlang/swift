@@ -42,7 +42,7 @@ static llvm::cl::OptionCategory Category("swift-serialize-diagnostics Options");
 
 static llvm::cl::opt<std::string>
     InputFilePath("input-file-path",
-                  llvm::cl::desc("Path to the YAML input file"),
+                  llvm::cl::desc("Path to the `.strings` input file"),
                   llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
@@ -60,11 +60,9 @@ int main(int argc, char *argv[]) {
                                     "Swift Serialize Diagnostics Tool\n");
 
   if (!llvm::sys::fs::exists(options::InputFilePath)) {
-    llvm::errs() << "YAML file not found\n";
+    llvm::errs() << "diagnostics file not found\n";
     return EXIT_FAILURE;
   }
-
-  YAMLLocalizationProducer yaml(options::InputFilePath);
 
   auto localeCode = llvm::sys::path::filename(options::InputFilePath);
   llvm::SmallString<128> SerializedFilePath(options::OutputDirectory);
@@ -72,25 +70,22 @@ int main(int argc, char *argv[]) {
   llvm::sys::path::replace_extension(SerializedFilePath, ".db");
 
   SerializedLocalizationWriter Serializer;
-  yaml.forEachAvailable(
-      [&Serializer](swift::DiagID id, llvm::StringRef translation) {
-        Serializer.insert(id, translation);
-      });
+
+  {
+    assert(llvm::sys::path::extension(options::InputFilePath) == ".strings");
+
+    StringsLocalizationProducer strings(options::InputFilePath);
+
+    strings.forEachAvailable(
+        [&Serializer](swift::DiagID id, llvm::StringRef translation) {
+          Serializer.insert(id, translation);
+        });
+  }
 
   if (Serializer.emit(SerializedFilePath.str())) {
     llvm::errs() << "Cannot serialize diagnostic file "
                  << options::InputFilePath << '\n';
     return EXIT_FAILURE;
-  }
-
-  // Print out the diagnostics IDs that are available in YAML but not available
-  // in `.def`
-  if (!yaml.unknownIDs.empty()) {
-    llvm::errs() << "These diagnostic IDs are no longer available: '";
-    llvm::interleave(
-        yaml.unknownIDs, [&](std::string id) { llvm::errs() << id; },
-        [&] { llvm::errs() << ", "; });
-    llvm::errs() << "'\n";
   }
 
   return EXIT_SUCCESS;

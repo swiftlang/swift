@@ -13,9 +13,9 @@
 // We also check that the type checker did not need to evaluate any 
 // DefaultStringInterpolation overloads in the initial expression.
 
-// CHECK-NOT: ---Solution---
+// CHECK-NOT: Constraint restrictions:
+// CHECK: --- Solution #{{.*}}---
 // CHECK: Overload choices:
-// CHECK-NOT: Swift.(file).DefaultStringInterpolation.append
-// CHECK: Constraint restrictions:
+// CHECK: Swift.(file).DefaultStringInterpolation.append
 
 _ = "\(1), \(2), \(3), \(4)"

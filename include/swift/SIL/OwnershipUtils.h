@@ -53,7 +53,7 @@ bool canOpcodeForwardGuaranteedValues(Operand *use);
 // This is the use-def equivalent of use->getOperandOwnership() ==
 // OperandOwnership::ForwardingBorrow.
 inline bool isForwardingBorrow(SILValue value) {
-  assert(value.getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
   return canOpcodeForwardGuaranteedValues(value);
 }
 
@@ -74,9 +74,11 @@ bool canOpcodeForwardOwnedValues(Operand *use);
 // This is the use-def equivalent of use->getOperandOwnership() ==
 // OperandOwnership::ForwardingConsume.
 inline bool isForwardingConsume(SILValue value) {
-  assert(value.getOwnershipKind() == OwnershipKind::Owned);
+  assert(value->getOwnershipKind() == OwnershipKind::Owned);
   return canOpcodeForwardOwnedValues(value);
 }
+
+bool hasPointerEscape(BorrowedValue value);
 
 /// Find leaf "use points" of \p guaranteedValue that determine its lifetime
 /// requirement. Return true if no PointerEscape use was found.
@@ -445,7 +447,7 @@ private:
 
 public:
   static BorrowedValueKind get(SILValue value) {
-    if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
+    if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
       return Kind::Invalid;
     switch (value->getKind()) {
     default:
@@ -1025,7 +1027,7 @@ private:
 
 public:
   static OwnedValueIntroducerKind get(SILValue value) {
-    if (value.getOwnershipKind() != OwnershipKind::Owned)
+    if (value->getOwnershipKind() != OwnershipKind::Owned)
       return Kind::Invalid;
 
     switch (value->getKind()) {
@@ -1216,6 +1218,14 @@ using BaseValueSet = SmallPtrSet<SILValue, 8>;
 void findTransitiveReborrowBaseValuePairs(
     BorrowingOperand initialScopeOperand, SILValue origBaseValue,
     function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
+
+/// Visit the phis in the same block as \p phi which are reborrows of a borrow
+/// of one of the values reaching \p phi.
+///
+/// If the visitor returns false, stops visiting and returns false.  Otherwise,
+/// returns true.
+bool visitAdjacentReborrowsOfPhi(SILPhiArgument *phi,
+                                 function_ref<bool(SILPhiArgument *)> visitor);
 
 /// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
 /// its reborrows.

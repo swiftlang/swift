@@ -598,6 +598,7 @@ int main(int argc, char **argv) {
   SILOpts.OptRecordPasses = RemarksPasses;
   SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnablePerformanceAnnotations = true;
+  SILOpts.EnableStackProtection = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -818,7 +819,7 @@ int main(int argc, char **argv) {
     }
 
     SerializationOptions serializationOpts;
-    serializationOpts.OutputPath = OutputFile.c_str();
+    serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = EmitSIB;
     serializationOpts.IsSIB = EmitSIB;
 

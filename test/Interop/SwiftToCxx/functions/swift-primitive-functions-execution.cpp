@@ -63,4 +63,13 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeRawPointer, &x);
   VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeMutableRawPointer, &x);
   VERIFY_PASSTHROUGH_VALUE(roundTwoPassThroughUnsafeMutableRawPointer, nullptr);
+
+  VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericMutableOptionalPointer, &x);
+  VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericMutableOptionalPointer,
+                           nullptr);
+  VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericMutablePointer, &x);
+  const int y = 0;
+  VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericOptionalPointer, &x);
+  VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericOptionalPointer, nullptr);
+  VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericPointer, &x);
 }

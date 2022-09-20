@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen %s -verify | %FileCheck %s
 
+// https://github.com/apple/swift/issues/45309
+
 func f<T>(_: () -> T) {}
 func f<T>(_: @autoclosure () -> T) {}
 

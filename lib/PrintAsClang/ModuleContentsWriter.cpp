@@ -16,7 +16,9 @@
 #include "DeclAndTypePrinter.h"
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
+#include "PrintClangValueType.h"
 #include "PrintSwiftToClangCoreScaffold.h"
+#include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
@@ -25,6 +27,7 @@
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Strings.h"
 
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
@@ -123,9 +126,12 @@ class ModuleWriter {
   ModuleDecl &M;
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
+  llvm::DenseSet<const NominalTypeDecl *> seenClangTypes;
   std::vector<const Decl *> declsToWrite;
   DelayedMemberSet delayedMembers;
   PrimitiveTypeMapping typeMapping;
+  std::string outOfLineDefinitions;
+  llvm::raw_string_ostream outOfLineDefinitionsOS;
   DeclAndTypePrinter printer;
   OutputLanguageMode outputLangMode;
 
@@ -133,10 +139,12 @@ public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
                llvm::SmallPtrSetImpl<ImportModuleTy> &imports, ModuleDecl &mod,
                SwiftToClangInteropContext &interopContext, AccessLevel access,
-               OutputLanguageMode outputLang)
+               bool requiresExposedAttribute, OutputLanguageMode outputLang)
       : os(os), imports(imports), M(mod),
-        printer(M, os, prologueOS, delayedMembers, typeMapping, interopContext,
-                access, outputLang),
+        outOfLineDefinitionsOS(outOfLineDefinitions),
+        printer(M, os, prologueOS, outOfLineDefinitionsOS, delayedMembers,
+                typeMapping, interopContext, access, requiresExposedAttribute,
+                outputLang),
         outputLangMode(outputLang) {}
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
@@ -171,6 +179,14 @@ public:
           return true;
         }
       }
+    }
+
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      // Only add C++ imports in C++ mode for now.
+      if (!D->hasClangNode())
+        return true;
+      if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
+        return true;
     }
 
     imports.insert(otherModule);
@@ -212,8 +228,11 @@ public:
 
   void forwardDeclare(const NominalTypeDecl *NTD,
                       llvm::function_ref<void(void)> Printer) {
-    if (NTD->getModuleContext()->isStdlibModule())
-      return;
+    if (NTD->getModuleContext()->isStdlibModule()) {
+      if (outputLangMode != OutputLanguageMode::Cxx ||
+          !printer.shouldInclude(NTD))
+        return;
+    }
     auto &state = seenTypes[NTD];
     if (state.second)
       return;
@@ -238,14 +257,8 @@ public:
       os << "@protocol " << getNameForObjC(PD) << ";\n";
     });
   }
-  
-  void forwardDeclare(const EnumDecl *ED) {
-    // TODO: skip for now; will overhaul the forward decals for c++ in the
-    // future
-    if (outputLangMode == swift::OutputLanguageMode::Cxx) {
-      return;
-    }
 
+  void forwardDeclare(const EnumDecl *ED) {
     assert(ED->isObjC() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
@@ -255,7 +268,26 @@ public:
     });
   }
 
+  void emitReferencedClangTypeMetadata(const NominalTypeDecl *typeDecl) {
+    auto it = seenClangTypes.insert(typeDecl);
+    if (it.second)
+      ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
+  }
+
   void forwardDeclareType(const TypeDecl *TD) {
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
+        auto *NTD = cast<NominalTypeDecl>(TD);
+        if (!addImport(NTD)) {
+          forwardDeclare(
+              NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+        } else {
+          if (isa<StructDecl>(TD) && NTD->hasClangNode())
+            emitReferencedClangTypeMetadata(NTD);
+        }
+      }
+      return;
+    }
     if (auto CD = dyn_cast<ClassDecl>(TD)) {
       if (!forwardDeclare(CD)) {
         (void)addImport(CD);
@@ -274,8 +306,9 @@ public:
       forwardDeclare(ED);
     } else if (isa<AbstractTypeParamDecl>(TD)) {
       llvm_unreachable("should not see type params here");
-    } else if (isa<StructDecl>(TD)) {
-      // FIXME: add support here.
+    } else if (isa<StructDecl>(TD) &&
+               TD->getModuleContext()->isStdlibModule()) {
+      // stdlib has some @_cdecl functions with structs.
       return;
     } else {
       assert(false && "unknown local type decl");
@@ -290,6 +323,11 @@ public:
     case DeclKind::Protocol:
     case DeclKind::Extension:
       break;
+    case DeclKind::Struct:
+    case DeclKind::Enum:
+      if (outputLangMode == OutputLanguageMode::Cxx)
+        break;
+      LLVM_FALLTHROUGH;
     default:
       llvm_unreachable("unexpected container kind");
     }
@@ -346,11 +384,12 @@ public:
           }
 
           // Protocols should be delayed wholesale unless we might have a cycle.
-          auto *proto = cast<ProtocolDecl>(container);
-          if (!hasBeenRequested(proto) || !hasBeenRequested(TD)) {
-            if (!require(TD))
-              hadAnyDelayedMembers = true;
-            return;
+          if (auto *proto = dyn_cast<ProtocolDecl>(container)) {
+            if (!hasBeenRequested(proto) || !hasBeenRequested(TD)) {
+              if (!require(TD))
+                hadAnyDelayedMembers = true;
+              return;
+            }
           }
 
           // Otherwise, we have a cyclic dependency. Give up and continue with
@@ -388,11 +427,12 @@ public:
     if ((superclass = CD->getSuperclassDecl())) {
       allRequirementsSatisfied &= require(superclass);
     }
-    for (auto proto : CD->getLocalProtocols(
-                        ConformanceLookupKind::OnlyExplicit))
-      if (printer.shouldInclude(proto))
-        allRequirementsSatisfied &= require(proto);
-
+    if (outputLangMode != OutputLanguageMode::Cxx) {
+      for (auto proto :
+           CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit))
+        if (printer.shouldInclude(proto))
+          allRequirementsSatisfied &= require(proto);
+    }
     if (!allRequirementsSatisfied)
       return false;
 
@@ -425,6 +465,13 @@ public:
   bool writeStruct(const StructDecl *SD) {
     if (addImport(SD))
       return true;
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      (void)forwardDeclareMemberTypes(SD->getMembers(), SD);
+      for (const auto *ed :
+           printer.getInteropContext().getExtensionsForNominalType(SD)) {
+        (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
+      }
+    }
     printer.print(SD);
     return true;
   }
@@ -486,7 +533,11 @@ public:
   bool writeEnum(const EnumDecl *ED) {
     if (addImport(ED))
       return true;
-    
+
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      forwardDeclareMemberTypes(ED->getMembers(), ED);
+    }
+
     if (seenTypes[ED].first == EmissionState::Defined)
       return true;
     
@@ -522,6 +573,8 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+        if (outputLangMode == OutputLanguageMode::Cxx)
+          return false;
         auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
@@ -547,6 +600,8 @@ public:
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           auto baseClass = ED->getSelfClassDecl();
+          if (!baseClass)
+              return ED->getExtendedNominal()->getName().str();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");
@@ -599,12 +654,24 @@ public:
     assert(declsToWrite.empty());
     declsToWrite.assign(decls.begin(), decls.end());
 
+    if (outputLangMode == OutputLanguageMode::Cxx) {
+      for (const Decl *D : declsToWrite) {
+        if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+          const auto *type = ED->getExtendedNominal();
+          if (isa<StructDecl>(type))
+            printer.getInteropContext().recordExtensions(type, ED);
+        }
+      }
+    }
+
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
       bool success = true;
 
       if (auto ED = dyn_cast<EnumDecl>(D)) {
         success = writeEnum(ED);
+      } else if (auto CD = dyn_cast<ClassDecl>(D)) {
+        success = writeClass(CD);
       } else if (outputLangMode == OutputLanguageMode::Cxx) {
         if (auto FD = dyn_cast<FuncDecl>(D))
           success = writeFunc(FD);
@@ -612,9 +679,7 @@ public:
           success = writeStruct(SD);
         // FIXME: Warn on unsupported exported decl.
       } else if (isa<ValueDecl>(D)) {
-        if (auto CD = dyn_cast<ClassDecl>(D))
-          success = writeClass(CD);
-        else if (auto PD = dyn_cast<ProtocolDecl>(D))
+        if (auto PD = dyn_cast<ProtocolDecl>(D))
           success = writeProtocol(PD);
         else if (auto ED = dyn_cast<FuncDecl>(D))
           success = writeFunc(ED);
@@ -645,6 +710,9 @@ public:
       }
       printer.printAdHocCategory(make_range(groupBegin, delayedMembers.end()));
     }
+
+    // Print any out of line definitions.
+    os << outOfLineDefinitionsOS.str();
   }
 };
 } // end anonymous namespace
@@ -658,13 +726,14 @@ void swift::printModuleContentsAsObjC(
     ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
   llvm::raw_null_ostream prologueOS;
   ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
-               OutputLanguageMode::ObjC)
+               /*requiresExposedAttribute=*/false, OutputLanguageMode::ObjC)
       .write();
 }
 
 void swift::printModuleContentsAsCxx(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    bool requiresExposedAttribute) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -672,12 +741,14 @@ void swift::printModuleContentsAsCxx(
 
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, imports, M, interopContext,
-                      AccessLevel::Public, OutputLanguageMode::Cxx);
+                      AccessLevel::Public, requiresExposedAttribute,
+                      OutputLanguageMode::Cxx);
   writer.write();
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
-  printSwiftToClangCoreScaffold(interopContext, writer.getTypeMapping(), os);
+  printSwiftToClangCoreScaffold(interopContext, M.getASTContext(),
+                                writer.getTypeMapping(), os);
   os << "#endif\n";
 
   // FIXME: refactor.

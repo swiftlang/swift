@@ -316,10 +316,13 @@ enum FunctionRepresentationSynthesizer {
 };
 template <class S> struct ThrowsSynthesizer { S sub; };
 template <class S> struct AsyncSynthesizer { S sub; };
+template <class S> struct NoescapeSynthesizer { S sub; };
 template <class S>
 constexpr ThrowsSynthesizer<S> _throws(S sub) { return {sub}; }
 template <class S>
 constexpr AsyncSynthesizer<S> _async(S sub) { return {sub}; }
+template <class S>
+constexpr NoescapeSynthesizer<S> _noescape(S sub) { return {sub}; }
 
 inline ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
                                     FunctionRepresentationSynthesizer kind) {
@@ -339,6 +342,11 @@ template <class S>
 ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
                              const AsyncSynthesizer<S> &s) {
   return synthesizeExtInfo(SC, s.sub).withAsync();
+}
+template <class S>
+ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
+                             const NoescapeSynthesizer<S> &s) {
+  return synthesizeExtInfo(SC, s.sub).withNoEscape();
 }
 
 /// Synthesize a function type.

@@ -1874,3 +1874,23 @@ bb0(%0 : @owned $NonTrivial):
   destroy_value %0 : $NonTrivial
   return undef : $()
 }
+
+sil shared [clang _swift_stdlib_has_malloc_size] @_swift_stdlib_has_malloc_size : $@convention(c) () -> Bool
+sil shared [clang _swift_stdlib_malloc_size] @_swift_stdlib_malloc_size : $@convention(c) (UnsafeRawPointer) -> Int
+
+// CHECK-LABEL: sil [ossa] @ignoreMallocSize :
+// CHECK:         begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'ignoreMallocSize'
+sil [ossa] @ignoreMallocSize : $@convention(thin) (UnsafeRawPointer) -> () {
+bb0(%0 : $UnsafeRawPointer):
+  %2 = global_addr @globalX: $*X
+  %3 = begin_access [read] [dynamic] %2 : $*X
+  %4 = function_ref @_swift_stdlib_has_malloc_size : $@convention(c) () -> Bool
+  %5 = apply %4() : $@convention(c) () -> Bool
+  %6 = function_ref @_swift_stdlib_malloc_size : $@convention(c) (UnsafeRawPointer) -> Int
+  %7 = apply %6(%0) : $@convention(c) (UnsafeRawPointer) -> Int
+  end_access %3 : $*X
+  %9 = tuple ()
+  return %9 : $()
+}
+

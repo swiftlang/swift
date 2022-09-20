@@ -192,16 +192,6 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
-include(Threading)
-
-threading_package_default("${SWIFT_HOST_VARIANT_SDK}"
-  SWIFT_THREADING_PACKAGE_default)
-
-set(SWIFT_THREADING_PACKAGE "${SWIFT_THREADING_PACKAGE_default}"
-    CACHE STRING
-    "The threading package to use.  Must be one of 'none', 'pthreads',
-    'darwin', 'linux', 'win32', 'c11'.")
-
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"
     TRUE)
@@ -465,6 +455,15 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 #
+#  Compatibility library deployment versions
+#
+
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX "10.9")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS "7.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_TVOS "9.0")
+set(COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_WATCHOS "2.0")
+
+#
 # User-configurable debugging options.
 #
 
@@ -589,6 +588,12 @@ cmake_dependent_option(SWIFT_ENABLE_SOURCEKIT_TESTS
   "Enable running SourceKit tests" TRUE
   "SWIFT_BUILD_SOURCEKIT" FALSE)
 
+option(SWIFT_THREADING_PACKAGE
+  "Override the threading package used for the build.  This can either be a
+   single package name, or a semicolon separated sequence of sdk:package pairs.
+   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
+   or the empty string for the SDK default.")
+
 #
 # End of user-configurable options.
 #
@@ -616,6 +621,11 @@ endif()
 # with unnecessary noise.
 if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
+endif()
+
+# Make sure we know where swift-syntax is because we need it to build the parser.
+if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
+  message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
 endif()
 
 # Use dispatch as the system scheduler by default.
@@ -725,6 +735,7 @@ get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(SWIFT_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
+set(SWIFT_SHIMS_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/stdlib/public/SwiftShims")
 set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
@@ -745,7 +756,7 @@ elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
   else()
     set(BOOTSTRAPPING_MODE "HOSTTOOLS")
   endif()
-elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_SWIFT_PARSER)
   # We are building using a pre-installed host toolchain but not bootstrapping
   # the Swift modules. This happens when building using 'build-tooling-libs'
   # where we haven't built a new Swift compiler. Use the Swift compiler from the
@@ -775,6 +786,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories(BEFORE
   ${SWIFT_MAIN_INCLUDE_DIR}
   ${SWIFT_INCLUDE_DIR}
+  ${SWIFT_SHIMS_INCLUDE_DIR}
   )
 
 # Configuration flags passed to all of our invocations of gyb.  Try to
@@ -821,6 +833,32 @@ if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQU
 endif()
 
 #
+# Display a message if the threading package has been overridden
+#
+
+if(SWIFT_THREADING_PACKAGE)
+  message(STATUS "")
+  message(STATUS "Threading package override enabled")
+  foreach(elt ${SWIFT_THREADING_PACKAGE})
+    string(REPLACE ":" ";" elt_list "${elt}")
+    list(LENGTH elt_list elt_list_len)
+    if(elt_list_len EQUAL 1)
+      set(elt_sdk "Global")
+      list(GET elt_list 0 elt_package)
+    elseif(elt_list_len EQUAL 2)
+      list(GET elt_list 0 elt_sdk)
+      list(GET elt_list 1 elt_package)
+      string(TOUPPER "${elt_sdk}" elt_sdk)
+    else()
+      message(FATAL_ERROR "Bad threading override \"${elt}\" - SWIFT_THREADING_PACKAGE must be a semicolon separated list of package or sdk:package pairs.")
+    endif()
+    string(TOLOWER "${elt_package}" elt_package)
+    message(STATUS "  ${elt_sdk}: ${elt_package}")
+  endforeach()
+  message(STATUS "")
+endif()
+
+#
 # Configure SDKs.
 #
 
@@ -831,6 +869,19 @@ if(XCODE)
   # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
 endif()
+
+# When we have the early SwiftSyntax build, we can include its parser.
+if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
+  set(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS
+    ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
+  if(NOT EXISTS "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS}")
+    message(STATUS "Skipping Swift Swift parser integration due to missing early SwiftSyntax")
+  else()
+    set(SWIFT_SWIFT_PARSER TRUE)
+    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
+  endif()
+endif()
+
 
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
@@ -1038,6 +1089,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
   message(STATUS "  Bootstrapping:  ${BOOTSTRAPPING_MODE}")
+  message(STATUS "  Swift parser:   ${SWIFT_SWIFT_PARSER}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1054,7 +1106,6 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
   message(STATUS "")
 
-  message(STATUS "Threading Package:                  ${SWIFT_THREADING_PACKAGE}")
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support:                ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
@@ -1133,6 +1184,7 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
+  set(SWIFT_STDLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/stdlib")
   # Some of the things below depend on the threading library
   add_subdirectory(stdlib/public/Threading)
 
@@ -1148,7 +1200,7 @@ else()
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
-    add_subdirectory(stdlib/public/SwiftShims)
+    add_subdirectory(stdlib/public/SwiftShims/swift/shims)
   endif()
 endif()
 

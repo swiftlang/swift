@@ -117,6 +117,7 @@ public:
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
+    UncheckedConversionKind,    // unchecked_X_cast
 
     FirstLogicalKind = GetterSetterKind,
     FirstTranslationKind = OrigToSubstKind,

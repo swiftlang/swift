@@ -249,6 +249,12 @@ AsyncTask *swift::_swift_task_clearCurrent() {
   return task;
 }
 
+AsyncTask *swift::_swift_task_setCurrent(AsyncTask *new_task) {
+  auto task = ActiveTask::get();
+  ActiveTask::set(new_task);
+  return task;
+}
+
 SWIFT_CC(swift)
 static ExecutorRef swift_task_getCurrentExecutorImpl() {
   auto currentTracking = ExecutorTrackingInfo::current();

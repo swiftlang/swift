@@ -2,12 +2,16 @@
 #define TEST_INTEROP_CXX_NAMESPACE_INPUTS_TEMPLATES_H
 
 namespace TemplatesNS1 {
-template <class T> const char *basicFunctionTemplate(T) {
+template <class T>
+const char *basicFunctionTemplate(T)
+    __attribute__((swift_attr("import_unsafe"))) {
   return "TemplatesNS1::basicFunctionTemplate";
 }
 
 template <class> struct BasicClassTemplate {
-  const char *basicMember() { return "TemplatesNS1::BasicClassTemplate::basicMember"; }
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
+    return "TemplatesNS1::BasicClassTemplate::basicMember";
+  }
 };
 
 using BasicClassTemplateChar = BasicClassTemplate<char>;
@@ -25,12 +29,13 @@ template <class> struct ForwardDeclaredClassTemplateOutOfLine;
 
 namespace TemplatesNS1 {
 template <class T>
-const char *TemplatesNS2::forwardDeclaredFunctionTemplate(T) {
+const char *TemplatesNS2::forwardDeclaredFunctionTemplate(T)
+    __attribute__((swift_attr("import_unsafe"))) {
   return "TemplatesNS1::TemplatesNS2::forwardDeclaredFunctionTemplate";
 }
 
 template <class> struct TemplatesNS2::ForwardDeclaredClassTemplate {
-  const char *basicMember() {
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
     return "TemplatesNS1::TemplatesNS2::ForwardDeclaredClassTemplate::basicMember";
   }
 };
@@ -47,7 +52,7 @@ TemplatesNS1::TemplatesNS2::forwardDeclaredFunctionTemplateOutOfLine(T) {
 
 template <class>
 struct TemplatesNS1::TemplatesNS2::ForwardDeclaredClassTemplateOutOfLine {
-  const char *basicMember() {
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
     return "TemplatesNS1::TemplatesNS2::ForwardDeclaredClassTemplateOutOfLine::"
            "basicMember";
   }

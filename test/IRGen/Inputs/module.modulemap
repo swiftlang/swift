@@ -26,3 +26,8 @@ module AtomicBoolModule {
   header "atomic_bool.h"
   export *
 }
+
+module SynthesizedProtocol {
+  header "synthesized_protocol.h"
+  export *
+}

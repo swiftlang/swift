@@ -110,13 +110,13 @@ extension Bar {
 }
 
 // FIXME: We should probably have better diagnostics for these situations--the user probably meant to use implicit member syntax
-let _: Int = _() // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-let _: () -> Int = { _() } // expected-error 2 {{type placeholder not allowed here}} expected-error {{unable to infer closure type in the current context}}
+let _: Int = _() // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+let _: () -> Int = { _() } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 let _: Int = _.init() // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 let _: () -> Int = { _.init() } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 
-func returnsInt() -> Int { _() } // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-func returnsIntClosure() -> () -> Int { { _() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{unable to infer closure type in the current context}}
+func returnsInt() -> Int { _() } // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+func returnsIntClosure() -> () -> Int { { _() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 func returnsInt2() -> Int { _.init() }  // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
 

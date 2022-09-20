@@ -613,7 +613,7 @@ sil @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @erro
 //
 // CHECK-LABEL: sil @testGenericClosureSpecialization
 // Call of the generic specialization of invokeGenericClosure<Never>
-// CHECK: function_ref @$s20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error Error)) -> (Never, @error Error)
+// CHECK: function_ref @$s20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error any Error)) -> (Never, @error any Error)
 // CHECK: apply [nothrow]
 // CHECK: unreachable
 // CHECK: end sil function 'testGenericClosureSpecialization'

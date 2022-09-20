@@ -416,8 +416,9 @@ func rdar_50512161() {
   }
 }
 
-// SR-11609: Compiler crash on missing conformance for default param
-func test_sr_11609() {
+// https://github.com/apple/swift/issues/54017
+// Compiler crash on missing conformance for default param
+do {
   func foo<T : Initable>(_ x: T = .init()) -> T { x } // expected-note {{where 'T' = 'String'}}
   let _: String = foo()
   // expected-error@-1 {{local function 'foo' requires that 'String' conform to 'Initable'}}
@@ -520,14 +521,15 @@ case test(cond: Bool, v: Int64)
   }
 }
 
-// SR-15970
-protocol SR15970_P {}
-struct SR15970_S {}
+// https://github.com/apple/swift/issues/58231
 
-func SR15970_F(x: Int) -> SR15970_P {
-  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+protocol P_58231 {}
+struct S_58231 {}
+
+func f1_58231(x: Int) -> P_58231 {
+  return S_58231() // expected-error{{return expression of type 'S_58231' does not conform to 'P_58231'}}
 }
 
-func SR15970_F1(x: Int) -> SR15970_P? {
-  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+func f2_58231(x: Int) -> P_58231? {
+  return S_58231() // expected-error{{return expression of type 'S_58231' does not conform to 'P_58231'}}
 }

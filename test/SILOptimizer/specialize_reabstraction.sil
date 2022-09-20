@@ -135,16 +135,22 @@ bb0(%0 : $Bool):
   return %rv : $()
 }
 
-// CHECK-LABEL: sil shared [escapes %0 => %r] @$s21arg_escapes_to_return4main1XC_Tg5
-sil [escapes %1 => %0] @arg_escapes_to_return : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil shared @$s21arg_escapes_to_return4main1XC_Tg5
+// CHECK-NEXT:  [%0: escape => %r]
+// CHECK-NEXT:  {{^[^[]}}
+sil @arg_escapes_to_return : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+[%1: escape => %0] 
 bb0(%0 : $*T, %1 : $*T):
   copy_addr %1 to [initialization] %0 : $*T
   %4 = tuple ()
   return %4 : $()
 }
 
-// CHECK-LABEL: sil shared [escapes %1 => %0] @$s015arg_escapes_to_A04main1XC_Tg5
-sil [escapes %1 => %0] @arg_escapes_to_arg : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
+// CHECK-LABEL: sil shared @$s015arg_escapes_to_A04main1XC_Tg5
+// CHECK-NEXT:  [%1: escape => %0]
+// CHECK-NEXT:  {{^[^[]}}
+sil @arg_escapes_to_arg : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
+[%1: escape => %0] 
 bb0(%0 : $*T, %1 : $*T):
   copy_addr %1 to %0 : $*T
   %4 = tuple ()

@@ -415,12 +415,13 @@ actor WrapperActorBad2<Wrapped: Sendable> {
 struct WrapperWithMainActorDefaultInit {
   var wrappedValue: Int { fatalError() }
 
-  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  @MainActor init() {} // expected-note 2 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 }
 
 actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
+  @WrapperWithMainActorDefaultInit var property: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   func f() {
     _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced on a different actor instance}}
     _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced on a different actor instance}}
@@ -456,6 +457,23 @@ func testInferredFromWrapper(x: InferredFromPropertyWrapper) { // expected-note{
   _ = x.test() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'test()' in a synchronous nonisolated context}}
 }
 
+@propertyWrapper 
+struct SimplePropertyWrapper {
+  var wrappedValue: Int { .zero }
+  var projectedValue: Int { .max }
+}
+
+@MainActor
+class WrappedContainsNonisolatedAttr {
+  @SimplePropertyWrapper nonisolated var value 
+  // expected-error@-1 {{'nonisolated' is not supported on properties with property wrappers}}
+  // expected-note@-2 2{{property declared here}}
+
+  nonisolated func test() {
+    _ = value // expected-error {{main actor-isolated property 'value' can not be referenced from a non-isolated context}}
+    _ = $value // expected-error {{main actor-isolated property '$value' can not be referenced from a non-isolated context}}
+  }
+}
 
 
 // ----------------------------------------------------------------------

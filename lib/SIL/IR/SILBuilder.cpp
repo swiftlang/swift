@@ -480,16 +480,12 @@ SILBuilder::emitDestroyValue(SILLocation Loc, SILValue Operand) {
 
 SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-  // If the operand is an otherwise-unused 'metatype' instruction in the
-  // same basic block, zap it and create a 'metatype' instruction that
-  // directly produces an Objective-C metatype.
+  // If the operand is a 'metatype' instruction accessing a known static type's
+  // metadata, create a 'metatype' instruction that
+  // directly produces the Objective-C class object representation instead.
   if (auto metatypeInst = dyn_cast<MetatypeInst>(Op)) {
-    if (metatypeInst->use_empty() &&
-        metatypeInst->getParent() == getInsertionBB()) {
-      auto origLoc = metatypeInst->getLoc();
-      metatypeInst->eraseFromParent();
-      return createMetatype(origLoc, Ty);
-    }
+    auto origLoc = metatypeInst->getLoc();
+    return createMetatype(origLoc, Ty);
   }
 
   // Just create the thick_to_objc_metatype instruction.
@@ -498,16 +494,12 @@ SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
 
 SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-  // If the operand is an otherwise-unused 'metatype' instruction in the
-  // same basic block, zap it and create a 'metatype' instruction that
-  // directly produces a thick metatype.
+  // If the operand is a 'metatype' instruction accessing a known static type's
+  // metadata, create a 'metatype' instruction that directly produces the
+  // Swift metatype representation instead.
   if (auto metatypeInst = dyn_cast<MetatypeInst>(Op)) {
-    if (metatypeInst->use_empty() &&
-        metatypeInst->getParent() == getInsertionBB()) {
-      auto origLoc = metatypeInst->getLoc();
-      metatypeInst->eraseFromParent();
-      return createMetatype(origLoc, Ty);
-    }
+    auto origLoc = metatypeInst->getLoc();
+    return createMetatype(origLoc, Ty);
   }
 
   // Just create the objc_to_thick_metatype instruction.
@@ -672,9 +664,9 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
 static ValueOwnershipKind deriveForwardingOwnership(SILValue operand,
                                                     SILType targetType,
                                                     SILFunction &func) {
-  if (operand.getOwnershipKind() != OwnershipKind::None
-      || targetType.isTrivial(func)) {
-    return operand.getOwnershipKind();
+  if (operand->getOwnershipKind() != OwnershipKind::None ||
+      targetType.isTrivial(func)) {
+    return operand->getOwnershipKind();
   }
   return OwnershipKind::Owned;
 }

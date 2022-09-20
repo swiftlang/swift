@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -g -primary-file %s
 
-// https://bugs.swift.org/browse/SR-14016
+// https://github.com/apple/swift/issues/56409
 
 public struct PowerCollection<C : Collection> : Collection {
   public typealias Index = [C.Index]

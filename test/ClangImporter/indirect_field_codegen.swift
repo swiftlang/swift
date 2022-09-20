@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -I %S/Inputs/custom-modules %s | %FileCheck %s
 
-// https://bugs.swift.org/browse/SR-10571
+// https://github.com/apple/swift/issues/52971
 
 import IndirectFields
 

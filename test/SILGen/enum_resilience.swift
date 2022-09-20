@@ -119,8 +119,7 @@ public enum MyResilientEnum {
   // CHECK-LABEL: sil hidden [ossa] @$s15enum_resilience15MyResilientEnumOACycfC : $@convention(method) (@thin MyResilientEnum.Type) -> @out MyResilientEnum
   // CHECK:       [[SELF_BOX:%.*]] = alloc_box ${ var MyResilientEnum }, var, name "self"
   // CHECK:       [[SELF_TMP:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var MyResilientEnum }
-  // CHECK:       [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[SELF_TMP]]
-  // CHECK:       [[SELF_ADDR:%.*]] = project_box [[SELF_LIFETIME]] : ${ var MyResilientEnum }, 0
+  // CHECK:       [[SELF_ADDR:%.*]] = project_box [[SELF_TMP]] : ${ var MyResilientEnum }, 0
   // CHECK:       [[NEW_SELF:%.*]] = enum $MyResilientEnum, #MyResilientEnum.loki!enumelt
   // CHECK:       [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*MyResilientEnum
   // CHECK:       assign [[NEW_SELF]] to [[ACCESS]] : $*MyResilientEnum

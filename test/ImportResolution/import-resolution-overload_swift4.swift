@@ -6,9 +6,10 @@ import overload_vars
 
 func useString(_ str: String) {}
 
+// https://github.com/apple/swift/issues/49889
 // Ensure we maintain compatibility with Swift 4's overload signature rules.
 // Variables defined in extensions of generic types had different overload
-// signatures to other variables, so allow overloading in such cases (SR-7341).
+// signatures to other variables, so allow overloading in such cases.
 extension HasFooGeneric {
   var foo: String { return "" } // `foo` isn't defined in a generic extension in the other module, so allow overloading in Swift 4 mode.
   var bar: String { return "" } // `bar` is defined in a generic extension in the other module, so `bar: String` always shadows it.

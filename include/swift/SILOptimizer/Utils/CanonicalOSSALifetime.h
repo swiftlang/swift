@@ -234,7 +234,7 @@ public:
   static SILValue getCanonicalCopiedDef(SILValue v) {
     while (auto *copy = dyn_cast<CopyValueInst>(v)) {
       auto def = copy->getOperand();
-      if (def.getOwnershipKind() != OwnershipKind::Owned) {
+      if (def->getOwnershipKind() != OwnershipKind::Owned) {
         // This guaranteed value cannot be handled, treat the copy as an owned
         // live range def instead.
         return copy;
@@ -297,6 +297,11 @@ private:
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
   PrunedLiveness liveness;
+
+  /// The destroys of the value.  These are not uses, but need to be recorded so
+  /// that we know when the last use in a consuming block is (without having to
+  /// repeatedly do use-def walks from destroys).
+  SmallPtrSet<SILInstruction *, 8> destroys;
 
   /// remnantLiveOutBlocks are part of the original extended lifetime that are
   /// not in canonical pruned liveness. There is a path from a PrunedLiveness

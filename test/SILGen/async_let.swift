@@ -41,7 +41,7 @@ func testAsyncLetWithThrows(cond: Bool) async throws -> String {
   return await s
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test0A14AsyncLetThrowsSSyYaKF : $@convention(thin) @async () -> (@owned String, @error Error) {
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A14AsyncLetThrowsSSyYaKF : $@convention(thin) @async () -> (@owned String, @error any Error) {
 func testAsyncLetThrows() async throws -> String {
   async let s = try await getStringThrowingly()
 

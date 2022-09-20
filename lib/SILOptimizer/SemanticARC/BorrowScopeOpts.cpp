@@ -35,7 +35,7 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
     return false;
   }
 
-  auto kind = bbi->getOperand().getOwnershipKind();
+  auto kind = bbi->getOperand()->getOwnershipKind();
   SmallVector<EndBorrowInst *, 16> endBorrows;
   for (auto *op : bbi->getUses()) {
     if (!op->isLifetimeEnding()) {

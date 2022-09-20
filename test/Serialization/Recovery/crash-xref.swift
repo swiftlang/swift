@@ -23,6 +23,8 @@
 
 // RUN: cat %t/normal_stderr | %FileCheck %s -check-prefixes=NORMALFAILURE
 // NORMALFAILURE-LABEL: *** DESERIALIZATION FAILURE ***
+// NORMALFAILURE-LABEL: *** If any module named here was modified in the SDK, please delete the ***
+// NORMALFAILURE-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
 // NORMALFAILURE-NEXT: module 'Client' with full misc version {{.*}}'
 // NORMALFAILURE-NEXT: Could not deserialize type for 'foo()'
 // NORMALFAILURE-NEXT: Caused by: top-level value not found
@@ -33,6 +35,8 @@
 
 // RUN: cat %t/error_stderr | %FileCheck %s -check-prefixes=ALLOWFAILURE
 // ALLOWFAILURE-LABEL: *** DESERIALIZATION FAILURE ***
+// ALLOWFAILURE-LABEL: *** If any module named here was modified in the SDK, please delete the ***
+// ALLOWFAILURE-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
 // ALLOWFAILURE-NEXT: module 'Client' with full misc version {{.*}}' (built with -experimental-allow-module-with-compiler-errors)
 // ALLOWFAILURE-NEXT: Could not deserialize type for 'foo()'
 // ALLOWFAILURE-NEXT: Caused by: top-level value not found

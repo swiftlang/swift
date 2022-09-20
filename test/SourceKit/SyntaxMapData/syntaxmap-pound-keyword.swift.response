@@ -94,6 +94,11 @@
       key.length: 3
     },
     {
+      key.kind: source.lang.swift.syntaxtype.operator,
+      key.offset: 200,
+      key.length: 1
+    },
+    {
       key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
       key.offset: 207,
       key.length: 3

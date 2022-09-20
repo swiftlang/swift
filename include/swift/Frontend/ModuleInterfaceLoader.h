@@ -151,8 +151,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
                   bool skipBuildingInterface, bool IsFramework) override;
 
-  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
-                       bool underlyingVersion) override;
+  bool canImportModule(ImportPath::Module named,
+                       ModuleVersionInfo *versionInfo) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -440,6 +440,21 @@ public:
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t RequireOSSAModules);
+
+  /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
+  /// a swiftmodule file).
+  ///
+  /// Unlike the above `buildSwiftModuleFromSwiftInterface`, this method
+  /// bypasses the instantiation of a `CompilerInstance` from the compiler
+  /// configuration flags in the interface and instead directly uses the
+  /// supplied \p Instance
+  static bool buildExplicitSwiftModuleFromSwiftInterface(
+      CompilerInstance &Instance, const StringRef moduleCachePath,
+      const StringRef backupInterfaceDir, const StringRef prebuiltCachePath,
+      const StringRef ABIDescriptorPath, StringRef interfacePath,
+      StringRef outputPath, bool ShouldSerializeDeps,
+      ArrayRef<std::string> CompiledCandidates,
+      DependencyTracker *tracker = nullptr);
 };
 
 struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
@@ -452,18 +467,14 @@ private:
   llvm::StringSaver ArgSaver;
   std::vector<StringRef> GenericArgs;
   CompilerInvocation genericSubInvocation;
+  llvm::Triple ParentInvocationTarget;
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(StringRef interfacePath,
                               SourceLoc diagnosticLoc,
                               Diag<ArgTypes...> ID,
-                        typename detail::PassArgument<ArgTypes>::type... Args) {
-    SourceLoc loc = diagnosticLoc;
-    if (diagnosticLoc.isInvalid()) {
-      // Diagnose this inside the interface file, if possible.
-      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
-    }
-    return Diags->diagnose(loc, ID, std::move(Args)...);
+                              typename detail::PassArgument<ArgTypes>::type... Args) {
+    return InterfaceSubContextDelegateImpl::diagnose(interfacePath, diagnosticLoc, SM, Diags, ID, std::move(Args)...);
   }
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
@@ -484,6 +495,22 @@ public:
       StringRef backupModuleInterfaceDir,
       bool serializeDependencyHashes, bool trackSystemDependencies,
       RequireOSSAModules_t requireOSSAModules);
+
+  template<typename ...ArgTypes>
+  static InFlightDiagnostic diagnose(StringRef interfacePath,
+                                     SourceLoc diagnosticLoc,
+                                     SourceManager &SM,
+                                     DiagnosticEngine *Diags,
+                                     Diag<ArgTypes...> ID,
+                                     typename detail::PassArgument<ArgTypes>::type... Args) {
+    SourceLoc loc = diagnosticLoc;
+    if (diagnosticLoc.isInvalid()) {
+      // Diagnose this inside the interface file, if possible.
+      loc = SM.getLocFromExternalSource(interfacePath, 1, 1);
+    }
+    return Diags->diagnose(loc, ID, std::move(Args)...);
+  }
+
   std::error_code runInSubContext(StringRef moduleName,
                                   StringRef interfacePath,
                                   StringRef outputPath,

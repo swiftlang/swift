@@ -157,6 +157,16 @@ Paragraph *Paragraph::create(MarkupContext &MC,
   return new (Mem) Paragraph(Children);
 }
 
+InlineAttributes::InlineAttributes(StringRef Attributes, ArrayRef<MarkupASTNode *> Children) : InlineContent(ASTNodeKind::InlineAttributes), NumChildren(Children.size()), Attributes(Attributes) {
+  std::uninitialized_copy(Children.begin(), Children.end(), getTrailingObjects<MarkupASTNode *>());
+}
+
+InlineAttributes *InlineAttributes::create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children) {
+  void *Mem = MC.allocate(totalSizeToAlloc<MarkupASTNode *>(Children.size()), alignof(InlineAttributes));
+  StringRef AttrsCopy = MC.allocateCopy(Attributes);
+  return new (Mem) InlineAttributes(AttrsCopy, Children);
+}
+
 HRule *HRule::create(MarkupContext &MC) {
   void *Mem = MC.allocate(sizeof(HRule), alignof(HRule));
   return new (Mem) HRule();
@@ -405,6 +415,14 @@ void swift::markup::dump(const MarkupASTNode *Node, llvm::raw_ostream &OS,
   switch (Node->getKind()) {
   case swift::markup::ASTNodeKind::Document: {
     OS << "Document: Children=" << Node->getChildren().size();
+    dumpChildren(Node->getChildren(), OS, indent + 1);
+    break;
+  }
+  case swift::markup::ASTNodeKind::InlineAttributes: {
+    auto A = cast<InlineAttributes>(Node);
+    OS << "Attribute:";
+    OS << " Attributes=" << A->getAttributes();
+    OS << " Children=" << Node->getChildren().size();
     dumpChildren(Node->getChildren(), OS, indent + 1);
     break;
   }

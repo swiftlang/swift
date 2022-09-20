@@ -267,6 +267,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   for (auto &reqt : signature.getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
+      case RequirementKind::SameCount:
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
       case RequirementKind::Layout:
@@ -871,7 +872,7 @@ bool IRGenModule::isResilientConformance(
   // across module boundaries.
   if (conformanceModule == getSwiftModule() &&
       conformanceModule->getName().str() ==
-        conformance->getProtocol()->getAlternateModuleName())
+      conformance->getProtocol()->getAlternateModuleName())
     return false;
 
   // If the protocol and the conformance are in the same module and the
@@ -920,6 +921,12 @@ static bool hasDependentTypeWitness(
   return false;
 }
 
+static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
+  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
+    return normal->isSynthesizedNonUnique();
+  return false;
+}
+
 static bool isDependentConformance(
               IRGenModule &IGM,
               const RootProtocolConformance *rootConformance,
@@ -940,8 +947,9 @@ static bool isDependentConformance(
   if (!visited.insert(conformance).second)
     return false;
 
-  // If the conformance is resilient, this is always true.
-  if (IGM.isResilientConformance(conformance))
+  // If the conformance is resilient or synthesized, this is always true.
+  if (IGM.isResilientConformance(conformance)
+      || isSynthesizedNonUnique(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -975,7 +983,7 @@ static bool isDependentConformance(
   // Check if there are any conditional conformances. Other forms of conditional
   // requirements don't exist in the witness table.
   return SILWitnessTable::enumerateWitnessTableConditionalConformances(
-      conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
+    conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
 
 /// Is there anything about the given conformance that requires witness
@@ -984,12 +992,6 @@ bool IRGenModule::isDependentConformance(
     const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(*this, conformance, visited);
-}
-
-static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
-    return normal->isSynthesizedNonUnique();
-  return false;
 }
 
 static llvm::Value *
@@ -1352,6 +1354,8 @@ public:
       auto &entry = SILEntries.front();
       SILEntries = SILEntries.slice(1);
 
+      bool isAsyncRequirement = requirement.hasAsync();
+
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
@@ -1364,10 +1368,9 @@ public:
 #endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
-      auto *afd = cast<AbstractFunctionDecl>(
-          entry.getMethodWitness().Requirement.getDecl());
       llvm::Constant *witness = nullptr;
       if (Func) {
+        assert(Func->isAsync() == isAsyncRequirement);
         if (Func->isAsync()) {
           witness = IGM.getAddrOfAsyncFunctionPointer(Func);
         } else {
@@ -1376,7 +1379,7 @@ public:
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
-        if (afd->hasAsync()) {
+        if (isAsyncRequirement) {
           witness = llvm::ConstantExpr::getBitCast(
               IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
               IGM.FunctionPtrTy);
@@ -1388,8 +1391,9 @@ public:
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
 
       PointerAuthSchema schema =
-          afd->hasAsync() ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
-                          : IGM.getOptions().PointerAuth.ProtocolWitnesses;
+          isAsyncRequirement
+              ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
+              : IGM.getOptions().PointerAuth.ProtocolWitnesses;
       Table.addSignedPointer(witness, schema, requirement);
       return;
     }
@@ -2225,7 +2229,7 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     break;
   }
 
-  auto relptrSize = IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty).getValue();
+  auto relptrSize = IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty).getKnownMinValue();
   IGM.setVCallVisibility(global, vis,
                          std::make_pair(minOffset, maxOffset + relptrSize));
 }
@@ -3308,7 +3312,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // Figure out what we're actually still required to pass 
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
-    assert(generics->isCanonicalTypeInContext(reqt.TypeParameter));
+    assert(generics->isReducedType(reqt.TypeParameter));
     Requirements.push_back(reqt);
   });
 
@@ -3457,24 +3461,34 @@ namespace {
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
       : PolymorphicConvention(IGM, fn) {}
 
-    void expand(SmallVectorImpl<llvm::Type*> &out) {
+    void expand(SmallVectorImpl<llvm::Type *> &out,
+                SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
+      auto outStartSize = out.size();
+      (void)outStartSize;
       for (auto &source : getSources())
-        addEarlySource(source, out);
+        addEarlySource(source, out, reqs);
 
       enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
+        if (reqs)
+          reqs->push_back(reqt);
         out.push_back(reqt.Protocol ? IGM.WitnessTablePtrTy
                                     : IGM.TypeMetadataPtrTy);
       });
+      assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
+             "missing type source for type");
     }
 
   private:
     /// Add signature elements for the source metadata.
-    void addEarlySource(const MetadataSource &source,
-                        SmallVectorImpl<llvm::Type*> &out) {
+    void addEarlySource(
+        const MetadataSource &source, SmallVectorImpl<llvm::Type *> &out,
+        SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
       switch (source.getKind()) {
       case MetadataSource::Kind::ClassPointer: return; // already accounted for
       case MetadataSource::Kind::Metadata: return; // already accounted for
       case MetadataSource::Kind::GenericLValueMetadata:
+        if (reqs)
+          reqs->push_back(source);
         return out.push_back(IGM.TypeMetadataPtrTy);
       case MetadataSource::Kind::SelfMetadata:
       case MetadataSource::Kind::SelfWitnessTable:
@@ -3488,10 +3502,11 @@ namespace {
 } // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
-void irgen::expandPolymorphicSignature(IRGenModule &IGM,
-                                       CanSILFunctionType polyFn,
-                                       SmallVectorImpl<llvm::Type*> &out) {
-  ExpandPolymorphicSignature(IGM, polyFn).expand(out);
+void irgen::expandPolymorphicSignature(
+    IRGenModule &IGM, CanSILFunctionType polyFn,
+    SmallVectorImpl<llvm::Type *> &out,
+    SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs) {
+  ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
 }
 
 void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,

@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 #include <climits>
 #include <cstdlib>

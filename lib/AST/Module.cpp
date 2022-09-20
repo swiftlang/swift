@@ -32,6 +32,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
@@ -792,15 +793,35 @@ bool ModuleDecl::shouldCollectDisplayDecls() const {
   return true;
 }
 
-void swift::collectParsedExportedImports(const ModuleDecl *M, SmallPtrSetImpl<ModuleDecl *> &Imports) {
+void swift::collectParsedExportedImports(const ModuleDecl *M,
+                                         SmallPtrSetImpl<ModuleDecl *> &Imports,
+                                         llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
+                                         llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport) {
   for (const FileUnit *file : M->getFiles()) {
     if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
       if (source->hasImports()) {
         for (auto import : source->getImports()) {
           if (import.options.contains(ImportFlags::Exported) &&
-              !Imports.contains(import.module.importedModule) &&
+              (!includeImport || includeImport(import)) &&
               import.module.importedModule->shouldCollectDisplayDecls()) {
-            Imports.insert(import.module.importedModule);
+            auto *TheModule = import.module.importedModule;
+
+            if (import.module.getAccessPath().size() > 0) {
+              if (QualifiedImports.find(TheModule) == QualifiedImports.end()) {
+                QualifiedImports.try_emplace(TheModule);
+              }
+              auto collectDecls = [&](ValueDecl *VD,
+                                      DeclVisibilityKind reason) {
+                if (reason == DeclVisibilityKind::VisibleAtTopLevel)
+                  QualifiedImports[TheModule].insert(VD);
+              };
+              auto consumer = makeDeclConsumer(std::move(collectDecls));
+              TheModule->lookupVisibleDecls(
+                  import.module.getAccessPath(), consumer,
+                  NLKind::UnqualifiedLookup);
+            } else if (!Imports.contains(TheModule)) {
+              Imports.insert(TheModule);
+            }
           }
         }
       }
@@ -956,7 +977,12 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results, bool Recursive) const {
   if (Recursive && isParsedModule(this)) {
     SmallPtrSet<ModuleDecl *, 4> Modules;
-    collectParsedExportedImports(this, Modules);
+    llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
+    collectParsedExportedImports(this, Modules, QualifiedImports);
+    for (const auto &QI : QualifiedImports) {
+      auto &Decls = QI.getSecond();
+      Results.append(Decls.begin(), Decls.end());
+    }
     for (const ModuleDecl *import : Modules) {
       import->getDisplayDecls(Results, Recursive);
     }
@@ -1113,9 +1139,45 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     Type type, const TupleType *tupleType, ProtocolDecl *protocol,
     ModuleDecl *module) {
+  ASTContext &ctx = protocol->getASTContext();
+
+  // This is the new code path.
+  //
+  // FIXME: Remove the Sendable stuff below.
+  auto *tupleDecl = ctx.getBuiltinTupleDecl();
+
+  // Find the (unspecialized) conformance.
+  SmallVector<ProtocolConformance *, 2> conformances;
+  if (tupleDecl->lookupConformance(protocol, conformances)) {
+    // If we have multiple conformances, first try to filter out any that are
+    // unavailable on the current deployment target.
+    //
+    // FIXME: Conformance lookup should really depend on source location for
+    // this to be 100% correct.
+    if (conformances.size() > 1) {
+      SmallVector<ProtocolConformance *, 2> availableConformances;
+
+      for (auto *conformance : conformances) {
+        if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+          availableConformances.push_back(conformance);
+      }
+
+      // Don't filter anything out if all conformances are unavailable.
+      if (!availableConformances.empty())
+        std::swap(availableConformances, conformances);
+    }
+
+    auto *conformance = cast<NormalProtocolConformance>(conformances.front());
+    auto subMap = type->getContextSubstitutionMap(module,
+                                                  conformance->getDeclContext());
+
+    // TODO: labels
+    auto *specialized = ctx.getSpecializedConformance(type, conformance, subMap);
+    return ProtocolConformanceRef(specialized);
+  }
+
   // Tuple type are Sendable when all of their element types are Sendable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-    ASTContext &ctx = protocol->getASTContext();
 
     // Create the pieces for a generic tuple type (T1, T2, ... TN) and a
     // generic signature <T1, T2, ..., TN>.
@@ -1127,7 +1189,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
       auto genericParam = GenericTypeParamType::get(/*type sequence*/ false, 0,
                                                     genericParams.size(), ctx);
       genericParams.push_back(genericParam);
-      typeSubstitutions.push_back(elt.getRawType());
+      typeSubstitutions.push_back(elt.getType());
       genericElements.push_back(elt.getWithType(genericParam));
       conditionalRequirements.push_back(
           Requirement(RequirementKind::Conformance, genericParam,
@@ -1234,6 +1296,33 @@ static ProtocolConformanceRef getBuiltinBuiltinTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+static ProtocolConformanceRef getPackTypeConformance(
+    PackType *type, ProtocolDecl *protocol, ModuleDecl *mod) {
+  SmallVector<ProtocolConformanceRef, 2> patternConformances;
+
+  for (auto packElement : type->getElementTypes()) {
+    if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
+      auto patternType = packExpansion->getPatternType();
+
+      auto patternConformance =
+          (patternType->isTypeParameter()
+           ? ProtocolConformanceRef(protocol)
+           : mod->lookupConformance(patternType, protocol));
+      patternConformances.push_back(patternConformance);
+      continue;
+    }
+
+    auto patternConformance =
+        (packElement->isTypeParameter()
+         ? ProtocolConformanceRef(protocol)
+         : mod->lookupConformance(packElement, protocol));
+    patternConformances.push_back(patternConformance);
+  }
+
+  return ProtocolConformanceRef(
+      PackConformance::get(type, protocol, patternConformances));
+}
+
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
@@ -1296,6 +1385,11 @@ LookupConformanceInModuleRequest::evaluate(
   // intended type might have. Same goes for PlaceholderType.
   if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
     return ProtocolConformanceRef(protocol);
+
+  // Pack types can conform to protocols.
+  if (auto packType = type->getAs<PackType>()) {
+    return getPackTypeConformance(packType, protocol, mod);
+  }
 
   // Tuple types can conform to protocols.
   if (auto tupleType = type->getAs<TupleType>()) {
@@ -1424,7 +1518,8 @@ LookupConformanceInModuleRequest::evaluate(
       auto subMap = type->getContextSubstitutionMap(mod, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
+      auto result = ctx.getSpecializedConformance(type,
+        cast<RootProtocolConformance>(conformance), subMap);
       return ProtocolConformanceRef(result);
     }
   }
@@ -1546,6 +1641,11 @@ void ModuleDecl::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
   FORWARD(getImportedModules, (modules, filter));
 }
 
+void ModuleDecl::getMissingImportedModules(
+    SmallVectorImpl<ImportedModule> &imports) const {
+  FORWARD(getMissingImportedModules, (imports));
+}
+
 void
 SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
@@ -1567,6 +1667,8 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
       requiredFilter |= ModuleDecl::ImportFilterKind::Exported;
     else if (desc.options.contains(ImportFlags::ImplementationOnly))
       requiredFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    else if (desc.options.contains(ImportFlags::SPIOnly))
+      requiredFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
     else if (desc.options.contains(ImportFlags::SPIAccessControl))
       requiredFilter |= ModuleDecl::ImportFilterKind::SPIAccessControl;
     else
@@ -1578,6 +1680,12 @@ SourceFile::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
     if (filter.contains(requiredFilter))
       modules.push_back(desc.module);
   }
+}
+
+void SourceFile::getMissingImportedModules(
+    SmallVectorImpl<ImportedModule> &modules) const {
+  for (auto module : MissingImportedModules)
+    modules.push_back(module);
 }
 
 void SourceFile::dumpSeparatelyImportedOverlays() const {
@@ -1841,6 +1949,8 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
       if (existingDiagLoc.isValid()) {
         getASTContext().Diags.diagnose(existingDiagLoc,
                            diag::attr_ApplicationMain_script_here);
+        getASTContext().Diags.diagnose(existingDiagLoc,
+                           diag::attr_ApplicationMain_parse_as_library);
       }
     }
   }
@@ -1867,6 +1977,7 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
   ModuleDecl::ImportFilter topLevelFilter = filter;
   topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::SPIOnly;
   topLevel->getImportedModules(stack, topLevelFilter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
@@ -2363,19 +2474,64 @@ void SourceFile::setImportUsedPreconcurrency(
   PreconcurrencyImportsUsed.insert(import);
 }
 
-bool HasImplementationOnlyImportsRequest::evaluate(Evaluator &evaluator,
-                                                   SourceFile *SF) const {
-  return llvm::any_of(SF->getImports(),
-                      [](AttributedImport<ImportedModule> desc) {
-    return desc.options.contains(ImportFlags::ImplementationOnly);
-  });
+bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,
+                                             SourceFile *SF,
+                                             ImportFlags flag) const {
+  for (auto desc : SF->getImports()) {
+    if (desc.options.contains(flag))
+      return true;
+  }
+  return false;
 }
 
-bool SourceFile::hasImplementationOnlyImports() const {
+Optional<bool> HasImportsMatchingFlagRequest::getCachedResult() const {
+  SourceFile *sourceFile = std::get<0>(getStorage());
+  ImportFlags flag = std::get<1>(getStorage());
+  if (sourceFile->validCachedImportOptions.contains(flag))
+    return sourceFile->cachedImportOptions.contains(flag);
+
+  return None;
+}
+
+void HasImportsMatchingFlagRequest::cacheResult(bool value) const {
+  SourceFile *sourceFile = std::get<0>(getStorage());
+  ImportFlags flag = std::get<1>(getStorage());
+
+  sourceFile->validCachedImportOptions |= flag;
+  if (value)
+    sourceFile->cachedImportOptions |= flag;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, ImportOptions options) {
+  using Flag = std::pair<ImportFlags, StringRef>;
+  Flag possibleFlags[] = {
+#define FLAG(Name) {ImportFlags::Name, #Name},
+    FLAG(Exported)
+    FLAG(Testable)
+    FLAG(PrivateImport)
+    FLAG(ImplementationOnly)
+    FLAG(SPIAccessControl)
+    FLAG(Preconcurrency)
+    FLAG(WeakLinked)
+    FLAG(Reserved)
+#undef FLAG
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options & flag.first; });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
+bool SourceFile::hasImportsWithFlag(ImportFlags flag) const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(
-      ctx.evaluator, HasImplementationOnlyImportsRequest{mutableThis}, false);
+      ctx.evaluator, HasImportsMatchingFlagRequest{mutableThis, flag}, false);
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
@@ -2442,24 +2598,46 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::Implicit;
 
+  // Workaround for the cases where the bridging header isn't properly
+  // imported implicitly.
+  if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
+    return RestrictedImportKind::None;
+
   // Look at the imports of this source file.
   for (auto &desc : *Imports) {
-    // Ignore implementation-only imports.
     if (desc.options.contains(ImportFlags::ImplementationOnly)) {
-      if (imports.isImportedBy(module, desc.module.importedModule))
+      if (importKind < RestrictedImportKind::ImplementationOnly &&
+          imports.isImportedBy(module, desc.module.importedModule))
         importKind = RestrictedImportKind::ImplementationOnly;
-      continue;
     }
-
-    // If the module is imported publicly, it's not imported
-    // implementation-only.
-    if (imports.isImportedBy(module, desc.module.importedModule))
+    else if (desc.options.contains(ImportFlags::SPIOnly)) {
+      if (importKind < RestrictedImportKind::SPIOnly &&
+          imports.isImportedBy(module, desc.module.importedModule))
+        importKind = RestrictedImportKind::SPIOnly;
+    }
+    // If the module is imported publicly, there's no restriction.
+    else if (imports.isImportedBy(module, desc.module.importedModule))
       return RestrictedImportKind::None;
   }
 
   // Now check this file's enclosing module in case there are re-exports.
   if (imports.isImportedBy(module, getParentModule()))
     return RestrictedImportKind::None;
+
+  if (importKind == RestrictedImportKind::Implicit &&
+      (module->getLibraryLevel() == LibraryLevel::API ||
+       getParentModule()->getLibraryLevel() != LibraryLevel::API)) {
+    // Hack to fix swiftinterfaces in case of missing imports.
+    // We can get rid of this logic when we don't leak the use of non-locally
+    // imported things in API.
+    ImportPath::Element pathElement = {module->getName(), SourceLoc()};
+    auto pathArray = getASTContext().AllocateCopy(
+                       llvm::makeArrayRef(pathElement));
+    auto missingImport = ImportedModule(
+                           ImportPath::Access(pathArray),
+                           const_cast<ModuleDecl *>(module));
+    addMissingImportedModule(missingImport);
+  }
 
   return importKind;
 }
@@ -2500,6 +2678,7 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
   // @_implementationOnly or @_spi.
   ModuleDecl::ImportFilter filter = {
     ModuleDecl::ImportFilterKind::ImplementationOnly,
+    ModuleDecl::ImportFilterKind::SPIOnly,
     ModuleDecl::ImportFilterKind::SPIAccessControl
   };
   SmallVector<ImportedModule, 4> results;
@@ -2545,6 +2724,25 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
+bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
+  for (auto &import : *Imports) {
+    if (!import.options.contains(ImportFlags::WeakLinked))
+      continue;
+
+    const ModuleDecl *importedModule = import.module.importedModule;
+    if (module == importedModule)
+      return true;
+
+    // Also check whether the target module is actually the underlyingClang
+    // module for this @_weakLinked import.
+    const ModuleDecl *clangModule =
+        importedModule->getUnderlyingModuleIfOverlay();
+    if (module == clangModule)
+      return true;
+  }
+  return false;
+}
+
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
@@ -2568,6 +2766,14 @@ bool ModuleDecl::isImportedAsSPI(Identifier spiGroup,
   if (importedSPIGroups.empty())
     return false;
   return importedSPIGroups.count(spiGroup);
+}
+
+bool ModuleDecl::isImportedAsWeakLinked(const ModuleDecl *module) const {
+  for (auto file : getFiles()) {
+    if (file->importsModuleAsWeakLinked(module))
+      return true;
+  }
+  return false;
 }
 
 bool Decl::isSPI() const {

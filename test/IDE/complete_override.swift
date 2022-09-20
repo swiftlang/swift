@@ -387,16 +387,18 @@ class OmitKW10: ProtocolA {
 // WITH_PA
 }
 
-protocol SR2560Proto {
+// https://github.com/apple/swift/issues/45165
+
+protocol P_45165 {
   func foo<S : Sequence>(x: S) where S.Iterator.Element == Int
 }
-class SR2560Class: SR2560Proto {
-  #^SR2560_WHERE_CLAUSE?keywords=false^#
+class C_45165: P_45165 {
+  #^ISSUE_45165_WHERE_CLAUSE?keywords=false^#
 }
 
-// SR2560_WHERE_CLAUSE: Begin completions
-// SR2560_WHERE_CLAUSE: Decl[InstanceMethod]/Super: func foo<S>(x: S) where S : Sequence, S.Element == Int {|};
-// SR2560_WHERE_CLAUSE: End completions
+// ISSUE_45165_WHERE_CLAUSE: Begin completions
+// ISSUE_45165_WHERE_CLAUSE: Decl[InstanceMethod]/Super: func foo<S>(x: S) where S : Sequence, S.Element == Int {|};
+// ISSUE_45165_WHERE_CLAUSE: End completions
 
 protocol HasThrowingProtocol {
   func foo() throws
@@ -758,10 +760,11 @@ class SynthesizedConformance5: SynthesizedConformance2 {
 // FIXME: 'required init(from decoder: Decoder)' is suggested twice
 }
 
-protocol ProtocolSr14687 {
+// https://github.com/apple/swift/issues/57037
+protocol P_57037 {
   var value: Int { get }
 }
-struct StructSr14687: ProtocolSr14687 {
+struct S_57037: P_57037 {
   let foo = val, #^MULTI_VAR_DECL_OVERRIDE^#
 // MULTI_VAR_DECL_OVERRIDE:     Begin completions, 1 items
 // MULTI_VAR_DECL_OVERRIDE-DAG: Decl[InstanceVar]/Super:            value: Int;

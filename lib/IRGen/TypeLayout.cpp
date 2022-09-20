@@ -2321,7 +2321,7 @@ EnumTypeLayoutEntry::getEnumTagMultipayload(IRGenFunction &IGF,
   auto usePayloadBB = IGF.createBasicBlock("use-payload-for-tag");
   auto numPayloads = IGM.getInt32(cases.size());
   auto usePayloadValue = Builder.CreateICmpUGE(loadedTag, numPayloads);
-  auto tagValue = llvm::PHINode::Create(IGM.Int32Ty, 3);
+  auto tagValue = llvm::PHINode::Create(IGM.Int32Ty, 4);
   tagValue->addIncoming(loadedTag, Builder.GetInsertBlock());
   Builder.CreateCondBr(usePayloadValue, usePayloadBB, resultBB);
 
@@ -2330,6 +2330,13 @@ EnumTypeLayoutEntry::getEnumTagMultipayload(IRGenFunction &IGF,
   auto truncSize = Builder.CreateZExtOrTrunc(maxPayloadSize(IGF), IGM.Int32Ty);
   auto sizeGTE4 = Builder.CreateICmpUGE(truncSize, four);
   auto sizeClampedTo4 = Builder.CreateSelect(sizeGTE4, four, truncSize);
+  auto sizeGreaterZeroBB = IGF.createBasicBlock("");
+  auto zero = IGM.getInt32(0);
+  auto sizeGreaterZero = Builder.CreateICmpUGT(sizeClampedTo4, zero);
+  tagValue->addIncoming(loadedTag, Builder.GetInsertBlock());
+  Builder.CreateCondBr(sizeGreaterZero, sizeGreaterZeroBB, resultBB);
+
+  Builder.emitBlock(sizeGreaterZeroBB);
   auto payloadValue = emitLoad1to4Bytes(IGF, enumAddr, sizeClampedTo4);
   auto payloadGTE4BB = IGF.createBasicBlock("");
   auto payloadLT4BB = IGF.createBasicBlock("");
@@ -2398,7 +2405,7 @@ void EnumTypeLayoutEntry::storeEnumTagMultipayload(IRGenFunction &IGF,
   //   } else {
   //     unsigned numPayloadBits = layout.payloadSize * CHAR_BIT;
   //     whichTag = numPayloads + (whichEmptyCase >> numPayloadBits);
-  //     whichPayloadValue = whichEmptyCase & ((1U << numPayloads) - 1U);
+  //     whichPayloadValue = whichEmptyCase & ((1U << numPayloadBits) - 1U);
   //   }
   //   storeMultiPayloadTag(value, layout, whichTag);
   //   storeMultiPayloadValue(value, layout, whichPayloadValue);
@@ -2444,7 +2451,7 @@ void EnumTypeLayoutEntry::storeEnumTagMultipayload(IRGenFunction &IGF,
     whichTag->addIncoming(tmp2, Builder.GetInsertBlock());
 
     auto tmp3 = Builder.CreateSub(
-        Builder.CreateShl(IGM.getInt32(1), numPayloads), IGM.getInt32(1));
+        Builder.CreateShl(IGM.getInt32(1), numPayloadBits), IGM.getInt32(1));
     auto tmp4 = Builder.CreateAnd(whichEmptyCase, tmp3);
     whichPayloadValue->addIncoming(tmp4, Builder.GetInsertBlock());
     Builder.CreateBr(storeBB);

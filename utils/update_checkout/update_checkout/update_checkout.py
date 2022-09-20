@@ -509,7 +509,7 @@ repositories.
         action="append")
     parser.add_argument(
         "--all-repositories",
-        help="""Includes repositories not required for current platform. 
+        help="""Includes repositories not required for current platform.
         This will not override '--skip-repositories'""",
         action='store_true')
     parser.add_argument(

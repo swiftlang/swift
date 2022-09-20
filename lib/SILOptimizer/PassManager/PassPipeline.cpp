@@ -128,6 +128,25 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+
+  //===---
+  // Begin Ownership Optimizations
+  //
+
+  P.addMoveOnlyAddressChecker(); // Check noImplicitCopy and move only types for
+                                 // addresses.
+  P.addMoveKillsCopyableAddressesChecker(); // Check _move for addresses.
+  P.addMoveOnlyObjectChecker();          // Check noImplicitCopy and move only
+                                         // types for objects
+  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
+                                         // value.
+  P.addTrivialMoveOnlyTypeEliminator();  // Lower move only wrapped trivial
+                                         // types.
+
+  //
+  // End Ownership Optimizations
+  //===---
+
   P.addAddressLowering();
 
   P.addFlowIsolation();
@@ -159,29 +178,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
-  // Before we promote any loads, perform _move checking for addresses.
-  P.addMoveFunctionCanonicalization();
-  P.addMoveKillsCopyableAddressesChecker();
-
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();
-
-  // Now that we have promoted simple loads for SSA based diagnostics, perform
-  // SSA based move function checking and no implicit copy checking.
-  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
-                                         //   value.
-  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
-
-  // Now that we have run move only checking, eliminate SILMoveOnly wrapped
-  // trivial types from the IR. We cannot introduce extra "copies" of trivial
-  // things so we can simplify our implementation by eliminating them here.
-  P.addTrivialMoveOnlyTypeEliminator();
-
-  // As a temporary measure, we also eliminate move only for non-trivial types
-  // until we can audit the later part of the pipeline. Eventually, this should
-  // occur before IRGen.
-  P.addMoveOnlyTypeEliminator();
 
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
@@ -224,6 +223,11 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
+
+  // As a temporary measure, we also eliminate move only for non-trivial types
+  // until we can audit the later part of the pipeline. Eventually, this should
+  // occur before IRGen.
+  P.addMoveOnlyTypeEliminator();
 }
 
 SILPassPipelinePlan
@@ -391,6 +395,15 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addSROA();
   }
 
+  // Promote stack allocations to values.
+  P.addMem2Reg();
+
+  // Run the existential specializer Pass.
+  P.addExistentialSpecializer();
+
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+
   if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
@@ -400,15 +413,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     }
     P.addNonTransparentFunctionOwnershipModelEliminator();
   }
-
-  // Promote stack allocations to values.
-  P.addMem2Reg();
-
-  // Run the existential specializer Pass.
-  P.addExistentialSpecializer();
-
-  // Cleanup, which is important if the inliner has restarted the pass pipeline.
-  P.addPerformanceConstantPropagation();
 
   addSimplifyCFGSILCombinePasses(P);
 
@@ -524,8 +528,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
-    // Remove retain/releases based on Builtin.unsafeGuaranteed
-    P.addUnsafeGuaranteedPeephole();
     // Only hoist releases very late.
     P.addLateCodeMotion();
   } else
@@ -793,6 +795,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 // - don't require IRGen information.
 static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
+  P.addOptimizeHopToExecutor();
   P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addAccessEnforcementWMO();
@@ -813,6 +816,9 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
+
+  // In optimized builds, do the inter-procedural analysis in a module pass.
+  P.addStackProtection();
 
   // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
   // P.addPruneVTables();
@@ -978,10 +984,16 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("Rest of Onone");
   P.addUsePrespecialized();
 
+  // Needed to fold MemoryLayout constants in performance-annotated functions.
+  P.addTargetConstantFolding();
+
   // Has only an effect if the -assume-single-thread option is specified.
   if (P.getOptions().AssumeSingleThreaded) {
     P.addAssumeSingleThreaded();
   }
+
+  // In Onone builds, do a function-local analysis in a function pass.
+  P.addFunctionStackProtection();
 
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();

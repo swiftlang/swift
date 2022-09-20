@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DECL_TYPECHECKDISTRIBUTED_H
-#define SWIFT_DECL_TYPECHECKDISTRIBUTED_H
+#ifndef SWIFT_DECL_DISTRIBUTEDDECL_H
+#define SWIFT_DECL_DISTRIBUTEDDECL_H
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -129,4 +129,6 @@ extractDistributedSerializationRequirements(
 
 }
 
-#endif /* SWIFT_DECL_TYPECHECKDISTRIBUTED_H */
+// ==== ------------------------------------------------------------------------
+
+#endif /* SWIFT_DECL_DISTRIBUTEDDECL_H */

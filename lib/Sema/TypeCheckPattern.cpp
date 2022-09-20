@@ -234,14 +234,14 @@ namespace {
     UnresolvedPatternFinder(bool &HadUnresolvedPattern)
       : HadUnresolvedPattern(HadUnresolvedPattern) {}
     
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find an UnresolvedPatternExpr, return true.
       if (isa<UnresolvedPatternExpr>(E)) {
         HadUnresolvedPattern = true;
-        return { false, E };
+        return Action::SkipChildren(E);
       }
       
-      return { true, E };
+      return Action::Continue(E);
     }
     
     static bool hasAny(Expr *E) {
@@ -1036,15 +1036,14 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     if ((options.getContext() == TypeResolverContext::EnumPatternPayload)
         && !isa<TuplePattern>(semantic)) {
       if (auto tupleType = type->getAs<TupleType>()) {
-        if (tupleType->getNumElements() == 1 &&
-            !tupleType->getElement(0).isVararg()) {
-          auto elementTy = tupleType->getElementType(0);
+        if (tupleType->getNumElements() == 1) {
+          auto element = tupleType->getElement(0);
           sub = coercePatternToType(
-              pattern.forSubPattern(sub, /*retainTopLevel=*/true), elementTy,
+              pattern.forSubPattern(sub, /*retainTopLevel=*/true), element.getType(),
               subOptions);
           if (!sub)
             return nullptr;
-          TuplePatternElt elt(sub);
+          TuplePatternElt elt(element.getName(), SourceLoc(), sub);
           P = TuplePattern::create(Context, PP->getLParenLoc(), elt,
                                    PP->getRParenLoc());
           if (PP->isImplicit())

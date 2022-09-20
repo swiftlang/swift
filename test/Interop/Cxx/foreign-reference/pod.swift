@@ -6,6 +6,10 @@
 import StdlibUnittest
 import POD
 
+extension IntPair {
+  static public func swiftMake() -> IntPair { IntPair.create() }
+}
+
 struct StructHoldingPair {
   var pair: IntPair
 };
@@ -46,6 +50,12 @@ PODTestSuite.test("var IntPair") {
 
   x = IntPair.create()
   expectEqual(x.test(), 1)
+}
+
+PODTestSuite.test("static extension") {
+  var x = IntPair.swiftMake()
+  expectEqual(x.test(), 1)
+  expectEqual(x.testMutable(), 1)
 }
 
 PODTestSuite.test("let IntPair") {

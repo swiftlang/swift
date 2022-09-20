@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/53125
+
 typealias T1 = Int
 typealias T2 = Float
 typealias T3 = Bool

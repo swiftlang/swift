@@ -57,12 +57,12 @@ bb0:
   %4 = metatype $@thick ArrayClassReaderWriter.Type
   %5 = apply %3(%4) : $@convention(thin) (@thick ArrayClassReaderWriter.Type) -> @owned ArrayClassReaderWriter
   store %5 to %2 : $*ArrayClassReaderWriter
-  %7 = open_existential_addr immutable_access %1 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
+  %7 = open_existential_addr immutable_access %1 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self
   // Check that the type information reaches the witness_method instruction and allows for devirtualization.
-  %8 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read, %7 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %8 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self, #ReaderWriterType.read, %7 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
   %9 = integer_literal $Builtin.Int32, 0
   %10 = struct $Int32 (%9 : $Builtin.Int32)
-  %11 = apply %8<@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType>(%10, %7) : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %11 = apply %8<@opened("3305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self>(%10, %7) : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
   %12 = integer_literal $Builtin.Int32, 0
   %13 = struct $Int32 (%12 : $Builtin.Int32)
   store %13 to %0 : $*Int32
@@ -92,12 +92,12 @@ bb0:
   store %6 to %3 : $*ArrayClassReaderWriter
   // Check that the type information set for %1 is propagated here to %2.
   copy_addr %1 to [initialization] %2 : $*ReaderWriterType
-  %9 = open_existential_addr immutable_access %2 : $*ReaderWriterType to $*@opened("4305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
+  %9 = open_existential_addr immutable_access %2 : $*ReaderWriterType to $*@opened("4305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self
   // Check that the type information reaches the witness_method instruction and allows for devirtualization.
-  %10 = witness_method $@opened("4305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read, %9 : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %10 = witness_method $@opened("4305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self, #ReaderWriterType.read, %9 : $*@opened("4305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
   %11 = integer_literal $Builtin.Int32, 0
   %12 = struct $Int32 (%11 : $Builtin.Int32)
-  %13 = apply %10<@opened("4305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType>(%12, %9) : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %13 = apply %10<@opened("4305E696-5685-11E5-9393-B8E856428C60", ReaderWriterType) Self>(%12, %9) : $@convention(witness_method: ReaderWriterType) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
   %14 = integer_literal $Builtin.Int32, 0
   %15 = struct $Int32 (%14 : $Builtin.Int32)
   store %15 to %0 : $*Int32
@@ -139,9 +139,9 @@ bb1:
   br bb2
 
 bb2:
-  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
-  %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self
+  %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self, #P.foo, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   return %12 : $Int64
@@ -161,9 +161,9 @@ bb0(%0 : $*P):
   store %8 to %3 : $*X
   destroy_addr %2 : $*P
   copy_addr [take] %0 to %2 : $*P                 // id: %5
-  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83") P
-  %11 = witness_method $@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo, %10 : $*@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %12 = apply %11<@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self
+  %11 = witness_method $@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self, #P.foo, %10 : $*@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %12 = apply %11<@opened("D22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   dealloc_stack %2 : $*P
   return %12 : $Int64
 }
@@ -184,9 +184,9 @@ bb0:
   destroy_addr %2 : $*P
   %f = function_ref @write_p : $@convention(thin) () -> @out P
   %a = apply %f(%2) : $@convention(thin) () -> @out P
-  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83") P
-  %11 = witness_method $@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo, %10 : $*@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %12 = apply %11<@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self
+  %11 = witness_method $@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self, #P.foo, %10 : $*@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %12 = apply %11<@opened("E22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   dealloc_stack %2 : $*P
   return %12 : $Int64
 }
@@ -207,9 +207,9 @@ bb0:
   store %8 to %3 : $*X
   %f = function_ref @read_p : $@convention(thin) (@in P) -> ()
   %a = apply %f(%2) : $@convention(thin) (@in P) -> ()
-  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83") P
-  %11 = witness_method $@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo, %10 : $*@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %12 = apply %11<@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self
+  %11 = witness_method $@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self, #P.foo, %10 : $*@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %12 = apply %11<@opened("F22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   return %12 : $Int64
@@ -261,9 +261,9 @@ sil @silcombine_dont_generate_wrong_upcasts_during_devirt: $@convention(thin) (@
 bb0(%0 : $BBB):
   strong_retain %0 : $BBB
   %3 = init_existential_ref %0 : $BBB : $BBB, $PPP
-  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
-  %6 = witness_method $BBB, #PPP.foo, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self
+  %6 = witness_method $BBB, #PPP.foo, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self>(%5) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
   strong_release %3 : $PPP
   %9 = tuple ()
   strong_release %0 : $BBB
@@ -283,9 +283,9 @@ sil @silcombine_devirt_both_applies_of_witness_method : $@convention(thin) (@own
 bb0(%0 : $XXX):
   strong_retain %0 : $XXX
   %3 = init_existential_ref %0 : $XXX : $XXX, $PPP
-  %5 = open_existential_ref %3 : $PPP to $@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
-  %6 = witness_method $@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP, #PPP.foo, %5 : $@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %5 = open_existential_ref %3 : $PPP to $@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self
+  %6 = witness_method $@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self, #PPP.foo, %5 : $@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("1AC9A62E-926E-11E6-8BF5-685B35C48C83", PPP) Self>(%5) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
   strong_release %3 : $PPP
   %9 = tuple ()
   strong_release %0 : $XXX
@@ -309,9 +309,9 @@ bb0(%0 : $*P, %1 : $Q):
   // A single operand instruction that uses an opened existential.
   // For some reason this is handled specialy in
   // SILBuilder::addOpenedArchetypeOperands.
-  %ref = open_existential_ref %1 : $Q to $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0") Q
-  %om = objc_method %ref : $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0") Q, #Q.bar!foreign : <Self where Self : Q> (Self) -> () -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()
-  %call1 = apply %om<@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0") Q>(%ref) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()
+  %ref = open_existential_ref %1 : $Q to $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0", Q) Self
+  %om = objc_method %ref : $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0", Q) Self, #Q.bar!foreign : <Self where Self : Q> (Self) -> () -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()
+  %call1 = apply %om<@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0", Q) Self>(%ref) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()
 
   // Some code to simplify in iteration #1
   %ptr = address_to_pointer %0 : $*P to $Builtin.RawPointer
@@ -319,19 +319,19 @@ bb0(%0 : $*P, %1 : $Q):
 
   // Some code to confuse SILCombineApply.
   %p0 = alloc_stack $P
-  %opened = open_existential_addr immutable_access %adr : $*P to $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  %opened = open_existential_addr immutable_access %adr : $*P to $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
   %p1 = alloc_stack $P
-  %v1 = init_existential_addr %p1 : $*P, $@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P
-  copy_addr %opened to [initialization] %v1 : $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  %v1 = init_existential_addr %p1 : $*P, $@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
+  copy_addr %opened to [initialization] %v1 : $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
   copy_addr [take] %p1 to [initialization] %p0 : $*P
   destroy_addr %0 : $*P
-  %v0 = open_existential_addr immutable_access %p0 : $*P to $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
-  %p2 = alloc_stack $@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
-  copy_addr %v0 to [initialization] %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
-  %wm = witness_method $@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P, #P.foo : <T where T : P> (T) -> () -> Int64, %opened : $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %call2 = apply %wm<@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P>(%p2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  destroy_addr %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
-  dealloc_stack %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  %v0 = open_existential_addr immutable_access %p0 : $*P to $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
+  %p2 = alloc_stack $@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
+  copy_addr %v0 to [initialization] %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
+  %wm = witness_method $@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self, #P.foo : <T where T : P> (T) -> () -> Int64, %opened : $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %call2 = apply %wm<@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self>(%p2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  destroy_addr %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
+  dealloc_stack %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0", P) Self
   dealloc_stack %p1 : $*P
   dealloc_stack %p0 : $*P
   %r = tuple ()

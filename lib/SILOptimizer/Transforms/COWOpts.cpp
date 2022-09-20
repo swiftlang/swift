@@ -17,10 +17,12 @@
 #define DEBUG_TYPE "cow-opts"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/StackList.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -65,16 +67,13 @@ public:
   void run() override;
 
 private:
-  using InstructionSet = SmallPtrSet<SILInstruction *, 8>;
-  using VoidPointerSet = SmallPtrSet<void *, 8>;
-
   AliasAnalysis *AA = nullptr;
 
   bool optimizeBeginCOW(BeginCOWMutationInst *BCM);
 
   static void collectEscapePoints(SILValue v,
-                                  InstructionSet &escapePoints,
-                                  VoidPointerSet &handled);
+                                  InstructionSetWithSize &escapePoints,
+                                  ValueSet &handled);
 };
 
 void COWOptsPass::run() {
@@ -120,37 +119,44 @@ static SILValue skipStructAndExtract(SILValue value) {
 }
 
 bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
-  VoidPointerSet handled;
-  SmallVector<SILValue, 8> workList;
-  SmallPtrSet<EndCOWMutationInst *, 4> endCOWMutationInsts;
+  SILFunction *function = BCM->getFunction();
+  StackList<EndCOWMutationInst *> endCOWMutationInsts(function);
+  InstructionSet endCOWMutationsFound(function);
 
-  // Collect all end_cow_mutation instructions, used by the begin_cow_mutation,
-  // looking through block phi-arguments.
-  workList.push_back(BCM->getOperand());
-  while (!workList.empty()) {
-    SILValue v = skipStructAndExtract(workList.pop_back_val());
-    if (SILPhiArgument *arg = dyn_cast<SILPhiArgument>(v)) {
-      if (handled.insert(arg).second) {
-        SmallVector<SILValue, 4> incomingVals;
-        if (!arg->getIncomingPhiValues(incomingVals))
-          return false;
-        for (SILValue incomingVal : incomingVals) {
-          workList.push_back(incomingVal);
+  {
+    // Collect all end_cow_mutation instructions, used by the begin_cow_mutation,
+    // looking through block phi-arguments.
+    StackList<SILValue> workList(function);
+    ValueSet handled(function);
+    workList.push_back(BCM->getOperand());
+    while (!workList.empty()) {
+      SILValue v = skipStructAndExtract(workList.pop_back_val());
+      if (SILPhiArgument *arg = dyn_cast<SILPhiArgument>(v)) {
+        if (handled.insert(arg)) {
+          SmallVector<SILValue, 4> incomingVals;
+          if (!arg->getIncomingPhiValues(incomingVals))
+            return false;
+          for (SILValue incomingVal : incomingVals) {
+            workList.push_back(incomingVal);
+          }
         }
+      } else if (auto *ECM = dyn_cast<EndCOWMutationInst>(v)) {
+        if (endCOWMutationsFound.insert(ECM))
+          endCOWMutationInsts.push_back(ECM);
+      } else {
+        return false;
       }
-    } else if (auto *ECM = dyn_cast<EndCOWMutationInst>(v)) {
-      endCOWMutationInsts.insert(ECM);
-    } else {
-      return false;
     }
   }
 
   // Collect all uses of the end_cow_instructions, where the buffer can
   // potentially escape.
-  handled.clear();
-  InstructionSet potentialEscapePoints;
-  for (EndCOWMutationInst *ECM : endCOWMutationInsts) {
-    collectEscapePoints(ECM, potentialEscapePoints, handled);
+  InstructionSetWithSize potentialEscapePoints(function);
+  {
+    ValueSet handled(function);
+    for (EndCOWMutationInst *ECM : endCOWMutationInsts) {
+      collectEscapePoints(ECM, potentialEscapePoints, handled);
+    }
   }
 
   if (!potentialEscapePoints.empty()) {
@@ -161,10 +167,13 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
     // For store instructions we do a little bit more: only count a store as an
     // escape if there is a (potential) load from the same address within the
     // liverange.
-    handled.clear();
-    SmallVector<SILInstruction *, 8> instWorkList;
-    SmallVector<SILInstruction *, 8> potentialLoadInsts;
-    llvm::DenseSet<SILValue> storeAddrs;
+    StackList<SILInstruction *> instWorkList(function);
+    StackList<SILInstruction *> potentialLoadInsts(function);
+    StackList<SILValue> storeAddrs(function);
+    ValueSet storeAddrsFound(function);
+    BasicBlockSet handled(function);
+    int numStoresFound = 0;
+    int numLoadsFound = 0;
   
     // This is a simple worklist-based backward dataflow analysis.
     // Start at the initial begin_cow_mutation and go backward.
@@ -173,27 +182,32 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
     while (!instWorkList.empty()) {
       SILInstruction *inst = instWorkList.pop_back_val();
       for (;;) {
-        if (potentialEscapePoints.count(inst) != 0) {
+        if (potentialEscapePoints.contains(inst)) {
           if (auto *store = dyn_cast<StoreInst>(inst)) {
             // Don't immediately bail on a store instruction. Instead, remember
             // it and check if it interfers with any (potential) load.
-            storeAddrs.insert(store->getDest());
+            if (storeAddrsFound.insert(store->getDest())) {
+              storeAddrs.push_back(store->getDest());
+              numStoresFound += 1;
+            }
           } else {
             return false;
           }
         }
-        if (inst->mayReadFromMemory())
+        if (inst->mayReadFromMemory()) {
           potentialLoadInsts.push_back(inst);
+          numLoadsFound += 1;
+        }
 
         // An end_cow_mutation marks the begin of the liverange. It's the end
         // point of the dataflow analysis.
         auto *ECM = dyn_cast<EndCOWMutationInst>(inst);
-        if (ECM && endCOWMutationInsts.count(ECM) != 0)
+        if (ECM && endCOWMutationsFound.contains(ECM))
           break;
 
         if (inst == &inst->getParent()->front()) {
           for (SILBasicBlock *pred : inst->getParent()->getPredecessorBlocks()) {
-            if (handled.insert(pred).second)
+            if (handled.insert(pred))
               instWorkList.push_back(pred->getTerminator());
           }
           break;
@@ -205,9 +219,9 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
     
     // Check if there is any (potential) load from a memory location where the
     // buffer is stored to.
-    if (!storeAddrs.empty()) {
+    if (numStoresFound != 0) {
       // Avoid quadratic behavior. Usually this limit is not exceeded.
-      if (storeAddrs.size() * potentialLoadInsts.size() > 128)
+      if (numStoresFound * numLoadsFound > 128)
         return false;
       for (SILInstruction *load : potentialLoadInsts) {
         for (SILValue storeAddr : storeAddrs) {
@@ -235,9 +249,9 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
 }
 
 void COWOptsPass::collectEscapePoints(SILValue v,
-                                      InstructionSet &escapePoints,
-                                      VoidPointerSet &handled) {
-  if (!handled.insert(v.getOpaqueValue()).second)
+                                      InstructionSetWithSize &escapePoints,
+                                      ValueSet &handled) {
+  if (!handled.insert(v))
     return;
 
   for (Operand *use : v->getUses()) {

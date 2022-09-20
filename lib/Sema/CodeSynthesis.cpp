@@ -96,6 +96,15 @@ Expr *swift::buildSelfReference(VarDecl *selfDecl,
   llvm_unreachable("bad self access kind");
 }
 
+Argument swift::buildSelfArgument(VarDecl *selfDecl,
+                                  SelfAccessorKind selfAccessorKind,
+                                  bool isMutable) {
+  auto &ctx = selfDecl->getASTContext();
+  auto *selfRef = buildSelfReference(selfDecl, selfAccessorKind, isMutable);
+  return isMutable ? Argument::implicitInOut(ctx, selfRef)
+                   : Argument::unlabeled(selfRef);
+}
+
 /// Build an argument list that forwards references to the specified parameter
 /// list.
 ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
@@ -119,7 +128,7 @@ ArgumentList *swift::buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
 }
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
-                                         unsigned paramSize, ASTContext &ctx) {
+                                         ASTContext &ctx) {
   // First and foremost, if this is a constant don't bother.
   if (var->isLet())
     return;
@@ -179,6 +188,49 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
+static void maybeAddTypeWrapperDefaultArg(ParamDecl *arg, VarDecl *var,
+                                          ASTContext &ctx) {
+  assert(var->isAccessedViaTypeWrapper() || var->hasAttachedPropertyWrapper());
+
+  if (!(var->getParentPattern() && var->getParentPattern()->getSingleVar()))
+    return;
+
+  auto *PBD = var->getParentPatternBinding();
+
+  Expr *initExpr = nullptr;
+
+  if (var->hasAttachedPropertyWrapper()) {
+    auto initInfo = var->getPropertyWrapperInitializerInfo();
+
+    if (initInfo.hasInitFromWrappedValue()) {
+      initExpr =
+          initInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue();
+    }
+  } else {
+    initExpr = PBD->getInit(/*index=*/0);
+  }
+
+  if (!initExpr)
+    return;
+
+  // Type wrapper variables are never initialized directly,
+  // initialization expression (if any) becomes an default
+  // argument of the initializer synthesized by the type wrapper.
+  {
+    // Since type wrapper is applied to backing property, that's
+    // the the initializer it subsumes.
+    if (var->hasAttachedPropertyWrapper()) {
+      auto *backingVar = var->getPropertyWrapperBackingProperty();
+      PBD = backingVar->getParentPatternBinding();
+    }
+
+    PBD->setInitializerSubsumed(/*index=*/0);
+  }
+
+  arg->setDefaultExpr(initExpr, PBD->isInitializerChecked(/*index=*/0));
+  arg->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+}
+
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
@@ -193,7 +245,78 @@ enum class ImplicitConstructorKind {
   /// the instance variables from a parameter of the same type and
   /// name.
   Memberwise,
+  /// The constructor of a type wrapped type which is going to
+  /// initialize underlying storage for all applicable properties.
+  TypeWrapper,
 };
+
+static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
+                                                SourceLoc paramLoc,
+                                                VarDecl *var) {
+  auto &ctx = var->getASTContext();
+  auto varInterfaceType = var->getValueInterfaceType();
+  bool isAutoClosure = false;
+
+  if (var->getAttrs().hasAttribute<LazyAttr>()) {
+    // If var is a lazy property, its value is provided for the underlying
+    // storage.  We thus take an optional of the property's type.  We only
+    // need to do this because the implicit initializer is added before all
+    // the properties are type checked.  Perhaps init() synth should be
+    // moved later.
+    varInterfaceType = OptionalType::get(varInterfaceType);
+  } else if (Type backingPropertyType =
+                 var->getPropertyWrapperBackingPropertyType()) {
+    // For a property that has a wrapper, writing the initializer
+    // with an '=' implies that the memberwise initializer should also
+    // accept a value of the original property type. Otherwise, the
+    // memberwise initializer will be in terms of the backing storage
+    // type.
+    if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
+      varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
+      isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
+    } else {
+      varInterfaceType = backingPropertyType;
+    }
+  }
+
+  Type resultBuilderType = var->getResultBuilderType();
+  if (resultBuilderType) {
+    // If the variable's type is structurally a function type, use that
+    // type. Otherwise, form a non-escaping function type for the function
+    // parameter.
+    bool isStructuralFunctionType =
+        varInterfaceType->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
+    if (!isStructuralFunctionType) {
+      auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+      varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
+    }
+  }
+
+  // Create the parameter.
+  auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
+                                  paramLoc, var->getName(), DC);
+  arg->setSpecifier(ParamSpecifier::Default);
+  arg->setInterfaceType(varInterfaceType);
+  arg->setImplicit();
+  arg->setAutoClosure(isAutoClosure);
+
+  // Don't allow the parameter to accept temporary pointer conversions.
+  arg->setNonEphemeralIfPossible();
+
+  // Attach a result builder attribute if needed.
+  if (resultBuilderType) {
+    auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
+    auto attr =
+        CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+    arg->getAttrs().add(attr);
+  }
+
+  maybeAddMemberwiseDefaultArg(arg, var, ctx);
+
+  return arg;
+}
 
 /// Create an implicit struct or class constructor.
 ///
@@ -226,70 +349,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      auto varInterfaceType = var->getValueInterfaceType();
-      bool isAutoClosure = false;
-
-      if (var->getAttrs().hasAttribute<LazyAttr>()) {
-        // If var is a lazy property, its value is provided for the underlying
-        // storage.  We thus take an optional of the property's type.  We only
-        // need to do this because the implicit initializer is added before all
-        // the properties are type checked.  Perhaps init() synth should be
-        // moved later.
-        varInterfaceType = OptionalType::get(varInterfaceType);
-      } else if (Type backingPropertyType =
-                     var->getPropertyWrapperBackingPropertyType()) {
-        // For a property that has a wrapper, writing the initializer
-        // with an '=' implies that the memberwise initializer should also
-        // accept a value of the original property type. Otherwise, the
-        // memberwise initializer will be in terms of the backing storage
-        // type.
-        if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
-          varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
-
-          auto initInfo = var->getPropertyWrapperInitializerInfo();
-          isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
-        } else {
-          varInterfaceType = backingPropertyType;
-        }
-      }
-
-      Type resultBuilderType= var->getResultBuilderType();
-      if (resultBuilderType) {
-        // If the variable's type is structurally a function type, use that
-        // type. Otherwise, form a non-escaping function type for the function
-        // parameter.
-        bool isStructuralFunctionType =
-            varInterfaceType->lookThroughAllOptionalTypes()
-              ->is<AnyFunctionType>();
-        if (!isStructuralFunctionType) {
-          auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-          varInterfaceType = FunctionType::get({ }, varInterfaceType, extInfo);
-        }
-      }
-
-      // Create the parameter.
-      auto *arg = new (ctx)
-          ParamDecl(SourceLoc(), Loc,
-                    var->getName(), Loc, var->getName(), decl);
-      arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(varInterfaceType);
-      arg->setImplicit();
-      arg->setAutoClosure(isAutoClosure);
-
-      // Don't allow the parameter to accept temporary pointer conversions.
-      arg->setNonEphemeralIfPossible();
-
-      // Attach a result builder attribute if needed.
-      if (resultBuilderType) {
-        auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
-        auto attr = CustomAttr::create(
-            ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-        arg->getAttrs().add(attr);
-      }
-
-      maybeAddMemberwiseDefaultArg(arg, var, params.size(), ctx);
-      
-      params.push_back(arg);
+      params.push_back(createMemberwiseInitParameter(decl, Loc, var));
     }
   } else if (ICK == ImplicitConstructorKind::DefaultDistributedActor) {
     auto classDecl = dyn_cast<ClassDecl>(decl);
@@ -308,6 +368,88 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(systemTy);
       arg->setImplicit();
+
+      params.push_back(arg);
+    }
+  } else if (ICK == ImplicitConstructorKind::TypeWrapper) {
+    // Access to the initializer should match that of its parent type.
+    accessLevel = decl->getEffectiveAccess();
+
+    for (auto *member : decl->getMembers()) {
+      auto *var = dyn_cast<VarDecl>(member);
+      if (!var)
+        continue;
+
+      if (!var->isAccessedViaTypeWrapper()) {
+        // Compiler synthesized properties are not included.
+        if (var->isImplicit())
+          continue;
+
+        // Computed properties are not included, except in cases
+        // where property has a property wrapper and `@typeWrapperIgnored`
+        // attribute.
+        if (!var->hasStorage() &&
+            !(var->hasAttachedPropertyWrapper() &&
+              var->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>()))
+          continue;
+
+        // If this is a memberwise initializeable property include
+        // it into the type wrapper initializer otherwise the instance
+        // of type wrapped type wouldn't be completely initialized.
+        if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+          params.push_back(createMemberwiseInitParameter(decl, Loc, var));
+
+        continue;
+      }
+
+      Identifier argName = var->getName();
+      Identifier paramName = argName;
+
+      auto paramInterfaceType = var->getValueInterfaceType();
+      DeclAttributes attrs;
+
+      // If this is a backing storage of a property wrapped property
+      // let's use wrapped property as a parameter and synthesize
+      // appropriate property wrapper initialization upon assignment.
+      if (auto *wrappedVar = var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::Backing)) {
+        // If there is `init(wrappedValue:)` or default value for a wrapped
+        // property we should use wrapped type, otherwise let's proceed with
+        // wrapper type.
+        if (wrappedVar->isPropertyMemberwiseInitializedWithWrappedType()) {
+          var = wrappedVar;
+          // If parameter have to get wrapped type, let's re-map both argument
+          // and parameter name to match wrapped property and let property
+          // wrapper attributes generate wrapped value and projection variables.
+          argName = wrappedVar->getName();
+          paramName = argName;
+
+          paramInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+          // The parameter needs to have all of the property wrapper
+          // attributes to generate projection and wrapper variables.
+          for (auto *attr : wrappedVar->getAttachedPropertyWrappers())
+            attrs.add(attr);
+        } else {
+          // If parameter has to have wrapper type then argument type should
+          // match that of a wrapped property but parameter name stays the same
+          // since it represents the type of backing storage and could be passed
+          // to `$Storage` constructor directly.
+          argName = wrappedVar->getName();
+        }
+      }
+
+      if (!paramInterfaceType || paramInterfaceType->hasError())
+        continue;
+
+      auto *arg =
+          new (ctx) ParamDecl(SourceLoc(), Loc, argName, Loc, paramName, decl);
+
+      arg->getAttrs().add(attrs);
+      arg->setSpecifier(ParamSpecifier::Default);
+      arg->setInterfaceType(paramInterfaceType);
+      arg->setImplicit();
+
+      maybeAddTypeWrapperDefaultArg(arg, var, ctx);
 
       params.push_back(arg);
     }
@@ -421,130 +563,37 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
            /*isTypeChecked=*/true };
 }
 
-namespace {
-  struct DesignatedInitOverrideInfo {
-    GenericSignature GenericSig;
-    GenericParamList *GenericParams;
-    SubstitutionMap OverrideSubMap;
-  };
-}
-
-static DesignatedInitOverrideInfo
-computeDesignatedInitOverrideSignature(ASTContext &ctx,
-                                       ClassDecl *classDecl,
-                                       Type superclassTy,
-                                       ConstructorDecl *superclassCtor) {
-  auto *moduleDecl = classDecl->getParentModule();
-
-  auto *superclassDecl = superclassTy->getAnyNominal();
-
-  auto classSig = classDecl->getGenericSignature();
-  auto superclassCtorSig = superclassCtor->getGenericSignature();
-  auto superclassSig = superclassDecl->getGenericSignature();
-
-  // These are our outputs.
-  GenericSignature genericSig = classSig;
+/// Clone the base class initializer's generic parameter list, but change the
+/// depth of the generic parameters to be one greater than the depth of the
+/// subclass.
+static GenericParamList *
+createDesignatedInitOverrideGenericParams(ASTContext &ctx,
+                                          ClassDecl *classDecl,
+                                          ConstructorDecl *superclassCtor) {
   auto *genericParams = superclassCtor->getGenericParams();
-  auto subMap = superclassTy->getContextSubstitutionMap(
-      moduleDecl, superclassDecl);
 
-  if (superclassCtorSig.getPointer() != superclassSig.getPointer()) {
-    // If the base initializer's generic signature is different
-    // from that of the base class, the base class initializer either
-    // has generic parameters or a 'where' clause.
-    //
-    // We need to "rebase" the requirements on top of the derived class's
-    // generic signature.
+  // If genericParams is non-null, the base class initializer has its own
+  // generic parameters. Otherwise, it is non-generic with a contextual
+  // 'where' clause.
+  if (genericParams == nullptr)
+    return nullptr;
 
-    SmallVector<GenericTypeParamDecl *, 4> newParams;
-    SmallVector<GenericTypeParamType *, 1> newParamTypes;
+  unsigned depth = 0;
+  if (auto classSig = classDecl->getGenericSignature())
+    depth = classSig.getGenericParams().back()->getDepth() + 1;
 
-    // If genericParams is non-null, the base class initializer has its own
-    // generic parameters. Otherwise, it is non-generic with a contextual
-    // 'where' clause.
-    if (genericParams) {
-      // First, clone the base class initializer's generic parameter list,
-      // but change the depth of the generic parameters to be one greater
-      // than the depth of the subclass.
-      unsigned depth = 0;
-      if (auto genericSig = classDecl->getGenericSignature())
-        depth = genericSig.getGenericParams().back()->getDepth() + 1;
-
-      for (auto *param : genericParams->getParams()) {
-        auto *newParam = GenericTypeParamDecl::create(
-            classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
-            depth, param->getIndex(), param->isOpaqueType(),
-            /*opaqueTypeRepr=*/nullptr);
-        newParams.push_back(newParam);
-      }
-
-      // We don't have to clone the RequirementReprs, because they're not
-      // used for anything other than SIL mode.
-      genericParams = GenericParamList::create(ctx,
-                                               SourceLoc(),
-                                               newParams,
-                                               SourceLoc(),
-                                               ArrayRef<RequirementRepr>(),
-                                               SourceLoc());
-
-      // Add the generic parameter types.
-      for (auto *newParam : newParams) {
-        newParamTypes.push_back(
-            newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
-      }
-    }
-
-    // The depth at which the initializer's own generic parameters start, if any.
-    unsigned superclassDepth = 0;
-    if (superclassSig)
-      superclassDepth = superclassSig.getGenericParams().back()->getDepth() + 1;
-
-    // We're going to be substituting the requirements of the base class
-    // initializer to form the requirements of the derived class initializer.
-    auto substFn = [&](SubstitutableType *type) -> Type {
-      auto *gp = cast<GenericTypeParamType>(type);
-      // Generic parameters of the base class itself are mapped via the
-      // substitution map of the superclass type.
-      if (gp->getDepth() < superclassDepth)
-        return Type(gp).subst(subMap);
-
-      // Generic parameters added by the base class initializer map to the new
-      // generic parameters of the derived initializer.
-      return genericParams->getParams()[gp->getIndex()]
-                 ->getDeclaredInterfaceType();
-    };
-
-    // If we don't have any new generic parameters and the derived class is
-    // not generic, the base class initializer's 'where' clause should already
-    // be fully satisfied, and we can just drop it.
-    if (genericParams != nullptr || classSig) {
-      auto lookupConformanceFn =
-          [&](CanType depTy, Type substTy,
-              ProtocolDecl *proto) -> ProtocolConformanceRef {
-        if (depTy->getRootGenericParam()->getDepth() < superclassDepth)
-          if (auto conf = subMap.lookupConformance(depTy, proto))
-            return conf;
-
-        return ProtocolConformanceRef(proto);
-      };
-
-      SmallVector<Requirement, 2> requirements;
-      for (auto reqt : superclassCtorSig.getRequirements())
-        if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
-          requirements.push_back(*substReqt);
-
-      // Now form the substitution map that will be used to remap parameter
-      // types.
-      subMap = SubstitutionMap::get(superclassCtorSig,
-                                    substFn, lookupConformanceFn);
-
-      genericSig = buildGenericSignature(ctx, classSig,
-                                         std::move(newParamTypes),
-                                         std::move(requirements));
-    }
+  SmallVector<GenericTypeParamDecl *, 4> newParams;
+  for (auto *param : genericParams->getParams()) {
+    auto *newParam = GenericTypeParamDecl::create(
+        classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
+        depth, param->getIndex(), param->isOpaqueType(),
+        /*opaqueTypeRepr=*/nullptr);
+    newParams.push_back(newParam);
   }
 
-  return DesignatedInitOverrideInfo{genericSig, genericParams, subMap};
+  return GenericParamList::create(ctx, SourceLoc(),
+                                  newParams, SourceLoc(),
+                                  ArrayRef<RequirementRepr>(), SourceLoc());
 }
 
 static void
@@ -633,13 +682,14 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
-  auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
-                                      /*isLValue=*/false);
+  auto superArg = buildSelfArgument(selfDecl, SelfAccessorKind::Super,
+                                    /*isMutable*/ false);
 
   SubstitutionMap subs;
   if (auto *genericEnv = fn->getGenericEnvironment())
     subs = genericEnv->getForwardingSubstitutionMap();
-  subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn, subs);
+  subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn)
+      .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
   auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
@@ -650,7 +700,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   if (auto *funcTy = type->getAs<FunctionType>())
     type = funcTy->getResult();
   auto *superclassCtorRefExpr =
-      DotSyntaxCallExpr::create(ctx, ctorRefExpr, SourceLoc(), superRef, type);
+      DotSyntaxCallExpr::create(ctx, ctorRefExpr, SourceLoc(), superArg, type);
   superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();
@@ -720,22 +770,27 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   //
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
-  auto *superclassCtorDecl =
-      superclassCtor->getDeclContext()->getSelfNominalTypeDecl();
-  Type superclassTy = classDecl->getSuperclass();
-  NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
-  if (superclassCtorDecl != superclassDecl) {
+  auto *superclassDecl = superclassCtor->getDeclContext()->getSelfClassDecl();
+  if (classDecl->getSuperclassDecl() != superclassDecl)
     return nullptr;
-  }
 
-  auto overrideInfo =
-      computeDesignatedInitOverrideSignature(ctx,
-                                             classDecl,
-                                             superclassTy,
-                                             superclassCtor);
+  auto *genericParams = createDesignatedInitOverrideGenericParams(
+      ctx, classDecl, superclassCtor);
 
-  if (auto superclassCtorSig = superclassCtor->getGenericSignature()) {
-    auto *genericEnv = overrideInfo.GenericSig.getGenericEnvironment();
+  auto superclassCtorSig = superclassCtor->getGenericSignature();
+
+  // Compute a generic signature for the initializer, and a substitution map
+  // from the superclass initializer signature to the initializer generic
+  // signature.
+  auto subMap = SubstitutionMap::getOverrideSubstitutions(
+      superclassDecl, classDecl, superclassCtorSig, genericParams);
+  auto genericSig = ctx.getOverrideGenericSignature(
+      superclassDecl, classDecl, superclassCtorSig, genericParams);
+
+  assert(!subMap.hasArchetypes());
+
+  if (superclassCtorSig) {
+    auto *genericEnv = genericSig.getGenericEnvironment();
 
     // If the base class initializer has a 'where' clause, it might impose
     // requirements on the base class's own generic parameters that are not
@@ -745,15 +800,15 @@ createDesignatedInitOverride(ClassDecl *classDecl,
         classDecl->getParentModule(),
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
-          auto substType = type.subst(overrideInfo.OverrideSubMap);
-          return GenericEnvironment::mapTypeIntoContext(
-            genericEnv, substType);
+          auto substType = type.subst(subMap);
+          return GenericEnvironment::mapTypeIntoContext(genericEnv, substType);
         });
     if (checkResult != CheckGenericArgumentsResult::Success)
       return nullptr;
   }
 
-  // Create the initializer parameter patterns.
+  // Create the initializer parameter list by cloning the superclass initializer
+  // parameter list and applying the substitution map.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
        ParameterList::Inherited |
@@ -771,7 +826,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto *bodyParam = bodyParams->get(idx);
 
     auto paramTy = superclassParam->getInterfaceType();
-    auto substTy = paramTy.subst(overrideInfo.OverrideSubMap);
+    auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
   }
@@ -787,13 +842,13 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
-                              bodyParams, overrideInfo.GenericParams,
+                              bodyParams, genericParams,
                               classDecl);
 
   ctor->setImplicit();
 
   // Set the interface type of the initializer.
-  ctor->setGenericSignature(overrideInfo.GenericSig);
+  ctor->setGenericSignature(genericSig);
 
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
@@ -925,15 +980,16 @@ bool AreAllStoredPropertiesDefaultInitableRequest::evaluate(
       for (auto idx : range(pbd->getNumPatternEntries())) {
         bool HasStorage = false;
         bool CheckDefaultInitializer = true;
-        pbd->getPattern(idx)->forEachVariable([&](VarDecl *VD) {
-          // If one of the bound variables is @NSManaged, go ahead no matter
-          // what.
-          if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-            CheckDefaultInitializer = false;
+        pbd->getPattern(idx)->forEachVariable(
+            [&HasStorage, &CheckDefaultInitializer](VarDecl *VD) {
+              // If one of the bound variables is @NSManaged, go ahead no matter
+              // what.
+              if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+                CheckDefaultInitializer = false;
 
-          if (VD->hasStorageOrWrapsStorage())
-            HasStorage = true;
-        });
+              if (VD->hasStorageOrWrapsStorage())
+                HasStorage = true;
+            });
 
         if (!HasStorage) continue;
 
@@ -1190,6 +1246,10 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return false;
 
+  // Don't attempt if the decl has a type wrapper.
+  if (decl->hasTypeWrapper())
+    return false;
+
   return true;
 }
 
@@ -1199,6 +1259,15 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     return;
 
   if (!shouldAttemptInitializerSynthesis(decl)) {
+    if (decl->hasTypeWrapper()) {
+      auto &ctx = decl->getASTContext();
+      // If declaration is type wrapped and there are no
+      // designated initializers, synthesize a special
+      // memberwise initializer that would instantiate `$_storage`.
+      if (!hasUserDefinedDesignatedInit(ctx.evaluator, decl))
+        (void)decl->getTypeWrapperInitializer();
+    }
+
     decl->setAddedImplicitInitializers();
     return;
   }
@@ -1510,24 +1579,6 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
-void swift::addFixedLayoutAttr(NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
-  // If nominal already has `@_fixed_layout`, return.
-  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return;
-  auto access = nominal->getEffectiveAccess();
-  // If nominal does not have at least internal access, return.
-  if (access < AccessLevel::Internal)
-    return;
-  // If nominal is internal, it should have the `@usableFromInline` attribute.
-  if (access == AccessLevel::Internal &&
-      !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    nominal->getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
-  }
-  // Add `@_fixed_layout` to the nominal.
-  nominal->getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
-}
-
 void swift::addNonIsolatedToSynthesized(
     NominalTypeDecl *nominal, ValueDecl *value) {
   if (!getActorIsolation(nominal).isActorIsolated())
@@ -1535,4 +1586,25 @@ void swift::addNonIsolatedToSynthesized(
 
   ASTContext &ctx = nominal->getASTContext();
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
+}
+
+ConstructorDecl *
+SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
+                                           NominalTypeDecl *wrappedType) const {
+  if (!wrappedType->hasTypeWrapper())
+    return nullptr;
+
+  // Create the implicit memberwise constructor.
+  auto &ctx = wrappedType->getASTContext();
+  auto ctor = createImplicitConstructor(
+      wrappedType, ImplicitConstructorKind::TypeWrapper, ctx);
+  wrappedType->addMember(ctor);
+
+  auto *body = evaluateOrDefault(
+      evaluator, SynthesizeTypeWrapperInitializerBody{ctor}, nullptr);
+  if (!body)
+    return nullptr;
+
+  ctor->setBody(body, AbstractFunctionDecl::BodyKind::Parsed);
+  return ctor;
 }

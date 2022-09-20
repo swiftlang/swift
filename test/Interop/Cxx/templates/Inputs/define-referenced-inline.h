@@ -9,8 +9,8 @@ inline void inlineFn2(T) { }
 
 inline void inlineFn3() { }
 
-template<class T>
-struct HasInlineDtor {
+template <class T>
+struct __attribute__((swift_attr("import_unsafe"))) HasInlineDtor {
   inline ~HasInlineDtor() { inlineFn1(T()); }
 };
 
@@ -30,22 +30,23 @@ struct ChildWithInlineCtorDtor1 {
   inline ~ChildWithInlineCtorDtor1() { HasInlineStaticMember<T>::member(); }
 };
 
-template<class T>
-struct ChildWithInlineCtorDtor2 {
+template <class T>
+struct __attribute__((swift_attr("import_unsafe"))) ChildWithInlineCtorDtor2 {
   inline ChildWithInlineCtorDtor2() { HasInlineStaticMember<T>::member(); }
   inline ~ChildWithInlineCtorDtor2() { HasInlineStaticMember<T>::member(); }
 };
 
-template<class T>
-struct ParentWithChildWithInlineCtorDtor : ChildWithInlineCtorDtor1<T> {};
+template <class T>
+struct __attribute__((swift_attr("import_unsafe")))
+ParentWithChildWithInlineCtorDtor : ChildWithInlineCtorDtor1<T> {};
 
 template<class T>
 struct HolderWithChildWithInlineCtorDtor {
   ChildWithInlineCtorDtor2<T> x;
 };
 
-template<class T>
-struct DtorCallsInlineMethod {
+template <class T>
+struct __attribute__((swift_attr("import_unsafe"))) DtorCallsInlineMethod {
   inline void unique_name() {}
 
   ~DtorCallsInlineMethod() {

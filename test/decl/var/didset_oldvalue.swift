@@ -3,7 +3,7 @@
 
 import Swift
 
-// SR-11297
+// https://github.com/apple/swift/issues/53698
 
 // Do not call the getter to fetch the oldValue when oldValue is not
 // referenced in the body

@@ -1,37 +1,21 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -profile-generate %s | %FileCheck %s
 
 // CHECK: sil hidden [ossa] @[[F_OPERATORS:.*operators.*]] :
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 2
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
+// CHECK: increment_profiler_counter 0, "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]", num_counters 2, hash
 func operators(a : Bool, b : Bool) {
   let c = a && b
   let d = a || b
 
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 2
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 1
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
+  // CHECK: increment_profiler_counter 1, "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]", num_counters 2, hash
   let e = c ? a : b
 
-  // CHECK-NOT: builtin "int_instrprof_increment"
+  // CHECK-NOT: increment_profiler_counter
 }
 
 // CHECK: implicit closure
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}:$s19instrprof_operators0B01a1bySb_SbtFSbyKXEfu_"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 1
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
-// CHECK-NOT: builtin "int_instrprof_increment"
+// CHECK: increment_profiler_counter 0, "{{.*}}:$s19instrprof_operators0B01a1bySb_SbtFSbyKXEfu_", num_counters 1, hash
+// CHECK-NOT: increment_profiler_counter
 
 // CHECK: implicit closure
-// CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}:$s19instrprof_operators0B01a1bySb_SbtFSbyKXEfu0_"
-// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 1
-// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
-// CHECK-NOT: builtin "int_instrprof_increment"
+// CHECK: increment_profiler_counter 0, "{{.*}}:$s19instrprof_operators0B01a1bySb_SbtFSbyKXEfu0_", num_counters 1, hash
+// CHECK-NOT: increment_profiler_counter

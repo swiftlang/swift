@@ -16,7 +16,7 @@ func c<T, U, V>(_ x: (V) -> T, _: U) {}
 // CHECK-LABEL: sil {{.*}}003Hca{{.*}} : $@convention(thin) <T> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, T>) -> ()
 func ç<T>(_ x: (T) -> T) {}
 
-// CHECK-LABEL: sil {{.*}}returnsThrowing{{.*}} : $@convention(thin) <T, U, V> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error Error) for <τ_0_1, τ_0_2>) for <T, U, V>) -> () {
+// CHECK-LABEL: sil {{.*}}returnsThrowing{{.*}} : $@convention(thin) <T, U, V> (@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <τ_0_1, τ_0_2>) for <T, U, V>) -> () {
 func returnsThrowing<T, U, V>(_ x: (T) -> (U) throws -> V) {}
 
 

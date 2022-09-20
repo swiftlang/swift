@@ -149,6 +149,8 @@ const char ExtensionError::ID = '\0';
 void ExtensionError::anchor() {}
 const char DeclAttributesDidNotMatch::ID = '\0';
 void DeclAttributesDidNotMatch::anchor() {}
+const char InvalidRecordKindError::ID = '\0';
+void InvalidRecordKindError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -239,8 +241,8 @@ ParameterList *ModuleFile::readParameterList() {
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   unsigned recordID =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  assert(recordID == PARAMETERLIST);
-  (void) recordID;
+  if (recordID != PARAMETERLIST)
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::ParameterListLayout::readRecord(scratch, rawMemberIDs);
@@ -312,7 +314,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       assert(next.Kind == llvm::BitstreamEntry::Record);
 
       kind = fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
-      assert(kind == decls_block::TUPLE_PATTERN_ELT);
+      if (kind != decls_block::TUPLE_PATTERN_ELT)
+        fatal(llvm::make_error<InvalidRecordKindError>(kind));
 
       // FIXME: Add something for this record or remove it.
       IdentifierID labelID;
@@ -393,7 +396,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
 
   default:
-    return nullptr;
+    return llvm::make_error<InvalidRecordKindError>(kind);
   }
 }
 
@@ -432,7 +435,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     return SILLayout::get(getContext(), canSig, fields, capturesGenerics);
   }
   default:
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
 
@@ -503,7 +506,7 @@ ProtocolConformanceDeserializer::read(
 
   // Not a protocol conformance.
   default:
-    MF.fatal();
+    MF.fatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
 
@@ -553,11 +556,11 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
   PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
   ++NumNormalProtocolConformancesLoaded;
 
-  assert(genericConformance.isConcrete() && "Abstract generic conformance?");
+  auto *rootConformance = cast<RootProtocolConformance>(
+      genericConformance.getConcrete());
+
   auto conformance =
-         ctx.getSpecializedConformance(conformingType,
-                                       genericConformance.getConcrete(),
-                                       subMap);
+         ctx.getSpecializedConformance(conformingType, rootConformance, subMap);
   return conformance;
 }
 
@@ -1172,7 +1175,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   }
   default:
     // Not a generic signature; no way to recover.
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   // If we've already deserialized this generic signature, start over to return
@@ -1186,6 +1189,53 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   auto signature = GenericSignature::get(paramTypes, requirements);
   sigOffset = signature;
   return signature;
+}
+
+Expected<GenericEnvironment *>
+ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID) {
+  using namespace decls_block;
+
+  assert(ID <= GenericEnvironments.size() &&
+         "invalid GenericEnvironment ID");
+  auto &envOffset = GenericEnvironments[ID-1];
+
+  // If we've already deserialized this generic environment, return it.
+  if (envOffset.isComplete())
+    return envOffset.get();
+
+  // Read the generic environment.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(envOffset));
+
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
+
+  StringRef blobData;
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+  if (recordID != GENERIC_ENVIRONMENT)
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
+
+  GenericSignatureID parentSigID;
+  TypeID existentialID;
+  GenericEnvironmentLayout::readRecord(scratch, existentialID, parentSigID);
+
+  auto existentialTypeOrError = getTypeChecked(existentialID);
+  if (!existentialTypeOrError)
+    return existentialTypeOrError.takeError();
+
+  auto parentSigOrError = getGenericSignatureChecked(parentSigID);
+  if (!parentSigOrError)
+    return parentSigOrError.takeError();
+
+  auto *genericEnv = GenericEnvironment::forOpenedExistential(
+      existentialTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+  envOffset = genericEnv;
+
+  return genericEnv;
 }
 
 SubstitutionMap ModuleFile::getSubstitutionMap(
@@ -1226,7 +1276,7 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != SUBSTITUTION_MAP)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   GenericSignatureID genericSigID;
   uint64_t numReplacementIDs;
@@ -1582,7 +1632,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   default:
     // Unknown xref kind.
     pathTrace.addUnknown(recordID);
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   auto getXRefDeclNameForError = [&]() -> DeclName {
@@ -1847,7 +1897,8 @@ giveUpFastPath:
       }
         
       default:
-        llvm_unreachable("Unhandled path piece");
+        fatal(llvm::make_error<InvalidRecordKindError>(recordID,
+                                                       "Unhandled path piece"));
       }
 
       pathTrace.addValue(memberName);
@@ -2053,7 +2104,7 @@ giveUpFastPath:
     default:
       // Unknown xref path piece.
       pathTrace.addUnknown(recordID);
-      fatal();
+      fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
 
     Optional<PrettyStackTraceModuleFile> traceMsg;
@@ -2226,7 +2277,8 @@ DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
   }
 
   default:
-    llvm_unreachable("Unknown record ID found when reading local DeclContext.");
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID,
+                   "Unknown record ID found when reading local DeclContext."));
   }
   return declContextOrOffset;
 }
@@ -3548,6 +3600,40 @@ public:
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
 
+  void deserializeConditionalSubstitutionConditions(
+      SmallVectorImpl<OpaqueTypeDecl::AvailabilityCondition> &conditions) {
+    using namespace decls_block;
+
+    SmallVector<uint64_t, 4> scratch;
+    StringRef blobData;
+
+    while (true) {
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+
+      unsigned recordID = MF.fatalIfUnexpected(
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+      if (recordID != decls_block::CONDITIONAL_SUBSTITUTION_COND)
+        break;
+
+      bool isUnavailability;
+      DEF_VER_TUPLE_PIECES(condition);
+
+      ConditionalSubstitutionConditionLayout::readRecord(
+          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(condition));
+
+      llvm::VersionTuple condition;
+      DECODE_VER_TUPLE(condition);
+
+      conditions.push_back(std::make_pair(VersionRange::allGTE(condition),
+                                          isUnavailability));
+    }
+  }
+
   void deserializeConditionalSubstitutions(
       SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
           &limitedAvailability) {
@@ -3566,20 +3652,16 @@ public:
       if (recordID != decls_block::CONDITIONAL_SUBSTITUTION)
         break;
 
-      ArrayRef<uint64_t> rawConditions;
       SubstitutionMapID substitutionMapRef;
 
       decls_block::ConditionalSubstitutionLayout::readRecord(
-          scratch, substitutionMapRef, rawConditions);
+          scratch, substitutionMapRef);
 
-      SmallVector<VersionRange, 4> conditions;
-      llvm::transform(rawConditions, std::back_inserter(conditions),
-                      [&](uint64_t id) {
-                        llvm::VersionTuple lowerEndpoint;
-                        if (lowerEndpoint.tryParse(MF.getIdentifier(id).str()))
-                          MF.fatal();
-                        return VersionRange::allGTE(lowerEndpoint);
-                      });
+      SmallVector<OpaqueTypeDecl::AvailabilityCondition, 2> conditions;
+      deserializeConditionalSubstitutionConditions(conditions);
+
+      if (conditions.empty())
+        MF.fatal();
 
       auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
       if (!subMapOrError)
@@ -3655,7 +3737,8 @@ public:
       } else {
         limitedAvailability.push_back(
             OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                ctx, VersionRange::empty(), subMapOrError.get()));
+                ctx, {{VersionRange::empty(), /*unavailability=*/false}},
+                subMapOrError.get()));
 
         opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
       }
@@ -4972,6 +5055,29 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Expose_DECL_ATTR: {
+        bool isImplicit;
+        serialization::decls_block::ExposeDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) ExposeAttr(blobData, isImplicit);
+        break;
+      }
+
+      case decls_block::Documentation_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t CategoryID;
+        bool hasVisibility;
+        uint8_t visibilityID;
+        serialization::decls_block::DocumentationDeclAttrLayout::readRecord(
+            scratch, isImplicit, CategoryID, hasVisibility, visibilityID);
+        StringRef CategoryText = MF.getIdentifierText(CategoryID);
+        Optional<swift::AccessLevel> realVisibility = None;
+        if (hasVisibility)
+          realVisibility = getActualAccessLevel(visibilityID);
+        Attr = new (ctx) DocumentationAttr(CategoryText, realVisibility, isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
@@ -4984,7 +5090,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       default:
         // We don't know how to deserialize this kind of attribute.
-        MF.fatal();
+        MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
       }
 
       if (!skipAttr) {
@@ -5110,7 +5216,7 @@ DeclDeserializer::getDeclCheckedImpl(
   
   default:
     // We don't know how to deserialize this kind of decl.
-    MF.fatal();
+    MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 }
 
@@ -5716,29 +5822,22 @@ Expected<Type> DESERIALIZE_TYPE(PRIMARY_ARCHETYPE_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(OPENED_ARCHETYPE_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  TypeID existentialID;
   TypeID interfaceID;
-  GenericSignatureID sigID;
+  GenericEnvironmentID genericEnvID;
 
-  decls_block::OpenedArchetypeTypeLayout::readRecord(scratch, existentialID,
-                                                     interfaceID, sigID);
-
-  auto sigOrError = MF.getGenericSignatureChecked(sigID);
-  if (!sigOrError)
-    return sigOrError.takeError();
+  decls_block::OpenedArchetypeTypeLayout::readRecord(scratch,
+                                                     interfaceID,
+                                                     genericEnvID);
 
   auto interfaceTypeOrError = MF.getTypeChecked(interfaceID);
   if (!interfaceTypeOrError)
     return interfaceTypeOrError.takeError();
 
-  auto existentialTypeOrError = MF.getTypeChecked(existentialID);
-  if (!existentialTypeOrError)
-    return existentialTypeOrError.takeError();
+  auto envOrError = MF.getGenericEnvironmentChecked(genericEnvID);
+  if (!envOrError)
+    return envOrError.takeError();
 
-  auto env = GenericEnvironment::forOpenedArchetypeSignature(
-      existentialTypeOrError.get(), sigOrError.get(), UUID::fromTime());
-  return env->mapTypeIntoContext(interfaceTypeOrError.get())
-      ->castTo<OpenedArchetypeType>();
+  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
 }
 
 Expected<Type> DESERIALIZE_TYPE(OPAQUE_ARCHETYPE_TYPE)(
@@ -6337,7 +6436,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   #undef TYPE
     default:
       // We don't know how to deserialize this kind of type.
-      fatal();
+      fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
   }
 
@@ -6456,7 +6555,7 @@ ModuleFile::getClangType(ClangTypeID TID) {
     DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
   if (recordID != decls_block::CLANG_TYPE)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   auto &clangLoader = *getContext().getClangModuleLoader();
   auto clangType =
@@ -6546,8 +6645,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   unsigned kind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, memberIDBuffer));
-  assert(kind == decls_block::MEMBERS);
-  (void)kind;
+  if (kind != decls_block::MEMBERS)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind));
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
@@ -6751,9 +6850,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   unsigned kind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  (void) kind;
-  assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
-         "registered lazy loader incorrectly");
+  if (kind != NORMAL_PROTOCOL_CONFORMANCE)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind,
+                    "registered lazy loader incorrectly"));
+
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,

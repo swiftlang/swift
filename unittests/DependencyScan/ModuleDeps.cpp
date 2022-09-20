@@ -157,11 +157,11 @@ export *\n\
   llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
 
   std::vector<std::string> CommandStrArr = {
-    std::string("'") + TestPathStr + std::string("'"),
-    std::string("-I ") + std::string("'") + SwiftDirPath + std::string("'"),
-    std::string("-I ") + std::string("'") + CHeadersDirPath + std::string("'"),
-    std::string("-I ") + std::string("'") + StdLibDir.str().str() + std::string("'"),
-    std::string("-I ") + std::string("'") + ShimsLibDir.str().str() + std::string("'")
+    TestPathStr,
+    std::string("-I ") + SwiftDirPath,
+    std::string("-I ") + CHeadersDirPath,
+    std::string("-I ") + StdLibDir.str().str(),
+    std::string("-I ") + ShimsLibDir.str().str(),
   };
 
   // On Windows we need to add an extra escape for path separator characters because otherwise

@@ -44,18 +44,18 @@ sil [noinline] @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed Some
 // The original "wrapFoo" function prior to existential specialization.
 //
 // This will be replaced with a thunk by existential specialization.
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int) {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed any SomeProtocol, @guaranteed any SomeProtocol) -> (Int, Int) {
 sil hidden [noinline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int) {
 bb0(%0 : $SomeProtocol, %1 : $SomeProtocol):
   debug_value %0 : $SomeProtocol, let, name "a", argno 1
   debug_value %1 : $SomeProtocol, let, name "b", argno 2
-  %4 = open_existential_ref %0 : $SomeProtocol to $@opened("15146E00-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
-  %5 = unchecked_ref_cast %4 : $@opened("15146E00-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  %4 = open_existential_ref %0 : $SomeProtocol to $@opened("15146E00-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self
+  %5 = unchecked_ref_cast %4 : $@opened("15146E00-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self to $SomeClass
   // function_ref SomeClass.foo()
   %6 = function_ref @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed SomeClass) -> Int
   %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
-  %8 = open_existential_ref %1 : $SomeProtocol to $@opened("15147238-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
-  %9 = unchecked_ref_cast %8 : $@opened("15147238-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  %8 = open_existential_ref %1 : $SomeProtocol to $@opened("15147238-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self
+  %9 = unchecked_ref_cast %8 : $@opened("15147238-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self to $SomeClass
   %10 = apply %6(%9) : $@convention(method) (@guaranteed SomeClass) -> Int
   %11 = tuple (%7 : $Int, %10 : $Int)
   return %11 : $(Int, Int)
@@ -86,13 +86,13 @@ bb0(%0 : $τ_0_0, %1 : $τ_0_1):
   %3 = init_existential_ref %1 : $τ_0_1 : $τ_0_1, $SomeProtocol
   debug_value %2 : $SomeProtocol, let, name "a", argno 1
   debug_value %3 : $SomeProtocol, let, name "b", argno 2
-  %6 = open_existential_ref %2 : $SomeProtocol to $@opened("47F4DDE6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
-  %7 = unchecked_ref_cast %6 : $@opened("47F4DDE6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  %6 = open_existential_ref %2 : $SomeProtocol to $@opened("47F4DDE6-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self
+  %7 = unchecked_ref_cast %6 : $@opened("47F4DDE6-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self to $SomeClass
   // function_ref SomeClass.foo()
   %8 = function_ref @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed SomeClass) -> Int
   %9 = apply %8(%7) : $@convention(method) (@guaranteed SomeClass) -> Int
-  %10 = open_existential_ref %3 : $SomeProtocol to $@opened("47F4E1A6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol
-  %11 = unchecked_ref_cast %10 : $@opened("47F4E1A6-3B09-11EB-9A47-D0817AD9F6DD") SomeProtocol to $SomeClass
+  %10 = open_existential_ref %3 : $SomeProtocol to $@opened("47F4E1A6-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self
+  %11 = unchecked_ref_cast %10 : $@opened("47F4E1A6-3B09-11EB-9A47-D0817AD9F6DD", SomeProtocol) Self to $SomeClass
   %12 = apply %8(%11) : $@convention(method) (@guaranteed SomeClass) -> Int
   %13 = tuple (%9 : $Int, %12 : $Int)
   return %13 : $(Int, Int)

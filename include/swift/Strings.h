@@ -30,6 +30,8 @@ constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
+/// The name of the CxxShim module, which contains a cxx casting utility.
+constexpr static const StringLiteral CXX_SHIM_NAME = "CxxShim";
 /// The name of the Builtin module, which contains Builtin functions.
 constexpr static const StringLiteral BUILTIN_NAME = "Builtin";
 /// The name of the clang imported header module.

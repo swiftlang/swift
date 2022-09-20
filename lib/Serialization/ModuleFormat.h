@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 696; // `distributed thunk` bit on `AbstractFunctionDecl`
+const uint16_t SWIFTMODULE_VERSION_MINOR = 711; // @typeWrapperIgnored attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -144,6 +144,9 @@ using ProtocolConformanceIDField = DeclIDField;
 // same way.
 using GenericSignatureID = DeclID;
 using GenericSignatureIDField = DeclIDField;
+
+using GenericEnvironmentID = unsigned;
+using GenericEnvironmentIDField = BCFixed<32>;
 
 // SubstitutionMapID must be the same as DeclID because it is stored in the
 // same way.
@@ -432,12 +435,13 @@ static inline OperatorFixity getASTOperatorFixity(OperatorKind fixity) {
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum GenericRequirementKind : uint8_t {
-  Conformance = 0,
-  SameType    = 1,
-  Superclass  = 2,
-  Layout = 3,
+  SameCount = 0,
+  Conformance = 1,
+  SameType    = 2,
+  Superclass  = 3,
+  Layout = 4,
 };
-using GenericRequirementKindField = BCFixed<2>;
+using GenericRequirementKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1122,9 +1126,8 @@ namespace decls_block {
 
   TYPE_LAYOUT(OpenedArchetypeTypeLayout,
     OPENED_ARCHETYPE_TYPE,
-    TypeIDField,            // the existential type
-    TypeIDField,            // the interface type
-    GenericSignatureIDField // generic signature
+    TypeIDField,              // the interface type
+    GenericEnvironmentIDField // generic environment ID
   );
 
   TYPE_LAYOUT(OpaqueArchetypeTypeLayout,
@@ -1462,10 +1465,17 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
 
+  using ConditionalSubstitutionConditionLayout = BCRecordLayout<
+    CONDITIONAL_SUBSTITUTION_COND,
+    BCFixed<1>, // is unavailable?
+    BC_AVAIL_TUPLE // the OS version triple.
+  >;
+
   using ConditionalSubstitutionLayout = BCRecordLayout<
     CONDITIONAL_SUBSTITUTION,
-    SubstitutionMapIDField,
-    BCArray<IdentifierIDField> // N conditions where each is <major>.<minor>.<patch>
+    SubstitutionMapIDField
+    // Trailed by N conditions that include a version and
+    // unavailability indicator.
   >;
 
   using OpaqueTypeLayout = BCRecordLayout<
@@ -1682,6 +1692,12 @@ namespace decls_block {
   using GenericSignatureLayout = BCRecordLayout<
     GENERIC_SIGNATURE,
     BCArray<TypeIDField>         // generic parameter types
+  >;
+
+  using GenericEnvironmentLayout = BCRecordLayout<
+    GENERIC_ENVIRONMENT,
+    TypeIDField,                 // existential type
+    GenericSignatureIDField      // parent signature
   >;
 
   using SubstitutionMapLayout = BCRecordLayout<
@@ -2089,6 +2105,19 @@ namespace decls_block {
     BCVBR<5>        // platform
   >;
 
+  using ExposeDeclAttrLayout = BCRecordLayout<Expose_DECL_ATTR,
+                                              BCFixed<1>, // implicit flag
+                                              BCBlob      // declaration name
+                                              >;
+
+  using DocumentationDeclAttrLayout = BCRecordLayout<
+    Documentation_DECL_ATTR,
+    BCFixed<1>,         // implicit flag
+    IdentifierIDField,  // metadata text
+    BCFixed<1>,         // has visibility
+    AccessLevelField    // visibility
+  >;
+
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
 #undef TYPE_LAYOUT
 #undef TYPE_LAYOUT_IMPL
@@ -2171,6 +2200,7 @@ namespace index_block {
     LOCAL_TYPE_DECLS,
     OPAQUE_RETURN_TYPE_DECLS,
     GENERIC_SIGNATURE_OFFSETS,
+    GENERIC_ENVIRONMENT_OFFSETS,
     PROTOCOL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 

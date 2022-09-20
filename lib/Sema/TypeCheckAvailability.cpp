@@ -180,7 +180,8 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
 static void computeExportContextBits(ASTContext &Ctx, Decl *D,
                                      bool *spi, bool *implicit, bool *deprecated,
                                      Optional<PlatformKind> *unavailablePlatformKind) {
-  if (D->isSPI())
+  if (D->isSPI() ||
+      D->isAvailableAsSPI())
     *spi = true;
 
   // Defer bodies are desugared to an implicit closure expression. We need to
@@ -469,7 +470,7 @@ public:
   }
 
 private:
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
     // Adds in a parent TRC for decls which are syntactically nested but are not
@@ -489,10 +490,10 @@ private:
 
     // Create TRCs that cover only the body of the declaration.
     buildContextsForBodyOfDecl(D);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
       ContextStack.pop_back();
     }
@@ -502,7 +503,7 @@ private:
       DeclBodyContextStack.pop_back();
     }
 
-    return true;
+    return Action::Continue();
   }
 
   TypeRefinementContext *getEffectiveParentContextForDecl(Decl *D) {
@@ -777,32 +778,32 @@ private:
     }
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
 
     if (consumeDeclBodyContextIfNecessary(S)) {
-      return std::make_pair(true, S);
+      return Action::Continue(S);
     }
 
     if (auto *IS = dyn_cast<IfStmt>(S)) {
       buildIfStmtRefinementContext(IS);
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
     }
 
     if (auto *RS = dyn_cast<GuardStmt>(S)) {
       buildGuardStmtRefinementContext(RS);
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
     }
 
     if (auto *WS = dyn_cast<WhileStmt>(S)) {
       buildWhileStmtRefinementContext(WS);
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
     }
 
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
-  Stmt *walkToStmtPost(Stmt *S) override {
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     // If we have multiple guard statements in the same block
     // then we may have multiple refinement contexts to pop
     // after walking that block.
@@ -811,7 +812,7 @@ private:
       ContextStack.pop_back();
     }
 
-    return S;
+    return Action::Continue(S);
   }
 
   /// Consumes the top TRC from \p DeclBodyContextStack and pushes it onto the
@@ -1198,12 +1199,12 @@ private:
     return AvailabilityContext(VersionRange::allGTE(Version));
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     if (ContextStack.back().ScopeNode.getAsExpr() == E) {
       ContextStack.pop_back();
     }
 
-    return E;
+    return Action::Continue(E);
   }
 };
   
@@ -1413,84 +1414,82 @@ public:
   /// the predicate.
   Optional<ASTNode> getInnermostMatchingNode() { return InnermostMatchingNode; }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    return std::make_pair(walkToRangePre(E->getSourceRange()), E);
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    return getPreWalkActionFor(E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    return std::make_pair(walkToRangePre(S->getSourceRange()), S);
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    return getPreWalkActionFor(S);
   }
 
-  bool walkToDeclPre(Decl *D) override {
-    return walkToRangePre(D->getSourceRange());
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return getPreWalkActionFor(D).Action;
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-    return std::make_pair(walkToRangePre(P->getSourceRange()), P);
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    return getPreWalkActionFor(P);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
-    return walkToRangePre(T->getSourceRange());
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return getPreWalkActionFor(T).Action;
   }
 
-  /// Returns true if the walker should traverse an AST node with
-  /// source range Range.
-  bool walkToRangePre(SourceRange Range) {
+  /// Retrieve the pre-walk action for a given node, which determines whether
+  /// or not it should be walked into.
+  template <typename T>
+  PreWalkResult<T> getPreWalkActionFor(T Node) {
     // When walking down the tree, we traverse until we have found a node
     // inside the target range. Once we have found such a node, there is no
     // need to traverse any deeper.
     if (FoundTarget)
-      return false;
+      return Action::SkipChildren(Node);
 
     // If we haven't found our target yet and the node we are pre-visiting
     // doesn't have a valid range, we still have to traverse it because its
     // subtrees may have valid ranges.
+    auto Range = Node->getSourceRange();
     if (Range.isInvalid())
-      return true;
+      return Action::Continue(Node);
 
     // We have found our target if the range of the node we are visiting
     // is contained in the range we are looking for.
     FoundTarget = SM.rangeContains(TargetRange, Range);
 
     if (FoundTarget)
-      return false;
+      return Action::SkipChildren(Node);
 
     // Search the subtree if the target range is inside its range.
-    return SM.rangeContains(Range, TargetRange);
+    if (!SM.rangeContains(Range, TargetRange))
+      return Action::SkipChildren(Node);
+
+    return Action::Continue(Node);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
-    if (walkToNodePost(E)) {
-      return E;
-    }
-
-    return nullptr;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    return walkToNodePost(E);
   }
 
-  Stmt *walkToStmtPost(Stmt *S) override {
-    if (walkToNodePost(S)) {
-      return S;
-    }
-
-    return nullptr;
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+    return walkToNodePost(S);
   }
 
-  bool walkToDeclPost(Decl *D) override {
-    return walkToNodePost(D);
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    return walkToNodePost(D).Action;
   }
 
   /// Once we have found the target node, look for the innermost ancestor
   /// matching our criteria on the way back up the spine of the tree.
-  bool walkToNodePost(ASTNode Node) {
+  template <typename T>
+  PostWalkResult<T> walkToNodePost(T Node) {
     if (!InnermostMatchingNode.hasValue() && Predicate(Node, Parent)) {
-      assert(Node.getSourceRange().isInvalid() ||
-             SM.rangeContains(Node.getSourceRange(), TargetRange));
+      assert(Node->getSourceRange().isInvalid() ||
+             SM.rangeContains(Node->getSourceRange(), TargetRange));
 
       InnermostMatchingNode = Node;
-      return false;
+      return Action::Stop();
     }
 
-    return true;
+    return Action::Continue(Node);
   }
 };
 
@@ -1892,6 +1891,17 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 static void fixAvailabilityByAddingVersionCheck(
     ASTNode NodeToWrap, const VersionRange &RequiredRange,
     SourceRange ReferenceRange, ASTContext &Context) {
+  // If this is an implicit variable that wraps an expression,
+  // let's point to it's initializer. For example, result builder
+  // transform captures expressions into implicit variables.
+  if (auto *PB =
+          dyn_cast_or_null<PatternBindingDecl>(NodeToWrap.dyn_cast<Decl *>())) {
+    if (PB->isImplicit() && PB->getSingleVar()) {
+      if (auto *init = PB->getInit(0))
+        NodeToWrap = init;
+    }
+  }
+
   SourceRange RangeToWrap = NodeToWrap.getSourceRange();
   if (RangeToWrap.isInvalid())
     return;
@@ -2397,13 +2407,40 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
                         ("." + baseReplace.str() + "(").str());
       diag.fixItReplace(SE->getEndLoc(), ")");
     } else {
-      if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
-          isa<VarDecl>(renamedDecl)) {
-        // If we're going from a var to a function with no arguments, emit an
-        // empty parameter list.
-        baseReplace += "()";
+      bool shouldEmitRenameFixit = true;
+      if (auto *CE = dyn_cast_or_null<CallExpr>(call)) {
+        SmallString<64> callContextName;
+        llvm::raw_svector_ostream name(callContextName);
+        if (auto *DCE = dyn_cast<DotSyntaxCallExpr>(CE->getDirectCallee())) {
+          if (auto *TE = dyn_cast<TypeExpr>(DCE->getBase())) {
+            TE->getTypeRepr()->print(name);
+            if (!parsed.ContextName.empty()) {
+              // If there is a context in rename function e.g.
+              // `Context.function()` and call context is a `DotSyntaxCallExpr`
+              // adjust the range so it replaces the base as well.
+              referenceRange =
+                  SourceRange(TE->getStartLoc(), referenceRange.End);
+            }
+          }
+        }
+        // Function names are the same(including context if applicable), so
+        // renaming fix-it doesn't need do be produced.
+        if ((parsed.ContextName.empty() ||
+             parsed.ContextName == callContextName) &&
+            CE->getCalledValue()->getBaseName() == parsed.BaseName) {
+          shouldEmitRenameFixit = false;
+        }
       }
-      diag.fixItReplace(referenceRange, baseReplace);
+      if (shouldEmitRenameFixit) {
+        if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
+            isa<VarDecl>(renamedDecl)) {
+          // If we're going from a var to a function with no arguments, emit an
+          // empty parameter list.
+          baseReplace += "()";
+        }
+
+        diag.fixItReplace(referenceRange, baseReplace);
+      }
     }
   }
 
@@ -3182,15 +3219,14 @@ public:
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     auto *DC = Where.getDeclContext();
 
     ExprStack.push_back(E);
 
-    auto visitChildren = [&]() { return std::make_pair(true, E); };
     auto skipChildren = [&]() {
       ExprStack.pop_back();
-      return std::make_pair(false, E);
+      return Action::SkipChildren(E);
     };
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
@@ -3282,17 +3318,17 @@ public:
       }
     }
 
-    return visitChildren();
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
-    return E;
+    return Action::Continue(E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
 
     // We end up here when checking the output of the result builder transform,
     // which includes closures that are not "separately typechecked" and yet
@@ -3300,7 +3336,7 @@ public:
     // since these availability for these statements is not diagnosed from
     // typeCheckStmt() as usual.
     diagnoseStmtAvailability(S, Where.getDeclContext(), /*walkRecursively=*/true);
-    return std::make_pair(false, S);
+    return Action::SkipChildren(S);
   }
 
   bool diagnoseDeclRefAvailability(ConcreteDeclRef declRef, SourceRange R,
@@ -3534,12 +3570,11 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   return false;
 }
 
-/// Diagnose uses of API annotated '@unavailableFromAsync' when used from
-/// asynchronous contexts.
-/// Returns true if a diagnostic was emitted, false otherwise.
+/// Diagnose misuses of API in asynchronous contexts.
+/// Returns true if a fatal diagnostic was emitted, false otherwise.
 static bool
-diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
-                                 const Expr *call, const ExportContext &Where) {
+diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
+                              const Expr *call, const ExportContext &Where) {
   // FIXME: I don't think this is right, but I don't understand the issue well
   //        enough to fix it properly. If the decl context is an abstract
   //        closure, we need it to have a type assigned to it before we can
@@ -3573,6 +3608,25 @@ diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
+
+  if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
+      assert(call && "No call calling async alternative function");
+      ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+
+      if (auto *accessor = dyn_cast<AccessorDecl>(asyncAlt)) {
+        SmallString<32> name;
+        llvm::raw_svector_ostream os(name);
+        accessor->printUserFacingName(os);
+        ctx.Diags.diagnose(asyncAlt->getLoc(),
+                           diag::descriptive_decl_declared_here, name);
+      } else {
+        ctx.Diags.diagnose(asyncAlt->getLoc(), diag::decl_declared_here,
+                           asyncAlt->getName());
+      }
+    }
+  }
+
   // @available(noasync) spelling
   if (const AvailableAttr *attr = D->getAttrs().getNoAsync(ctx)) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
@@ -3637,7 +3691,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
     return true;
 
-  if (diagnoseDeclUnavailableFromAsync(D, R, call, Where))
+  if (diagnoseDeclAsyncAvailability(D, R, call, Where))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
@@ -3843,32 +3897,32 @@ public:
   explicit StmtAvailabilityWalker(DeclContext *dc, bool walkRecursively)
     : DC(dc), WalkRecursively(walkRecursively) {}
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (!WalkRecursively && isa<BraceStmt>(S))
-      return std::make_pair(false, S);
+      return Action::SkipChildren(S);
 
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (WalkRecursively)
       diagnoseExprAvailability(E, DC);
-    return std::make_pair(false, E);
+    return Action::SkipChildren(E);
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     auto where = ExportContext::forFunctionBody(DC, T->getStartLoc());
     diagnoseTypeReprAvailability(T, where);
-    return false;
+    return Action::SkipChildren();
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
     if (auto *IP = dyn_cast<IsPattern>(P)) {
       auto where = ExportContext::forFunctionBody(DC, P->getLoc());
       diagnoseTypeAvailability(IP->getCastType(), P->getLoc(), where);
     }
 
-    return std::make_pair(true, P);
+    return Action::Continue(P);
   }
 };
 }
@@ -3918,7 +3972,7 @@ public:
                              DeclAvailabilityFlags flags)
       : where(where), flags(flags) {}
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (auto *ITR = dyn_cast<IdentTypeRepr>(T)) {
       if (auto *CTR = dyn_cast<CompoundIdentTypeRepr>(ITR)) {
         for (auto *comp : CTR->getComponents()) {
@@ -3940,10 +3994,10 @@ public:
 
       // We've already visited all the children above, so we don't
       // need to recurse.
-      return false;
+      return Action::SkipChildren();
     }
 
-    return true;
+    return Action::Continue();
   }
 };
 
@@ -4222,7 +4276,8 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
 void swift::checkExplicitAvailability(Decl *decl) {
   // Skip if the command line option was not set and
   // accessors as we check the pattern binding decl instead.
-  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability ||
+  auto DiagLevel = decl->getASTContext().LangOpts.RequireExplicitAvailability;
+  if (!DiagLevel ||
       isa<AccessorDecl>(decl))
     return;
 
@@ -4266,6 +4321,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
 
   if (declNeedsExplicitAvailability(decl)) {
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
+    diag.limitBehavior(*DiagLevel);
 
     auto suggestPlatform =
       decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;

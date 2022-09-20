@@ -376,6 +376,7 @@ struct Runner {
 
                 await withExclusiveAccessAsync(to: &global) {
                     @MyMainActorWithAccessInUnownedExecAccessor (x: inout Int) async -> Void in
+                    print("do something to avoid optimizing away to executor switch")
                     debugLog("==> Making sure can push/pop access")
                 }
                 // In order to test that we properly hand off the access, we

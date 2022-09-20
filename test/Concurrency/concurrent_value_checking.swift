@@ -174,7 +174,7 @@ func testConcurrency() {
 func testUnsafeSendableNothing() {
   var x = 5
   acceptUnsafeSendable {
-    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    x = 17 // expected-warning{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }
@@ -182,7 +182,7 @@ func testUnsafeSendableNothing() {
 func testUnsafeSendableInAsync() async {
   var x = 5
   acceptUnsafeSendable {
-    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    x = 17 // expected-warning{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }

@@ -144,15 +144,17 @@ func testTypoCorrection() {
   let _: String = #keyPath(A.proString) // expected-error {{type 'A' has no member 'proString'}}
 }
 
-class SR_10146_1 {
+// https://github.com/apple/swift/issues/52548
+
+class C2 {
   @objc let b = 1
 }
 
-class SR_10146_2: SR_10146_1 {
+class C1_52548: C2 {
   let a = \AnyObject.b // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
 }
 
-class SR_10146_3 {
+class C2_52548 {
   @objc let abc: Int = 1
   
   func doNotCrash() {

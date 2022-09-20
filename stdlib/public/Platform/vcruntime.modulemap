@@ -652,4 +652,24 @@ module std [system] {
     header "version"
     export *
   }
+
+  explicit module xmemory {
+    header "xmemory"
+    export *
+  }
+
+  explicit module xtr1common {
+    header "xtr1common"
+    export *
+  }
+
+  explicit module xstring {
+    header "xstring"
+    export *
+  }
+
+  explicit module xtree {
+    header "xtree"
+    export *
+  }
 }

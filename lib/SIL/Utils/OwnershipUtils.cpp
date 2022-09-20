@@ -20,13 +20,72 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 
+bool swift::hasPointerEscape(BorrowedValue value) {
+  assert(value.kind == BorrowedValueKind::BeginBorrow ||
+         value.kind == BorrowedValueKind::LoadBorrow);
+  GraphNodeWorklist<Operand *, 8> worklist;
+  for (Operand *use : value->getUses()) {
+    if (use->getOperandOwnership() != OperandOwnership::NonUse)
+      worklist.insert(use);
+  }
+
+  while (Operand *op = worklist.pop()) {
+    switch (op->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      llvm_unreachable("this operand cannot handle an inner guaranteed use");
+
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return true;
+
+    case OperandOwnership::Borrow:
+    case OperandOwnership::EndBorrow:
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::InteriorPointer:
+    case OperandOwnership::BitwiseEscape:
+      break;
+
+    case OperandOwnership::Reborrow: {
+      SILArgument *phi = cast<BranchInst>(op->getUser())
+                             ->getDestBB()
+                             ->getArgument(op->getOperandNumber());
+      for (auto *use : phi->getUses()) {
+        if (use->getOperandOwnership() != OperandOwnership::NonUse)
+          worklist.insert(use);
+      }
+      break;
+    }
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result->getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            worklist.insert(resultUse);
+          }
+        }
+        return true;
+      });
+      break;
+    }
+    }
+  }
+  return false;
+}
+
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
-         v.getOwnershipKind() == OwnershipKind::None;
+         v->getOwnershipKind() == OwnershipKind::None;
 }
 
 bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
@@ -168,7 +227,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
       bool nonLeaf = false;
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
-        if (result.getOwnershipKind() == OwnershipKind::None)
+        if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
         for (auto *resultUse : result->getUses()) {
           if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
@@ -288,7 +347,7 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
     case OperandOwnership::ForwardingBorrow: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
-        if (result.getOwnershipKind() == OwnershipKind::None)
+        if (result->getOwnershipKind() == OwnershipKind::None)
           return true;
         for (auto *resultUse : result->getUses()) {
           if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
@@ -917,7 +976,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user)) {
+        isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user)) {
       leafUse(op);
       continue;
     }
@@ -935,7 +994,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
-        isa<UncheckedAddrCastInst>(user)) {
+        isa<UncheckedAddrCastInst>(user) || isa<MarkMustCheckInst>(user)) {
       transitiveResultUses(op);
       continue;
     }
@@ -1081,7 +1140,7 @@ void OwnedValueIntroducerKind::print(llvm::raw_ostream &os) const {
 
 bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
                                           SmallVectorImpl<BorrowedValue> &out) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
   SmallVector<SILValue, 32> worklist;
@@ -1100,7 +1159,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     // that we put this before checking for guaranteed forwarding instructions,
     // since we want to ignore guaranteed forwarding instructions that in this
     // specific case produce a .none value.
-    if (value.getOwnershipKind() == OwnershipKind::None)
+    if (value->getOwnershipKind() == OwnershipKind::None)
       continue;
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -1134,7 +1193,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
 
 // FIXME: replace this logic with AccessBase::findOwnershipReferenceRoot.
 BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return {};
 
   SILValue currentValue = inputValue;
@@ -1145,7 +1204,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
       return scopeIntroducer;
     }
 
-    if (currentValue.getOwnershipKind() == OwnershipKind::None)
+    if (currentValue->getOwnershipKind() == OwnershipKind::None)
       return {};
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -1186,7 +1245,7 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
 
 bool swift::getAllOwnedValueIntroducers(
     SILValue inputValue, SmallVectorImpl<OwnedValueIntroducer> &out) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Owned)
     return false;
 
   SmallVector<SILValue, 32> worklist;
@@ -1205,7 +1264,7 @@ bool swift::getAllOwnedValueIntroducers(
     // that we put this before checking for guaranteed forwarding instructions,
     // since we want to ignore guaranteed forwarding instructions that in this
     // specific case produce a .none value.
-    if (value.getOwnershipKind() == OwnershipKind::None)
+    if (value->getOwnershipKind() == OwnershipKind::None)
       continue;
 
     // Otherwise if v is an ownership forwarding value, add its defining
@@ -1238,7 +1297,7 @@ bool swift::getAllOwnedValueIntroducers(
 }
 
 OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
-  if (inputValue.getOwnershipKind() != OwnershipKind::Owned)
+  if (inputValue->getOwnershipKind() != OwnershipKind::Owned)
     return {};
 
   SILValue currentValue = inputValue;
@@ -1513,7 +1572,7 @@ bool ForwardingOperand::visitForwardedValues(
 
   if (auto *mvri = dyn_cast<MultipleValueInstruction>(user)) {
     return llvm::all_of(mvri->getResults(), [&](SILValue value) {
-      if (value.getOwnershipKind() == OwnershipKind::None)
+      if (value->getOwnershipKind() == OwnershipKind::None)
         return true;
       return visitor(value);
     });
@@ -1584,6 +1643,223 @@ void swift::findTransitiveReborrowBaseValuePairs(
       return true;
     });
   }
+}
+
+/// Visit the phis in the same block as \p phi which are reborrows of a borrow
+/// of one of the values reaching \p phi.
+///
+/// If the visitor returns false, stops visiting and returns false.  Otherwise,
+/// returns true.
+///
+///
+/// When an owned value is passed as a phi argument, it is consumed.  So any
+/// open scope borrowing that owned value must be ended no later than in that
+/// branch instruction.  Either such a borrow scope is ended beforehand
+///     %lifetime = begin_borrow %value
+///     ...
+///     end_borrow %lifetime <-- borrow scope ended here
+///     br block(%value)        <-- before consume
+/// or the borrow scope is ended in the same instruction as the owned value is
+/// consumed
+///     %lifetime = begin_borrow %value
+///     ...
+///     end_borrow %lifetime
+///     br block(%value, %lifetime)         <-- borrow scope ended here
+///                                         <-- in same instruction as consume
+/// In particular, the following is invalid
+///         %lifetime = begin_borrow %value
+///         ...
+///         br block(%value)
+///     block(%value_2 : @owned):
+///         end_borrow %lifetime
+///         destroy_value %value_2
+/// because %lifetime was guaranteed by %value but value is consumed at
+/// `br two`.
+///
+/// Similarly, when a guaranteed value is passed as a phi argument, its borrow
+/// scope ends and a new borrow scope is begun.  And so any open nested borrow
+/// of the original outer borrow must be ended no later than in that branch
+/// instruction.
+///
+///
+/// Given an phi argument
+///     block(..., %value : @owned, ...)
+/// this function finds the adjacent reborrow phis
+///     block(..., %lifetime : @guaranteed, ..., %value : @owned, ...)
+///                ^^^^^^^^^^^^^^^^^^^^^^^
+/// one of whose reaching values is a borrow of a reaching value of %value.
+///
+/// Finding these is more complicated than merely looking for guaranteed
+/// operands adjacent to the incoming operands to phi and which are borrows of
+/// the value consumed there.  The reason is that they might not be borrows of
+/// that incoming value _directly_ but rather reborrows of some other reborrow
+/// if the incoming value is itself a phi argument:
+///         %lifetime = begin_borrow %value
+///         br one(%value, %lifetime)
+///     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
+///         br two(%value_1, %lifetime_1)
+///     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
+///         end_borrow %lifetime_2
+///         destroy_value %value_2
+///
+/// When called with %value_2, \p visitor is invoked with both:
+///     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
+///                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+bool swift::visitAdjacentReborrowsOfPhi(
+    SILPhiArgument *phi, function_ref<bool(SILPhiArgument *)> visitor) {
+  assert(phi->isPhi());
+
+  // First, collect all the values that reach \p phi, that is:
+  // - operands to the phi
+  // - operands to phis which are operands to the phi
+  // - and so forth.
+  SmallPtrSet<SILValue, 8> reachingValues;
+  // At the same time, record all the phis in \p phi's phi web: the phis which
+  // are transitively operands to \p phi.  This is the subset of \p
+  // reachingValues that are phis.
+  SmallVector<SILPhiArgument *, 4> phis;
+  phi->visitTransitiveIncomingPhiOperands(
+      [&](auto *phi, auto *operand) -> bool {
+        phis.push_back(phi);
+        reachingValues.insert(phi);
+        reachingValues.insert(operand->get());
+        return true;
+      });
+
+  // Second, find all the guaranteed phis one of whose operands _could_ (by
+  // dint of being adjacent to a phi in the phi web with the appropriate
+  // ownership and type) be a reborrow of a reaching value of \p phi.
+  SmallVector<SILPhiArgument *, 4> candidates;
+  for (auto *phi : phis) {
+    SILBasicBlock *block = phi->getParentBlock();
+    for (auto *uncastAdjacent : block->getArguments()) {
+      auto *adjacent = cast<SILPhiArgument>(uncastAdjacent);
+      if (adjacent == phi)
+        continue;
+      if (adjacent->getType() != phi->getType())
+        continue;
+      if (adjacent->getOwnershipKind() != OwnershipKind::Guaranteed)
+        continue;
+      candidates.push_back(adjacent);
+    }
+  }
+
+  // Finally, look through \p candidates to find those one of whose incoming
+  // operands either
+  // (1) borrow one of reaching values of \p phi
+  // or (2) is itself a guaranteed phi which does so.
+  // Because we may discover a reborrow R1 of type (1) after visiting another
+  // R2 of type (2) which reborrows R1, we need to iterate to a fixed point.
+  //
+  // Record all the phis that we see which are borrows or reborrows of a
+  // reaching value \p so that we can check for case (2) above.
+  //
+  // Visit those phis which are both reborrows of a reaching value AND are in
+  // the same block as \phi.
+  //
+  // For example, given
+  //
+  //         %lifetime = begin_borrow %value
+  //         br one(%value, %lifetime)
+  //     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
+  //         br two(%value_1, %lifetime_1)
+  //     two(%value_2 : @owned, %lifetime_2 : @guaranteed)
+  //         end_borrow %lifetime_2
+  //         destroy_value %value_2
+  //
+  // when visiting the reborrow phis adjacent to %value_2, The following steps
+  // would be taken:
+  //
+  // (1) Look at the first candidate:
+  //   two(%value_2 : @owned, %lifetime_2 : @guaranteed)
+  //                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  // but see that its one incoming value
+  //   br two(%value_1, %lifetime_1)
+  //                    ^^^^^^^^^^^
+  // although a phi argument itself, is not known (yet!) to be a reborrow phi.
+  // So the first candidate is NOT (yet!) added to reborrowPhis.
+  //
+  // (2) Look at the second candidate:
+  //     one(%value_1 : @owned, %lifetime_1 : @guaranteed)
+  //                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  // and see that one of its incoming values
+  //   br one(%value, %lifetime)
+  //                  ^^^^^^^^^
+  // is a borrow
+  //   %lifetime = begin_borrow %value
+  // of %value, one of the values reaching %value_2.
+  // So the second candidate IS added to reborrowPhis.
+  // AND changed is set to true, so we will repeat the outer loop.
+  // But this candidate is not adjacent to our phi %value_2, so it is not
+  // visited.
+  //
+  // (4.5) Changed is true: repeat the outer loop.  Set changed to false.
+  //
+  // (3) Look at the first candidate:
+  //   two(%value_2 : @owned, %lifetime_2 : @guaranteed)
+  //                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  // and see that one of its incoming values
+  //   br two(%value_1, %lifetime_1)
+  //                    ^^^^^^^^^^^
+  // is itself a phi
+  //   one(%value_1 : @owned, %lifetime_1 : @guaranteed)
+  //                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  // which was added to reborrowPhis in (2).
+  // So the first candidate IS added to reborrowPhis.
+  // AND changed is set to true.
+  // ALSO, see that the first candidate IS adjacent to our phi %value_2, so our
+  // visitor is invoked with the first candidate.
+  //
+  // (4) Look at the second candidate.
+  // See that it is already a member of reborrowPhis.
+  //
+  // (4.5) Changed is true: repeat the outer loop.  Set changed to false.
+  //
+  // (5) Look at the first candidate.
+  // See that it is already a member of reborrowPhis.
+  //
+  // (6) Look at the second candidate.
+  // See that it is already a member of reborrowPhis.
+  //
+  // (6.5) Changed is false: exit the outer loop.
+  bool changed = false;
+  SmallSetVector<SILPhiArgument *, 4> reborrowPhis;
+  do {
+    changed = false;
+    for (auto *candidate : candidates) {
+      if (reborrowPhis.contains(candidate))
+        continue;
+      auto success = candidate->visitIncomingPhiOperands([&](auto *operand) {
+        // If the value being reborrowed is itself a reborrow of a value
+        // reaching \p phi, then visit it.
+        SILPhiArgument *forwarded;
+        if ((forwarded = dyn_cast<SILPhiArgument>(operand->get()))) {
+          if (!reborrowPhis.contains(forwarded))
+            return true;
+          changed = true;
+          reborrowPhis.insert(candidate);
+          if (candidate->getParentBlock() == phi->getParentBlock())
+            return visitor(candidate);
+          return true;
+        }
+        BeginBorrowInst *bbi;
+        if (!(bbi = dyn_cast<BeginBorrowInst>(operand->get())))
+          return true;
+        auto borrowee = bbi->getOperand();
+        if (!reachingValues.contains(borrowee))
+          return true;
+        changed = true;
+        reborrowPhis.insert(candidate);
+        if (candidate->getParentBlock() == phi->getParentBlock())
+          return visitor(candidate);
+        return true;
+      });
+      if (!success)
+        return false;
+    }
+  } while (changed);
+
+  return true;
 }
 
 void swift::visitTransitiveEndBorrows(

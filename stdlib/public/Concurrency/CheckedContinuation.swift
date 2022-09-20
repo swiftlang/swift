@@ -16,6 +16,7 @@ import Swift
 @_silgen_name("swift_continuation_logFailedCheck")
 internal func logFailedCheck(_ message: UnsafeRawPointer)
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
 @available(SwiftStdlib 5.1, *)
@@ -82,7 +83,9 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     }
   }
 }
+#endif
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A mechanism to interface
 /// between synchronous and asynchronous code,
 /// logging correctness violations.
@@ -119,7 +122,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 /// you can replace one with the other in most circumstances,
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
-public struct CheckedContinuation<T, E: Error> {
+public struct CheckedContinuation<T, E: Error>: Sendable {
   private let canary: CheckedContinuationCanary
   
   /// Creates a checked continuation from an unsafe continuation.
@@ -185,9 +188,6 @@ public struct CheckedContinuation<T, E: Error> {
     }
   }
 }
-
-@available(SwiftStdlib 5.1, *)
-extension CheckedContinuation: Sendable where T: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 extension CheckedContinuation {
@@ -299,4 +299,65 @@ public func withCheckedThrowingContinuation<T>(
     body(CheckedContinuation(continuation: $0, function: function))
   }
 }
+#else
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+public struct CheckedContinuation<T, E: Error>: Sendable {
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public init(continuation: UnsafeContinuation<T, E>, function: String = #function) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func resume(returning value: __owned T) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+  
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func resume(throwing error: __owned E) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+}
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+extension CheckedContinuation {
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
 
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func resume(with result: Result<T, E>) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func resume() where T == Void {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+public func withCheckedContinuation<T>(
+    function: String = #function,
+    _ body: (CheckedContinuation<T, Never>) -> Void
+) async -> T {
+  fatalError("Unavailable in task-to-thread concurrency model")
+}
+
+@available(SwiftStdlib 5.1, *)
+@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+public func withCheckedThrowingContinuation<T>(
+    function: String = #function,
+    _ body: (CheckedContinuation<T, Error>) -> Void
+) async throws -> T {
+  fatalError("Unavailable in task-to-thread concurrency model")
+}
+#endif

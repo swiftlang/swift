@@ -41,10 +41,10 @@ struct IntStructWithClassWrapper {
   }
 }
 
-// SR_11477
+// https://github.com/apple/swift/issues/53877
 
 @propertyWrapper
-struct SR_11477_W {
+struct W_53877 {
   let name: String
 
   init<T: ExpressibleByIntegerLiteral>(_ value: T = 0) {
@@ -56,8 +56,8 @@ struct SR_11477_W {
   }
 }
 
-struct SR_11477_S {
-  @SR_11477_W var foo: Int
+struct S_53877 {
+  @W_53877 var foo: Int
   init() {} // expected-error {{return from initializer without initializing all stored properties}} expected-note {{'self.foo' not initialized}}
 }
 

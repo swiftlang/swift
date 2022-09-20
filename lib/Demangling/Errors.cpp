@@ -159,6 +159,7 @@ static int demangle_asprintf(char **strp, const char *format, ...) {
 
 // -- Implementation ---------------------------------------------------------
 
+SWIFT_VFORMAT(2)
 static SWIFT_NORETURN void demangleFatal(uint32_t flags, const char *format,
                                          va_list val) {
   char *message;
@@ -172,6 +173,7 @@ static SWIFT_NORETURN void demangleFatal(uint32_t flags, const char *format,
   abort();
 }
 
+SWIFT_VFORMAT(2)
 static void demangleWarn(uint32_t flags, const char *format, va_list val) {
   char *message;
 
@@ -190,6 +192,7 @@ namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
+SWIFT_FORMAT(2, 3)
 SWIFT_NORETURN void fatal(uint32_t flags, const char *format, ...) {
   va_list val;
 
@@ -197,6 +200,7 @@ SWIFT_NORETURN void fatal(uint32_t flags, const char *format, ...) {
   fatalv(flags, format, val);
 }
 
+SWIFT_FORMAT(2, 3)
 void warn(uint32_t flags, const char *format, ...) {
   va_list val;
 
@@ -205,10 +209,12 @@ void warn(uint32_t flags, const char *format, ...) {
   va_end(val);
 }
 
+SWIFT_VFORMAT(2)
 SWIFT_NORETURN void fatalv(uint32_t flags, const char *format, va_list val) {
   demangleFatal(flags, format, val);
 }
 
+SWIFT_VFORMAT(2)
 void warnv(uint32_t flags, const char *format, va_list val) {
   demangleWarn(flags, format, val);
 }

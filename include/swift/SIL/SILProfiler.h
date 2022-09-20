@@ -32,7 +32,7 @@ class SILFunction;
 class SILModule;
 
 /// Returns whether the given AST node requires profiling instrumentation.
-bool doesASTRequireProfiling(SILModule &M, ASTNode N);
+bool doesASTRequireProfiling(SILModule &M, ASTNode N, SILDeclRef Constant);
 
 /// SILProfiler - Maps AST nodes to profile counters.
 class SILProfiler : public SILAllocated<SILProfiler> {
@@ -69,8 +69,7 @@ private:
         EmitCoverageMapping(EmitCoverageMapping) {}
 
 public:
-  static SILProfiler *create(SILModule &M, ForDefinition_t forDefinition,
-                             ASTNode N, SILDeclRef forDecl);
+  static SILProfiler *create(SILModule &M, ASTNode N, SILDeclRef Ref);
 
   /// Check if the function is set up for profiling.
   bool hasRegionCounters() const { return NumRegionCounters != 0; }

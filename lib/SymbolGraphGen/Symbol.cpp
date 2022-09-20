@@ -19,6 +19,7 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/SourceManager.h"
@@ -32,16 +33,24 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
+Symbol::Symbol(SymbolGraph *Graph, const ExtensionDecl *ED,
+               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+    : Symbol::Symbol(Graph, nullptr, ED, SynthesizedBaseTypeDecl, BaseType) {}
+
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-               const NominalTypeDecl *SynthesizedBaseTypeDecl,
-               Type BaseType)
-: Graph(Graph),
-  VD(VD),
-  BaseType(BaseType),
-  SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {
-    if (!BaseType && SynthesizedBaseTypeDecl)
-      BaseType = SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+    : Symbol::Symbol(Graph, VD, nullptr, SynthesizedBaseTypeDecl, BaseType) {}
+
+Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD, const ExtensionDecl *ED,
+               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
+    : Graph(Graph), D(VD), BaseType(BaseType),
+      SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {
+  if (!BaseType && SynthesizedBaseTypeDecl)
+    BaseType = SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
+  if (D == nullptr) {
+    D = ED;
   }
+}
 
 void Symbol::serializeKind(StringRef Identifier, StringRef DisplayName,
                            llvm::json::OStream &OS) const {
@@ -51,10 +60,10 @@ void Symbol::serializeKind(StringRef Identifier, StringRef DisplayName,
   });
 }
 
-std::pair<StringRef, StringRef> Symbol::getKind(const ValueDecl *VD) const {
+std::pair<StringRef, StringRef> Symbol::getKind(const Decl *D) {
   // Make sure supportsKind stays in sync with getKind.
-  assert(Symbol::supportsKind(VD->getKind()) && "unsupported decl kind");
-  switch (VD->getKind()) {
+  assert(Symbol::supportsKind(D->getKind()) && "unsupported decl kind");
+  switch (D->getKind()) {
   case swift::DeclKind::Class:
     return {"swift.class", "Class"};
   case swift::DeclKind::Struct:
@@ -69,7 +78,9 @@ std::pair<StringRef, StringRef> Symbol::getKind(const ValueDecl *VD) const {
     return {"swift.init", "Initializer"};
   case swift::DeclKind::Destructor:
     return {"swift.deinit", "Deinitializer"};
-  case swift::DeclKind::Func:
+  case swift::DeclKind::Func: {
+    const auto *VD = cast<ValueDecl>(D);
+
     if (VD->isOperator())
       return {"swift.func.op", "Operator"};
     if (VD->isStatic())
@@ -77,29 +88,38 @@ std::pair<StringRef, StringRef> Symbol::getKind(const ValueDecl *VD) const {
     if (VD->getDeclContext()->getSelfNominalTypeDecl())
       return {"swift.method", "Instance Method"};
     return {"swift.func", "Function"};
-  case swift::DeclKind::Var:
+  }
+  case swift::DeclKind::Var: {
+    const auto *VD = cast<ValueDecl>(D);
+
     if (VD->isStatic())
       return {"swift.type.property", "Type Property"};
     if (VD->getDeclContext()->getSelfNominalTypeDecl())
       return {"swift.property", "Instance Property"};
     return {"swift.var", "Global Variable"};
-  case swift::DeclKind::Subscript:
+  }
+  case swift::DeclKind::Subscript: {
+    const auto *VD = cast<ValueDecl>(D);
+
     if (VD->isStatic())
       return {"swift.type.subscript", "Type Subscript"};
     return {"swift.subscript", "Instance Subscript"};
+  }
   case swift::DeclKind::TypeAlias:
     return {"swift.typealias", "Type Alias"};
   case swift::DeclKind::AssociatedType:
     return {"swift.associatedtype", "Associated Type"};
+  case swift::DeclKind::Extension:
+    return {"swift.extension", "Extension"};
   default:
-    llvm::errs() << "Unsupported kind: " << VD->getKindName(VD->getKind());
+    llvm::errs() << "Unsupported kind: " << D->getKindName(D->getKind());
     llvm_unreachable("Unsupported declaration kind for symbol graph");
   }
 }
 
 void Symbol::serializeKind(llvm::json::OStream &OS) const {
   AttributeRAII A("kind", OS);
-  std::pair<StringRef, StringRef> IDAndName = getKind(VD);
+  std::pair<StringRef, StringRef> IDAndName = getKind(D);
   serializeKind(IDAndName.first, IDAndName.second, OS);
 }
 
@@ -127,7 +147,14 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
     SmallVector<PathComponent, 8> PathComponents;
     getPathComponents(PathComponents);
 
-    if (isa<GenericTypeDecl>(VD) || isa<EnumElementDecl>(VD)) {
+    const ValueDecl *Decl = nullptr;
+    if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+      Decl = ED->getExtendedNominal();
+    } else if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+      Decl = VD;
+    }
+      
+    if (isa<GenericTypeDecl>(Decl) || isa<EnumElementDecl>(Decl)) {
       SmallString<64> FullyQualifiedTitle;
 
       for (const auto *It = PathComponents.begin(); It != PathComponents.end(); ++It) {
@@ -179,15 +206,14 @@ void Symbol::serializeRange(size_t InitialIndentation,
 
 const ValueDecl *Symbol::getDeclInheritingDocs() const {
   // get the decl that would provide docs for this symbol
-  const auto *DocCommentProvidingDecl =
-    dyn_cast_or_null<ValueDecl>(
-      getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
-  
+  const auto *DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
+      getDocCommentProvidingDecl(D, /*AllowSerialized=*/true));
+
   // if the decl is the same as the one for this symbol, we're not
   // inheriting docs, so return null. however, if this symbol is
-  // a synthesized symbol, `VD` is actually the source symbol, and
+  // a synthesized symbol, `D` is actually the source symbol, and
   // we should point to that one regardless.
-  if (DocCommentProvidingDecl == VD && !SynthesizedBaseTypeDecl) {
+  if (DocCommentProvidingDecl == D && !SynthesizedBaseTypeDecl) {
     return nullptr;
   } else {
     // otherwise, return whatever `getDocCommentProvidingDecl` returned.
@@ -199,13 +225,13 @@ const ValueDecl *Symbol::getDeclInheritingDocs() const {
 
 namespace {
 
-StringRef getFileNameForDecl(const ValueDecl *VD) {
-  if (!VD) return StringRef{};
+StringRef getFileNameForDecl(const Decl *D) {
+  if (!D) return StringRef{};
 
-  SourceLoc Loc = VD->getLoc(/*SerializedOK=*/true);
+  SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
   if (Loc.isInvalid()) return StringRef{};
 
-  SourceManager &SourceM = VD->getASTContext().SourceMgr;
+  SourceManager &SourceM = D->getASTContext().SourceMgr;
   return SourceM.getDisplayNameForLoc(Loc);
 }
 
@@ -229,7 +255,7 @@ void serializeFileURI(llvm::json::OStream &OS, StringRef FileName) {
 }
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
-  if (ClangNode ClangN = VD->getClangNode()) {
+  if (ClangNode ClangN = D->getClangNode()) {
     if (!Graph->Walker.Options.IncludeClangDocs)
       return;
 
@@ -255,7 +281,7 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
         StringRef FileName = getFileNameForDecl(ClangD);
         if (!FileName.empty())
           serializeFileURI(OS, FileName);
-        if (const auto *ModuleD = VD->getModuleContext()) {
+        if (const auto *ModuleD = D->getModuleContext()) {
           OS.attribute("module", ModuleD->getNameStr());
         }
         OS.attributeArray("lines", [&]() {
@@ -270,12 +296,12 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
     return;
   }
 
-  const auto *DocCommentProvidingDecl = VD;
+  const auto *DocCommentProvidingDecl = D;
   if (!Graph->Walker.Options.SkipInheritedDocs) {
     DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
-      getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+        getDocCommentProvidingDecl(D, /*AllowSerialized=*/true));
     if (!DocCommentProvidingDecl) {
-      DocCommentProvidingDecl = VD;
+      DocCommentProvidingDecl = D;
     }
   }
   auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
@@ -322,7 +348,7 @@ void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeFunctionSignature(llvm::json::OStream &OS) const {
-  if (const auto *FD = dyn_cast_or_null<FuncDecl>(VD)) {
+  if (const auto *FD = dyn_cast_or_null<FuncDecl>(D)) {
     OS.attributeObject("functionSignature", [&](){
 
       // Parameters
@@ -367,7 +393,7 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
     return {};
 
   // Map from the base type into the this declaration's innermost type context,
-  // or if we're dealing with an extention rather than a member, into its
+  // or if we're dealing with an extension rather than a member, into its
   // extended nominal (the extension's own requirements shouldn't be considered
   // in the substitution).
   swift::DeclContext *DC;
@@ -391,12 +417,16 @@ static SubstitutionMap getSubMapForDecl(const ValueDecl *D, Type BaseType) {
 }
 
 void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
-
   SubstitutionMap SubMap;
-  if (BaseType)
-    SubMap = getSubMapForDecl(VD, BaseType);
+  const auto *VD = dyn_cast<ValueDecl>(D);
 
-  if (const auto *GC = VD->getAsGenericContext()) {
+  if (VD && BaseType) {
+    SubMap = getSubMapForDecl(VD, BaseType);
+  } else {
+    SubMap = {};
+  }
+
+  if (const auto *GC = D->getAsGenericContext()) {
     if (const auto Generics = GC->getGenericSignature()) {
 
       SmallVector<const GenericTypeParamType *, 4> FilteredParams;
@@ -404,9 +434,9 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
       filterGenericParams(Generics.getGenericParams(), FilteredParams,
                           SubMap);
 
-      const auto *Self = dyn_cast<NominalTypeDecl>(VD);
+      const auto *Self = dyn_cast<NominalTypeDecl>(D);
       if (!Self) {
-        Self = VD->getDeclContext()->getSelfNominalTypeDecl();
+        Self = D->getDeclContext()->getSelfNominalTypeDecl();
       }
 
       filterGenericRequirements(Generics.getRequirements(), Self,
@@ -438,9 +468,13 @@ void Symbol::serializeSwiftGenericMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeSwiftExtensionMixin(llvm::json::OStream &OS) const {
-  if (const auto *Extension
-          = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
-    ::serialize(Extension, OS);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    ::serialize(ED, OS);
+  } else if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (const auto *Extension =
+            dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
+      ::serialize(Extension, OS);
+    }
   }
 }
 
@@ -449,35 +483,48 @@ void Symbol::serializeDeclarationFragmentMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeAccessLevelMixin(llvm::json::OStream &OS) const {
-  OS.attribute("accessLevel", getAccessLevelSpelling(VD->getFormalAccess()));
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    OS.attribute("accessLevel",
+                 getAccessLevelSpelling(getEffectiveAccessLevel(ED)));
+  } else if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    OS.attribute("accessLevel", getAccessLevelSpelling(VD->getFormalAccess()));
+  }
+}
+
+void Symbol::serializeMetadataMixin(llvm::json::OStream &OS) const {
+  StringRef Category = documentationMetadataForDecl(D);
+  if (!Category.empty())
+    OS.attribute("metadata", Category);
 }
 
 void Symbol::serializeLocationMixin(llvm::json::OStream &OS) const {
-  if (ClangNode ClangN = VD->getClangNode()) {
-    if (!Graph->Walker.Options.IncludeClangDocs)
-      return;
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (ClangNode ClangN = VD->getClangNode()) {
+      if (!Graph->Walker.Options.IncludeClangDocs)
+        return;
 
-    if (auto *ClangD = ClangN.getAsDecl()) {
-      StringRef FileName = getFileNameForDecl(ClangD);
-      if (!FileName.empty()) {
-        OS.attributeObject("location", [&](){
-          // TODO: We should use a common function to fill in the location
-          // information for both cursor info and symbol graph gen, then also
-          // include position here.
-          serializeFileURI(OS, FileName);
-        });
+      if (auto *ClangD = ClangN.getAsDecl()) {
+        StringRef FileName = getFileNameForDecl(ClangD);
+        if (!FileName.empty()) {
+          OS.attributeObject("location", [&](){
+            // TODO: We should use a common function to fill in the location
+            // information for both cursor info and symbol graph gen, then also
+            // include position here.
+            serializeFileURI(OS, FileName);
+          });
+        }
       }
+
+      return;
     }
-
-    return;
   }
-
-  auto FileName = getFileNameForDecl(VD);
+    
+  auto FileName = getFileNameForDecl(D);
   if (FileName.empty()) {
     return;
   }
   // TODO: Fold serializePosition into serializeFileURI so we don't need to load Loc twice?
-  auto Loc = VD->getLoc(/*SerializedOK=*/true);
+  auto Loc = D->getLoc(/*SerializedOK=*/true);
   if (Loc.isInvalid()) {
     return;
   }
@@ -559,7 +606,7 @@ llvm::StringMap<Availability> &Availabilities) {
 
 void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   llvm::StringMap<Availability> Availabilities;
-  getInheritedAvailabilities(VD, Availabilities);
+  getInheritedAvailabilities(D, Availabilities);
 
   if (Availabilities.empty()) {
     return;
@@ -573,7 +620,7 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
 }
 
 void Symbol::serializeSPIMixin(llvm::json::OStream &OS) const {
-  if (VD->isSPI())
+  if (D->isSPI())
     OS.attribute("spi", true);
 }
 
@@ -592,57 +639,84 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeDeclarationFragmentMixin(OS);
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
+    serializeMetadataMixin(OS);
     serializeLocationMixin(OS);
     serializeSPIMixin(OS);
   });
 }
 
+swift::DeclName Symbol::getName(const Decl *D) const {
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return ED->getExtendedNominal()->getName();
+  } else {
+    return cast<ValueDecl>(D)->getName();
+  }
+}
+
+const ValueDecl *Symbol::getSymbolDecl() const {
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return ED->getExtendedNominal();
+  } else {
+    return cast<ValueDecl>(D);
+  }
+}
+
 void
 Symbol::getPathComponents(SmallVectorImpl<PathComponent> &Components) const {
+  const ValueDecl *Decl = nullptr;
+  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    Decl = ED->getExtendedNominal();
+  } else if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    Decl = VD;
+  }
+
   // Note: this is also used for sourcekit's cursor-info request, so can be
   // called on local symbols too. For such symbols, the path contains all parent
   // decl contexts that are currently representable in the symbol graph,
   // skipping over the rest (e.g. containing closures and accessors).
 
-  auto collectPathComponents = [&](const ValueDecl *Decl,
-                                   SmallVectorImpl<PathComponent> &DeclComponents) {
-    // Collect the spellings, kinds, and decls of the fully qualified identifier
-    // components.
-    while (Decl && !isa<ModuleDecl>(Decl)) {
-      SmallString<32> Scratch;
-      Decl->getName().getString(Scratch);
-      if (supportsKind(Decl->getKind()))
-        DeclComponents.push_back({Scratch, getKind(Decl).first, Decl});
+  auto collectPathComponents =
+      [&](const ValueDecl *Decl,
+          SmallVectorImpl<PathComponent> &DeclComponents) {
+        // Collect the spellings, kinds, and decls of the fully qualified
+        // identifier components.
+        while (Decl && !isa<ModuleDecl>(Decl)) {
+          SmallString<32> Scratch;
+          getName(Decl).getString(Scratch);
 
-      // Find the next parent.
-      auto *DC = Decl->getDeclContext();
-      while (DC && DC->getContextKind() == DeclContextKind::AbstractClosureExpr)
-        DC = DC->getParent();
-      if (DC) {
-        if (const auto *Nominal = DC->getSelfNominalTypeDecl()) {
-          Decl = Nominal;
-        } else {
-          Decl = dyn_cast_or_null<ValueDecl>(DC->getAsDecl());
+          if (supportsKind(Decl->getKind()))
+            DeclComponents.push_back({Scratch, getKind(Decl).first, Decl});
+
+          // Find the next parent.
+          auto *DC = Decl->getDeclContext();
+          while (DC &&
+                 DC->getContextKind() == DeclContextKind::AbstractClosureExpr)
+            DC = DC->getParent();
+          if (DC) {
+            if (const auto *Nominal = DC->getSelfNominalTypeDecl()) {
+              Decl = Nominal;
+            } else {
+              Decl = dyn_cast_or_null<ValueDecl>(DC->getAsDecl());
+            }
+          } else {
+            Decl = nullptr;
+          }
         }
-      } else {
-        Decl = nullptr;
-      }
-    }
-  };
+      };
 
   if (const auto BaseTypeDecl = getSynthesizedBaseTypeDecl()) {
     // This is a synthesized member of some base type declaration, actually
     // existing on another type, such as a default implementation of
     // a protocol. Build a path as if it were defined in the base type.
     SmallString<32> LastPathComponent;
-    VD->getName().getString(LastPathComponent);
-    if (supportsKind(VD->getKind()))
-      Components.push_back({LastPathComponent, getKind(VD).first, VD});
+    getName(Decl).getString(LastPathComponent);
+    if (supportsKind(Decl->getKind()))
+      Components.push_back({LastPathComponent, getKind(Decl).first, Decl});
     collectPathComponents(BaseTypeDecl, Components);
   } else {
     // Otherwise, this is just a normal declaration, so we can build
     // its path normally.
-    collectPathComponents(VD, Components);
+    collectPathComponents(Decl, Components);
   }
 
   // The list is leaf-to-root, but we want root-to-leaf, so reverse it.
@@ -689,7 +763,7 @@ void Symbol::printPath(llvm::raw_ostream &OS) const {
 
 void Symbol::getUSR(SmallVectorImpl<char> &USR) const {
   llvm::raw_svector_ostream OS(USR);
-  ide::printDeclUSR(VD, OS);
+  ide::printDeclUSR(D, OS);
   if (SynthesizedBaseTypeDecl) {
     OS << "::SYNTHESIZED::";
     ide::printDeclUSR(SynthesizedBaseTypeDecl, OS);
@@ -709,9 +783,30 @@ bool Symbol::supportsKind(DeclKind Kind) {
   case DeclKind::Var: LLVM_FALLTHROUGH;
   case DeclKind::Subscript: LLVM_FALLTHROUGH;
   case DeclKind::TypeAlias: LLVM_FALLTHROUGH;
-  case DeclKind::AssociatedType:
+  case DeclKind::AssociatedType: LLVM_FALLTHROUGH;
+  case DeclKind::Extension:
     return true;
   default:
     return false;
   }
+}
+
+AccessLevel Symbol::getEffectiveAccessLevel(const ExtensionDecl *ED) {
+  AccessLevel maxPropertyAL = AccessLevel::Private;
+  for (auto Member : ED->getMembers()) {
+    if (const auto *VMember = dyn_cast<ValueDecl>(Member)) {
+      maxPropertyAL = std::max(maxPropertyAL, VMember->getFormalAccess());
+    }
+  }
+
+  AccessLevel maxInheritedAL = AccessLevel::Private;
+  for (auto Inherited : ED->getInherited()) {
+    if (const auto *Proto = dyn_cast_or_null<ProtocolDecl>(
+            Inherited.getType()->getAnyNominal())) {
+      maxInheritedAL = std::max(maxInheritedAL, Proto->getFormalAccess());
+    }
+  }
+
+  return std::min(ED->getExtendedNominal()->getFormalAccess(),
+                  std::max(maxPropertyAL, maxInheritedAL));
 }

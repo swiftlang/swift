@@ -215,3 +215,45 @@ distributed actor DijonMustard {
     self.init(system: conv2)
   }
 }
+
+// ==== Larger example with protocols and extensions ---------------------------
+
+
+protocol Greeting: DistributedActor {
+  distributed func greeting() -> String
+  distributed func greetingAsyncThrows() async throws -> String
+}
+
+extension Greeting {
+  func greetLocal(name: String) async throws { // expected-note{{distributed actor-isolated instance method 'greetLocal(name:)' declared here}}
+    try await print("\(greetingAsyncThrows()), \(name)!") // requirement is async throws, things work
+  }
+
+  func greetLocal2(name: String) {
+    print("\(greeting()), \(name)!")
+  }
+}
+
+extension Greeting where SerializationRequirement == Codable {
+  // okay, uses Codable to transfer arguments.
+  distributed func greetDistributed(name: String) async throws {
+  // okay, we're on the actor
+  try await greetLocal(name: name)
+}
+
+  distributed func greetDistributed2(name: String) async throws {
+  // okay, we're on the actor
+  greetLocal2(name: name)
+}
+
+  func greetDistributedNon(name: String) async throws {
+    // okay, we're on the actor
+    greetLocal2(name: name)
+  }
+}
+
+extension Greeting where SerializationRequirement == Codable {
+  nonisolated func greetAliceALot() async throws {
+    try await greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  }
+}

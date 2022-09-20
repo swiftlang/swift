@@ -269,7 +269,7 @@ public:
   /// returned since end_borrows should not be cancellable.
   ScopedValue borrowValue(SILInstruction *insertPt, SILValue value) {
     if (!insertPt->getFunction()->hasOwnership() ||
-        value.getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
+        value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed))
       return {};
     SILValue borrow = SILBuilderWithScope(insertPt).emitBeginBorrowOperation(
         insertPt->getLoc(), value);

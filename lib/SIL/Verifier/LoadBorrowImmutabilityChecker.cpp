@@ -94,6 +94,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::DeallocStackInst:
+  case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::ExistentialMetatypeInst:
@@ -108,6 +109,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::StoreInst:
+  case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
@@ -130,10 +132,6 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
 #include "swift/AST/ReferenceStorage.def"
 
   // Ignored pointer uses...
-
-  // Allow store_borrow within the load_borrow scope.
-  // FIXME: explain why.
-  case SILInstructionKind::StoreBorrowInst:
   // Returns are never in scope.
   case SILInstructionKind::ReturnInst:
     return true;
@@ -167,6 +165,17 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     }
     // This operand is the copy source. Check if it is taken.
     if (cast<CopyAddrInst>(user)->isTakeOfSrc()) {
+      writeAccumulator.push_back(op);
+    }
+    return true;
+
+  case SILInstructionKind::ExplicitCopyAddrInst:
+    if (cast<ExplicitCopyAddrInst>(user)->getDest() == op->get()) {
+      writeAccumulator.push_back(op);
+      return true;
+    }
+    // This operand is the copy source. Check if it is taken.
+    if (cast<ExplicitCopyAddrInst>(user)->isTakeOfSrc()) {
       writeAccumulator.push_back(op);
     }
     return true;

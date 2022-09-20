@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "irgensil"
-
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
@@ -51,6 +49,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
@@ -61,7 +60,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -93,6 +91,8 @@
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
+
+#define DEBUG_TYPE "irgensil"
 
 using namespace swift;
 using namespace irgen;
@@ -810,7 +810,7 @@ public:
                            SILDebugVariable VarInfo,
                            const SILDebugScope *Scope) {
     bool canStore =
-        cast<llvm::PointerType>(Alloca->getType())->getElementType() ==
+        cast<llvm::PointerType>(Alloca->getType())->getPointerElementType() ==
         Val->getType();
     if (canStore)
       return true;
@@ -910,7 +910,7 @@ public:
     auto *Address = Alloca.getAddress();
     if (WasMoved) {
       auto nonPtrAllocaType =
-          cast<llvm::PointerType>(Address->getType())->getElementType();
+          cast<llvm::PointerType>(Address->getType())->getPointerElementType();
       if (nonPtrAllocaType != Storage->getType())
         Address = Builder.CreateBitOrPointerCast(
             Address, llvm::PointerType::get(Storage->getType(), 0));
@@ -1087,14 +1087,9 @@ public:
       const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
       IndirectionKind Indirection,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
-    // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
         ty = metaTy->getRootClass().getPointer();
-      if (ty->getStructOrBoundGenericStruct() &&
-          isa_and_nonnull<clang::CXXRecordDecl>(
-              ty->getStructOrBoundGenericStruct()->getClangDecl()))
-        return;
     }
 
     assert(IGM.DebugInfo && "debug info not enabled");
@@ -1310,6 +1305,7 @@ public:
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
+  void visitExplicitCopyAddrInst(ExplicitCopyAddrInst *i);
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
     llvm_unreachable("Valid only when ownership is enabled");
   }
@@ -1319,7 +1315,9 @@ public:
   void visitRebindMemoryInst(RebindMemoryInst *i);
 
   void visitCondFailInst(CondFailInst *i);
-  
+
+  void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *I);
+
   void visitConvertFunctionInst(ConvertFunctionInst *i);
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *i);
   void visitUpcastInst(UpcastInst *i);
@@ -2230,6 +2228,19 @@ void IRGenSILFunction::emitSILFunction() {
 
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
+
+  if (CurSILFn->getLinkage() == SILLinkage::Shared) {
+    if (CurSILFn->markedAsAlwaysEmitIntoClient() &&
+        CurSILFn->hasOpaqueResultTypeWithAvailabilityConditions()) {
+      auto *V = CurSILFn->getLocation().castToASTNode<ValueDecl>();
+      auto *opaqueResult = V->getOpaqueResultTypeDecl();
+      // `@_alwaysEmitIntoClient` declaration with opaque result
+      // has to emit opaque type descriptor into client module
+      // when it has availability conditions because the underlying
+      // type in such cases is unknown until runtime.
+      IGM.maybeEmitOpaqueTypeDecl(opaqueResult);
+    }
+  }
 
   auto funcTy = CurSILFn->getLoweredFunctionType();
   bool isAsyncFn = funcTy->isAsync();
@@ -6871,6 +6882,30 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   }
 }
 
+void IRGenSILFunction::visitExplicitCopyAddrInst(
+    swift::ExplicitCopyAddrInst *i) {
+  SILType addrTy = i->getSrc()->getType();
+  const TypeInfo &addrTI = getTypeInfo(addrTy);
+  Address src = getLoweredAddress(i->getSrc());
+  // See whether we have a deferred fixed-size buffer initialization.
+  auto &loweredDest = getLoweredValue(i->getDest());
+  assert(!loweredDest.isUnallocatedAddressInBuffer());
+  Address dest = loweredDest.getAnyAddress();
+  if (i->isInitializationOfDest()) {
+    if (i->isTakeOfSrc()) {
+      addrTI.initializeWithTake(*this, dest, src, addrTy, false);
+    } else {
+      addrTI.initializeWithCopy(*this, dest, src, addrTy, false);
+    }
+  } else {
+    if (i->isTakeOfSrc()) {
+      addrTI.assignWithTake(*this, dest, src, addrTy, false);
+    } else {
+      addrTI.assignWithCopy(*this, dest, src, addrTy, false);
+    }
+  }
+}
+
 // bind_memory and rebind_memory are no-ops because Swift TBAA info is not
 // lowered to LLVM IR TBAA, and the output token is ignored except for
 // verification.
@@ -6921,6 +6956,39 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Builder.SetInsertPoint(origInsertionPoint);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
+}
+
+void IRGenSILFunction::visitIncrementProfilerCounterInst(
+    IncrementProfilerCounterInst *i) {
+  // If we import profiling intrinsics from a swift module but profiling is
+  // not enabled, ignore the increment.
+  if (!getSILModule().getOptions().GenerateProfile)
+    return;
+
+  // Retrieve the global variable that stores the PGO function name, creating it
+  // if needed.
+  auto funcName = i->getPGOFuncName();
+  auto varLinkage = llvm::GlobalValue::LinkOnceAnyLinkage;
+  auto *nameVar = IGM.Module.getNamedGlobal(
+      llvm::getPGOFuncNameVarName(funcName, varLinkage));
+  if (!nameVar)
+    nameVar = llvm::createPGOFuncNameVar(IGM.Module, varLinkage, funcName);
+
+  // We need to GEP the function name global to point to the first character of
+  // the string.
+  llvm::SmallVector<llvm::Value *, 2> indices;
+  indices.append(2, llvm::ConstantInt::get(IGM.SizeTy, 0));
+  auto *nameGEP = llvm::ConstantExpr::getGetElementPtr(
+      nameVar->getValueType(), nameVar, makeArrayRef(indices));
+
+  // Emit the call to the 'llvm.instrprof.increment' LLVM intrinsic.
+  llvm::Value *args[] = {
+    nameGEP,
+    llvm::ConstantInt::get(IGM.Int64Ty, i->getPGOFuncHash()),
+    llvm::ConstantInt::get(IGM.Int32Ty, i->getNumCounters()),
+    llvm::ConstantInt::get(IGM.Int32Ty, i->getCounterIndex())
+  };
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::instrprof_increment, args);
 }
 
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {

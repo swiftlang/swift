@@ -38,10 +38,12 @@ public SwiftObjectHeader {
   friend class SILFunction;
   friend class SILGlobalVariable;
   template <typename, unsigned> friend class BasicBlockData;
-  friend class BasicBlockBitfield;
+  template <class, class> friend class SILBitfield;
 
   static SwiftMetatype registeredMetatype;
-    
+  
+  using CustomBitsType = uint32_t;
+  
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -67,7 +69,7 @@ private:
   int index = -1;
 
   /// Custom bits managed by BasicBlockBitfield.
-  uint32_t customBits = 0;
+  CustomBitsType customBits = 0;
   
   /// The BasicBlockBitfield ID of the last initialized bitfield in customBits.
   /// Example:
@@ -82,8 +84,16 @@ private:
   /// -> AAA, BB and C are initialized,
   ///    DD and EEE are uninitialized
   ///
-  /// See also: BasicBlockBitfield::bitfieldID, SILFunction::currentBitfieldID.
+  /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
   uint64_t lastInitializedBitfieldID = 0;
+
+  // Used by `BasicBlockBitfield`.
+  unsigned getCustomBits() const { return customBits; }
+  // Used by `BasicBlockBitfield`.
+  void setCustomBits(unsigned value) { customBits = value; }
+
+  // Used by `BasicBlockBitfield`.
+  enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
 
   friend struct llvm::ilist_traits<SILBasicBlock>;
 
@@ -111,6 +121,7 @@ public:
   Optional<llvm::StringRef> getDebugName() const;
 
   SILFunction *getParent() { return Parent; }
+  SILFunction *getFunction() { return getParent(); }
   const SILFunction *getParent() const { return Parent; }
 
   SILModule &getModule() const;

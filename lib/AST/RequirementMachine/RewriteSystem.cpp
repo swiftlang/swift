@@ -549,14 +549,21 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       if (index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
-        ASSERT_RULE(!symbol.hasSubstitutions());
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Superclass);
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteType);
+      }
+
+      if (!rule.isLHSSimplified() &&
+          index != lhs.size() - 1) {
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteConformance);
       }
 
       if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0 && index != lhs.size() - 1) {
+      if (!rule.isLHSSimplified() &&
+          index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }
@@ -585,13 +592,29 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
       }
 
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
-      ASSERT_RULE(!symbol.hasSubstitutions());
+      ASSERT_RULE(symbol.getKind() != Symbol::Kind::Superclass);
+      ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteType);
+
+      // Completion can introduce a rule of the form
+      //
+      // (T.[P] => T.[concrete: C : P])
+      //
+      // Such rules are immediately simplified away. Otherwise, we should
+      // never see a symbol with substitutions (concrete type, superclass,
+      // concrete conformance) on the right hand side of a rule.
+      if (!(rule.isRHSSimplified() &&
+            index == rhs.size() - 1)) {
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Superclass);
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteType);
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::ConcreteConformance);
+      }
 
       if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam);
       }
 
-      if (index != 0 && !rule.isRHSSimplified()) {
+      if (!rule.isRHSSimplified() &&
+          index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
     }

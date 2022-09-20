@@ -1,15 +1,19 @@
 {
   "kind": "SourceFile",
   "layout": [
+    null,
     {
       "kind": "CodeBlockItemList",
       "layout": [
         {
           "kind": "CodeBlockItem",
           "layout": [
+            null,
             {
               "kind": "ClassDecl",
               "layout": [
+                null,
+                null,
                 null,
                 {
                   "kind": "ModifierList",
@@ -17,6 +21,7 @@
                     {
                       "kind": "DeclModifier",
                       "layout": [
+                        null,
                         {
                           "tokenKind": {
                             "kind": "contextual_keyword",
@@ -27,7 +32,6 @@
                           "presence": "Present"
                         },
                         null,
-                        null,
                         null
                       ],
                       "presence": "Present"
@@ -35,6 +39,7 @@
                   ],
                   "presence": "Present"
                 },
+                null,
                 {
                   "tokenKind": {
                     "kind": "kw_class"
@@ -43,6 +48,7 @@
                   "trailingTrivia": " ",
                   "presence": "Present"
                 },
+                null,
                 {
                   "tokenKind": {
                     "kind": "identifier",
@@ -55,9 +61,14 @@
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
                 {
                   "kind": "MemberDeclBlock",
                   "layout": [
+                    null,
                     {
                       "tokenKind": {
                         "kind": "l_brace"
@@ -66,11 +77,13 @@
                       "trailingTrivia": "",
                       "presence": "Present"
                     },
+                    null,
                     {
                       "kind": "MemberDeclList",
                       "layout": [],
                       "presence": "Present"
                     },
+                    null,
                     {
                       "tokenKind": {
                         "kind": "r_brace"
@@ -86,6 +99,8 @@
               "presence": "Present"
             },
             null,
+            null,
+            null,
             null
           ],
           "presence": "Present"
@@ -93,6 +108,7 @@
       ],
       "presence": "Present"
     },
+    null,
     {
       "tokenKind": {
         "kind": "eof",

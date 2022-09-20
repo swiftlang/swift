@@ -34,47 +34,46 @@ public func noConstantSize<T>(_ t: T.Type) -> Int {
   return MemoryLayout<T>.size
 }
 
-// Check that there is not constant propagation if optimizations are disabled.
-// This is important for the runtime check to make sure that we are comparing
+// It's important to not constant propagate here to make sure that we are comparing
 // SIL constant propagated values with IRGen values.
 
-// CHECK-LABEL: sil {{.*}} @$s4test7getSizeSiyF
-// CHECK:         builtin "sizeof"<S>
-// CHECK:       } // end sil function '$s4test7getSizeSiyF' 
+// CHECK-LABEL: sil {{.*}} @$s4test7getSizeySixmlF
+// CHECK:         builtin "sizeof"<T>
+// CHECK:       } // end sil function '$s4test7getSizeySixmlF' 
 @_optimize(none)
-func getSize() -> Int {
-  return MemoryLayout<S>.size
+func getSize<T>(_ t: T.Type) -> Int {
+  return MemoryLayout<T>.size
 }
 
-// CHECK-LABEL: sil {{.*}} @$s4test12getAlignmentSiyF
-// CHECK:         builtin "alignof"<S>
-// CHECK:       } // end sil function '$s4test12getAlignmentSiyF' 
+// CHECK-LABEL: sil {{.*}} @$s4test12getAlignmentySixmlF
+// CHECK:         builtin "alignof"<T>
+// CHECK:       } // end sil function '$s4test12getAlignmentySixmlF' 
 @_optimize(none)
-func getAlignment() -> Int {
-  return MemoryLayout<S>.alignment
+func getAlignment<T>(_ t: T.Type) -> Int {
+  return MemoryLayout<T>.alignment
 }
 
-// CHECK-LABEL: sil {{.*}} @$s4test9getStrideSiyF
-// CHECK:         builtin "strideof"<S>
-// CHECK:       } // end sil function '$s4test9getStrideSiyF' 
+// CHECK-LABEL: sil {{.*}} @$s4test9getStrideySixmlF
+// CHECK:         builtin "strideof"<T>
+// CHECK:       } // end sil function '$s4test9getStrideySixmlF' 
 @_optimize(none)
-func getStride() -> Int {
-  return MemoryLayout<S>.stride
+func getStride<T>(_ t: T.Type) -> Int {
+  return MemoryLayout<T>.stride
 }
 
 @inline(never)
 func testit() {
   // CHECK-OUTPUT: size: true
-  print("size: \(S.size == getSize())")
+  print("size: \(S.size == getSize(S.self))")
 
   // CHECK-OUTPUT: alignment: true
-  print("alignment: \(S.alignment == getAlignment())")
+  print("alignment: \(S.alignment == getAlignment(S.self))")
 
   // CHECK-OUTPUT: stride: true
-  print("stride: \(S.stride == getStride())")
+  print("stride: \(S.stride == getStride(S.self))")
 
   // CHECK-OUTPUT: doubleSize: true
-  print("doubleSize: \(S.doubleSize == getSize() * 2)")
+  print("doubleSize: \(S.doubleSize == getSize(S.self) * 2)")
 }
 
 testit()

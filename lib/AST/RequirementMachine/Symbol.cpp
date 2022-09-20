@@ -675,9 +675,15 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     return;
   }
 
-  case Kind::GenericParam:
-    out << Type(getGenericParam());
+  case Kind::GenericParam: {
+    auto *gp = getGenericParam();
+    if (gp->isTypeSequence()) {
+      out << "(" << Type(gp) << "…)";
+    } else {
+      out << Type(gp);
+    }
     return;
+  }
 
   case Kind::Layout:
     out << "[layout: ";

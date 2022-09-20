@@ -1,0 +1,14 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -parse-stdlib
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -compile-module-from-interface -module-name ExplicitModule -explicit-interface-module-build -o %/t/ExplicitModule.swiftmodule %s
+
+// RUN: %target-swift-frontend -compile-module-from-interface -module-name ExplicitModule -explicit-interface-module-build -o %/t/ExplicitModule.swiftmodule %s -Rskip-explicit-interface-build 2>&1 | %FileCheck %s
+
+import Swift
+extension Int {
+  public static var fortytwo: Int = 42
+}
+
+// CHECK: <unknown>:0: remark: Skipped rebuilding module at {{.*}}ExplicitModule.swiftmodule - up-to-date

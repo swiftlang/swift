@@ -408,6 +408,7 @@ UID_KINDS = [
     KIND('NameSwift', 'source.lang.name.kind.swift'),
     KIND('Keyword', 'source.lang.swift.syntaxtype.keyword'),
     KIND('Identifier', 'source.lang.swift.syntaxtype.identifier'),
+    KIND('Operator', 'source.lang.swift.syntaxtype.operator'),
     KIND('TypeIdentifier', 'source.lang.swift.syntaxtype.typeidentifier'),
     KIND('BuildConfigKeyword',
          'source.lang.swift.syntaxtype.buildconfig.keyword'),

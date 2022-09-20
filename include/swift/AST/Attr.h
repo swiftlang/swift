@@ -2221,11 +2221,52 @@ public:
   /// The earliest platform version that may use the back deployed implementation.
   const llvm::VersionTuple Version;
 
+  /// Returns true if this attribute is active given the current platform.
+  bool isActivePlatform(const ASTContext &ctx) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_BackDeploy;
   }
 };
 
+/// Defines the `@_expose` attribute, used to expose declarations in the
+/// header used by C/C++ to interoperate with Swift.
+class ExposeAttr : public DeclAttribute {
+public:
+  ExposeAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_Expose, AtLoc, Range, Implicit), Name(Name) {}
+
+  ExposeAttr(StringRef Name, bool Implicit)
+      : ExposeAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The exposed declaration name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Expose;
+  }
+};
+
+/// The `@_documentation(...)` attribute, used to override a symbol's visibility
+/// in symbol graphs, and/or adding arbitrary metadata to it.
+class DocumentationAttr: public DeclAttribute {
+public:
+  DocumentationAttr(SourceLoc AtLoc, SourceRange Range,
+                    StringRef Metadata, Optional<AccessLevel> Visibility,
+                    bool Implicit)
+  : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
+    Metadata(Metadata), Visibility(Visibility) {}
+
+  DocumentationAttr(StringRef Metadata, Optional<AccessLevel> Visibility, bool Implicit)
+  : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility, Implicit) {}
+
+  const StringRef Metadata;
+  const Optional<AccessLevel> Visibility;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Documentation;
+  }
+};
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
@@ -2493,6 +2534,9 @@ public:
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
 
+  // For an opened existential type, the constraint type.
+  Optional<TypeRepr *> ConstraintType;
+
   // For a reference to an opaque return type, the mangled name and argument
   // index into the generic signature.
   struct OpaqueReturnTypeRef {
@@ -2581,6 +2625,9 @@ public:
   bool hasOpenedID() const { return OpenedID.hasValue(); }
   UUID getOpenedID() const { return *OpenedID; }
 
+  bool hasConstraintType() const { return ConstraintType.hasValue(); }
+  TypeRepr *getConstraintType() const { return *ConstraintType; }
+
   /// Given a name like "autoclosure", return the type attribute ID that
   /// corresponds to it.  This returns TAK_Count on failure.
   ///
@@ -2625,6 +2672,10 @@ void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
   return attr->getLocation();
 }
+
+/// Determine whether the given attribute is available, looking up the
+/// attribute by name.
+bool hasAttribute(const LangOptions &langOpts, llvm::StringRef attributeName);
 
 } // end namespace swift
 

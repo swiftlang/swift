@@ -154,8 +154,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (witnessConv.isSILIndirect(witnessConv.getParameters()[0])
       && !swiftValue.getType().isAddress()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, swiftValue.getType());
-    SGF.B.createStoreBorrowOrTrivial(loc, swiftValue.borrow(SGF, loc), tmp);
-    swiftValue = ManagedValue::forUnmanaged(tmp);
+    swiftValue = SGF.emitManagedStoreBorrow(
+        loc, swiftValue.borrow(SGF, loc).getValue(), tmp);
   }
 
   // Call the witness.
@@ -2224,8 +2224,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         auto bridged = emitNativeToBridgedValue(fd, param, nativeFormalType,
                                                 foreignFormalType,
                                                 foreignLoweredTy);
-        // Handle C pointer arguments imported as indirect `self` arguments.
-        if (foreignParam.getConvention() == ParameterConvention::Indirect_In) {
+        if (foreignParam.getConvention() == ParameterConvention::Indirect_In ||
+            foreignParam.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
           auto temp = emitTemporaryAllocation(fd, bridged.getType());
           bridged.forwardInto(*this, fd, temp);
           bridged = emitManagedBufferWithCleanup(temp);

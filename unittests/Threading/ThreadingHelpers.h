@@ -13,6 +13,37 @@
 #ifndef THREADING_HELPERS_H
 #define THREADING_HELPERS_H
 
+#if SWIFT_THREADING_NONE
+
+template <typename ThreadBody, typename AfterSpinRelease>
+void threadedExecute(int threadCount, ThreadBody threadBody,
+                     AfterSpinRelease afterSpinRelease) {
+  for (int i = 0; i < threadCount; ++i) {
+    threadBody(i);
+  }
+}
+
+template <typename ThreadBody>
+void threadedExecute(int threadCount, ThreadBody threadBody) {
+  threadedExecute(threadCount, threadBody, [] {});
+}
+
+template <typename M, typename C, typename ConsumerBody, typename ProducerBody>
+void threadedExecute(M &mutex, C &condition, bool &doneCondition,
+                     ConsumerBody consumerBody, ProducerBody producerBody) {
+  for (int i = 1; i <= 5; ++i) {
+    producerBody(i);
+  }
+  mutex.withLockThenNotifyAll(condition, [&] {
+    doneCondition = true;
+  });
+  for (int i = 1; i <= 8; ++i) {
+    consumerBody(i);
+  }
+}
+
+#else // !SWIFT_THREADING_NONE
+
 #include <thread>
 
 // When true many of the threaded tests log activity to help triage issues.
@@ -130,5 +161,7 @@ void threadedExecute(M &mutex, C &condition, bool &doneCondition,
     thread.join();
   }
 }
+
+#endif // !SWIFT_THREADING_NONE
 
 #endif

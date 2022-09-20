@@ -9,7 +9,7 @@
 // CHECK: }
 
 // CHECK: struct LoadableBoolWrapper {
-// CHECK:   static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
+// CHECK:   prefix static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
 // CHECK: }
 
 // CHECK: struct AddressOnlyIntWrapper {

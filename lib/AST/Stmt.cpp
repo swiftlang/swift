@@ -156,6 +156,30 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
+SourceLoc BraceStmt::getStartLoc() const {
+  if (LBLoc) {
+    return LBLoc;
+  }
+  for (auto elt : getElements()) {
+    if (auto loc = elt.getStartLoc()) {
+      return loc;
+    }
+  }
+  return SourceLoc();
+}
+
+SourceLoc BraceStmt::getEndLoc() const {
+  if (RBLoc) {
+    return RBLoc;
+  }
+  for (auto elt : llvm::reverse(getElements())) {
+    if (auto loc = elt.getEndLoc()) {
+      return loc;
+    }
+  }
+  return SourceLoc();
+}
+
 ASTNode BraceStmt::findAsyncNode() {
   // TODO: Statements don't track their ASTContext/evaluator, so I am not making
   // this a request. It probably should be a request at some point.
@@ -168,41 +192,41 @@ ASTNode BraceStmt::findAsyncNode() {
   class FindInnerAsync : public ASTWalker {
     ASTNode AsyncNode;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found an 'await', record it and terminate the traversal.
       if (isa<AwaitExpr>(expr)) {
         AsyncNode = expr;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return {false, expr};
+        return Action::SkipChildren(expr);
 
-      return {true, expr};
+      return Action::Continue(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override {
+    PreWalkAction walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
-        return true;
+        return Action::Continue();
       }
 
-      return false;
+      return Action::SkipChildren();
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
         if (forEach->getAwaitLoc().isValid()) {
           AsyncNode = forEach;
-          return {false, nullptr};
+          return Action::Stop();
         }
       }
 
-      return {true, stmt};
+      return Action::Continue(stmt);
     }
 
   public:
@@ -368,6 +392,8 @@ SourceRange StmtConditionElement::getSourceRange() const {
     return getBoolean()->getSourceRange();
   case StmtConditionElement::CK_Availability:
     return getAvailability()->getSourceRange();
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getSourceRange();
   case StmtConditionElement::CK_PatternBinding:
     SourceLoc Start;
     if (IntroducerLoc.isValid())
@@ -386,6 +412,15 @@ SourceRange StmtConditionElement::getSourceRange() const {
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
+PoundHasSymbolInfo *PoundHasSymbolInfo::create(ASTContext &Ctx,
+                                               SourceLoc PoundLoc,
+                                               SourceLoc LParenLoc,
+                                               Expr *SymbolExpr,
+                                               SourceLoc RParenLoc) {
+  return new (Ctx)
+      PoundHasSymbolInfo(PoundLoc, LParenLoc, SymbolExpr, RParenLoc);
+}
+
 SourceLoc StmtConditionElement::getStartLoc() const {
   switch (getKind()) {
   case StmtConditionElement::CK_Boolean:
@@ -394,6 +429,8 @@ SourceLoc StmtConditionElement::getStartLoc() const {
     return getAvailability()->getStartLoc();
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().Start;
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getStartLoc();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -407,6 +444,8 @@ SourceLoc StmtConditionElement::getEndLoc() const {
     return getAvailability()->getEndLoc();
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().End;
+  case StmtConditionElement::CK_HasSymbol:
+    return getHasSymbolInfo()->getEndLoc();
   }
 
   llvm_unreachable("Unhandled StmtConditionElement in switch.");
@@ -499,6 +538,24 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
+}
+
+DoStmt *DoStmt::createImplicit(ASTContext &C, LabeledStmtInfo labelInfo,
+                               ArrayRef<ASTNode> body) {
+  return new (C) DoStmt(labelInfo, /*doLoc=*/SourceLoc(),
+                        BraceStmt::createImplicit(C, body),
+                        /*implicit=*/true);
+}
+
+SourceLoc DoStmt::getStartLoc() const {
+  if (auto LabelOrDoLoc = getLabelLocOrKeywordLoc(DoLoc)) {
+    return LabelOrDoLoc;
+  }
+  return Body->getStartLoc();
+}
+
+SourceLoc DoStmt::getEndLoc() const {
+  return Body->getEndLoc();
 }
 
 namespace {

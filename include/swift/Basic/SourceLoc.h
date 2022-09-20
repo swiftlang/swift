@@ -23,6 +23,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
+#include <assert.h>
 #include <functional>
 
 namespace swift {
@@ -247,7 +248,7 @@ public:
 } // end namespace swift
 
 namespace llvm {
-template <typename T> struct DenseMapInfo;
+template <typename T, typename Enable> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<swift::SourceLoc> {
   static swift::SourceLoc getEmptyKey() {

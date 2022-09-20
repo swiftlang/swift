@@ -1,7 +1,7 @@
 @import Foundation;
 #import "swift.h"
 
-int main() {
+int main(void) {
   @autoreleasepool {
     Test *test = [[Test alloc] init];
     id result = [test initAllTheThings]; // CHECK: method called

@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
+
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
@@ -313,7 +315,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
             } else {
               assert(isa<ClassDecl>(NTD));
               SILValue Original, Borrowed;
-              if (Ptr.getOwnershipKind() != OwnershipKind::Guaranteed) {
+              if (Ptr->getOwnershipKind() != OwnershipKind::Guaranteed) {
                 Original = Ptr;
                 Borrowed = Ptr = B.createBeginBorrow(Loc, Ptr);
                 EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
@@ -742,6 +744,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Ignore end_access.
     if (isa<EndAccessInst>(User)) {
+      continue;
+    }
+
+    // Look through mark_must_check. To us, it is not interesting.
+    if (auto *mmi = dyn_cast<MarkMustCheckInst>(User)) {
+      collectUses(mmi, BaseEltNo);
       continue;
     }
 
@@ -1211,6 +1219,7 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
       Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
       continue;
     }
+
     if (isa<EndAccessInst>(User))
       continue;
 
@@ -1489,9 +1498,9 @@ void ElementUseCollector::collectClassSelfUses(
 
     // Look through begin_borrow, upcast, unchecked_ref_cast
     // and copy_value.
-    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User)
-        || isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User)
-        || isa<CopyValueInst>(User)) {
+    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User) ||
+        isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User) ||
+        isa<CopyValueInst>(User) || isa<MarkMustCheckInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
@@ -1582,6 +1591,12 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // Look through begin_access
     if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
       collectDelegatingInitUses(TheMemory, UseInfo, BAI);
+      continue;
+    }
+
+    // Look through mark_must_check.
+    if (auto *MMCI = dyn_cast<MarkMustCheckInst>(User)) {
+      collectDelegatingInitUses(TheMemory, UseInfo, MMCI);
       continue;
     }
 

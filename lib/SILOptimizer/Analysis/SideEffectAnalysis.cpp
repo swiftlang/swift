@@ -498,6 +498,12 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
     // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;
+      
+    if (SingleCallee->getName() == "_swift_stdlib_malloc_size" ||
+        SingleCallee->getName() == "_swift_stdlib_has_malloc_size") {
+      GlobalEffects.Reads = true;
+      return true;
+    }
   }
   return false;
 }

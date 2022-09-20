@@ -147,8 +147,6 @@ func test_remote() async {
   print("remote.id = \(remote.id)") // CHECK: remote.id = ActorAddress(address: "sact://127.0.0.1/example#1234")
   print("remote.system = \(remote.actorSystem)") // CHECK: remote.system = main.FakeActorSystem
 
-  // only once we exit the function and the remote is released, the system has no more references
-  // CHECK-DAG: deinit ActorAddress(address: "sact://127.0.0.1/example#1234")
   // system must deinit after the last actor using it does deinit
   // CHECK-DAG: deinit main.FakeActorSystem
 }

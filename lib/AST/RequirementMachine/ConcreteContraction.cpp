@@ -154,14 +154,23 @@ using namespace rewriting;
 /// Strip associated types from types used as keys to erase differences between
 /// resolved types coming from the parent generic signature and unresolved types
 /// coming from user-written requirements.
-static CanType stripBoundDependentMemberTypes(Type t) {
+static Type stripBoundDependentMemberTypes(Type t) {
   if (auto *depMemTy = t->getAs<DependentMemberType>()) {
-    return CanType(DependentMemberType::get(
+    return DependentMemberType::get(
       stripBoundDependentMemberTypes(depMemTy->getBase()),
-      depMemTy->getName()));
+      depMemTy->getName());
   }
 
-  return t->getCanonicalType();
+  return t;
+}
+
+/// Returns true if \p lhs appears as the base of a member type in \p rhs.
+static bool typeOccursIn(Type lhs, Type rhs) {
+  return rhs.findIf([lhs](Type t) -> bool {
+    if (auto *memberType = t->getAs<DependentMemberType>())
+      return memberType->getBase()->isEqual(lhs);
+    return false;
+  });
 }
 
 namespace {
@@ -232,17 +241,18 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
   // losing the requirement.
   if (position == Position::BaseType ||
       position == Position::ConformanceRequirement) {
+    auto key = stripBoundDependentMemberTypes(type)->getCanonicalType();
 
     Type concreteType;
     {
-      auto found = ConcreteTypes.find(stripBoundDependentMemberTypes(type));
+      auto found = ConcreteTypes.find(key);
       if (found != ConcreteTypes.end() && found->second.size() == 1)
         concreteType = *found->second.begin();
     }
 
     Type superclass;
     {
-      auto found = Superclasses.find(stripBoundDependentMemberTypes(type));
+      auto found = Superclasses.find(key);
       if (found != Superclasses.end() && found->second.size() == 1)
         superclass = *found->second.begin();
     }
@@ -301,7 +311,7 @@ Optional<Type> ConcreteContraction::substTypeParameterRec(
 
     // An unresolved DependentMemberType stores an identifier. Handle this
     // by performing a name lookup into the base type.
-    SmallVector<TypeDecl *, 2> concreteDecls;
+    SmallVector<TypeDecl *> concreteDecls;
     lookupConcreteNestedType(*substBaseType, memberType->getName(), concreteDecls);
 
     auto *typeDecl = findBestConcreteNestedType(concreteDecls);
@@ -361,6 +371,9 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
+  case RequirementKind::SameCount:
+    llvm_unreachable("Same-count requirement not supported here");
+
   case RequirementKind::Superclass:
   case RequirementKind::SameType: {
     auto position = (req.getKind() == RequirementKind::Superclass
@@ -392,7 +405,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
     // 'T : Sendable' would be incorrect; we want to ensure that we only admit
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = false;
-    if (ConcreteTypes.count(stripBoundDependentMemberTypes(firstType)) > 0)
+    auto key = stripBoundDependentMemberTypes(firstType)->getCanonicalType();
+    if (ConcreteTypes.count(key) > 0)
       allowMissing = true;
 
     if (!substFirstType->isTypeParameter()) {
@@ -449,17 +463,18 @@ hasResolvedMemberTypeOfInterestingParameter(Type type) const {
       if (memberTy->getAssocType() == nullptr)
         return false;
 
-      auto baseTy = memberTy->getBase();
+      auto key = stripBoundDependentMemberTypes(memberTy->getBase())
+          ->getCanonicalType();
       Type concreteType;
       {
-        auto found = ConcreteTypes.find(stripBoundDependentMemberTypes(baseTy));
+        auto found = ConcreteTypes.find(key);
         if (found != ConcreteTypes.end() && found->second.size() == 1)
           return true;
       }
 
       Type superclass;
       {
-        auto found = Superclasses.find(stripBoundDependentMemberTypes(baseTy));
+        auto found = Superclasses.find(key);
         if (found != Superclasses.end() && found->second.size() == 1)
           return true;
       }
@@ -496,14 +511,14 @@ bool ConcreteContraction::preserveSameTypeRequirement(
 
   // One of the parent types of this type parameter should be subject
   // to a superclass requirement.
-  auto type = req.getFirstType();
+  auto type = stripBoundDependentMemberTypes(req.getFirstType())
+      ->getCanonicalType();
   while (true) {
-    if (Superclasses.find(stripBoundDependentMemberTypes(type))
-        != Superclasses.end())
+    if (Superclasses.find(type) != Superclasses.end())
       break;
 
-    if (auto *memberType = type->getAs<DependentMemberType>()) {
-      type = memberType->getBase();
+    if (auto memberType = dyn_cast<DependentMemberType>(type)) {
+      type = memberType.getBase();
       continue;
     }
 
@@ -538,6 +553,9 @@ bool ConcreteContraction::performConcreteContraction(
 
     auto kind = req.req.getKind();
     switch (kind) {
+    case RequirementKind::SameCount:
+      llvm_unreachable("Same-count requirement not supported here");
+
     case RequirementKind::SameType: {
       auto constraintType = req.req.getSecondType();
 
@@ -546,8 +564,17 @@ bool ConcreteContraction::performConcreteContraction(
       if (constraintType->isTypeParameter())
         break;
 
-      ConcreteTypes[stripBoundDependentMemberTypes(subjectType)]
-          .insert(constraintType);
+      subjectType = stripBoundDependentMemberTypes(subjectType);
+      if (typeOccursIn(subjectType,
+                       stripBoundDependentMemberTypes(constraintType))) {
+        if (Debug) {
+          llvm::dbgs() << "@ Subject type of same-type requirement "
+                       << subjectType << " == " << constraintType << " "
+                       << "occurs in the constraint type, skipping\n";
+        }
+        break;
+      }
+      ConcreteTypes[subjectType->getCanonicalType()].insert(constraintType);
       break;
     }
     case RequirementKind::Superclass: {
@@ -555,14 +582,23 @@ bool ConcreteContraction::performConcreteContraction(
       assert(!constraintType->isTypeParameter() &&
              "You forgot to call desugarRequirement()");
 
-      Superclasses[stripBoundDependentMemberTypes(subjectType)]
-          .insert(constraintType);
+      subjectType = stripBoundDependentMemberTypes(subjectType);
+      if (typeOccursIn(subjectType,
+                       stripBoundDependentMemberTypes(constraintType))) {
+        if (Debug) {
+          llvm::dbgs() << "@ Subject type of superclass requirement "
+                       << subjectType << " : " << constraintType << " "
+                       << "occurs in the constraint type, skipping\n";
+        }
+        break;
+      }
+      Superclasses[subjectType->getCanonicalType()].insert(constraintType);
       break;
     }
     case RequirementKind::Conformance: {
       auto *protoDecl = req.req.getProtocolDecl();
-      Conformances[stripBoundDependentMemberTypes(subjectType)]
-          .push_back(protoDecl);
+      subjectType = stripBoundDependentMemberTypes(subjectType);
+      Conformances[subjectType->getCanonicalType()].push_back(protoDecl);
 
       break;
     }
@@ -588,7 +624,7 @@ bool ConcreteContraction::performConcreteContraction(
       if (auto otherSuperclassTy = proto->getSuperclass()) {
         if (Debug) {
           llvm::dbgs() << "@ Subject type of superclass requirement "
-                       << "τ_" << subjectType << " : " << superclassTy
+                       << subjectType << " : " << superclassTy
                        << " conforms to "<< proto->getName()
                        << " which has a superclass bound "
                        << otherSuperclassTy << "\n";

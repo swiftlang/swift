@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
-#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
@@ -2091,7 +2090,7 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   //   recovered from.
   auto *Ptr = TokStart;
   CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
+      &Ptr, BufferEnd, MustBeRegex, Diags);
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -3214,7 +3213,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
         // Hashbang '#!/path/to/swift'.
         advanceToEndOfLine(CurPtr, BufferEnd);
         size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::GarbageText, Length);
+        Pieces.push_back(TriviaKind::Shebang, Length);
         continue;
       }
       break;
@@ -3223,7 +3222,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
       if (tryAdvanceToEndOfConflictMarker(CurPtr, BufferEnd)) {
         // Conflict marker.
         size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::GarbageText, Length);
+        Pieces.push_back(TriviaKind::UnexpectedText, Length);
         continue;
       }
       break;
@@ -3232,13 +3231,13 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
         // BOM marker.
         CurPtr = CurPtr + 2;
         size_t Length = CurPtr - TriviaStart;
-        Pieces.push_back(TriviaKind::GarbageText, Length);
+        Pieces.push_back(TriviaKind::UnexpectedText, Length);
         continue;
       }
       break;
     case 0: {
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaKind::GarbageText, Length);
+      Pieces.push_back(TriviaKind::UnexpectedText, Length);
       continue;
     }
     default:
@@ -3268,7 +3267,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
     }
 
     size_t Length = CurPtr - TriviaStart;
-    Pieces.push_back(TriviaKind::GarbageText, Length);
+    Pieces.push_back(TriviaKind::UnexpectedText, Length);
     continue;
   }
 

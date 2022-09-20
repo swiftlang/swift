@@ -15,7 +15,7 @@
 // dead_array_elim.swift. The problem can be overcome by handling
 // non-trivial stores in OSSA, as described here:
 //   [OSSA] Improve DeadObjectElimination to handle array copies
-//   https://bugs.swift.org/browse/SR-13782
+//   https://github.com/apple/swift/issues/56179
 // Once that bug is fixed, remove the requirement: swift_stdlib_no_asserts.
 
 import OSLogTestHelper
@@ -131,6 +131,7 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // TODO: check why the ARC optimizer cannot eliminate the many retain/release pairs here.
     // CHECK: entry:
     // CHECK-NEXT: bitcast %TSo7NSArrayC* %0 to i8*
+    // CHECK-NEXT: [[COPY:%.+]] = tail call i8* @llvm.objc.retain
     // CHECK-NEXT: [[NSARRAY_ARG:%.+]] = tail call i8* @llvm.objc.retain
     // CHECK: tail call swiftcc i1 @"${{.*}}isLoggingEnabled{{.*}}"()
     // CHECK-NEXT: br i1 {{%.*}}, label %[[ENABLED:[0-9]+]], label %[[NOT_ENABLED:[0-9]+]]
@@ -138,7 +139,8 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK: [[NOT_ENABLED]]:
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: tail call void @llvm.objc.release
-    // CHECK-NEXT: br label %[[EXIT:[0-9]+]]
+    // CHECK-NEXT: tail call void @llvm.objc.release
+    // CHECK: br label %[[EXIT:[0-9]+]]
 
     // CHECK: [[ENABLED]]:
     //
@@ -161,15 +163,16 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
     // CHECK-NEXT: [[OFFSET4:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
     // CHECK-NEXT: [[BITCASTED_DEST:%.+]] = bitcast i8* [[OFFSET4]] to %TSo7NSArrayC**
-    // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
+    // CHECK-NEXT: [[BITCASTED_SRC:%.+]] = bitcast i8* {{.*}} to %TSo7NSArrayC*
     // CHECK-NEXT: store %TSo7NSArrayC*  [[BITCASTED_SRC]], %TSo7NSArrayC** [[BITCASTED_DEST]], align 1
     // CHECK-NEXT: [[BITCASTED_DEST2:%.+]] = bitcast i8* [[OBJ_STORAGE]] to %TSo7NSArrayC**
-    // CHECK-NEXT: [[BITCASTED_SRC2:%.+]] = bitcast i8* [[NSARRAY_ARG]] to %TSo7NSArrayC*
+    // CHECK-NEXT: [[BITCASTED_SRC2:%.+]] = bitcast i8* {{.*}} to %TSo7NSArrayC*
     // CHECK-64-NEXT: store %TSo7NSArrayC* [[BITCASTED_SRC2]], %TSo7NSArrayC** [[BITCASTED_DEST2]], align 8
     // CHECK-32-NEXT: store %TSo7NSArrayC* [[BITCASTED_SRC2]], %TSo7NSArrayC** [[BITCASTED_DEST2]], align 4
-    // CHECK-64-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
-    // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
-    // CHECK-NEXT: [[BITCASTED_OBJ_STORAGE:%.+]] = bitcast i8* [[OBJ_STORAGE]] to %swift.opaque*
+    // CHECK-NEXT: tail call void @llvm.objc.release(i8* [[NSARRAY_ARG]])
+    // CHECK-64: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i64 0, i64 0), i8* {{(nonnull )?}}[[BUFFER]], i32 12)
+    // CHECK-32: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
+    // CHECK:      [[BITCASTED_OBJ_STORAGE:%.+]] = bitcast i8* [[OBJ_STORAGE]] to %swift.opaque*
     // CHECK-NEXT: tail call void @swift_arrayDestroy(%swift.opaque* [[BITCASTED_OBJ_STORAGE]]
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[OBJ_STORAGE]]
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]

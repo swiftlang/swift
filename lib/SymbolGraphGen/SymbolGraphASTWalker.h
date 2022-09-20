@@ -46,8 +46,11 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   /// The module that this symbol graph will represent.
   const ModuleDecl &M;
-    
+
+  // FIXME: these should be tracked per-graph, rather than at the top level
   const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
+
+  const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports;
 
   /// The symbol graph for the main module of interest.
   SymbolGraph MainGraph;
@@ -59,6 +62,7 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   
   SymbolGraphASTWalker(ModuleDecl &M,
                        const SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules,
+                       const llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedExportedImports,
                        const SymbolGraphOptions &Options);
   virtual ~SymbolGraphASTWalker() {}
 
@@ -93,12 +97,28 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
     
   // MARK: - Utilities
+
+  /// Returns whether the given declaration was itself imported via an `@_exported import`
+  /// statement, or if it is an extension or child symbol of something else that was.
+  virtual bool isConsideredExportedImported(const Decl *D) const;
   
   /// Returns whether the given declaration comes from an `@_exported import` module.
   virtual bool isFromExportedImportedModule(const Decl *D) const;
 
+  /// Returns whether the given declaration was imported via an `@_exported import <type>` declaration.
+  virtual bool isQualifiedExportedImport(const Decl *D) const;
+
   /// Returns whether the given module is an `@_exported import` module.
   virtual bool isExportedImportedModule(const ModuleDecl *M) const;
+
+  /// Returns whether the given module is the main module, or is an `@_exported import` module.
+  virtual bool isOurModule(const ModuleDecl *M) const;
+
+public:
+  /// Returns whether the given ExtensionDecl is to be recorded as an extra
+  /// extension block symbol, or if its members should be directly associated
+  /// with its extended nominal.
+  virtual bool shouldBeRecordedAsExtension(const ExtensionDecl *ED) const;
 };
 
 } // end namespace symbolgraphgen

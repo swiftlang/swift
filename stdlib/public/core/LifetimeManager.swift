@@ -82,6 +82,23 @@ public func withUnsafeMutablePointer<T, Result>(
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
+/// Calls the given closure with a mutable pointer to the given argument.
+///
+/// This function is similar to `withUnsafeMutablePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafeMutablePointer<T, Result>(
+  to value: inout T,
+  _ body: (UnsafeMutablePointer<T>) throws -> Result
+) rethrows -> Result
+{
+#if $BuiltinUnprotectedAddressOf
+  return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
+#else
+  return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+#endif
+}
+
 /// Invokes the given closure with a pointer to the given argument.
 ///
 /// The `withUnsafePointer(to:_:)` function is useful for calling Objective-C
@@ -144,6 +161,23 @@ public func withUnsafePointer<T, Result>(
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
+/// Invokes the given closure with a pointer to the given argument.
+///
+/// This function is similar to `withUnsafePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafePointer<T, Result>(
+  to value: inout T,
+  _ body: (UnsafePointer<T>) throws -> Result
+) rethrows -> Result
+{
+#if $BuiltinUnprotectedAddressOf
+  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
+#else
+  return try body(UnsafePointer<T>(Builtin.addressof(&value)))
+#endif
+}
+
 extension String {
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of UTF-8 code units.
@@ -164,35 +198,6 @@ extension String {
   ) rethrows -> Result {
     return try _guts.withCString(body)
   }
-}
-
-/// Takes in a value at +1 and performs a Builtin.move upon it.
-///
-/// IMPLEMENTATION NOTES: During transparent inlining, Builtin.move becomes the
-/// move_value instruction if we are inlining into a context where the
-/// specialized type is loadable. If the transparent function is called in a
-/// context where the inlined function specializes such that the specialized
-/// type is still not loadable, the compiler aborts (a). Once we have opaque
-/// values, this restriction will be lifted since after that address only types
-/// at SILGen time will be loadable objects.
-///
-/// (a). This is implemented by requiring that Builtin.move only be called
-/// within a function marked with the semantic tag "lifetimemanagement.move"
-/// which conveniently is only the function we are defining here: _move.
-///
-/// NOTE: We mark this _alwaysEmitIntoClient to ensure that we are not creating
-/// new ABI that the stdlib must maintain if a user calls this ignoring the '_'
-/// implying it is stdlib SPI.
-@_alwaysEmitIntoClient
-@inlinable
-@_transparent
-@_semantics("lifetimemanagement.move")
-public func _move<T>(_ value: __owned T) -> T {
-    #if $BuiltinMove
-        Builtin.move(value)
-    #else
-        value
-    #endif
 }
 
 /// Takes in a value at +0 and performs a Builtin.copy upon it.

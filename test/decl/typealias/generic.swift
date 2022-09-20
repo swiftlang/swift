@@ -307,9 +307,9 @@ func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
 extension A {}
 
 extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
-extension A<Float,Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
+extension A<Float,Int> {}
 extension C<T> {}  // expected-error {{cannot find type 'T' in scope}}
-extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
+extension C<Int> {}
 
 
 protocol ErrorQ {

@@ -1203,6 +1203,13 @@ bool swift::ide::isBeingCalled(ArrayRef<Expr *> ExprStack) {
   Expr *Target = ExprStack.back();
   auto UnderlyingDecl = getReferencedDecl(Target).second;
   for (Expr *E: reverse(ExprStack)) {
+    auto *LE = dyn_cast<LiteralExpr>(E);
+    if (LE && getReferencedDecl(LE).second == UnderlyingDecl)
+      return true;
+    auto *CE = dyn_cast<CollectionExpr>(E);
+    if (CE && getReferencedDecl(CE).second == UnderlyingDecl)
+      return true;
+
     auto *AE = dyn_cast<ApplyExpr>(E);
     if (!AE || AE->isImplicit())
       continue;

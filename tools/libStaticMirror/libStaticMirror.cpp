@@ -43,6 +43,14 @@ swiftscan_string_ref_t create_clone(const char *string) {
   return str;
 }
 
+swiftscan_string_set_t *create_set(const std::vector<std::string> &strings) {
+  swiftscan_string_set_t *set = new swiftscan_string_set_t;
+  set->count = strings.size();
+  set->strings = new swiftscan_string_ref_t[set->count];
+  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
+    set->strings[SI] = create_clone(strings[SI].c_str());
+  return set;
+}
 } // namespace c_string_utils
 } // namespace swift
 
@@ -168,13 +176,46 @@ convertAssociatedTypeQueryResult(
       swift_static_mirror_type_alias_s *typeAliasDetails =
           new swift_static_mirror_type_alias_s;
       typeAliasDetails->type_alias_name = swift::c_string_utils::create_clone(
-          typeAliasInfo.TypeAliasName.c_str());
+          typeAliasInfo.SubstitutionInfo.TypeAliasName.c_str());
       typeAliasDetails->substituted_type_name =
           swift::c_string_utils::create_clone(
-              typeAliasInfo.SubstitutedTypeFullyQualifiedName.c_str());
+              typeAliasInfo.SubstitutionInfo.SubstitutedTypeFullyQualifiedName.c_str());
       typeAliasDetails->substituted_type_mangled_name =
           swift::c_string_utils::create_clone(
-              typeAliasInfo.SubstitutedTypeMangledName.c_str());
+              typeAliasInfo.SubstitutionInfo.SubstitutedTypeMangledName.c_str());
+
+      // Opaque type's protocol conformance requirements
+      typeAliasDetails->opaque_protocol_requirements_set =
+          swift::c_string_utils::create_set(
+              typeAliasInfo.OpaqueTypeProtocolConformanceRequirements);
+
+      // Opaque type's same-type requirements
+      typeAliasDetails->opaque_same_type_requirements_set =
+          new swift_static_mirror_type_alias_set_t;
+      typeAliasDetails->opaque_same_type_requirements_set->count =
+          typeAliasInfo.OpaqueTypeSameTypeRequirements.size();
+      typeAliasDetails->opaque_same_type_requirements_set->type_aliases =
+          new swift_static_mirror_type_alias_t
+              [typeAliasInfo.OpaqueTypeSameTypeRequirements.size()];
+      int sameTypeReqIndex = 0;
+      for (const auto &sameTypeReq :
+           typeAliasInfo.OpaqueTypeSameTypeRequirements) {
+        swift_static_mirror_type_alias_s *sameTypeReqDetails =
+            new swift_static_mirror_type_alias_s;
+        sameTypeReqDetails->type_alias_name =
+            swift::c_string_utils::create_clone(
+                sameTypeReq.TypeAliasName.c_str());
+        sameTypeReqDetails->substituted_type_mangled_name =
+            swift::c_string_utils::create_clone(
+                sameTypeReq.SubstitutedTypeMangledName.c_str());
+        sameTypeReqDetails->substituted_type_name =
+            swift::c_string_utils::create_clone(
+                sameTypeReq.SubstitutedTypeFullyQualifiedName.c_str());
+        typeAliasDetails->opaque_same_type_requirements_set
+            ->type_aliases[sameTypeReqIndex] = sameTypeReqDetails;
+        sameTypeReqIndex += 1;
+      }
+
       info->type_alias_set->type_aliases[typealiasIndex] = typeAliasDetails;
       typealiasIndex += 1;
     }
@@ -269,6 +310,16 @@ swift_static_mirror_string_ref_t
 swift_static_mirror_type_alias_get_substituted_type_mangled_name(
     swift_static_mirror_type_alias_t type_alias) {
   return type_alias->substituted_type_mangled_name;
+}
+swiftscan_string_set_t *
+swift_static_mirror_type_alias_get_opaque_type_protocol_requirements(
+    swift_static_mirror_type_alias_t type_alias) {
+  return type_alias->opaque_protocol_requirements_set;
+}
+swift_static_mirror_type_alias_set_t *
+swift_static_mirror_type_alias_get_opaque_type_same_type_requirements(
+    swift_static_mirror_type_alias_t type_alias) {
+  return type_alias->opaque_same_type_requirements_set;
 }
 
 // swift_static_mirror_associated_type_info query methods
