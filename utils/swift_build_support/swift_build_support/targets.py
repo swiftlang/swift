@@ -430,7 +430,7 @@ def install_prefix():
 
 def darwin_toolchain_prefix(darwin_install_prefix):
     """
-    Given the install prefix for a Darwin system, and assuming that that path
+    Given the install prefix for a Darwin system, and assuming that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory.
     """
@@ -439,7 +439,7 @@ def darwin_toolchain_prefix(darwin_install_prefix):
 
 def toolchain_path(install_destdir, install_prefix):
     """
-    Given the install prefix for a Darwin system, and assuming that that path
+    Given the install prefix for a Darwin system, and assuming that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory in the given install directory.
     This toolchain is being populated during the build-script invocation.

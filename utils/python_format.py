@@ -113,7 +113,7 @@ def parse_args():
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Don't format the file, just retun the status.",
+        help="Don't format the file, just return the status.",
     )
 
     parser.add_argument(

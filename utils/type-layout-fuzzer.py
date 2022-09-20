@@ -131,7 +131,7 @@ def defineRandomNominalType(name, depth=0):
         print("}")
         print()
 
-    def clas():
+    def clazz():
         defineRandomClass(name, depth)
 
     def enum():
@@ -145,7 +145,7 @@ def defineRandomNominalType(name, depth=0):
         print("}")
         print()
 
-    kinds = [struct, clas, enum]
+    kinds = [struct, clazz, enum]
     return random.choice(kinds)()
 
 
