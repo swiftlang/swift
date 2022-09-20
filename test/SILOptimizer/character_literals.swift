@@ -43,7 +43,7 @@ public func singleNonAsciiChar() -> Character {
 //
 // CHECK-LABEL: define {{.*}}singleNonSmolChar
 // CHECK-NEXT: entry:
-// CHECK:   ret { i64, %swift.bridge* } { i64 1152921504606847001, %swift.bridge* {{.*}}@.str{{.*}}i64 -9223372036854775808
+// CHECK:   ret { i64, %swift.bridge* } { i64 1152921504606847001, %swift.bridge* {{.*}}@".str.25.\F0\9F\91\A9\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A6\E2\80\8D\F0\9F\91\A6" {{.*}}i64 -9223372036854775808
 public func singleNonSmolChar() -> Character {
   return "👩‍👩‍👦‍👦"
 }
