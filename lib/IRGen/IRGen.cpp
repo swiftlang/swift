@@ -1003,6 +1003,14 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.ClangTypeTaskContinuationFunction = PointerAuthSchema(
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::ClangTypeTaskContinuationFunction);
+
+  opts.GetExtraInhabitantTagFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::GetExtraInhabitantTagFunction);
+
+  opts.StoreExtraInhabitantTagFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::StoreExtraInhabitantTagFunction);
 }
 
 std::unique_ptr<llvm::TargetMachine>
