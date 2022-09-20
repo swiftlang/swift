@@ -1601,8 +1601,13 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
+
+  if (Loc.isInvalid() && !IsModuleFile)
+    return true;
+
   if (Loc.isValid() && SrcMgr.findBufferContainingLoc(Loc) != BufferID)
     return true;
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Always base the symbol information on the canonical VarDecl
     D = VD->getCanonicalVarDecl();
