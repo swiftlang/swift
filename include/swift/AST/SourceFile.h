@@ -37,7 +37,7 @@ class PersistentParserState;
 ///
 /// \sa getRestrictedImportKind
 enum class RestrictedImportKind {
-  Implicit,
+  MissingImport,
   ImplementationOnly,
   SPIOnly,
   None // No restriction, i.e. the module is imported publicly.
