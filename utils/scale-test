@@ -358,7 +358,7 @@ def Nelder_Mead_simplex(objective, params, bounds, epsilon=1.0e-6):
 # objective-at-those-params and the data. Then runs a simple
 # coordinate_descent nonlinear optimization on the parameter space until it
 # converges. Then calculates the r_squared (coefficient of determination
-# a.k.a. goodness-of-fit, a number betwee 0 and 1 with 1 meaning "fits
+# a.k.a. goodness-of-fit, a number between 0 and 1 with 1 meaning "fits
 # perfectly") and finally returns (fit_params, r_squared).
 def fit_function_to_data_by_least_squares(objective, params, bounds, xs, ys):
 

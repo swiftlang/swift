@@ -440,14 +440,14 @@ class Categories(object):
                       (category[0], category[1], category[2]))
         print("%60s: %8d (%6.2f%%)" % ('TOTAL', total_size, float(100)))
 
-    def uncatorizedSymbols(self):
+    def uncategorizedSymbols(self):
         category = self.categories.get('Unknown')
         if category:
             return category.symbols
         return None
 
     def print_uncategorizedSymbols(self):
-        syms = self.uncatorizedSymbols()
+        syms = self.uncategorizedSymbols()
         if syms:
             for symbol in syms:
                 print(symbol.mangled_name + " " + symbol.name + " " +
