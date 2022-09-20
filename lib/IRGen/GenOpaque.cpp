@@ -1269,8 +1269,13 @@ irgen::emitGetEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
   auto getExtraInhabitantTagFn =
     getOrCreateGetExtraInhabitantTagFunction(IGF.IGM, payloadType,
                                              payloadTI, emitter);
-  getExtraInhabitantTagFn =
-    IGF.IGM.getConstantSignedCFunctionPointer(getExtraInhabitantTagFn);      
+  // Sign the getExtraInhabitantTag function with the C function pointer schema.
+  if (auto schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers) {
+    if (schema.hasOtherDiscrimination())
+      schema = IGF.IGM.getOptions().PointerAuth.GetExtraInhabitantTagFunction;
+    getExtraInhabitantTagFn = IGF.IGM.getConstantSignedPointer(
+        getExtraInhabitantTagFn, schema, PointerAuthEntity(), nullptr);
+  }
 
   // We assume this is never a reabstracted type.
   auto type = payloadType.getASTType();
@@ -1344,8 +1349,14 @@ irgen::emitStoreEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
   auto storeExtraInhabitantTagFn =
     getOrCreateStoreExtraInhabitantTagFunction(IGF.IGM, payloadType,
                                                payloadTI, emitter);
-  storeExtraInhabitantTagFn =
-    IGF.IGM.getConstantSignedCFunctionPointer(storeExtraInhabitantTagFn);      
+
+  // Sign the getExtraInhabitantTag function with the C function pointer schema.
+  if (auto schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers) {
+    if (schema.hasOtherDiscrimination())
+      schema = IGF.IGM.getOptions().PointerAuth.StoreExtraInhabitantTagFunction;
+    storeExtraInhabitantTagFn = IGF.IGM.getConstantSignedPointer(
+        storeExtraInhabitantTagFn, schema, PointerAuthEntity(), nullptr);
+  }
 
   // We assume this is never a reabstracted type.
   auto type = payloadType.getASTType();
