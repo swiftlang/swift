@@ -2221,7 +2221,21 @@ namespace {
               MD->overwriteAccess(AccessLevel::Private);
             } else if (cxxOperatorKind ==
                        clang::OverloadedOperatorKind::OO_PlusPlus) {
-              if (cxxMethod->param_empty()) {
+              // Make sure the type is not an immortal foreign reference type.
+              // We cannot handle `operator++` for those types, since the
+              // current implementation creates a new instance of the type.
+              bool isImmortal = false;
+              if (auto classDecl = dyn_cast<ClassDecl>(result)) {
+                auto retainOperation = evaluateOrDefault(
+                    Impl.SwiftContext.evaluator,
+                    CustomRefCountingOperation(
+                        {classDecl, CustomRefCountingOperationKind::retain}),
+                    {});
+                isImmortal = retainOperation.kind ==
+                             CustomRefCountingOperationResult::immortal;
+              }
+
+              if (cxxMethod->param_empty() && !isImmortal) {
                 // This is a pre-increment operator. We synthesize a
                 // non-mutating function called `successor() -> Self`.
                 FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(MD);
