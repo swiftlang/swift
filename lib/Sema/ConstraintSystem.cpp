@@ -4088,7 +4088,8 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch ||
                      fix->getKind() == FixKind::GenericArgumentsMismatch ||
-                     fix->getKind() == FixKind::InsertCall;
+                     fix->getKind() == FixKind::InsertCall ||
+                     fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch;
             });
       });
 
