@@ -498,12 +498,12 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
     case NodeKind::TypeMangling:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
     case NodeKind::Type:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
@@ -606,7 +606,8 @@ protected:
                                     "expected 1 generic argument, saw %zu",
                                     genericArgs->getNumChildren());
 
-      return decodeMangledType(genericArgs->getChild(0), depth + 1);
+      return decodeMangledType(genericArgs->getChild(0), depth + 1,
+                               forRequirement);
     }
     case NodeKind::BuiltinTypeName: {
       auto mangling = Demangle::mangleNode(Node);
@@ -641,7 +642,8 @@ protected:
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
       }
 
-      auto instance = decodeMangledType(Node->getChild(i), depth + 1);
+      auto instance =
+          decodeMangledType(Node->getChild(i), depth + 1, forRequirement);
       if (instance.isError())
         return instance;
       if (Node->getKind() == NodeKind::Metatype) {
@@ -700,7 +702,8 @@ protected:
                                       Node->getNumChildren());
 
         auto superclassNode = Node->getChild(1);
-        auto result = decodeMangledType(superclassNode, depth + 1);
+        auto result =
+            decodeMangledType(superclassNode, depth + 1, forRequirement);
         if (result.isError())
           return result;
         Superclass = result.getType();
@@ -721,7 +724,8 @@ protected:
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
 
-      auto protocolType = decodeMangledType(Node->getChild(0), depth + 1);
+      auto protocolType =
+          decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (protocolType.isError())
         return protocolType;
 
@@ -755,7 +759,8 @@ protected:
         return MAKE_NODE_TYPE_ERROR(Node, "expected 1 child, saw %zu",
                                     Node->getNumChildren());
 
-      auto selfType = decodeMangledType(Node->getChild(0), depth + 1);
+      auto selfType =
+          decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (selfType.isError())
         return selfType;
 
@@ -807,7 +812,7 @@ protected:
         }
 
         auto globalActorResult =
-            decodeMangledType(child->getChild(0), depth + 1);
+            decodeMangledType(child->getChild(0), depth + 1, forRequirement);
         if (globalActorResult.isError())
           return globalActorResult;
 
@@ -997,7 +1002,7 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
 
     case NodeKind::ReturnType:
       if (Node->getNumChildren() < 1)
@@ -1067,7 +1072,7 @@ protected:
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
 
-      return decodeMangledType(Node->getChild(1), depth + 1);
+      return decodeMangledType(Node->getChild(1), depth + 1, forRequirement);
     }
     case NodeKind::DependentMemberType: {
       if (Node->getNumChildren() < 2)
@@ -1075,7 +1080,8 @@ protected:
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base =
+          decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
       auto assocTypeChild = Node->getChild(1);
@@ -1096,13 +1102,13 @@ protected:
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
 
-      return decodeMangledType(Node->getChild(1), depth + 1);
+      return decodeMangledType(Node->getChild(1), depth + 1, forRequirement);
     }
     case NodeKind::Unowned: {
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base = decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
       return Builder.createUnownedStorageType(base.getType());
@@ -1111,7 +1117,7 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base = decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
       return Builder.createUnmanagedStorageType(base.getType());
@@ -1120,7 +1126,7 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base = decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
       return Builder.createWeakStorageType(base.getType());
@@ -1129,7 +1135,7 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base = decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
       return Builder.createSILBoxType(base.getType());
@@ -1155,7 +1161,8 @@ protected:
         }
         if (fieldNode->getNumChildren() < 1)
           return MAKE_NODE_TYPE_ERROR0(fieldNode, "no children");
-        auto type = decodeMangledType(fieldNode->getChild(0), depth + 1);
+        auto type = decodeMangledType(fieldNode->getChild(0), depth + 1,
+                                      forRequirement);
         if (type.isError())
           return type;
         fields.emplace_back(type.getType(), isMutable);
@@ -1224,7 +1231,8 @@ return {}; // Not Implemented!
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base =
+          decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
 
@@ -1234,7 +1242,7 @@ return {}; // Not Implemented!
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base = decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
 
@@ -1246,11 +1254,12 @@ return {}; // Not Implemented!
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
 
-      auto key = decodeMangledType(Node->getChild(0), depth + 1);
+      auto key = decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (key.isError())
         return key;
 
-      auto value = decodeMangledType(Node->getChild(1), depth + 1);
+      auto value =
+          decodeMangledType(Node->getChild(1), depth + 1, forRequirement);
       if (value.isError())
         return value;
 
@@ -1260,7 +1269,8 @@ return {}; // Not Implemented!
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
-      auto base = decodeMangledType(Node->getChild(0), depth + 1);
+      auto base =
+          decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
       if (base.isError())
         return base;
 
