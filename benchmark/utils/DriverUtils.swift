@@ -665,8 +665,7 @@ final class TestRunner {
           (c.logMemory ? [r.meta?.maxRSS].compactMap { $0 } : []) +
           (c.logMeta ? r.meta.map {
             [$0.pages, $0.ics, $0.yields] } ?? [] : [])
-        return values.map {
-          (c.delta && $0 == 0) ? "" : String($0) } // drop 0s in deltas
+        return values.map { String($0) }
       }
       let benchmarkStats = (
         [index, t.name] + (results.map(values) ?? ["Unsupported"])
