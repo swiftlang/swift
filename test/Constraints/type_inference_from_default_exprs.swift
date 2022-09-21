@@ -246,7 +246,10 @@ struct S61061_1<T> where T:Hashable { // expected-note{{'T' declared as paramete
   // expected-error@-1{{generic parameter 'T' could not be inferred}}
 }
 
-// TODO(diagnostics): Should produce a conflicting types inferred for generic argument 'T'
 struct S61061_2<T> where T:Hashable {
-  init(x:[(T, T)] = [(1, "")]) {} // expected-error{{type of expression is ambiguous without more context}}
+  init(x:[(T, T)] = [(1, "")]) {} // expected-error{{conflicting arguments to generic parameter 'T' ('String' vs. 'Int')}}
+}
+
+struct S61061_3<T> where T:Hashable {
+  init(x:[(T, T)] = [(1, 1)]) {} // OK
 }

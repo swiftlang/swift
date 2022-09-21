@@ -27,6 +27,11 @@ public struct FirstSmallStruct {
     }
 }
 
+// CHECK: class FirstSmallStruct;
+
+// CHECK: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
+
 // CHECK: class FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK: inline FirstSmallStruct(const FirstSmallStruct &other) {
@@ -70,8 +75,6 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: namespace swift {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
-// CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Structs::FirstSmallStruct> {
 // CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {

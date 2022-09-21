@@ -297,6 +297,8 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       // FIXME: Print availability.
+      // FIXME: forward decl should be handled by ModuleWriter.
+      ClangValueTypePrinter::forwardDeclType(os, CD);
       ClangClassTypePrinter(os).printClassTypeDecl(
           CD, [&]() { printMembers(CD->getMembers()); });
       return;

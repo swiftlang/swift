@@ -4,7 +4,7 @@
 
 // CHECK: namespace Structs {
 
-// CHECK-NOT: ZeroSizedStruct
+// CHECK-NOT: class ZeroSizedStruct final {
 
 public struct ZeroSizedStruct {}
 

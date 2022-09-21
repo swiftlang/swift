@@ -10,7 +10,7 @@ public struct FirstSmallStruct {
 
 // CHECK: class FirstSmallStruct final {
 // CHECK: public:
-// CHECK:   inline FirstSmallStruct(FirstSmallStruct &&) = default;
+// CHECK:   inline FirstSmallStruct(FirstSmallStruct &&)
 // CHECK-NEXT:   inline uint32_t getX() const;
 // CHECK-NEXT:   inline void setX(uint32_t value);
 // CHECK-NEXT:   private:
@@ -21,7 +21,7 @@ public struct LargeStruct {
 
 // CHECK: class LargeStruct final {
 // CHECK: public:
-// CHECK: inline LargeStruct(LargeStruct &&) = default;
+// CHECK: inline LargeStruct(LargeStruct &&)
 // CHECK-NEXT: inline swift::Int getX1() const;
 // CHECK-NEXT: inline void setX1(swift::Int value);
 // CHECK-NEXT: inline swift::Int getX2() const;
@@ -97,7 +97,7 @@ public struct SmallStructWithProps {
 
 // CHECK: class SmallStructWithProps final {
 // CHECK: public:
-// CHECK:   inline SmallStructWithProps(SmallStructWithProps &&) = default;
+// CHECK:   inline SmallStructWithProps(SmallStructWithProps &&)
 // CHECK-NEXT:    inline uint32_t getStoredInt() const;
 // CHECK-NEXT:    inline void setStoredInt(uint32_t value);
 // CHECK-NEXT:    inline swift::Int getComputedInt() const;

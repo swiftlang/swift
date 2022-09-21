@@ -77,7 +77,7 @@ public final class ExposedClass {
 // CHECK: class ExposedClass final
 // CHECK: class ExposedStruct final {
 // CHECK: class ExposedStruct2 final {
-// CHECK: ExposedStruct2(ExposedStruct2 &&) = default;
+// CHECK: ExposedStruct2(ExposedStruct2 &&)
 // CHECK-NEXT: swift::Int getY() const;
 // CHECK-NEXT: void setY(swift::Int value);
 // CHECK-NEXT: static inline ExposedStruct2 init();
