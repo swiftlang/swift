@@ -475,7 +475,7 @@ StringRef CompletionOverrideLookup::getResultBuilderDocComment(
     return "Enables support for setting breakpoints on each component";
   case ResultBuilderBuildFunction::BuildDebuggableFinalResult:
     return "Enables support for setting breakpoints on ending curly braces "
-           "to debug the final result";
+           "to debug the final result if declared with buildFinalResult";
   }
 }
 

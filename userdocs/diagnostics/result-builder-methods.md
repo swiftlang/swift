@@ -52,5 +52,12 @@ struct ExampleResultBuilder {
   /// If declared, this will be called on the partial result from the outermost
   /// block statement to produce the final returned result.
   static func buildFinalResult(_ component: Component) -> Result { ... }
+  
+  /// Enables support for setting breakpoints on each component
+  static func buildDebuggable(component: Component, debugInfoProvider: DSLDebugInfoProvider) -> Component { ... }
+  
+  /// Enables support for setting breakpoints on ending curly braces
+  /// to debug the final result if declared with buildFinalResult
+  static func buildDebuggable(finalResult: Result, debugInfoProvider: DSLDebugInfoProvider) -> Result { ... }
 }
 ```
