@@ -230,6 +230,7 @@ KNOWN_SETTINGS=(
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
+    swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -850,6 +851,16 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
+
+    if [[ "$(true_false ${SWIFT_EARLYSWIFTSYNTAX})" == "TRUE" ]]; then
+        early_swiftsyntax_build_dir="$(build_directory ${host} earlyswiftsyntax)"
+        swift_cmake_options+=(
+            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
+        )
+        lldb_cmake_options+=(
+            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
+        )
+    fi
 }
 
 function configure_default_options() {
@@ -1233,6 +1244,7 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
+SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
