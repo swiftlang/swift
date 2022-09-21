@@ -1108,7 +1108,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
     
   // Load the isa pointer.
   llvm::Value *objMetadata = emitHeapMetadataRefForHeapObject(IGF, instance,
-      targetFormalType, GenericSignature(), /*suppress cast*/ true);
+      sourceFormalType, GenericSignature(), /*suppress cast*/ true);
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
   
   // return isa_ptr == metadata_ptr ? instance : nullptr
