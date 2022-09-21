@@ -457,7 +457,8 @@ function(_add_target_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      list(APPEND result "-resource-dir=${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/${SWIFT_ANDROID_NDK_CLANG_VERSION}")
+      file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      list(APPEND result "-resource-dir=${RESOURCE_DIR}")
     endif()
 
     # link against the custom C++ library

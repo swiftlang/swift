@@ -33,7 +33,7 @@ To follow along with this guide, you'll need:
    Ubuntu 18.04 or Ubuntu 16.04. Before attempting to build for Android,
    please make sure you are able to build for Linux by following the
    instructions in the Swift project README.
-2. The latest version of the Android NDK (r23b at the time of this writing),
+3. The latest version of the Android LTS NDK (r25b at the time of this writing),
    available to download here:
    https://developer.android.com/ndk/downloads/index.html.
 3. An Android device with remote debugging enabled or the emulator. We require
@@ -49,7 +49,7 @@ Enter your Swift directory, then run the build script, passing the path to the
 Android NDK:
 
 ```
-$ NDK_PATH=path/to/android-ndk-r23b
+$ NDK_PATH=path/to/android-ndk-r25b
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
     --android \                                # Build for Android.
@@ -70,7 +70,7 @@ Then use the built Swift compiler from the previous step to compile a Swift
 source file, targeting Android:
 
 ```
-$ NDK_PATH="path/to/android-ndk-r23b"
+$ NDK_PATH="path/to/android-ndk-r25b"
 $ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \          # The Swift compiler built in the previous step
                                                                      # The location of the tools used to build Android binaries
     -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
@@ -116,7 +116,7 @@ $ adb push build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift/android/libswi
 In addition, you'll also need to copy the Android NDK's libc++:
 
 ```
-$ adb push /path/to/android-ndk-r23b/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
+$ adb push /path/to/android-ndk-r25b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so /data/local/tmp
 ```
 
 Finally, you'll need to copy the `hello` executable you built in the
@@ -159,7 +159,7 @@ $ utils/build-script \
   -R \                               # Build in ReleaseAssert mode.
   -T \                               # Run all tests, including on the Android device (add --host-test to only run Android tests on the linux host).
   --android \                        # Build for Android.
-  --android-ndk ~/android-ndk-r23b \  # Path to an Android NDK.
+  --android-ndk ~/android-ndk-r25b \  # Path to an Android NDK.
   --android-arch armv7 \             # Optionally specify Android architecture, alternately aarch64
   --android-api-level 21
 ```
