@@ -159,7 +159,7 @@ void swift::conformToCxxIteratorIfNeeded(
   if (pointees.size() != 1)
     return;
   auto pointee = dyn_cast<VarDecl>(pointees.front());
-  if (!pointee || pointee->isGetterMutating())
+  if (!pointee || pointee->isGetterMutating() || pointee->getType()->hasError())
     return;
 
   // Check if present: `func successor() -> Self`
