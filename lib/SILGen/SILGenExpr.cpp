@@ -1754,11 +1754,26 @@ static bool canPeepholeLiteralClosureConversion(Type literalType,
     return true;
   }
   
-  // Does the conversion only add `throws`?
-  if (literalFnType->isEqual(convertedFnType->getWithoutThrowing())) {
+  // Are the types equivalent aside from effects (throws) or coeffects
+  // (escaping)? Then we should emit the literal as having the destination type
+  // (co)effects, even if it doesn't exercise them.
+  //
+  // TODO: We could also in principle let `async` through here, but that
+  // interferes with the implementation of `reasync`.
+  auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
+    .withThrows(false)
+    .withNoEscape(false)
+    .build();
+    
+  auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
+    .withThrows(false)
+    .withNoEscape(false)
+    .build();
+  if (literalFnType->withExtInfo(literalWithoutEffects)
+        ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects))) {
     return true;
   }
-  
+
   return false;
 }
 

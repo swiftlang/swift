@@ -24,3 +24,11 @@ func reabstractCaptureListExprArgument() {
 func reabstractKeyPathFunctionArgument() {
     gen(f: \Butt.x)
 }
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}reabstractStaticMemberRef
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
+// CHECK:         [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
+// CHECK:         apply {{.*}}<Int, Butt>([[CLOSURE]])
+func reabstractStaticMemberRef() {
+    gen(f: Butt.init)
+}
