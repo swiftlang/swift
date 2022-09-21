@@ -1765,7 +1765,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         out << "(default type of literal) ";
         break;
       }
-      BindingType.print(out);
+      BindingType.print(out, PO);
     }
   };
 
