@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+
+// Until we get support for emitting value witnesses for deinits, do not run
+// this with optimizations.
 
 @_moveOnly
 public struct BufferView<T> {
