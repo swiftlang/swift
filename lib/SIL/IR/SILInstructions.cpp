@@ -169,10 +169,11 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
   // TODO: Support AllocBoxInst
 
   if (!VarInfo)
-    return VarInfo;
+    return {};
 
-  // Copy everything but the DIExpr
-  VarInfo->DIExpr.clear();
+  // TODO: Support variables with expressions.
+  if (VarInfo->DIExpr)
+    return {};
 
   // Coalesce the debug loc attached on AI into VarInfo
   SILType Type = AI->getType();
