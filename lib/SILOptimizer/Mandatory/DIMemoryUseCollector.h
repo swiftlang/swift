@@ -100,19 +100,7 @@ public:
   /// alloc_stack, this always just returns the actual mark_uninitialized
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
-  SingleValueInstruction *getUninitializedValue() const {
-    if (IsBox) {
-      SILValue inst = MemoryInst;
-      if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
-        inst = bbi;
-      }
-      // TODO: consider just storing the ProjectBoxInst in this case.
-      SingleValueInstruction *svi = inst->getSingleUserOfType<ProjectBoxInst>();
-      assert(svi);
-      return svi;
-    }
-    return MemoryInst;
-  }
+  SingleValueInstruction *getUninitializedValue() const;
 
   /// Return the number of elements, without the extra "super.init" tracker in
   /// initializers of derived classes.
@@ -129,6 +117,10 @@ public:
 
   /// Return true if this is 'self' in any kind of initializer.
   bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
+
+  /// Return uninitialized value of 'self' if current memory object
+  /// is located in an initializer (of any kind).
+  SingleValueInstruction *findUninitializedSelfValue() const;
 
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
