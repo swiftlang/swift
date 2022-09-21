@@ -1588,6 +1588,15 @@ namespace {
         return Mval;
       };
 
+      auto getTupleFieldIndex =
+          [&](VarDecl *var, Identifier fieldName) -> Optional<unsigned> {
+        auto *tupleType = var->getInterfaceType()->castTo<TupleType>();
+        int fieldIdx = tupleType->getNamedElementId(fieldName);
+        if (fieldIdx < 0)
+          return None;
+        return fieldIdx;
+      };
+
       if (canRewriteSetAsTypeWrapperInit(SGF)) {
         auto *ctor = cast<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
         auto *field = cast<VarDecl>(Storage);
@@ -1599,20 +1608,19 @@ namespace {
         auto *localVar = ctor->getLocalTypeWrapperStorageVar();
 
         // First, we need to find index of the current field in `_storage.
-        auto *tempType = localVar->getInterfaceType()->castTo<TupleType>();
-        int fieldIdx = tempType->getNamedElementId(field->getName());
-        assert(fieldIdx >= 0);
+        auto fieldIdx = getTupleFieldIndex(localVar, field->getName());
+        assert(fieldIdx.hasValue());
 
         // Load `_storage.<name>`
-        auto storageBase =
+        auto localVarRef =
             SGF.maybeEmitValueOfLocalVarDecl(localVar, AccessKind::Write);
 
         auto typeData = getLogicalStorageTypeData(
             SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
             FieldType->getCanonicalType());
 
-        TupleElementComponent TEC(fieldIdx, typeData);
-        auto storage = std::move(TEC).project(SGF, loc, storageBase);
+        TupleElementComponent TEC(*fieldIdx, typeData);
+        auto storage = std::move(TEC).project(SGF, loc, localVarRef);
 
         // Partially apply the setter so it could be used by assign_by_wrapper
 
@@ -1653,29 +1661,51 @@ namespace {
           ValType = ValType.subst(Substitutions);
         }
 
-        // TODO: revist minimal
-        SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
-            TypeExpansionContext::minimal(), backingVar,
+        auto typeData = getLogicalStorageTypeData(
+            SGF.getTypeExpansionContext(), SGF.SGM, getTypeData().AccessKind,
             ValType->getCanonicalType());
-        auto typeData =
-            getLogicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
-                                      getTypeData().AccessKind,
-                                      ValType->getCanonicalType());
 
-        // Get the address of the storage property.
+        // Stores the address of the storage property.
         ManagedValue proj;
-        if (!BaseFormalType) {
-          proj = SGF.maybeEmitValueOfLocalVarDecl(
-              backingVar, AccessKind::Write);
-        } else if (BaseFormalType->mayHaveSuperclass()) {
-          RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
-                                  typeData, /*actorIsolation=*/None);
-          proj = std::move(REC).project(SGF, loc, base);
+
+        // If this is a type wrapper managed property, we emit everything
+        // through local `_storage` variable because wrapper property
+        // in this case is backed by `$storage` which has to get initialized
+        // first.
+        if (backingVar->isAccessedViaTypeWrapper()) {
+          auto *ctor = cast<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
+          auto *localVar = ctor->getLocalTypeWrapperStorageVar();
+
+          // First, we need to find index of the backing storage field in
+          // `_storage`.
+          auto fieldIdx = getTupleFieldIndex(localVar, backingVar->getName());
+          assert(fieldIdx.hasValue());
+
+          // Load `_storage.<name>`
+          auto localVarRef =
+              SGF.maybeEmitValueOfLocalVarDecl(localVar, AccessKind::Write);
+
+          TupleElementComponent TEC(*fieldIdx, typeData);
+          proj = std::move(TEC).project(SGF, loc, localVarRef);
         } else {
-          assert(BaseFormalType->getStructOrBoundGenericStruct());
-          StructElementComponent SEC(backingVar, varStorageType,
-                                     typeData, /*actorIsolation=*/None);
-          proj = std::move(SEC).project(SGF, loc, base);
+          // TODO: revist minimal
+          SILType varStorageType = SGF.SGM.Types.getSubstitutedStorageType(
+              TypeExpansionContext::minimal(), backingVar,
+              ValType->getCanonicalType());
+
+          if (!BaseFormalType) {
+            proj =
+                SGF.maybeEmitValueOfLocalVarDecl(backingVar, AccessKind::Write);
+          } else if (BaseFormalType->mayHaveSuperclass()) {
+            RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
+                                    typeData, /*actorIsolation=*/None);
+            proj = std::move(REC).project(SGF, loc, base);
+          } else {
+            assert(BaseFormalType->getStructOrBoundGenericStruct());
+            StructElementComponent SEC(backingVar, varStorageType, typeData,
+                                       /*actorIsolation=*/None);
+            proj = std::move(SEC).project(SGF, loc, base);
+          }
         }
 
         // The property wrapper backing initializer forms an instance of
