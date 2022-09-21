@@ -168,7 +168,8 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
   return NominalType::get(nominalDecl, parent, Ctx);
 }
 
-Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
+Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent,
+                                     bool forRequirement) {
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl);
   if (!aliasDecl)
     return Type();
@@ -177,13 +178,18 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   if (aliasDecl->getGenericParams())
     return Type();
 
+  auto maybeWrapInExistential = [forRequirement](Type type) {
+    if (forRequirement || !type->isConstraintType())
+      return type;
+    return ExistentialType::get(type);
+  };
   // Imported types can be renamed to be members of other (non-generic)
   // types, but the mangling does not have a parent type. Just use the
   // declared type directly in this case and skip the parent check below.
   bool isImported = aliasDecl->hasClangNode() ||
       aliasDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
   if (isImported && !aliasDecl->isGenericContext())
-    return aliasDecl->getDeclaredInterfaceType();
+    return maybeWrapInExistential(aliasDecl->getDeclaredInterfaceType());
 
   // Validate the parent type.
   if (!validateParentType(aliasDecl, parent))
@@ -191,12 +197,12 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
 
   auto declaredType = aliasDecl->getDeclaredInterfaceType();
   if (!parent)
-    return declaredType;
+    return maybeWrapInExistential(declaredType);
 
   auto *dc = aliasDecl->getDeclContext();
   auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
 
-  return declaredType.subst(subs);
+  return maybeWrapInExistential(declaredType.subst(subs));
 }
 
 static SubstitutionMap

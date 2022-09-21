@@ -518,7 +518,7 @@ public:
 
   const TypeRef *
   createTypeAliasType(const BuiltTypeDecl &typeRefDecl,
-                      const TypeRef *parent) {
+                      const TypeRef *parent, bool forRequirement = true) {
     // TypeRefs don't contain sugared types
     return nullptr;
   }

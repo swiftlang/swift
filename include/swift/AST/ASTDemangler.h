@@ -89,7 +89,8 @@ public:
 
   Type createNominalType(GenericTypeDecl *decl, Type parent);
 
-  Type createTypeAliasType(GenericTypeDecl *decl, Type parent);
+  Type createTypeAliasType(GenericTypeDecl *decl, Type parent,
+                           bool forRequirement = true);
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
   

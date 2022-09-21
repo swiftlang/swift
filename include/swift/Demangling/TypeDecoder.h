@@ -531,7 +531,7 @@ protected:
         return *error;
 
       if (typeAlias)
-        return Builder.createTypeAliasType(typeDecl, parent);
+        return Builder.createTypeAliasType(typeDecl, parent, forRequirement);
 
       return Builder.createNominalType(typeDecl, parent);
     }

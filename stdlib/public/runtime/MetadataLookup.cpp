@@ -1526,8 +1526,9 @@ public:
     return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
-  TypeLookupErrorOr<BuiltType> createTypeAliasType(BuiltTypeDecl typeAliasDecl,
-                                                   BuiltType parent) const {
+  TypeLookupErrorOr<BuiltType>
+  createTypeAliasType(BuiltTypeDecl typeAliasDecl, BuiltType parent,
+                      bool forRequirement = true) const {
     // We can't support sugared types here since we have no way to
     // resolve the underlying type of the type alias. However, some
     // CF types are mangled as type aliases.
