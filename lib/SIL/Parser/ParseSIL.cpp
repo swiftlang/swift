@@ -958,9 +958,11 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
                                        Req.getLayoutConstraint());
       To.push_back(ConvertedRequirement);
 
-      if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(Req.getSubjectRepr())) {
-        if (attributedTy->getAttrs().has(TAK__noMetadata)) {
-          typeErasedParams.push_back(Subject);
+      if (SILMod.getASTContext().LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+        if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(Req.getSubjectRepr())) {
+          if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+            typeErasedParams.push_back(Subject);
+          }
         }
       }
 

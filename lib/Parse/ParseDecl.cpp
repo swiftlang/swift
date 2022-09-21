@@ -794,11 +794,13 @@ bool Parser::parseSpecializeAttributeArguments(
     SmallVector<RequirementRepr, 4> requirements;
     parseGenericWhereClause(whereLoc, endLoc, requirements,
                             /* AllowLayoutConstraints */ true);
-    for (auto req : requirements) {
-      if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-        if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
-          if (attributedTy->getAttrs().has(TAK__noMetadata)) {
-            typeErasedParamsCount += 1;
+    if (Context.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+      for (auto req : requirements) {
+        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+          if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+            if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+              typeErasedParamsCount += 1;
+            }
           }
         }
       }

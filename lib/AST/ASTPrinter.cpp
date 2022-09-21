@@ -3062,6 +3062,10 @@ static bool usesFeatureVariadicGenerics(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureLayoutPrespecialization(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNamedOpaqueTypes(Decl *decl) {
   return false;
 }

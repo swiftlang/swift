@@ -2851,7 +2851,7 @@ bool usePrespecialized(
       auto specializedSig = SA->getSpecializedSignature();
 
       auto erasedParams = SA->getTypeErasedParams();
-      if(erasedParams.empty()) {
+      if(!ctxt.LangOpts.hasFeature(Feature::LayoutPrespecialization) || erasedParams.empty()) {
         continue;
       }
 
