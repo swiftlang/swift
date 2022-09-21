@@ -105,7 +105,7 @@ struct AnyBuilder {
   static func #^IN_RESULT_BUILDER_DECL^#
 }
 
-// IN_RESULT_BUILDER_DECL: Begin completions, 10 items
+// IN_RESULT_BUILDER_DECL: Begin completions, 12 items
 // IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildBlock(_ components: Any...) -> Any {|}; name=buildBlock(_ components: Any...) -> Any; comment=Required by every
 // IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildExpression(_ expression: <#Expression#>) -> Any {|}; name=buildExpression(_ expression: <#Expression#>) -> Any; comment=
 // IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildOptional(_ component: Any?) -> Any {|}; name=buildOptional(_ component: Any?) -> Any; comment=
@@ -116,6 +116,8 @@ struct AnyBuilder {
 // IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildFinalResult(_ component: Any) -> <#Result#> {|}; name=buildFinalResult(_ component: Any) -> <#Result#>; comment=
 // IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildPartialBlock(first: Any) -> Any {|}; name=buildPartialBlock(first: Any) -> Any; comment=
 // IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=buildPartialBlock(accumulated: Any, next: Any) -> Any; comment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildDebuggable(component: Any, debugInfoProvider: DSLDebugInfoProvider) -> Any {|}; name=buildDebuggable(component: Any, debugInfoProvider: DSLDebugInfoProvider) -> Any; comment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildDebuggable(finalResult: <#Result#>, debugInfoProvider: DSLDebugInfoProvider) -> <#Result#> {|}; name=buildDebuggable(finalResult: <#Result#>, debugInfoProvider: DSLDebugInfoProvider) -> <#Result#>; comment=
 // IN_RESULT_BUILDER_DECL: End completions
 
 // IN_RESULT_BUILDER_DECL_PREFIX: Begin completions
@@ -129,4 +131,6 @@ struct AnyBuilder {
 // IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildFinalResult(_ component: Any) -> <#Result#> {|}; name=static func buildFinalResult(_ component: Any) -> <#Result#>; comment=
 // IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(first: Any) -> Any {|}; name=static func buildPartialBlock(first: Any) -> Any; comment=
 // IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=static func buildPartialBlock(accumulated: Any, next: Any) -> Any; comment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildDebuggable(component: Any, debugInfoProvider: DSLDebugInfoProvider) -> Any {|}; name=static func buildDebuggable(component: Any, debugInfoProvider: DSLDebugInfoProvider) -> Any; comment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildDebuggable(finalResult: <#Result#>, debugInfoProvider: DSLDebugInfoProvider) -> <#Result#> {|}; name=static func buildDebuggable(finalResult: <#Result#>, debugInfoProvider: DSLDebugInfoProvider) -> <#Result#>; comment=
 // IN_RESULT_BUILDER_DECL_PREFIX: End completions

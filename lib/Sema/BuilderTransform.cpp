@@ -3001,11 +3001,13 @@ void swift::printResultBuilderBuildFunction(
     break;
 
   case ResultBuilderBuildFunction::BuildDebuggableComponent:
-    printer << "buildDebuggable(component: " << componentTypeString << ")";
+    printer << "buildDebuggable(component: " << componentTypeString
+            << ", debugInfoProvider: DSLDebugInfoProvider)";
     break;
 
   case ResultBuilderBuildFunction::BuildDebuggableFinalResult:
-    printer << "buildDebuggable(finalResult: <#Result#>) -> <#Result#>";
+    printer << "buildDebuggable(finalResult: <#Result#>"
+            << ", debugInfoProvider: DSLDebugInfoProvider) -> <#Result#>";
     printedResult = true;
     break;
   }
