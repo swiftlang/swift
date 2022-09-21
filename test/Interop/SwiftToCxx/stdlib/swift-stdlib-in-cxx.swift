@@ -52,7 +52,7 @@
 // CHECK:  }
 // CHECK-NEXT:  inline String(const String &other) {
 // CHECK:  }
-// CHECK-NEXT:  inline String(String &&) = default;
+// CHECK-NEXT:  inline String(String &&) { abort(); }
 // CHECK-NEXT:  static inline String init();
 // CHECK-NEXT:  #if defined(__OBJC__)
 // CHECK-NEXT:  inline __attribute__((always_inline)) operator NSString * _Nonnull () const noexcept {

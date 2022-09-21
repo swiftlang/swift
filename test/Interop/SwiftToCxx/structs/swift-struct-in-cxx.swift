@@ -25,7 +25,7 @@
 // CHECK:        }
 // CHECK-NEXT:   inline StructWithIntField(const StructWithIntField &other) {
 // CHECK:        }
-// CHECK-NEXT:   inline StructWithIntField(StructWithIntField &&) = default;
+// CHECK-NEXT:   noreturn]] inline StructWithIntField(StructWithIntField &&) { abort(); }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline StructWithIntField() {}
 // CHECK-NEXT:   static inline StructWithIntField _make() { return StructWithIntField(); }
