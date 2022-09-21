@@ -537,6 +537,47 @@ namespace {
       }
     }
 
+    void packIntoEnumPayload(IRGenFunction &IGF,
+                             EnumPayload &payload,
+                             Explosion &src,
+                             unsigned startOffset) const override {
+      forEachNonEmptyBase([&](clang::QualType, clang::CharUnits offset,
+                              clang::CharUnits size) {
+        auto &typeInfo = IGM.getOpaqueStorageTypeInfo(Size(size.getQuantity()),
+                                                      Alignment(1));
+        typeInfo.packIntoEnumPayload(IGF, payload, src, offset.getQuantity());
+      });
+
+      for (auto &field : getFields()) {
+        if (!field.isEmpty()) {
+          unsigned offset = field.getFixedByteOffset().getValueInBits()
+                            + startOffset;
+          cast<LoadableTypeInfo>(field.getTypeInfo())
+              .packIntoEnumPayload(IGF, payload, src, offset);
+        }
+      }
+    }
+
+    void unpackFromEnumPayload(IRGenFunction &IGF, const EnumPayload &payload,
+                               Explosion &dest, unsigned startOffset)
+        const override {
+      forEachNonEmptyBase([&](clang::QualType, clang::CharUnits offset,
+                              clang::CharUnits size) {
+        auto &typeInfo = IGM.getOpaqueStorageTypeInfo(Size(size.getQuantity()),
+                                                      Alignment(1));
+        typeInfo.unpackFromEnumPayload(IGF, payload, dest, offset.getQuantity());
+      });
+
+      for (auto &field : getFields()) {
+        if (!field.isEmpty()) {
+          unsigned offset = field.getFixedByteOffset().getValueInBits()
+                            + startOffset;
+          cast<LoadableTypeInfo>(field.getTypeInfo())
+              .unpackFromEnumPayload(IGF, payload, dest, offset);
+        }
+      }
+    }
+
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
       return None;
     }
@@ -1165,6 +1206,17 @@ public:
   }
 
   void collectRecordFields() {
+    if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
+      NextExplosionIndex += llvm::count_if(cxxRecord->bases(), [](auto base) {
+        auto baseType = base.getType().getCanonicalType();
+
+        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
+
+        return !baseCxxRecord->isEmpty();
+      });
+    }
+
     if (ClangDecl->isUnion()) {
       collectUnionFields();
     } else {
