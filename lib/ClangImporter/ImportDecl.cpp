@@ -2645,14 +2645,27 @@ namespace {
       // deep/complex template, or we've run into an infinite loop. In either
       // case, its not worth the compile time, so bail.
       // TODO: this could be configurable at some point.
-      if (llvm::size(decl->getSpecializedTemplate()->specializations()) >
-          1000) {
+      auto classTemplate = decl->getSpecializedTemplate();
+      if (Impl.templateSpecializationsCount.find(classTemplate) ==
+          Impl.templateSpecializationsCount.end())
+        Impl.templateSpecializationsCount[classTemplate] = 0;
+
+      // Currently this is a relatively low number, in the future we might
+      // consider increasing it, but this should keep compile time down,
+      // especially for types that become exponentially large when
+      // instantiating.
+      if (isSpecializationDepthGreaterThan(decl, 8))
+        return nullptr;
+
+      if (Impl.templateSpecializationsCount[classTemplate] > 4096) {
         std::string name;
         llvm::raw_string_ostream os(name);
         decl->printQualifiedName(os);
-        // Emit a warning if we haven't warned about this decl yet.
-        if (Impl.tooDeepTemplateSpecializations.insert(name).second)
-          Impl.diagnose({}, diag::too_many_class_template_instantiations, name);
+        Impl.addImportDiagnostic(
+            decl, Diagnostic(
+                      diag::too_many_class_template_instantiations,
+                      Impl.SwiftContext.AllocateCopy(name)),
+            decl->getLocation());
         return nullptr;
       }
 
@@ -2679,13 +2692,6 @@ namespace {
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
-
-      // Currently this is a relatively low number, in the future we might
-      // consider increasing it, but this should keep compile time down,
-      // especially for types that become exponentially large when
-      // instantiating.
-      if (isSpecializationDepthGreaterThan(def, 8))
-        return nullptr;
 
       return VisitCXXRecordDecl(def);
     }
