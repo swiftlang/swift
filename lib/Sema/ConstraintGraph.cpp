@@ -1604,49 +1604,43 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
   out.indent(indent);
-  out << "(Changes:\n";
+  out << "Changes:\n";
   if (!tvWithboundTypes.empty()) {
     out.indent(indent + 2);
-    out << "(Newly Bound: \n";
+    out << "Newly Bound: \n";
     for (const auto &tvWithType : tvWithboundTypes) {
       out.indent(indent + 4);
       out << "> $T" << tvWithType.first->getImpl().getID() << " := ";
       tvWithType.second->print(out, PO);
       out << '\n';
     }
-    out.indent(indent + 2);
-    out << ")\n";
   }
   if (!addedTypeVars.empty()) {
     out.indent(indent + 2);
-    auto heading = (addedTypeVars.size() > 1) ? "(New Type Variables: \n"
-                                              : "(New Type Variable: \n";
+    auto heading = (addedTypeVars.size() > 1) ? "New Type Variables: \n"
+                                              : "New Type Variable: \n";
     out << heading;
     for (const auto &typeVar : addedTypeVars) {
       out.indent(indent + 4);
       out << "> $T" << typeVar->getImpl().getID();
       out << '\n';
     }
-    out.indent(indent + 2);
-    out << ")\n";
   }
   if (!equivTypeVars.empty()) {
     out.indent(indent + 2);
-    auto heading = (equivTypeVars.size() > 1) ? "(New Equivalences: \n"
-                                              : "(New Equivalence: \n";
+    auto heading = (equivTypeVars.size() > 1) ? "New Equivalences: \n"
+                                              : "New Equivalence: \n";
     out << heading;
     for (const auto &typeVar : equivTypeVars) {
       out.indent(indent + 4);
       out << "> $T" << typeVar->getImpl().getID();
       out << '\n';
     }
-    out.indent(indent + 2);
-    out << ")\n";
   }
   if (!addedConstraints.empty()) {
     out.indent(indent + 2);
-    auto heading = (addedConstraints.size() > 1) ? "(Added Constraints: \n"
-                                                 : "(Added Constraint: \n";
+    auto heading = (addedConstraints.size() > 1) ? "Added Constraints: \n"
+                                                 : "Added Constraint: \n";
     out << heading;
     for (const auto &constraint : addedConstraints) {
       out.indent(indent + 4);
@@ -1654,13 +1648,11 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
       constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
       out << '\n';
     }
-    out.indent(indent + 2);
-    out << ")\n";
   }
   if (!removedConstraints.empty()) {
     out.indent(indent + 2);
-    auto heading = (removedConstraints.size() > 1) ? "(Removed Constraints: \n"
-                                                   : "(Removed Constraint: \n";
+    auto heading = (removedConstraints.size() > 1) ? "Removed Constraints: \n"
+                                                   : "Removed Constraint: \n";
     out << heading;
     for (const auto &constraint : removedConstraints) {
       out.indent(indent + 4);
@@ -1668,11 +1660,8 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
       constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
       out << '\n';
     }
-    out.indent(indent + 2);
-    out << ")\n";
   }
-  out.indent(indent);
-  out << ")\n";
+  out << '\n';
 }
 
 void ConstraintGraph::printConnectedComponents(

@@ -11353,9 +11353,8 @@ retry_after_fail:
       PrintOptions PO;
       PO.PrintTypesForDebugging = true;
       llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 0)
-        << "(common result type for $T" << fnTypeVar->getID() << " is "
-        << commonResultType.getString(PO)
-        << ")\n";
+          << "Common result type for $T" << fnTypeVar->getID() << " is "
+          << commonResultType.getString(PO) << "\n";
     }
 
     // Introduction of a `Bind` constraint here could result in the disconnect

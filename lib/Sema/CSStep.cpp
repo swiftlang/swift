@@ -243,9 +243,9 @@ bool SplitterStep::mergePartialSolutions() const {
       solutionMemory += solution.getTotalMemory();
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
-        log << "(composed solution:";
+        log << "<! Composed solution:";
         CS.CurrentScore.print(log);
-        log << ")\n";
+        log << ">\n";
       }
 
       // Save this solution.
@@ -352,9 +352,8 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
       bos.indent(CS.solverState->getCurrentIndent() + 2);
-      bos << "(";
       bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
-      bos << ")\n";
+      bos << "\n";
     }
   });
 
@@ -363,7 +362,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (CS.isDebugMode()) {
     if (!potentialBindings.empty()) {
       auto &log = getDebugLogger();
-      log << "(Potential Binding(s): " << '\n';
+      log << "Potential Binding(s): " << '\n';
       log << potentialBindings;
     }
 
@@ -385,11 +384,6 @@ StepResult ComponentStep::take(bool prevFailed) {
       log << "Disjunction(s) = [";
       interleave(overloadDisjunctions, log, ", ");
       log << "]\n";
-
-      if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-        auto &log = getDebugLogger();
-        log << ")\n";
-      }
     }
   }
 
@@ -479,9 +473,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto solution = CS.finalize();
   if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
-    log << "(found solution:";
+    log << "Found solution:";
     getCurrentScore().print(log);
-    log << ")\n";
+    log << "\n";
   }
 
   Solutions.push_back(std::move(solution));
@@ -500,8 +494,8 @@ StepResult ComponentStep::finalize(bool isSuccess) {
 
   if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
-    log << (isSuccess ? "finished" : "failed") << " component #" << Index
-        << ")\n";
+    log << (isSuccess ? "Finished" : "Failed") << " component #" << Index
+        << "}\n";
   }
 
   // If we came either back to this step and previous
@@ -554,7 +548,7 @@ StepResult TypeVariableStep::resume(bool prevFailed) {
   ActiveChoice.reset();
 
   if (CS.isDebugMode())
-    getDebugLogger() << ")\n";
+    getDebugLogger() << "}\n";
 
   // Let's check if we should stop right before
   // attempting any new bindings.
@@ -600,7 +594,7 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
   ActiveChoice.reset();
 
   if (CS.isDebugMode())
-    getDebugLogger() << ")\n";
+    getDebugLogger() << "}\n";
 
   // Attempt next disjunction choice (if any left).
   return take(prevFailed);
@@ -880,7 +874,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   if (Snapshot && Snapshot->isScoped()) {
     Snapshot.reset();
     if (CS.isDebugMode())
-      getDebugLogger() << ")\n";
+      getDebugLogger() << "}\n";
     
     return done(/*isSuccess=*/!prevFailed);
   }
@@ -893,7 +887,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   ActiveChoice.reset();
 
   if (CS.isDebugMode())
-    getDebugLogger() << ")\n";
+    getDebugLogger() << "}\n";
 
   // Check whether it makes sense to continue solving
   // this conjunction. Note that for conjunction constraint
@@ -961,7 +955,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     if (Conjunction->isIsolated()) {
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
-        log << "(applying conjunction result to outer context\n";
+        log << "{Applying conjunction result to outer context\n";
       }
 
       assert(
