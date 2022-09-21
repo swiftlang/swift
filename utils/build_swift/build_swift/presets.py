@@ -116,7 +116,7 @@ class PresetError(Exception):
 
 
 class DuplicatePresetError(PresetError):
-    """Raised when an existing preset would be overriden.
+    """Raised when an existing preset would be overridden.
     """
 
     def __init__(self, preset_name):
@@ -306,7 +306,7 @@ class PresetParser(object):
     @_catch_duplicate_option_error
     @_catch_duplicate_section_error
     def read_string(self, string):
-        """Reads and parses a string containing preset definintions.
+        """Reads and parses a string containing preset definitions.
         """
 
         fp = io.StringIO(string)

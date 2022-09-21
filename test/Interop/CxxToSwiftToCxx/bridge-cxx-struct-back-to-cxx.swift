@@ -126,7 +126,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<int>)) char storage[sizeof(ns::NonTrivialTemplate<int>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<int> *>(storage);
 // CHECK-NEXT: _impl::$s8UseCxxTy13retNonTrivialSo2nsO02__b18TemplateInstN2ns18efH4IiEEVyF(storage);
-// CHECK-NEXT: ns::NonTrivialTemplate<int> result(std::move(*storageObjectPtr));
+// CHECK-NEXT: ns::NonTrivialTemplate<int> result(static_cast<ns::NonTrivialTemplate<int> &&>(*storageObjectPtr));
 // CHECK-NEXT: storageObjectPtr->~NonTrivialTemplate();
 // CHECK-NEXT: return result;
 // CHECK-NEXT: }
@@ -165,7 +165,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<ns::TrivialinNS> *>(storage);
 // CHECK-NEXT: _impl::$s8UseCxxTy14retNonTrivial2So2nsO02__b18TemplateInstN2ns18e7TrivialH20INS_11TrivialinNSEEEVyF(storage);
-// CHECK-NEXT: ns::NonTrivialTemplate<ns::TrivialinNS> result(std::move(*storageObjectPtr));
+// CHECK-NEXT: ns::NonTrivialTemplate<ns::TrivialinNS> result(static_cast<ns::NonTrivialTemplate<ns::TrivialinNS> &&>(*storageObjectPtr));
 // CHECK-NEXT: storageObjectPtr->~NonTrivialTemplate();
 // CHECK-NEXT: return result;
 // CHECK-NEXT: }
@@ -174,7 +174,7 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialImplicitMove)) char storage[sizeof(ns::NonTrivialImplicitMove)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialImplicitMove *>(storage);
 // CHECK-NEXT: _impl::$s8UseCxxTy25retNonTrivialImplicitMoveSo2nsO0efgH0VyF(storage);
-// CHECK-NEXT: ns::NonTrivialImplicitMove result(std::move(*storageObjectPtr));
+// CHECK-NEXT: ns::NonTrivialImplicitMove result(static_cast<ns::NonTrivialImplicitMove &&>(*storageObjectPtr));
 // CHECK-NEXT: storageObjectPtr->~NonTrivialImplicitMove();
 // CHECK-NEXT: return result;
 // CHECK-NEXT: }

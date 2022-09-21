@@ -1554,7 +1554,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
     // Before Swift 6, implicit imports were not reported unless an
     // implementation-only import was also present. Downgrade to a warning
     // just in this case.
-    if (howImported == RestrictedImportKind::Implicit &&
+    if (howImported == RestrictedImportKind::MissingImport &&
         !SF->getASTContext().isSwiftVersionAtLeast(6) &&
         !SF->hasImportsWithFlag(ImportFlags::ImplementationOnly)) {
       downgradeToWarning = DowngradeToWarning::Yes;
@@ -1600,8 +1600,8 @@ swift::getDisallowedOriginKind(const Decl *decl,
 
     // Restrictively imported, cannot be reexported.
     switch (howImported) {
-    case RestrictedImportKind::Implicit:
-      return DisallowedOriginKind::ImplicitlyImported;
+    case RestrictedImportKind::MissingImport:
+      return DisallowedOriginKind::MissingImport;
     case RestrictedImportKind::SPIOnly:
       return DisallowedOriginKind::SPIOnly;
     case RestrictedImportKind::ImplementationOnly:

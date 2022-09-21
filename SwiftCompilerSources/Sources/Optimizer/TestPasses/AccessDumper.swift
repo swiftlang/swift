@@ -50,9 +50,9 @@ let accessDumper = FunctionPass(name: "dump-access", {
 
 private struct AccessStoragePathVisitor : AccessStoragePathWalker {
   var walkUpCache = WalkerCache<Path>()
-  mutating func visit(access: AccessStoragePath) {
-    print("    Storage: \(access.storage)")
-    print("    Path: \"\(access.path)\"")
+  mutating func visit(accessStoragePath: ProjectedValue) {
+    print("    Storage: \(accessStoragePath.value)")
+    print("    Path: \"\(accessStoragePath.path)\"")
   }
 }
 

@@ -33,7 +33,7 @@ umask 0022
 # The --skip-build parameter, with no product name, does not affect the
 # configuration (CMake parameters). You can turn this option on and
 # off in different invocations of the script for the same build
-# directory without affecting configutation.
+# directory without affecting configuration.
 #
 # skip-build-* and build-* parameters affect the CMake configuration
 # (enable/disable those components).
@@ -3457,10 +3457,10 @@ for host in "${ALL_HOSTS[@]}"; do
         # The usage for this script says that lipo happens before
         # dsym extraction but that's not really what happens.  At this point,
         # we're processing an individual host (eg macosx-x86_64) but targeting
-        # the (shared) SYMROOT which can cause mutliple hosts to stomp on each
+        # the (shared) SYMROOT which can cause multiple hosts to stomp on each
         # other.  As a hack, I'm segregating the hosts in the symroot but it
         # would probably be better to make the script behave as the usage
-        # descibes
+        # describes
         host_symroot="${INSTALL_SYMROOT}/${host}"
 
         set -x

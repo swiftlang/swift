@@ -548,6 +548,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     assert(!type->is<UnboundGenericType>());
 
     if (auto *GP = type->getAs<GenericTypeParamType>()) {
+      auto openedVar = genericParameters.find(getCanonicalGenericParamTy(GP));
+      if (openedVar != genericParameters.end()) {
+        return openedVar->second;
+      }
       return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
                                      locator);
     }

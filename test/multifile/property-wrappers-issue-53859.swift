@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/sr11458.swift
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/issue-53859.swift
 
 // https://github.com/apple/swift/issues/53859
 // Crash involving subscript in other file

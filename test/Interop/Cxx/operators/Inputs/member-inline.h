@@ -85,6 +85,18 @@ struct HasPreIncrementOperatorWithVoidReturnType {
   void operator++() { ++value; }
 };
 
+struct __attribute__((swift_attr("import_reference"),
+                      swift_attr("retain:immortal"),
+                      swift_attr("release:immortal"))) ImmortalCounter {
+  int value = 0;
+
+  ImmortalCounter &operator++() {
+    value++;
+    return *this;
+  }
+};
+static ImmortalCounter myCounter;
+
 struct HasDeletedOperator {
   void operator!=(HasDeletedOperator) const = delete;
 };

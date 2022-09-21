@@ -49,5 +49,5 @@ for _ in 1...10 {
 
 print("Done!")
 
-// CHECK: ThreadSanitizer: data race
-// CHECK: Done!
+// CHECK-DAG: ThreadSanitizer: data race
+// CHECK-DAG: Done!

@@ -366,7 +366,7 @@ class DisableOption(_BaseOption):
 
 
 class ChoicesOption(_BaseOption):
-    """Option that accepts an argument from a predifined list of choices."""
+    """Option that accepts an argument from a predefined list of choices."""
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
@@ -752,7 +752,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
-    # Options forwared to build-script-impl
+    # Options forwarded to build-script-impl
     BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
     BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 

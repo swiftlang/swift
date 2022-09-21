@@ -49,3 +49,5 @@ let anotherReturnTypeResult: HasPreIncrementOperatorWithAnotherReturnType = anot
 
 let voidReturnType = HasPreIncrementOperatorWithVoidReturnType()
 let voidReturnTypeResult: HasPreIncrementOperatorWithVoidReturnType = voidReturnType.successor()
+
+let immortalIncrement = myCounter.successor() // expected-error {{value of type 'ImmortalCounter' has no member 'successor'}}
