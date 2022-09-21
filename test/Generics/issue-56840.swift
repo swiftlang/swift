@@ -2,7 +2,7 @@
 
 // https://github.com/apple/swift/issues/56840
 
-// CHECK: sr14485.(file).P@
+// CHECK-LABEL: .P@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P]Input == Self.[P]Output.[Numeric]Magnitude, Self.[P]Output : FixedWidthInteger, Self.[P]Output : SignedInteger>
 protocol P {
   // expected-warning@+2 {{redundant conformance constraint 'Self.Input' : 'FixedWidthInteger'}}

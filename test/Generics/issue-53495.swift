@@ -10,7 +10,7 @@ protocol P2 {
   associatedtype C: P1
 }
 
-// CHECK: sr11100.(file).Q@
+// CHECK-LABEL: .Q@
 // CHECK-NEXT: Requirement signature: <Self where Self.[Q]X == Self.[Q]X.[P1]A, Self.[Q]Y : P2, Self.[Q]X.[P1]A == Self.[Q]Y.[P2]C>
 protocol Q {
   associatedtype X

@@ -15,7 +15,7 @@ public protocol MapReduceArithmetic: ScalarMultiplicative, Collection where Elem
 public protocol Tensor: MapReduceArithmetic where Element == Scalar {
 }
 
-// CHECK-LABEL: sr14580.(file).ColorModel@
+// CHECK-LABEL: .ColorModel@
 // CHECK-LABEL: Requirement signature: <Self where Self : Tensor, Self == Self.[ColorModel]Float16Components.[ColorComponents]Model, Self.[Sequence]Element == Double, Self.[ColorModel]Float16Components : ColorComponents, Self.[ColorModel]Float32Components : ColorComponents, Self.[ColorModel]Float16Components.[Sequence]Element == Double, Self.[ColorModel]Float16Components.[ColorComponents]Model == Self.[ColorModel]Float32Components.[ColorComponents]Model, Self.[ColorModel]Float32Components.[Sequence]Element == Double>
 public protocol ColorModel: Tensor where Scalar == Double {
   associatedtype Float16Components: ColorComponents where Float16Components.Model == Self, Float16Components.Scalar == Double
