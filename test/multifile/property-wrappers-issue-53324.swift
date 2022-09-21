@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/sr10933a.swift %S/Inputs/sr10933b.swift
+// RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/issue-53324a.swift %S/Inputs/issue-53324b.swift
 
 // https://github.com/apple/swift/issues/53324
 // Crash involving multiple files
