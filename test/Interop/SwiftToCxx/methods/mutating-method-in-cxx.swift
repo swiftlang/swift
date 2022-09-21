@@ -57,14 +57,14 @@ public struct SmallStruct {
 // CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV6invertyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // invert()
 
 // CHECK: class LargeStruct final {
-// CHECK: inline LargeStruct(LargeStruct &&) = default;
+// CHECK: inline LargeStruct(LargeStruct &&)
 // CHECK-NEXT:   inline void dump() const;
 // CHECK-NEXT:   inline void double_();
 // CHECK-NEXT:   inline LargeStruct scale(swift::Int x, swift::Int y);
 // CHECK-NEXT: private
 
 // CHECK: class SmallStruct final {
-// CHECK:   inline SmallStruct(SmallStruct &&) = default;
+// CHECK:   inline SmallStruct(SmallStruct &&)
 // CHECK-NEXT:   inline void dump() const;
 // CHECK-NEXT:   inline SmallStruct scale(float y);
 // CHECK-NEXT:   inline void invert();

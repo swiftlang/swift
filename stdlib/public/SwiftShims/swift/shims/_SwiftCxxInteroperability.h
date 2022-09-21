@@ -103,8 +103,11 @@ public:
     _opaquePointer = other._opaquePointer;
     return *this;
   }
-  // FIXME: What to do in 'move'?
-  inline RefCountedClass(RefCountedClass &&) noexcept = default;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+  // FIXME: implement 'move'?
+  inline RefCountedClass(RefCountedClass &&) noexcept { abort(); }
+#pragma clang diagnostic pop
 
 protected:
   inline RefCountedClass(void *_Nonnull ptr) noexcept : _opaquePointer(ptr) {}
