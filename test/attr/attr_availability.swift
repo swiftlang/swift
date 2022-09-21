@@ -20,6 +20,9 @@ func noKind() {}
 @available(badPlatform, unavailable) // expected-warning {{unknown platform 'badPlatform' for attribute 'available'}}
 func unavailable_bad_platform() {}
 
+@available(macos, unavailable) // expected-warning {{unknown platform 'macos' for attribute 'available'; did you mean 'macOS'?}} {{12-17=macOS}}
+func incorrect_platform_case() {}
+
 // Handle unknown platform.
 @available(HAL9000, unavailable) // expected-warning {{unknown platform 'HAL9000'}}
 func availabilityUnknownPlatform() {}
@@ -223,6 +226,12 @@ func shortFormWithUnrecognizedPlatform() {
 // expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
 // expected-warning@-2 {{unrecognized platform name 'iRefrigeratorOS'}}
 func shortFormWithTwoUnrecognizedPlatforms() {
+}
+
+@available(ios 8.0, macos 10.12, *)
+// expected-warning@-1 {{unrecognized platform name 'ios'; did you mean 'iOS'?}}
+// expected-warning@-2 {{unrecognized platform name 'macos'; did you mean 'macOS'?}}
+func shortFormWithTwoPlatformsIncorrectCase() {
 }
 
 // Make sure that even after the parser hits an unrecognized

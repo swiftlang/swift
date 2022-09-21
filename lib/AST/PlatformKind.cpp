@@ -58,6 +58,15 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
       .Default(Optional<PlatformKind>());
 }
 
+Optional<StringRef> swift::caseCorrectedPlatformString(StringRef candidate) {
+#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
+  if (candidate.compare_insensitive(#X) == 0) {                                \
+    return StringRef(#X);                                                      \
+  }
+#include "swift/AST/PlatformKinds.def"
+  return None;
+}
+
 static bool isApplicationExtensionPlatform(PlatformKind Platform) {
   switch (Platform) {
   case PlatformKind::macOSApplicationExtension:
