@@ -6083,11 +6083,9 @@ public:
 /// Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
-/// \param fromTuple The tuple type we're converting from, as represented by its
-/// TupleTypeElt members.
+/// \param fromTuple The tuple type we're converting from.
 ///
-/// \param toTuple The tuple type we're converting to, as represented by its
-/// TupleTypeElt members.
+/// \param toTuple The tuple type we're converting to.
 ///
 /// \param sources Will be populated with information about the source of each
 /// of the elements for the result tuple. The indices into this array are the
@@ -6095,15 +6093,9 @@ public:
 /// an index into the source tuple.
 ///
 /// \returns true if no tuple conversion is possible, false otherwise.
-bool computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
-                         ArrayRef<TupleTypeElt> toTuple,
+bool computeTupleShuffle(TupleType *fromTuple,
+                         TupleType *toTuple,
                          SmallVectorImpl<unsigned> &sources);
-static inline bool computeTupleShuffle(TupleType *fromTuple,
-                                       TupleType *toTuple,
-                                       SmallVectorImpl<unsigned> &sources){
-  return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
-                             sources);
-}
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
