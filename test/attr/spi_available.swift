@@ -11,3 +11,6 @@ public class SPIClass3 {}
 
 @_spi_available(macOS 10.4, *)
 public class SPIClass4 {} // expected-warning {{symbols that are @_spi_available on all platforms should use @_spi instead}}
+
+@_spi_available(macos 10.15, *) // expected-warning {{unrecognized platform name 'macos'; did you mean 'macOS'?}} {{17-22=macOS}}
+public class SPIClass5 {}

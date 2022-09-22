@@ -579,6 +579,10 @@ def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
   HelpText<"Enable experimental associated type inference via type witness systems">;
 
+def enable_experimental_implicit_some :
+  Flag<["-"], "enable-experimental-implicit-some">,
+  HelpText<"Enable experimental implicit some">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;

@@ -174,95 +174,79 @@ func thirteen() {
   }
 }
 
-// SR 6400
+// https://github.com/apple/swift/issues/48950
+protocol ClassProto: AnyObject {}
+do {
+  enum E: Error {
+    case castError
+  }
 
-enum SR_6400_E: Error {
-  case castError
-}
-
-struct SR_6400_S_1 {}
-struct SR_6400_S_2: Error {}
-
-protocol SR_6400_FakeApplicationDelegate: AnyObject {}
-class SR_6400_FakeViewController {}
-
-func sr_6400() throws {
   do {
-    throw SR_6400_E.castError
-  } catch is SR_6400_S_1 { // expected-warning {{cast from 'any Error' to unrelated type 'SR_6400_S_1' always fails}}
-    print("Caught error")
+    struct S1 {}
+    struct S2: Error {}
+
+    do {
+      throw E.castError
+    } catch is S1 {} // expected-warning {{cast from 'any Error' to unrelated type 'S1' always fails}}
+
+    do {
+      throw E.castError
+    } catch is S2 {} // Ok
   }
-  
+
   do {
-    throw SR_6400_E.castError
-  } catch is SR_6400_S_2 {
-    print("Caught error") // Ok
+    class C1 {}
+    class C2: ClassProto & Error {}
+
+    do {
+      throw E.castError
+    } catch let error as C1 { // Okay
+      print(error)
+    } catch {}
+
+    do {
+      throw E.castError
+    } catch let error as C2 { // Okay
+      print(error)
+    } catch {}
+
+    let err: Error
+    _ = err as? (C1 & Error) // Ok
+    _ = err as? (Error & ClassProto) // Ok
+  }
+
+  func f<T>(error: Error, as type: T.Type) -> Bool {
+    return (error as? T) != nil // Ok
   }
 }
 
-func sr_6400_1<T>(error: Error, as type: T.Type) -> Bool {
-  return (error as? T) != nil // Ok
+// https://github.com/apple/swift/issues/53803
+protocol P {}
+do {
+  class Super {}
+  class Sub: Super, P {}
+  final class Final {}
+
+  let x: any P
+
+  if let _ = x as? Super {} // Okay
+
+  if let _ = x as? Final {} // expected-warning {{cast from 'any P' to unrelated type 'Final' always fails}}
 }
 
-func sr_6400_2(error: Error) {
-  _ = error as? (SR_6400_FakeViewController & Error) // Ok
-}
-func sr_6400_3(error: Error) {
-  _ = error as? (Error & SR_6400_FakeApplicationDelegate) // Ok
-}
+// https://github.com/apple/swift/issues/56091
+do {
+  func f() throws -> String {}
 
-class SR_6400_A {}
-class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
-
-func sr_6400_4() {
-  do {
-    throw SR_6400_E.castError
-  } catch let error as SR_6400_A { // Okay
-    print(error)
-  } catch {
-    print("Bar")
+  func invalid_interpolation() {
+    _ = try "\(f())" // expected-error {{errors thrown from here are not handled}}
+    _ = "\(try f())" // expected-error {{errors thrown from here are not handled}}
   }
-  
-  do {
-    throw SR_6400_E.castError
-  } catch let error as SR_6400_B { // Okay
-    print(error)
-  } catch {
-    print("Bar")
+
+  func valid_interpolation() throws {
+    _ = try "\(f())"
+    _ = "\(try f())"
   }
-}
-
-// SR-11402
-
-protocol SR_11402_P {}
-class SR_11402_Superclass {}
-class SR_11402_Subclass: SR_11402_Superclass, SR_11402_P {}
-
-func sr_11402_func1(_ x: SR_11402_P) {
-  if let y = x as? SR_11402_Superclass { // Okay
-    print(y)
-  }
-}
-
-final class SR_11402_Final {}
-
-func sr_11402_func2(_ x: SR_11402_P) {
-  if let y = x as? SR_11402_Final { // expected-warning {{cast from 'any SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
-    print(y)
-  }
-}
-
-// https://bugs.swift.org/browse/SR-13654
-
-func sr_13654_func() throws -> String {}
-
-func sr_13654_invalid_interpolation() {
-  _ = try "\(sr_13654_func())" // expected-error {{errors thrown from here are not handled}}
-  _ = "\(try sr_13654_func())" // expected-error {{errors thrown from here are not handled}}
-}
-func sr_13654_valid_interpolation() throws {
-  _ = try "\(sr_13654_func())"
-  _ = "\(try sr_13654_func())"
 }
 
 // rdar://problem/72748150

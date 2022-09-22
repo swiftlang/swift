@@ -1725,10 +1725,12 @@ struct HasUnavailableExtension {
 
 @available(OSX, unavailable)
 extension HasUnavailableExtension {
+    // expected-note@-1 {{enclosing scope has been explicitly marked unavailable here}}
+
   public func inheritsUnavailable() { }
       // expected-note@-1 {{'inheritsUnavailable()' has been explicitly marked unavailable here}}
 
-  @available(OSX 10.9, *)
+  @available(OSX 10.9, *) // expected-warning {{instance method cannot be more available than unavailable enclosing scope}}
   public func moreAvailableButStillUnavailable() { }
       // expected-note@-1 {{'moreAvailableButStillUnavailable()' has been explicitly marked unavailable here}}
 }

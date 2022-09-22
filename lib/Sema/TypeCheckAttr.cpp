@@ -1814,9 +1814,15 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   Optional<AvailabilityContext> EnclosingAnnotatedRange;
+  bool EnclosingDeclIsUnavailable = false;
   Decl *EnclosingDecl = getEnclosingDeclForDecl(D);
 
   while (EnclosingDecl) {
+    if (EnclosingDecl->getAttrs().getUnavailable(Ctx)) {
+      EnclosingDeclIsUnavailable = true;
+      break;
+    }
+
     EnclosingAnnotatedRange =
         AvailabilityInference::annotatedAvailableRange(EnclosingDecl, Ctx);
 
@@ -1830,7 +1836,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       VersionRange::allGTE(attr->Introduced.getValue())};
 
   if (EnclosingDecl) {
-    if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+    if (EnclosingDeclIsUnavailable) {
+      diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
+               diag::availability_decl_more_than_unavailable_enclosing,
+               D->getDescriptiveKind());
+      diagnose(EnclosingDecl->getLoc(),
+               diag::availability_decl_more_than_unavailable_enclosing_here);
+    } else if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
       diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
                diag::availability_decl_more_than_enclosing,
                D->getDescriptiveKind());
@@ -1841,7 +1853,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
                  prettyPlatformString(targetPlatform(Ctx.LangOpts)),
                  AttrRange.getOSVersion().getLowerEndpoint());
       diagnose(EnclosingDecl->getLoc(),
-               diag::availability_decl_more_than_enclosing_enclosing_here,
+               diag::availability_decl_more_than_enclosing_here,
                prettyPlatformString(targetPlatform(Ctx.LangOpts)),
                EnclosingAnnotatedRange->getOSVersion().getLowerEndpoint());
     }

@@ -295,6 +295,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   };
 
   StringRef Platform = Tok.getText();
+  SourceLoc PlatformLoc = Tok.getLoc();
 
   StringRef Message, Renamed;
   VersionArg Introduced, Deprecated, Obsoleted;
@@ -564,8 +565,14 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   if (AnyArgumentInvalid)
     return nullptr;
   if (!PlatformKind.hasValue()) {
-    diagnose(AttrLoc, diag::attr_availability_unknown_platform,
-           Platform, AttrName);
+    if (auto CorrectedPlatform = caseCorrectedPlatformString(Platform)) {
+      diagnose(PlatformLoc, diag::attr_availability_suggest_platform, Platform,
+               AttrName, *CorrectedPlatform)
+          .fixItReplace(SourceRange(PlatformLoc), *CorrectedPlatform);
+    } else {
+      diagnose(AttrLoc, diag::attr_availability_unknown_platform, Platform,
+               AttrName);
+    }
     return nullptr;
   }
 
@@ -1820,8 +1827,14 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   consumeToken();
 
   if (!MaybePlatform.hasValue()) {
-    diagnose(PlatformLoc, diag::attr_availability_unknown_platform,
-             platformText, AttrName);
+    if (auto correctedPlatform = caseCorrectedPlatformString(platformText)) {
+      diagnose(PlatformLoc, diag::attr_availability_suggest_platform,
+               platformText, AttrName, *correctedPlatform)
+          .fixItReplace(SourceRange(PlatformLoc), *correctedPlatform);
+    } else {
+      diagnose(PlatformLoc, diag::attr_availability_unknown_platform,
+               platformText, AttrName);
+    }
   } else if (*MaybePlatform == PlatformKind::none) {
     // Wildcards ('*') aren't supported in this kind of list.
     diagnose(PlatformLoc, diag::attr_availability_wildcard_ignored,

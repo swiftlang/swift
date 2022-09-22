@@ -537,12 +537,14 @@ func test_diagnostic_with_contextual_generic_params() {
   }
 }
 
-// SR-10988 - Suggest `return` when the last statement of a multi-statement function body would be a valid return value
+// https://github.com/apple/swift/issues/53378
+// Suggest `return` when the last statement of a multi-statement function body
+// would be a valid return value
 protocol P1 {
 }
 protocol P2 {
 }
-func sr10988() {
+do {
   func test() -> some Numeric {
     // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
     let x = 0

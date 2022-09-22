@@ -91,6 +91,7 @@ void ClangValueTypePrinter::forwardDeclType(raw_ostream &os,
   os << "class ";
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << ";\n";
+  printTypePrecedingGenericTraits(os, typeDecl, typeDecl->getModuleContext());
 }
 
 static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
@@ -471,6 +472,32 @@ void ClangValueTypePrinter::printClangTypeSwiftGenericTraits(
                          /*typeMetadataFuncRequirements=*/{}, moduleContext);
 }
 
+void ClangValueTypePrinter::printTypePrecedingGenericTraits(
+    raw_ostream &os, const NominalTypeDecl *typeDecl,
+    const ModuleDecl *moduleContext) {
+  assert(!typeDecl->hasClangNode());
+  ClangSyntaxPrinter printer(os);
+  // FIXME: avoid popping out of the module's namespace here.
+  os << "} // end namespace \n\n";
+  os << "namespace swift {\n";
+
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
+  if (!typeDecl->isGeneric()) {
+    // FIXME: generic type support.
+    os << "template<>\n";
+    os << "static inline const constexpr bool isUsableInGenericContext<";
+    printer.printNominalTypeReference(typeDecl,
+                                      /*moduleContext=*/nullptr);
+    os << "> = true;\n";
+  }
+  os << "#pragma clang diagnostic pop\n";
+  os << "} // namespace swift\n";
+  os << "\nnamespace ";
+  printer.printBaseName(moduleContext);
+  os << " {\n";
+}
+
 void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     StringRef typeMetadataFuncName,
@@ -492,8 +519,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  if (typeMetadataFuncRequirements.empty()) {
-    // FIXME: generic type support.
+  if (typeDecl->hasClangNode()) {
+    // FIXME: share the code.
     os << "template<>\n";
     os << "static inline const constexpr bool isUsableInGenericContext<";
     printer.printNominalTypeReference(typeDecl,

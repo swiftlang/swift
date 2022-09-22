@@ -274,17 +274,19 @@ public:
       ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M);
   }
 
+  void forwardDeclareCxxValueTypeIfNeeded(const NominalTypeDecl *NTD) {
+    forwardDeclare(NTD,
+                   [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
+  }
+
   void forwardDeclareType(const TypeDecl *TD) {
     if (outputLangMode == OutputLanguageMode::Cxx) {
       if (isa<StructDecl>(TD) || isa<EnumDecl>(TD)) {
         auto *NTD = cast<NominalTypeDecl>(TD);
-        if (!addImport(NTD)) {
-          forwardDeclare(
-              NTD, [&]() { ClangValueTypePrinter::forwardDeclType(os, NTD); });
-        } else {
-          if (isa<StructDecl>(TD) && NTD->hasClangNode())
-            emitReferencedClangTypeMetadata(NTD);
-        }
+        if (!addImport(NTD))
+          forwardDeclareCxxValueTypeIfNeeded(NTD);
+        else if (isa<StructDecl>(TD) && NTD->hasClangNode())
+          emitReferencedClangTypeMetadata(NTD);
       }
       return;
     }
@@ -471,6 +473,7 @@ public:
            printer.getInteropContext().getExtensionsForNominalType(SD)) {
         (void)forwardDeclareMemberTypes(ed->getMembers(), SD);
       }
+      forwardDeclareCxxValueTypeIfNeeded(SD);
     }
     printer.print(SD);
     return true;
@@ -536,6 +539,7 @@ public:
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
       forwardDeclareMemberTypes(ED->getMembers(), ED);
+      forwardDeclareCxxValueTypeIfNeeded(ED);
     }
 
     if (seenTypes[ED].first == EmissionState::Defined)

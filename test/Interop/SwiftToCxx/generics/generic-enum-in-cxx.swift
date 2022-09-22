@@ -91,6 +91,10 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: class GenericOpt;
+
+// CHECK: template<class T_0_0>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: class _impl_GenericOpt;
 
 // CHECK: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s8Generics10GenericOptOMa(swift::_impl::MetadataRequestTy, void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;
