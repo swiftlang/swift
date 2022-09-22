@@ -4777,15 +4777,16 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         uint64_t numArgs;
         uint64_t numSPIGroups;
         uint64_t numAvailabilityAttrs;
+        uint64_t numTypeErasedParams;
         DeclID targetFunID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
             scratch, exported, specializationKindVal, specializedSigID,
             targetFunID, numArgs, numSPIGroups, numAvailabilityAttrs,
-            rawPieceIDs);
+            numTypeErasedParams, rawPieceIDs);
 
-        assert(rawPieceIDs.size() == numArgs + numSPIGroups ||
-               rawPieceIDs.size() == (numArgs - 1 + numSPIGroups));
+        assert(rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams ||
+               rawPieceIDs.size() == (numArgs - 1 + numSPIGroups + numTypeErasedParams));
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
@@ -4807,11 +4808,21 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         SmallVector<Identifier, 4> spis;
         if (numSPIGroups) {
           auto numTargetFunctionPiecesToSkip =
-              (rawPieceIDs.size() == numArgs + numSPIGroups) ? numArgs
+              (rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams) ? numArgs
                                                              : numArgs - 1;
           for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
             spis.push_back(MF.getIdentifier(id));
         }
+
+        SmallVector<Type, 4> typeErasedParams;
+        if (numTypeErasedParams) {
+          auto numTargetFunctionPiecesToSkip =
+              (rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams) ? numArgs + numSPIGroups
+                                                             : numArgs - 1 + numSPIGroups;
+          for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
+            typeErasedParams.push_back(MF.getType(id));
+        }
+
         SmallVector<AvailableAttr *, 4> availabilityAttrs;
         while (numAvailabilityAttrs) {
           // Prepare to read the next record.
@@ -4840,8 +4851,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         auto specializedSig = MF.getGenericSignature(specializedSigID);
         Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
-                                      spis, availabilityAttrs, specializedSig,
-                                      replacedFunctionName, &MF, targetFunID);
+                                      spis, availabilityAttrs, typeErasedParams,
+                                      specializedSig, replacedFunctionName, &MF,
+                                      targetFunID);
         break;
       }
 

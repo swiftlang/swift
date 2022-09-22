@@ -240,6 +240,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@async") << " ";
   if (hasAttr(TAK_opened))
     Printer.printSimpleAttr("@opened") << " ";
+
+  if (hasAttr(TAK__noMetadata))
+    Printer.printSimpleAttr("@_noMetadata") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,

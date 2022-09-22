@@ -434,8 +434,7 @@ void decodeRequirement(NodePointer node,
             Builder.getLayoutConstraintWithSizeAlign(*kind, size, alignment);
       }
 
-      requirements.push_back(
-          BuiltRequirement(RequirementKind::Layout, subjectType, layout));
+      requirements.push_back(BuiltRequirement(RequirementKind::Layout, subjectType, layout));
       break;
     }
     default:
