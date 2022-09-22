@@ -227,8 +227,12 @@ func testRepeated(ri: RepeatedSequence<Int>) {
   for x in ri { _ = x }
 }
 
-// SR-12398: Poor pattern matching diagnostic: "for-in loop requires '[Int]' to conform to 'Sequence'"
-func sr_12398(arr1: [Int], arr2: [(a: Int, b: String)]) {
+// https://github.com/apple/swift/issues/54836
+// Poor pattern matching diagnostic: for-in loop requires '[Int]' to conform to 'Sequence'
+do {
+  let arr1: [Int]
+  let arr2: [(a: Int, b: String)]
+
   for (x, y) in arr1 {}
   // expected-error@-1 {{tuple pattern cannot match values of non-tuple type 'Int'}}
 
@@ -245,7 +249,8 @@ func testForEachWhereWithClosure(_ x: [Int]) {
   for i in x where x.contains(where: { $0.byteSwapped == i }) {}
 }
 
-// https://github.com/apple/swift/issues/59522 - use of `prefix` with generic base causes ambiguity in for-in statement
+// https://github.com/apple/swift/issues/59522
+// Use of 'prefix' with generic base causes ambiguity in for-in statement
 func test_no_ambiguity_with_prefix_iterator<C: Collection>(c: C) {
   for _ in c.prefix(1) { // Ok
   }
