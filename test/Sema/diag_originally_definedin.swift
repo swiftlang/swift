@@ -27,6 +27,11 @@ public func macroVersioned() {}
 public func macroUnknown() {}
 
 @available(macOS 10.9, *)
+@_originallyDefinedIn(module: "original", macos 10.13) // expected-warning {{unknown platform 'macos' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-48=macOS}}
+// expected-error@-1 {{expected at least one platform version in '@_originallyDefinedIn' attribute}}
+public func incorrectPlatformCase() {}
+
+@available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for attribute '@_originallyDefinedIn'}}
 // expected-error@-1 {{expected at least one platform version in '@_originallyDefinedIn' attribute}}
 public func swiftVersionMacro() {}
