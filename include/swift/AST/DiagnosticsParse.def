@@ -720,6 +720,14 @@ ERROR(sil_vtable_bad_entry_kind,none,
 ERROR(sil_vtable_expect_rsquare,none,
       "expected ']' after vtable entry kind", ())
 
+// SIL MoveOnlyDeinit
+ERROR(expected_sil_moveonlydeinit_colon,none,
+      "expected ':' in a MoveOnlyDeinit entry", ())
+ERROR(sil_moveonlydeinit_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_moveonlydeinit_nominal_not_found,none,
+      "sil nominal decl not found %0", (Identifier))
+
 // SIL Global
 ERROR(sil_global_variable_not_found,none,
       "sil global not found %0", (Identifier))

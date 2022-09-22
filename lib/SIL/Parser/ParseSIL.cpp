@@ -33,6 +33,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
@@ -6990,6 +6991,81 @@ bool SILParserState::parseSILVTable(Parser &P) {
                        LBraceLoc);
 
   SILVTable::create(M, theClass, Serialized, vtableEntries);
+  return false;
+}
+
+/// decl-sil-vtable: [[only in SIL mode]]
+///   'sil_vtable' ClassName decl-sil-vtable-body
+/// decl-sil-vtable-body:
+///   '{' sil-vtable-entry* '}'
+/// sil-vtable-entry:
+///   SILDeclRef ':' SILFunctionName
+bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
+  parser.consumeToken(tok::kw_sil_moveonlydeinit);
+  SILParser moveOnlyDeinitTableState(parser);
+
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, moveOnlyDeinitTableState, M))
+    return true;
+
+  // Parse the class name.
+  Identifier name;
+  SourceLoc loc;
+  if (moveOnlyDeinitTableState.parseSILIdentifier(
+          name, loc, diag::expected_sil_value_name))
+    return true;
+
+  // Find the nominal decl.
+  llvm::PointerUnion<ValueDecl *, ModuleDecl *> res =
+      lookupTopDecl(parser, name, /*typeLookup=*/true);
+  assert(res.is<ValueDecl *>() && "Class Nominal-up should return a Decl");
+  ValueDecl *varDecl = res.get<ValueDecl *>();
+  if (!varDecl) {
+    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+    return true;
+  }
+
+  auto *theNominalDecl = dyn_cast<NominalTypeDecl>(varDecl);
+  if (!theNominalDecl) {
+    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+    return true;
+  }
+
+  SourceLoc lBraceLoc = parser.Tok.getLoc();
+  parser.consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII tmp(*parser.L);
+  SILFunction *func = nullptr;
+
+  if (parser.Tok.isNot(tok::r_brace)) {
+    Identifier funcName;
+    SourceLoc funcLoc;
+    if (parser.Tok.is(tok::kw_nil)) {
+      parser.consumeToken();
+    } else {
+      if (parser.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          moveOnlyDeinitTableState.parseSILIdentifier(
+              funcName, funcLoc, diag::expected_sil_value_name))
+        return true;
+      func = M.lookUpFunction(funcName.str());
+      if (!func) {
+        parser.diagnose(funcLoc, diag::sil_moveonlydeinit_func_not_found,
+                        funcName);
+        return true;
+      }
+    }
+  }
+
+  SourceLoc RBraceLoc;
+  parser.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                            lBraceLoc);
+
+  SILMoveOnlyDeinit::create(M, theNominalDecl, Serialized, func);
   return false;
 }
 

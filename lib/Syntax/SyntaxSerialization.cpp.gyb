@@ -63,6 +63,7 @@ uint8_t getNumericValue(tok Value) {
     case tok::kw_sil_stage:
     case tok::kw_sil_property:
     case tok::kw_sil_vtable:
+    case tok::kw_sil_moveonlydeinit:
     case tok::kw_sil_global:
     case tok::kw_sil_witness_table:
     case tok::kw_sil_default_witness_table:
