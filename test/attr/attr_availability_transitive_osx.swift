@@ -105,6 +105,7 @@ extension Outer {
 }
 
 @available(OSX, unavailable)
+// expected-note@+1 {{enclosing scope has been explicitly marked unavailable here}}
 extension Outer {
   // expected-note@+1 {{'outer_osx_init_osx' has been explicitly marked unavailable here}}
   static var outer_osx_init_osx = osx() // OK
@@ -123,7 +124,7 @@ extension Outer {
   }
   
   // This @available should be ignored; inherited unavailability takes precedence
-  @available(OSX 999, *)
+  @available(OSX 999, *) // expected-warning {{instance method cannot be more available than unavailable enclosing scope}}
   // expected-note@+1 {{'osx_more_available_but_still_unavailable_call_osx()' has been explicitly marked unavailable here}}
   func osx_more_available_but_still_unavailable_call_osx() {
     osx() // OK
