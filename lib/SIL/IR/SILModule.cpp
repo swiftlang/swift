@@ -11,15 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-module"
+
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
@@ -130,6 +133,9 @@ SILModule::~SILModule() {
 
   for (auto vt : vtables)
     vt->~SILVTable();
+
+  for (auto deinit : moveOnlyDeinits)
+    deinit->~SILMoveOnlyDeinit();
 
   // Drop everything functions in this module reference.
   //
@@ -519,6 +525,29 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
   return Vtbl;
 }
 
+SILMoveOnlyDeinit *SILModule::lookUpMoveOnlyDeinit(const NominalTypeDecl *C,
+                                                   bool deserializeLazily) {
+  if (!C)
+    return nullptr;
+
+  // First try to look up R from the lookup table.
+  auto iter = MoveOnlyDeinitMap.find(C);
+  if (iter != MoveOnlyDeinitMap.end())
+    return iter->second;
+
+  if (!deserializeLazily)
+    return nullptr;
+
+  // If that fails, try to deserialize it. If that fails, return nullptr.
+  auto *tbl = getSILLoader()->lookupMoveOnlyDeinit(C);
+  if (!tbl)
+    return nullptr;
+
+  // If we succeeded, map C -> VTbl in the table and return VTbl.
+  MoveOnlyDeinitMap[C] = tbl;
+  return tbl;
+}
+
 SerializedSILLoader *SILModule::getSILLoader() {
   // If the SILLoader is null, create it.
   if (!SILLoader)
@@ -625,6 +654,20 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
     return E->getImplementation();
 
   return nullptr;
+}
+
+SILFunction *
+SILModule::lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl) {
+  assert(nomDecl->isMoveOnly());
+
+  auto *tbl = lookUpMoveOnlyDeinit(nomDecl);
+
+  // Bail, if the lookup of VTable fails.
+  if (!tbl) {
+    return nullptr;
+  }
+
+  return tbl->getImplementation();
 }
 
 SILDifferentiabilityWitness *

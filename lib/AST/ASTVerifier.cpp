@@ -3142,8 +3142,9 @@ public:
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
       auto *ND = DD->getDeclContext()->getSelfNominalTypeDecl();
-      if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
-        Out << "DestructorDecls outside classes should be marked invalid";
+      if (!isa<ClassDecl>(ND) && !ND->isMoveOnly() && !DD->isInvalid()) {
+        Out << "DestructorDecls outside classes/move only types should be "
+               "marked invalid\n";
         abort();
       }
       verifyCheckedBase(DD);

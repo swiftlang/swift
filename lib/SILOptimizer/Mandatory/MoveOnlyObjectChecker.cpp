@@ -507,6 +507,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
             b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
         cvi->replaceAllUsesWith(expCopy);
         cvi->eraseFromParent();
+        changed = true;
       }
     }
   }

@@ -31,6 +31,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -3349,6 +3351,15 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
+    // Only check again for destructor decl outside of a class if our dstructor
+    // is not marked as invalid.
+    if (!DD->isInvalid()) {
+      auto *nom = dyn_cast<NominalTypeDecl>(DD->getDeclContext());
+      if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
+        DD->diagnose(diag::destructor_decl_outside_class);
+      }
+    }
+
     TypeChecker::checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {

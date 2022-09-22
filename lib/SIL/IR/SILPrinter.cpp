@@ -35,6 +35,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
@@ -3250,6 +3251,30 @@ static void printSILVTables(SILPrintContext &Ctx,
     vt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+static void printSILMoveOnlyDeinits(
+    SILPrintContext &printCtx,
+    const SILModule::SILMoveOnlyDeinitListType &deinitTables) {
+  if (!printCtx.sortSIL()) {
+    for (const auto &tbl : deinitTables)
+      tbl->print(printCtx.OS(), printCtx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILMoveOnlyDeinit *> sortedTables;
+  sortedTables.reserve(deinitTables.size());
+  for (const auto &tbl : deinitTables)
+    sortedTables.push_back(tbl);
+  std::sort(
+      sortedTables.begin(), sortedTables.end(),
+      [](const SILMoveOnlyDeinit *v1, const SILMoveOnlyDeinit *v2) -> bool {
+        StringRef name1 = v1->getNominalDecl()->getName().str();
+        StringRef name2 = v2->getNominalDecl()->getName().str();
+        return name1.compare(name2) == -1;
+      });
+  for (const auto *tbl : sortedTables)
+    tbl->print(printCtx.OS(), printCtx.printVerbose());
+}
+
 static void
 printSILWitnessTables(SILPrintContext &Ctx,
                       const SILModule::WitnessTableListType &WTables) {
@@ -3502,6 +3527,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
+  printSILMoveOnlyDeinits(PrintCtx, getMoveOnlyDeinits());
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
 
   if (M)
@@ -3582,9 +3608,20 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "}\n\n";
 }
 
-void SILVTable::dump() const {
-  print(llvm::errs());
+void SILVTable::dump() const { print(llvm::errs()); }
+
+void SILMoveOnlyDeinit::print(llvm::raw_ostream &OS, bool verbose) const {
+  OS << "sil_moveonlydeinit ";
+  if (isSerialized())
+    OS << "[serialized] ";
+  OS << getNominalDecl()->getName() << " {\n";
+  OS << "  @" << getImplementation()->getName();
+  OS << "\t// " << demangleSymbol(getImplementation()->getName());
+  OS << "\n";
+  OS << "}\n\n";
 }
+
+void SILMoveOnlyDeinit::dump() const { print(llvm::errs(), false); }
 
 /// Returns true if anything was printed.
 static bool printAssociatedTypePath(llvm::raw_ostream &OS, CanType path) {
