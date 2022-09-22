@@ -144,7 +144,9 @@ targets += singleSourceLibraries.map { name in
       path: "single-source",
       sources: ["\(name).swift"],
       swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                    "-disable-swift-bridge-attr"])])
+                                    "-disable-swift-bridge-attr",
+                                    "-Xfrontend",
+                                    "-enable-experimental-layout-prespecialization"])])
   }
   return .target(name: name,
       dependencies: singleSourceDeps,
@@ -170,7 +172,9 @@ targets += multiSourceLibraries.map { lib in
     dependencies: [
       .target(name: "TestsUtils")
     ],
-    path: lib.parentSubDir)
+    path: lib.parentSubDir,
+    swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                  "-enable-experimental-layout-prespecialization"])])
 }
 
 //===---
