@@ -263,9 +263,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
   // For now, references storage types are just pointers.
-#define CHECKED_REF_STORAGE(Name, name, ...) \
-  Name##ReferencePtrTy = \
-    createStructPointerType(*this, "swift." #name, { RefCountedPtrTy });
+#define CHECKED_REF_STORAGE(Name, name, ...)                                   \
+  Name##ReferenceStructTy =                                                    \
+      createStructType(*this, "swift." #name, {RefCountedPtrTy});              \
+  Name##ReferencePtrTy = Name##ReferenceStructTy->getPointerTo(0);
 #include "swift/AST/ReferenceStorage.def"
 
   // A type metadata record is the structure pointed to by the canonical
@@ -333,13 +334,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     TypeMetadataPtrTy,      // Metadata *Type;
     Int32Ty                 // int32_t Offset;
   });
-  TupleTypeMetadataPtrTy = createStructPointerType(*this, "swift.tuple_type", {
-    TypeMetadataStructTy,   // (base)
-    SizeTy,                 // size_t NumElements;
-    Int8PtrTy,              // const char *Labels;
-    llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
-  });
-
+  TupleTypeMetadataTy = createStructType(
+      *this, "swift.tuple_type",
+      {
+          TypeMetadataStructTy,                   // (base)
+          SizeTy,                                 // size_t NumElements;
+          Int8PtrTy,                              // const char *Labels;
+          llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
+      });
+  TupleTypeMetadataPtrTy = TupleTypeMetadataTy->getPointerTo();
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
@@ -689,6 +692,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
+  ClassMetadataBaseOffsetTy = llvm::StructType::get(
+      getLLVMContext(), {
+                            SizeTy,  // Immediate members offset
+                            Int32Ty, // Negative size in words
+                            Int32Ty  // Positive size in words
+                        });
+
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 }
@@ -698,8 +708,6 @@ IRGenModule::~IRGenModule() {
   destroyPointerAuthCaches();
   delete &Types;
 }
-
-static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
 // Explicitly listing these constants is an unfortunate compromise for
 // making the database file much more compact.
@@ -891,6 +899,20 @@ bool IRGenModule::isStandardLibrary() const {
   return ::isStandardLibrary(Module);
 }
 
+llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
+                                           llvm::ArrayRef<llvm::Type*> retTypes,
+                                           llvm::ArrayRef<llvm::Type*> argTypes) {
+  llvm::Type *retTy;
+  if (retTypes.size() == 1)
+    retTy = *retTypes.begin();
+  else
+    retTy = llvm::StructType::get(Module.getContext(),
+                                  {retTypes.begin(), retTypes.end()},
+                                  /*packed*/ false);
+  return llvm::FunctionType::get(retTy, {argTypes.begin(), argTypes.end()},
+                                 /*isVararg*/ false);
+}
+
 llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
@@ -998,6 +1020,9 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
+static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
+static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr);
+
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
 void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
                                          const char *funcName) {
@@ -1025,13 +1050,35 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
 
-#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT)\
+#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,        \
+                      EFFECT)                                                  \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        AVAILABILITY(this->Context),                           \
-                        RETURNS, ARGS, ATTRS, this);                           \
+                        AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
+                        this);                                                 \
+  }                                                                            \
+  FunctionPointer IRGenModule::get##ID##FunctionPointer() {                    \
+    using namespace RuntimeConstants;                                          \
+    auto fn = get##ID##Fn();                                                   \
+    auto fnTy = get##ID##FnType();                                             \
+    llvm::AttributeList attrs;                                                 \
+    SmallVector<llvm::Attribute::AttrKind, 8> theAttrs(ATTRS);                 \
+    for (auto Attr : theAttrs) {                                               \
+      if (isReturnAttribute(Attr))                                             \
+        attrs = attrs.addRetAttribute(getLLVMContext(), Attr);                 \
+      else if (isReturnedAttribute(Attr))                                      \
+        attrs = attrs.addParamAttribute(getLLVMContext(), 0, Attr);            \
+      else                                                                     \
+        attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
+    }                                                                          \
+    auto sig = Signature(fnTy, attrs, CC);                                     \
+    return FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn,     \
+                                      nullptr, sig);                           \
+  }                                                                            \
+  llvm::FunctionType *IRGenModule::get##ID##FnType() {                         \
+    return getRuntimeFnType(Module, RETURNS, ARGS);                            \
   }
 
 #include "swift/Runtime/RuntimeFunctions.def"
@@ -1090,8 +1137,7 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
 
   if (ObjCInterop) {
     // struct objc_cache _objc_empty_cache;
-    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
-                                                 OpaquePtrTy->getPointerElementType());
+    ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache", OpaqueTy);
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
   } else {
@@ -1127,7 +1173,7 @@ Address IRGenModule::getAddrOfObjCISAMask() {
     ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalVariable>(ObjCISAMaskPtr));
   }
-  return Address(ObjCISAMaskPtr, getPointerAlignment());
+  return Address(ObjCISAMaskPtr, IntPtrTy, getPointerAlignment());
 }
 
 ModuleDecl *IRGenModule::getSwiftModule() const {

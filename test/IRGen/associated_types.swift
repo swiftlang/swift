@@ -103,5 +103,5 @@ public struct P0Impl : P0 {
 // CHECK: define{{.*}} swiftcc i8** @"$s16associated_types6P0ImplVAA0C0AA9ErrorTypeAaDP_s0E0PWT"(%swift.type* %P0Impl.ErrorType, %swift.type* %P0Impl, i8** %P0Impl.P0)
 // CHECK:  ret i8** @"$ss5ErrorWS"
 
-// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
+// CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone willreturn }
 

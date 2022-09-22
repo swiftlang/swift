@@ -314,19 +314,32 @@ namespace irgen {
     PointerAuthInfo AuthInfo;
 
     Signature Sig;
+    // If this is an await function pointer contains the signature of the await
+    // call (without return values).
+    llvm::Type *awaitSignature = nullptr;
 
-  public:
+    explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             const Signature &signature)
+        : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
+
+    explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             PointerAuthInfo authInfo,
+                             const Signature &signature)
+        : FunctionPointer(kind, value, nullptr, authInfo, signature){};
+
     /// Construct a FunctionPointer for an arbitrary pointer value.
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
     explicit FunctionPointer(Kind kind, llvm::Value *value,
                              llvm::Value *secondaryValue,
                              PointerAuthInfo authInfo,
-                             const Signature &signature)
+                             const Signature &signature,
+                             llvm::Type *awaitSignature = nullptr)
         : kind(kind), Value(value), SecondaryValue(secondaryValue),
-          AuthInfo(authInfo), Sig(signature) {
+          AuthInfo(authInfo), Sig(signature), awaitSignature(awaitSignature) {
       // The function pointer should have function type.
-      assert(value->getType()->getPointerElementType()->isFunctionTy());
+      assert(!value->getContext().supportsTypedPointers() ||
+             value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
       if (authInfo) {
         if (kind == Kind::Function) {
@@ -337,15 +350,29 @@ namespace irgen {
       }
     }
 
-    explicit FunctionPointer(Kind kind, llvm::Value *value,
-                             PointerAuthInfo authInfo,
-                             const Signature &signature)
-        : FunctionPointer(kind, value, nullptr, authInfo, signature){};
+  public:
+    FunctionPointer()
+        : kind(FunctionPointer::Kind::Function), Value(nullptr),
+          SecondaryValue(nullptr) {}
 
-    // Temporary only!
-    explicit FunctionPointer(Kind kind, llvm::Value *value,
-                             const Signature &signature)
-      : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
+    static FunctionPointer createForAsyncCall(llvm::Value *value,
+                                              PointerAuthInfo authInfo,
+                                              const Signature &signature,
+                                              llvm::Type *awaitCallSignature) {
+      return FunctionPointer(FunctionPointer::Kind::Function, value, nullptr,
+                             authInfo, signature, awaitCallSignature);
+    }
+
+    static FunctionPointer createSigned(Kind kind, llvm::Value *value,
+                                        PointerAuthInfo authInfo,
+                                        const Signature &signature) {
+      return FunctionPointer(kind, value, authInfo, signature);
+    }
+
+    static FunctionPointer createUnsigned(Kind kind, llvm::Value *value,
+                                          const Signature &signature) {
+      return FunctionPointer(kind, value, signature);
+    }
 
     static FunctionPointer forDirect(IRGenModule &IGM, llvm::Constant *value,
                                      llvm::Constant *secondaryValue,
@@ -394,10 +421,7 @@ namespace irgen {
       return cast<llvm::Constant>(Value);
     }
 
-    llvm::FunctionType *getFunctionType() const {
-      return cast<llvm::FunctionType>(
-                                  Value->getType()->getPointerElementType());
-    }
+    llvm::FunctionType *getFunctionType() const;
 
     const PointerAuthInfo &getAuthInfo() const {
       return AuthInfo;

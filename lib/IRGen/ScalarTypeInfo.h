@@ -121,7 +121,7 @@ public:
     auto &IGM = IGF.IGM;
 
     // Store in multiples of bytes to avoid undefined bits.
-    auto storageTy = addr.getAddress()->getType()->getPointerElementType();
+    auto storageTy = addr.getElementType();
     if (storageTy->isIntegerTy() && (storageTy->getIntegerBitWidth() % 8)) {
       auto &Builder = IGF.Builder;
       auto nextByteSize = (storageTy->getIntegerBitWidth() + 7) & ~7UL;
@@ -130,7 +130,7 @@ public:
       auto newAddr =
           Address(Builder.CreatePointerCast(addr.getAddress(),
                                             nextByteSizedIntTy->getPointerTo()),
-                  addr.getAlignment());
+                  nextByteSizedIntTy, addr.getAlignment());
       auto newValue = Builder.CreateZExt(src.claimNext(), nextByteSizedIntTy);
       Builder.CreateStore(newValue, newAddr);
       return;

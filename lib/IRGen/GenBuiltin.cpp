@@ -336,8 +336,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::InitializeDefaultActor ||
       Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
     auto fn = Builtin.ID == BuiltinValueKind::InitializeDefaultActor
-                ? IGF.IGM.getDefaultActorInitializeFn()
-                : IGF.IGM.getDefaultActorDestroyFn();
+                  ? IGF.IGM.getDefaultActorInitializeFunctionPointer()
+                  : IGF.IGM.getDefaultActorDestroyFunctionPointer();
     auto actor = args.claimNext();
     actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
     auto call = IGF.Builder.CreateCall(fn, {actor});
@@ -430,7 +430,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     SmallVector<llvm::Value*, 8> IRArgs;
     for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
       IRArgs.push_back(args.claimNext());
-    llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
+    llvm::Value *TheCall = IGF.Builder.CreateIntrinsicCall(
+        (llvm::Intrinsic::ID)IID, ArgTys, IRArgs);
 
     if (!TheCall->getType()->isVoidTy())
       extractScalarResults(IGF, TheCall->getType(), TheCall, out);
@@ -479,28 +480,29 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
 #define BUILTIN_RUNTIME_CALL(id, name, attrs)                                  \
   if (Builtin.ID == BuiltinValueKind::id) {                                    \
-    auto *fn = cast<llvm::Function>(IGF.IGM.get##id##Fn());                    \
+    auto fn = IGF.IGM.get##id##FunctionPointer();                              \
     llvm::CallInst *call = IGF.Builder.CreateCall(fn, args.claimNext());       \
-    call->setCallingConv(fn->getCallingConv());                                \
-    call->setAttributes(fn->getAttributes());                                  \
     return out.add(call);                                                      \
   }
 
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, uncheckedID, attrs, overload) \
-if (Builtin.ID == BuiltinValueKind::id) { \
-  SmallVector<llvm::Type*, 2> ArgTys; \
-  auto opType = Builtin.Types[0]->getCanonicalType(); \
-  ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(opType)); \
-  auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module, \
-    getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), ArgTys); \
-  SmallVector<llvm::Value*, 2> IRArgs; \
-  IRArgs.push_back(args.claimNext()); \
-  IRArgs.push_back(args.claimNext()); \
-  args.claimNext();\
-  llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs); \
-  extractScalarResults(IGF, TheCall->getType(), TheCall, out);  \
-  return; \
-}
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, uncheckedID, attrs,   \
+                                               overload)                       \
+  if (Builtin.ID == BuiltinValueKind::id) {                                    \
+    SmallVector<llvm::Type *, 2> ArgTys;                                       \
+    auto opType = Builtin.Types[0]->getCanonicalType();                        \
+    ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(opType));                \
+    auto F = llvm::Intrinsic::getDeclaration(                                  \
+        &IGF.IGM.Module, getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID), \
+        ArgTys);                                                               \
+    SmallVector<llvm::Value *, 2> IRArgs;                                      \
+    IRArgs.push_back(args.claimNext());                                        \
+    IRArgs.push_back(args.claimNext());                                        \
+    args.claimNext();                                                          \
+    llvm::Value *TheCall = IGF.Builder.CreateCall(                             \
+        cast<llvm::FunctionType>(F->getValueType()), F, IRArgs);               \
+    extractScalarResults(IGF, TheCall->getType(), TheCall, out);               \
+    return;                                                                    \
+  }
   // FIXME: We could generate the code to dynamically report the overflow if the
   // third argument is true. Now, we just ignore it.
 
@@ -532,8 +534,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // willThrow is emitted like a Swift function call with the error in
     // the error return register. We also have to pass a fake context
     // argument due to how swiftcc works in clang.
-  
-    auto *fn = cast<llvm::Function>(IGF.IGM.getWillThrowFn());
+
+    auto fn = IGF.IGM.getWillThrowFunctionPointer();
     auto error = args.claimNext();
     auto errorTy = IGF.IGM.Context.getErrorExistentialType();
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
@@ -823,7 +825,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer, valueTy->getPointerTo());
 
     if (Builtin.ID == BuiltinValueKind::AtomicLoad) {
-      auto load = IGF.Builder.CreateLoad(pointer,
+      auto load = IGF.Builder.CreateLoad(pointer, valueTy,
                                          valueTI.getBestKnownAlignment());
       load->setAtomic(ordering, isSingleThread ? llvm::SyncScope::SingleThread
                                                : llvm::SyncScope::System);
@@ -887,14 +889,14 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto ToTy = cast<llvm::IntegerType>(
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType()));
 
+    auto FromTy = IGF.IGM.getStorageTypeForLowered(FromType);
+
     // Handle the arbitrary-precision truncate specially.
     if (isa<BuiltinIntegerLiteralType>(FromType)) {
-      emitIntegerLiteralCheckedTrunc(IGF, args, ToTy, Signed, out);
+      emitIntegerLiteralCheckedTrunc(IGF, args, IGF.IGM.SizeTy, ToTy, Signed,
+                                     out);
       return;
     }
-
-    auto FromTy =
-      IGF.IGM.getStorageTypeForLowered(FromType);
 
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
@@ -980,7 +982,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::BasicBlock *beforeBB = IGF.Builder.GetInsertBlock();
 
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
-      auto PredValue = IGF.Builder.CreateLoad(PredPtr,
+      auto PredValue = IGF.Builder.CreateLoad(PredPtr, IGF.IGM.OnceTy,
                                               IGF.IGM.getPointerAlignment());
       auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
                                                             *ExpectedPred);
@@ -998,8 +1000,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     }
     
     // Emit the runtime "once" call.
-    auto call
-      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode, Context});
+    auto call = IGF.Builder.CreateCall(IGF.IGM.getOnceFunctionPointer(),
+                                       {PredPtr, FnCode, Context});
     call->setCallingConv(IGF.IGM.DefaultCC);
     
     // If we emitted the "done" check inline, join the branches.
@@ -1008,7 +1010,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       IGF.Builder.SetInsertPoint(beforeBB);
       IGF.Builder.emitBlock(doneBB);
       // We can assume the once predicate is in the "done" state now.
-      auto PredValue = IGF.Builder.CreateLoad(PredPtr,
+      auto PredValue = IGF.Builder.CreateLoad(PredPtr, IGF.IGM.OnceTy,
                                               IGF.IGM.getPointerAlignment());
       auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
                                                             *ExpectedPred);
@@ -1206,8 +1208,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
         llvm::MaybeAlign(IGF.IGM.getAtomicBoolAlignment().getValue()));
     entrypointArgs[6] = llvm::ConstantExpr::getBitCast(flag, IGF.IGM.Int8PtrTy);
 
-    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(),
-                           entrypointArgs);
+    IGF.Builder.CreateCall(
+        IGF.IGM.getSwift3ImplicitObjCEntrypointFunctionPointer(),
+        entrypointArgs);
     return;
   }
   
@@ -1243,14 +1246,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::AutoDiffProjectTopLevelSubcontext) {
-    Address allocatorAddr(args.claimNext(), IGF.IGM.getPointerAlignment());
+    Address allocatorAddr(args.claimNext(), IGF.IGM.RefCountedStructTy,
+                          IGF.IGM.getPointerAlignment());
     out.add(
         emitAutoDiffProjectTopLevelSubcontext(IGF, allocatorAddr).getAddress());
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::AutoDiffAllocateSubcontext) {
-    Address allocatorAddr(args.claimNext(), IGF.IGM.getPointerAlignment());
+    Address allocatorAddr(args.claimNext(), IGF.IGM.RefCountedStructTy,
+                          IGF.IGM.getPointerAlignment());
     auto size = args.claimNext();
     out.add(
         emitAutoDiffAllocateSubcontext(IGF, allocatorAddr, size).getAddress());

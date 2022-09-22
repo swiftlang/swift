@@ -38,7 +38,7 @@ class C {
     return id(nil)
   }
   // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A12SelfArgumentACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself %0)
-  // CHECK: [[GEP1:%.+]] = getelementptr {{.*}} %0
+  // CHECK: [[GEP1:%.+]] = bitcast {{.*}} %0
   // CHECK: [[TYPE1:%.+]] = load {{.*}} [[GEP1]]
   // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$sSqMa"(i64 0, %swift.type* [[TYPE1]])
   // CHECK: [[TYPE2:%.+]] = extractvalue %swift.metadata_response [[T0]], 0
@@ -49,7 +49,7 @@ class C {
     return nil
   }
   // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A18SelfConformingTypeACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself %0)
-  // CHECK: [[SELF_GEP:%.+]] = getelementptr {{.*}} %0
+  // CHECK: [[SELF_GEP:%.+]] = bitcast {{.*}} %0
   // CHECK: [[SELF_TYPE:%.+]] = load {{.*}} [[SELF_GEP]]
   // CHECK: [[METADATA_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s21dynamic_self_metadata1GVMa"(i64 0, %swift.type* [[SELF_TYPE]])
   // CHECK: [[METADATA:%.*]] =  extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0

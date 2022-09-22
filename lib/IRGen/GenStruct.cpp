@@ -297,16 +297,13 @@ namespace {
           auto metadataBytes =
             IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
           auto fieldOffsetPtr = IGF.Builder.CreateInBoundsGEP(
-              metadataBytes->getType()
-                  ->getScalarType()
-                  ->getPointerElementType(),
-              metadataBytes,
+              IGF.IGM.Int8Ty, metadataBytes,
               IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
           fieldOffsetPtr =
             IGF.Builder.CreateBitCast(fieldOffsetPtr,
                                       IGF.IGM.Int32Ty->getPointerTo());
-          llvm::Value *fieldOffset =
-            IGF.Builder.CreateLoad(fieldOffsetPtr, Alignment(4));
+          llvm::Value *fieldOffset = IGF.Builder.CreateLoad(
+              Address(fieldOffsetPtr, IGF.IGM.Int32Ty, Alignment(4)));
           fieldOffset = IGF.Builder.CreateZExtOrBitCast(fieldOffset,
                                                         IGF.IGM.SizeTy);
 
@@ -619,7 +616,7 @@ namespace {
                              IGF.IGM.DataLayout);
       src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
                             IGF.IGM.DataLayout);
-      IGF.Builder.CreateCall(callee, {dest, src});
+      IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
     }
 
   public:
@@ -1472,7 +1469,7 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
-  llvm::Type *storageType = IGM.OpaquePtrTy->getPointerElementType();
+  llvm::Type *storageType = IGM.OpaqueTy;
   return new ResilientStructTypeInfo(storageType, abiAccessible);
 }
 

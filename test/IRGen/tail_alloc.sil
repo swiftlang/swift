@@ -199,8 +199,7 @@ bb0(%0 : $TestClass, %1 : $@thick T.Type):
 // CHECK-NEXT: [[S3:%[0-9]+]] = ptrtoint %Ts4Int8V* [[S2]] to i64
 // CHECK-NEXT: [[S4:%[0-9]+]] = add nuw i64 [[S3]], 3
 // CHECK-NEXT: [[S5:%[0-9]+]] = and i64 [[S4]], -4
-// CHECK-NEXT: [[S6:%[0-9]+]] = inttoptr i64 [[S5]] to %Ts4Int8V*
-// CHECK-NEXT: [[S7:%[0-9]+]] = bitcast %Ts4Int8V* [[S6]] to %Ts5Int32V*
+// CHECK-NEXT: [[S6:%[0-9]+]] = inttoptr i64 [[S5]] to %Ts5Int32V*
 // CHECK: ret
 sil @project_tail_index_byte_to_int : $@convention(thin) (Builtin.RawPointer, Int32) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Int32):
