@@ -3145,7 +3145,7 @@ public:
     friend KeyPathPatternComponent;
   public:
     enum KindType {
-      Property, Function, DeclRef,
+      Property, Function, DeclRef, EnumElement,
     };
   private:
   
@@ -3153,11 +3153,13 @@ public:
       AbstractStorageDecl *Property;
       SILFunction *Function;
       SILDeclRef DeclRef;
+      EnumElementDecl *EnumElement;
       
       ValueType() : Property(nullptr) {}
       ValueType(AbstractStorageDecl *p) : Property(p) {}
       ValueType(SILFunction *f) : Function(f) {}
       ValueType(SILDeclRef d) : DeclRef(d) {}
+      ValueType(EnumElementDecl *e) : EnumElement(e) {}
     } Value;
   
     KindType Kind;
@@ -3182,6 +3184,10 @@ public:
       : Value{declRef}, Kind{DeclRef}
     {}
     
+    /*implicit*/ ComputedPropertyId(EnumElementDecl *enumElement)
+      : Value{enumElement}, Kind{EnumElement}
+    {}
+
     KindType getKind() const { return Kind; }
     
     VarDecl *getProperty() const {
@@ -3198,6 +3204,11 @@ public:
       assert(getKind() == DeclRef);
       return Value.DeclRef;
     }
+
+    EnumElementDecl *getEnumElement() const {
+      assert(getKind() == EnumElement);
+      return Value.EnumElement;
+    }
   };
   
   enum class Kind: unsigned {
@@ -3208,6 +3219,8 @@ public:
     OptionalChain,
     OptionalForce,
     OptionalWrap,
+    EnumCase,
+    ComputedEnumCase,
   };
   
   // Description of a captured index value and its Hashable conformance for a
@@ -3232,9 +3245,11 @@ private:
     switch (k) {
     case Kind::StoredProperty:
     case Kind::TupleElement:
+    case Kind::EnumCase:
       return PackedStored;
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::ComputedEnumCase:
       return PackedComputed;
     case Kind::OptionalChain:
     case Kind::OptionalForce:
@@ -3265,6 +3280,8 @@ private:
   CanType ComponentType;
   AbstractStorageDecl *ExternalStorage;
   SubstitutionMap ExternalSubstitutions;
+
+  EnumElementDecl *EnumElement = nullptr;
 
   /// Constructor for stored components
   KeyPathPatternComponent(VarDecl *storedProp,
@@ -3309,6 +3326,19 @@ private:
   {
   }
 
+  /// Constructor for enum cases.
+  KeyPathPatternComponent(EnumElementDecl *enumElement, CanType componentType)
+      : ValueAndKind((void*)((uintptr_t)Kind::EnumCase << KindPackingBits), PackedStored),
+        ComponentType(componentType),
+        EnumElement(enumElement) {}
+
+  KeyPathPatternComponent(ComputedPropertyId id, SILFunction *getter,
+                          CanType componentType)
+      : ValueAndKind(getter, PackedComputed),
+        SetterAndIdKind{nullptr, id.Kind},
+        IdValue{id.Value},
+        ComponentType(componentType) {}
+
 public:
   KeyPathPatternComponent() : ValueAndKind(nullptr, 0) {}
 
@@ -3320,11 +3350,26 @@ public:
     auto packedKind = ValueAndKind.getInt();
     switch ((PackedKind)packedKind) {
     case PackedStored:
-      return TupleIndex
-        ? Kind::TupleElement : Kind::StoredProperty;
+      if (TupleIndex) {
+        return Kind::TupleElement;
+      }
+
+      if (EnumElement) {
+        return Kind::EnumCase;
+      }
+
+      return Kind::StoredProperty;
     case PackedComputed:
-      return SetterAndIdKind.getPointer()
-        ? Kind::SettableProperty : Kind::GettableProperty;
+      if (SetterAndIdKind.getPointer()) {
+        return Kind::SettableProperty;
+      } else {
+        if (SetterAndIdKind.getInt() ==
+            ComputedPropertyId::KindType::EnumElement) {
+          return Kind::ComputedEnumCase;
+        } else {
+          return Kind::GettableProperty;
+        }
+      }
     case Unpacked:
       return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
     }
@@ -3345,6 +3390,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
@@ -3357,9 +3404,11 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::ComputedEnumCase:
       return ComputedPropertyId(IdValue,
                                 SetterAndIdKind.getInt());
     }
@@ -3373,9 +3422,11 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::ComputedEnumCase:
       return static_cast<SILFunction*>(ValueAndKind.getPointer());
     }
     llvm_unreachable("unhandled kind");
@@ -3389,6 +3440,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
       return SetterAndIdKind.getPointer();
@@ -3403,6 +3456,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -3418,6 +3473,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -3432,6 +3489,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -3454,6 +3513,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -3469,6 +3530,8 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -3485,9 +3548,30 @@ public:
     case Kind::OptionalWrap:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not a tuple element");
     case Kind::TupleElement:
       return TupleIndex - 1;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  EnumElementDecl *getEnumElement() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+    case Kind::TupleElement:
+      llvm_unreachable("not a payload case");
+    case Kind::EnumCase:
+      return EnumElement;
+    case Kind::ComputedEnumCase: {
+      return IdValue.EnumElement;
+    }
     }
     llvm_unreachable("unhandled kind");
   }
@@ -3539,6 +3623,8 @@ public:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
     case Kind::TupleElement:
+    case Kind::EnumCase:
+    case Kind::ComputedEnumCase:
       llvm_unreachable("not an optional kind");
     }
     return KeyPathPatternComponent(kind, ty);
@@ -3549,6 +3635,17 @@ public:
     return KeyPathPatternComponent(tupleIndex, ty);
   }
   
+  static KeyPathPatternComponent forEnumCase(EnumElementDecl *enumElement,
+                                             CanType componentType) {
+    return KeyPathPatternComponent(enumElement, componentType);
+  }
+
+  static KeyPathPatternComponent forComputedEnumCase(ComputedPropertyId id,
+                                                     SILFunction *getter,
+                                                     CanType componentType) {
+    return KeyPathPatternComponent(id, getter, componentType);
+  }
+
   void visitReferencedFunctionsAndMethods(
       std::function<void (SILFunction *)> functionCallBack,
       std::function<void (SILDeclRef)> methodCallBack) const;

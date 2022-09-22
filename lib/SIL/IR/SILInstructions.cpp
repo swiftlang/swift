@@ -2412,6 +2412,8 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
   case Kind::TupleElement:
+  case Kind::EnumCase:
+  case Kind::ComputedEnumCase:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2431,6 +2433,10 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
   case KeyPathPatternComponent::Kind::TupleElement:
+  case KeyPathPatternComponent::Kind::EnumCase:
+    return;
+  case KeyPathPatternComponent::Kind::ComputedEnumCase:
+    forFunction(component.getComputedPropertyGetter());
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2446,6 +2452,8 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
       forFunction(component.getComputedPropertyId().getFunction());
       break;
     case KeyPathPatternComponent::ComputedPropertyId::Property:
+      break;
+    case KeyPathPatternComponent::ComputedPropertyId::EnumElement:
       break;
     }
     
@@ -2488,6 +2496,8 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::TupleElement:
+    case KeyPathPatternComponent::Kind::EnumCase:
+    case KeyPathPatternComponent::Kind::ComputedEnumCase:
       break;
     
     case KeyPathPatternComponent::Kind::GettableProperty:
@@ -2571,11 +2581,16 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::TupleElement:
       ID.AddInteger(component.getTupleIndex());
       break;
-    
+
+    case KeyPathPatternComponent::Kind::EnumCase:
+      ID.AddPointer(component.getEnumElement());
+      break;
+
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
       LLVM_FALLTHROUGH;
     case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::ComputedEnumCase:
       ID.AddPointer(component.getComputedPropertyGetter());
       auto id = component.getComputedPropertyId();
       ID.AddInteger(id.getKind());
@@ -2596,10 +2611,19 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
         ID.AddPointer(id.getProperty());
         break;
       }
+      case KeyPathPatternComponent::ComputedPropertyId::EnumElement: {
+        ID.AddPointer(id.getEnumElement());
+        break;
       }
-      profileIndices(component.getSubscriptIndices());
-      ID.AddPointer(component.getExternalDecl());
-      component.getExternalSubstitutions().profile(ID);
+      }
+
+      if (component.getKind() !=
+          KeyPathPatternComponent::Kind::ComputedEnumCase) {
+        profileIndices(component.getSubscriptIndices());
+        ID.AddPointer(component.getExternalDecl());
+        component.getExternalSubstitutions().profile(ID);
+      }
+
       break;
     }
   }
@@ -2676,6 +2700,9 @@ visitReferencedFunctionsAndMethods(
       std::function<void (SILFunction *)> functionCallBack,
       std::function<void (SILDeclRef)> methodCallBack) const {
   switch (getKind()) {
+  case KeyPathPatternComponent::Kind::ComputedEnumCase:
+    functionCallBack(getComputedPropertyGetter());
+    break;
   case KeyPathPatternComponent::Kind::SettableProperty:
     functionCallBack(getComputedPropertySetter());
     LLVM_FALLTHROUGH;
@@ -2692,6 +2719,8 @@ visitReferencedFunctionsAndMethods(
       break;
     case KeyPathPatternComponent::ComputedPropertyId::Property:
       break;
+    case KeyPathPatternComponent::ComputedPropertyId::EnumElement:
+      break;
     }
 
     if (auto equals = getSubscriptIndexEquals())
@@ -2706,6 +2735,7 @@ visitReferencedFunctionsAndMethods(
   case KeyPathPatternComponent::Kind::OptionalForce:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::TupleElement:
+  case KeyPathPatternComponent::Kind::EnumCase:
     break;
   }
 }

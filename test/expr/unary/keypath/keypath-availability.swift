@@ -32,4 +32,3 @@ public func conditionalAvailableSetterContext() {
         assertExactType(of: &kp, is: KeyPath<Butt, Int>.self)
     }
 }
-

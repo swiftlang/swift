@@ -1195,6 +1195,22 @@ bool AllowInvalidRefInKeyPath::isEqual(const ConstraintFix *other) const {
 }
 
 AllowInvalidRefInKeyPath *
+AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, OverloadChoice choice,
+                                 ConstraintLocator *locator) {
+  auto member = choice.getDecl();
+
+  // It's possible for a keypath to refer to enum cases, however they cannot do
+  // so if the referenced type is the metatype of the enum.
+  if (isa<EnumElementDecl>(member) &&
+      choice.getBaseType()->getRValueType()->is<AnyMetatypeType>()) {
+    return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
+                                            locator);
+  }
+
+  return AllowInvalidRefInKeyPath::forRef(cs, member, locator);
+}
+
+AllowInvalidRefInKeyPath *
 AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
                                  ConstraintLocator *locator) {
   // Referencing (instance or static) methods in key path is
@@ -1202,12 +1218,6 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
   if (isa<FuncDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
                                             locator);
-
-  // Referencing enum cases in key path is not currently allowed.
-  if (isa<EnumElementDecl>(member)) {
-    return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
-                                            locator);
-  }
 
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))

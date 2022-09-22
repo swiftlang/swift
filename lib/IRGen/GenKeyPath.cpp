@@ -21,6 +21,7 @@
 #include "Explosion.h"
 #include "GenClass.h"
 #include "GenDecl.h"
+#include "GenEnum.h"
 #include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
@@ -1025,7 +1026,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       }
       break;
     }
-    case KeyPathPatternComponent::ComputedPropertyId::Property:
+    case KeyPathPatternComponent::ComputedPropertyId::Property: {
       // Use the index of the stored property within the aggregate to key
       // the property.
       auto property = id.getProperty();
@@ -1084,6 +1085,14 @@ emitKeyPathComponent(IRGenModule &IGM,
         llvm_unreachable("neither struct nor class");
       }
       break;
+    }
+
+    // This should only occur with ComputedEnumCase component kinds.
+    case KeyPathPatternComponent::ComputedPropertyId::EnumElement: {
+      llvm_unreachable("enum element computed property id kind on a non \
+                        computed enum case component kind");
+      break;
+    }
     }
     
     auto header = KeyPathComponentHeader::forComputedProperty(componentKind,
@@ -1158,7 +1167,7 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::OptionalWrap:
     fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
     break;
-  case KeyPathPatternComponent::Kind::TupleElement:
+  case KeyPathPatternComponent::Kind::TupleElement: {
     assert(baseTy->is<TupleType>() && "not a tuple");
 
     SILType loweredTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
@@ -1193,6 +1202,98 @@ emitKeyPathComponent(IRGenModule &IGM,
     break;
 
     llvm_unreachable("could not get tuple element offset");
+  }
+
+  case KeyPathPatternComponent::Kind::EnumCase: {
+    auto enumElement = component.getEnumElement();
+    auto enumDecl = enumElement->getParentEnum();
+    auto enumTy = enumDecl->getDeclaredTypeInContext()->getCanonicalType();
+
+    // If our enum is resilient, it may reorder and add cases as it pleases.
+    // In light of that, we cannot emit a hard coded case tag into clients
+    // because future versions of this enum may not be identical as when the
+    // client compiled their code. Emit a relative indirect pointer to the
+    // enum's case global which stores its tag.
+    if (IGM.isResilient(enumDecl, ResilienceExpansion::Minimal)) {
+      auto enumCase = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forEnumCase(enumElement));
+
+      auto header = KeyPathComponentHeader::forEnumCase();
+
+      fields.addInt32(header.getData());
+      fields.addRelativeAddress(enumCase);
+    } else {
+      // Otherwise, this enum is either part of a library not participating in
+      // library evolution, we're in said library/executable and will always
+      // be compiled with new tags, or the enum is marked '@frozen'.
+      auto &strategy = getEnumImplStrategy(IGM, enumTy);
+      auto tag = strategy.getTagIndex(enumElement);
+
+      auto header = KeyPathComponentHeader::forEnumCase(tag);
+
+      fields.addInt32(header.getData());
+    }
+
+    break;
+  }
+
+  case KeyPathPatternComponent::Kind::ComputedEnumCase: {
+    auto enumElement = component.getEnumElement();
+    auto enumDecl = enumElement->getParentEnum();
+    auto enumTy = enumDecl->getDeclaredTypeInContext()->getCanonicalType();
+    auto &strategy = getEnumImplStrategy(IGM, enumTy);
+
+    // Lower the id reference.
+    KeyPathComponentHeader::ComputedPropertyIDKind idKind;
+    llvm::Constant *idValue;
+    KeyPathComponentHeader::ComputedPropertyIDResolution idResolution;
+
+    if (IGM.isResilient(enumDecl, ResilienceExpansion::Minimal)) {
+      idKind = KeyPathComponentHeader::Pointer;
+
+      auto enumCase = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forEnumCase(enumElement));
+
+      idValue = enumCase.getValue();
+      idResolution = enumCase.isIndirect()
+          ? KeyPathComponentHeader::IndirectPointer
+          : KeyPathComponentHeader::Resolved;
+    } else {
+      idKind = KeyPathComponentHeader::StoredPropertyIndex;
+      auto tag = strategy.getTagIndex(enumElement);
+      idValue = llvm::ConstantInt::get(IGM.Int32Ty, tag);
+      idResolution = KeyPathComponentHeader::Resolved;
+    }
+
+    auto header = KeyPathComponentHeader::forComputedEnumCase(idKind,
+                                                              idResolution);
+
+    fields.addInt32(header.getData());
+
+    switch (idKind) {
+    case KeyPathComponentHeader::Pointer: {
+      fields.addRelativeAddress(idValue);
+      break;
+    }
+
+    case KeyPathComponentHeader::StoredPropertyIndex: {
+      // Store the offset as an i32.
+      fields.add(llvm::ConstantExpr::getTruncOrBitCast(idValue, IGM.Int32Ty));
+      break;
+    }
+
+    default:
+      llvm_unreachable("unknown computed id for computed enum case");
+      break;
+    }
+
+    fields.addCompactFunctionReference(
+      getAccessorForComputedComponent(IGM, component, Getter,
+                                      genericEnv, requirements,
+                                      hasSubscriptIndices));
+
+    break;
+  }
   }
 }
 
@@ -1286,6 +1387,8 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::TupleElement:
+    case KeyPathPatternComponent::Kind::EnumCase:
+    case KeyPathPatternComponent::Kind::ComputedEnumCase:
       break;
     }
   }

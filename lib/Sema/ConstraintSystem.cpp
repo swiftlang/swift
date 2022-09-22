@@ -524,6 +524,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::TupleElement:
       llvm_unreachable("Not implemented by CSGen");
       break;
+    case ComponentKind::EnumCase:
+      llvm_unreachable("Not implemented by CSGen");
+      break;
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -3526,6 +3529,27 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
         // Otherwise both `Self` and arguments are applied,
         // e.g. `foo.bar()` or `Foo.bar(&foo)()`, and there is nothing to do.
+      }
+    }
+
+    // If we're referring to an overload of an enum element as a key path
+    // component, the resulting ref type will be (...) -> Root. In this case,
+    // we want our component type to actually be the optional tuple of the
+    // parameter types (...)?.
+    if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
+      if (locator->isLastElement<LocatorPathElt::KeyPathComponent>()) {
+        if (auto fnTy = refType->getAs<FunctionType>()) {
+          refType = FunctionType::composeTuple(getASTContext(),
+                                               fnTy->getParams(),
+                                            ParameterFlagHandling::AssertEmpty);
+          refType = refType->getDesugaredType();
+          refType = OptionalType::get(refType);
+        } else {
+          // Otherwise, this is a non-payload case
+          refType = OptionalType::get(getASTContext().TheEmptyTupleType);
+        }
+
+        adjustedRefType = refType;
       }
     }
   }

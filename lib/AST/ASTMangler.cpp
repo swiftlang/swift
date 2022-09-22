@@ -280,6 +280,29 @@ std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
 }
 
 std::string ASTMangler::mangleKeyPathGetterThunkHelper(
+                                            const EnumElementDecl *enumElement,
+                                            GenericSignature signature,
+                                            CanType baseType,
+                                            SubstitutionMap sub,
+                                            ResilienceExpansion expansion) {
+  beginMangling();
+  appendEntity(enumElement);
+
+  if (signature) {
+    appendGenericSignature(signature);
+  }
+
+  appendType(baseType, signature);
+  appendOperator("TK");
+
+  if (expansion == ResilienceExpansion::Minimal) {
+    appendOperator("q");
+  }
+
+  return finalize();
+}
+
+std::string ASTMangler::mangleKeyPathGetterThunkHelper(
                                             const AbstractStorageDecl *property,
                                             GenericSignature signature,
                                             CanType baseType,

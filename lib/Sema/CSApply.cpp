@@ -309,6 +309,8 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       // when indexing a Dictionary or NSDictionary by string, or when applying
       // a mapping subscript operation to Array/Set or NSArray/NSSet.
       return false;
+    case KeyPathExpr::Component::Kind::EnumCase:
+      return false;
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -4802,6 +4804,7 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
+      bool didOptionalChainWithSomeCase = false;
       bool isFunctionType = false;
       Type baseTy, leafTy;
       Type exprType = cs.getType(E);
@@ -4863,6 +4866,15 @@ namespace {
           buildKeyPathPropertyComponent(solution.getOverloadChoice(calleeLoc),
                                         origComponent.getLoc(), calleeLoc,
                                         resolvedComponents);
+
+          // We may have potentially optional chained if the property in
+          // question was referring to Optional.some.
+          if (resolvedComponents.back().getKind() ==
+              KeyPathExpr::Component::Kind::OptionalChain) {
+            didOptionalChain = true;
+            didOptionalChainWithSomeCase = true;
+          }
+
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -4873,6 +4885,14 @@ namespace {
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
+          // If we have already chained, do not add another chain. This can
+          // occur if we had an unresolved property resolve to Optional.some.
+          // E.g. \(Int, Int)?.some?.1 resolves the .some to an optional chain.
+          if (didOptionalChainWithSomeCase) {
+            didOptionalChainWithSomeCase = false;
+            continue;
+          }
+
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
           auto objectTy =
@@ -4919,6 +4939,7 @@ namespace {
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:
         case KeyPathExpr::Component::Kind::TupleElement:
+        case KeyPathExpr::Component::Kind::EnumCase:
           llvm_unreachable("already resolved");
           break;
         case KeyPathExpr::Component::Kind::DictionaryKey:
@@ -4949,7 +4970,7 @@ namespace {
       // See whether there's an equivalent ObjC key path string we can produce
       // for interop purposes.
       checkAndSetObjCKeyPathString(E);
-      
+
       // The final component type ought to line up with the leaf type of the
       // key path.
       assert(!componentTy || componentTy->hasUnresolvedType()
@@ -5104,19 +5125,43 @@ namespace {
         ConstraintLocator *locator,
         SmallVectorImpl<KeyPathExpr::Component> &components) {
       auto resolvedTy = simplifyType(overload.adjustedOpenedType);
-      if (auto *property = overload.choice.getDeclOrNull()) {
-        // Key paths can only refer to properties currently.
-        auto varDecl = cast<VarDecl>(property);
-        // Key paths don't work with mutating-get properties.
-        assert(!varDecl->isGetterMutating());
-        // Key paths don't currently support static members.
-        // There is a fix which diagnoses such situation already.
-        assert(!varDecl->isStatic());
+      if (auto *decl = overload.choice.getDeclOrNull()) {
+        if (auto var = dyn_cast<VarDecl>(decl)) {
+          // Key paths can only refer to properties currently.
+          auto varDecl = cast<VarDecl>(decl);
+          // Key paths don't work with mutating-get properties.
+          assert(!varDecl->isGetterMutating());
+          // Key paths don't currently support static members.
+          // There is a fix which diagnoses such situation already.
+          assert(!varDecl->isStatic());
 
-        // Compute the concrete reference to the member.
-        auto ref = resolveConcreteDeclRef(property, locator);
-        components.push_back(
-            KeyPathExpr::Component::forProperty(ref, resolvedTy, componentLoc));
+          // Compute the concrete reference to the member.
+          auto ref = resolveConcreteDeclRef(decl, locator);
+          components.push_back(
+              KeyPathExpr::Component::forProperty(ref, resolvedTy,
+                                                  componentLoc));
+        } else if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
+          auto ref = resolveConcreteDeclRef(decl, locator);
+
+          // If our ref is Optional.some, lower that as the start of an optional
+          // chain.
+          if (auto type =
+                dyn_cast<NominalTypeDecl>(ref.getDecl()->getDeclContext())) {
+            if (type->isOptionalDecl()) {
+              auto objectTy = resolvedTy->getWithoutSpecifierType()
+                                        ->getOptionalObjectType();
+              components.push_back(
+                KeyPathExpr::Component::forOptionalChain(objectTy,
+                                                         componentLoc));
+            } else {
+              components.push_back(
+                  KeyPathExpr::Component::forEnumCase(ref, resolvedTy,
+                                                      componentLoc));
+            }
+          }
+        } else {
+          llvm_unreachable("Unknown keypath property decl kind");
+        }
       } else {
         auto fieldIndex = overload.choice.getTupleIndex();
         components.push_back(KeyPathExpr::Component::forTupleElement(

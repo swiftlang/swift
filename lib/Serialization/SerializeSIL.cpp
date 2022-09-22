@@ -806,6 +806,11 @@ SILSerializer::writeKeyPathPatternComponent(
         (unsigned)KeyPathComputedComponentIdKindEncoding::DeclRef);
       handleSILDeclRef(S, id.getDeclRef(), ListOfValues);
       break;
+    case KeyPathPatternComponent::ComputedPropertyId::EnumElement:
+      ListOfValues.push_back(
+        (unsigned)KeyPathComputedComponentIdKindEncoding::EnumElement);
+      ListOfValues.push_back(S.addDeclRef(id.getEnumElement()));
+      break;
     }
   };
   auto handleComputedExternalReferenceAndIndices
@@ -865,6 +870,16 @@ SILSerializer::writeKeyPathPatternComponent(
   case KeyPathPatternComponent::Kind::TupleElement:
     handleComponentCommon(KeyPathComponentKindEncoding::TupleElement);
     ListOfValues.push_back((unsigned)component.getTupleIndex());
+    break;
+  case KeyPathPatternComponent::Kind::EnumCase:
+    handleComponentCommon(KeyPathComponentKindEncoding::EnumCase);
+    ListOfValues.push_back(S.addDeclRef(component.getEnumElement()));
+    break;
+  case KeyPathPatternComponent::Kind::ComputedEnumCase:
+    handleComponentCommon(KeyPathComponentKindEncoding::ComputedEnumCase);
+    handleComputedId(component.getComputedPropertyId());
+    ListOfValues.push_back(
+                  addSILFunctionRef(component.getComputedPropertyGetter()));
     break;
   }
 }

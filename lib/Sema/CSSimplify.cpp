@@ -8542,6 +8542,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
       return;
     } else {
+      // If we're handling with keypath components, check if the candiate is
+      // from an enum and is a case with associated values. If it is, then we
+      // will accept the candidate.
+      if (memberLocator &&
+          memberLocator->isLastElement<LocatorPathElt::KeyPathComponent>()) {
+        if (auto enumElement = 
+              dyn_cast_or_null<EnumElementDecl>(candidate.getDecl())) {
+          result.addViable(candidate);
+          return;
+        }
+      }
+
       if (!hasStaticMembers) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_TypeMemberOnInstance);
@@ -9029,7 +9041,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     }
 
     if (locator->isForKeyPathDynamicMemberLookup()) {
-      if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, decl, locator))
+      if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, choice, locator))
         return fix;
     }
   }
@@ -10892,7 +10904,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
       if (auto *fix = AllowInvalidRefInKeyPath::forRef(
-              *this, choice.getDecl(), calleeLoc)) {
+              *this, choice, calleeLoc)) {
         if (!hasFixFor(calleeLoc, FixKind::AllowTypeOrInstanceMember))
           if (!shouldAttemptFixes() || recordFix(fix))
             return SolutionKind::Error;
@@ -10902,6 +10914,11 @@ ConstraintSystem::simplifyKeyPathConstraint(
           capability = ReadOnly;
           continue;
         }
+      }
+
+      if (isa<EnumElementDecl>(choice.getDecl())) {
+        capability = ReadOnly;
+        continue;
       }
 
       if (!storage)
@@ -10938,8 +10955,13 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::TupleElement:
       llvm_unreachable("not implemented");
       break;
+
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
+
+    case KeyPathExpr::Component::Kind::EnumCase:
+      llvm_unreachable("not implemented");
       break;
     }
   }

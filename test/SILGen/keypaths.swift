@@ -49,6 +49,20 @@ struct T {
   let c: (x: C<Int>, y: C<String>)
 }
 
+enum Color {
+  case red
+  case green
+  case blue
+  case generic(String)
+}
+
+enum GenericColor<T> {
+  case red
+  case green
+  case blue
+  case generic(T)
+}
+
 /* TODO: When we support superclass requirements on protocols, we should test
  * this case as well.
 protocol PoC : C<Int> {}
@@ -594,6 +608,26 @@ func tuples_generic<T, U, V>(_: T, _: U, _: V) {
   let _: ReferenceWritableKeyPath<TUC, V> = \TUC.2.x
   // CHECK: keypath $KeyPath<(T, U, C<V>), String>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #2 : $C<τ_0_2>; stored_property #C.y : $String) <T, U, V>
   let _: KeyPath<TUC, String> = \TUC.2.y
+}
+
+func payloadCases(_: Color) {
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+  let _ = \Color.generic
+
+  // The following produces a "self" KVC objc keypath.
+  // keypath $KeyPath<Optional<Int>, Optional<Int>>, (objc "self"; root $Optional<Int>; optional_chain : $Int; optional_wrap : $Optional<Int>)
+  let _ = \Int?.some
+
+  // CHECK: keypath $KeyPath<Optional<(Int, Int)>, Optional<Int>>, (root $Optional<(Int, Int)>; optional_chain : $(Int, Int); tuple_element #1 : $Int; optional_wrap : $Optional<Int>)
+  let _ = \(Int, Int)?.some?.1
+}
+
+func payloadCasesGeneric<T, U>(_: T, _: U) {
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  let _ = \(T, U)?.some?.1
+
+  // CHECK: keypath $KeyPath<GenericColor<T>, Optional<T>>, <τ_0_0, τ_0_1> (root $GenericColor<τ_0_0>; enum_case #GenericColor.generic : $Optional<τ_0_0>) <T, U>
+  let _ = \GenericColor<T>.generic
 }
 
 protocol DefineSomeType {

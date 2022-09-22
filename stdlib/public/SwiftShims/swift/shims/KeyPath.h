@@ -55,6 +55,8 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalTag
   = 4;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ExternalTag
   = 0;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_PayloadCaseTag
+  = 5;
 
 static const __swift_uint32_t
 _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker = 0U;
@@ -131,6 +133,7 @@ static const __swift_uint16_t _SwiftKeyPath_ptrauth_MutatingSetter = 0x7469;
 static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentLayout = 0x6373;
 static const __swift_uint16_t _SwiftKeyPath_ptrauth_ArgumentInit = 0x6275;
 static const __swift_uint16_t _SwiftKeyPath_ptrauth_MetadataAccessor = 0x7474;
+//static const __swift_uint16_t _SwiftKeyPath_ptrauth_ValueWitnessTable = ;
 
 #ifdef __cplusplus
 } // extern "C"

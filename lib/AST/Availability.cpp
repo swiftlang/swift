@@ -442,6 +442,11 @@ ASTContext::getImmortalRefCountSymbolsAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext
+ASTContext::getPayloadCaseKeyPathAvailability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 

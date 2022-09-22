@@ -2682,6 +2682,59 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       
     component = KeyPathPatternComponent::forTupleElement(tupleIndex, ty);
     return false;
+  } else if (componentKind.str() == "enum_case")  {
+    ValueDecl *enumElement;
+    CanType ty;
+
+    if (parseSILDottedPath(enumElement)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar,
+                        diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternSig, patternParams)) {
+      return true;
+    }
+
+    component =
+      KeyPathPatternComponent::forEnumCase(cast<EnumElementDecl>(enumElement),
+                                           ty);
+    return false;
+  } else if (componentKind.str() == "computed_enum_case") {
+    ValueDecl *enumElement;
+    CanType ty;
+
+    if (parseSILDottedPath(enumElement)
+        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+        || P.parseToken(tok::sil_dollar,
+                        diag::expected_tok_in_sil_instr, "$")
+        || parseASTType(ty, patternSig, patternParams)) {
+      return true;
+    }
+
+    Identifier getterIden;
+    SourceLoc getterIdenLoc;
+
+    if (parseSILIdentifier(getterIden, getterIdenLoc,
+                           diag::sil_keypath_expected_component_kind)) {
+      return true;
+    }
+
+    if (getterIden.str() != "getter") {
+      P.diagnose(getterIdenLoc, diag::sil_keypath_unknown_component_kind,
+                 getterIden);
+      return true;
+    }
+
+    SILFunction *getter = nullptr;
+
+    if (parseSILFunctionRef(InstLoc, getter)) {
+      return true;
+    }
+
+    KeyPathPatternComponent::ComputedPropertyId id(
+        cast<EnumElementDecl>(enumElement));
+
+    component = KeyPathPatternComponent::forComputedEnumCase(id, getter, ty);
+    return false;
   } else {
     P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                componentKind);

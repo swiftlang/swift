@@ -3422,7 +3422,7 @@ private:
     if (KP->isObjC())
       flags = DeclAvailabilityFlag::ForObjCKeyPath;
 
-    for (auto &component : KP->getComponents()) {
+    for (auto &component : KP->getMutableComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::Subscript: {
@@ -3432,8 +3432,23 @@ private:
         break;
       }
 
-      case KeyPathExpr::Component::Kind::TupleElement:
+      // Enum case keypaths were introduced in Swift 5.*
+      case KeyPathExpr::Component::Kind::EnumCase: {
+        auto enumElement = component.getDeclRef();
+        auto loc = component.getLoc();
+        auto runningOS = Where.getAvailabilityContext();
+        auto availability = Context.getPayloadCaseKeyPathAvailability();
+
+        // If our availability context is less than 5.*, back deploy enum
+        // case by emitting a computed read only getter for older clients.
+        if (!runningOS.isContainedIn(availability)) {
+          component.setEnumCaseRequiresComputedGetter(true);
+        }
+
+        // Otherwise, diagnose potential availability issues with the enum decl.
+        diagnoseDeclRefAvailability(enumElement, loc, nullptr, flags);
         break;
+      }
 
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
@@ -3444,6 +3459,7 @@ private:
       case KeyPathExpr::Component::Kind::Identity:
       case KeyPathExpr::Component::Kind::DictionaryKey:
       case KeyPathExpr::Component::Kind::CodeCompletion:
+      case KeyPathExpr::Component::Kind::TupleElement:
         break;
       }
     }

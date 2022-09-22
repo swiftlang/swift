@@ -182,7 +182,8 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
         case .struct:
           offset += rawComponent._structOrClassOffset
 
-        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap,
+             .external, .payloadCase:
           return .none
         }
 
@@ -441,6 +442,10 @@ internal enum KeyPathComponentKind {
   case optionalForce
   /// The keypath wraps a value in an optional.
   case optionalWrap
+  /// The keypath refers to an enum case with an associated value. Accessing
+  /// this kind of component returns an optional of a tuple of the associated
+  /// value types.
+  case payloadCase
 }
 
 internal struct ComputedPropertyID: Hashable {
@@ -661,6 +666,8 @@ internal enum KeyPathComponent: Hashable {
   case optionalForce
   /// The keypath wraps a value in an optional.
   case optionalWrap
+  /// The keypath references an enum case with an associated value.
+  case payloadCase(tag: Int)
 
   internal static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
     switch (a, b) {
@@ -692,6 +699,8 @@ internal enum KeyPathComponent: Hashable {
       // only arguments in that component were generic captures and therefore
       // not affecting equality.
       return true
+    case(.payloadCase(let tagA), .payloadCase(let tagB)):
+      return tagA == tagB
     case (.struct, _),
          (.class,  _),
          (.optionalChain, _),
@@ -699,7 +708,8 @@ internal enum KeyPathComponent: Hashable {
          (.optionalWrap, _),
          (.get, _),
          (.mutatingGetSet, _),
-         (.nonmutatingGetSet, _):
+         (.nonmutatingGetSet, _),
+         (.payloadCase, _):
       return false
     }
   }
@@ -746,6 +756,9 @@ internal enum KeyPathComponent: Hashable {
       hasher.combine(7)
       hasher.combine(id)
       appendHashFromArgument(argument)
+    case .payloadCase(let tag):
+      hasher.combine(8)
+      hasher.combine(tag)
     }
   }
 }
@@ -974,6 +987,8 @@ internal struct RawKeyPathComponent {
         return .optionalWrap
       case (Header.optionalTag, Header.optionalForcePayload):
         return .optionalForce
+      case (Header.payloadCaseTag, _):
+        return .payloadCase
       default:
         _internalInvariantFailure("invalid header")
       }
@@ -1011,6 +1026,9 @@ internal struct RawKeyPathComponent {
     }
     internal static var optionalForcePayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalForcePayload
+    }
+    internal static var payloadCaseTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_PayloadCaseTag
     }
 
     internal static var endOfReferencePrefixFlag: UInt32 {
@@ -1202,6 +1220,15 @@ internal struct RawKeyPathComponent {
       case .optionalForce, .optionalChain, .optionalWrap:
         // Otherwise, there's no body.
         return 0
+
+      case .payloadCase:
+        // If the enum in question was resilient, we would have stored a
+        // relative reference to the enum case symbol.
+        if payload == Header.outOfLineOffsetPayload {
+          return 4
+        }
+
+        return 0
       }
     }
 
@@ -1218,6 +1245,11 @@ internal struct RawKeyPathComponent {
     init(optionalChain: ()) {
       self.init(discriminator: Header.optionalTag,
                 payload: Header.optionalChainPayload)
+    }
+
+    init(payloadCaseTag: Int) {
+      self.init(discriminator: Header.payloadCaseTag,
+                payload: UInt32(payloadCaseTag))
     }
 
     init(stored kind: KeyPathStructOrClass,
@@ -1306,6 +1338,14 @@ internal struct RawKeyPathComponent {
         }
       }
       return total
+    case .payloadCase:
+      // If the enum in question was resilient, we would have stored a
+      // relative reference to the enum case symbol.
+      if header.payload == Header.outOfLineOffsetPayload {
+        return 4
+      }
+
+      return 0
     }
   }
 
@@ -1391,6 +1431,12 @@ internal struct RawKeyPathComponent {
     return 0
   }
 
+  internal var _payloadCaseTag: Int {
+    _internalInvariant(header.kind == .payloadCase)
+
+    return Int(header.payload)
+  }
+
   internal var value: KeyPathComponent {
     switch header.kind {
     case .struct:
@@ -1437,6 +1483,8 @@ internal struct RawKeyPathComponent {
       }
     case .external:
       _internalInvariantFailure("should have been instantiated away")
+    case .payloadCase:
+      return .payloadCase(tag: _payloadCaseTag)
     }
   }
 
@@ -1446,7 +1494,8 @@ internal struct RawKeyPathComponent {
          .class,
          .optionalChain,
          .optionalForce,
-         .optionalWrap:
+         .optionalWrap,
+         .payloadCase:
       // trivial
       break
     case .computed:
@@ -1480,6 +1529,8 @@ internal struct RawKeyPathComponent {
     case .optionalChain,
          .optionalForce,
          .optionalWrap:
+      break
+    case .payloadCase:
       break
     case .computed:
       // Fields are pointer-aligned after the header
@@ -1633,6 +1684,13 @@ internal struct RawKeyPathComponent {
                    "should be wrapping optional value")
       return .continue(
         unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
+
+    case .payloadCase(let tag):
+      guard _getEnumTag(of: base) == tag else {
+        return .continue((Optional<()>.none as any Any) as! NewValue)
+      }
+
+      return .continue(_getEnumPayload(from: base))
     }
   }
 
@@ -1717,7 +1775,7 @@ internal struct RawKeyPathComponent {
       _ = baseOptionalPointer.pointee!
       return base
     
-    case .optionalChain, .optionalWrap, .get:
+    case .optionalChain, .optionalWrap, .get, .payloadCase:
       _internalInvariantFailure("not a mutable key path component")
     }
   }
@@ -2675,6 +2733,97 @@ internal func _resolveKeyPathMetadataReference(
            to: Any.Type.self)
 }
 
+typealias GetEnumTag = @convention(c) (
+  /* enum value*/ UnsafeRawPointer,
+  /* metadata */ UnsafeRawPointer
+) -> UInt32
+
+typealias DestructiveProjectEnumData = @convention(c) (
+  /* enum value */ UnsafeRawPointer,
+  /* metadata */ UnsafeRawPointer
+) -> ()
+
+internal func _getEnumTag<T>(of value: T) -> Int {
+  let metadata = unsafeBitCast(
+    T.self as any Any.Type,
+    to: UnsafeRawPointer.self
+  )
+
+  // Enum metadata kind == 0x201 or Optional metadata kind == 0x202
+  let metadataKind = metadata.load(as: Int.self)
+  guard metadataKind == 0x201 || metadataKind == 0x202 else {
+    fatalError("cannot get enum tag of non enum type")
+  }
+
+  // VWT pointer is one word behind the metadata pointer
+  let vwtPtr = metadata.load(
+    fromByteOffset: -MemoryLayout<Int>.size,
+    as: UnsafeRawPointer.self
+  )
+
+  // The getEnumTag function is 11 words away from the start of the VWT.
+  let getEnumTagPtr = vwtPtr.load(
+    fromByteOffset: MemoryLayout<Int>.size * 11,
+    as: UnsafeRawPointer.self
+  )
+
+  let getEnumTagPtrSigned = _PtrAuth.sign(
+    pointer: getEnumTagPtr,
+    key: .processIndependentCode,
+    discriminator: _PtrAuth.discriminator(for: GetEnumTag.self)
+  )
+
+  let getEnumTag = unsafeBitCast(getEnumTagPtrSigned, to: GetEnumTag.self)
+
+  return withUnsafePointer(to: value) {
+    Int(getEnumTag(UnsafeRawPointer($0), metadata))
+  }
+}
+
+internal func _getEnumPayload<T, Payload>(from value: T) -> Payload {
+  let metadata = unsafeBitCast(
+    T.self as any Any.Type,
+    to: UnsafeRawPointer.self
+  )
+
+  // Enum metadata kind == 0x201 or Optional metadata kind == 0x202
+  let metadataKind = metadata.load(as: Int.self)
+  guard metadataKind == 0x201 || metadataKind == 0x202 else {
+    fatalError("cannot get enum payload of non enum type")
+  }
+
+  // VWT pointer is one word behind the metadata pointer
+  let vwtPtr = metadata.load(
+    fromByteOffset: -MemoryLayout<Int>.size,
+    as: UnsafeRawPointer.self
+  )
+
+  let destructiveProjectEnumDataPtr = vwtPtr.load(
+    fromByteOffset: MemoryLayout<Int>.size * 12,
+    as: UnsafeRawPointer.self
+  )
+
+  let destructiveProjectEnumDataPtrSigned = _PtrAuth.sign(
+    pointer: destructiveProjectEnumDataPtr,
+    key: .processIndependentCode,
+    discriminator: _PtrAuth.discriminator(for: DestructiveProjectEnumData.self)
+  )
+
+  let destructiveProjectEnumData = unsafeBitCast(
+    destructiveProjectEnumDataPtrSigned,
+    to: DestructiveProjectEnumData.self
+  )
+
+  var value = value
+
+  return withUnsafePointer(to: &value) {
+    let pointer = UnsafeRawPointer($0)
+    destructiveProjectEnumData(pointer, metadata)
+
+    return pointer.load(as: Payload.self)
+  }
+}
+
 internal enum KeyPathStructOrClass {
   case `struct`, `class`
 }
@@ -2710,6 +2859,7 @@ internal protocol KeyPathPatternVisitor {
   mutating func visitOptionalChainComponent()
   mutating func visitOptionalForceComponent()
   mutating func visitOptionalWrapComponent()
+  mutating func visitPayloadCaseComponent(tag: Int)
 
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference)
 
@@ -2912,6 +3062,24 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
       walker.visitOptionalWrapComponent()
     case .optionalForce:
       walker.visitOptionalForceComponent()
+    case .payloadCase:
+      var tag = header.payload
+
+      // If our payload is equal to the out of line payload, then it means our
+      // enum was resilient and that there is a 4 byte indirect reference
+      // immediately following the component header.
+      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        let enumCaseBase = buffer.baseAddress.unsafelyUnwrapped
+        let offset = _pop(from: &buffer, as: Int32.self)
+        let enumCase = _resolveRelativeIndirectableAddress(
+          enumCaseBase,
+          offset
+        )
+
+        tag = enumCase.load(as: UInt32.self)
+      }
+
+      walker.visitPayloadCaseComponent(tag: Int(tag))
     case .external:
       // Look at the external property descriptor to see if we should take it
       // over the component given in the pattern.
@@ -2996,7 +3164,8 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
           setter: setter,
           arguments: arguments,
           externalArgs: genericParamCount > 0 ? externalArgs : nil)
-      case .optionalChain, .optionalWrap, .optionalForce, .external:
+      case .optionalChain, .optionalWrap, .optionalForce, .external,
+           .payloadCase:
         _internalInvariantFailure("not possible for property descriptor")
       }
     }
@@ -3188,6 +3357,11 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
 
   mutating func visitOptionalForceComponent() {
     // Force-unwrapping passes through the mutability of the preceding keypath.
+    size += 4
+  }
+
+  mutating func visitPayloadCaseComponent(tag: Int) {
+    capability = .readOnly
     size += 4
   }
 
@@ -3535,6 +3709,12 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     pushDest(header)
   }
 
+  mutating func visitPayloadCaseComponent(tag: Int) {
+    let _ = updatePreviousComponentAddr()
+    let header = RawKeyPathComponent.Header(payloadCaseTag: tag)
+    pushDest(header)
+  }
+
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
     // Get the metadata for the intermediate type.
     let metadata = _resolveKeyPathMetadataReference(
@@ -3634,6 +3814,13 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     instantiateVisitor.visitOptionalForceComponent()
     checkSizeConsistency()
   }
+
+  mutating func visitPayloadCaseComponent(tag: Int) {
+    sizeVisitor.visitPayloadCaseComponent(tag: tag)
+    instantiateVisitor.visitPayloadCaseComponent(tag: tag)
+    checkSizeConsistency()
+  }
+
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
     sizeVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
     instantiateVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
@@ -3816,6 +4003,8 @@ extension AnyKeyPath: CustomDebugStringConvertible {
           description.append("?")
         case .optionalForce:
           description.append("!")
+        case .payloadCase:
+          description.append("some enum case")
         }
         if hasEnded {
           break

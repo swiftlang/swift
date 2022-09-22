@@ -50,6 +50,13 @@ struct T {
   let w: (Int, C)
 }
 
+enum Color {
+  case red
+  case green
+  case blue
+  case generic(String)
+}
+
 // CHECK-LABEL: sil shared @stored_properties
 sil shared @stored_properties : $@convention(thin) () -> () {
 entry:
@@ -87,6 +94,14 @@ entry:
   %c = keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
   // CHECK: keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
   %d = keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+
+  return undef : $()
+}
+
+sil shared @payload_cases : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
 
   return undef : $()
 }
@@ -147,6 +162,14 @@ entry:
   %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
   // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
   %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  return undef : $()
+}
+
+sil shared @payload_cases_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
 
   return undef : $()
 }

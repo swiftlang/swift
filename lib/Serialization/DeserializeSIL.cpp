@@ -1017,6 +1017,9 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
       // read SILDeclRef
       return getSILDeclRef(MF, ListOfValues, nextValue);
     }
+    case KeyPathComputedComponentIdKindEncoding::EnumElement: {
+      return cast<EnumElementDecl>(MF->getDecl(ListOfValues[nextValue++]));
+    }
     }
     llvm_unreachable("unhandled kind");
   };
@@ -1096,6 +1099,17 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::TupleElement:
     return KeyPathPatternComponent::forTupleElement(
         ListOfValues[nextValue++], type);
+  case KeyPathComponentKindEncoding::EnumCase: {
+    auto enumElement =
+        cast<EnumElementDecl>(MF->getDecl(ListOfValues[nextValue++]));
+    return KeyPathPatternComponent::forEnumCase(enumElement, type);
+  }
+  case KeyPathComponentKindEncoding::ComputedEnumCase: {
+    auto id = handleComputedId();
+    auto getterName = MF->getIdentifierText(ListOfValues[nextValue++]);
+    auto getter = getFuncForReference(getterName);
+    return KeyPathPatternComponent::forComputedEnumCase(id, getter, type);
+  }
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }
