@@ -1748,11 +1748,6 @@ static bool canPeepholeLiteralClosureConversion(Type literalType,
   
   if (!literalFnType || !convertedFnType)
     return false;
-    
-  // Is it an identity conversion?
-  if (literalFnType->isEqual(convertedFnType)) {
-    return true;
-  }
   
   // Does the conversion only add `throws`?
   if (literalFnType->isEqual(convertedFnType->getWithoutThrowing())) {
