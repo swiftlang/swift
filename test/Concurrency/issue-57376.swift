@@ -57,6 +57,25 @@ func search(query: String, entities: [String]) async throws -> [String] {
   return await r // OK
 }
 
+@rethrows protocol TestRethrowProtocol {
+    func fn() async throws
+}
+extension TestRethrowProtocol {
+    func testRethrow() async rethrows {
+        try await self.fn()
+    }
+}
+
+struct TestRethrowStruct: TestRethrowProtocol {
+    func fn() async throws {}
+}
+
+func testStructRethrows() async throws {
+   let s = TestRethrowStruct()
+   async let rt: () = s.testRethrow()
+   try await rt // OK
+}
+
 // https://github.com/apple/swift/issues/60351
 func foo() async {
     let stream = AsyncStream<Int>{ _ in }
