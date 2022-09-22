@@ -3635,9 +3635,22 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             // This would make sure that arguments with incorrect
             // conformances are not prioritized over general argument
             // mismatches.
-            if (recordFix(fix, /*impact=*/2))
+            auto impact = 2;
+            if (type1->isOptional()) {
+              auto unwrappedType = type1->getOptionalObjectType();
+              auto matchTypeResult =
+                  matchTypes(unwrappedType, type2, ConstraintKind::Conversion,
+                             subflags, locator);
+              if (matchTypeResult.isSuccess()) {
+                // Impact here is a 1 because there is only one failure before
+                // we need to force type1 to be
+                impact = 1;
+                fix = ForceOptional::create(*this, type1, proto,
+                                            getConstraintLocator(locator));
+              }
+            }
+            if (recordFix(fix, /*impact=*/impact))
               return getTypeMatchFailure(locator);
-
             break;
           }
 
