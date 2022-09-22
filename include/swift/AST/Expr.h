@@ -4047,6 +4047,14 @@ public:
 ///   func f(x : @autoclosure () -> Int)
 ///   f(42)  // AutoclosureExpr convert from Int to ()->Int
 /// \endcode
+///
+///  They are also created when key path expressions are converted to function
+///  type, in which case, a pair of nested implicit closures are formed:
+/// \code
+///   { $kp$ in { $0[keyPath: $kp$] } }( \(E) )
+/// \endcode
+/// This is to ensure side effects of the key path expression (mainly indices in
+/// subscripts) are only evaluated once.
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
@@ -5389,10 +5397,6 @@ class KeyPathExpr : public Expr {
   /// a contextual root type.
   bool HasLeadingDot = false;
 
-  /// When we parse a key path literal, we claim a closure discriminator for it, since it may be used as
-  /// a closure value in function type context.
-  unsigned ClosureDiscriminator;
-
 public:
   /// A single stored component, which will be one of:
   /// - an unresolved DeclNameRef, which has to be type-checked
@@ -5724,12 +5728,11 @@ private:
 
   KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot, Expr *parsedPath,
               SourceLoc endLoc, bool hasLeadingDot, bool isObjC,
-              bool isImplicit, unsigned closureDiscriminator);
+              bool isImplicit);
 
   /// Create a key path with unresolved root and path expressions.
   KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
-              bool hasLeadingDot, bool isImplicit,
-              unsigned closureDiscriminator);
+              bool hasLeadingDot, bool isImplicit);
 
   /// Create a key path with components.
   KeyPathExpr(ASTContext &ctx, SourceLoc startLoc,
@@ -5739,9 +5742,8 @@ private:
 public:
   /// Create a new parsed Swift key path expression.
   static KeyPathExpr *createParsed(ASTContext &ctx, SourceLoc backslashLoc,
-     Expr *parsedRoot, Expr *parsedPath,
-     bool hasLeadingDot,
-     unsigned closureDiscriminator = AbstractClosureExpr::InvalidDiscriminator);
+                                   Expr *parsedRoot, Expr *parsedPath,
+                                   bool hasLeadingDot);
 
   /// Create a new parsed #keyPath expression.
   static KeyPathExpr *createParsedPoundKeyPath(ASTContext &ctx,
@@ -5835,9 +5837,6 @@ public:
 
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
-
-  /// Return the discriminator to use if this key path becomes a closure.
-  unsigned getClosureDiscriminator() const { return ClosureDiscriminator; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPath;

@@ -690,8 +690,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   auto *keypath = KeyPathExpr::createParsed(
       Context, backslashLoc, rootResult.getPtrOrNull(),
-      pathResult.getPtrOrNull(), hasLeadingDot,
-      CurLocalContext->claimNextClosureDiscriminator());
+      pathResult.getPtrOrNull(), hasLeadingDot);
   return makeParserResult(parseStatus, keypath);
 }
 
