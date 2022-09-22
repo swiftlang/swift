@@ -2,6 +2,8 @@
 
 // REQUIRES: PTRSIZE=64
 
+// https://github.com/apple/swift/issues/47644
+
 sil_stage canonical
 
 import Builtin

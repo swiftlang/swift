@@ -241,7 +241,7 @@ CStringTests.test("String.cString.with.Array.UInt8.input") {
   }
   // no need to test every case; that is covered in other tests
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
   )
   _ = String(cString: [] as [UInt8])
@@ -265,7 +265,7 @@ CStringTests.test("String.cString.with.Array.CChar.input") {
   }
   // no need to test every case; that is covered in other tests
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
   )
   _ = String(cString: [] as [CChar])
@@ -293,7 +293,7 @@ CStringTests.test("String.cString.with.inout.UInt8.conversion") {
   expectTrue(str.isEmpty)
   c = 100
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
   )
   str = String(cString: &c)
@@ -307,7 +307,7 @@ CStringTests.test("String.cString.with.inout.CChar.conversion") {
   expectTrue(str.isEmpty)
   c = 100
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
   )
   str = String(cString: &c)
@@ -332,7 +332,7 @@ CStringTests.test("String.validatingUTF8.with.Array.input") {
   }
   // no need to test every case; that is covered in other tests
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
   )
   _ = String(validatingUTF8: [])
@@ -363,7 +363,7 @@ CStringTests.test("String.validatingUTF8.with.inout.conversion") {
   expectEqual(str?.isEmpty, true)
   c = 100
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
   )
   str = String(validatingUTF8: &c)
@@ -389,7 +389,7 @@ CStringTests.test("String.decodeCString.with.Array.input") {
   }
   // no need to test every case; that is covered in other tests
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
   _ = String.decodeCString([], as: Unicode.UTF8.self)
@@ -427,7 +427,7 @@ CStringTests.test("String.decodeCString.with.inout.conversion") {
   expectEqual(result?.repairsMade, false)
   c = 100
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
   result = String.decodeCString(&c, as: Unicode.UTF8.self)
@@ -451,7 +451,7 @@ CStringTests.test("String.init.decodingCString.with.Array.input") {
   }
   // no need to test every case; that is covered in other tests
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
   _ = String(decodingCString: [], as: Unicode.UTF8.self)
@@ -479,7 +479,7 @@ CStringTests.test("String.init.decodingCString.with.inout.conversion") {
   expectEqual(str.isEmpty, true)
   c = 100
   expectCrashLater(
-    // Workaround for https://bugs.swift.org/browse/SR-16103 (rdar://91365967)
+    // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(decodingCString:as:) must be null-terminated"
   )
   str = String(decodingCString: &c, as: Unicode.UTF8.self)
