@@ -16,6 +16,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -134,34 +135,41 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
   } else {
-    opaqueReprs = repr->collectOpaqueReturnTypeReprs();
+    opaqueReprs = collectOpaqueReturnTypeReprs(repr, ctx, dc);
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> requirements;
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
       auto *currentRepr = opaqueReprs[i];
 
-      // Usually, we resolve the opaque constraint and bail if it isn't a class
-      // or existential type (see below). However, in this case we know we will
-      // fail, so we can bail early and provide a better diagnostic.
-      if (auto *optionalRepr =
-              dyn_cast<OptionalTypeRepr>(currentRepr->getConstraint())) {
-        std::string buf;
-        llvm::raw_string_ostream stream(buf);
-        stream << "(some " << optionalRepr->getBase() << ")?";
+      if( auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
+        // Usually, we resolve the opaque constraint and bail if it isn't a class
+        // or existential type (see below). However, in this case we know we will
+        // fail, so we can bail early and provide a better diagnostic.
+        if (auto *optionalRepr =
+                dyn_cast<OptionalTypeRepr>(opaqueReturn->getConstraint())) {
+          std::string buf;
+          llvm::raw_string_ostream stream(buf);
+          stream << "(some " << optionalRepr->getBase() << ")?";
 
-        ctx.Diags.diagnose(currentRepr->getLoc(),
-                           diag::opaque_type_invalid_constraint);
-        ctx.Diags
-            .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
-            .fixItReplaceChars(currentRepr->getStartLoc(),
-                               currentRepr->getEndLoc(), stream.str());
-        return nullptr;
+          ctx.Diags.diagnose(currentRepr->getLoc(),
+                             diag::opaque_type_invalid_constraint);
+          ctx.Diags
+             .diagnose(currentRepr->getLoc(), diag::opaque_of_optional_rewrite)
+             .fixItReplaceChars(currentRepr->getStartLoc(),
+                                currentRepr->getEndLoc(), stream.str());
+          return nullptr;
+        }
       }
 
       auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
                                                   opaqueSignatureDepth, i, ctx);
       genericParamTypes.push_back(paramType);
-
+    
+      TypeRepr *constraint = currentRepr;
+      
+      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)){
+        constraint = opaqueReturn->getConstraint();
+      }
       // Try to resolve the constraint repr in the parent decl context. It
       // should be some kind of existential type. Pass along the error type if
       // resolving the repr failed.
@@ -171,7 +179,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
                                 // meaningless in opaque types.
                                 /*unboundTyOpener*/ nullptr,
                                 /*placeholderHandler*/ nullptr)
-                                .resolveType(currentRepr->getConstraint());
+                                .resolveType(constraint);
 
       if (constraintType->hasError())
         return nullptr;

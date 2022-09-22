@@ -27,6 +27,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/TypeRepr.h"
 
 namespace swift {
 class ASTContext;
@@ -36,11 +37,14 @@ class TypeDecl;
 class ValueDecl;
 struct SelfBounds;
 class NominalTypeDecl;
-
 namespace ast_scope {
 class ASTSourceFileScope;
 class ASTScopeImpl;
 } // namespace ast_scope
+
+/// Walk the type representation recursively, collecting any
+/// `OpaqueReturnTypeRepr`s, `CompositionTypeRepr`s  or `IdentTypeRepr`s.
+CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *, ASTContext &ctx, DeclContext *dc);
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
@@ -637,8 +641,8 @@ private:
   void visitDoCatchStmt(DoCatchStmt *S);
   
 };
-  
-  
+
+
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {
