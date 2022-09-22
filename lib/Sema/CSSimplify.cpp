@@ -2133,106 +2133,324 @@ ConstraintSystem::matchFunctionResultTypes(Type expectedResult, Type fnResult,
                     locator);
 }
 
-ConstraintSystem::TypeMatchResult
-ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
-                                  ConstraintKind kind, TypeMatchOptions flags,
-                                  ConstraintLocatorBuilder locator) {
-  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  (void)locator.getLocatorParts(path);
 
-  // Equality and subtyping have fairly strict requirements on tuple matching,
-  // requiring element names to either match up or be disjoint.
-  if (kind < ConstraintKind::Conversion) {
-    if (tuple1->getNumElements() != tuple2->getNumElements())
-      return getTypeMatchFailure(locator);
+  while (!path.empty() && path.back().is<LocatorPathElt::TupleType>())
+    path.pop_back();
 
-    // Determine whether this conversion is performed as part
-    // of a larger pattern matching operation.
-    bool inPatternMatchingContext = false;
-    {
-      SmallVector<LocatorPathElt, 4> path;
-      (void)locator.getLocatorParts(path);
+  if (!path.empty()) {
+    // Direct pattern matching between tuple pattern and tuple type.
+    if (path.back().is<LocatorPathElt::PatternMatch>()) {
+      return true;
+    } else if (path.size() > 1) {
+      // sub-pattern matching as part of the enum element matching
+      // where sub-element is a tuple pattern e.g.
+      // `case .foo((a: 42, _)) = question`
+      auto lastIdx = path.size() - 1;
+      if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
+          path[lastIdx].is<LocatorPathElt::FunctionArgument>())
+        return true;
+    }
+  }
 
-      while (!path.empty() && path.back().is<LocatorPathElt::TupleType>())
-        path.pop_back();
+  return false;
+}
 
-      if (!path.empty()) {
-        // Direct pattern matching between tuple pattern and tuple type.
-        if (path.back().is<LocatorPathElt::PatternMatch>()) {
-          inPatternMatchingContext = true;
-        } else if (path.size() > 1) {
-          // sub-pattern matching as part of the enum element matching
-          // where sub-element is a tuple pattern e.g.
-          // `case .foo((a: 42, _)) = question`
-          auto lastIdx = path.size() - 1;
-          if (path[lastIdx - 1].is<LocatorPathElt::PatternMatch>() &&
-              path[lastIdx].is<LocatorPathElt::FunctionArgument>())
-            inPatternMatchingContext = true;
-        }
+namespace {
+
+struct MatchedPair {
+  Type lhs;
+  Type rhs;
+  unsigned idx;
+
+  MatchedPair(Type lhs, Type rhs, unsigned idx)
+    : lhs(lhs), rhs(rhs), idx(idx) {}
+};
+
+static PackType *gatherTupleElements(ArrayRef<TupleTypeElt> &elts,
+                                     Identifier name,
+                                     ASTContext &ctx) {
+  SmallVector<Type, 2> types;
+
+  if (!elts.empty() && elts.front().getName() == name) {
+    do {
+      types.push_back(elts.front().getType());
+      elts = elts.slice(1);
+    } while (!elts.empty() && !elts.front().hasName());
+  }
+
+  return PackType::get(ctx, types);
+}
+
+class TuplePackMatcher {
+  ASTContext &ctx;
+
+  ArrayRef<TupleTypeElt> lhsElts;
+  ArrayRef<TupleTypeElt> rhsElts;
+
+public:
+  SmallVector<MatchedPair, 4> pairs;
+
+  TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple)
+    : ctx(lhsTuple->getASTContext()),
+      lhsElts(lhsTuple->getElements()),
+      rhsElts(rhsTuple->getElements()) {}
+
+  bool match() {
+    unsigned idx = 0;
+
+    // Iterate over the two tuples in parallel, popping elements from
+    // the start.
+    while (true) {
+      // If both tuples have been exhausted, we're done.
+      if (lhsElts.empty() && rhsElts.empty())
+        return false;
+
+      if (lhsElts.empty()) {
+        assert(!rhsElts.empty());
+        return true;
       }
+
+      // A pack expansion type on the left hand side absorbs all elements
+      // from the right hand side up to the next mismatched label.
+      auto lhsElt = lhsElts.front();
+      if (lhsElt.getType()->is<PackExpansionType>()) {
+        lhsElts = lhsElts.slice(1);
+
+        assert(lhsElts.empty() || lhsElts.front().hasName() &&
+               "Tuple element with pack expansion type cannot be followed "
+               "by an unlabeled element");
+
+        auto *rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
+        pairs.emplace_back(lhsElt.getType(), rhs, idx++);
+        continue;
+      }
+
+      if (rhsElts.empty()) {
+        assert(!lhsElts.empty());
+        return true;
+      }
+
+      // A pack expansion type on the right hand side absorbs all elements
+      // from the left hand side up to the next mismatched label.
+      auto rhsElt = rhsElts.front();
+      if (rhsElt.getType()->is<PackExpansionType>()) {
+        rhsElts = rhsElts.slice(1);
+
+        assert(rhsElts.empty() || rhsElts.front().hasName() &&
+               "Tuple element with pack expansion type cannot be followed "
+               "by an unlabeled element");
+
+        auto *lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
+        pairs.emplace_back(lhs, rhsElt.getType(), idx++);
+        continue;
+      }
+
+      // Neither side is a pack expansion. We must have an exact match.
+      if (lhsElt.getName() != rhsElt.getName())
+        return true;
+
+      lhsElts = lhsElts.slice(1);
+      rhsElts = rhsElts.slice(1);
+
+      pairs.emplace_back(lhsElt.getType(), rhsElt.getType(), idx++);
     }
 
-    auto hasLabelMismatch = false;
+    return false;
+  }
+};
+
+class TupleMatcher {
+  TupleType *tuple1;
+  TupleType *tuple2;
+
+public:
+  SmallVector<MatchedPair, 4> pairs;
+  bool hasLabelMismatch = false;
+
+  TupleMatcher(TupleType *tuple1, TupleType *tuple2)
+    : tuple1(tuple1), tuple2(tuple2) {}
+
+  bool matchBind() {
+    if (tuple1->containsPackExpansionType() ||
+        tuple2->containsPackExpansionType()) {
+      TuplePackMatcher matcher(tuple1, tuple2);
+      if (matcher.match())
+        return true;
+
+      pairs = matcher.pairs;
+      return false;
+    }
+
+    if (tuple1->getNumElements() != tuple2->getNumElements())
+      return true;
+
     for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
       const auto &elt1 = tuple1->getElement(i);
       const auto &elt2 = tuple2->getElement(i);
 
-      // If the tuple pattern had a label for the tuple element,
-      // it must match the label for the tuple type being matched.
-      if (inPatternMatchingContext) {
-        if (elt1.hasName() && elt1.getName() != elt2.getName()) {
-          return getTypeMatchFailure(locator);
-        }
-      } else {
-        // If the names don't match, we may have a conflict.
-        if (elt1.getName() != elt2.getName()) {
-          // Same-type requirements require exact name matches.
-          if (kind <= ConstraintKind::Equal)
-            return getTypeMatchFailure(locator);
+      // If the names don't match, we have a conflict.
+      if (elt1.getName() != elt2.getName())
+        return true;
 
-          // For subtyping constraints, just make sure that this name isn't
-          // used at some other position.
-          if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
-            return getTypeMatchFailure(locator);
-
-          // If both elements have names and they mismatch, make a note of it
-          // so we can emit a warning.
-          if (elt1.hasName() && elt2.hasName())
-            hasLabelMismatch = true;
-        }
-      }
-
-      // Compare the element types.
-      auto result = matchTypes(elt1.getType(), elt2.getType(), kind, subflags,
-                               locator.withPathElement(
-                                           LocatorPathElt::TupleElement(i)));
-      if (result.isFailure())
-        return result;
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
     }
 
-    if (hasLabelMismatch) {
+    return false;
+  }
+
+  bool matchInPatternMatchingContext() {
+    if (tuple1->containsPackExpansionType() ||
+        tuple2->containsPackExpansionType()) {
+      TuplePackMatcher matcher(tuple1, tuple2);
+      if (matcher.match())
+        return true;
+
+      pairs = matcher.pairs;
+      return false;
+    }
+
+    if (tuple1->getNumElements() != tuple2->getNumElements())
+      return true;
+
+    for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
+      const auto &elt1 = tuple1->getElement(i);
+      const auto &elt2 = tuple2->getElement(i);
+
+      if (elt1.hasName() && elt1.getName() != elt2.getName())
+        return true;
+
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+    }
+
+    return false;
+  }
+
+  bool matchSubtype() {
+    if (tuple1->containsPackExpansionType() ||
+        tuple2->containsPackExpansionType()) {
+      TuplePackMatcher matcher(tuple1, tuple2);
+      if (matcher.match())
+        return true;
+
+      pairs = matcher.pairs;
+      return false;
+    }
+
+    if (tuple1->getNumElements() != tuple2->getNumElements())
+      return true;
+
+    for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
+      const auto &elt1 = tuple1->getElement(i);
+      const auto &elt2 = tuple2->getElement(i);
+
+      // If the names don't match, we may have a conflict.
+      if (elt1.getName() != elt2.getName()) {
+        // Make sure that this name isn't used at some other position.
+        if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
+          return true;
+
+        // If both elements have names and they mismatch, make a note of it
+        // so we can emit a warning.
+        if (elt1.hasName() && elt2.hasName())
+          hasLabelMismatch = true;
+      }
+
+      pairs.emplace_back(elt1.getType(), elt2.getType(), i);
+    }
+
+    return false;
+  }
+
+  bool matchConversion() {
+    if (tuple1->containsPackExpansionType() ||
+        tuple2->containsPackExpansionType()) {
+      TuplePackMatcher matcher(tuple1, tuple2);
+      if (matcher.match())
+        return true;
+
+      pairs = matcher.pairs;
+      return false;
+    }
+
+    SmallVector<unsigned, 4> sources;
+    if (computeTupleShuffle(tuple1, tuple2, sources))
+      return true;
+
+    for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
+      unsigned idx1 = sources[idx2];
+
+      auto lhs = tuple1->getElementType(idx1);
+      auto rhs = tuple2->getElementType(idx2);
+
+      pairs.emplace_back(lhs, rhs, idx1);
+    }
+
+    return false;
+  }
+};
+
+}
+
+ConstraintSystem::TypeMatchResult
+ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
+                                  ConstraintKind kind, TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator) {
+  TupleMatcher matcher(tuple1, tuple2);
+
+  ConstraintKind subkind;
+
+  switch (kind) {
+  case ConstraintKind::Bind:
+  case ConstraintKind::Equal: {
+    subkind = kind;
+
+    if (isInPatternMatchingContext(locator)) {
+      if (matcher.matchInPatternMatchingContext())
+        return getTypeMatchFailure(locator);
+    } else {
+      if (matcher.matchBind())
+        return getTypeMatchFailure(locator);
+    }
+
+    break;
+  }
+
+  // NOTE: It was probably a mistake that BindToPointerType is handled like
+  // Subtype; this was implicit in the old structure of the code due to bogus
+  // use of operator<= on enum cases.
+  case ConstraintKind::Subtype:
+  case ConstraintKind::BindToPointerType: {
+    subkind = kind;
+
+    if (matcher.matchSubtype())
+      return getTypeMatchFailure(locator);
+
+    if (matcher.hasLabelMismatch) {
       // If we had a label mismatch, emit a warning. This is something we
       // shouldn't permit, as it's more permissive than what a conversion would
       // allow. Ideally we'd turn this into an error in Swift 6 mode.
       recordFix(AllowTupleLabelMismatch::create(
           *this, tuple1, tuple2, getConstraintLocator(locator)));
     }
-    return getTypeMatchSuccess();
+    break;
   }
 
-  assert(kind >= ConstraintKind::Conversion);
-  ConstraintKind subKind;
-  switch (kind) {
-  case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
-    subKind = ConstraintKind::Conversion;
-    break;
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::OperatorArgumentConversion: {
+    subkind = ConstraintKind::Conversion;
 
-  case ConstraintKind::Bind:
+    // Compute the element shuffles for conversions.
+    if (matcher.matchConversion())
+      return getTypeMatchFailure(locator);
+
+    break;
+  }
+
   case ConstraintKind::BindParam:
-  case ConstraintKind::BindToPointerType:
-  case ConstraintKind::Equal:
-  case ConstraintKind::Subtype:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload:
@@ -2261,24 +2479,15 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
-    llvm_unreachable("Not a conversion");
+    llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
-  // Compute the element shuffles for conversions.
-  SmallVector<unsigned, 16> sources;
-  if (computeTupleShuffle(tuple1, tuple2, sources))
-    return getTypeMatchFailure(locator);
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
-  // Check each of the elements.
-  for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
-    unsigned idx1 = sources[idx2];
-
-    // Match up the types.
-    const auto &elt1 = tuple1->getElement(idx1);
-    const auto &elt2 = tuple2->getElement(idx2);
-    auto result = matchTypes(elt1.getType(), elt2.getType(), subKind, subflags,
-                       locator.withPathElement(
-                                        LocatorPathElt::TupleElement(idx1)));
+  for (auto pair : matcher.pairs) {
+    auto result = matchTypes(pair.lhs, pair.rhs, subkind, subflags,
+                             locator.withPathElement(
+                                       LocatorPathElt::TupleElement(pair.idx)));
     if (result.isFailure())
       return result;
   }
@@ -6501,6 +6710,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             kind, subflags, packLoc);
     }
     case TypeKind::PackExpansion: {
+      // FIXME: we need to match the count types as well
       return matchTypes(cast<PackExpansionType>(desugar1)->getPatternType(),
                         cast<PackExpansionType>(desugar2)->getPatternType(),
                         kind, subflags, locator);
@@ -6896,6 +7106,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             ConstraintLocator::LValueConversion));
       }
     }
+  }
+
+  if (isa<PackExpansionType>(desugar1) && isa<PackType>(desugar2)) {
+    auto *packExpansionType = cast<PackExpansionType>(desugar1);
+    auto *packType = cast<PackType>(desugar2);
+
+    if (packExpansionType->getPatternType()->is<TypeVariableType>())
+      return matchTypes(packExpansionType->getPatternType(), packType, kind, subflags, locator);
+  } else if (isa<PackType>(desugar1) && isa<PackExpansionType>(desugar2)) {
+    auto *packType = cast<PackType>(desugar1);
+    auto *packExpansionType = cast<PackExpansionType>(desugar2);
+
+    if (packExpansionType->getPatternType()->is<TypeVariableType>())
+      return matchTypes(packType, packExpansionType->getPatternType(), kind, subflags, locator);
   }
 
   // Attempt fixes iff it's allowed, both types are concrete and
@@ -13022,6 +13246,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     auto larger = lhsLarger ? lhs : rhs;
     auto smaller = lhsLarger ? rhs : lhs;
     llvm::SmallVector<TupleTypeElt, 4> newTupleTypes;
+
+    // FIXME: For now, if either side contains pack expansion types, just fail.
+    {
+      if (lhs->containsPackExpansionType() ||
+          rhs->containsPackExpansionType()) {
+        return SolutionKind::Error;
+      }
+    }
 
     for (unsigned i = 0; i < larger->getNumElements(); ++i) {
       auto largerElt = larger->getElement(i);
