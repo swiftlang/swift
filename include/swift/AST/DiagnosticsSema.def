@@ -5696,13 +5696,21 @@ ERROR(availability_decl_more_than_enclosing, none,
       "%0 cannot be more available than enclosing scope",
       (DescriptiveDeclKind))
 
+WARNING(availability_decl_more_than_unavailable_enclosing, none,
+        "%0 cannot be more available than unavailable enclosing scope",
+        (DescriptiveDeclKind))
+
 NOTE(availability_implicit_decl_here, none,
      "%0 implicitly declared here with availability of %1 %2 or newer",
      (DescriptiveDeclKind, StringRef, llvm::VersionTuple))
 
-NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
+NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
      (StringRef, llvm::VersionTuple))
+
+NOTE(availability_decl_more_than_unavailable_enclosing_here, none,
+     "enclosing scope has been explicitly marked unavailable here",
+     ())
 
 ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
