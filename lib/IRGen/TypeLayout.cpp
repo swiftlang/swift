@@ -14,6 +14,7 @@
 #include "FixedTypeInfo.h"
 #include "GenOpaque.h"
 #include "IRGen.h"
+#include "GenExistential.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "SwitchBuilder.h"
@@ -43,6 +44,10 @@ ScalarKind swift::irgen::refcountingToScalarKind(ReferenceCounting refCounting) 
     return ScalarKind::UnknownReference;
   case ReferenceCounting::ObjC:
     return ScalarKind::ObjCReference;
+  case ReferenceCounting::None:
+    return ScalarKind::POD;
+  case ReferenceCounting::Custom:
+    return ScalarKind::UnknownReference;
   }
 }
 
@@ -3179,7 +3184,8 @@ LLVM_DUMP_METHOD void TypeInfoBasedTypeLayoutEntry::dump() const {
 
 ScalarTypeLayoutEntry *
 TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
-                                        SILType representative) {
+                                        SILType representative,
+                                        ScalarKind kind) {
   assert(ti.isFixedSize());
   llvm::FoldingSetNodeID id;
   ScalarTypeLayoutEntry::Profile(id, cast<FixedTypeInfo>(ti), representative);
@@ -3191,8 +3197,8 @@ TypeLayoutCache::getOrCreateScalarEntry(const TypeInfo &ti,
   // Otherwise, create a new one.
   auto bytes = sizeof(ScalarTypeLayoutEntry);
   auto mem = bumpAllocator.Allocate(bytes, alignof(ScalarTypeLayoutEntry));
-  auto newEntry =
-      new (mem) ScalarTypeLayoutEntry(cast<FixedTypeInfo>(ti), representative);
+  auto newEntry = new (mem)
+      ScalarTypeLayoutEntry(cast<FixedTypeInfo>(ti), representative, kind);
   scalarEntries.InsertNode(newEntry, insertPos);
   newEntry->computeProperties();
   return newEntry;
@@ -3215,7 +3221,7 @@ TypeLayoutCache::getOrCreateArchetypeEntry(SILType archetype) {
 }
 
 AlignedGroupEntry *TypeLayoutCache::getOrCreateAlignedGroupEntry(
-    std::vector<TypeLayoutEntry *> &entries,
+    const std::vector<TypeLayoutEntry *> &entries,
     Alignment::int_type minimumAlignment) {
   llvm::FoldingSetNodeID id;
   AlignedGroupEntry::Profile(id, entries, minimumAlignment);

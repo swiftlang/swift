@@ -2409,14 +2409,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_GenerateLayoutBytecode: {
-    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    if (!DiscardAttribute)
-      Attributes.add(new (Context)
-                         GenerateLayoutBytecodeAttr(AtLoc, AttrRange, false));
-    break;
-  }
-
   case DAK_Optimize: {
     auto optMode = parseSingleAttrOption<OptimizationMode>(
         *this, Loc, AttrRange, AttrName, DK, {

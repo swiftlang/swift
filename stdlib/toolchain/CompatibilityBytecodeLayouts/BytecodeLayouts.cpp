@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "BytecodeLayouts.h"
-#include "../public/SwiftShims/HeapObject.h"
+#include "../../public/SwiftShims/swift/shims/HeapObject.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/Runtime/Error.h"
@@ -133,7 +133,7 @@ size_t BitVector::size() const { return data.size(); }
 
 BitVector &BitVector::operator&=(const BitVector &other) {
   for (size_t i = 0; i < size(); i++) {
-    data[i] = data[i] & other.data[i];
+    data[i] = data[i] && other.data[i];
   }
   return *this;
 }

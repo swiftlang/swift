@@ -562,8 +562,8 @@ private:
                               IsTake_t isTake) const;
 
   std::pair<Address, llvm::Value *>
-  getMultiPalyloadEnumTagByteAddrAndNumBytes(IRGenFunction &IGF,
-                                             Address addr) const;
+  getMultiPayloadEnumTagByteAddrAndNumBytes(IRGenFunction &IGF,
+                                            Address addr) const;
 
   llvm::Value *
   getEnumTagSinglePayloadForSinglePayloadEnum(IRGenFunction &IGF, Address addr,

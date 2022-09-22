@@ -502,21 +502,6 @@ public:
   }
 };
 
-/// Defines the @_GenerateLayoutBytecode attribute.
-class GenerateLayoutBytecodeAttr : public DeclAttribute {
-public:
-  GenerateLayoutBytecodeAttr(SourceLoc AtLoc, SourceRange Range, bool Implicit)
-      : DeclAttribute(DAK_GenerateLayoutBytecode, AtLoc, Range, Implicit) {}
-
-  GenerateLayoutBytecodeAttr(bool Implicit)
-      : GenerateLayoutBytecodeAttr(SourceLoc(), SourceRange(),
-                                   /*Implicit=*/true) {}
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_GenerateLayoutBytecode;
-  }
-};
-
 /// Defines the @_cdecl attribute.
 class CDeclAttr : public DeclAttribute {
 public:
