@@ -97,7 +97,12 @@ products += multiSourceLibraries.map {
 
 var targets: [Target] = []
 targets.append(.target(name: "TestsUtils", path: "utils", sources: ["TestsUtils.swift"]))
-targets.append(.target(name: "SimpleArray", path: "utils", sources: ["SimpleArray.swift"]))
+targets.append(.target(
+  name: "SimpleArray",
+  path: "utils",
+  sources: ["SimpleArray.swift"],
+  swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                "-enable-experimental-layout-prespecialization"])]))
 targets.append(.systemLibrary(name: "LibProc", path: "utils/LibProc"))
 targets.append(
   .target(name: "DriverUtils",
@@ -144,14 +149,14 @@ targets += singleSourceLibraries.map { name in
       path: "single-source",
       sources: ["\(name).swift"],
       swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                    "-disable-swift-bridge-attr",
-                                    "-Xfrontend",
-                                    "-enable-experimental-layout-prespecialization"])])
+                                    "-disable-swift-bridge-attr"])])
   }
   return .target(name: name,
       dependencies: singleSourceDeps,
       path: "single-source",
-      sources: ["\(name).swift"])
+      sources: ["\(name).swift"],
+      swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                    "-enable-experimental-layout-prespecialization"])])
 }
 
 targets += cxxSingleSourceLibraries.map { name in
@@ -172,9 +177,7 @@ targets += multiSourceLibraries.map { lib in
     dependencies: [
       .target(name: "TestsUtils")
     ],
-    path: lib.parentSubDir,
-    swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-experimental-layout-prespecialization"])])
+    path: lib.parentSubDir)
 }
 
 //===---
