@@ -1,5 +1,7 @@
 // Check that we are not crashing
-// RUN: %sourcekitd-test -req=complete -pos=48:28 %s -- %s == -req=complete -pos=48:16 %s -- %s
+// RUN: %sourcekitd-test -req=complete -pos=50:28 %s -- %s == -req=complete -pos=50:16 %s -- %s
+
+// https://github.com/apple/swift/issues/56786
 
 let abcde = "abc"
 

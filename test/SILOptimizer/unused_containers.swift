@@ -2,11 +2,11 @@
 
 // REQUIRES: swift_stdlib_no_asserts
 
-// FIXME: https://bugs.swift.org/browse/SR-7806
+// FIXME: https://github.com/apple/swift/issues/50345
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: rdar45797168
 
-// FIXME: https://bugs.swift.org/browse/SR-9008
+// FIXME: https://github.com/apple/swift/issues/51511
 
 //CHECK-LABEL: @$s17unused_containers16empty_array_testyyF
 //CHECK: bb0:

@@ -790,7 +790,7 @@ ObjCConformsToProtocolTestSuite.test("cast/metatype") {
   expectTrue(SomeSubclass.self is SomeObjCProto.Type)
 }
 
-// SR-7357
+// https://github.com/apple/swift/issues/49905
 
 extension Optional where Wrapped == NSData {
     private class Inner {

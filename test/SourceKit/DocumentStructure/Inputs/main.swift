@@ -105,10 +105,10 @@ protocol FooProtocol {
     associatedtype Baz: Equatable
 }
 
-// SR-5717
+// https://github.com/apple/swift/issues/48287
 a.b(c: d?.e?.f, h: i)
 
-// SR-6926
+// https://github.com/apple/swift/issues/49474
 /* 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦 */
 `init`(x: Int, y: Int) {}
 class C {

@@ -40,7 +40,7 @@ StringBridgeTests.test("Tagged NSString") {
   expectCocoa(bigBs)
   expectCocoa(bigQs)
 
-#if false // TODO(SR-7594): re-enable
+#if false // FIXME: Re-enable (https://github.com/apple/swift/issues/50136)
   let littleAsNSString = ("aa" as NSString)
   var littleAs = littleAsNSString as String
 

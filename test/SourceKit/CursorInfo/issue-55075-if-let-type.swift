@@ -3,6 +3,8 @@ if let bar: Int = foo {
   _ = bar
 }
 
+// https://github.com/apple/swift/issues/55075
+
 // RUN: %sourcekitd-test -req=cursor -pos=2:8 %s -- %s | %FileCheck --check-prefix=CHECK-BAR %s
 // RUN: %sourcekitd-test -req=cursor -pos=3:7 %s -- %s | %FileCheck --check-prefix=CHECK-BAR %s
 // RUN: %sourcekitd-test -req=cursor -pos=1:5 %s -- %s | %FileCheck --check-prefix=CHECK-FOO %s
