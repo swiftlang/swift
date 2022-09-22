@@ -263,12 +263,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
         "*>(other._getOpaquePointer()), metadata._0);\n";
   os << "  }\n";
 
-  // FIXME: the move constructor should be hidden somehow.
-  os << "  inline ";
+  // FIXME: implement the move constructor.
+  os << "  [[noreturn]] inline ";
   printer.printBaseName(typeDecl);
   os << "(";
   printer.printBaseName(typeDecl);
-  os << " &&) = default;\n";
+  os << " &&) { abort(); }\n";
 
   bodyPrinter();
   if (typeDecl->isStdlibDecl())

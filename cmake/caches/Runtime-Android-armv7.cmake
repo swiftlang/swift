@@ -23,6 +23,3 @@ set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7 CACHE STRING "")
 
 # NOTE(compnerd) this is lollipop, which seems to still have decent usage.
 set(SWIFT_ANDROID_API_LEVEL 21 CACHE STRING "")
-# NOTE(compnerd) this matches the value from the NDK r24.
-set(SWIFT_ANDROID_NDK_CLANG_VERSION 14.0.1 CACHE STRING "" FORCE)
-
