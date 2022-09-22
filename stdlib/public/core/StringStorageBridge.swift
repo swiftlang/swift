@@ -16,6 +16,144 @@ import SwiftShims
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
 internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
+internal let _cocoaNotFound = Int.max
+
+extension Collection {
+  @inline(__always)
+  @_effects(readonly)
+  func _boyerMooreSearch<C>(
+    for needle: C, skipTableLookup: (Element) -> Int) -> Range<Index>?
+  where C: BidirectionalCollection, C.Element == Element, Element: Hashable {
+    let needleCount = needle.count
+    guard let initialSearchEnd = index(
+      startIndex,
+      offsetBy: needleCount,
+      limitedBy: endIndex
+    ) else {
+      return nil
+    }
+    var searchRange = startIndex ..< initialSearchEnd
+    let needleSlice = needle.reversed()
+    while true {
+      let ourSlice = self[searchRange].reversed()
+      
+      let maybeMismatch = zip(ourSlice.indices, needleSlice.indices).first {
+        ourSlice[$0] != needleSlice[$1]
+      }?.0
+      guard let mismatch = maybeMismatch else {
+        return searchRange
+      }
+      let skip = skipTableLookup(ourSlice[mismatch])
+      guard let newEnd = index(
+        searchRange.upperBound,
+        offsetBy: skip,
+        limitedBy: endIndex
+      ) else {
+        //went off the end, no match
+        return nil
+      }
+      let newStart = index(
+        searchRange.lowerBound,
+        offsetBy: skip
+      )
+      searchRange = newStart ..< newEnd
+    }
+  }
+  
+  @_effects(readonly)
+  func boyerMooreSearch<C>(for needle: C) -> Range<Index>?
+  where C: BidirectionalCollection, C.Element == Element, Element: Hashable {
+    if needle.count > count {
+      return nil
+    }
+    if needle.count == count {
+      return elementsEqual(needle) ? startIndex ..< endIndex : nil
+    }
+    var skipTable:[Element : Int] = [:]
+    skipTable.reserveCapacity(needle.count)
+    var offset = 0
+    for element in needle.reversed() {
+      skipTable[element] = needle.count - offset
+      offset += 1
+    }
+    return _boyerMooreSearch(for: needle) { skipTable[$0] ?? needle.count }
+  }
+  
+  // 256 bytes
+  typealias TableStorage =
+  (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64,
+   UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64,
+   UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64,
+   UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64)
+  
+  @_effects(readonly)
+  func boyerMooreSearch<C>(for needle: C) -> Range<Index>?
+  where C: BidirectionalCollection, C.Element == UInt8, Element == UInt8 {
+    if needle.count > count {
+      return nil
+    }
+    if needle.count == count {
+      return elementsEqual(needle) ? startIndex ..< endIndex : nil
+    }
+    if needle.count < 256 {
+      var skipTableStorage: TableStorage =
+      (0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0)
+      return withUnsafeMutableBytes(of: &skipTableStorage) { rawBuffer in
+        let skipTable = rawBuffer.bindMemory(to: UInt8.self)
+        skipTable.initialize(repeating: UInt8(needle.count))
+        for (i, c) in needle.reversed().enumerated() {
+          skipTable[Int(c)] = UInt8(needle.count - i)
+        }
+        return _boyerMooreSearch(for: needle) { Int(skipTable[Int($0)]) }
+      }
+    } else {
+      var skipTable = [Int](repeating: needle.count, count: 256)
+      for (i, c) in needle.reversed().enumerated() {
+        skipTable[Int(c)] = needle.count - i
+      }
+      return _boyerMooreSearch(for: needle) { skipTable[Int($0)] }
+    }
+  }
+}
+
+struct NSStringUTF16View : BidirectionalCollection {
+  typealias Index = Int
+  typealias Element = UTF16.CodeUnit
+  
+  let str: AnyObject
+  var ptr: UnsafePointer<UTF16.CodeUnit>? = nil
+  let endIndex: Int
+  
+  init(_ opaque: AnyObject) {
+    str = opaque
+    endIndex = _stdlib_binary_CFStringGetLength(opaque)
+    if let direct = _stdlib_binary_CFStringGetCharactersPtr(opaque) {
+      ptr = UnsafePointer(direct)
+    }
+  }
+  
+  @inline(__always)
+  subscript(position: Int) -> UTF16.CodeUnit {
+    guard let direct = ptr else {
+      return _cocoaStringSubscript(str, position)
+    }
+    return UnsafeBufferPointer(start: direct, count: endIndex)[position]
+  }
+  
+  var startIndex: Int {
+    0
+  }
+  
+  func index(after i: Index) -> Int {
+    return i + 1
+  }
+  func index(before i: Index) -> Int {
+    return i - 1
+  }
+}
 
 extension String {
   @available(SwiftStdlib 5.6, *)
@@ -154,13 +292,80 @@ extension _AbstractStringStorage {
       return _cocoaStringCompare(self, other) == 0 ? 1 : 0
     }
   }
+  
+  @inline(__always)
+  func _toNSRange(_ indices: Range<String.Index>?) -> _SwiftNSRange {
+    return asString._toNSRange(indices)
+  }
+  
+  @inline(__always) var utf8: String.UTF8View { asString.utf8 }
+  @inline(__always) var utf16: String.UTF16View { asString.utf16 }
+
+  @_effects(readonly)
+  internal func _nativeRange<T:_AbstractStringStorage>(
+    of nativeOther: T
+  ) -> _SwiftNSRange {
+    return _toNSRange(utf8.boyerMooreSearch(for: nativeOther.utf8))
+  }
+  
+  @_effects(readonly)
+  internal func _foreignRange(of needle: AnyObject) -> _SwiftNSRange {
+    precondition(_isNSString(needle))
+    // At this point we've proven that it is a non-Swift NSString
+    
+    // CFString will only give us ASCII bytes here, but that's fine.
+    // We already handled non-ASCII UTF8 strings earlier since they're Swift.
+    if let range = withCocoaASCIIPointer(
+      needle,
+      work: { ptr -> Range<String.Index>? in
+        let asciiNeedle = UnsafeBufferPointer(
+          start: ptr,
+          count: _stdlib_binary_CFStringGetLength(needle)
+        )
+        return utf8.boyerMooreSearch(for: asciiNeedle)
+      }) {
+      return _toNSRange(range)
+    }
+    
+    if let range = utf16.boyerMooreSearch(for: NSStringUTF16View(needle)) {
+      return _toNSRange(range)
+    }
+    
+    return _toNSRange(nil)
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _range(of other: AnyObject?) -> _SwiftNSRange {
+    guard let other = other, count > 0 else {
+      return _toNSRange(nil)
+    }
+    
+    if self === other {
+      return _toNSRange(utf16.startIndex ..< utf16.endIndex)
+    }
+    
+    let knownOther = _KnownCocoaString(other)
+    switch knownOther {
+    case .storage:
+      return _nativeRange(
+        of: _unsafeUncheckedDowncast(other, to: __StringStorage.self)
+      )
+    case .shared:
+      return _nativeRange(
+        of: _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self)
+      )
+    default:
+      return _foreignRange(of: other)
+    }
+  }
 }
 
 extension __StringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      return utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
@@ -241,6 +446,12 @@ extension __StringStorage {
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
+    
+  @objc(rangeOfString:)
+  @_effects(readonly)
+  final internal func range(of other: AnyObject?) -> _SwiftNSRange {
+    return _range(of: other)
+  }
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -256,7 +467,7 @@ extension __SharedStringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      return utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
@@ -336,6 +547,12 @@ extension __SharedStringStorage {
   @_effects(readonly)
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
+  }
+  
+  @objc(rangeOfString:)
+  @_effects(readonly)
+  final internal func range(of other: AnyObject?) -> _SwiftNSRange {
+    return _range(of: other)
   }
 
   @objc(copyWithZone:)

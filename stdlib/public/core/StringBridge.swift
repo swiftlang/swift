@@ -738,6 +738,17 @@ extension StringProtocol {
     let upperbound = _toUTF16Index(range.lowerBound + range.count)
     return Range(uncheckedBounds: (lower: lowerbound, upper: upperbound))
   }
+  
+  func _toNSRange(_ indices: Range<Index>?) -> _SwiftNSRange {
+    guard let indices = indices else {
+      return _SwiftNSRange(location: _cocoaNotFound, length: 0)
+    }
+    let offsetRange = self._toUTF16Offsets(indices)
+    return _SwiftNSRange(
+      location: offsetRange.lowerBound,
+      length: offsetRange.count
+    )
+  }
 }
 
 extension String {
