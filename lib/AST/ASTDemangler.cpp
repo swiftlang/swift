@@ -588,11 +588,7 @@ Type ASTBuilder::createProtocolCompositionType(
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
 
-  Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
-  if (forRequirement)
-    return composition;
-
-  return ExistentialType::get(composition);
+  return ProtocolCompositionType::get(Ctx, members, isClassBound);
 }
 
 Type ASTBuilder::createProtocolTypeFromDecl(ProtocolDecl *protocol) {
@@ -1219,4 +1215,10 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
   }
 
   return consumer.Result;
+}
+
+Type ASTBuilder::maybeWrapInExistential(Type type) {
+  if (type->isConstraintType())
+    return ExistentialType::get(type);
+  return type;
 }

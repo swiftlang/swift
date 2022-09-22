@@ -498,12 +498,12 @@ protected:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
     case NodeKind::TypeMangling:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
 
-      return decodeMangledType(Node->getChild(0), depth + 1);
+      return decodeMangledType(Node->getChild(0), depth + 1, forRequirement);
     case NodeKind::Type:
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children.");
@@ -530,8 +530,12 @@ protected:
               decodeMangledTypeDecl(Node, depth, typeDecl, parent, typeAlias))
         return *error;
 
-      if (typeAlias)
-        return Builder.createTypeAliasType(typeDecl, parent);
+      if (typeAlias) {
+        auto type = Builder.createTypeAliasType(typeDecl, parent);
+        if (!forRequirement)
+          return Builder.maybeWrapInExistential(type);
+        return type;
+      }
 
       return Builder.createNominalType(typeDecl, parent);
     }
@@ -710,9 +714,11 @@ protected:
         IsClassBound = true;
       }
 
-      return Builder.createProtocolCompositionType(Protocols, Superclass,
-                                                   IsClassBound,
-                                                   forRequirement);
+      auto Composition = Builder.createProtocolCompositionType(
+          Protocols, Superclass, IsClassBound);
+      if (!forRequirement)
+        return Builder.maybeWrapInExistential(Composition);
+      return Composition;
     }
 
     case NodeKind::ConstrainedExistential: {
@@ -743,9 +749,12 @@ protected:
     case NodeKind::Protocol:
     case NodeKind::ProtocolSymbolicReference: {
       if (auto Proto = decodeMangledProtocolType(Node, depth + 1)) {
-        return Builder.createProtocolCompositionType(Proto, BuiltType(),
-                                                     /*IsClassBound=*/false,
-                                                     forRequirement);
+        auto Composition =
+            Builder.createProtocolCompositionType(Proto, BuiltType(),
+                                                  /*IsClassBound=*/false);
+        if (!forRequirement)
+          return Builder.maybeWrapInExistential(Composition);
+        return Composition;
       }
 
       return MAKE_NODE_TYPE_ERROR0(Node, "failed to decode protocol type");

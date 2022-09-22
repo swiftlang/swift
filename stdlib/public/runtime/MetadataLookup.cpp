@@ -1644,8 +1644,7 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createProtocolCompositionType(llvm::ArrayRef<BuiltProtocolDecl> protocols,
-                                BuiltType superclass, bool isClassBound,
-                                bool forRequirement = true) const {
+                                BuiltType superclass, bool isClassBound) const {
     // Determine whether we have a class bound.
     ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
     if (isClassBound || superclass) {
@@ -1838,8 +1837,13 @@ public:
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
   }
-};
 
+  TypeLookupErrorOr<BuiltType>
+  maybeWrapInExistential(TypeLookupErrorOr<BuiltType> type) {
+    // Nothing to do.
+    return type;
+  }
+};
 }
 
 SWIFT_CC(swift)
