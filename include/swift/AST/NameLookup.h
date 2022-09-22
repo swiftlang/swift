@@ -103,7 +103,8 @@ private:
   /// extension (if it found something at that level).
   DeclContext *BaseDC;
 
-  /// The declaration that defines the base of the call to `Value`
+  /// The declaration that defines the base of the call to `Value`.
+  /// This is always available, as long as `BaseDC` is not null.
   ValueDecl *BaseDecl;
   
   /// The declaration corresponds to the given name; i.e. the decl we are

@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Initializer.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -345,20 +346,59 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   for (auto Result : Lookup) {
     auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
     
+    // Retrieve the base decl for this lookup
+    ValueDecl* baseDecl;
+    
     // Perform an unqualified lookup for the base decl of this result. This handles cases
     // where self was rebound (e.g. `guard let self = self`) earlier in the scope.
-    // Only do this in closures, since implicit self isn't allowed to be rebound
-    // in other contexts. Otherwise, we use the `ParamDecl` from `baseDC` if applicable.
+    //  - Only do this in closures that capture self weakly, since implicit self isn't
+    //    allowed to be rebound in other contexts. In other contexts, implicit self
+    //    _always_ refers to the context's self `ParamDecl`, even if there is another
+    //    local decl with the name `self` that would be found by `lookupSingleLocalDecl`.
     ValueDecl* localBaseDecl = nullptr;
-    if (factory->DC->getContextKind() == DeclContextKind::AbstractClosureExpr && baseDC) {
-      auto *localDecl = ASTScope::lookupSingleLocalDecl(factory->DC->getParentSourceFile(),
-                                                       DeclName(factory->Ctx.Id_self),
-                                                       factory->Loc);
-      if (localDecl)
-        localBaseDecl = localDecl;
+    bool isInWeakSelfClosure = false;
+    if (auto closureExpr = dyn_cast<ClosureExpr>(factory->DC)) {
+      if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+        auto *attr = selfDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+        isInWeakSelfClosure = attr->get() == ReferenceOwnership::Weak;
+      }
+    }
+            
+    if (isInWeakSelfClosure) {
+      localBaseDecl = ASTScope::lookupSingleLocalDecl(factory->DC->getParentSourceFile(),
+                                                      DeclName(factory->Ctx.Id_self),
+                                                      factory->Loc);
     }
     
-    results.emplace_back(baseDC, localBaseDecl, Result);
+    if (baseDC == nullptr)
+      baseDecl = nullptr;
+    
+    else if (localBaseDecl)
+      baseDecl = localBaseDecl;
+
+    else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(baseDC))
+      baseDecl = AFD->getImplicitSelfDecl();
+
+    else if (auto *PBI = dyn_cast<PatternBindingInitializer>(baseDC)) {
+      auto *selfDecl = PBI->getImplicitSelfDecl();
+      assert(selfDecl);
+      baseDecl = selfDecl;
+    }
+
+    else if (auto *CE = dyn_cast<ClosureExpr>(baseDC)) {
+      auto *selfDecl = CE->getCapturedSelfDecl();
+      assert(selfDecl);
+      assert(selfDecl->isSelfParamCapture());
+      baseDecl = selfDecl;
+    }
+
+    else {
+      auto *nominalDecl = baseDC->getSelfNominalTypeDecl();
+      assert(nominalDecl);
+      baseDecl = nominalDecl;
+    }
+    
+    results.emplace_back(baseDC, baseDecl, Result);
 #ifndef NDEBUG
     factory->addedResult(results.back());
 #endif

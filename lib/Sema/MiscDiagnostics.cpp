@@ -1565,7 +1565,51 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       if (!DRE || !DRE->isImplicit())
         return false;
-
+      
+      // If this decl isn't named "self", then it isn't an implicit self capture
+      // and we have no reason to reject it.
+      ASTContext &Ctx = DRE->getDecl()->getASTContext();
+      if (!DRE->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
+        return false;
+      }
+      
+      auto isExplicitWeakSelfCapture = false;
+      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+          if (selfDecl->getType()->is<WeakStorageType>()) {
+            isExplicitWeakSelfCapture = true;
+          }
+        }
+      }
+      
+      // If this is an explicit `weak self` capture, then implicit self is allowed
+      // once the closure's self param is unwrapped. We need to validate that the
+      // unwrapped `self` decl specifically refers to an unwrapped copy of the
+      // closure's `self` param, and not something else like in
+      // `guard let self = .someOptionalVariable else { return }` or
+      // `let self = someUnrelatedVariable`. If self hasn't been unwrapped yet
+      // and is still an optional, we would have already hit an error elsewhere.
+      if (isExplicitWeakSelfCapture) {
+        bool hasCorrectSelfBindingCondition = false;
+        if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+          // if the `self` decls was defined in a `let`, `guard`, or `while` condition...
+          if (auto parentStmt = var->getParentPatternStmt())
+            if (auto parentConditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt))
+              for (auto cond : parentConditionalStmt->getCond())
+                if (auto optionalPattern = dyn_cast_or_null<OptionalSomePattern>(cond.getPattern()))
+                  // if the lhs of the optional binding is `self`...
+                  if (optionalPattern->getSubPattern()->getBoundName() == Ctx.Id_self)
+                    if (auto loadExpr = dyn_cast<LoadExpr>(cond.getInitializer()))
+                      if (auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr()))
+                        // and the rhs of the optional binding is `self`...
+                        if (declRefExpr->getDecl()->getName().isSimpleName(Ctx.Id_self))
+                          // then we can permit implicit self in this case
+                          hasCorrectSelfBindingCondition = true;
+        }
+        
+        return !hasCorrectSelfBindingCondition;
+      }
+      
       // Defensive check for type. If the expression doesn't have type here, it
       // should have been diagnosed somewhere else.
       Type ty = DRE->getType();
@@ -1582,83 +1626,17 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
       
-      // If this is an implicit self parameter to a `AbstractFunctionDecl`
-      // (`FuncDecl`, `ConstructorDecl`, or `DestructorDecl`,
-      //  `@autoclosure @escaping () -> String = String()` as one example)
-      // then it isn't actually capturing the closure's 'self', and is fine.
-      if (isa<AbstractFunctionDecl>(DRE->getDecl())) {
-        return false;
-      }
-      
-      // If this decl isn't named "self", then it isn't an implicit self capture
-      // and we have no reason to reject it.
-      ASTContext &Ctx = DRE->getDecl()->getASTContext();
-      if (!DRE->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
-        return false;
-      }
-      
-      auto isExplicitWeakSelfCapture = false;
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-          // If `weak self` was captured explicitly, then implicit self
-          // is always allowed allowed once `self` is unwrapped.
-          //  - If `self` is still an Optional, compilation would have failed already,
-          //    so we don't need to check for that here.
-          if (selfDecl->getType()->is<WeakStorageType>()) {
-            isExplicitWeakSelfCapture = true;
-          }
-          
+      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure))
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl())
           // If this capture is using the name `self` actually referring
           // to some other variable (e.g. with `[self = "hello"]`)
           // then implicit self is not allowed.
-          else if (!selfDecl->isSelfParamCapture()) {
+          if (!selfDecl->isSelfParamCapture())
             return true;
-          }
-        }
-      }
       
-      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (auto parentStmt = var->getParentPatternStmt()) {
-          if (isa<LabeledConditionalStmt>(parentStmt)) {
-            // If this `self` decl was not captured explicitly by this closure,
-            // but is actually from an outer `weak` capture's `if let self = self`
-            // or `guard let self = self` etc, then we don't allow implicit self.
-            if (!isExplicitWeakSelfCapture) {
-              return true;
-            }
-            
-            // If this is an explicit `weak self` capture, then we need
-            // to validate that the unwrapped `self` decl is actually
-            // referring to `self`, and not something else like in
-            // `guard let self = .someOptionalVariable else { return }`
-            auto hasCorrectSelfBindingCondition = false;
-            for (auto cond : dyn_cast<LabeledConditionalStmt>(parentStmt)->getCond()) {
-              if (cond.getKind() == StmtConditionElement::CK_PatternBinding) {
-                if (auto optionalPattern = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-                  // if the lhs of the optional binding is `self`...
-                  if (optionalPattern->getSubPattern()->getBoundName() == Ctx.Id_self) {
-                    if (auto loadExpr = dyn_cast<LoadExpr>(cond.getInitializer())) {
-                      if (auto declRefExpr = dyn_cast<DeclRefExpr>(loadExpr->getSubExpr())) {
-                        // and the rhs of the optional binding is `self`...
-                        if (declRefExpr->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
-                          // then we can permit implicit self in this closure
-                          hasCorrectSelfBindingCondition = true;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            
-            return !hasCorrectSelfBindingCondition;
-          }
-        }
-        
-        if (!isEnclosingSelfReference(var, inClosure)) {
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl()))
+        if (!isEnclosingSelfReference(var, inClosure))
           return false;
-        }
-      }
       
       return true;
     }
@@ -1667,6 +1645,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     /// use or capture of "self." for qualification of member references.
     static bool isClosureRequiringSelfQualification(
                   const AbstractClosureExpr *CE) {
+      // If this closure capture self weakly, then we have to validate each usage
+      // of implicit self individually, even in a nonescaping closure
+      if (auto closureExpr = dyn_cast<ClosureExpr>(CE))
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl())
+          if (selfDecl->getType()->is<WeakStorageType>())
+            return true;
+            
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
@@ -1713,23 +1698,19 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // Until Swift 6, only emit a warning when we get this with an
       // explicit capture, since we used to not diagnose this at all.
       auto shouldOnlyWarn = [&](Expr *selfRef) {
-        if (auto declRef = dyn_cast<DeclRefExpr>(selfRef)) {
-          if (auto decl = declRef->getDecl()) {
-            if (auto varDecl = dyn_cast<VarDecl>(decl)) {
-              // If the self decl was defined in an conditional binding in an `if`/`guard`/`while`,
-              // then we know this is an inner closure of some outer closure's `weak self` capture.
-              // Since this wasn't allowed in Swift 5.5, we should just always emit an error.
-              if (auto parentStmt = varDecl->getParentPatternStmt()) {
-                if (isa<LabeledConditionalStmt>(parentStmt)) {
-                  return false;
-                }
-              }
-              
+        // If this implicit self decl is from a closure that captured self weakly,
+        // then we should always emit an error, since implicit self was only
+        // allowed starting in Swift 5.8 and later.
+        if (auto closureExpr = dyn_cast<ClosureExpr>(ACE))
+          if (auto selfDecl = closureExpr->getCapturedSelfDecl())
+            if (selfDecl->getType()->is<WeakStorageType>())
+              return false;
+        
+        if (auto declRef = dyn_cast<DeclRefExpr>(selfRef))
+          if (auto decl = declRef->getDecl())
+            if (auto varDecl = dyn_cast<VarDecl>(decl))
               return !varDecl->isSelfParameter();
-            }
-          }
-        }
-          
+        
         return false;
       };
       
