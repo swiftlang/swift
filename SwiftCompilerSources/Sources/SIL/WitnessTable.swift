@@ -20,14 +20,28 @@ public struct WitnessTable : CustomStringConvertible, CustomReflectable {
   public struct Entry : CustomStringConvertible, CustomReflectable {
     fileprivate let bridged: BridgedWitnessTableEntry
     
-    public typealias Kind = swift.SILWitnessTable.WitnessKind
+    public enum Kind {
+      case invalid
+      case method
+      case associatedType
+      case associatedTypeProtocol
+      case baseProtocol
+    }
     
     public var kind: Kind {
-      return SILWitnessTableEntry_getKind(bridged)
+      switch SILWitnessTableEntry_getKind(bridged) {
+        case SILWitnessTableEntry_Invalid:                return .invalid
+        case SILWitnessTableEntry_Method:                 return .method
+        case SILWitnessTableEntry_AssociatedType:         return .associatedType
+        case SILWitnessTableEntry_AssociatedTypeProtocol: return .associatedTypeProtocol
+        case SILWitnessTableEntry_BaseProtocol:           return .baseProtocol
+        default:
+          fatalError("unknown witness table kind")
+      }
     }
     
     public var methodFunction: Function? {
-      assert(kind == .Method)
+      assert(kind == .method)
       return SILWitnessTableEntry_getMethodFunction(bridged).function
     }
 
