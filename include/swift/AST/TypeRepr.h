@@ -33,6 +33,7 @@
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
+  class ASTContext;
   class ASTWalker;
   class DeclContext;
   class IdentTypeRepr;
@@ -48,7 +49,7 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 class OpaqueReturnTypeRepr;
-using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
+using CollectedOpaqueReprs = SmallVector<TypeRepr *, 2>;
 
 /// Representation of a type as written in source.
 class alignas(1 << TypeReprAlignInBits) TypeRepr
@@ -118,6 +119,9 @@ public:
     return static_cast<TypeReprKind>(Bits.TypeRepr.Kind);
   }
 
+  /// Is this type representation a protocol?
+  bool isProtocol(DeclContext *dc);
+
   /// Is this type representation known to be invalid?
   bool isInvalid() const { return Bits.TypeRepr.Invalid; }
 
@@ -164,10 +168,6 @@ public:
   /// Check recursively whether this type repr or any of its descendants are
   /// opaque return type reprs.
   bool hasOpaque();
-
-  /// Walk the type representation recursively, collecting any
-  /// `OpaqueReturnTypeRepr`s.
-  CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
 
   /// Retrieve the type repr without any parentheses around it.
   ///
@@ -866,6 +866,12 @@ public:
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
 
+  /// 'Any' is understood as CompositionTypeRepr by the compiler but its type array will be empty
+  ///  becasue it is a  nonspecific type
+  bool isTypeReprAny() {
+        return getTypes().size() == 0 ?  true : false;
+  }
+  
   static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,

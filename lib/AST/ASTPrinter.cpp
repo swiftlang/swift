@@ -3045,6 +3045,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureImplicitSome(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }

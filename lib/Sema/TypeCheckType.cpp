@@ -755,7 +755,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (resolution.getOptions().isConstraintImplicitExistential()) {
+    if (resolution.getOptions().isConstraintImplicitExistential() && !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
                      protoDecl->getExistentialType(),
@@ -2243,8 +2243,48 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                              options);
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
-  case TypeReprKind::CompoundIdent:
+  case TypeReprKind::CompoundIdent: {
+    auto *DC = getDeclContext();
+    auto diagnoseDisallowedExistential = [&](Type ty) {
+      if (!(options & TypeResolutionFlags::SilenceErrors) &&
+          options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
+        // We're specifically looking at an existential type `any P<some Q>`,
+        // so emit a tailored diagnostic. We don't emit an ErrorType here
+        // for better recovery.
+        diagnose(repr->getLoc(),
+                 diag::unsupported_opaque_type_in_existential);
+        // FIXME: We shouldn't have to invalid the type repr here, but not
+        // doing so causes a double-diagnostic.
+        repr->setInvalid();
+      }
+      return ty;
+    };
+
+    if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+      if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+        if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
+          return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+      }
+
+      // Check whether any of the generic parameters in the context represents
+      // this opaque type. If so, return that generic parameter.
+      if (options.isConstraintImplicitExistential()) {
+        if (auto declDC = DC->getAsDecl()) {
+          if (auto genericContext = declDC->getAsGenericContext()) {
+            if (auto genericParams = genericContext->getGenericParams()) {
+              for (auto genericParam : *genericParams) {
+                if (genericParam->getOpaqueTypeRepr() == repr)
+                  return diagnoseDisallowedExistential(
+                                                       genericParam->getDeclaredInterfaceType());
+              }
+            }
+          }
+        }
+      }
+    }
+
     return resolveIdentifierType(cast<IdentTypeRepr>(repr), options);
+  }
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {
@@ -2283,8 +2323,32 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
 
-  case TypeReprKind::Composition:
-    return resolveCompositionType(cast<CompositionTypeRepr>(repr), options);
+    case TypeReprKind::Composition: {
+      auto *DC = getDeclContext();
+      auto diagnoseDisallowedExistential = [&](Type ty) {
+        if (!(options & TypeResolutionFlags::SilenceErrors) &&
+            options.contains(TypeResolutionFlags::DisallowOpaqueTypes)) {
+          // We're specifically looking at an existential type `any P<some Q>`,
+          // so emit a tailored diagnostic. We don't emit an ErrorType here
+          // for better recovery.
+          diagnose(repr->getLoc(),
+                   diag::unsupported_opaque_type_in_existential);
+          // FIXME: We shouldn't have to invalid the type repr here, but not
+          // doing so causes a double-diagnostic.
+          repr->setInvalid();
+        }
+        return ty;
+      };
+
+      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+        if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
+          if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
+            return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+        }
+      }
+
+      return resolveCompositionType(cast<CompositionTypeRepr>(repr), options);
+    }
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);
@@ -3822,6 +3886,24 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(getASTContext());
   }
 
+    auto *dc = getDeclContext();
+    auto &ctx = getASTContext();
+
+    if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) && options.isConstraintImplicitExistential()) {
+      // Check whether any of the generic parameters in the context represents
+      // this opaque type. If so, return that generic parameter.
+      if (auto declDC = dc->getAsDecl()) {
+        if (auto genericContext = declDC->getAsGenericContext()) {
+          if (auto genericParams = genericContext->getGenericParams()) {
+            for (auto genericParam : *genericParams) {
+              if (genericParam->getOpaqueTypeRepr() == IdType)
+                return genericParam->getDeclaredInterfaceType();
+            }
+          }
+        }
+      }
+    }
+
   if (result->isConstraintType() &&
       options.isConstraintImplicitExistential()) {
     return ExistentialType::get(result);
@@ -4686,7 +4768,7 @@ public:
 
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
-      if (proto->existentialRequiresAny()) {
+      if (proto->existentialRequiresAny() && !Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
@@ -4703,7 +4785,7 @@ public:
       if (type->isConstraintType()) {
         auto layout = type->getExistentialLayout();
         for (auto *protoDecl : layout.getProtocols()) {
-          if (!protoDecl->existentialRequiresAny())
+          if (!protoDecl->existentialRequiresAny() || Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
             continue;
 
           Ctx.Diags.diagnose(comp->getNameLoc(),
