@@ -615,7 +615,7 @@ struct SwiftSemanticToken {
 #if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
 // FIXME: MSVC doesn't pack bitfields with different underlying types.
-// Giving up to check this in MSVC for now, becasue static_assert is only for
+// Giving up to check this in MSVC for now, because static_assert is only for
 // keeping low memory usage.
 #endif
 
@@ -2078,7 +2078,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
 
     bool SawChanges = true;
     if (Impl.Edited) {
-      // We're ansering an edit request. Report all highlighted token ranges not
+      // We're answering an edit request. Report all highlighted token ranges not
       // in the previous syntax map to the Consumer and extend the AffectedRange
       // to contain all added/removed token ranges.
       SawChanges =
@@ -2546,7 +2546,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
     }
 
-    // If client doesn't need any information, we doen't need to parse it.
+    // If client doesn't need any information, we doesn't need to parse it.
 
 
     SyntaxParsingCache *SyntaxCachePtr = nullptr;

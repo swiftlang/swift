@@ -18,7 +18,7 @@ function(add_sourcekit_default_compiler_flags target)
     -fblocks)
 endfunction()
 
-function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
+function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
   set(RPATH_LIST)
 
   # If we are linking in the Swift Swift parser, we at least need host tools
@@ -57,7 +57,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
 
       elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
 
-        # Intentinally don't add the lib dir of the cross-compiled compiler, so that
+        # Intentionally don't add the lib dir of the cross-compiled compiler, so that
         # the stdlib is not picked up from there, but from the SDK.
         # This requires to explicitly add all the needed compatibility libraries. We
         # can take them from the current build.
@@ -119,7 +119,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(${ASKD_BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and and run time, link against the swift libraries in the
+      # At build time and run time, link against the swift libraries in the
       # installed host toolchain.
       get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
@@ -231,7 +231,7 @@ macro(add_sourcekit_library name)
 
   if(SOURCEKITLIB_SHARED)
     set(RPATH_LIST)
-    add_sourcekitd_swifrt_linking(${name} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR} ${SOURCEKITLIB_HAS_SWIFT_MODULES})
+    add_sourcekit_swift_runtime_link_flags(${name} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR} ${SOURCEKITLIB_HAS_SWIFT_MODULES})
 
     if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
       set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath")
@@ -387,7 +387,7 @@ macro(add_sourcekit_framework name)
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
     set(RPATH_LIST)
-    add_sourcekitd_swifrt_linking(${name} "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}" ${SOURCEKITFW_HAS_SWIFT_MODULES})
+    add_sourcekit_swift_runtime_link_flags(${name} "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}" ${SOURCEKITFW_HAS_SWIFT_MODULES})
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -418,7 +418,7 @@ macro(add_sourcekit_framework name)
         BINARY_DIR ${framework_location}
         LIBRARY_DIR ${framework_location})
     set(RPATH_LIST)
-    add_sourcekitd_swifrt_linking(${name} "${framework_location}" SOURCEKITFW_HAS_SWIFT_MODULES RPATH_LIST)
+    add_sourcekit_swift_runtime_link_flags(${name} "${framework_location}" SOURCEKITFW_HAS_SWIFT_MODULES RPATH_LIST)
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -503,13 +503,13 @@ macro(add_sourcekit_xpc_service name framework_target)
   add_dependencies(${framework_target} ${name})
 
   set(RPATH_LIST)
-  add_sourcekitd_swifrt_linking(${name} ${xpc_bin_dir} ${SOURCEKITXPC_HAS_SWIFT_MODULES})
+  add_sourcekit_swift_runtime_link_flags(${name} ${xpc_bin_dir} ${SOURCEKITXPC_HAS_SWIFT_MODULES})
 
   file(RELATIVE_PATH relative_lib_path "${xpc_bin_dir}" "${lib_dir}")
   list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
 
   # Add rpath for sourcekitdInProc
-  # lib/${framework_taget}.framework/Versions/A/XPCServices/${name}.xpc/Contents/MacOS/${name}
+  # lib/${framework_target}.framework/Versions/A/XPCServices/${name}.xpc/Contents/MacOS/${name}
   set_target_properties(${name} PROPERTIES
                         BUILD_WITH_INSTALL_RPATH On
                         INSTALL_RPATH "${RPATH_LIST}"
