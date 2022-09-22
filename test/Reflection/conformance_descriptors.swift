@@ -3,9 +3,6 @@
 // Temporarily disable on AArch64 Linux (rdar://88451721)
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
-// Temporarily disable on arm64e (rdar://88579818)
-// UNSUPPORTED: CPU=arm64e
-
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/Conformances.swift -parse-as-library -emit-module -emit-library -module-name ConformanceCheck -o %t/Conformances
