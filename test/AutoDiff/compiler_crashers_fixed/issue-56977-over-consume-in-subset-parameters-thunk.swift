@@ -1,7 +1,7 @@
 // RUN: %target-build-swift %s
 
-// SR-14625: An over-consume in a subset parameters thunk detected after
-// enabling OSSA.
+// https://github.com/apple/swift/issues/56977
+// An over-consume in a subset parameters thunk detected after enabling OSSA
 
 // The test is flaky and crashes in some CI builds
 // REQUIRES: rdar86063852

@@ -1,7 +1,9 @@
 // RUN: %target-build-swift %s
 // RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s
 
-// rdar://74876596 ([SR-14290]: SIL verification fails when differentiating a function of [[Double]])
+// rdar://74876596
+// https://github.com/apple/swift/issues/56649
+// SIL verification fails when differentiating a function of `[[Double]]`
 
 import _Differentiation
 

@@ -2,16 +2,17 @@
 
 import _Differentiation
 
-// SR-13305: Test protocol witness thunk for `@differentiable` protocol
-// requirement, where the required method has a non-wrt `inout` parameter
-// that should be treated as a differentiability result.
+// https://github.com/apple/swift/issues/55745
+// Test protocol witness thunk for `@differentiable` protocol requirement, where
+// the required method has a non-wrt `inout` parameter that should be treated as
+// a differentiability result.
 
-protocol SR_13305_Protocol {
+protocol Proto {
   @differentiable(reverse, wrt: x)
   func method(x: Float, y: inout Float)
 }
 
-struct SR_13305_Struct: SR_13305_Protocol {
+struct Struct: Proto {
   @differentiable(reverse, wrt: x)
   func method(x: Float, y: inout Float) {
     y = y * x

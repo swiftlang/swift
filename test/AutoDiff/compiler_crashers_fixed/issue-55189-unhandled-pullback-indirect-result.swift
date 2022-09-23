@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-// SR-12744: Pullback generation crash for unhandled indirect result.
+// https://github.com/apple/swift/issues/55189
+// Pullback generation crash for unhandled indirect result
+//
 // May be due to inconsistent derivative function type calculation logic in
 // `VJPEmitter::createEmptyPullback`.
 

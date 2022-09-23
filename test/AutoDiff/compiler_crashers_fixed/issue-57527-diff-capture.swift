@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-// SR-15205: fix assertions related to captured arguments, they should
-// treated as constants
+// https://github.com/apple/swift/issues/57527
+// Fix assertions related to captured arguments, they should be treated
+// as constants.
 
 import _Differentiation
 

@@ -1,6 +1,8 @@
 // RUN: not %target-swift-frontend-typecheck -parse-stdlib %s
 
-// SR-12559: `@derivative` attribute type-checking crash.
+// https://github.com/apple/swift/issues/55003
+// `@derivative` attribute type-checking crash
+//
 // This program is not valid, but the compiler should not crash nonetheless.
 // Reproducible only with `-parse-stdlib`.
 

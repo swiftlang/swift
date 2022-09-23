@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-// SR-15891: The parameter indices used for copying
-// inout tangent vectors were calculated improperly
-// in presence of other pullback parameters (e.g. 
-// captures)
+// https://github.com/apple/swift/issues/58152
+// The parameter indices used for copying `inout` tangent vectors were
+// calculated improperly in presence of other pullback parameters
+// (e.g. captures).
 
 import _Differentiation
 

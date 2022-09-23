@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -enable-resilience -emit-sil -verify %s
 
-// SR-12641: SILGen verification error regarding `ImmutableAddressUseVerifier` and AutoDiff-generated code.
+// https://github.com/apple/swift/issues/55085
+// SILGen verification error regarding `ImmutableAddressUseVerifier`
+// and AutoDiff-generated code.
 
 import _Differentiation
 
@@ -32,7 +34,7 @@ _ = pullback(at: Class(Resilient(x: 10)), of: f)
 //  #9 0x00000000011e6add (anonymous namespace)::ImmutableAddressUseVerifier::isMutatingOrConsuming(swift::SILValue)
 // #10 0x00000000011ce0b4 (anonymous namespace)::SILVerifier::visitSILBasicBlock(swift::SILBasicBlock*)
 
-// Related crasher discovered while fixing SR-12641.
+// Related crasher discovered while fixing the aforementioned issue.
 
 class LoadableOriginal<T: Differentiable>: Differentiable {
   var x: T
