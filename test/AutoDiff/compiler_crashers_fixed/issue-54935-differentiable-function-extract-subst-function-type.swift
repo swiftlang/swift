@@ -1,9 +1,10 @@
 // RUN: %target-build-swift -O %s
 
-// SR-12493: SIL verification error regarding substituted function types and
+// https://github.com/apple/swift/issues/54935
+// SIL verification error regarding substituted function types and
 // `differentiable_function_extract` instruction. Occurs only with `-O`.
 
-// FIXME(SR-13021): Disabled due to flakiness on Linux, likely related to TF-1197.
+// FIXME: Disabled due to flakiness on Linux (https://github.com/apple/swift/issues/55466), likely related to TF-1197.
 // REQUIRES: SR13021
 
 import _Differentiation

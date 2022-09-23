@@ -1,8 +1,11 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
-// SR-12642: Crash regarding `Differentiable` derived conformances and
-// redeclared properties. This crash surfaced only briefly during the
-// implementation of wrapped property differentiation (SR-12637).
+// https://github.com/apple/swift/issues/55086
+// Crash regarding `Differentiable` derived conformances and redeclared
+// properties
+//
+// This crash surfaced only briefly during the implementation of wrapped
+// property differentiation (https://github.com/apple/swift/issues/55081).
 
 import _Differentiation
 

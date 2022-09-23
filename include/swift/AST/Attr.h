@@ -2204,19 +2204,6 @@ public:
   }
 };
 
-// /// The @_noMetadata attribute, which marks a generic param as not providing metadata
-// class NoMetadataAttr : public DeclAttribute {
-//   NoMetadataAttr(SourceLoc atLoc, SourceRange Range);
-
-// public:
-//   static NoMetadataAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-//                                 SourceRange Range);
-
-//   static bool classof(const DeclAttribute *DA) {
-//     return DA->getKind() == DAK_NoMetadata;
-//   }
-// };
-
 /// The @_unavailableFromAsync attribute, used to make function declarations
 /// unavailable from async contexts.
 class UnavailableFromAsyncAttr : public DeclAttribute {

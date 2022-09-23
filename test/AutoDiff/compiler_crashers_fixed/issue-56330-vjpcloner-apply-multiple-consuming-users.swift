@@ -2,8 +2,9 @@
 // Every so often, this test causes the linker to crash!
 // REQUIRES: rdar86041709
 
-// SR-13933: Fix "multiple consuming users" ownership error caused by
-// `VJPCloner::visitApply` related to `@differentiable`-function-typed callees.
+// https://github.com/apple/swift/issues/56330
+// Fix "multiple consuming users" ownership error caused by
+// `VJPCloner::visitApply` related to `@differentiable`-function-typed callees
 
 import _Differentiation
 

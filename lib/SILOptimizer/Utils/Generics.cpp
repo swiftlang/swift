@@ -2874,8 +2874,7 @@ bool usePrespecialized(
           break;
         } else if (!specializedSig->getRequiredProtocols(genericParam)
                         .empty()) {
-          // FIXME: how to handle this properly?
-          assert(false && "Wat?");
+          llvm::report_fatal_error("Unexpected protocol requirements");
         } else if (layout->isNativeClass()) {
           newSubs.push_back(genericParam->getASTContext().TheNativeObjectType);
           score += 1;

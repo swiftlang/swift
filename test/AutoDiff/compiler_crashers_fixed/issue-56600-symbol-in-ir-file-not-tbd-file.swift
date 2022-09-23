@@ -2,8 +2,9 @@
 
 // REQUIRES: executable_test
 
-// SR-14240: Error: symbol 'powTJfSSpSr' (powTJfSSpSr) is in generated IR file,
-// but not in TBD file.
+// https://github.com/apple/swift/issues/56600
+// Error: symbol 'powTJfSSpSr' (powTJfSSpSr) is in generated IR file, but not
+// in TBD file
 
 import _Differentiation
 

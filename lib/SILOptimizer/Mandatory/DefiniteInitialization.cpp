@@ -1142,9 +1142,6 @@ void LifetimeChecker::doIt() {
   // If we emitted an error, there is no reason to proceed with load promotion.
   if (!EmittedErrorLocs.empty()) return;
 
-  // Insert hop_to_executor instructions for actor initializers, if needed.
-  injectActorHops();
-
   // If the memory object has nontrivial type, then any destroy/release of the
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
@@ -1154,6 +1151,15 @@ void LifetimeChecker::doIt() {
     for (unsigned i = 0, e = Destroys.size(); i != e; ++i)
       processNonTrivialRelease(i);
   }
+
+  /// At this point, we should have computed enough liveness information to
+  /// provide accurate information about initialization points, even for
+  /// local variables within a function, because we've now processed the
+  /// destroy/releases.
+
+  // Insert hop_to_executor instructions for actor initializers, if needed.
+  injectActorHops();
+
 
   // If the memory object had any non-trivial stores that are init or assign
   // based on the control flow path reaching them, then insert dynamic control
