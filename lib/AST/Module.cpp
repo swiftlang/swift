@@ -1876,6 +1876,22 @@ bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
   return false;
 }
 
+NominalTypeDecl *ModuleDecl::getMainTypeDecl() const {
+  if (!EntryPointInfo.hasEntryPoint())
+    return nullptr;
+  auto *file = EntryPointInfo.getEntryPointFile();
+  if (!file)
+    return nullptr;
+  auto *mainDecl = file->getMainDecl();
+  if (!mainDecl)
+    return nullptr;
+  auto *func = dyn_cast<FuncDecl>(file->getMainDecl());
+  if (!func)
+    return nullptr;
+  auto *nominalType = dyn_cast<NominalTypeDecl>(func->getDeclContext());
+  return nominalType;
+}
+
 bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
                                         Optional<ArtificialMainKind> kind) {
   if (!EntryPointInfo.hasEntryPoint()) {
