@@ -13,7 +13,7 @@
 #
 # Split swift compiler command lines into multiple lines.
 #
-# Reads the command line from stdin an outputs the split line to stdout.
+# Reads the command line from stdin and outputs the split line to stdout.
 # Example:
 #
 # $ swiftc -c hello.swift -### | split-cmdline
