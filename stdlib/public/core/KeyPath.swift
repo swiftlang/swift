@@ -158,7 +158,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     let base = UnsafeMutableRawPointer(Builtin.projectTailElems(keypath,
                                                                 Int32.self))
     body(UnsafeMutableRawBufferPointer(start: base, count: bytes))
-    keypath._computeOffsetForPureStructKeypath()
+    keypath._pureStructValueOffset = 0
     return keypath
   }
   final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
@@ -173,7 +173,8 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   internal func isClass(_ item: Any.Type) -> Bool {
-    // Displays "warning: 'is' test is always true" at compile time, but that's not actually the case.
+    // Displays "warning: 'is' test is always true" at compile time,
+    // but that's not actually the case.
     return (item is AnyObject)
   }
 
@@ -192,73 +193,14 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     let mirror = Mirror(reflecting: unwrapType(item))
     let description = mirror.description
     let offsetOfFirstBracketForMirrorDescriptionOfTuple = 11
-    let idx = description.index(description.startIndex, offsetBy: offsetOfFirstBracketForMirrorDescriptionOfTuple)
+    let idx = description.index(description.startIndex,
+                offsetBy: offsetOfFirstBracketForMirrorDescriptionOfTuple)
     if description[idx] == "(" {
       return true
     }
     return false
   }
     
-    // TODO: Merge the functionality of _computeOffsetForPureStructKeypath,
-    // _recalculateOffsetForPureStructKeyPath() and _storedInlineOffset.
-
-    // If this keypath traverses structs only, it'll have a predictable memory layout.
-    // We can then jump to the value directly in _projectReadOnly().
-    internal func _computeOffsetForPureStructKeypath() {
-      _pureStructValueOffset = 0
-      var isPureStruct = true
-      var exitEarly = false
-      defer {
-        _isPureStructKeyPath = isPureStruct
-      }
-      withBuffer {
-        var buffer = $0
-        if buffer.data.isEmpty {
-          if isClass(Self._rootAndValueType.root) {
-            isPureStruct = false
-          }
-        } else {
-          while !exitEarly {
-            let (rawComponent, optNextType) = buffer.next()
-            if isTuple(optNextType as Any) {
-              isPureStruct = false
-              break
-            }
-            switch rawComponent.header.kind {
-            case .struct:
-              _pureStructValueOffset += rawComponent._structOrClassOffset
-            case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
-              isPureStruct = false
-              exitEarly = true
-            }
-            if optNextType == nil {
-              break
-            }
-          }
-        }
-      }
-    }
-
-    // Recalculates the offset in the case where one pure struct keypath is appended to another.
-    internal func _recalculateOffsetForPureStructKeyPath() {
-      _pureStructValueOffset = 0
-      withBuffer {
-        var buffer = $0
-        while true {
-          let (rawComponent, optNextType) = buffer.next()
-          switch rawComponent.header.kind {
-          case .struct:
-            _pureStructValueOffset += rawComponent._structOrClassOffset
-          case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
-            return
-          }
-          if optNextType == nil {
-            break
-          }
-        }
-      }
-    }
-
     @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
     internal var _storedInlineOffset: Int? {
       return withBuffer {
@@ -2370,10 +2312,15 @@ extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
 /// Note: Currently we only distinguish between keypaths that traverse only structs to get to the final value,
 /// and all other types. This is done for performance reasons.
 /// Other type information may be handled in the future to improve performance.
-internal func _processAppendingKeyPathType(root: inout AnyKeyPath, leaf: AnyKeyPath) {
-  root._isPureStructKeyPath = root.isPureStructKeyPath && leaf.isPureStructKeyPath
-  if let isPureStruct = root._isPureStructKeyPath, isPureStruct {
-    root._computeOffsetForPureStructKeypath()
+internal func _processOffsetForAppendedKeyPath(
+  appendedKeyPath: inout AnyKeyPath,
+  root: AnyKeyPath,
+  leaf: AnyKeyPath
+) {
+  appendedKeyPath._isPureStructKeyPath = root.isPureStructKeyPath && leaf.isPureStructKeyPath
+  if let isPureStruct = appendedKeyPath._isPureStructKeyPath, isPureStruct {
+    appendedKeyPath._pureStructValueOffset = root._pureStructValueOffset + leaf
+      ._pureStructValueOffset
   }
 }
 
@@ -2403,11 +2350,10 @@ internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
     }
     return _openExistential(rootValue, do: open2)
   }
-  var returnValue:AnyKeyPath = _openExistential(rootRoot, do: open)
-  _processAppendingKeyPathType(root: &returnValue, leaf: leaf)
-  if let returnValue = returnValue as? Result
-  {
-      return returnValue
+  var returnValue: AnyKeyPath = _openExistential(rootRoot, do: open)
+  _processOffsetForAppendedKeyPath(appendedKeyPath: &returnValue, root: root, leaf: leaf)
+  if let returnValue = returnValue as? Result {
+    return returnValue
   }
   return nil
 }
@@ -2555,7 +2501,7 @@ internal func _appendingKeyPaths<
       return unsafeDowncast(result, to: Result.self)
     }
   }
-   _processAppendingKeyPathType(root: &returnValue, leaf: leaf)
+    _processOffsetForAppendedKeyPath(appendedKeyPath: &returnValue, root: root, leaf: leaf)
    return returnValue as! Result
 }
 
@@ -2639,11 +2585,32 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   let (keyPathClass, rootType, size, _)
     = _getKeyPathClassAndInstanceSizeFromPattern(patternPtr, arguments)
 
+  var offset = UInt32(0)
+  var isPureStruct = true
+  var keyPathBase: Any.Type?
   // Allocate the instance.
   let instance = keyPathClass._create(capacityInBytes: size) { instanceData in
     // Instantiate the pattern into the instance.
-    _instantiateKeyPathBuffer(patternPtr, instanceData, rootType, arguments)
+    let returnValue = _instantiateKeyPathBuffer(patternPtr, instanceData, rootType, arguments)
+    offset += returnValue.structOffset
+
+    let booleans = returnValue.componentStructList
+    if(booleans.count == 0) {
+      isPureStruct = false
+    }
+    for value in booleans {
+      isPureStruct = isPureStruct && value
+    }
+    keyPathBase = rootType
   }
+
+  // TODO: See if there's a better way to eliminate
+  // tuples from the current `isPureStruct` optimization.
+  if let keyPathBase = keyPathBase, instance.isTuple(keyPathBase) {
+    isPureStruct = false
+  }
+  instance._pureStructValueOffset = Int(offset)
+  instance._isPureStructKeyPath = isPureStruct
 
   // Adopt the KVC string from the pattern.
   let kvcStringBase = patternPtr.advanced(by: 12)
@@ -2848,6 +2815,10 @@ internal protocol KeyPathPatternVisitor {
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference)
 
   mutating func finish()
+    
+  // Offset for pure-struct keypaths.
+  var structOffset: UInt32 { get set }
+  var isPureStruct: [Bool] { get set }
 }
 
 internal func _resolveRelativeAddress(_ base: UnsafeRawPointer,
@@ -3175,6 +3146,8 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
   var leaf: Any.Type!
   var genericEnvironment: UnsafeRawPointer?
   let patternArgs: UnsafeRawPointer?
+  var structOffset: UInt32 = 0
+  var isPureStruct: [Bool] = []
 
   init(patternArgs: UnsafeRawPointer?) {
     self.patternArgs = patternArgs
@@ -3382,6 +3355,8 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   var genericEnvironment: UnsafeRawPointer?
   let patternArgs: UnsafeRawPointer?
   var base: Any.Type
+  var structOffset: UInt32 = 0
+  var isPureStruct: [Bool] = []
 
   init(destData: UnsafeMutableRawBufferPointer,
        patternArgs: UnsafeRawPointer?,
@@ -3455,6 +3430,12 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
                                      offset: KeyPathPatternStoredOffset) {
     let previous = updatePreviousComponentAddr()
     switch kind {
+        case .struct:
+      isPureStruct.append(true)
+        default:
+      isPureStruct.append(false)
+    }
+    switch kind {
     case .class:
       // A mutable class property can end the reference prefix.
       if mutable {
@@ -3470,6 +3451,12 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
                                                 mutable: mutable,
                                                 inlineOffset: value)
         pushDest(header)
+        switch kind {
+          case .struct:
+            structOffset += value
+          default:
+             break
+        }
       case .outOfLine(let offset):
         let header = RawKeyPathComponent.Header(storedWithOutOfLineOffset: kind,
                                                 mutable: mutable)
@@ -3515,6 +3502,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
                                    setter: UnsafeRawPointer?,
                                    arguments: KeyPathPatternComputedArguments?,
                                    externalArgs: UnsafeBufferPointer<Int32>?) {
+    isPureStruct.append(false)
     let previous = updatePreviousComponentAddr()
     let settable = setter != nil
     // A nonmutating settable property can end the reference prefix.
@@ -3654,22 +3642,26 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   }
 
   mutating func visitOptionalChainComponent() {
+    isPureStruct.append(false)
     let _ = updatePreviousComponentAddr()
     let header = RawKeyPathComponent.Header(optionalChain: ())
     pushDest(header)
   }
   mutating func visitOptionalWrapComponent() {
+    isPureStruct.append(false)
     let _ = updatePreviousComponentAddr()
     let header = RawKeyPathComponent.Header(optionalWrap: ())
     pushDest(header)
   }
   mutating func visitOptionalForceComponent() {
+    isPureStruct.append(false)
     let _ = updatePreviousComponentAddr()
     let header = RawKeyPathComponent.Header(optionalForce: ())
     pushDest(header)
   }
 
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
+    isPureStruct.append(false)
     // Get the metadata for the intermediate type.
     let metadata = _resolveKeyPathMetadataReference(
                      metadataRef,
@@ -3694,6 +3686,8 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
   var sizeVisitor: GetKeyPathClassAndInstanceSizeFromPattern
   var instantiateVisitor: InstantiateKeyPathBuffer
   let origDest: UnsafeMutableRawPointer
+  var structOffset: UInt32 = 0
+  var isPureStruct: [Bool] = []
 
   init(sizeVisitor: GetKeyPathClassAndInstanceSizeFromPattern,
        instantiateVisitor: InstantiateKeyPathBuffer) {
@@ -3795,7 +3789,7 @@ internal func _instantiateKeyPathBuffer(
   _ origDestData: UnsafeMutableRawBufferPointer,
   _ rootType: Any.Type,
   _ arguments: UnsafeRawPointer
-) {
+) -> (structOffset: UInt32, componentStructList: [Bool]) {
   let destHeaderPtr = origDestData.baseAddress.unsafelyUnwrapped
   var destData = UnsafeMutableRawBufferPointer(
     start: destHeaderPtr.advanced(by: MemoryLayout<Int>.size),
@@ -3847,6 +3841,7 @@ internal func _instantiateKeyPathBuffer(
     endOfReferencePrefixComponent.storeBytes(of: componentHeader,
       as: RawKeyPathComponent.Header.self)
   }
+  return (walker.structOffset, walker.isPureStruct)
 }
 
 #if SWIFT_ENABLE_REFLECTION
