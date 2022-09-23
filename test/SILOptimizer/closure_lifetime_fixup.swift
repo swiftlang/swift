@@ -95,15 +95,10 @@ public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> 
 }
 
 // CHECK-LABEL: sil @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tF
-// CHECK:  [[FN:%.*]] = function_ref @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tFSSSvcfu_ : $@convention(thin) (UnsafeMutableRawPointer) -> @owned String
+// CHECK:  [[FN:%.*]] = function_ref @$s22closure_lifetime_fixup28to_stack_of_convert_function1pySvSg_tFSSSvcfu_ :
 // CHECK:  [[PA:%.*]] = thin_to_thick_function [[FN]]
-// CHECK:  [[CVT:%.*]] = convert_function [[PA]]
-// CHECK:  [[CVT2:%.*]] = convert_escape_to_noescape [[CVT]]
-// CHECK:  [[REABSTRACT:%.*]] = function_ref @$sSvSSs5Error_pIgyozo_SvSSsAA_pIegnrzo_TR
-// CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[REABSTRACT]]([[CVT2]])
-// CHECK:  [[CF2:%.*]] = convert_function [[PA2]]
 // CHECK:  [[MAP:%.*]] = function_ref @$sSq3mapyqd__Sgqd__xKXEKlF
-// CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, String>({{.*}}, [[CF2]], {{.*}})
+// CHECK:  try_apply [[MAP]]<UnsafeMutableRawPointer, String>({{.*}}, [[PA]], {{.*}})
 public func to_stack_of_convert_function(p: UnsafeMutableRawPointer?) {
   _ = p.map(String.init(describing:))
 }
