@@ -16,7 +16,7 @@ func reabstractCaptureListExprArgument() {
 }
 
 // CHECK-LABEL: sil {{.*}} @{{.*}}reabstractKeyPathFunctionArgument
-// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}U_
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref {{.*}}u_
 // CHECK:         [[KP_ARG:%.*]] = copy_value {{.*}} $KeyPath
 // CHECK:         [[CLOSURE:%.*]] = partial_apply {{.*}}[[CLOSURE_FN]]([[KP_ARG]])
 // CHECK:         [[CLOSURE_NE:%.*]] = convert_escape_to_noescape {{.*}} [[CLOSURE]]

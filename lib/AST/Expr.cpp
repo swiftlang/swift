@@ -2252,24 +2252,21 @@ OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
 
 KeyPathExpr::KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot,
                          Expr *parsedPath, SourceLoc endLoc, bool hasLeadingDot,
-                         bool isObjC, bool isImplicit,
-                         unsigned closureDiscriminator)
+                         bool isObjC, bool isImplicit)
     : Expr(ExprKind::KeyPath, isImplicit), StartLoc(startLoc), EndLoc(endLoc),
       ParsedRoot(parsedRoot), ParsedPath(parsedPath),
-      HasLeadingDot(hasLeadingDot), ClosureDiscriminator(closureDiscriminator) {
+      HasLeadingDot(hasLeadingDot) {
   assert(!(isObjC && (parsedRoot || parsedPath)) &&
          "Obj-C key paths should only have components");
   Bits.KeyPathExpr.IsObjC = isObjC;
 }
 
 KeyPathExpr::KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot,
-                         Expr *parsedPath, bool hasLeadingDot, bool isImplicit,
-                         unsigned closureDiscriminator)
+                         Expr *parsedPath, bool hasLeadingDot, bool isImplicit)
     : KeyPathExpr(backslashLoc, parsedRoot, parsedPath,
                   parsedPath ? parsedPath->getEndLoc()
                              : parsedRoot->getEndLoc(),
-                  hasLeadingDot, /*isObjC*/ false, isImplicit,
-                  closureDiscriminator) {
+                  hasLeadingDot, /*isObjC*/ false, isImplicit) {
   assert((parsedRoot || parsedPath) &&
          "Key path must have either root or path");
 }
@@ -2278,8 +2275,7 @@ KeyPathExpr::KeyPathExpr(ASTContext &ctx, SourceLoc startLoc,
                          ArrayRef<Component> components, SourceLoc endLoc,
                          bool isObjC, bool isImplicit)
     : KeyPathExpr(startLoc, /*parsedRoot*/ nullptr, /*parsedPath*/ nullptr,
-                  endLoc, /*hasLeadingDot*/ false, isObjC, isImplicit,
-                  /*closure discriminator*/ AbstractClosureExpr::InvalidDiscriminator) {
+                  endLoc, /*hasLeadingDot*/ false, isObjC, isImplicit) {
   assert(!components.empty());
   Components = ctx.AllocateCopy(components);
 }
@@ -2293,11 +2289,9 @@ KeyPathExpr *KeyPathExpr::createParsedPoundKeyPath(
 
 KeyPathExpr *KeyPathExpr::createParsed(ASTContext &ctx, SourceLoc backslashLoc,
                                        Expr *parsedRoot, Expr *parsedPath,
-                                       bool hasLeadingDot,
-                                       unsigned closureDiscriminator) {
+                                       bool hasLeadingDot) {
   return new (ctx) KeyPathExpr(backslashLoc, parsedRoot, parsedPath,
-                               hasLeadingDot, /*isImplicit*/ false,
-                               closureDiscriminator);
+                               hasLeadingDot, /*isImplicit*/ false);
 }
 
 KeyPathExpr *KeyPathExpr::createImplicit(ASTContext &ctx,
@@ -2313,8 +2307,7 @@ KeyPathExpr *KeyPathExpr::createImplicit(ASTContext &ctx,
                                          Expr *parsedRoot, Expr *parsedPath,
                                          bool hasLeadingDot) {
   return new (ctx) KeyPathExpr(backslashLoc, parsedRoot, parsedPath,
-           hasLeadingDot, /*isImplicit*/ true,
-           /*closureDiscriminator*/ AbstractClosureExpr::InvalidDiscriminator);
+           hasLeadingDot, /*isImplicit*/ true);
 }
 
 void
