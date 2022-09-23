@@ -1603,65 +1603,74 @@ void ConstraintGraph::dumpActiveScopeChanges(llvm::raw_ostream &out,
   // Print out Changes.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
-  out.indent(indent);
-  out << "Changes:\n";
+  out.indent(indent) << "|"
+                     << "\n";
+  ;
+  out.indent(indent) << "|  * Changes:\n";
+  //  out.indent(2) << "* Changes:\n";
   if (!tvWithboundTypes.empty()) {
-    out.indent(indent + 2);
-    out << "Newly Bound: \n";
+    out.indent(indent) << "|";
+    out.indent(2) << "| Newly Bound: \n";
     for (const auto &tvWithType : tvWithboundTypes) {
-      out.indent(indent + 4);
-      out << "> $T" << tvWithType.first->getImpl().getID() << " := ";
+      out.indent(indent) << "|";
+      out.indent(2) << "|";
+      out.indent(2) << "> $T" << tvWithType.first->getImpl().getID() << " := ";
       tvWithType.second->print(out, PO);
       out << '\n';
     }
   }
   if (!addedTypeVars.empty()) {
-    out.indent(indent + 2);
-    auto heading = (addedTypeVars.size() > 1) ? "New Type Variables: \n"
-                                              : "New Type Variable: \n";
-    out << heading;
+    out.indent(indent) << "|";
+    auto heading = (addedTypeVars.size() > 1) ? "| New Type Variables: \n"
+                                              : "| New Type Variable: \n";
+    out.indent(2) << heading;
     for (const auto &typeVar : addedTypeVars) {
-      out.indent(indent + 4);
-      out << "> $T" << typeVar->getImpl().getID();
+      out.indent(indent) << "|";
+      out.indent(2) << "|";
+      out.indent(2) << "> $T" << typeVar->getImpl().getID();
       out << '\n';
     }
   }
   if (!equivTypeVars.empty()) {
-    out.indent(indent + 2);
-    auto heading = (equivTypeVars.size() > 1) ? "New Equivalences: \n"
-                                              : "New Equivalence: \n";
-    out << heading;
+    out.indent(indent) << "|";
+    auto heading = (equivTypeVars.size() > 1) ? "| New Equivalences: \n"
+                                              : "| New Equivalence: \n";
+    out.indent(2) << heading;
     for (const auto &typeVar : equivTypeVars) {
-      out.indent(indent + 4);
-      out << "> $T" << typeVar->getImpl().getID();
+      out.indent(indent) << "|";
+      out.indent(2) << "|";
+      out.indent(2) << "> $T" << typeVar->getImpl().getID();
       out << '\n';
     }
   }
   if (!addedConstraints.empty()) {
-    out.indent(indent + 2);
-    auto heading = (addedConstraints.size() > 1) ? "Added Constraints: \n"
-                                                 : "Added Constraint: \n";
-    out << heading;
+    out.indent(indent) << "|";
+    auto heading = (addedConstraints.size() > 1) ? "| Added Constraints: \n"
+                                                 : "| Added Constraint: \n";
+    out.indent(2) << heading;
     for (const auto &constraint : addedConstraints) {
-      out.indent(indent + 4);
-      out << "> ";
+      out.indent(indent) << "|";
+      out.indent(2) << "|";
+      out.indent(2) << "> ";
       constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
       out << '\n';
     }
   }
   if (!removedConstraints.empty()) {
-    out.indent(indent + 2);
-    auto heading = (removedConstraints.size() > 1) ? "Removed Constraints: \n"
-                                                   : "Removed Constraint: \n";
-    out << heading;
+    out.indent(indent) << "|";
+    auto heading = (removedConstraints.size() > 1) ? "| Removed Constraints: \n"
+                                                   : "| Removed Constraint: \n";
+    out.indent(2) << heading;
     for (const auto &constraint : removedConstraints) {
-      out.indent(indent + 4);
-      out << "> ";
+      out.indent(indent) << "|";
+      out.indent(2) << "|";
+      out.indent(2) << "> ";
       constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
       out << '\n';
     }
   }
-  out << '\n';
+  out.indent(indent) << "|"
+                     << "\n";
 }
 
 void ConstraintGraph::printConnectedComponents(

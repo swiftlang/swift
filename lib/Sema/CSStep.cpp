@@ -351,7 +351,8 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
-      bos.indent(CS.solverState->getCurrentIndent() + 2);
+      bos.indent(CS.solverState->getCurrentIndent());
+      bos << "`- ";
       bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
       bos << "\n";
     }
@@ -362,7 +363,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (CS.isDebugMode()) {
     if (!potentialBindings.empty()) {
       auto &log = getDebugLogger();
-      log << "Potential Binding(s): " << '\n';
+      log << "| Potential Binding(s): " << '\n';
       log << potentialBindings;
     }
 
@@ -380,8 +381,8 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
     if (!overloadDisjunctions.empty()) {
       auto &log = getDebugLogger();
-      log.indent(2);
-      log << "Disjunction(s) = [";
+      //      log.indent(2);
+      log << "`- Disjunction(s) = [";
       interleave(overloadDisjunctions, log, ", ");
       log << "]\n";
     }
@@ -473,9 +474,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto solution = CS.finalize();
   if (CS.isDebugMode()) {
     auto &log = getDebugLogger();
-    log << "Found solution:";
+    log << "<! Found solution:";
     getCurrentScore().print(log);
-    log << "\n";
+    log << ">\n";
   }
 
   Solutions.push_back(std::move(solution));

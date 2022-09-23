@@ -53,10 +53,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   }
 
   if (isDebugMode() && value > 0) {
-    if (solverState)
-      llvm::errs().indent(solverState->getCurrentIndent());
-    llvm::errs() << "Increasing '" << Score::getNameFor(kind) << "' score by "  << value
-                 << "\n";
+    auto &log = llvm::errs();
+    log.indent(solverState ? solverState->getCurrentIndent() : 2) << "|";
+    log.indent(2) << "`- Increasing '" << Score::getNameFor(kind)
+                  << "' score by " << value << "\n";
   }
 
   unsigned index = static_cast<unsigned>(kind);
@@ -73,7 +73,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
 
   if (isDebugMode()) {
     llvm::errs().indent(solverState->getCurrentIndent())
-      << "Solution is worse than the best solution\n";
+      << "| Solution is worse than the best solution\n";
   }
 
   return true;

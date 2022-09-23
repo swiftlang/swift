@@ -476,7 +476,8 @@ private:
     
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
-      log << "Type variables in scope = "
+      //      log.indent(CS.solverState->getCurrentIndent());
+      log << "`- Type variables in scope = "
           << "[";
       auto typeVars = CS.getTypeVariables();
       PrintOptions PO;
@@ -537,10 +538,10 @@ public:
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
         log << "{\n";
-        log.indent(CS.solverState->getCurrentIndent());
-        log << "Attempting ";
+        log.indent(CS.solverState->getCurrentIndent() + 2);
+        log << "!> Attempting ";
         choice->print(log, &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent() + 2);
-        log << '\n';
+        log << "\n";
       }
 
       {
