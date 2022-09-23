@@ -82,6 +82,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "silgen-poly"
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -3054,6 +3055,24 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 const TypeLowering &expectedTL) {
   auto substSourceType = fn.getType().castTo<SILFunctionType>();
   auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
+  
+  LLVM_DEBUG(llvm::dbgs() << "=== Generating reabstraction thunk from:\n";
+             substSourceType.dump(llvm::dbgs());
+             llvm::dbgs() << "\n    to:\n";
+             substExpectedType.dump(llvm::dbgs());
+             llvm::dbgs() << "\n    for source location:\n";
+             if (auto d = loc.getAsASTNode<Decl>()) {
+               d->dump(llvm::dbgs());
+             } else if (auto e = loc.getAsASTNode<Expr>()) {
+               e->dump(llvm::dbgs());
+             } else if (auto s = loc.getAsASTNode<Stmt>()) {
+               s->dump(llvm::dbgs());
+             } else if (auto p = loc.getAsASTNode<Pattern>()) {
+               p->dump(llvm::dbgs());
+             } else {
+               loc.dump();
+             }
+             llvm::dbgs() << "\n");
   
   // Apply substitutions in the source and destination types, since the thunk
   // doesn't change because of different function representations.
