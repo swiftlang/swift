@@ -94,10 +94,10 @@ struct ImplementationDetail<T> {
 
 struct TestStructInit {
   // property wrapper backing initializer of number #1 in TestStructInit.init(number:message:)
-  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
 
   // property wrapper init from projected value of number #1 in TestStructInit.init(number:message:)
-  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
 
   // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter14TestStructInitV6number7messageAcA7WrapperVySiG_SStcfC : $@convention(method) (Wrapper<Int>, @owned String, @thin TestStructInit.Type) -> TestStructInit
   init(@Wrapper number: Int, @ImplementationDetail message: String) {
@@ -123,10 +123,10 @@ struct TestStructInit {
 
 class TestClassInit {
   // property wrapper backing initializer of number #1 in TestClassInit.init(number:message:)
-  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
 
   // property wrapper init from projected value of number #1 in TestClassInit.init(number:message:)
-  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfcADL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
 
   // TestClassInit.__allocating_init(number:message:)
   // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s26property_wrapper_parameter13TestClassInitC6number7messageAcA7WrapperVySiG_SStcfC : $@convention(method) (Wrapper<Int>, @owned String, @thick TestClassInit.Type) -> @owned TestClassInit
@@ -172,7 +172,7 @@ public struct AutoClosureWrapper<T> {
 }
 
 // property wrapper backing initializer of value #1 in testAutoClosureWrapper<A>(value:)
-// CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter22testAutoClosureWrapper5valueyAA0efG0VyxG_tlFACL_xvpfP : $@convention(thin) <T> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out AutoClosureWrapper<T>
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter22testAutoClosureWrapper5valueyAA0efG0VyxG_tlFACL_xvpfP : $@convention(thin) <T> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out AutoClosureWrapper<T>
 // CHECK: function_ref @$s26property_wrapper_parameter18AutoClosureWrapperV12wrappedValueACyxGxyXK_tcfC : $@convention(method) <τ_0_0> (@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @thin AutoClosureWrapper<τ_0_0>.Type) -> @out AutoClosureWrapper<τ_0_0>
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter22testAutoClosureWrapper5valueyAA0efG0VyxG_tlF : $@convention(thin) <T> (@in_guaranteed AutoClosureWrapper<T>) -> ()
