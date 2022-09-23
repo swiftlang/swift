@@ -43,9 +43,9 @@ import Swift
 /// A task's execution can be seen as a series of periods where the task ran.
 /// Each such period ends at a suspension point or the
 /// completion of the task.
-/// These periods of execution are represented by instances of `PartialAsyncTask`.
+/// These periods of execution are represented by instances of `UnownedJob`.
 /// Unless you're implementing a custom executor,
-/// you don't directly interact with partial tasks.
+/// you don't directly interact with jobs.
 ///
 /// For information about the language-level concurrency model that `Task` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
