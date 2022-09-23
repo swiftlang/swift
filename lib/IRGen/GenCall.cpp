@@ -5014,13 +5014,13 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
 
 Callee irgen::getSwiftFunctionPointerCallee(
     IRGenFunction &IGF, llvm::Value *fnPtr, llvm::Value *dataPtr,
-    CalleeInfo &&calleeInfo, bool castOpaqueToRefcountedContext) {
+    CalleeInfo &&calleeInfo, bool castOpaqueToRefcountedContext, bool isClosure) {
   auto sig = emitCastOfFunctionPointer(IGF, fnPtr, calleeInfo.OrigFnType);
   auto authInfo =
     PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
-  auto fn = FunctionPointer::createSigned(calleeInfo.OrigFnType, fnPtr,
-                                          authInfo, sig);
+  auto fn = isClosure ? FunctionPointer::createSignedClosure(calleeInfo.OrigFnType, fnPtr, authInfo, sig) :
+    FunctionPointer::createSigned(calleeInfo.OrigFnType, fnPtr, authInfo, sig);
   if (castOpaqueToRefcountedContext) {
     assert(dataPtr && dataPtr->getType() == IGF.IGM.OpaquePtrTy &&
            "Expecting trivial closure context");
@@ -5054,11 +5054,13 @@ StringRef FunctionPointer::getName(IRGenModule &IGM) const {
   switch (getBasicKind()) {
   case BasicKind::Function:
     return getRawPointer()->getName();
-  case BasicKind::AsyncFunctionPointer:
+  case BasicKind::AsyncFunctionPointer: {
+    auto *asyncFnPtr = getDirectPointer();
+    if (isa<llvm::BitCastInst>(asyncFnPtr))
+      asyncFnPtr = cast<llvm::Constant>(asyncFnPtr->getOperand(0));
     return IGM
-        .getSILFunctionForAsyncFunctionPointer(
-            cast<llvm::Constant>(getDirectPointer()->getOperand(0)))
-        ->getName();
+        .getSILFunctionForAsyncFunctionPointer(asyncFnPtr)->getName();
+  }
   }
   llvm_unreachable("unhandled case");
 }
@@ -5341,6 +5343,13 @@ void irgen::forwardAsyncCallResult(IRGenFunction &IGF,
 }
 
 llvm::FunctionType *FunctionPointer::getFunctionType() const {
+  // Static async function pointers can read the type off the secondary value
+  // (the function definition.
+  if (SecondaryValue) {
+    assert(kind == FunctionPointer::Kind::AsyncFunctionPointer);
+    return cast<llvm::Function>(SecondaryValue)->getFunctionType();
+  }
+
   // Read the function type off the global or else from the Signature.
   if (auto *constant = dyn_cast<llvm::Constant>(Value)) {
     auto *gv = dyn_cast<llvm::GlobalValue>(Value);
@@ -5349,8 +5358,17 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
                  ->isOpaqueOrPointeeTypeMatches(Sig.getType()));
       return Sig.getType();
     }
+
+    if (useSignature) // Because of various casting (e.g thin_to_thick) the
+                      // signature of the function Value might mismatch
+                      // (e.g no context argument).
+      return Sig.getType();
+
     assert(llvm::cast<llvm::PointerType>(Value->getType())
                ->isOpaqueOrPointeeTypeMatches(gv->getValueType()));
+    if (!isa<llvm::FunctionType>(gv->getValueType())) {
+      gv->getValueType()->dump();
+    }
     return cast<llvm::FunctionType>(gv->getValueType());
   }
 

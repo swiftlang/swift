@@ -690,7 +690,10 @@ public:
       return;
 
     // Only do this at -Onone.
-    uint64_t Size = *AI->getAllocationSizeInBits(IGM.DataLayout) / 8;
+    auto optAllocationSize = AI->getAllocationSizeInBits(IGM.DataLayout);
+    if (!optAllocationSize)
+      return;
+    uint64_t Size = *optAllocationSize / 8;
     if (IGM.IRGen.Opts.shouldOptimize() || !Size)
       return;
 
@@ -3013,10 +3016,12 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
 
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thin:
-    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::Method:
       return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
-                                           std::move(calleeInfo), false);
+                                           std::move(calleeInfo), false, false);
+    case SILFunctionType::Representation::Closure:
+      return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
+                                           std::move(calleeInfo), false, true);
 
     case SILFunctionType::Representation::CFunctionPointer:
       assert(!selfValue && "C function pointer has self?");
@@ -3038,7 +3043,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     bool castToRefcountedContext = calleeInfo.OrigFnType->isNoEscape();
     return getSwiftFunctionPointerCallee(IGF, functionValue, contextValue,
                                          std::move(calleeInfo),
-                                         castToRefcountedContext);
+                                         castToRefcountedContext, true);
   }
 
   case LoweredValue::Kind::EmptyExplosion:
@@ -5425,7 +5430,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     } else if (isCallToSwiftTaskAlloc(shadow)) {
       shadowTy = IGM.Int8Ty;
     }
-    assert(shadowTy == shadow->getType()->getPointerElementType());
+    assert(!IGM.getLLVMContext().supportsTypedPointers() ||
+           shadowTy == shadow->getType()->getPointerElementType());
     addr = builder.CreateLoad(shadowTy, shadow);
   }
 

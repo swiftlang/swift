@@ -317,6 +317,7 @@ namespace irgen {
     // If this is an await function pointer contains the signature of the await
     // call (without return values).
     llvm::Type *awaitSignature = nullptr;
+    bool useSignature = false;
 
     explicit FunctionPointer(Kind kind, llvm::Value *value,
                              const Signature &signature)
@@ -368,6 +369,14 @@ namespace irgen {
                                         const Signature &signature) {
       return FunctionPointer(kind, value, authInfo, signature);
     }
+    static FunctionPointer createSignedClosure(Kind kind, llvm::Value *value,
+                                        PointerAuthInfo authInfo,
+                                        const Signature &signature) {
+      auto res = FunctionPointer(kind, value, authInfo, signature);
+      res.useSignature = true;
+      return res;
+    }
+
 
     static FunctionPointer createUnsigned(Kind kind, llvm::Value *value,
                                           const Signature &signature) {
@@ -380,9 +389,12 @@ namespace irgen {
 
     static FunctionPointer forDirect(Kind kind, llvm::Constant *value,
                                      llvm::Constant *secondaryValue,
-                                     const Signature &signature) {
-      return FunctionPointer(kind, value, secondaryValue, PointerAuthInfo(),
+                                     const Signature &signature,
+                                     bool useSignature = false) {
+      auto res = FunctionPointer(kind, value, secondaryValue, PointerAuthInfo(),
                              signature);
+      res.useSignature = useSignature;
+      return res;
     }
 
     static FunctionPointer forExplosionValue(IRGenFunction &IGF,
