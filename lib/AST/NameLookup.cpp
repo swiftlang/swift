@@ -55,7 +55,7 @@ void VectorDeclConsumer::anchor() {}
 ValueDecl *LookupResultEntry::getBaseDecl() const {
   if (BaseDC == nullptr)
     return nullptr;
-  
+
   return BaseDecl;
 }
 

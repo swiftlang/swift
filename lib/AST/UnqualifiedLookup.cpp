@@ -19,12 +19,12 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/Initializer.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -77,6 +77,8 @@ namespace {
       
     private:
       SelfBounds findSelfBounds(const DeclContext *dc);
+      ValueDecl *lookupBaseDecl(const DeclContext *baseDC) const;
+      ValueDecl *getBaseDeclForResult(const DeclContext *baseDC) const;
 
       // Classify this declaration.
       // Types are formally members of the metatype.
@@ -345,64 +347,74 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
   for (auto Result : Lookup) {
     auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
-    
-    // Retrieve the base decl for this lookup
-    ValueDecl* baseDecl;
-    
-    // Perform an unqualified lookup for the base decl of this result. This handles cases
-    // where self was rebound (e.g. `guard let self = self`) earlier in the scope.
-    //  - Only do this in closures that capture self weakly, since implicit self isn't
-    //    allowed to be rebound in other contexts. In other contexts, implicit self
-    //    _always_ refers to the context's self `ParamDecl`, even if there is another
-    //    local decl with the name `self` that would be found by `lookupSingleLocalDecl`.
-    ValueDecl* localBaseDecl = nullptr;
-    bool isInWeakSelfClosure = false;
-    if (auto closureExpr = dyn_cast<ClosureExpr>(factory->DC)) {
-      if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-        auto *attr = selfDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
-        isInWeakSelfClosure = attr->get() == ReferenceOwnership::Weak;
-      }
-    }
-            
-    if (isInWeakSelfClosure) {
-      localBaseDecl = ASTScope::lookupSingleLocalDecl(factory->DC->getParentSourceFile(),
-                                                      DeclName(factory->Ctx.Id_self),
-                                                      factory->Loc);
-    }
-    
-    if (baseDC == nullptr)
-      baseDecl = nullptr;
-    
-    else if (localBaseDecl)
-      baseDecl = localBaseDecl;
-
-    else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(baseDC))
-      baseDecl = AFD->getImplicitSelfDecl();
-
-    else if (auto *PBI = dyn_cast<PatternBindingInitializer>(baseDC)) {
-      auto *selfDecl = PBI->getImplicitSelfDecl();
-      assert(selfDecl);
-      baseDecl = selfDecl;
-    }
-
-    else if (auto *CE = dyn_cast<ClosureExpr>(baseDC)) {
-      auto *selfDecl = CE->getCapturedSelfDecl();
-      assert(selfDecl);
-      assert(selfDecl->isSelfParamCapture());
-      baseDecl = selfDecl;
-    }
-
-    else {
-      auto *nominalDecl = baseDC->getSelfNominalTypeDecl();
-      assert(nominalDecl);
-      baseDecl = nominalDecl;
-    }
-    
+    auto baseDecl = getBaseDeclForResult(baseDC);
     results.emplace_back(baseDC, baseDecl, Result);
 #ifndef NDEBUG
     factory->addedResult(results.back());
 #endif
   }
+}
+
+ValueDecl *
+UnqualifiedLookupFactory::ResultFinderForTypeContext::getBaseDeclForResult(
+    const DeclContext *baseDC) const {
+  if (baseDC == nullptr) {
+    return nullptr;
+  }
+
+  if (auto localBaseDecl = lookupBaseDecl(baseDC)) {
+    return localBaseDecl;
+  }
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(baseDC)) {
+    return const_cast<ParamDecl *>(AFD->getImplicitSelfDecl());
+  }
+
+  if (auto *PBI = dyn_cast<PatternBindingInitializer>(baseDC)) {
+    auto *selfDecl = PBI->getImplicitSelfDecl();
+    assert(selfDecl);
+    return selfDecl;
+  }
+
+  else if (auto *CE = dyn_cast<ClosureExpr>(baseDC)) {
+    auto *selfDecl = CE->getCapturedSelfDecl();
+    assert(selfDecl);
+    assert(selfDecl->isSelfParamCapture());
+    return selfDecl;
+  }
+
+  auto *nominalDecl = baseDC->getSelfNominalTypeDecl();
+  assert(nominalDecl);
+  return nominalDecl;
+}
+
+ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
+    const DeclContext *baseDC) const {
+  // Perform an unqualified lookup for the base decl of this result. This
+  // handles cases where self was rebound (e.g. `guard let self = self`)
+  // earlier in the scope.
+  //
+  // Only do this in closures that capture self weakly, since implicit self
+  // isn't allowed to be rebound in other contexts. In other contexts, implicit
+  // self _always_ refers to the context's self `ParamDecl`, even if there
+  // is another local decl with the name `self` that would be found by
+  // `lookupSingleLocalDecl`.
+  bool isInWeakSelfClosure = false;
+  if (auto closureExpr = dyn_cast<ClosureExpr>(factory->DC)) {
+    if (auto decl = closureExpr->getCapturedSelfDecl()) {
+      if (auto a = decl->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+        isInWeakSelfClosure = a->get() == ReferenceOwnership::Weak;
+      }
+    }
+  }
+
+  if (isInWeakSelfClosure) {
+    return ASTScope::lookupSingleLocalDecl(factory->DC->getParentSourceFile(),
+                                           DeclName(factory->Ctx.Id_self),
+                                           factory->Loc);
+  }
+
+  return nullptr;
 }
 
 // TODO (someday): Instead of adding unavailable entries to Results,

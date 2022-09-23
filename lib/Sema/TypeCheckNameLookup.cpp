@@ -100,12 +100,13 @@ namespace {
     ///
     /// \param isOuter Whether this is an outer result (i.e. a result that isn't
     /// from the innermost scope with results)
-    void add(ValueDecl *found, DeclContext *baseDC, ValueDecl *baseDecl, Type foundInType,
-             bool isOuter) {
+    void add(ValueDecl *found, DeclContext *baseDC, ValueDecl *baseDecl,
+             Type foundInType, bool isOuter) {
       DeclContext *foundDC = found->getDeclContext();
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
+          // HERE, need to look up base decl
           Result.add(LookupResultEntry(baseDC, baseDecl, result), isOuter);
           if (isOuter)
             FoundOuterDecls.push_back(result);
@@ -270,7 +271,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getDeclContext(), found.getBaseDecl(), foundInType,
+    builder.add(found.getValueDecl(), found.getDeclContext(),
+                found.getBaseDecl(), foundInType,
                 /*isOuter=*/idx >= lookup.getIndexOfFirstOuterResult());
   }
   return result;
