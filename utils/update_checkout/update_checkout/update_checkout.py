@@ -266,6 +266,20 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
         if repo_name in args.skip_repository_list:
             print("Skipping update of '" + repo_name + "', requested by user")
             continue
+
+        # If the repository is not listed in the branch-scheme, skip it.
+        if scheme_map and repo_name not in scheme_map:
+            # If the repository exists locally, notify we are skipping it.
+            if os.path.isdir(os.path.join(args.source_root, repo_name)):
+                print(
+                    "Skipping update of '"
+                    + repo_name
+                    + "', repository not listed in the '"
+                    + scheme_name
+                    + "' branch-scheme"
+                )
+            continue
+
         my_args = [args.source_root, config,
                    repo_name,
                    scheme_name,
