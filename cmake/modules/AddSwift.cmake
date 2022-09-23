@@ -577,6 +577,9 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       if (NOT "${bootstrapping}" STREQUAL "1")
         if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
           target_link_directories(${target} PRIVATE "${sdk_dir}")
+
+          # Include the abi stable system stdlib in our rpath.
+         set(swift_runtime_rpath "/usr/lib/swift")
         endif()
       endif()
     endif()
