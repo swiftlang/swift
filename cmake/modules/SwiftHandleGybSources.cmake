@@ -128,6 +128,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Classification.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/kinds.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/Node.py"
+      "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AttributeKinds.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AttributeNodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/AvailabilityNodes.py"
       "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/CommonNodes.py"
