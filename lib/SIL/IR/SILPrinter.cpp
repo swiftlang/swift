@@ -3933,7 +3933,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     genericSig = genericEnv->getGenericSignature();
 
   auto requirements =
-      getSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
+      getUnerasedSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
   }
@@ -3945,27 +3945,36 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     OS << "where ";
     SILFunction *F = getFunction();
     assert(F);
-    interleave(requirements,
-               [&](Requirement req) {
-                 if (!genericSig) {
-                   req.print(OS, SubPrinter);
-                   return;
-                 }
-                 // Use GenericEnvironment to produce user-friendly
-                 // names instead of something like t_0_0.
-                 auto FirstTy = genericSig->getSugaredType(req.getFirstType());
-                 if (req.getKind() != RequirementKind::Layout) {
-                   auto SecondTy =
-                       genericSig->getSugaredType(req.getSecondType());
-                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                   ReqWithDecls.print(OS, SubPrinter);
-                 } else {
-                   Requirement ReqWithDecls(req.getKind(), FirstTy,
-                                            req.getLayoutConstraint());
-                   ReqWithDecls.print(OS, SubPrinter);
-                 }
-               },
-               [&] { OS << ", "; });
+    interleave(
+        requirements,
+        [&](Requirement req) {
+          if (!genericSig) {
+            req.print(OS, SubPrinter);
+            return;
+          }
+
+          // Use GenericEnvironment to produce user-friendly
+          // names instead of something like t_0_0.
+          auto FirstTy = genericSig->getSugaredType(req.getFirstType());
+          auto erasedParams = getTypeErasedParams();
+          bool erased = std::any_of(erasedParams.begin(), erasedParams.end(),
+              [&](auto Ty) {
+            return Ty->isEqual(FirstTy);
+          });
+          if (erased) {
+            OS << " @_noMetadata ";
+          }
+          if (req.getKind() != RequirementKind::Layout) {
+            auto SecondTy = genericSig->getSugaredType(req.getSecondType());
+            Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+            ReqWithDecls.print(OS, SubPrinter);
+          } else {
+            Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                     req.getLayoutConstraint());
+            ReqWithDecls.print(OS, SubPrinter);
+          }
+        },
+        [&] { OS << ", "; });
   }
 }
 

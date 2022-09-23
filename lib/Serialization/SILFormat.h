@@ -312,7 +312,8 @@ namespace sil_block {
                      DeclIDField, // Target SILFunction name or 0.
                      DeclIDField,  // SPIGroup or 0.
                      DeclIDField, // SPIGroup Module name id.
-                     BC_AVAIL_TUPLE // Availability
+                     BC_AVAIL_TUPLE, // Availability
+                     BCArray<IdentifierIDField> // type erased params
                      >;
 
   using SILArgEffectsAttrLayout =

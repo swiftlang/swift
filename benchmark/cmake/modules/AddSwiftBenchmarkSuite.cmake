@@ -354,7 +354,8 @@ function (swift_benchmark_compile_archopts)
   set(common_options
       "-c"
       "-target" "${target}"
-      "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
+      "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION}
+      "-Xfrontend -enable-experimental-layout-prespecialization")
 
   if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
     list(APPEND common_options "-g")

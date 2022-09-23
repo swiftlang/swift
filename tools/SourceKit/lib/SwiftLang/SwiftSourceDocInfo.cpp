@@ -2216,7 +2216,7 @@ public:
       //     print(x)
       Dcl = V->getCanonicalVarDecl();
 
-      // If we have a prioperty wrapper backing property or projected value, use
+      // If we have a property wrapper backing property or projected value, use
       // the wrapped property instead (i.e. if this is _foo or $foo, pretend
       // it's foo).
       if (auto *Wrapped = V->getOriginalWrappedProperty()) {
@@ -2284,7 +2284,7 @@ private:
     if (auto *V = dyn_cast<VarDecl>(D)) {
       D = V->getCanonicalVarDecl();
 
-      // If we have a prioperty wrapper backing property or projected value, use
+      // If we have a property wrapper backing property or projected value, use
       // the wrapped property for comparison instead (i.e. if this is _foo or
       // $foo, pretend it's foo).
       if (auto *Wrapped = V->getOriginalWrappedProperty()) {

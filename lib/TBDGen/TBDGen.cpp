@@ -689,11 +689,15 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   for (auto *attr : AFD->getAttrs().getAttributes<SpecializeAttr>()) {
     if (!attr->isExported())
       continue;
+
+    auto erasedSignature = attr->getSpecializedSignature()
+        .typeErased(attr->getTypeErasedParams());
+
     if (auto *targetFun = attr->getTargetFunctionDecl(AFD)) {
-      auto declRef = SILDeclRef(targetFun, attr->getSpecializedSignature());
+      auto declRef = SILDeclRef(targetFun, erasedSignature);
       addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
     } else {
-      auto declRef = SILDeclRef(AFD, attr->getSpecializedSignature());
+      auto declRef = SILDeclRef(AFD, erasedSignature);
       addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef));
     }
   }

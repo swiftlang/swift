@@ -764,11 +764,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     IdentifierID targetFunctionID;
     IdentifierID spiGroupID;
     ModuleID spiModuleID;
+    ArrayRef<uint64_t> typeErasedParamsIDs;
     unsigned LIST_VER_TUPLE_PIECES(available);
     SILSpecializeAttrLayout::readRecord(
         scratch, exported, specializationKindVal, specializedSigID,
         targetFunctionID, spiGroupID, spiModuleID,
-        LIST_VER_TUPLE_PIECES(available));
+        LIST_VER_TUPLE_PIECES(available), typeErasedParamsIDs);
 
     SILFunction *target = nullptr;
     if (targetFunctionID) {
@@ -792,12 +793,18 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       ? AvailabilityContext::alwaysAvailable()
       : AvailabilityContext(VersionRange::allGTE(available));
 
+    llvm::SmallVector<Type, 4> typeErasedParams;
+    for (auto id : typeErasedParamsIDs) {
+      typeErasedParams.push_back(MF->getType(id));
+    }
+
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
     if (shouldAddSpecAttrs) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
-          SILMod, specializedSig, exported != 0, specializationKind, target,
+          SILMod, specializedSig, typeErasedParams,
+          exported != 0, specializationKind, target,
           spiGroup, spiModule, availability));
     }
   }
