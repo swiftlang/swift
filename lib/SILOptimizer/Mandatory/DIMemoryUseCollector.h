@@ -357,6 +357,15 @@ struct DIElementUseInfo {
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               DIElementUseInfo &UseInfo);
 
+/// Check whether given function is a user-defined initializer of a
+/// type wrapped type.
+bool canHaveTypeWrapperLocalStorageVar(SILFunction &F);
+
+/// Check whether this instruction represents `_storage` variable
+/// injected by type-checker into user-defined designated initializer
+/// of a type wrapped type.
+bool isTypeWrapperLocalStorageVar(SILFunction &F, MarkUninitializedInst *Inst);
+
 } // end namespace ownership
 } // end namespace swift
 

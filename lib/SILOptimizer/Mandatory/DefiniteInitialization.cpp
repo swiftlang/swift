@@ -1160,7 +1160,6 @@ void LifetimeChecker::doIt() {
   // Insert hop_to_executor instructions for actor initializers, if needed.
   injectActorHops();
 
-
   // If the memory object had any non-trivial stores that are init or assign
   // based on the control flow path reaching them, then insert dynamic control
   // logic and CFG diamonds to handle this.
@@ -3542,6 +3541,24 @@ static void processMemoryObject(MarkUninitializedInst *I,
   LifetimeChecker(MemInfo, UseInfo, blockStates).doIt();
 }
 
+static MarkUninitializedInst *findLocalTypeWrapperStorageVar(SILFunction &F) {
+  if (!canHaveTypeWrapperLocalStorageVar(F))
+    return nullptr;
+
+  auto BB = F.getEntryBlock();
+  if (!BB)
+    return nullptr;
+
+  for (auto &I : *BB) {
+    SILInstruction *Inst = &I;
+    auto *MUI = dyn_cast<MarkUninitializedInst>(Inst);
+    if (MUI && isTypeWrapperLocalStorageVar(F, MUI))
+      return MUI;
+  }
+
+  return nullptr;
+}
+
 /// Check that all memory objects that require initialization before use are
 /// properly set and transform the code as required for flow-sensitive
 /// properties.
@@ -3551,6 +3568,17 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   bool Changed = false;
 
   BlockStates blockStates(&Fn);
+
+  // Special handling of _storage variable introduced by type wrapper.
+  // It has to be checked first because it injects initialization of
+  // `self.$storage`.
+  if (auto *storageVar = findLocalTypeWrapperStorageVar(Fn)) {
+    // Then process the memory object.
+    processMemoryObject(storageVar, blockStates);
+    storageVar->replaceAllUsesWith(storageVar->getOperand());
+    storageVar->eraseFromParent();
+    Changed = true;
+  }
 
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E;) {
