@@ -140,7 +140,7 @@ static ClosureExpr *findTrailingClosureFromArgument(Expr *arg) {
   if (auto TC = dyn_cast_or_null<ClosureExpr>(arg))
     return TC;
   if (auto TCL = dyn_cast_or_null<CaptureListExpr>(arg))
-    return TCL->getClosureBody();
+    return dyn_cast_or_null<ClosureExpr>(TCL->getClosureBody());
   return nullptr;
 }
 
@@ -2488,7 +2488,7 @@ private:
   Optional<IndentContext>
   getIndentContextFrom(CaptureListExpr *CL,
                        SourceLoc ContextLoc = SourceLoc()) {
-    ClosureExpr *CE = CL->getClosureBody();
+    AbstractClosureExpr *CE = CL->getClosureBody();
     BraceStmt *BS = CE->getBody();
     if (!CE || !BS)
       return None;
@@ -2503,8 +2503,14 @@ private:
   }
 
   Optional<IndentContext>
-  getIndentContextFrom(ClosureExpr *CE, SourceLoc ContextLoc = SourceLoc(),
+  getIndentContextFrom(AbstractClosureExpr *ACE, SourceLoc ContextLoc = SourceLoc(),
                        CaptureListExpr *ParentCapture = nullptr) {
+    // Explicit capture lists should always have an explicit ClosureExpr as
+    // their subexpression.
+    auto CE = dyn_cast<ClosureExpr>(ACE);
+    if (!CE) {
+      return None;
+    }
     BraceStmt *BS = CE->getBody();
     if (!BS)
       return None;
