@@ -39,10 +39,12 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64 }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD }}
-      - run: |
+      - name: Run ./utils/webassembly/distribute-latest-toolchain.sh
+        run: |
           BRANCH="${{ github.event.inputs.branch }}"
+          CHANNEL="${{ github.event.inputs.channel }}"
 
-          case "${{ github.event.inputs.channel }}" in
+          case "$CHANNEL" in
             "DEVELOPMENT")
               export TARGETS_TO_DIST="amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 macos_x86_64 macos_arm64"
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm} DEVELOPMENT "${{ github.event.inputs.toolchain_name }}"
@@ -64,8 +66,8 @@ jobs:
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.6} 5.6 "${{ github.event.inputs.toolchain_name }}"
             ;;
             *)
-              echo "Unrecognised release channel: ${{ github.event.inputs.channel }}"
-              exit 1
+              export TARGETS_TO_DIST="amazonlinux2_x86_64 ubuntu18.04_x86_64 ubuntu20.04_x86_64 ubuntu20.04_aarch64 macos_x86_64 macos_arm64"
+              ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/$CHANNEL} "$CHANNEL" "${{ github.event.inputs.toolchain_name }}"
             ;;
           esac
 
