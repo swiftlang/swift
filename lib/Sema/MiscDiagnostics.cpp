@@ -2718,20 +2718,28 @@ public:
         auto element = Body->getLastElement();
         // Let's see if the last statement would make for a valid return value.
         if (auto expr = element.dyn_cast<Expr *>()) {
-          bool conforms = llvm::all_of(OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements(),
-                                       [&expr, this](auto requirement) {
-            if (requirement.getKind() == RequirementKind::Conformance) {
-              auto conformance =
-                  TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
-                                                  requirement.getProtocolDecl(),
-                                                  Implementation->getModuleContext(),
-                                                  /*allowMissing=*/ false);
-              return !conformance.isInvalid();
-            }
-            // If we encounter any requirements other than `Conformance`, we do
-            // not attempt to type check the expression.
-            return false;
-          });
+          auto exprType = expr->getType();
+          // Function body might not be valid and we cannot reply on
+          // \c typeCheckStmt here to propagate HadError because its
+          // unreliable.
+          if (!exprType || exprType->hasError())
+            return;
+
+          bool conforms = llvm::all_of(
+              OpaqueDecl->getOpaqueInterfaceGenericSignature()
+                  .getRequirements(),
+              [&exprType, this](auto requirement) {
+                if (requirement.getKind() == RequirementKind::Conformance) {
+                  auto conformance = TypeChecker::conformsToProtocol(
+                      exprType->getRValueType(), requirement.getProtocolDecl(),
+                      Implementation->getModuleContext(),
+                      /*allowMissing=*/false);
+                  return !conformance.isInvalid();
+                }
+                // If we encounter any requirements other than `Conformance`, we
+                // do not attempt to type check the expression.
+                return false;
+              });
 
           // If all requirements are fulfilled, we offer to insert `return` to
           // fix the issue.
