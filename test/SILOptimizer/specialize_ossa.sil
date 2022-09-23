@@ -115,6 +115,18 @@ bb0(%0 : $*T, %1 : $*XXX<T>):
   return %9 : $Int32                              // id: %11
 }
 
+
+sil [ossa] [noinline] @XXX_foo_guaranteed_generic_return : $@convention(method) <T> (@in_guaranteed T, @in XXX<T>) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $*XXX<T>):
+  %3 = address_to_pointer %1 : $*T to $Builtin.RawPointer
+  %4 = alloc_stack $T
+  %5 = struct_element_addr %2 : $*XXX<T>, #XXX.m_t
+  copy_addr [take] %5 to [initialization] %0 : $*T
+  dealloc_stack %4 : $*T
+  %t = tuple ()
+  return %t : $()
+}
+
 // Swift.Int32._convertFromBuiltinIntegerLiteral (Swift.Int32.Type)(Builtin.IntLiteral) -> Swift.Int32
 sil public_external [ossa] [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32 {
 bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int32.Type):
@@ -231,10 +243,21 @@ bb0(%arg : @guaranteed $Builtin.NativeObject):
   apply %9(%15g) : $@convention(thin) (Int32) -> ()
   destroy_addr %11g : $*Builtin.NativeObject
   dealloc_stack %11g : $*Builtin.NativeObject    // id: %17
-  destroy_addr %0 : $*XXX<Builtin.NativeObject>
-  dealloc_stack %0 : $*XXX<Builtin.NativeObject> // id: %19
-  %18 = tuple ()                                  // user: %20
-  return %18 : $()                                // id: %20
+
+  %17 = function_ref @XXX_foo_guaranteed_generic_return : $@convention(method) <T> (@in_guaranteed T, @in XXX<T>) -> @out T
+  %18 = alloc_stack $Builtin.NativeObject
+  %19 = alloc_stack $Builtin.NativeObject
+  %arg3 = copy_value %arg : $Builtin.NativeObject
+  store %arg3 to [init] %18 : $*Builtin.NativeObject
+  apply %17<Builtin.NativeObject>(%19, %18, %0) : $@convention(method) <T> (@in_guaranteed T, @in XXX<T>) -> @out T
+  destroy_addr %18 : $*Builtin.NativeObject
+  destroy_addr %19 : $*Builtin.NativeObject
+  dealloc_stack %19 : $*Builtin.NativeObject
+  dealloc_stack %18 : $*Builtin.NativeObject
+
+  dealloc_stack %0 : $*XXX<Builtin.NativeObject>
+  %t = tuple ()
+  return %t : $()
 }
 
 // specialize.useClosure <A>(fun : () -> A) -> A
