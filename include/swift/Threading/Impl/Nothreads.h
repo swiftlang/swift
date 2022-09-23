@@ -19,6 +19,8 @@
 
 #include "llvm/ADT/Optional.h"
 
+#include <chrono>
+
 namespace swift {
 namespace threading_impl {
 
@@ -56,6 +58,27 @@ inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) { return true; }
 
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {}
+
+// .. ConditionVariable support ..............................................
+
+using cond_handle = unsigned;
+
+inline void cond_init(cond_handle &handle) {}
+inline void cond_destroy(cond_handle &handle) {}
+inline void cond_lock(cond_handle &handle) {}
+inline void cond_unlock(cond_handle &handle) {}
+inline void cond_signal(cond_handle &handle) {}
+inline void cond_broadcast(cond_handle &handle) {}
+inline void cond_wait(cond_handle &handle) {}
+template <class Rep, class Period>
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::duration<Rep, Period> duration) {
+  return true;
+}
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::system_clock::time_point deadline) {
+  return true;
+}
 
 // .. Once ...................................................................
 
