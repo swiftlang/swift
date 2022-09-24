@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 711; // @typeWrapperIgnored attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 713; // @_noMetadata attribute in @_specialize
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2032,7 +2032,8 @@ namespace decls_block {
       BCVBR<4>, // # of arguments (+1) or 1 if simple decl name, 0 if no target
       BCVBR<4>, // # of SPI groups
       BCVBR<4>, // # of availability attributes
-      BCArray<IdentifierIDField> // target function pieces, spi groups
+      BCVBR<4>, // # of type erased parameters
+      BCArray<IdentifierIDField> // target function pieces, spi groups, type erased params
       >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<

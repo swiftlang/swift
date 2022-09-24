@@ -32,6 +32,16 @@
 // CHECK-NEXT:   var c: Int32
 // CHECK-NEXT: }
 
+// CHECK-NEXT: struct OneField {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(value: Int32)
+// CHECK-NEXT:   var value: Int32
+// CHECK-NEXT: }
+// CHECK-NEXT: struct DerivedFromOneField {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var value: Int32
+// CHECK-NEXT: }
+
 // CHECK-NEXT: struct NonTrivial {
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }

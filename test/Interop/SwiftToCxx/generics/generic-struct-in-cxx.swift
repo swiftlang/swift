@@ -202,6 +202,10 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: class GenericPair;
+
+// CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: class _impl_GenericPair;
 // CHECK-EMPTY:
 // CHECK-NEXT: static_assert(2 <= 3, "unsupported generic requirement list for metadata func");
@@ -247,11 +251,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
-// CHECK: template<class T_0_0, class T_0_1>
-// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
-// CHECK-NEXT: class GenericPair;
-// CHECK-EMPTY:
-// CHECK-NEXT: inline void inoutConcretePair(uint16_t x, GenericPair<uint16_t, uint16_t>& y) noexcept {
+// CHECK: inline void inoutConcretePair(uint16_t x, GenericPair<uint16_t, uint16_t>& y) noexcept {
 // CHECK-NEXT:   return _impl::$s8Generics17inoutConcretePairyys6UInt16V_AA07GenericD0VyA2DGztF(x, _impl::_impl_GenericPair<uint16_t, uint16_t>::getOpaquePointer(y));
 // CHECK-NEXT: }
 

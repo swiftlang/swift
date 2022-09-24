@@ -320,7 +320,7 @@ void EditTest::doubleOpenWithDelay(std::chrono::microseconds delay,
   close(DocName);
 }
 
-// This test is failing occassionally in CI: rdar://45644449
+// This test is failing occasionally in CI: rdar://45644449
 TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
   // Attempt to open the same file twice in a row. This tests (subject to
   // timing) cases where:

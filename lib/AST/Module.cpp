@@ -2596,7 +2596,7 @@ bool SourceFile::hasTestableOrPrivateImport(
 
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
-  RestrictedImportKind importKind = RestrictedImportKind::Implicit;
+  RestrictedImportKind importKind = RestrictedImportKind::MissingImport;
 
   // Workaround for the cases where the bridging header isn't properly
   // imported implicitly.
@@ -2624,7 +2624,7 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
   if (imports.isImportedBy(module, getParentModule()))
     return RestrictedImportKind::None;
 
-  if (importKind == RestrictedImportKind::Implicit &&
+  if (importKind == RestrictedImportKind::MissingImport &&
       (module->getLibraryLevel() == LibraryLevel::API ||
        getParentModule()->getLibraryLevel() != LibraryLevel::API)) {
     // Hack to fix swiftinterfaces in case of missing imports.

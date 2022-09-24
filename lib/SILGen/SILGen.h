@@ -312,7 +312,14 @@ public:
   /// Generates code for the given class's destructor and adds
   /// the SILFunction to the current SILModule under the name
   /// SILDeclRef(cd, Destructor).
+  ///
+  /// TODO: Rename to emitClassDestructor.
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
+
+  /// Generates code for the given move only nominal type's destructor and adds
+  /// the SILFunction to the current SILModule under the name SILDeclRef(nd,
+  /// dd).
+  void emitMoveOnlyDestructor(NominalTypeDecl *nd, DestructorDecl *dd);
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, ParamDecl *param);

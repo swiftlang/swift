@@ -317,6 +317,10 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
+
+def enable_experimental_layout_prespecialization :
+  Flag<["-"], "enable-experimental-layout-prespecialization">,
+  HelpText<"Enable experimental support for layout based pre-specializations">;
 }
 
 // HIDDEN FLAGS
@@ -578,6 +582,10 @@ def enable_experimental_variadic_generics :
 def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
   HelpText<"Enable experimental associated type inference via type witness systems">;
+
+def enable_experimental_implicit_some :
+  Flag<["-"], "enable-experimental-implicit-some">,
+  HelpText<"Enable experimental implicit some">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,

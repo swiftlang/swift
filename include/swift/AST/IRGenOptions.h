@@ -198,6 +198,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Non-unique extended existential type shapes in flight.
   PointerAuthSchema NonUniqueExtendedExistentialTypeShape;
+
+  /// C type GetExtraInhabitantTag function descriminator.
+  PointerAuthSchema GetExtraInhabitantTagFunction;
+
+  /// C type StoreExtraInhabitantTag function descriminator.
+  PointerAuthSchema StoreExtraInhabitantTagFunction;
 };
 
 enum class JITDebugArtifact : unsigned {

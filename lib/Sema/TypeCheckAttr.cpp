@@ -288,6 +288,7 @@ public:
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitTypeSequenceAttr(TypeSequenceAttr *attr);
+  void visitNoMetadataAttr(NoMetadataAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
 
@@ -1814,9 +1815,15 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
   Optional<AvailabilityContext> EnclosingAnnotatedRange;
+  bool EnclosingDeclIsUnavailable = false;
   Decl *EnclosingDecl = getEnclosingDeclForDecl(D);
 
   while (EnclosingDecl) {
+    if (EnclosingDecl->getAttrs().getUnavailable(Ctx)) {
+      EnclosingDeclIsUnavailable = true;
+      break;
+    }
+
     EnclosingAnnotatedRange =
         AvailabilityInference::annotatedAvailableRange(EnclosingDecl, Ctx);
 
@@ -1830,7 +1837,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
       VersionRange::allGTE(attr->Introduced.getValue())};
 
   if (EnclosingDecl) {
-    if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+    if (EnclosingDeclIsUnavailable) {
+      diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
+               diag::availability_decl_more_than_unavailable_enclosing,
+               D->getDescriptiveKind());
+      diagnose(EnclosingDecl->getLoc(),
+               diag::availability_decl_more_than_unavailable_enclosing_here);
+    } else if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
       diagnose(D->isImplicit() ? EnclosingDecl->getLoc() : attr->getLocation(),
                diag::availability_decl_more_than_enclosing,
                D->getDescriptiveKind());
@@ -1841,7 +1854,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
                  prettyPlatformString(targetPlatform(Ctx.LangOpts)),
                  AttrRange.getOSVersion().getLowerEndpoint());
       diagnose(EnclosingDecl->getLoc(),
-               diag::availability_decl_more_than_enclosing_enclosing_here,
+               diag::availability_decl_more_than_enclosing_here,
                prettyPlatformString(targetPlatform(Ctx.LangOpts)),
                EnclosingAnnotatedRange->getOSVersion().getLowerEndpoint());
     }
@@ -2659,6 +2672,22 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
+
+  if (Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    llvm::SmallVector<Type, 4> typeErasedParams;
+    for (const auto &pair : llvm::zip(attr->getTrailingWhereClause()->getRequirements(), specializedSig.getRequirements())) {
+      auto &reqRepr = std::get<0>(pair);
+      auto &req = std::get<1>(pair);
+      if (reqRepr.getKind() == RequirementReprKind::LayoutConstraint) {
+        if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(reqRepr.getSubjectRepr())) {
+          if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+            typeErasedParams.push_back(req.getFirstType());
+          }
+        }
+      }
+    }
+    attr->setTypeErasedParams(typeErasedParams);
+  }
 
   attr->setSpecializedSignature(specializedSig);
 
@@ -3986,6 +4015,20 @@ void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
   if (!isa<GenericTypeParamDecl>(D)) {
     attr->setInvalid();
     diagnoseAndRemoveAttr(attr, diag::type_sequence_on_non_generic_param);
+  }
+}
+
+void AttributeChecker::visitNoMetadataAttr(NoMetadataAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    auto error =
+        diag::experimental_no_metadata_feature_can_only_be_used_when_enabled;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  if (!isa<GenericTypeParamDecl>(D)) {
+    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::no_metadata_on_non_generic_param);
   }
 }
 

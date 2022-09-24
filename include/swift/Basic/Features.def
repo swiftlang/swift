@@ -103,6 +103,7 @@ EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
 EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
+EXPERIMENTAL_FEATURE(LayoutPrespecialization)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
@@ -137,6 +138,9 @@ EXPERIMENTAL_FEATURE(ParserValidation)
 /// Whether to fold sequence expressions in the syntax tree produced by the
 /// Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserSequenceFolding)
+
+/// Enables implicit some while also enabling existential `any`
+EXPERIMENTAL_FEATURE(ImplicitSome)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -1473,9 +1473,10 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
       [&](const Requirement &req) {
         // Skip the inferred 'Self : AnyObject' constraint if this is an
         // @objc protocol.
-        if (req.getKind() == RequirementKind::Layout &&
+        if ((req.getKind() == RequirementKind::Layout) &&
             req.getFirstType()->isEqual(proto->getProtocolSelfType()) &&
-            req.getLayoutConstraint()->getKind() == LayoutConstraintKind::Class &&
+            req.getLayoutConstraint()->getKind() ==
+                LayoutConstraintKind::Class &&
             proto->isObjC()) {
           return false;
         }
@@ -3045,6 +3046,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureImplicitSome(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }
@@ -3054,6 +3059,10 @@ static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
 }
 
 static bool usesFeatureVariadicGenerics(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   return false;
 }
 
@@ -6622,7 +6631,7 @@ void LayoutConstraint::print(raw_ostream &OS,
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
                                  const PrintOptions &PO) const {
-  Printer << getName();
+  Printer << getName(PO.PrintClassLayoutName);
   switch (getKind()) {
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:

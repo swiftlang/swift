@@ -1611,6 +1611,7 @@ namespace  {
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
     UNINTERESTING_ATTR(TypeSequence)
+    UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
     UNINTERESTING_ATTR(BackDeploy)

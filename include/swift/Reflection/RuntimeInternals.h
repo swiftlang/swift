@@ -176,6 +176,7 @@ struct DefaultActorImpl {
   HeapObject<Runtime> HeapObject;
   Job<Runtime> JobStorage;
   ActiveActorStatus Status;
+  bool IsDistributedRemote;
 };
 
 template <typename Runtime>

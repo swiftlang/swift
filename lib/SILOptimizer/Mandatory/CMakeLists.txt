@@ -26,6 +26,7 @@ target_sources(swiftSILOptimizer PRIVATE
   MoveKillsCopyableValuesChecker.cpp
   MoveOnlyObjectChecker.cpp
   MoveOnlyAddressChecker.cpp
+  MoveOnlyDeinitInsertion.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp

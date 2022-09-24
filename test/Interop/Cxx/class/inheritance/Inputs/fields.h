@@ -16,6 +16,12 @@ struct DerivedFromAll : HasOneField, DerivedWithOneField {
   int f = 6;
 };
 
+struct OneField {
+  int value = 42;
+};
+
+struct DerivedFromOneField : OneField {};
+
 // Non trivial types:
 
 struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {

@@ -32,7 +32,7 @@ public struct FirstSmallStruct {
 
 // CHECK: class FirstSmallStruct final {
 // CHECK-NEXT: public:
-// CHECK:   inline FirstSmallStruct(FirstSmallStruct &&) = default;
+// CHECK:   inline FirstSmallStruct(FirstSmallStruct &&)
 // CHECK-NEXT:   inline uint32_t getX() const;
 // CHECK-NEXT:   static inline FirstSmallStruct init();
 // CHECK-NEXT:   static inline FirstSmallStruct init(swift::Int x);

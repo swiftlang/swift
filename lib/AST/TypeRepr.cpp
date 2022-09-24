@@ -114,29 +114,6 @@ TypeRepr *TypeRepr::getWithoutParens() const {
   return repr;
 }
 
-CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
-      // Don't allow variadic opaque parameter or return types.
-      if (isa<PackExpansionTypeRepr>(repr))
-        return Action::SkipChildren();
-
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return Action::Continue();
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  walk(Walker(reprs));
-  return reprs;
-}
-
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
   auto typeRepr = this;
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
@@ -263,6 +240,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@async") << " ";
   if (hasAttr(TAK_opened))
     Printer.printSimpleAttr("@opened") << " ";
+
+  if (hasAttr(TAK__noMetadata))
+    Printer.printSimpleAttr("@_noMetadata") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,

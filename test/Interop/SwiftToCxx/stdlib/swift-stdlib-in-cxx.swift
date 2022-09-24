@@ -8,8 +8,15 @@
 
 // CHECK: namespace Swift {
 
+// CHECK: template<class T_0_0>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: class Optional;
+
 // CHECK: class String;
 
+// CHECK: template<class T_0_0>
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: class Array;
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
@@ -52,7 +59,7 @@
 // CHECK:  }
 // CHECK-NEXT:  inline String(const String &other) {
 // CHECK:  }
-// CHECK-NEXT:  inline String(String &&) = default;
+// CHECK-NEXT:  inline String(String &&) { abort(); }
 // CHECK-NEXT:  static inline String init();
 // CHECK-NEXT:  #if defined(__OBJC__)
 // CHECK-NEXT:  inline __attribute__((always_inline)) operator NSString * _Nonnull () const noexcept {

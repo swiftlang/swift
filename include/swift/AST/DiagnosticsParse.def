@@ -720,6 +720,14 @@ ERROR(sil_vtable_bad_entry_kind,none,
 ERROR(sil_vtable_expect_rsquare,none,
       "expected ']' after vtable entry kind", ())
 
+// SIL MoveOnlyDeinit
+ERROR(expected_sil_moveonlydeinit_colon,none,
+      "expected ':' in a MoveOnlyDeinit entry", ())
+ERROR(sil_moveonlydeinit_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_moveonlydeinit_nominal_not_found,none,
+      "sil nominal decl not found %0", (Identifier))
+
 // SIL Global
 ERROR(sil_global_variable_not_found,none,
       "sil global not found %0", (Identifier))
@@ -1513,7 +1521,10 @@ ERROR(attr_availability_multiple_kinds ,none,
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
-      "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+WARNING(attr_availability_suggest_platform,none,
+       "unknown platform '%0' for attribute '%1'; did you mean '%2'?",
+       (StringRef, StringRef, StringRef))
 ERROR(attr_availability_expected_platform,none,
       "expected platform in '%0' attribute", (StringRef))
 ERROR(attr_availability_invalid_renamed,none,
@@ -1897,6 +1908,10 @@ ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
 
 WARNING(avail_query_unrecognized_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
+WARNING(avail_query_suggest_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0;"
+        " did you mean '%1'?",
+        (Identifier, StringRef))
 
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))

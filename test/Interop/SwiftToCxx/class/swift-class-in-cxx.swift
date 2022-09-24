@@ -30,7 +30,23 @@ public final class ClassWithIntField {
 
 // CHECK: namespace Class {
 
-// CHECK: namespace _impl {
+// CHECK: class ClassWithIntField;
+// CHECK-NEXT: } // end namespace
+
+// CHECK: namespace
+// CHECK-SAME: swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+
+// CHECK: namespace
+// CHECK-SAME: Class {
+
+// CHECK: namespace
+// CHECK-SAME: _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_ClassWithIntField;
 // CHECK-NEXT: // Type metadata accessor for ClassWithIntField
@@ -63,8 +79,6 @@ public final class ClassWithIntField {
 // CHECK-NEXT: namespace swift {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
-// CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Class::ClassWithIntField> {
 // CHECK-NEXT:   inline void * _Nonnull getTypeMetadata() {

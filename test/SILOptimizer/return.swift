@@ -159,8 +159,8 @@ struct StructWithIUOinit : InitProtocol {
   init!(_ x: Int) {  } // no missing-return error
 }
 
-func testSR13753() {
-  // SR-13753
+// https://github.com/apple/swift/issues/56150
+func f_56150() {
   let _ : () -> Int = {
     var x : Int {
       get { 0 }
@@ -217,8 +217,9 @@ func testSR13753() {
   }
 }
 
-// SR-14505
-struct SR14505 {
+// https://github.com/apple/swift/issues/56857
+
+struct S_56857 {
     let b = true
     var x: Int {
         if b {
@@ -236,7 +237,7 @@ struct SR14505 {
     } 
 }
 
-class SR14505_C {
+class C_56857 {
   static let a = false
   let b = true
 

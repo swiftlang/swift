@@ -9,6 +9,19 @@
 
 // CHECK: namespace Structs {
 
+// CHECK: class StructWithIntField;
+// CHECK-NEXT: } // end namespace
+
+// CHECK: namespace swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+
+// CHECK: namespace Structs {
+
 // CHECK:      namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_StructWithIntField;
@@ -25,7 +38,7 @@
 // CHECK:        }
 // CHECK-NEXT:   inline StructWithIntField(const StructWithIntField &other) {
 // CHECK:        }
-// CHECK-NEXT:   inline StructWithIntField(StructWithIntField &&) = default;
+// CHECK-NEXT:   noreturn]] inline StructWithIntField(StructWithIntField &&) { abort(); }
 // CHECK-NEXT: private:
 // CHECK-NEXT:   inline StructWithIntField() {}
 // CHECK-NEXT:   static inline StructWithIntField _make() { return StructWithIntField(); }
@@ -67,8 +80,6 @@
 // CHECK-NEXT: namespace swift {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
-// CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Structs::StructWithIntField>
 // CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {

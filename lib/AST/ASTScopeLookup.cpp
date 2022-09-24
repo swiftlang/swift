@@ -166,10 +166,10 @@ NullablePtr<const GenericParamList> ASTScopeImpl::genericParams() const {
 }
 NullablePtr<const GenericParamList>
 AbstractFunctionDeclScope::genericParams() const {
-  return decl->getGenericParams();
+  return decl->getParsedGenericParams();
 }
 NullablePtr<const GenericParamList> SubscriptDeclScope::genericParams() const {
-  return decl->getGenericParams();
+  return decl->getParsedGenericParams();
 }
 NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // For Decls:

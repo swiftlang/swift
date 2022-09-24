@@ -690,7 +690,8 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   auto *keypath = KeyPathExpr::createParsed(
       Context, backslashLoc, rootResult.getPtrOrNull(),
-      pathResult.getPtrOrNull(), hasLeadingDot);
+      pathResult.getPtrOrNull(), hasLeadingDot,
+      CurLocalContext->claimNextClosureDiscriminator());
   return makeParserResult(parseStatus, keypath);
 }
 
@@ -3951,8 +3952,15 @@ Parser::parsePlatformVersionConstraintSpec() {
       platformFromString(PlatformIdentifier.str());
 
   if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
-    diagnose(Tok, diag::avail_query_unrecognized_platform_name,
-             PlatformIdentifier);
+    if (auto CorrectedPlatform =
+            caseCorrectedPlatformString(PlatformIdentifier.str())) {
+      diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
+               PlatformIdentifier, *CorrectedPlatform)
+          .fixItReplace(PlatformLoc, *CorrectedPlatform);
+    } else {
+      diagnose(PlatformLoc, diag::avail_query_unrecognized_platform_name,
+               PlatformIdentifier);
+    }
     Platform = PlatformKind::none;
   }
 

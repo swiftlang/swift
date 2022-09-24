@@ -673,7 +673,10 @@ Reflection.test("ObjectIdentifier/CustomDebugStringConvertible") {
 class C: Q1 & Codable { }
 
 Reflection.test("multiprotocolTypes") {
-  // [SR-8158]: Printing type(of: Codable & Protocol type ) EXC_BAD_ACCESS
+  // https://github.com/apple/swift/issues/50690
+  // EXC_BAD_ACCESS when calling 'type(of:)' on protocol composition with
+  // 'Codable'
+  //
   // This use of String(reflecting:) exercises a previously incorrect cast in
   // NonFixedExistentialMetatypeBox::Container::getNumWitnessTables.
   let obj: Q1 & Codable = C()

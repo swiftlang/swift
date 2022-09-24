@@ -4642,6 +4642,10 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
+ERROR(distributed_func_cannot_overload_on_async_only,none,
+      "ambiguous distributed func declaration %0, cannot overload distributed methods on effect only", (DeclName))
+NOTE(distributed_func_other_ambiguous_overload_here,none,
+      "ambiguous distributed func %0 declared here", (DeclName))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
@@ -5692,13 +5696,21 @@ ERROR(availability_decl_more_than_enclosing, none,
       "%0 cannot be more available than enclosing scope",
       (DescriptiveDeclKind))
 
+WARNING(availability_decl_more_than_unavailable_enclosing, none,
+        "%0 cannot be more available than unavailable enclosing scope",
+        (DescriptiveDeclKind))
+
 NOTE(availability_implicit_decl_here, none,
      "%0 implicitly declared here with availability of %1 %2 or newer",
      (DescriptiveDeclKind, StringRef, llvm::VersionTuple))
 
-NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
+NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
      (StringRef, llvm::VersionTuple))
+
+NOTE(availability_decl_more_than_unavailable_enclosing_here, none,
+     "enclosing scope has been explicitly marked unavailable here",
+     ())
 
 ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
@@ -6588,6 +6600,19 @@ ERROR(has_symbol_invalid_expr,none,
       "#_hasSymbol condition must refer to a declaration", ())
 ERROR(has_symbol_unsupported_in_closures,none,
       "#_hasSymbol is not supported in closures", ())
+
+//------------------------------------------------------------------------------
+// MARK: Type erasure
+//------------------------------------------------------------------------------
+
+ERROR(no_metadata_on_non_generic_param, none,
+"'@_noMetadata' must appear on a generic parameter",
+())
+ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental layout based"
+      " pre-specializations are disabled! Pass the frontend flag"
+      " -enable-experimental-layout-prespecialization to swift to enable "
+      " the usage of this language feature", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

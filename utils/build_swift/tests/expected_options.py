@@ -90,7 +90,7 @@ EXPECTED_DEFAULTS = {
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_early_swift_driver': True,
-    'build_early_swiftsyntax': False,
+    'build_early_swiftsyntax': True,
     'build_swiftsyntax': False,
     'build_libparser_only': False,
     'build_skstresstester': False,
@@ -366,7 +366,7 @@ class DisableOption(_BaseOption):
 
 
 class ChoicesOption(_BaseOption):
-    """Option that accepts an argument from a predifined list of choices."""
+    """Option that accepts an argument from a predefined list of choices."""
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
@@ -519,7 +519,6 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
     SetTrueOption('--swift-driver', dest='build_swift_driver'),
-    SetTrueOption('--early-swiftsyntax', dest='build_early_swiftsyntax'),
     SetTrueOption('--swiftsyntax', dest='build_swiftsyntax'),
     SetTrueOption('--build-libparser-only', dest='build_libparser_only'),
     SetTrueOption('--skstresstester', dest='build_skstresstester'),
@@ -637,6 +636,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-clean-xctest', dest='clean_xctest'),
     DisableOption('--skip-clean-llbuild', dest='clean_llbuild'),
     DisableOption('--skip-early-swift-driver', dest='build_early_swift_driver'),
+    DisableOption('--skip-early-swiftsyntax', dest='build_early_swiftsyntax'),
     DisableOption('--skip-clean-swiftpm', dest='clean_swiftpm'),
     DisableOption('--skip-clean-swift-driver', dest='clean_swift_driver'),
     DisableOption('--skip-test-android', dest='test_android'),
@@ -752,7 +752,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
-    # Options forwared to build-script-impl
+    # Options forwarded to build-script-impl
     BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
     BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 

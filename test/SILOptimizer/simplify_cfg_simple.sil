@@ -36,7 +36,10 @@ bb3:
 // Test that SimplifyCFG::simplifyBlocks, tryJumpThreading does not
 // perform unbounded loop peeling.
 //
-// rdar://73357726 ([SR-14068]: Compiling with optimisation runs indefinitely for grpc-swift)
+// rdar://73357726
+// https://github.com/apple/swift/issues/56457
+// Compiling with optimisation runs indefinitely for grpc-swift
+//
 // CHECK-LABEL: sil @testInfinitePeeling : $@convention(method) (Builtin.Int64, Enum) -> () {
 //
 // There is only one switch_enum blocks, and it is no longer in a loop.

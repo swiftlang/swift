@@ -179,6 +179,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("propagate-requirement-ids", DebugFlags::PropagateRequirementIDs)
       .Case("timers", DebugFlags::Timers)
       .Case("conflicting-rules", DebugFlags::ConflictingRules)
+      .Case("split-concrete-equiv-class", DebugFlags::SplitConcreteEquivalenceClass)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "

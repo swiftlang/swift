@@ -47,5 +47,5 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   inline StructWithRefcountedMember(StructWithRefcountedMember &&) = default;
+// CHECK-NEXT:   inline StructWithRefcountedMember(StructWithRefcountedMember &&) { abort(); }
 // CHECK-NEXT: private:

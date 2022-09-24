@@ -11,14 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "deserialize"
+
 #include "DeserializeSIL.h"
 
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFile.h"
 #include "SILFormat.h"
-
 #include "SILSerializationFunctionBuilder.h"
+
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -28,6 +29,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -173,24 +175,26 @@ SILDeserializer::SILDeserializer(
     unsigned prevKind = kind;
     kind =
         MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
-    assert((next.Kind == llvm::BitstreamEntry::Record &&
-            kind > prevKind &&
+    assert((next.Kind == llvm::BitstreamEntry::Record && kind > prevKind &&
             (kind == sil_index_block::SIL_FUNC_NAMES ||
              kind == sil_index_block::SIL_VTABLE_NAMES ||
+             kind == sil_index_block::SIL_MOVEONLYDEINIT_NAMES ||
              kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
              kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_PROPERTY_OFFSETS ||
              kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)) &&
-         "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
+           "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
           SIL_WITNESS_TABLE_NAMES, SIL_DEFAULT_WITNESS_TABLE_NAMES, \
-          SIL_PROPERTY_OFFSETS, or SIL_DIFFERENTIABILITY_WITNESS_NAMES.");
+          SIL_PROPERTY_OFFSETS, SIL_MOVEONLYDEINIT_NAMES, or SIL_DIFFERENTIABILITY_WITNESS_NAMES.");
     (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
       FuncTable = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_VTABLE_NAMES)
       VTableList = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_MOVEONLYDEINIT_NAMES)
+      MoveOnlyDeinitList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES)
       GlobalVarList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_WITNESS_TABLE_NAMES)
@@ -221,6 +225,11 @@ SILDeserializer::SILDeserializer(
               offKind == sil_index_block::SIL_VTABLE_OFFSETS) &&
              "Expect a SIL_VTABLE_OFFSETS record.");
       MF->allocateBuffer(VTables, scratch);
+    } else if (kind == sil_index_block::SIL_MOVEONLYDEINIT_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind == sil_index_block::SIL_MOVEONLYDEINIT_OFFSETS) &&
+             "Expect a SIL_MOVEONLYDEINIT_OFFSETS record.");
+      MF->allocateBuffer(MoveOnlyDeinits, scratch);
     } else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
@@ -755,11 +764,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     IdentifierID targetFunctionID;
     IdentifierID spiGroupID;
     ModuleID spiModuleID;
+    ArrayRef<uint64_t> typeErasedParamsIDs;
     unsigned LIST_VER_TUPLE_PIECES(available);
     SILSpecializeAttrLayout::readRecord(
         scratch, exported, specializationKindVal, specializedSigID,
         targetFunctionID, spiGroupID, spiModuleID,
-        LIST_VER_TUPLE_PIECES(available));
+        LIST_VER_TUPLE_PIECES(available), typeErasedParamsIDs);
 
     SILFunction *target = nullptr;
     if (targetFunctionID) {
@@ -783,12 +793,18 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       ? AvailabilityContext::alwaysAvailable()
       : AvailabilityContext(VersionRange::allGTE(available));
 
+    llvm::SmallVector<Type, 4> typeErasedParams;
+    for (auto id : typeErasedParamsIDs) {
+      typeErasedParams.push_back(MF->getType(id));
+    }
+
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
     if (shouldAddSpecAttrs) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
-          SILMod, specializedSig, exported != 0, specializationKind, target,
+          SILMod, specializedSig, typeErasedParams,
+          exported != 0, specializationKind, target,
           spiGroup, spiModule, availability));
     }
   }
@@ -852,7 +868,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
-         kind != SIL_WITNESS_TABLE && kind != SIL_DIFFERENTIABILITY_WITNESS) {
+         kind != SIL_MOVEONLY_DEINIT && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DIFFERENTIABILITY_WITNESS) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
@@ -3211,7 +3228,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   std::swap(SavedLastValueID, LastValueID);
 
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
-         kind != SIL_WITNESS_TABLE && kind != SIL_DIFFERENTIABILITY_WITNESS) {
+         kind != SIL_MOVEONLY_DEINIT && kind != SIL_WITNESS_TABLE &&
+         kind != SIL_DIFFERENTIABILITY_WITNESS) {
     if (readSILInstruction(nullptr, Builder, kind, scratch)) {
       MF->fatal("readSILInstruction returns error");
     }
@@ -3333,9 +3351,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
-         kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_FUNCTION &&
-         kind != SIL_PROPERTY) {
+         kind != SIL_DEFAULT_WITNESS_TABLE && kind != SIL_FUNCTION &&
+         kind != SIL_PROPERTY && kind != SIL_MOVEONLY_DEINIT) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
@@ -3403,6 +3420,89 @@ void SILDeserializer::getAllVTables() {
 
   for (unsigned I = 0, E = VTables.size(); I < E; ++I)
     readVTable(I+1);
+}
+
+SILMoveOnlyDeinit *SILDeserializer::readMoveOnlyDeinit(DeclID tableID) {
+  if (tableID == 0)
+    return nullptr;
+  assert(tableID <= MoveOnlyDeinits.size() && "invalid VTable ID");
+  auto &moveOnlyDeinitOrOffset = MoveOnlyDeinits[tableID - 1];
+
+  if (moveOnlyDeinitOrOffset.isFullyDeserialized())
+    return moveOnlyDeinitOrOffset.get();
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  if (llvm::Error Err = SILCursor.JumpToBit(moveOnlyDeinitOrOffset.getOffset()))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
+  assert(kind == SIL_MOVEONLY_DEINIT && "expect a sil move only deinit table");
+  (void)kind;
+
+  DeclID nominalID;
+  DeclID funcNameID;
+  unsigned rawSerialized;
+  MoveOnlyDeinitLayout::readRecord(scratch, nominalID, funcNameID,
+                                   rawSerialized);
+  if (nominalID == 0) {
+    LLVM_DEBUG(llvm::dbgs() << "MoveOnlyDeinit nominalID is 0.\n");
+    return nullptr;
+  }
+
+  auto *theNomDecl = cast<NominalTypeDecl>(MF->getDecl(nominalID));
+  auto *theFunc = getFuncForReference(MF->getIdentifierText(funcNameID));
+
+  // If we've already serialized the module, don't mark the witness table
+  // as serialized, since we no longer need to enforce resilience
+  // boundaries.
+  if (SILMod.isSerialized())
+    rawSerialized = 0;
+
+  auto *deinit = SILMoveOnlyDeinit::create(
+      SILMod, theNomDecl, rawSerialized ? IsSerialized : IsNotSerialized,
+      theFunc);
+  moveOnlyDeinitOrOffset.set(deinit, true /*isFullyDeserialized*/);
+
+  if (Callback)
+    Callback->didDeserialize(MF->getAssociatedModule(), deinit);
+  return deinit;
+}
+
+SILMoveOnlyDeinit *
+SILDeserializer::lookupMoveOnlyDeinit(StringRef MangledClassName) {
+  if (!MoveOnlyDeinitList)
+    return nullptr;
+  auto iter = MoveOnlyDeinitList->find(MangledClassName);
+  if (iter == MoveOnlyDeinitList->end())
+    return nullptr;
+
+  auto tbl = readMoveOnlyDeinit(*iter);
+  return tbl;
+}
+
+/// Deserialize all move only deinit tables inside the module and add them to
+/// SILMod.
+void SILDeserializer::getAllMoveOnlyDeinits() {
+  if (!MoveOnlyDeinitList)
+    return;
+
+  for (unsigned i : range(MoveOnlyDeinits.size()))
+    readMoveOnlyDeinit(i + 1);
 }
 
 SILProperty *SILDeserializer::readProperty(DeclID PId) {

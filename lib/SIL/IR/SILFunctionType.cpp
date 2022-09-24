@@ -1960,9 +1960,12 @@ static CanSILFunctionType getSILFunctionType(
 
     if (reqtSubs) {
       valueType = valueType.subst(*reqtSubs);
+      coroutineSubstYieldType = valueType->getReducedType(
+          genericSig);
+    } else {
+      coroutineSubstYieldType = valueType->getReducedType(
+          accessor->getGenericSignature());
     }
-
-    coroutineSubstYieldType = valueType->getReducedType(genericSig);
   }
 
   bool shouldBuildSubstFunctionType = [&]{

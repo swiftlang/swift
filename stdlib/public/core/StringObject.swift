@@ -915,7 +915,7 @@ extension _StringObject {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
     if largeIsCocoa {
-      return stableCocoaASCIIPointer(cocoaObject)._unsafelyUnwrappedUnchecked
+      return stableCocoaUTF8Pointer(cocoaObject)._unsafelyUnwrappedUnchecked
     }
 #endif
 
