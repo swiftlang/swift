@@ -1,7 +1,8 @@
 // RUN: %target-swift-emit-silgen -verify -module-name main %s -warn-redundant-requirements | %FileCheck %s
 // RUN: %target-swift-emit-sil -verify -module-name main %s -warn-redundant-requirements
 
-// NOTE(SR-11950): SILParser crashes for SILGen round-trip.
+// NOTE: SILParser crashes for SILGen round-trip
+// (https://github.com/apple/swift/issues/54370).
 
 // This file tests:
 // - The "derivative generic signature" of `@differentiable` and `@derivative`

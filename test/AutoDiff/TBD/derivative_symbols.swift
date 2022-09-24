@@ -83,7 +83,8 @@ extension Array where Element == Struct {
   }
 }
 
-// SR-13866: Dispatch thunks and method descriptor mangling.
+// https://github.com/apple/swift/issues/56264
+// Dispatch thunks and method descriptor mangling.
 public protocol P: Differentiable {
   @differentiable(reverse, wrt: self)
   @differentiable(reverse, wrt: (self, x))
@@ -129,7 +130,7 @@ public final class Class: Differentiable {
     @differentiable(reverse)
     get { x }
 
-    // FIXME(SR-13096)
+    // FIXME: https://github.com/apple/swift/issues/55542
     // @differentiable(reverse)
     // set { stored = newValue }
   }
@@ -141,7 +142,7 @@ public final class Class: Differentiable {
     fatalError()
   }
 
-  // FIXME(SR-13096)
+  // FIXME: https://github.com/apple/swift/issues/55542
   // @derivative(of: subscript.set)
   // public func vjpSubscriptSetter(_ x: Float, _ newValue: Float) -> (
   //   value: (), pullback: (inout TangentVector) -> (Float, Float)
