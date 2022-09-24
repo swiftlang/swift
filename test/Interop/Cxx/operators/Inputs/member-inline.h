@@ -7,6 +7,11 @@ struct LoadableIntWrapper {
     return LoadableIntWrapper{.value = value - rhs.value};
   }
 
+  LoadableIntWrapper operator+=(LoadableIntWrapper rhs) {
+    value += rhs.value;
+    return *this;
+  }
+
   int operator()() {
     return value;
   }
@@ -30,6 +35,11 @@ struct LoadableIntWrapper {
 
   friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
     return LoadableIntWrapper{.value = -obj.value};
+  }
+
+  friend LoadableIntWrapper operator-=(LoadableIntWrapper& lhs, const LoadableIntWrapper& rhs) {
+    lhs.value -= rhs.value;
+    return lhs;
   }
 };
 

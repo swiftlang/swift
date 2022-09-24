@@ -196,7 +196,7 @@ This status table describes which of the following Swift language features have 
 | Generic functions            | Partially, only without generic constraints              |
 | Generic methods              | Partially, only without generic constraints              |
 | Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
-| Generic `enum` types         | No |
+| Generic `enum` types         | Partially, only without generic constraints and less than 4 generic parameters |
 | Generic `class` types        | No |
 
 ### Swift standard library
@@ -206,4 +206,5 @@ This status table describes which of the following Swift standard library APIs h
 | **Swift Library Type**     | **Can be used from C++** |
 |--------------------------------|----------------------------------------------------------|
 | `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++   |
-| `Array<T>`   | Can be used as a type in C++. APIs in extensions are not exposed to C++   |
+| `Array<T>`   | Can be used as a type in C++. Limited set of APIs in some extensions are exposed to C++.   |
+| `Optional<T>`   | Can be used as a type in C++. APIs in extensions are not exposed to C++   |

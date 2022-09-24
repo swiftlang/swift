@@ -74,7 +74,7 @@ suite.test("_rawHashValue forwarding") {
   // RawRepresentable types. Adding a custom hash(into:) implementation should
   // always be enough to customize hashing.
   //
-  // See https://bugs.swift.org/browse/SR-10734
+  // See https://github.com/apple/swift/issues/53126.
 
   if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     let r = CustomRawRepresentable(rawValue: 42)!

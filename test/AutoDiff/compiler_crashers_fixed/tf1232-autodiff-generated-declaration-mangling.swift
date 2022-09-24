@@ -1,5 +1,5 @@
 // RUN: %target-build-swift -g %s
-// This test occasionally fails to link.
+// FIXME: This test occasionally fails to link (https://github.com/apple/swift/issues/57125).
 // REQUIRES: SR14775
 
 // TF-1232: IRGenDebugInfo crash due to lack of proper mangling for

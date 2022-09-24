@@ -16,7 +16,7 @@
 // CHECK: key.modulename: "A"
 
 // Set up a cross-import module with doc comments that also uses cross-imports.
-// This lets us check that that imports of overlays are printed as their
+// This lets us check that imports of overlays are printed as their
 // underlying modules, and that the synthesized comment above each decl
 // originally from an overlay appears before any doc comments.
 //

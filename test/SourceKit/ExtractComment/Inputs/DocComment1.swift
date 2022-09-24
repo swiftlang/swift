@@ -1,4 +1,4 @@
-///	DocComent 1
-///	DocComent 2
-///	DocComent 3
-///	DocComent 4
+///	DocComment 1
+///	DocComment 2
+///	DocComment 3
+///	DocComment 4

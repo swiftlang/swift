@@ -162,8 +162,9 @@ internal extension TGMath {
     expectEqual((0.625, 2), Self._frexp(2.5))
     expectEqual(1, Self._ilogb(2.5))
 #if os(Linux) && arch(x86_64)
+    // FIXME: https://github.com/apple/swift/issues/49782
     // double-precision remquo is broken in the glibc in 14.04. Disable this
-    // test for all Linux in the short-term to un-FAIL the build. SR-7234.
+    // test for all Linux in the short-term to un-FAIL the build.
     if Self.significandBitCount != 52 {
       expectEqual(-0.25, Self._remquo(16, 0.625).0)
       expectEqual(2, Self._remquo(16, 0.625).1 & 7)

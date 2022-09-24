@@ -100,7 +100,7 @@ public:
 };
 
 // data[0] = ProtocolListFuncs::funcs
-// data[1] = custum buffer
+// data[1] = custom buffer
 // data[2] = offset for the element in ExpressionTypeArray
 struct ProtocolListFuncs {
   static sourcekitd_variant_type_t get_type(sourcekitd_variant_t var) {
@@ -170,7 +170,7 @@ struct ExpressionTypeArrayBuilder::Implementation {
   }
 
   // data[0] = ExpressionTypeArrayBuilder::funcs
-  // data[1] = custum buffer
+  // data[1] = custom buffer
   static size_t array_get_count(sourcekitd_variant_t array) {
     ExpressionTypeReader reader((char*)array.data[1]);
     return reader.count();

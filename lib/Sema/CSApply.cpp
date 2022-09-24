@@ -4980,9 +4980,7 @@ namespace {
       auto &ctx = cs.getASTContext();
       auto discriminator = E->getClosureDiscriminator();
 
-      auto contextInfo = exprType->castTo<AnyFunctionType>()->getExtInfo();
       FunctionType::ExtInfo closureInfo;
-      closureInfo = closureInfo.withNoEscape(contextInfo.isNoEscape());
       auto closureTy =
           FunctionType::get({FunctionType::Param(baseTy)}, leafTy, closureInfo);
 

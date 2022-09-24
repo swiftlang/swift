@@ -11,12 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "serialized-sil-loader"
-#include "swift/Serialization/SerializedSILLoader.h"
+
 #include "DeserializeSIL.h"
 #include "ModuleFile.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/SIL/SILModule.h"
+
 #include "swift/AST/ASTMangler.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -104,6 +107,18 @@ SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
   for (auto &Des : LoadedSILSections) {
     if (auto VT = Des->lookupVTable(mangledClassName))
       return VT;
+  }
+  return nullptr;
+}
+
+SILMoveOnlyDeinit *
+SerializedSILLoader::lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl) {
+  Mangle::ASTMangler mangler;
+  std::string mangledClassName = mangler.mangleNominalType(nomDecl);
+
+  for (auto &des : LoadedSILSections) {
+    if (auto *tbl = des->lookupMoveOnlyDeinit(mangledClassName))
+      return tbl;
   }
   return nullptr;
 }

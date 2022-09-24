@@ -14,21 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/ParsedSyntaxRecorder.h"
-#include "swift/Parse/ParseSILSupport.h"
-#include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxKind.h"
-#include "swift/Subsystems.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/GenericParamList.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
@@ -36,13 +29,21 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "swift/Parse/Parser.h"
+#include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Strings.h"
+#include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxKind.h"
+#include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Twine.h"
 #include <algorithm>
 
 using namespace swift;
@@ -250,6 +251,7 @@ bool Parser::parseTopLevelSIL() {
     CASE_SIL(sil, DeclSIL)
     CASE_SIL(sil_stage, DeclSILStage)
     CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_moveonlydeinit, SILMoveOnlyDeinit)
     CASE_SIL(sil_global, SILGlobal)
     CASE_SIL(sil_witness_table, SILWitnessTable)
     CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
@@ -627,9 +629,11 @@ bool Parser::parseSpecializeAttributeArguments(
     swift::TrailingWhereClause *&TrailingWhereClause,
     DeclNameRef &targetFunction, AvailabilityContext *SILAvailability, SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
+    size_t &typeErasedParamsCount,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   bool isSIL = SILAvailability != nullptr;
+  typeErasedParamsCount = 0;
   SyntaxParsingContext ContentContext(SyntaxContext,
                                       SyntaxKind::SpecializeAttributeSpecList);
   // Parse optional "exported" and "kind" labeled parameters.
@@ -790,6 +794,18 @@ bool Parser::parseSpecializeAttributeArguments(
     SmallVector<RequirementRepr, 4> requirements;
     parseGenericWhereClause(whereLoc, endLoc, requirements,
                             /* AllowLayoutConstraints */ true);
+    if (Context.LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+      for (auto req : requirements) {
+        if (req.getKind() == RequirementReprKind::LayoutConstraint) {
+          if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(req.getSubjectRepr())) {
+            if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+              typeErasedParamsCount += 1;
+            }
+          }
+        }
+      }
+    }
+
     TrailingWhereClause =
         TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
   }
@@ -949,10 +965,11 @@ bool Parser::parseSpecializeAttribute(
   DeclNameRef targetFunction;
   SmallVector<Identifier, 4> spiGroups;
   SmallVector<AvailableAttr *, 4> availableAttrs;
+  size_t typeErasedParamsCount = 0;
   if (!parseSpecializeAttributeArguments(
           ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
-          targetFunction, SILAvailability, spiGroups, availableAttrs, parseSILTargetName,
-          parseSILSIPModule)) {
+          targetFunction, SILAvailability, spiGroups, availableAttrs, typeErasedParamsCount,
+          parseSILTargetName, parseSILSIPModule)) {
     return false;
   }
 
@@ -977,12 +994,13 @@ bool Parser::parseSpecializeAttribute(
   if (DiscardAttribute) {
     Attr = nullptr;
     return false;
-  }
+  }  
+
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                 trailingWhereClause, exported.getValue(),
                                 kind.getValue(), targetFunction, spiGroups,
-                                availableAttrs);
+                                availableAttrs, typeErasedParamsCount);
   return true;
 }
 
@@ -4605,6 +4623,7 @@ bool Parser::isStartOfSILDecl() {
   case tok::kw_sil_stage:
   case tok::kw_sil_property:
   case tok::kw_sil_vtable:
+  case tok::kw_sil_moveonlydeinit:
   case tok::kw_sil_global:
   case tok::kw_sil_witness_table:
   case tok::kw_sil_default_witness_table:
@@ -5124,9 +5143,7 @@ static Parser::ParseDeclOptions getMemberParseDeclOptions(
         Parser::PD_InProtocol);
 
   case DeclKind::Class:
-    return ParseDeclOptions(
-        Parser::PD_HasContainerType | Parser::PD_AllowDestructor |
-        Parser::PD_InClass);
+    return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InClass);
 
   case DeclKind::Struct:
     return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InStruct);
@@ -8761,8 +8778,13 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   DD->getAttrs() = Attributes;
 
-  // Reject 'destructor' functions outside of classes
-  if (!(Flags & PD_AllowDestructor)) {
+  // Reject 'destructor' functions outside of structs, enums, and classes.
+  //
+  // Later in the type checker, we validate that structs/enums only do this if
+  // they are move only.
+  auto *nom = dyn_cast<NominalTypeDecl>(CurDeclContext);
+  if (!nom ||
+      (!isa<StructDecl>(nom) && !isa<EnumDecl>(nom) && !isa<ClassDecl>(nom))) {
     diagnose(DestructorLoc, diag::destructor_decl_outside_class);
 
     // Tell the type checker not to touch this destructor.
@@ -8804,10 +8826,9 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // A common error is to try to define an operator with something in the
   // unicode plane considered to be an operator, or to try to define an
   // operator like "not".  Analyze and diagnose this specifically.
-  if (Tok.isAnyOperator() || Tok.isAny(tok::exclaim_postfix,
-                                       tok::question_infix,
-                                       tok::question_postfix,
-                                       tok::equal, tok::arrow)) {
+  if (Tok.isAnyOperator() ||
+      Tok.isAny(tok::exclaim_postfix, tok::question_infix,
+                tok::question_postfix, tok::equal, tok::arrow)) {
     if (peekToken().getLoc() == Tok.getRange().getEnd() &&
       maybeDiagnoseInvalidCharInOperatorName(peekToken())) {
       consumeToken();

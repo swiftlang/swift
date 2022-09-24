@@ -33,6 +33,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
@@ -165,7 +166,8 @@ namespace swift {
                                GenericParamList *GenericParams) const;
 
     void convertRequirements(ArrayRef<RequirementRepr> From,
-                             SmallVectorImpl<Requirement> &To);
+                             SmallVectorImpl<Requirement> &To,
+                             SmallVectorImpl<Type> &typeErasedParams);
 
     ProtocolConformanceRef parseProtocolConformanceHelper(
         ProtocolDecl *&proto,
@@ -917,7 +919,8 @@ bool SILParser::parseSILQualifier(
 
 /// Remap RequirementReps to Requirements.
 void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
-                                    SmallVectorImpl<Requirement> &To) {
+                                    SmallVectorImpl<Requirement> &To,
+                                    SmallVectorImpl<Type> &typeErasedParams) {
   if (From.empty()) {
     To.clear();
     return;
@@ -954,8 +957,18 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
       Requirement ConvertedRequirement(RequirementKind::Layout, Subject,
                                        Req.getLayoutConstraint());
       To.push_back(ConvertedRequirement);
+
+      if (SILMod.getASTContext().LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+        if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(Req.getSubjectRepr())) {
+          if (attributedTy->getAttrs().has(TAK__noMetadata)) {
+            typeErasedParams.push_back(Subject);
+          }
+        }
+      }
+
       continue;
     }
+
     llvm_unreachable("Unsupported requirement kind");
   }
 }
@@ -6628,15 +6641,16 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         if (GenericSig && !SpecAttrs.empty()) {
           for (auto &Attr : SpecAttrs) {
             SmallVector<Requirement, 2> requirements;
+            SmallVector<Type, 2> typeErasedParams;
             // Resolve types and convert requirements.
-            FunctionState.convertRequirements(Attr.requirements, requirements);
+            FunctionState.convertRequirements(Attr.requirements, requirements, typeErasedParams);
             auto *fenv = FunctionState.F->getGenericEnvironment();
             auto genericSig = buildGenericSignature(P.Context,
                                                     fenv->getGenericSignature(),
                                                     /*addedGenericParams=*/{ },
                                                     std::move(requirements));
             FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
-                FunctionState.F->getModule(), genericSig, Attr.exported,
+                FunctionState.F->getModule(), genericSig, typeErasedParams, Attr.exported,
                 Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
           }
         }
@@ -6990,6 +7004,81 @@ bool SILParserState::parseSILVTable(Parser &P) {
                        LBraceLoc);
 
   SILVTable::create(M, theClass, Serialized, vtableEntries);
+  return false;
+}
+
+/// decl-sil-vtable: [[only in SIL mode]]
+///   'sil_vtable' ClassName decl-sil-vtable-body
+/// decl-sil-vtable-body:
+///   '{' sil-vtable-entry* '}'
+/// sil-vtable-entry:
+///   SILDeclRef ':' SILFunctionName
+bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
+  parser.consumeToken(tok::kw_sil_moveonlydeinit);
+  SILParser moveOnlyDeinitTableState(parser);
+
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, moveOnlyDeinitTableState, M))
+    return true;
+
+  // Parse the class name.
+  Identifier name;
+  SourceLoc loc;
+  if (moveOnlyDeinitTableState.parseSILIdentifier(
+          name, loc, diag::expected_sil_value_name))
+    return true;
+
+  // Find the nominal decl.
+  llvm::PointerUnion<ValueDecl *, ModuleDecl *> res =
+      lookupTopDecl(parser, name, /*typeLookup=*/true);
+  assert(res.is<ValueDecl *>() && "Class Nominal-up should return a Decl");
+  ValueDecl *varDecl = res.get<ValueDecl *>();
+  if (!varDecl) {
+    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+    return true;
+  }
+
+  auto *theNominalDecl = dyn_cast<NominalTypeDecl>(varDecl);
+  if (!theNominalDecl) {
+    parser.diagnose(loc, diag::sil_moveonlydeinit_nominal_not_found, name);
+    return true;
+  }
+
+  SourceLoc lBraceLoc = parser.Tok.getLoc();
+  parser.consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII tmp(*parser.L);
+  SILFunction *func = nullptr;
+
+  if (parser.Tok.isNot(tok::r_brace)) {
+    Identifier funcName;
+    SourceLoc funcLoc;
+    if (parser.Tok.is(tok::kw_nil)) {
+      parser.consumeToken();
+    } else {
+      if (parser.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          moveOnlyDeinitTableState.parseSILIdentifier(
+              funcName, funcLoc, diag::expected_sil_value_name))
+        return true;
+      func = M.lookUpFunction(funcName.str());
+      if (!func) {
+        parser.diagnose(funcLoc, diag::sil_moveonlydeinit_func_not_found,
+                        funcName);
+        return true;
+      }
+    }
+  }
+
+  SourceLoc RBraceLoc;
+  parser.parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                            lBraceLoc);
+
+  SILMoveOnlyDeinit::create(M, theNominalDecl, Serialized, func);
   return false;
 }
 

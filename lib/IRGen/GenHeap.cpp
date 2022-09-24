@@ -1917,7 +1917,8 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      GenericSignature sig,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
-  if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) {
+  if ((theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) ||
+      !IGF.IGM.ObjCInterop) {
     auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType, sig);
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      isaEncoding,
