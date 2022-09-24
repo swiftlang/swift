@@ -1737,6 +1737,8 @@ public:
       *this << "[poison] ";
     if (DVI->getWasMoved())
       *this << "[moved] ";
+    if (DVI->hasTrace())
+      *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(),
                   &DVI->getModule().getASTContext().SourceMgr);
