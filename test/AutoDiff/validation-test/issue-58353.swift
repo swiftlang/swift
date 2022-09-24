@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// https://github.com/apple/swift/issues/58353
+
 import _Differentiation
 import StdlibUnittest
 

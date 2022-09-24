@@ -618,7 +618,8 @@ func testClassTangentPropertyNotStored(_ c: ClassTangentPropertyNotStored) -> Fl
 // CHECK-LABEL: sil {{.*}} @test_class_tangent_property_not_stored
 // CHECK: ref_element_addr {{%.*}} : $ClassTangentPropertyNotStored, #ClassTangentPropertyNotStored.x
 
-// SR-13134: Test stored property access with conditionally `Differentiable` base type.
+// https://github.com/apple/swift/issues/55580
+// Test stored property access with conditionally `Differentiable` base type.
 
 struct Complex<T: FloatingPoint> {
   var real: T
@@ -630,7 +631,7 @@ extension Complex: Differentiable where T: Differentiable {
 extension Complex: AdditiveArithmetic {}
 
 @differentiable(reverse)
-func SR_13134(lhs: Complex<Float>, rhs: Complex<Float>) -> Float {
+func f_55580(lhs: Complex<Float>, rhs: Complex<Float>) -> Float {
   return lhs.real + rhs.real
 }
 
@@ -692,7 +693,8 @@ func projectedValueAccess(_ s: Struct) -> Float {
   s.$y.wrappedValue
 }
 
-// SR-12640: Test `wrapperValue.modify` differentiation.
+// https://github.com/apple/swift/issues/55084
+// Test `wrapperValue.modify` differentiation.
 
 // expected-error @+2 {{function is not differentiable}}
 // expected-note @+2 {{when differentiating this function definition}}
@@ -722,7 +724,7 @@ func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
 // Subset parameter differentiation thunks
 //===----------------------------------------------------------------------===//
 
-// FIXME(SR-13046): Non-differentiability diagnostic crash due to invalid source location.
+// FIXME: Non-differentiability diagnostic crash due to invalid source location (https://github.com/apple/swift/issues/55492).
 /*
 func testNoDerivativeParameter(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) -> Float {
   return gradient(at: 2) { x in f(x * x, x) }
@@ -774,27 +776,27 @@ public func fragileDifferentiable(_ x: Float) -> Float {
 }
 
 
-// FIXME(rdar://87429620): Differentiable curry thunk RequirementMachine error.
+// FIXME: Differentiable curry thunk RequirementMachine error (rdar://87429620, https://github.com/apple/swift/issues/54819).
 #if false
 // TF-1208: Test curry thunk differentiation regression.
-public struct SR_14228_Struct<Scalar> {
+public struct Struct_54819<Scalar> {
   var x: Scalar
 }
-extension SR_14228_Struct: Differentiable where Scalar: Differentiable {
+extension Struct_54819: Differentiable where Scalar: Differentiable {
   @differentiable(reverse)
   public static func id(x: Self) -> Self {
     return x
   }
 }
 @differentiable(reverse, wrt: x)
-public func SR_14228<Scalar: Differentiable>(
-  _ x: SR_14228_Struct<Scalar>,
-  // NOTE(TF-1208): This diagnostic is unexpected because `SR_14228_Struct.id` is marked `@differentiable`.
+public func f_54819<Scalar: Differentiable>(
+  _ x: Struct_54819<Scalar>,
+  // NOTE(TF-1208): This diagnostic is unexpected because `Struct_54819.id` is marked `@differentiable`.
   // xpected-error @+3 2 {{function is not differentiable}}
   // xpected-note @+2 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
   // xpected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
-  reduction: @differentiable(reverse) (SR_14228_Struct<Scalar>) -> SR_14228_Struct<Scalar> = SR_14228_Struct.id
-) -> SR_14228_Struct<Scalar> {
+  reduction: @differentiable(reverse) (Struct_54819<Scalar>) -> Struct_54819<Scalar> = Struct_54819.id
+) -> Struct_54819<Scalar> {
   reduction(x)
 }
 #endif
