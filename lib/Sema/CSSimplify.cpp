@@ -3626,33 +3626,36 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
           if (last.is<LocatorPathElt::ApplyArgToParam>()) {
             auto proto = protoDecl->getDeclaredInterfaceType();
-            ConstraintFix *fix;
             // Impact is 2 here because there are two failures
             // 1 - missing conformance and 2 - incorrect argument type.
             //
             // This would make sure that arguments with incorrect
             // conformances are not prioritized over general argument
             // mismatches.
-            unsigned impact;
             if (type1->isOptional()) {
               auto unwrappedType = type1->lookThroughAllOptionalTypes();
-              auto matchTypeResult =
-                  matchTypes(unwrappedType, type2, ConstraintKind::Conversion,
-                             subflags, locator);
-              if (matchTypeResult.isSuccess()) {
-                // Impact here is a 1 because there is only one failure before
-                // we need to force type1 to be
-                impact = 1;
-                fix = ForceOptional::create(*this, type1, proto,
-                                            getConstraintLocator(locator));
+              auto result = simplifyConformsToConstraint(
+                  unwrappedType, type2, ConstraintKind::ConformsTo,
+                  getConstraintLocator(locator),
+                  TypeMatchFlags::TMF_ApplyingFix);
+              if (result == SolutionKind::Solved) {
+                auto matchTypeResult =
+                    matchTypes(unwrappedType, type2, ConstraintKind::Conversion,
+                               subflags, locator);
+                if (matchTypeResult.isSuccess()) {
+                  // Impact here is a 1 because there is only one failure before
+                  // we need to force type1 to be
+                  auto fix = ForceOptional::create(
+                      *this, type1, proto, getConstraintLocator(locator));
+                  if (recordFix(fix, /*impact=*/1))
+                    return getTypeMatchFailure(locator);
+                  break;
+                }
               }
             }
-            if (!fix) {
-              fix = AllowArgumentMismatch::create(
-                  *this, type1, proto, getConstraintLocator(anchor, path));
-              impact = 2;
-            }
-            if (recordFix(fix, /*impact=*/impact))
+            auto fix = AllowArgumentMismatch::create(
+                *this, type1, proto, getConstraintLocator(anchor, path));
+            if (recordFix(fix, /*impact=*/2))
               return getTypeMatchFailure(locator);
             break;
           }
