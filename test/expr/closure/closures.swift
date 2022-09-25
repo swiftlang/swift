@@ -790,19 +790,19 @@ public class TestImplicitSelfForWeakSelfCapture {
     
     doVoidStuffNonEscaping { [weak self] in
       let `self`: TestImplicitSelfForWeakSelfCapture? = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional
-      guard let self = self else { return } // expected-warning {{unexpected warning produced: value 'self' was defined but never used; consider replacing with boolean test}}
+      guard let self = self else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
     
     doVoidStuffNonEscaping { [weak self] in
-      guard let self = self else { return } // expected-warning {{unexpected warning produced: value 'self' was defined but never used; consider replacing with boolean test}}
+      guard let self = self else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
     
     doVoidStuffNonEscaping { [weak self] in
-      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{unexpected warning produced: value 'self' was defined but never used; consider replacing with boolean test}}
+      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
   }
