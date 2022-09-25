@@ -281,7 +281,7 @@ bool PrunedLiveRange<LivenessWithDefs>::isWithinBoundary(
   for (SILInstruction &it : llvm::reverse(*block)) {
     // the def itself is not within the boundary, so cancel liveness before
     // matching 'inst'.
-    if (asImpl().isDef(inst)) {
+    if (asImpl().isDef(&it)) {
       isLive = false;
     }
     if (&it == inst) {

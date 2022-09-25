@@ -586,10 +586,6 @@ public:
       SILArgument *arg, ClosureOperandState &state,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
 
-  void clear() {
-    livenessForConsumes.clear();
-  }
-
 private:
   /// Perform our liveness dataflow. Returns true if we found any liveness uses
   /// at all. These we will need to error upon.
@@ -799,8 +795,6 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 bool ClosureArgDataflowState::process(
     SILArgument *address, ClosureOperandState &state,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
-  clear();
-
   SILFunction *fn = address->getFunction();
   assert(fn);
 
@@ -867,9 +861,9 @@ bool ClosureArgDataflowState::process(
       return false;
     }
 
-    SWIFT_DEFER { livenessForConsumes.clear(); };
-    auto *frontBlock = &*fn->begin();
-    livenessForConsumes.initializeDefBlock(frontBlock);
+    //!!! FIXME: Why?
+    // auto *frontBlock = &*fn->begin();
+    // livenessForConsumes.initializeDefBlock(frontBlock);
 
     for (unsigned i : indices(livenessWorklist)) {
       if (auto *ptr = livenessWorklist[i]) {
@@ -1952,7 +1946,6 @@ struct MoveKillsCopyableAddressesChecker {
   UseState useState;
   DataflowState dataflowState;
   UseState closureUseState;
-  ClosureArgDataflowState closureUseDataflowState;
   SILOptFunctionBuilder &funcBuilder;
   llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
       applySiteToPromotedArgIndices;
@@ -1963,8 +1956,7 @@ struct MoveKillsCopyableAddressesChecker {
       : fn(fn), useState(),
         dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
                       closureConsumes),
-        closureUseState(), closureUseDataflowState(fn, closureUseState),
-        funcBuilder(funcBuilder) {}
+        closureUseState(), funcBuilder(funcBuilder) {}
 
   void cloneDeferCalleeAndRewriteUses(
       SmallVectorImpl<SILValue> &temporaryStorage,
@@ -2087,7 +2079,7 @@ bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
   if (!visitAccessPathUses(visitor, accessPath, fn))
     return false;
 
-  SWIFT_DEFER { closureUseDataflowState.clear(); };
+  ClosureArgDataflowState closureUseDataflowState(fn, closureUseState);
   return closureUseDataflowState.process(address, calleeOperandState,
                                          closureConsumes);
 }

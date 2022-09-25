@@ -753,7 +753,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 }
 
 /// Add this scopes live blocks into the PrunedLiveness result.
-void BorrowedValue::computeLiveness(SSAPrunedLiveness &liveness) const {
+void BorrowedValue::
+computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const {
   liveness.initializeDef(value);
   visitTransitiveLifetimeEndingUses([&](Operand *endOp) {
     if (endOp->getOperandOwnership() == OperandOwnership::EndBorrow) {
@@ -761,8 +762,8 @@ void BorrowedValue::computeLiveness(SSAPrunedLiveness &liveness) const {
       return true;
     }
     assert(endOp->getOperandOwnership() == OperandOwnership::Reborrow);
-    auto *succBlock = cast<BranchInst>(endOp->getUser())->getDestBB();
-    liveness.initializeDefBlock(succBlock);
+    PhiOperand phiOper(endOp);
+    liveness.initializeDef(phiOper.getValue());
     liveness.updateForUse(endOp->getUser(), /*lifetimeEnding*/ false);
     return true;
   });
@@ -779,8 +780,8 @@ bool BorrowedValue::areUsesWithinTransitiveScope(
     return true;
 
   // Compute the local scope's liveness.
-  SSAPrunedLiveness liveness;
-  computeLiveness(liveness);
+  MultiDefPrunedLiveness liveness(value->getFunction());
+  computeTransitiveLiveness(liveness);
   return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
 }
 

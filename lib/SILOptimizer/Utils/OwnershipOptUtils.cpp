@@ -198,7 +198,7 @@ GuaranteedOwnershipExtension::checkBorrowExtension(
     return Valid; // arguments have whole-function ownership
 
   assert(guaranteedLiveness.empty());
-  borrow.computeLiveness(guaranteedLiveness);
+  borrow.computeTransitiveLiveness(guaranteedLiveness);
 
   if (guaranteedLiveness.areUsesWithinBoundary(newUses, &deBlocks))
     return Valid; // reuse the borrow scope as-is
@@ -438,9 +438,9 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
     return true;
 
   if (auto borrowedValue = BorrowedValue(value)) {
-    SSAPrunedLiveness liveness;
     auto *function = value->getFunction();
-    borrowedValue.computeLiveness(liveness);
+    MultiDefPrunedLiveness liveness(function);
+    borrowedValue.computeTransitiveLiveness(liveness);
     DeadEndBlocks deadEndBlocks(function);
     return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
   }

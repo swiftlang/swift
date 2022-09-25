@@ -567,8 +567,10 @@ struct BorrowedValue {
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
-  /// Add this scopes live blocks into the PrunedLiveness result.
-  void computeLiveness(SSAPrunedLiveness &liveness) const;
+  /// Add this scope's live blocks into the PrunedLiveness result. This
+  /// includes reborrow scopes that are reachable from this borrow scope but not
+  /// necessarilly dominated by the borrow scope.
+  void computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.

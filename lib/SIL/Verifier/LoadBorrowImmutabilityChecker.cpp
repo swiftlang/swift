@@ -329,8 +329,8 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
                            : SILValue();
 
   BorrowedValue borrowedValue(lbi);
-  SSAPrunedLiveness borrowLiveness;
-  borrowedValue.computeLiveness(borrowLiveness);
+  MultiDefPrunedLiveness borrowLiveness(lbi->getFunction());
+  borrowedValue.computeTransitiveLiveness(borrowLiveness);
 
   // Then for each write...
   for (auto *op : *writes) {

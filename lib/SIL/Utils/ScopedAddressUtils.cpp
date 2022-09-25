@@ -94,7 +94,7 @@ bool ScopedAddressValue::computeLiveness(SSAPrunedLiveness &liveness) const {
     return false;
   }
 
-  liveness.initializeDefBlock(value->getParentBlock());
+  liveness.initializeDef(value);
   for (auto *use : uses) {
     // Update all collected uses as non-lifetime ending.
     liveness.updateForUse(use->getUser(), /* lifetimeEnding */ false);
@@ -193,7 +193,8 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 
   InstModCallbacks tempCallbacks = callbacks;
   InstructionDeleter deleter(std::move(tempCallbacks));
-  GuaranteedOwnershipExtension borrowExtension(deleter, *deadEndBlocks);
+  GuaranteedOwnershipExtension borrowExtension(deleter, *deadEndBlocks,
+                                               sbi->getFunction());
   auto status = borrowExtension.checkBorrowExtension(
       BorrowedValue(sbi->getSrc()), newUses);
   if (status == GuaranteedOwnershipExtension::Invalid) {
