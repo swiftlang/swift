@@ -408,6 +408,13 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
     }
   }
 
+  // We can only change the behavior of lookup in Swift 6 and later,
+  // due to a bug in Swift 5 where implicit self is always allowed
+  // for weak self captures in non-escaping closures.
+  if (!factory->Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+    return nullptr;
+  }
+
   if (isInWeakSelfClosure) {
     return ASTScope::lookupSingleLocalDecl(factory->DC->getParentSourceFile(),
                                            DeclName(factory->Ctx.Id_self),

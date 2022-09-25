@@ -1581,7 +1581,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
       // an optional, we would have already hit an error elsewhere.
       if (closureHasWeakSelfCapture(inClosure)) {
-        return !implicitWeakSelfReferenceIsValid(DRE);
+        return !implicitWeakSelfReferenceIsValid(DRE, inClosure);
       }
 
       // Defensive check for type. If the expression doesn't have type here, it
@@ -1620,12 +1620,32 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return true;
     }
 
-    static bool implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE) {
+    static bool
+    implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE,
+                                     const AbstractClosureExpr *inClosure) {
       ASTContext &Ctx = DRE->getDecl()->getASTContext();
+      auto selfDecl = DRE->getDecl();
+
+      if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+        // In Swift 5 language modes, the decl of this implicit `DeclRefExpr`
+        // incorrectly refers to the `self` `ParamDecl` of the closure
+        // (which is always non-optional), instead of the actual decl that
+        // an explicit `self` call would refer to. As a workaround, we can
+        // manually lookup what self "should" refer to, and then validate
+        // that decl instead.
+        auto lookupResult = ASTScope::lookupSingleLocalDecl(
+            inClosure->getParentSourceFile(), DeclName(Ctx.Id_self),
+            DRE->getLoc());
+        if (!lookupResult) {
+          return false;
+        }
+
+        selfDecl = lookupResult;
+      }
 
       // Check if the implicit self decl refers to a var in a conditional stmt
       LabeledConditionalStmt *conditionalStmt = nullptr;
-      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
         if (auto parentStmt = var->getParentPatternStmt()) {
           conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
         }
@@ -1645,7 +1665,17 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
           if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
             if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
-              return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
+              if (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
+                // Mark this `OptionalStatementPattern` as enabling implicit
+                // self for this weak self capture. This lets us avoid emitting
+                // a false-positive warning in `VarDeclUsageChecker` in
+                // Swift 5 mode (this is unnecessary in Swift 6).
+                if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+                  OSP->setEnablesImplicitSelfForWeakSelfCapture(true);
+                }
+
+                return true;
+              }
             }
           }
         }
@@ -1666,14 +1696,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     /// Return true if this is a closure expression that will require explicit
     /// use or capture of "self." for qualification of member references.
-    static bool isClosureRequiringSelfQualification(
-                  const AbstractClosureExpr *CE) {
-      // If this closure capture self weakly, then we have to validate each
-      // usage of implicit self individually, even in a nonescaping closure
-      if (closureHasWeakSelfCapture(CE)) {
-        return true;
-      }
-
+    static bool
+    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
@@ -1702,8 +1726,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         // If this is a potentially-escaping closure expression, start looking
-        // for references to self if we aren't already.
-        if (isClosureRequiringSelfQualification(CE))
+        // for references to self if we aren't already. But if this closure
+        // captures self weakly, then we have to validate each usage of implicit
+        // self individually, even in a nonescaping closure
+        if (isClosureRequiringSelfQualification(CE) ||
+            closureHasWeakSelfCapture(CE))
           Closures.push_back(CE);
       }
 
@@ -1724,7 +1751,10 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // weakly, then we should always emit an error, since implicit self was
         // only allowed starting in Swift 5.8 and later.
         if (closureHasWeakSelfCapture(ACE)) {
-          return false;
+          // Implicit self was incorrectly permitted for weak self captures
+          // in non-escaping closures in Swift 5.7, so in that case we can
+          // only warn until Swift 6.
+          return !isClosureRequiringSelfQualification(ACE);
         }
 
         // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
@@ -3275,7 +3305,20 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
                   unsigned noParens = initExpr->canAppendPostfixExpression();
-                  
+
+                  // Don't emit an "unused value" warning if this is a
+                  // `let self = self` condition being used to enable
+                  // implicit self for the remainder of this scope,
+                  // since it would be a false positive. This is only
+                  // necessary in Swift 5 mode, because in Swift 6
+                  // this new self decl is correctly used as the base of
+                  // implicit self calls for the remainder of the scope.
+                  auto &ctx = var->getASTContext();
+                  if (!ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+                      OSP->getEnablesImplicitSelfForWeakSelfCapture()) {
+                    continue;
+                  }
+
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
                   ConditionalCheckedCastExpr *CCE = nullptr;
