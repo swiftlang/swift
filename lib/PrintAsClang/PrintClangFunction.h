@@ -122,7 +122,7 @@ public:
                                       const AccessorDecl *accessor,
                                       const LoweredFunctionSignature &signature,
                                       StringRef swiftSymbolName, Type resultTy,
-                                      bool isDefinition);
+                                      bool isStatic, bool isDefinition);
 
   /// Print the C++ subscript method.
   void printCxxSubscriptAccessorMethod(

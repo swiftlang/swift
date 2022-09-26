@@ -55,5 +55,13 @@ int main() {
   propsInClass.setComputedInt(-11);
   assert(propsInClass.getComputedInt() == -11);
   assert(propsInClass.getStoredInt() == -13);
+
+  {
+    auto x = LargeStruct::getStaticX();
+    assert(x == 0);
+    LargeStruct::setStaticX(13);
+    x = LargeStruct::getStaticX();
+    assert(x == 13);
+  }
   return 0;
 }
