@@ -3804,7 +3804,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? '[moved]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+  sil-instruction ::= debug_value '[poison]'? '[moved]'? '[trace]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value %1 : $Int
 
@@ -3909,6 +3909,8 @@ It is worth noting that a SIL DIExpression is similar to
 `!DIExpression <https://www.llvm.org/docs/LangRef.html#diexpression>`_ in LLVM debug
 info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
 SIL DIExpression can have elements with various types, like AST nodes or strings.
+
+The ``[trace]`` flag is available for compiler unit testing. It is not produced during normal compilation. It is used combination with internal logging and optimization controls to select specific values to trace or to transform. For example, liveness analysis combines all "traced" values into a single live range with multiple definitions. This exposes corner cases that cannot be represented by passing valid SIL through the pipeline.
 
 Profiling
 ~~~~~~~~~
