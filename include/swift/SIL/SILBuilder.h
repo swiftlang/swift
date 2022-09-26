@@ -957,10 +957,12 @@ public:
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
                                    SILDebugVariable Var,
                                    bool poisonRefs = false,
-                                   bool wasMoved = false);
+                                   bool wasMoved = false,
+                                   bool trace = false);
   DebugValueInst *createDebugValueAddr(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var,
-                                       bool wasMoved = false);
+                                       bool wasMoved = false,
+                                       bool trace = false);
 
   /// Create a debug_value according to the type of \p src
   SILInstruction *emitDebugDescription(SILLocation Loc, SILValue src,

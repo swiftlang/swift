@@ -1309,6 +1309,7 @@ sil @debug_value : $@convention(thin) (Int, @in P, AnyObject) -> () {
 bb0(%0 : $Int, %1 : $*P, %2 : $AnyObject):
   debug_value %0 : $Int         // CHECK: debug_value %0 : $Int
   debug_value [poison] %2 : $AnyObject // CHECK: debug_value [poison] %2 : $AnyObject
+  debug_value [trace] %2 : $AnyObject // CHECK: debug_value [trace] %2 : $AnyObject
   debug_value %1 : $*P, expr op_deref // CHECK: debug_value %1 : $*any P, expr op_deref
   unreachable
 }

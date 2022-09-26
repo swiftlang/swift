@@ -3347,6 +3347,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::DebugValueInst: {
     bool poisonRefs = false;
     bool wasMoved = false;
+    bool hasTrace = false;
     SILDebugVariable VarInfo;
 
     // Allow for poison and moved to be in either order.
@@ -3357,6 +3358,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         poisonRefs = true;
       else if (attributeName == "moved")
         wasMoved = true;
+      else if (attributeName == "trace")
+        hasTrace = true;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "debug_value");
@@ -3369,7 +3372,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (Val->getType().isAddress())
       assert(!poisonRefs && "debug_value w/ address value does not support poison");
-    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs, wasMoved);
+    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs, wasMoved,
+                                   hasTrace);
     break;
   }
 
