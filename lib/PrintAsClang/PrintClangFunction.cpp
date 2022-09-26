@@ -28,6 +28,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -67,6 +68,11 @@ bool isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
         getKnownTypeInfo(structType->getDecl(), typeMapping, languageMode);
     if (nullableInfo && nullableInfo->canBeNullable)
       return true;
+  }
+  if (auto *classType = dyn_cast<ClassType>(tPtr)) {
+    return classType->getClassOrBoundGenericClass()->hasClangNode() &&
+           isa<clang::ObjCInterfaceDecl>(
+               classType->getClassOrBoundGenericClass()->getClangDecl());
   }
 
   if (auto *structDecl = t->getStructOrBoundGenericStruct())
@@ -260,6 +266,20 @@ public:
   ClangRepresentation visitClassType(ClassType *CT,
                                      Optional<OptionalTypeKind> optionalKind,
                                      bool isInOutParam) {
+    auto *cd = CT->getDecl();
+    if (cd->hasClangNode()) {
+      ClangSyntaxPrinter(os).printIdentifier(
+          cast<clang::NamedDecl>(cd->getClangDecl())->getName());
+      os << " *"
+         << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
+                                                        : "_Nullable");
+      if (isInOutParam) {
+        os << " __strong";
+        printInoutTypeModifier();
+      }
+      // FIXME: Mark that this is only ObjC representable.
+      return ClangRepresentation::representable;
+    }
     // FIXME: handle optionalKind.
     if (languageMode != OutputLanguageMode::Cxx) {
       os << "void * "
@@ -902,6 +922,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     }
 
     if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      if (classDecl->hasClangNode()) {
+        if (isInOut)
+          os << '&';
+        namePrinter();
+        return;
+      }
       ClangClassTypePrinter::printParameterCxxtoCUseScaffold(
           os, classDecl, moduleContext, namePrinter, isInOut);
       return;
@@ -1111,6 +1137,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       return;
     }
     if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
+      assert(!classDecl->hasClangNode());
       ClangClassTypePrinter::printClassTypeReturnScaffold(
           os, classDecl, moduleContext,
           [&]() { printCallToCFunc(/*additionalParam=*/None); });
@@ -1146,6 +1173,20 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     }
   }
 
+  auto nonOptResultType = resultTy->getOptionalObjectType();
+  if (!nonOptResultType)
+    nonOptResultType = resultTy;
+  if (auto *classDecl = nonOptResultType->getClassOrBoundGenericClass()) {
+    assert(classDecl->hasClangNode());
+    assert(isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
+    os << "return (__bridge_transfer ";
+    ClangSyntaxPrinter(os).printIdentifier(
+        cast<clang::NamedDecl>(classDecl->getClangDecl())->getName());
+    os << " *)(__bridge void *)";
+    printCallToCFunc(/*additionalParam=*/None);
+    os << ";\n";
+    return;
+  }
   // Primitive values are returned directly without any conversions.
   // Assign the function return value to a variable if the function can throw.
   if (!resultTy->isVoid() && hasThrows)
