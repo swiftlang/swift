@@ -201,24 +201,28 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     auto bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
     unsigned int flags = 0;
 
-    if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip))
+    if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+        !parser.L->lexingCutOffOffset()) {
       flags |= SCC_RoundTrip;
+    }
 
     if (!ctx.Diags.hadAnyError() &&
         ctx.LangOpts.hasFeature(Feature::ParserValidation))
       flags |= SCC_ParseDiagnostics;
 
-    if (ctx.LangOpts.hasFeature(Feature::ParserSequenceFolding))
+    if (ctx.LangOpts.hasFeature(Feature::ParserSequenceFolding) &&
+        !parser.L->lexingCutOffOffset())
       flags |= SCC_FoldSequences;
 
-    int roundTripResult =
-      swift_parser_consistencyCheck(
-        bufferRange.str().data(), bufferRange.getByteLength(),
-        SF->getFilename().str().c_str(), flags);
+    if (flags) {
+      int roundTripResult = swift_parser_consistencyCheck(
+          bufferRange.str().data(), bufferRange.getByteLength(),
+          SF->getFilename().str().c_str(), flags);
 
-    // FIXME: Produce an error on round-trip failure.
-    if (roundTripResult)
-      abort();
+      // FIXME: Produce an error on round-trip failure.
+      if (roundTripResult)
+        abort();
+    }
   }
 #endif
 
