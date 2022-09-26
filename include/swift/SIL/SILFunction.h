@@ -1461,4 +1461,20 @@ private:
 
 } // end llvm namespace
 
+//===----------------------------------------------------------------------===//
+// Inline SIL implementations
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+inline bool SILBasicBlock::isEntry() const {
+  return this == &*getParent()->begin();
+}
+
+inline SILModule &SILInstruction::getModule() const {
+  return getFunction()->getModule();
+}
+
+} // end swift namespace
+
 #endif
