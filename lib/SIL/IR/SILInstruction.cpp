@@ -104,24 +104,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
 #include "swift/SIL/SILNodes.def"
 
-SILFunction *SILInstruction::getFunction() const {
-  return getParent()->getParent();
-}
-
-SILModule &SILInstruction::getModule() const {
-  return getFunction()->getModule();
-}
-
-SILInstruction *SILInstruction::getPreviousInstruction() {
-  auto pos = getIterator();
-  return pos == getParent()->begin() ? nullptr : &*std::prev(pos);
-}
-
-SILInstruction *SILInstruction::getNextInstruction() {
-  auto nextPos = std::next(getIterator());
-  return nextPos == getParent()->end() ? nullptr : &*nextPos;
-}
-
 void SILInstruction::removeFromParent() {
 #ifndef NDEBUG
   for (auto result : getResults()) {
