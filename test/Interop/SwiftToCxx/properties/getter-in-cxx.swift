@@ -24,6 +24,14 @@ public struct LargeStruct {
     public var firstSmallStruct: FirstSmallStruct {
         return FirstSmallStruct(x: 65)
     }
+
+    static public var staticX: Int {
+        return -402
+    }
+
+    static public var staticSmallStruct: FirstSmallStruct {
+        return FirstSmallStruct(x: 789)
+    }
 }
 
 // CHECK: class LargeStruct final {
@@ -37,6 +45,8 @@ public struct LargeStruct {
 // CHECK-NEXT: inline swift::Int getX6() const;
 // CHECK-NEXT: inline LargeStruct getAnotherLargeStruct() const;
 // CHECK-NEXT: inline FirstSmallStruct getFirstSmallStruct() const;
+// CHECK-NEXT: static inline swift::Int getStaticX();
+// CHECK-NEXT: static inline FirstSmallStruct getStaticSmallStruct();
 // CHECK-NEXT: private:
 
 public final class PropertiesInClass {
@@ -151,6 +161,14 @@ public func createStructWithRefCountStoredProp() -> StructWithRefCountStoredProp
 // CHECK-NEXT: inline FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
 // CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties11LargeStructV010firstSmallC0AA05FirsteC0Vvg(_getOpaquePointer()));
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+// CHECK-NEXT: inline swift::Int LargeStruct::getStaticX() {
+// CHECK-NEXT: return _impl::$s10Properties11LargeStructV7staticXSivgZ();
+// CHECK-NEXT: }
+// CHECK-NEXT: inline FirstSmallStruct LargeStruct::getStaticSmallStruct() {
+// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
+// CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties11LargeStructV011staticSmallC0AA05FirsteC0VvgZ());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 

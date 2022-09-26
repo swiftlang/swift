@@ -59,5 +59,12 @@ int main() {
   assert(propsInClass.getComputedInt() == -1235);
   auto smallStructFromClass = propsInClass.getSmallStruct();
   assert(smallStructFromClass.getX() == 1234);
+
+  {
+    auto x = LargeStruct::getStaticX();
+    assert(x == -402);
+    auto smallStruct = LargeStruct::getStaticSmallStruct();
+    assert(smallStruct.getX() == 789);
+  }
   return 0;
 }
