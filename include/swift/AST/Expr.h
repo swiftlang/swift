@@ -1169,6 +1169,7 @@ class DeclRefExpr : public Expr {
   ConcreteDeclRef D;
   DeclNameLoc Loc;
   ActorIsolation implicitActorHopTarget;
+  ValueDecl *DeclForUsageAnalysis = nullptr;
 
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
@@ -1246,6 +1247,20 @@ public:
   void setFunctionRefKind(FunctionRefKind refKind) {
     Bits.DeclRefExpr.FunctionRefKind = static_cast<unsigned>(refKind);
   }
+
+  /// The decl that should be used for usage analysis of this DRE.
+  /// This is potentially different from `getDecl()`, to handle
+  /// cases where performing usage analysis on the actual decl
+  /// causes false-positive warnings.
+  ValueDecl *getDeclForUsageAnalysis() {
+    if (DeclForUsageAnalysis) {
+      return DeclForUsageAnalysis;
+    }
+
+    return getDecl();
+  }
+
+  void setDeclForUsageAnalysis(ValueDecl *vd) { DeclForUsageAnalysis = vd; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DeclRef;

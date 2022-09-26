@@ -1580,8 +1580,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // let self = .someOptionalVariable else { return }` or `let self =
       // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
       // an optional, we would have already hit an error elsewhere.
+      //
+      // Always run the `implicitWeakSelfReferenceIsValid` check, since it
+      // annotates applicable decls / stmts with state used in
+      // `VarDeclUsageChecker`, and we need that state even in closures that
+      // don't directly capture self weakly (but are inner closures of a closure
+      // that does capture self weakly).
+      auto isValid = implicitWeakSelfReferenceIsValid(DRE, inClosure);
       if (closureHasWeakSelfCapture(inClosure)) {
-        return !implicitWeakSelfReferenceIsValid(DRE, inClosure);
+        return !isValid;
       }
 
       // Defensive check for type. If the expression doesn't have type here, it
@@ -1621,7 +1628,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
 
     static bool
-    implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE,
+    implicitWeakSelfReferenceIsValid(DeclRefExpr *DRE,
                                      const AbstractClosureExpr *inClosure) {
       ASTContext &Ctx = DRE->getDecl()->getASTContext();
       auto selfDecl = DRE->getDecl();
@@ -1639,6 +1646,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         if (!lookupResult) {
           return false;
         }
+
+        // When `VarDeclUsageChecker` checks this DRE, we need to use
+        // the base we looked up here instead, since otherwise
+        // we'll emit confusing false-positive warnings.
+        DRE->setDeclForUsageAnalysis(lookupResult);
 
         selfDecl = lookupResult;
       }
@@ -3537,7 +3549,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   
   // If we found a decl that is being assigned to, then mark it.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(DRE->getDecl(), Flags);
+    addMark(DRE->getDeclForUsageAnalysis(), Flags);
     return;
   }
   
@@ -3622,10 +3634,10 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(DRE->getDecl(), RK_Read);
+    addMark(DRE->getDeclForUsageAnalysis(), RK_Read);
 
     // If the Expression is a read of a getter, track for diagnostics
-    if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+    if (auto VD = dyn_cast<VarDecl>(DRE->getDeclForUsageAnalysis())) {
       AssociatedGetterRefExpr.insert(std::make_pair(VD, DRE));
     }
   }
@@ -3699,7 +3711,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // conservatively mark it read and written.  This will silence "variable
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
+        VDUC.addMark(DRE->getDeclForUsageAnalysis(), RK_Read | RK_Written);
       else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
         auto name = declRef->getName();
         auto loc = declRef->getLoc();
