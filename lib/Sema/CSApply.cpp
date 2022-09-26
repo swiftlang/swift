@@ -1745,11 +1745,12 @@ namespace {
                                     memberLocator);
       } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
-        // we have a partial application of a constructor on a statically-
+        // we have a partial application of a static member on a statically-
         // derived metatype value. Again, there are no order of evaluation
         // concerns here, and keeping the call and base together in the AST
         // improves SILGen.
-        if (isa<ConstructorDecl>(member) &&
+        if ((isa<ConstructorDecl>(member)
+             || member->isStatic()) &&
             cs.isStaticallyDerivedMetatype(base)) {
           // Add a useless ".self" to avoid downstream diagnostics.
           base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
