@@ -189,7 +189,8 @@ void GenericCloner::visitTerminator(SILBasicBlock *BB) {
       getBuilder().createDeallocStack(ASI->getLoc(), ASI);
     }
     if (ReturnValue) {
-      getBuilder().createReturn(RI->getLoc(), ReturnValue);
+      auto *NewReturn = getBuilder().createReturn(RI->getLoc(), ReturnValue);
+      FunctionExits.push_back(NewReturn);
       return;
     }
   } else if (OrigTermInst->isFunctionExiting()) {

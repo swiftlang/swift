@@ -40,23 +40,33 @@ using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
+                                     GenericSignature unerasedSpecializedSig,
+                                     ArrayRef<Type> typeErasedParams,
                                      SILFunction *target, Identifier spiGroup,
                                      const ModuleDecl *spiModule,
                                      AvailabilityContext availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
-      spiGroup(spiGroup), availability(availability), spiModule(spiModule), targetFunction(target) {
+      unerasedSpecializedSignature(unerasedSpecializedSig),
+      typeErasedParams(typeErasedParams.begin(), typeErasedParams.end()),
+      spiGroup(spiGroup), availability(availability), spiModule(spiModule),
+      targetFunction(target) {
   if (targetFunction)
     targetFunction->incrementRefCount();
 }
 
 SILSpecializeAttr *
 SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
+                          ArrayRef<Type> typeErasedParams,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
                           AvailabilityContext availability) {
+  auto erasedSpecializedSig = specializedSig.typeErased(typeErasedParams);
+
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target,
+
+  return ::new (buf) SILSpecializeAttr(exported, kind, erasedSpecializedSig,
+                                       specializedSig, typeErasedParams, target,
                                        spiGroup, spiModule, availability);
 }
 

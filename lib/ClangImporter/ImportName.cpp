@@ -1858,6 +1858,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Minus:
     case clang::OverloadedOperatorKind::OO_Star:
     case clang::OverloadedOperatorKind::OO_Slash:
+    case clang::OverloadedOperatorKind::OO_PlusEqual:
+    case clang::OverloadedOperatorKind::OO_MinusEqual:
+    case clang::OverloadedOperatorKind::OO_StarEqual:
+    case clang::OverloadedOperatorKind::OO_SlashEqual:
     case clang::OverloadedOperatorKind::OO_Percent:
     case clang::OverloadedOperatorKind::OO_Caret:
     case clang::OverloadedOperatorKind::OO_Amp:

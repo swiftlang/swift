@@ -266,7 +266,7 @@ class ASTBuildOperation
     /// The AST that was created by the build operation.
     ASTUnitRef AST;
     /// An error message emitted by the creation of the AST. There might still
-    /// be an AST if an error occurred, but it's usefulnes depends on the
+    /// be an AST if an error occurred, but it's usefulness depends on the
     /// severity of the error.
     std::string Error;
     /// Whether the build operation was cancelled. There might be an AST and
@@ -304,7 +304,7 @@ class ASTBuildOperation
   const SwiftInvocationRef InvokRef;
   const IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
 
-  /// The contents of all explicit input files of the compiler invoation, which
+  /// The contents of all explicit input files of the compiler innovation, which
   /// can be determined at construction time of the \c ASTBuildOperation.
   const std::vector<FileContent> FileContents;
 
@@ -315,7 +315,7 @@ class ASTBuildOperation
   /// \c DependencyStamps).
   llvm::sys::Mutex DependencyStampsMtx;
 
-  /// \c DependencyStamps contains the stamps of all module depenecies needed
+  /// \c DependencyStamps contains the stamps of all module dependencies needed
   /// for the AST build. These stamps are only known after the AST is built.
   /// Before the AST has been built, we thus assume that all dependency stamps
   /// match. This seems to be a reasonable assumption since the dependencies
@@ -435,7 +435,7 @@ public:
 
   /// Determines whether the AST built from this build operation can be used for
   /// the given source state. Note that before the AST is built, this does not
-  /// consider depenencies needed for the AST build that are not explicitly
+  /// consider dependencies needed for the AST build that are not explicitly
   /// listed in the input files. As such, this might be \c true before the AST
   /// build and \c false after the AST has been built. See documentation on \c
   /// DependencyStamps for more info.
@@ -463,7 +463,7 @@ class ASTProducer : public std::enable_shared_from_this<ASTProducer> {
   /// these operations might already have finished, effectively caching an old
   /// AST, one might currently be building an AST and some might be waiting to
   /// execute. Operations are guaranteed to be in FIFO order, that is the first
-  /// one in the vector is the oldes build operation.
+  /// one in the vector is the oldest build operation.
   SmallVector<ASTBuildOperationRef, 4> BuildOperations = {};
   WorkQueue BuildOperationsQueue = WorkQueue(
       WorkQueue::Dequeuing::Serial, "ASTProducer.BuildOperationsQueue");
@@ -1224,7 +1224,7 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
       ++Mgr->Impl.Stats->numASTCacheHits;
       return BuildOp;
     } else if (Consumer->canUseASTWithSnapshots(Snapshots)) {
-      ++Mgr->Impl.Stats->numASTsUsedWithSnaphots;
+      ++Mgr->Impl.Stats->numASTsUsedWithSnapshots;
       return BuildOp;
     }
   }

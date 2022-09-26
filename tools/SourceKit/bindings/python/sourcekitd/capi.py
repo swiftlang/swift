@@ -571,7 +571,7 @@ class Config(object):
     def set_library_path(path):
         """Set the path in which to search for sourcekitd"""
         if Config.loaded:
-            raise Exception("library path must be set before before using "
+            raise Exception("library path must be set before using "
                             "any other functionalities in sourcekitd.")
 
         Config.library_path = path
@@ -580,7 +580,7 @@ class Config(object):
     def set_library_file(filename):
         """Set the exact location of sourcekitd"""
         if Config.loaded:
-            raise Exception("library file must be set before before using "
+            raise Exception("library file must be set before using "
                             "any other functionalities in sourcekitd.")
 
         Config.library_file = filename

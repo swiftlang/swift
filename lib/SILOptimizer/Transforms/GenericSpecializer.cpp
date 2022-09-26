@@ -65,8 +65,10 @@ static void transferSpecializeAttributeTargets(SILModule &M,
       }
       auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
           SA, M.getSwiftModule()->getASTContext());
+
       targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, nullptr,
           spiGroupIdent, vd->getModuleContext(), availability));
     }
   }

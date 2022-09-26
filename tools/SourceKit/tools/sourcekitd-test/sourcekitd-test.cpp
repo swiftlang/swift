@@ -785,7 +785,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-  case SourceKitRequest::CollectExpresstionType: {
+  case SourceKitRequest::CollectExpressionType: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
     addRequestOptionsDirect(Req, Opts);
     break;
@@ -1365,7 +1365,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printRangeInfo(Info, SourceFile, llvm::outs());
       break;
 
-    case SourceKitRequest::CollectExpresstionType:
+    case SourceKitRequest::CollectExpressionType:
       printExpressionType(Info, llvm::outs());
       break;
 

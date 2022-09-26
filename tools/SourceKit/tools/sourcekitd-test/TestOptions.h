@@ -63,7 +63,7 @@ enum class SourceKitRequest {
   Statistics,
   SyntaxTree,
   EnableCompileNotifications,
-  CollectExpresstionType,
+  CollectExpressionType,
   CollectVariableType,
   GlobalConfiguration,
   DependencyUpdated,

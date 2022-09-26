@@ -7,9 +7,10 @@
 // sil-combine should bailout since it does not propagate
 // type substitutions on the return value.
 //
-// <rdar://40555427> [SR-7773]:
-// SILCombiner::propagateConcreteTypeOfInitExistential fails to full propagate
-// type substitutions.
+// rdar://40555427
+// https://github.com/apple/swift/issues/50312
+// 'SILCombiner::propagateConcreteTypeOfInitExistential' fails to fully
+// propagate type substitutions.
 //===----------------------------------------------------------------------===//
 public protocol P: class {}
 

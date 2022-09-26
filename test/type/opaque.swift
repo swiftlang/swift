@@ -571,4 +571,10 @@ do {
     let x = S2()
     x // expected-warning {{expression of type 'S2' is unused}}
   }
+
+  func test5() -> some P1 {
+    // expected-error@-1 {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    let x = invalid // expected-error {{cannot find 'invalid' in scope}}
+    x
+  }
 }

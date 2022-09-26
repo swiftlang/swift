@@ -7,7 +7,7 @@
 
 // Check that the compiled code does not crash because of a wrong
 // stack-promoted array.
-// End-to-end test for https://bugs.swift.org/browse/SR-10444
+// End-to-end test for https://github.com/apple/swift/issues/52844.
 
 public struct Beta {
   var gamma: [Int]

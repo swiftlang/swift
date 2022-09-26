@@ -266,7 +266,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
 
   // If we have a synthesized target, map from its base type into the this
   // declaration's innermost type context, or if we're dealing with the
-  // synthesized extention itself rather than a member, into its extended
+  // synthesized extension itself rather than a member, into its extended
   // nominal (the extension's own requirements shouldn't be considered in the
   // substitution).
   unsigned TypeContextDepth = 0;
@@ -1087,7 +1087,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Ctx.getModule(unloadedImport.module.getModulePath());

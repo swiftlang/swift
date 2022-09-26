@@ -91,13 +91,14 @@ void SILFunctionBuilder::addFunctionAttributes(
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind,
-          targetFunction, spiGroupIdent,
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, targetFunction, spiGroupIdent,
           attributedFuncDecl->getModuleContext(), availability));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, nullptr, spiGroupIdent,
+          attributedFuncDecl->getModuleContext(), availability));
     }
   }
 

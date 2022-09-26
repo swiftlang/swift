@@ -65,6 +65,16 @@ inline bool operator>=(LoadableIntWrapper lhs, LoadableIntWrapper rhs) {
   return lhs.value != rhs.value;
 }
 
+inline LoadableIntWrapper operator/=(LoadableIntWrapper &lhs, LoadableIntWrapper rhs) {
+  lhs.value /= rhs.value;
+  return lhs;
+}
+
+inline LoadableIntWrapper operator*=(LoadableIntWrapper &lhs, LoadableIntWrapper rhs) {
+  lhs.value *= rhs.value;
+  return lhs;
+}
+
 struct LoadableBoolWrapper {
   bool value;
 };

@@ -31,7 +31,7 @@ func switchOver<S1: StringProtocol, S2: StringProtocol>(
 ) -> Character {
   let (first, second) = ("first", "second")
 
-  // TODO(SR-12457): Enable
+  // FIXME: Enable (https://github.com/apple/swift/issues/54896)
 #if true
   fatalError()
 #else
@@ -65,7 +65,7 @@ StringSwitchTests.test("switch") {
   expectEqual("B", switchOver(second))
   expectEqual("X", switchOver(foo))
 
-  // TODO(SR-12457): Enable
+  // FIXME: Enable (https://github.com/apple/swift/issues/54896)
 #if true
 #else
   expectEqual("A", switchOver(first, first))

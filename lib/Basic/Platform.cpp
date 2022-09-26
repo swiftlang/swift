@@ -426,12 +426,15 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
         }
       }
     } else if (Major == 11) {
-      if (Minor <= 3)
+      if (Minor <= 2)
         return floorFor64(llvm::VersionTuple(5, 3));
-
       return floorFor64(llvm::VersionTuple(5, 4));
     } else if (Major == 12) {
-      return floorFor64(llvm::VersionTuple(5, 5));
+      if (Minor <= 2)
+        return floorFor64(llvm::VersionTuple(5, 5));
+      return floorFor64(llvm::VersionTuple(5, 6));
+    } else if (Major == 13) {
+      return floorFor64(llvm::VersionTuple(5, 7));
     }
   } else if (Triple.isiOS()) { // includes tvOS
     llvm::VersionTuple OSVersion = Triple.getiOSVersion();
@@ -467,7 +470,11 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
 
       return floorForArchitecture(llvm::VersionTuple(5, 4));
     } else if (Major <= 15) {
-      return floorForArchitecture(llvm::VersionTuple(5, 5));
+      if (Minor <= 3)
+        return floorForArchitecture(llvm::VersionTuple(5, 5));
+      return floorForArchitecture(llvm::VersionTuple(5, 6));
+    } else if (Major <= 16) {
+      return floorForArchitecture(llvm::VersionTuple(5, 7));
     }
   } else if (Triple.isWatchOS()) {
     llvm::VersionTuple OSVersion = Triple.getWatchOSVersion();
@@ -489,12 +496,16 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
         return floorFor64bits(llvm::VersionTuple(5, 2));
       }
     } else if (Major <= 7) {
-      if (Minor <= 4)
+      if (Minor <= 3)
         return floorFor64bits(llvm::VersionTuple(5, 3));
 
       return floorFor64bits(llvm::VersionTuple(5, 4));
     } else if (Major <= 8) {
-      return floorFor64bits(llvm::VersionTuple(5, 5));
+      if (Minor <= 4)
+        return floorFor64bits(llvm::VersionTuple(5, 5));
+      return floorFor64bits(llvm::VersionTuple(5, 6));
+    } else if (Major <= 9) {
+      return floorFor64bits(llvm::VersionTuple(5, 7));
     }
   }
 
