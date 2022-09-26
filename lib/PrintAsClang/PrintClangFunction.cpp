@@ -1291,15 +1291,17 @@ static std::string remapPropertyName(const AccessorDecl *accessor,
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-    Type resultTy, bool isDefinition) {
+    Type resultTy, bool isStatic, bool isDefinition) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   os << "  ";
 
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isStatic = isStatic && !isDefinition;
   modifiers.isInline = true;
-  modifiers.isConst = accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
+  modifiers.isConst =
+      !isStatic && accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
   auto result = printFunctionSignature(
       accessor, signature, remapPropertyName(accessor, resultTy), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);
