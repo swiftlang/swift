@@ -449,3 +449,105 @@ do {
   marvin.manufacturer = nil
   // CHECK-NOT: in setter
 }
+
+// user-defined init tests
+do {
+  _ = EmptyUserDefinedInitClassTest()
+  // CHECK: Wrapper.init($Storage())
+  _ = EmptyUserDefinedInitStructTest()
+  // CHECK: Wrapper.init($Storage())
+
+  _ = TrivialUserDefinedInitClassTest(a: 42)
+  // CHECK: Wrapper.init($Storage(a: 42))
+
+  _ = TrivialUserDefinedInitClassTest(withReassign: 42)
+  // CHECK: Wrapper.init($Storage(a: 0))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: 0
+  // CHECK-NEXT: in setter => 42
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: 42
+
+  _ = TrivialUserDefinedInitStructTest(withReassign: 42)
+  // CHECK: Wrapper.init($Storage(a: 0))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: 0
+  // CHECK-NEXT: in setter => 42
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: 42
+
+  let complex1 = ContextUserDefinedInitClassTest(c: ["hello": 42], placeholder: ("<placeholder>", -1))
+  // CHECK: Wrapper.init($Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1, 2, 3]))), c: ["hello": 42]))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: ["hello": 42]
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: in setter => [{{.*}}, {{.*}}]
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: [{{.*}}, {{.*}}]
+  print(complex1.a)
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: 0
+  print(complex1.b)
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: ("", (0, [1, 2, 3]))
+
+  if complex1.c == ["hello": 42] { // use of Hashable, Equatable conformances
+    // CHECK-NEXT: in getter
+    fatalError("== failed between complex1 dictionaries")
+  }
+
+  if complex1.c != ["hello": 42, "<placeholder>": -1] {
+    // CHECK-NEXT: in getter
+    fatalError("!= failed between complex1 dictionaries")
+  }
+
+  let complex2 = ContextUserDefinedInitStructTest(b: ("", (0, [1])), c: ["hello": 42], placeholder: ("<placeholder>", -1))
+  // CHECK: Wrapper.init($Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1]))), c: ["hello": 42]))
+    // CHECK-NEXT: in getter
+  // CHECK-NEXT: ["hello": 42]
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: in setter => [{{.*}}, {{.*}}]
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: [{{.*}}, {{.*}}]
+  print(complex2.a)
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: 0
+  print(complex2.b)
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: ("", (0, [1]))
+  if complex2.c == ["hello": 42] { // use of Hashable, Equatable conformances
+    // CHECK-NEXT: in getter
+    fatalError("== failed between complex2 dictionaries")
+  }
+
+  if complex2.c != ["hello": 42, "<placeholder>": -1] {
+    // CHECK-NEXT: in getter
+    fatalError("!= failed between complex2 dictionaries")
+  }
+
+  // cond: true, initialValue: nil
+  _ = UserDefinedInitWithConditionalTest<Int>()
+  // CHECK: Wrapper.init($Storage(val: nil))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT nil
+
+  // initalValue: nil
+  _ = UserDefinedInitWithConditionalTest<[String: any BinaryInteger]>(cond: true)
+  // CHECK: Wrapper.init($Storage(val: nil))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: nil
+
+  do {
+    let initialValue = (("a", 42), ("b", 0))
+
+    _ = UserDefinedInitWithConditionalTest(cond: true, initialValue: initialValue)
+    // CHECK: Wrapper.init($Storage(val: Optional((("a", 42), ("b", 0)))))
+    // CHECK-NEXT: in getter
+    // CHECK-NEXT: Optional((("a", 42), ("b", 0)))
+
+    _ = UserDefinedInitWithConditionalTest(cond: false, initialValue: initialValue)
+    // CHECK: Wrapper.init($Storage(val: nil))
+    // CHECK-NEXT: in getter
+    // CHECK-NEXT: nil
+  }
+}
