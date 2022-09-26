@@ -287,11 +287,8 @@ class NameMatcher: public ASTWalker {
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
   PreWalkAction walkToDeclPre(Decl *D) override;
-  PostWalkAction walkToDeclPost(Decl *D) override;
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
-  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override;
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
-  PostWalkAction walkToTypeReprPost(TypeRepr *T) override;
   PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 

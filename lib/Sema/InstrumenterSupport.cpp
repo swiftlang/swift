@@ -55,20 +55,17 @@ class ErrorFinder : public ASTWalker {
 public:
   ErrorFinder() {}
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
+    if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError())
       error = true;
-      return Action::SkipChildren(E);
-    }
-    return Action::Continue(E);
+
+    return Action::StopIf(error, E);
   }
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError()) {
+      if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError())
         error = true;
-        return Action::SkipChildren();
-      }
     }
-    return Action::Continue();
+    return Action::StopIf(error);
   }
   bool hadError() { return error; }
 };

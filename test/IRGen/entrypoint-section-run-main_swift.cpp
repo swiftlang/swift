@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %s -std=c++11 -isysroot %sdk -o %t/main
 // RUN: %target-codesign %t/main
-// RUN: %target-build-swift %S/Inputs/at-main-struct-simple.swift -O -parse-as-library -emit-library -o %t/libHowdy.dylib -module-name Howdy
+// RUN: %target-swift-frontend -c %S/Inputs/entry-point-section/main.swift -O -o %t/howdy.o -module-name Howdy
+// RUN: %target-ld %t/howdy.o -syslibroot %sdk -lSystem -dylib -o %t/libHowdy.dylib
 // RUN: %target-codesign %t/libHowdy.dylib
 // RUN: %target-run %t/main %t/libHowdy.dylib | %FileCheck %s
 
@@ -12,9 +13,9 @@
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
+#include <ptrauth.h>
 #include <stdio.h>
 #include <string.h>
-#include <ptrauth.h>
 
 #if __POINTER_WIDTH__ == 64
 using mach_header_platform = mach_header_64;
@@ -42,8 +43,8 @@ int main(int argc, char *argv[]) {
       printf("skipping %s\n", imageName);
       continue;
     }
-    auto *header =
-        reinterpret_cast<const mach_header_platform *>(_dyld_get_image_header(index));
+    auto *header = reinterpret_cast<const mach_header_platform *>(
+        _dyld_get_image_header(index));
     size_t size;
     auto *data = getsectiondata(header, "__TEXT", "__swift5_entry", &size);
     int32_t offset = *reinterpret_cast<int32_t *>(data);
@@ -55,7 +56,7 @@ int main(int argc, char *argv[]) {
       printf("flags: %d\n", flags);
       bool isAtMainEntryPoint = flags & HasAtMainTypeFlag;
       if (!isAtMainEntryPoint) {
-        printf("no @main entry point!\n");
+        printf("no @main entry point!\n"); // CHECK: no @main entry point!
         continue;
       }
     }
@@ -69,11 +70,13 @@ int main(int argc, char *argv[]) {
       )
     );
 
+
     break;
   }
   if (!mainFunction) {
-    printf("no function!\n");
-    return 1;
+    printf("no function!\n"); // CHECK: no function!
+    return 0;
   }
-  mainFunction(argc, argv); // CHECK: howdy mundo
+  mainFunction(argc, argv);
+  return 1;
 }
