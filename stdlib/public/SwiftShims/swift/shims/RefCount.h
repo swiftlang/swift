@@ -1326,7 +1326,7 @@ class HeapObjectSideTableEntry {
   public:
   HeapObjectSideTableEntry(HeapObject *newObject)
     : object(newObject), 
-#if __arm__ || __powerpc__ // https://bugs.swift.org/browse/SR-5846
+#if __arm__ || __powerpc__ // https://github.com/apple/swift/issues/48416
    refCounts(SideTableRefCounts::Initialized)
 #else
    refCounts()
