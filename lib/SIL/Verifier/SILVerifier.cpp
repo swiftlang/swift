@@ -2446,7 +2446,9 @@ public:
 
     SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
-    bool success = scopedAddress.computeLiveness(scopedAddressLiveness);
+    AddressUseKind useKind =
+      scopedAddress.computeLiveness(scopedAddressLiveness);
+    bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(
                             scopedAddress, &scopedAddressLiveness, &DEBlocks),

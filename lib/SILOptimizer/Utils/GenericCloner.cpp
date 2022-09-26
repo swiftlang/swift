@@ -251,8 +251,8 @@ void GenericCloner::postFixUp(SILFunction *f) {
     }
     discoveredBlocks.clear();
     SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
-    bool success = scopedAddress.computeLiveness(storeBorrowLiveness);
-    if (success) {
+    AddressUseKind useKind = scopedAddress.computeLiveness(storeBorrowLiveness);
+    if (useKind == AddressUseKind::NonEscaping) {
       scopedAddress.endScopeAtLivenessBoundary(&storeBorrowLiveness);
       continue;
     }

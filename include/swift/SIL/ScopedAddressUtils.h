@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -87,10 +88,10 @@ struct ScopedAddressValue {
   bool isScopeEndingUse(Operand *op) const;
   /// Pass all scope ending instructions to the visitor.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
-  /// Returns false, if liveness cannot be computed due to pointer escape or
-  /// unkown address use. Add this scope's live blocks into the SSA
-  /// PrunedLiveness result.
-  bool computeLiveness(SSAPrunedLiveness &liveness) const;
+  /// Optimistically computes liveness for all known uses, and adds this scope's
+  /// live blocks into the SSA PrunedLiveness result. Returns AddressUseKind
+  /// indicated whether a PointerEscape or Unknown use was encountered.
+  AddressUseKind computeLiveness(SSAPrunedLiveness &liveness) const;
 
   /// Create appropriate scope ending instruction at \p insertPt.
   void createScopeEnd(SILBasicBlock::iterator insertPt, SILLocation loc) const;

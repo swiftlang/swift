@@ -86,13 +86,11 @@ bool ScopedAddressValue::visitScopeEndingUses(
   }
 }
 
-bool ScopedAddressValue::computeLiveness(SSAPrunedLiveness &liveness) const {
+AddressUseKind ScopedAddressValue::
+computeLiveness(SSAPrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
-  if (addressKind != AddressUseKind::NonEscaping) {
-    return false;
-  }
 
   liveness.initializeDef(value);
   for (auto *use : uses) {
@@ -103,7 +101,7 @@ bool ScopedAddressValue::computeLiveness(SSAPrunedLiveness &liveness) const {
     liveness.updateForUse(endOp->getUser(), /* isLifetimeEnding */ true);
     return true;
   });
-  return true;
+  return addressKind;
 }
 
 void ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
@@ -172,14 +170,15 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
   SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
-  bool success = scopedAddress.computeLiveness(storeBorrowLiveness);
+  
+  AddressUseKind useKind = scopedAddress.computeLiveness(storeBorrowLiveness);
 
   // If all new uses are within store_borrow boundary, no need for extension.
   if (storeBorrowLiveness.areUsesWithinBoundary(newUses, deadEndBlocks)) {
     return true;
   }
 
-  if (!success) {
+  if (useKind != AddressUseKind::NonEscaping) {
     return false;
   }
 
