@@ -205,17 +205,19 @@ ASTWalker::PreWalkAction NameMatcher::walkToDeclPre(Decl *D) {
         tryResolve(ASTWalker::ParentTy(), nextLoc());
     }
   }
+  if (isDone())
+    return Action::Stop();
 
   // FIXME: Even implicit Decls should have proper ranges if they include any
   // non-implicit children (fix implicit Decls created for lazy vars).
   if (D->isImplicit())
-    return Action::SkipChildrenIf(isDone());
+    return Action::Continue();
 
   if (shouldSkip(D->getSourceRangeIncludingAttrs()))
     return Action::SkipChildren();
 
   if (!handleCustomAttrs(D))
-    return Action::SkipChildren();
+    return Action::Stop();
 
   if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
     for (auto Clause : ICD->getClauses()) {
@@ -261,28 +263,17 @@ ASTWalker::PreWalkAction NameMatcher::walkToDeclPre(Decl *D) {
              isa<PrecedenceGroupDecl>(D)) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc());
   }
-  // TODO: Can this use Action::StopIf?
-  return Action::SkipChildrenIf(isDone());
-}
-
-ASTWalker::PostWalkAction NameMatcher::walkToDeclPost(Decl *D) {
   return Action::StopIf(isDone());
 }
 
 ASTWalker::PreWalkResult<Stmt *> NameMatcher::walkToStmtPre(Stmt *S) {
+  if (isDone())
+    return Action::Stop();
+
   // FIXME: Even implicit Stmts should have proper ranges that include any
   // non-implicit Stmts (fix Stmts created for lazy vars).
-  if (!S->isImplicit() && shouldSkip(S->getSourceRange())) {
-    if (isDone())
-      return Action::Stop();
-
-    return Action::SkipChildren(S);
-  }
-  return Action::Continue(S);
-}
-
-ASTWalker::PostWalkResult<Stmt *> NameMatcher::walkToStmtPost(Stmt *S) {
-  return Action::StopIf(isDone(), S);
+  auto ShouldSkip = !S->isImplicit() && shouldSkip(S->getSourceRange());
+  return Action::SkipChildrenIf(ShouldSkip, S);
 }
 
 ArgumentList *NameMatcher::getApplicableArgsFor(Expr *E) {
@@ -320,7 +311,7 @@ NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
              Labels.first, Labels.second);
   }
   if (isDone())
-    return Action::SkipChildren(ArgList);
+    return Action::Stop();
 
   // Handle arg label locations (the index reports property occurrences on them
   // for memberwise inits).
@@ -330,10 +321,10 @@ NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
     if (!Name.empty()) {
       tryResolve(Parent, Arg.getLabelLoc());
       if (isDone())
-        return Action::SkipChildren(ArgList);
+        return Action::Stop();
     }
     if (!E->walk(*this))
-      return Action::SkipChildren(ArgList);
+      return Action::Stop();
   }
   // TODO: We should consider changing Action::SkipChildren to still call
   // walkToArgumentListPost, which would eliminate the need for this.
@@ -349,12 +340,11 @@ NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
 }
 
 ASTWalker::PreWalkResult<Expr *> NameMatcher::walkToExprPre(Expr *E) {
-  if (shouldSkip(E)) {
-    if (isDone())
-      return Action::Stop();
-
+  if (isDone())
+    return Action::Stop();
+  if (shouldSkip(E))
     return Action::SkipChildren(E);
-  }
+
   if (isa<ObjCSelectorExpr>(E)) {
       ++SelectorNestings;
   }
@@ -489,11 +479,13 @@ ASTWalker::PostWalkResult<Expr *> NameMatcher::walkToExprPost(Expr *E) {
     --SelectorNestings;
   }
 
-  return Action::Continue(E);
+  return Action::StopIf(isDone(), E);
 }
 
 ASTWalker::PreWalkAction NameMatcher::walkToTypeReprPre(TypeRepr *T) {
-  if (isDone() || shouldSkip(T->getSourceRange()))
+  if (isDone())
+    return Action::Stop();
+  if (shouldSkip(T->getSourceRange()))
     return Action::SkipChildren();
 
   if (isa<ComponentIdentTypeRepr>(T)) {
@@ -509,19 +501,17 @@ ASTWalker::PreWalkAction NameMatcher::walkToTypeReprPre(TypeRepr *T) {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }
   }
-  return Action::SkipChildrenIf(isDone());
-}
-
-ASTWalker::PostWalkAction NameMatcher::walkToTypeReprPost(TypeRepr *T) {
   return Action::StopIf(isDone());
 }
 
 ASTWalker::PreWalkResult<Pattern *> NameMatcher::walkToPatternPre(Pattern *P) {
-  if (isDone() || shouldSkip(P->getSourceRange()))
+  if (isDone())
+    return Action::Stop();
+  if (shouldSkip(P->getSourceRange()))
     return Action::SkipChildren(P);
 
   tryResolve(ASTWalker::ParentTy(P), P->getStartLoc());
-  return Action::SkipChildrenIf(isDone(), P);
+  return Action::StopIf(isDone(), P);
 }
 
 bool NameMatcher::checkComments() {
