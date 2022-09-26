@@ -889,6 +889,10 @@ def explicit_interface_module_build :
   Flag<["-"], "explicit-interface-module-build">,
   HelpText<"Use the specified command-line to build the module from interface, instead of flags specified in the interface">;
 
+def direct_clang_cc1_module_build :
+  Flag<["-"], "direct-clang-cc1-module-build">,
+  HelpText<"Use the specified -Xcc options to build a PCM by using Clang frontend directly, bypassing the Clang driver">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
