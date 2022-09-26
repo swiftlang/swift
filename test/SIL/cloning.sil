@@ -94,3 +94,16 @@ entry(%0 : @owned $Builtin.NativeObject):
   %res = apply %callee_move_value(%0) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
   return %res : $Builtin.NativeObject
 }
+
+sil [ossa] @callee_debug_value : $@convention(thin) (@owned X) -> @owned X {
+entry(%0 : @owned $X):
+  debug_value [trace] %0 : $X
+  return %0 : $X
+}
+
+sil [ossa] @caller_debug_value : $@convention(thin) (@owned X) -> @owned X {
+entry(%0 : @owned $X):
+  %callee_debug_value = function_ref @callee_debug_value : $@convention(thin) (@owned X) -> @owned X
+  %res = apply %callee_debug_value(%0) : $@convention(thin) (@owned X) -> @owned X
+  return %res : $X
+}

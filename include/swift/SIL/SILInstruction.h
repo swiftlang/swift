@@ -4832,13 +4832,15 @@ class DebugValueInst final
   USE_SHARED_UINT8;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, bool poisonRefs, bool operandWasMoved);
+                 SILDebugVariable Var, bool poisonRefs, bool operandWasMoved,
+                 bool trace);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                bool poisonRefs, bool operandWasMoved);
+                                bool poisonRefs, bool operandWasMoved,
+                                bool trace);
   static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
                                     SILModule &M, SILDebugVariable Var,
-                                    bool operandWasMoved);
+                                    bool operandWasMoved, bool trace);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -4914,6 +4916,12 @@ public:
 
   void setPoisonRefs(bool poisonRefs = true) {
     sharedUInt8().DebugValueInst.poisonRefs = poisonRefs;
+  }
+
+  bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
+
+  void setTrace(bool trace = true) {
+    sharedUInt8().DebugValueInst.trace = trace;
   }
 };
 
