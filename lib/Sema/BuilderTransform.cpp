@@ -427,7 +427,7 @@ protected:
         // The operand should have optional type if we had optional results,
         // so we just need to call `buildIf` now, since we're at the top level.
         if (isOptional && isTopLevel(anchor)) {
-          builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
+          builderCall = builder.buildCall(ifStmt->getEndLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
         }
@@ -1172,9 +1172,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    auto indent = solverState ? solverState->depth * 2 : 0;
+    auto indent = solverState ? solverState->getCurrentIndent() * 2 : 0;
     log.indent(indent) << "------- Transfomed Body -------\n";
-    transformedBody->second->dump(log);
+    transformedBody->second->dump(log, &getASTContext(), indent);
     log << '\n';
   }
 
