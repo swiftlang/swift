@@ -189,11 +189,18 @@ lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
     case AssignByWrapperInst::Assign: {
       switch (inst->getOriginator()) {
       case AssignByWrapperInst::Originator::TypeWrapper: {
-        if (inst->getMode() == AssignByWrapperInst::Initialization ||
-            inst->getDest()->getType().isTrivial(*inst->getFunction())) {
-          b.createTrivialStoreOr(loc, src, dest, StoreOwnershipQualifier::Init);
+        bool initialization =
+            inst->getMode() == AssignByWrapperInst::Initialization;
+
+        if (inst->getDest()->getType().isAddressOnly(*inst->getFunction())) {
+          b.createCopyAddr(loc, src, dest, IsTake,
+                           initialization ? IsInitialization
+                                          : IsNotInitialization);
         } else {
-          b.createStore(loc, src, dest, StoreOwnershipQualifier::Assign);
+          b.createTrivialStoreOr(loc, src, dest,
+                                 initialization
+                                     ? StoreOwnershipQualifier::Init
+                                     : StoreOwnershipQualifier::Assign);
         }
         break;
       }
