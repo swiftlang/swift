@@ -284,45 +284,163 @@ bool SILDeclRef::isImplicit() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
-SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+namespace {
+enum class LinkageLimit {
+  /// No limit.
+  None,
+  /// The linkage should behave as if the decl is private.
+  Private,
+  /// The declaration is emitted on-demand; it should end up with internal
+  /// or shared linkage.
+  OnDemand,
+  /// The declaration should never be made public.
+  NeverPublic,
+  /// The declaration should always be emitted into the client,
+  AlwaysEmitIntoClient,
+};
+} // end anonymous namespace
+
+/// Compute the linkage limit for a given SILDeclRef. This augments the
+/// mapping of access level to linkage to provide a maximum or minimum linkage.
+static LinkageLimit getLinkageLimit(SILDeclRef constant) {
+  using Limit = LinkageLimit;
+  using Kind = SILDeclRef::Kind;
+
+  auto *d = constant.getDecl();
+
+  // Back deployment thunks and fallbacks are emitted into the client.
+  if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
+    return Limit::AlwaysEmitIntoClient;
+
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(d)) {
+    // Native-to-foreign thunks for top-level decls are created on-demand,
+    // unless they are marked @_cdecl, in which case they expose a dedicated
+    // entry-point with the visibility of the function.
+    //
+    // Native-to-foreign thunks for methods are always just private, since
+    // they're anchored by Objective-C metadata.
+    auto &attrs = fn->getAttrs();
+    if (constant.isNativeToForeignThunk() && !attrs.hasAttribute<CDeclAttr>()) {
+      auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
+      return isTopLevel ? Limit::OnDemand : Limit::Private;
+    }
+  }
+
+  if (auto fn = constant.getFuncDecl()) {
+    // Forced-static-dispatch functions are created on-demand and have
+    // at best shared linkage.
+    if (fn->hasForcedStaticDispatch())
+      return Limit::OnDemand;
+  }
+
+  switch (constant.kind) {
+  case Kind::Func:
+  case Kind::Allocator:
+  case Kind::Initializer:
+  case Kind::Deallocator:
+  case Kind::Destroyer: {
+    // @_alwaysEmitIntoClient declarations are like the default arguments of
+    // public functions; they are roots for dead code elimination and have
+    // serialized bodies, but no public symbol in the generated binary.
+    if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      return Limit::AlwaysEmitIntoClient;
+    if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+      auto *storage = accessor->getStorage();
+      if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+        return Limit::AlwaysEmitIntoClient;
+    }
+    break;
+  }
+  case Kind::EnumElement:
+    return Limit::OnDemand;
+
+  case Kind::GlobalAccessor:
+    return cast<VarDecl>(d)->isResilient() ? Limit::NeverPublic : Limit::None;
+
+  case Kind::DefaultArgGenerator:
+    // If the default argument is to be serialized, only use non-ABI public
+    // linkage. If the argument is not to be serialized, don't use a limit.
+    // This actually means that default arguments *can be ABI public* if
+    // `isSerialized()` returns false and the effective access level is public,
+    // which happens under `-enable-testing` with an internal decl.
+    return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
+
+  case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrapperInitFromProjectedValue: {
+    if (!d->getDeclContext()->isTypeContext()) {
+      // If the backing initializer is to be serialized, only use non-ABI public
+      // linkage. If the initializer is not to be serialized, don't use a limit.
+      // This actually means that it *can be ABI public* if `isSerialized()`
+      // returns false and the effective access level is public, which happens
+      // under `-enable-testing` with an internal decl.
+      return constant.isSerialized() ? Limit::AlwaysEmitIntoClient
+                                     : Limit::None;
+    }
+    // Otherwise, regular property wrapper backing initializers (for properties)
+    // are treated just like stored property intializers.
+    LLVM_FALLTHROUGH;
+  }
+  case Kind::StoredPropertyInitializer: {
+    // Stored property initializers get the linkage of their containing type.
+    // There are three cases:
+    //
+    // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
+    //    declared @inlinable. The property initializer must only reference
+    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
+    //
+    // 2) Type is not formally @_fixed_layout/@frozen and the module is not
+    //    resilient. Root initializers can be declared @inlinable. This is the
+    //    annoying case. We give the initializer public linkage if the type is
+    //    public.
+    //
+    // 3) Type is resilient. The property initializer is never public because
+    //    root initializers cannot be @inlinable.
+    //
+    // FIXME: Get rid of case 2 somehow.
+    if (constant.isSerialized())
+      return Limit::AlwaysEmitIntoClient;
+
+    // FIXME: This should always be true.
+    if (d->getModuleContext()->isResilient())
+      return Limit::NeverPublic;
+
+    break;
+  }
+  case Kind::IVarInitializer:
+  case Kind::IVarDestroyer:
+    // ivar initializers and destroyers are completely contained within the
+    // class from which they come, and never get seen externally.
+    return Limit::NeverPublic;
+
+  case Kind::EntryPoint:
+  case Kind::AsyncEntryPoint:
+    llvm_unreachable("Already handled");
+  }
+  return Limit::None;
+}
+
+SILLinkage SILDeclRef::getDefinitionLinkage() const {
+  using Limit = LinkageLimit;
+
+  auto privateLinkage = [&]() {
+    // Private decls may still be serialized if they are e.g in an inlinable
+    // function. In such a case, they receive shared linkage.
+    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
+  };
 
   // Prespecializations are public.
-  if (getSpecializedSignature()) {
+  if (getSpecializedSignature())
     return SILLinkage::Public;
-  }
 
-  if (getAbstractClosureExpr()) {
-    return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
-  }
+  // Closures can only be referenced from the same file.
+  if (getAbstractClosureExpr())
+    return privateLinkage();
 
   // The main entry-point is public.
   if (kind == Kind::EntryPoint)
     return SILLinkage::Public;
   if (kind == Kind::AsyncEntryPoint)
     return SILLinkage::Hidden;
-
-  // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
-  // declaration not a definition.
-  auto maybeAddExternal = [&](SILLinkage linkage) {
-    return forDefinition ? linkage : addExternalToLinkage(linkage);
-  };
-
-  ValueDecl *d = getDecl();
-
-  // Property wrapper generators of public functions have PublicNonABI linkage
-  if (isPropertyWrapperBackingInitializer() && isa<ParamDecl>(d)) {
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-  }
-
-  // Function-local declarations have private linkage, unless serialized.
-  DeclContext *moduleContext = d->getDeclContext();
-  while (!moduleContext->isModuleScopeContext()) {
-    if (moduleContext->isLocalContext()) {
-      return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
-    }
-    moduleContext = moduleContext->getParent();
-  }
 
   // Calling convention thunks have shared linkage.
   if (isForeignToNativeThunk())
@@ -332,141 +450,79 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isClangImported())
     return SILLinkage::Shared;
 
-  // Default argument generators of Public functions have PublicNonABI linkage
-  // if the function was type-checked in Swift 4 mode.
-  if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
+  const auto limit = getLinkageLimit(*this);
+  if (limit == Limit::Private)
+    return privateLinkage();
+
+  auto *decl = getDecl();
+
+  if (isPropertyWrapperBackingInitializer()) {
+    auto *dc = decl->getDeclContext();
+
+    // Property wrapper generators of public functions have PublicNonABI
+    // linkage.
+    if (isa<ParamDecl>(decl) && isSerialized())
+      return SILLinkage::PublicNonABI;
+
+    // Property wrappers in types have linkage based on the access level of
+    // their nominal.
+    if (dc->isTypeContext())
+      decl = cast<NominalTypeDecl>(dc);
   }
 
-  // Back deployment thunks and fallbacks are emitted into the client and
-  // therefore have PublicNonABI linkage.
-  if (backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
-    return maybeAddExternal(SILLinkage::PublicNonABI);
+  // Stored property initializers have linkage based on the access level of
+  // their nominal.
+  if (isStoredPropertyInitializer())
+    decl = cast<NominalTypeDecl>(decl->getDeclContext());
 
-  enum class Limit {
-    /// No limit.
-    None,
-    /// The declaration is emitted on-demand; it should end up with internal
-    /// or shared linkage.
-    OnDemand,
-    /// The declaration should never be made public.
-    NeverPublic,
-    /// The declaration should always be emitted into the client,
-    AlwaysEmitIntoClient,
-  };
-  auto limit = Limit::None;
+  // Compute the effective access level, taking e.g testable into consideration.
+  auto effectiveAccess = decl->getEffectiveAccess();
 
-  // @_alwaysEmitIntoClient declarations are like the default arguments of
-  // public functions; they are roots for dead code elimination and have
-  // serialized bodies, but no public symbol in the generated binary.
-  if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-    limit = Limit::AlwaysEmitIntoClient;
-  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-    auto *storage = accessor->getStorage();
-    if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-      limit = Limit::AlwaysEmitIntoClient;
-  }
-
-  // ivar initializers and destroyers are completely contained within the class
-  // from which they come, and never get seen externally.
-  if (isIVarInitializerOrDestroyer()) {
-    limit = Limit::NeverPublic;
-  }
-
-  // Stored property initializers get the linkage of their containing type.
-  if (isStoredPropertyInitializer() || isPropertyWrapperBackingInitializer()) {
-    // Three cases:
-    //
-    // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
-    //    declared @inlinable. The property initializer must only reference
-    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
-    //
-    // 2) Type is not formally @_fixed_layout/@frozen and the module is not
-    //    resilient. Root initializers can be declared @inlinable. This is the 
-    //    annoying case. We give the initializer public linkage if the type is
-    //    public.
-    //
-    // 3) Type is resilient. The property initializer is never public because
-    //    root initializers cannot be @inlinable.
-    //
-    // FIXME: Get rid of case 2 somehow.
-    if (isSerialized())
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-
-    d = cast<NominalTypeDecl>(d->getDeclContext());
-
-    // FIXME: This should always be true.
-    if (d->getModuleContext()->isResilient())
-      limit = Limit::NeverPublic;
-  }
-
-  // The global addressor is never public for resilient globals.
-  if (kind == Kind::GlobalAccessor) {
-    if (cast<VarDecl>(d)->isResilient()) {
-      limit = Limit::NeverPublic;
-    }
-  }
-
-  if (auto fn = dyn_cast<FuncDecl>(d)) {
-    // Forced-static-dispatch functions are created on-demand and have
-    // at best shared linkage.
-    if (fn->hasForcedStaticDispatch()) {
-      limit = Limit::OnDemand;
-    }
-  }
-
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(d)) {
-    // Native-to-foreign thunks for top-level decls are created on-demand,
-    // unless they are marked @_cdecl, in which case they expose a dedicated
-    // entry-point with the visibility of the function.
-    //
-    // Native-to-foreign thunks for methods are always just private, since
-    // they're anchored by Objective-C metadata.
-    if (isNativeToForeignThunk() && !fn->getAttrs().hasAttribute<CDeclAttr>()) {
-      if (fn->getDeclContext()->isModuleScopeContext())
-        limit = Limit::OnDemand;
-      else
-        return SILLinkage::Private;
-    }
-  }
-
-  if (isEnumElement()) {
-    limit = Limit::OnDemand;
-  }
-
-  auto effectiveAccess = d->getEffectiveAccess();
-  
   // Private setter implementations for an internal storage declaration should
   // be at least internal as well, so that a dynamically-writable
   // keypath can be formed from other files in the same module.
-  if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-    if (accessor->isSetter()
-       && accessor->getStorage()->getEffectiveAccess() >= AccessLevel::Internal)
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto storageAccess = accessor->getStorage()->getEffectiveAccess();
+    if (accessor->isSetter() && storageAccess >= AccessLevel::Internal)
       effectiveAccess = std::max(effectiveAccess, AccessLevel::Internal);
   }
 
   switch (effectiveAccess) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
-    return SILLinkage::Private;
+    return privateLinkage();
 
   case AccessLevel::Internal:
+    assert(!isSerialized() &&
+           "Serialized decls should either be private (for decls in inlinable "
+           "code), or they should be public");
     if (limit == Limit::OnDemand)
       return SILLinkage::Shared;
-    return maybeAddExternal(SILLinkage::Hidden);
+    return SILLinkage::Hidden;
 
   case AccessLevel::Public:
   case AccessLevel::Open:
-    if (limit == Limit::OnDemand)
+    switch (limit) {
+    case Limit::None:
+      return SILLinkage::Public;
+    case Limit::AlwaysEmitIntoClient:
+      return SILLinkage::PublicNonABI;
+    case Limit::OnDemand:
       return SILLinkage::Shared;
-    if (limit == Limit::NeverPublic)
-      return maybeAddExternal(SILLinkage::Hidden);
-    if (limit == Limit::AlwaysEmitIntoClient)
-      return maybeAddExternal(SILLinkage::PublicNonABI);
-    return maybeAddExternal(SILLinkage::Public);
+    case Limit::NeverPublic:
+      return SILLinkage::Hidden;
+    case Limit::Private:
+      llvm_unreachable("Already handled");
+    }
   }
   llvm_unreachable("unhandled access");
+}
+
+SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+  // Add external to the linkage of the definition
+  // (e.g. Public -> PublicExternal) if this is a declaration.
+  auto linkage = getDefinitionLinkage();
+  return forDefinition ? linkage : addExternalToLinkage(linkage);
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
