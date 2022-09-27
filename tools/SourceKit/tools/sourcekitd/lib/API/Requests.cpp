@@ -1233,10 +1233,13 @@ static void handleSemanticRequest(
     SmallVector<const char *, 8> ExpectedProtocols;
     if (Req.getStringArray(KeyExpectedTypes, ExpectedProtocols, true))
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
+    int64_t FullyQualified = false;
+    Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
     int64_t CanonicalTy = false;
     Req.getInt64(KeyCanonicalizeType, CanonicalTy, /*isOptional=*/true);
     return Lang.collectExpressionTypes(
-        *SourceFile, Args, ExpectedProtocols, CanonicalTy, CancellationToken,
+        *SourceFile, Args, ExpectedProtocols, FullyQualified, CanonicalTy,
+        CancellationToken,
         [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
           reportExpressionTypeInfo(Result, Rec);
         });

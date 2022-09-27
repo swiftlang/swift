@@ -686,8 +686,8 @@ public:
 
   void collectExpressionTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-      SourceKitCancellationToken CancellationToken,
+      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+      bool CanonicalType, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 

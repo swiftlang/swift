@@ -2526,8 +2526,8 @@ void SwiftLangSupport::semanticRefactoring(
 
 void SwiftLangSupport::collectExpressionTypes(
     StringRef FileName, ArrayRef<const char *> Args,
-    ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-    SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+    bool CanonicalType, SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<ExpressionTypesInFile> &)>
         Receiver) {
   std::string Error;
@@ -2542,23 +2542,26 @@ void SwiftLangSupport::collectExpressionTypes(
   class ExpressionTypeCollector: public SwiftASTConsumer {
     std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver;
     std::vector<const char *> ExpectedProtocols;
+    bool FullyQualified;
     bool CanonicalType;
   public:
     ExpressionTypeCollector(
-        std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver,
-        ArrayRef<const char *> ExpectedProtocols,
-        bool CanonicalType):
-          Receiver(std::move(Receiver)),
+        std::function<void(const RequestResult<ExpressionTypesInFile> &)>
+            Receiver,
+        ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+        bool CanonicalType)
+        : Receiver(std::move(Receiver)),
           ExpectedProtocols(ExpectedProtocols.vec()),
-          CanonicalType(CanonicalType) {}
+          FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
       std::vector<ExpressionTypeInfo> Scratch;
       llvm::SmallString<256> TypeBuffer;
       llvm::raw_svector_ostream OS(TypeBuffer);
       ExpressionTypesInFile Result;
-      for (auto Item: collectExpressionType(*SF, ExpectedProtocols, Scratch,
-                                            CanonicalType, OS)) {
+      for (auto Item :
+           collectExpressionType(*SF, ExpectedProtocols, Scratch,
+                                 FullyQualified, CanonicalType, OS)) {
         Result.Results.push_back({Item.offset, Item.length, Item.typeOffset, {}});
         for (auto P: Item.protocols) {
           Result.Results.back().ProtocolOffsets.push_back(P.first);
@@ -2576,9 +2579,8 @@ void SwiftLangSupport::collectExpressionTypes(
       Receiver(RequestResult<ExpressionTypesInFile>::fromError(Error));
     }
   };
-  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver,
-                                                             ExpectedProtocols,
-                                                             CanonicalType);
+  auto Collector = std::make_shared<ExpressionTypeCollector>(
+      Receiver, ExpectedProtocols, FullyQualified, CanonicalType);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

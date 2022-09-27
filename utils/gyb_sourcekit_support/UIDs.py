@@ -182,6 +182,7 @@ UID_KEYS = [
     KEY('VariableLength', 'key.variable_length'),
     KEY('VariableType', 'key.variable_type'),
     KEY('VariableTypeExplicit', 'key.variable_type_explicit'),
+    KEY('FullyQualified', 'key.fully_qualified'),
     KEY('CanonicalizeType', 'key.canonicalize_type'),
     KEY('InternalDiagnostic', 'key.internal_diagnostic'),
     KEY('VFSName', 'key.vfs.name'),
