@@ -288,9 +288,11 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
       IGM.swiftImmortalRefCount = var;
     }
     if (!IGM.swiftStaticArrayMetadata) {
+      // HACK: This should be an alias to this symbol rather than a direct
+      // reference.
       auto *var = new llvm::GlobalVariable(IGM.Module, IGM.TypeMetadataStructTy,
                                         /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
-                                        /*initializer*/ nullptr, "_swiftStaticArrayMetadata");
+                                        /*initializer*/ nullptr, "$ss19__EmptyArrayStorageCN");
       IGM.swiftStaticArrayMetadata = var;
     }
     elts[0] = llvm::ConstantStruct::get(ObjectHeaderTy, {
