@@ -48,6 +48,7 @@ if (SWIFT_SWIFT_PARSER)
   #   )
   target_link_libraries(swiftParse
     PRIVATE
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftBasicFormat>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
