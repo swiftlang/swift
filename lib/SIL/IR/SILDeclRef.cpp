@@ -459,10 +459,14 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   if (isPropertyWrapperBackingInitializer()) {
     auto *dc = decl->getDeclContext();
 
-    // Property wrapper generators of public functions have PublicNonABI
-    // linkage.
-    if (isa<ParamDecl>(decl) && isSerialized())
-      return SILLinkage::PublicNonABI;
+    // External property wrapper backing initializers have linkage based
+    // on the access level of their function.
+    if (isa<ParamDecl>(decl)) {
+      if (isa<AbstractClosureExpr>(dc))
+        return privateLinkage();
+
+      decl = cast<ValueDecl>(dc->getAsDecl());
+    }
 
     // Property wrappers in types have linkage based on the access level of
     // their nominal.
