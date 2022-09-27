@@ -1025,7 +1025,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     f->createProfiler(wrapperInfo.getInitFromWrappedValue(), constant);
     auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
-    SGF.emitGeneratorFunction(constant, wrapperInfo.getInitFromWrappedValue());
+    SGF.emitGeneratorFunction(constant, wrapperInfo.getInitFromWrappedValue(),
+                              /*EmitProfilerIncrement*/ true);
     postEmitFunction(constant, f);
     break;
   }

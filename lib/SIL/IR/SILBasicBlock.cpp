@@ -361,10 +361,6 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
   return ClonedScope;
 }
 
-bool SILBasicBlock::isEntry() const {
-  return this == &*getParent()->begin();
-}
-
 /// Declared out of line so we can have a declaration of SILArgument.
 #define ARGUMENT(NAME, PARENT)                                                 \
   NAME##ArrayRef SILBasicBlock::get##NAME##s() const {                         \

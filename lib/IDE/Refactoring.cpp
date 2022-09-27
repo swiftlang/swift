@@ -7315,7 +7315,7 @@ private:
     if (auto Closure = dyn_cast<ClosureExpr>(E)) {
       return Closure;
     } else if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
-      return CaptureList->getClosureBody();
+      return dyn_cast<ClosureExpr>(CaptureList->getClosureBody());
     } else {
       return nullptr;
     }

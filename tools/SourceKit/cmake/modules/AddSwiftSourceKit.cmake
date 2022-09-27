@@ -154,6 +154,24 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
     endif()
   endif()
   set(RPATH_LIST ${RPATH_LIST} PARENT_SCOPE)
+
+  if(SWIFT_SWIFT_PARSER)
+    # Make sure we can find the early SwiftSyntax libraries.
+    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib")
+
+    # For the "end step" of bootstrapping configurations on Darwin, need to be
+    # able to fall back to the SDK directory for libswiftCore et al.
+    if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+      if (NOT "${bootstrapping}" STREQUAL "1")
+        if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+          target_link_directories(${target} PRIVATE "${sdk_dir}")
+
+          # Include the abi stable system stdlib in our rpath.
+         set(swift_runtime_rpath "/usr/lib/swift")
+        endif()
+      endif()
+    endif()
+  endif()
 endfunction()
 
 # Add a new SourceKit library.

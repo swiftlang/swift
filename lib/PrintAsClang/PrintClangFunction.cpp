@@ -1059,6 +1059,20 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       emitNewParam();
       std::string paramName;
       if (param.isSelfParameter()) {
+        bool needsStaticSelf = isa<ConstructorDecl>(FD);
+        if (needsStaticSelf) {
+          os << "swift::TypeMetadataTrait<";
+          CFunctionSignatureTypePrinter typePrinter(
+              os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+              interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+              moduleContext, declPrinter,
+              FunctionSignatureTypeUse::TypeReference);
+          auto result = typePrinter.visit(param.getType(), OTK_None,
+                                          /*isInOutParam=*/false);
+          assert(!result.isUnsupported());
+          os << ">::getTypeMetadata()";
+          return;
+        }
         paramName = "*this";
       } else if (param.getName().empty()) {
         llvm::raw_string_ostream paramOS(paramName);
@@ -1291,15 +1305,17 @@ static std::string remapPropertyName(const AccessorDecl *accessor,
 void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
     const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-    Type resultTy, bool isDefinition) {
+    Type resultTy, bool isStatic, bool isDefinition) {
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   os << "  ";
 
   FunctionSignatureModifiers modifiers;
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
+  modifiers.isStatic = isStatic && !isDefinition;
   modifiers.isInline = true;
-  modifiers.isConst = accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
+  modifiers.isConst =
+      !isStatic && accessor->isGetter() && !isa<ClassDecl>(typeDeclContext);
   auto result = printFunctionSignature(
       accessor, signature, remapPropertyName(accessor, resultTy), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);

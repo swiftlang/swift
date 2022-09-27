@@ -58,13 +58,28 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
       .Default(Optional<PlatformKind>());
 }
 
-Optional<StringRef> swift::caseCorrectedPlatformString(StringRef candidate) {
+Optional<StringRef> swift::closestCorrectedPlatformString(StringRef candidate) {
+  auto lowerCasedCandidate = candidate.lower();
+  auto lowerCasedCandidateRef = StringRef(lowerCasedCandidate);
+  auto minDistance = std::numeric_limits<unsigned int>::max();
+  Optional<StringRef> result = None;
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  if (candidate.compare_insensitive(#X) == 0) {                                \
-    return StringRef(#X);                                                      \
+  {                                                                            \
+    auto platform = StringRef(#X);                                             \
+    auto distance = lowerCasedCandidateRef.edit_distance(platform.lower());    \
+    if (distance == 0) {                                                       \
+      return platform;                                                         \
+    }                                                                          \
+    if (distance < minDistance) {                                              \
+      minDistance = distance;                                                  \
+      result = platform;                                                       \
+    }                                                                          \
   }
 #include "swift/AST/PlatformKinds.def"
-  return None;
+  // If the most similar platform distance is greater than this threshold,
+  // it's not similar enough to be suggested as correction.
+  const unsigned int distanceThreshold = 5;
+  return (minDistance < distanceThreshold) ? result : None;
 }
 
 static bool isApplicationExtensionPlatform(PlatformKind Platform) {

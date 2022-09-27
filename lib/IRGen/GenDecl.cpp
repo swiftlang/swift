@@ -2092,6 +2092,14 @@ void IRGenerator::emitEntryPointInfo() {
   auto entrypointInfo = builder.beginStruct();
   entrypointInfo.addCompactFunctionReference(
       IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
+  uint32_t flags = 0;
+  enum EntryPointFlags : unsigned {
+    HasAtMainTypeFlag = 1 << 0,
+  };
+  if (auto *mainTypeDecl = SIL.getSwiftModule()->getMainTypeDecl()) {
+    flags |= HasAtMainTypeFlag;
+  }
+  entrypointInfo.addInt(IGM.Int32Ty, flags);
   auto var = entrypointInfo.finishAndCreateGlobal(
       "\x01l_entry_point", Alignment(4),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);

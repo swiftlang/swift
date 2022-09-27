@@ -140,7 +140,7 @@ static ClosureExpr *findTrailingClosureFromArgument(Expr *arg) {
   if (auto TC = dyn_cast_or_null<ClosureExpr>(arg))
     return TC;
   if (auto TCL = dyn_cast_or_null<CaptureListExpr>(arg))
-    return TCL->getClosureBody();
+    return dyn_cast_or_null<ClosureExpr>(TCL->getClosureBody());
   return nullptr;
 }
 
@@ -476,8 +476,6 @@ private:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    // TODO: Can we use Action::Stop instead of Action::SkipChildren in this
-    // function?
     if (!walkCustomAttributes(D))
       return Action::SkipChildren();
 
@@ -504,32 +502,32 @@ private:
       if (SafeToAskForGenerics) {
         if (auto *GP = GC->getParsedGenericParams()) {
           if (!handleAngles(GP->getLAngleLoc(), GP->getRAngleLoc(), ContextLoc))
-            return Action::SkipChildren();
+            return Action::Stop();
         }
       }
     }
 
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!handleBraces(NTD->getBraces(), ContextLoc))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       if (!handleBraces(ED->getBraces(), ContextLoc))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (!handleBraces(VD->getBracesRange(), VD->getNameLoc()))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
       if (isa<SubscriptDecl>(D)) {
         if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
-          return Action::SkipChildren();
+          return Action::Stop();
       }
       auto *PL = getParameterList(cast<ValueDecl>(D));
       if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
       // TODO: add paren locations to PoundDiagnosticDecl
     }
@@ -683,20 +681,18 @@ private:
   }
 
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    // TODO: Can we use Action::Stop instead of Action::SkipChildren in this
-    // function?
     if (auto *TT = dyn_cast<TupleTypeRepr>(T)) {
       SourceRange Parens = TT->getParens();
       if (!handleParens(Parens.Start, Parens.End, Parens.Start))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (isa<ArrayTypeRepr>(T) || isa<DictionaryTypeRepr>(T)) {
       if (!handleSquares(T->getStartLoc(), T->getEndLoc(), T->getStartLoc()))
-        return Action::SkipChildren();
+        return Action::Stop();
     } else if (auto *GI = dyn_cast<GenericIdentTypeRepr>(T)) {
       SourceLoc ContextLoc = GI->getNameLoc().getBaseNameLoc();
       SourceRange Brackets = GI->getAngleBrackets();
       if (!handleAngles(Brackets.Start, Brackets.End, ContextLoc))
-        return Action::SkipChildren();
+        return Action::Stop();
     }
     return Action::Continue();
   }
@@ -2488,7 +2484,7 @@ private:
   Optional<IndentContext>
   getIndentContextFrom(CaptureListExpr *CL,
                        SourceLoc ContextLoc = SourceLoc()) {
-    ClosureExpr *CE = CL->getClosureBody();
+    AbstractClosureExpr *CE = CL->getClosureBody();
     BraceStmt *BS = CE->getBody();
     if (!CE || !BS)
       return None;
@@ -2503,8 +2499,14 @@ private:
   }
 
   Optional<IndentContext>
-  getIndentContextFrom(ClosureExpr *CE, SourceLoc ContextLoc = SourceLoc(),
+  getIndentContextFrom(AbstractClosureExpr *ACE, SourceLoc ContextLoc = SourceLoc(),
                        CaptureListExpr *ParentCapture = nullptr) {
+    // Explicit capture lists should always have an explicit ClosureExpr as
+    // their subexpression.
+    auto CE = dyn_cast<ClosureExpr>(ACE);
+    if (!CE) {
+      return None;
+    }
     BraceStmt *BS = CE->getBody();
     if (!BS)
       return None;

@@ -5,6 +5,9 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function)
 
 
+// CHECK: SWIFT_EXTERN void * _Nonnull $s4Init9BaseClassCyACSi_SitcfC(ptrdiff_t x, ptrdiff_t y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s4Init12DerivedClassCyACSi_SitcfC(ptrdiff_t x, ptrdiff_t y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:_:)
+
 // CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Init_uint32_t_0_4 $s4Init16FirstSmallStructVACycfC(void) SWIFT_NOEXCEPT SWIFT_CALL; // init()
 // CHECK-NEXT: SWIFT_EXTERN struct swift_interop_returnStub_Init_uint32_t_0_4 $s4Init16FirstSmallStructVyACSicfC(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:)
 
@@ -92,6 +95,40 @@ public struct StructWithRefCountStoredProp {
 
 // CHECK:      static inline StructWithRefCountStoredProp init();
 // CHECK-NEXT: static inline StructWithRefCountStoredProp init(swift::Int x);
+
+
+public final class FinalClass {
+    public var prop: FirstSmallStruct
+
+    public init(_ prop: FirstSmallStruct) { self.prop = prop }
+}
+
+public class BaseClass {
+    public var x: Int
+
+    public init(_ x: Int, _ y: Int) { self.x = x + y }
+}
+
+public class DerivedClass: BaseClass {
+    override public init(_ x: Int, _ y: Int) {
+        super.init(x + 1, y + 1)
+    }
+}
+
+public class DerivedClassTwo: BaseClass {
+}
+
+// CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) {
+// CHECK-NEXT: return _impl::_impl_BaseClass::makeRetained(_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
+
+// CHECK: DerivedClass DerivedClass::init(swift::Int x, swift::Int y) {
+// CHECK-NEXT: _impl::_impl_DerivedClass::makeRetained(_impl::$s4Init12DerivedClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClass>::getTypeMetadata()));
+
+// CHECK: DerivedClassTwo DerivedClassTwo::init(swift::Int x, swift::Int y) {
+// CHECK-NEXT: return _impl::_impl_DerivedClassTwo::makeRetained(_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
+
+// CHECK: FinalClass FinalClass::init(const FirstSmallStruct& prop) {
+// CHECK-NEXT: return _impl::_impl_FinalClass::makeRetained(_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(_impl::swift_interop_passDirect_Init_uint32_t_0_4(_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
 
 
 // CHECK:      inline uint32_t FirstSmallStruct::getX() const {

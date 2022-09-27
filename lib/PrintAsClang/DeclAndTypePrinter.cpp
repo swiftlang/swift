@@ -914,10 +914,6 @@ private:
         getForeignResultType(AFD, methodTy, asyncConvention, errorConvention);
 
     if (outputLang == OutputLanguageMode::Cxx) {
-      // FIXME: Support static methods.
-      if (isClassMethod)
-        return;
-      assert(!AFD->isStatic());
       auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
       if (!typeDeclContext) {
         typeDeclContext =
@@ -941,11 +937,13 @@ private:
         if (SD)
           declPrinter.printCxxSubscriptAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
-              funcABI->getSymbolName(), resultTy, /*isDefinition=*/false);
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/false);
         else
           declPrinter.printCxxPropertyAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
+              /*isStatic=*/isClassMethod,
               /*isDefinition=*/false);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
@@ -968,6 +966,7 @@ private:
           defPrinter.printCxxPropertyAccessorMethod(
               typeDeclContext, accessor, funcABI->getSignature(),
               funcABI->getSymbolName(), resultTy,
+              /*isStatic=*/isClassMethod,
               /*isDefinition=*/true);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
@@ -1596,6 +1595,9 @@ private:
         return;
       }
 
+      // FIXME: Support static methods.
+      if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
+        return;
       if (FD->getDeclContext()->isTypeContext())
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
 
@@ -1688,13 +1690,10 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
       // FIXME: availability.
-      // FIXME: support static properties.
-      if (VD->isStatic())
-        return;
       auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
-      printAbstractFunctionAsMethod(getter, /*isStatic=*/false);
+      printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
       if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
-        printAbstractFunctionAsMethod(setter, /*isStatic=*/false);
+        printAbstractFunctionAsMethod(setter, /*isStatic=*/VD->isStatic());
       return;
     }
 
@@ -2577,6 +2576,9 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
       return true;
     return false;
   }
+  // Clang decls don't need to be explicitly exposed.
+  if (VD->hasClangNode())
+    return true;
   if (VD->getAttrs().hasAttribute<ExposeAttr>())
     return true;
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))

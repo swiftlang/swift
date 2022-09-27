@@ -47,6 +47,18 @@ int main(int argc, char *argv[]) {
     size_t size;
     auto *data = getsectiondata(header, "__TEXT", "__swift5_entry", &size);
     int32_t offset = *reinterpret_cast<int32_t *>(data);
+    if (size >= 8) {
+      auto flags = *(reinterpret_cast<int32_t *>(data) + 1);
+      enum EntryPointFlags : unsigned {
+        HasAtMainTypeFlag = 1 << 0,
+      };
+      printf("flags: %d\n", flags);
+      bool isAtMainEntryPoint = flags & HasAtMainTypeFlag;
+      if (!isAtMainEntryPoint) {
+        printf("no @main entry point!\n");
+        continue;
+      }
+    }
     mainFunction = reinterpret_cast<MainFunction *>(
       ptrauth_sign_unauthenticated(
           reinterpret_cast<void *>(
@@ -60,7 +72,7 @@ int main(int argc, char *argv[]) {
     break;
   }
   if (!mainFunction) {
-    printf("no function!");
+    printf("no function!\n");
     return 1;
   }
   mainFunction(argc, argv); // CHECK: howdy mundo
