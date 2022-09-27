@@ -9,6 +9,7 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
 // UNSUPPORTED: remote_run
+// UNSUPPORTED: asan
 
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
