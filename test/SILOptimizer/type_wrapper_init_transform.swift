@@ -293,3 +293,40 @@ class TestConditionalInjection<T> {
     }
   }
 }
+
+/// Make sure that convenience initializers don't get _storage variable injected and don't produce any assign_by_wrapper instructions
+@Wrapper
+class ClassWithConvenienceInit<T> {
+  var a: T?
+  var b: String
+
+  init(a: T?, b: String) {
+    self.a = a
+    self.b = b
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test24ClassWithConvenienceInitC1aACyxGxSg_tcfC
+  // CHECK-NOT: {{.*}} alloc_stack [lexical] $(b: Optional<T>), var, name "_storage", implicit
+  // CHECK-NOT: assign_by_wrapper {{.*}}
+
+  convenience init(a: T? = nil) {
+    self.init(a: a, b: "<placeholder>")
+
+    // CHECK: [[A_GETTER:%.*]] = class_method [[SELF:%.*]] : $ClassWithConvenienceInit<T>, #ClassWithConvenienceInit.a!getter
+    // CHECK-NEXT: {{.*}} = apply [[A_GETTER]]<T>({{.*}})
+    _ = self.a
+    // CHECK: [[B_GETTER:%.*]] = class_method [[SELF:%.*]] : $ClassWithConvenienceInit<T>, #ClassWithConvenienceInit.b!getter
+    // CHECK-NEXT: {{.*}} = apply [[B_GETTER]]<T>({{.*}})
+    _ = self.b
+
+    // CHECK: [[A_SETTER:%.*]] = class_method [[SELF:%.*]] : $ClassWithConvenienceInit<T>, #ClassWithConvenienceInit.a!setter
+    // CHECK-NEXT: {{.*}} = apply [[A_SETTER]]<T>({{.*}})
+    self.a = a
+
+    if let a {
+      // CHECK: [[B_SETTER:%.*]] = class_method [[SELF:%.*]] : $ClassWithConvenienceInit<T>, #ClassWithConvenienceInit.b!setter
+      // CHECK-NEXT: {{.*}} = apply [[B_SETTER]]<T>({{.*}})
+      self.b = "ultimate question"
+    }
+  }
+}

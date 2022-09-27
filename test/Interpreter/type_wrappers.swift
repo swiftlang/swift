@@ -551,3 +551,39 @@ do {
     // CHECK-NEXT: nil
   }
 }
+
+do {
+  let test1 = ClassWithConvenienceInit(a: [1, 2, 3])
+  // CHECK: in getter
+  // CHECK-NEXT: [1, 2, 3]
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: <placeholder>
+  // CHECK-NEXT: in setter => <modified>
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: <modified>
+
+  func test<T>(_ v: T) {
+    let test1 = ClassWithConvenienceInit<(Int, String, T)>()
+    test1.a = (-1, "ultimate question", v)
+    print(test1.a)
+  }
+
+  test((a: 1, b: 2.0, c: 3))
+  // -> from init(a: T?)
+  // CHECK: in getter
+  // CHECK-NEXT: nil
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: <placeholder>
+  // CHECK-NEXT: in setter => <modified>
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: <modified>
+  // -> from init()
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: nil
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: <modified>
+  // -> from test<T>(_: T)
+  // CHECK-NEXT: in setter => Optional((-1, "ultimate question", (a: 1, b: 2.0, c: 3)))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: Optional((-1, "ultimate question", (a: 1, b: 2.0, c: 3)))
+}

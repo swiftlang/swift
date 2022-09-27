@@ -271,3 +271,35 @@ public class UserDefinedInitWithConditionalTest<T> {
     print(self.val)
   }
 }
+
+@Wrapper
+public class ClassWithConvenienceInit<T> {
+  public var a: T?
+  public var b: String
+
+  init(a: T?, b: String) {
+    // Just to test that conditionals work properly
+    if let a {
+      self.a = a
+    } else {
+      self.a = nil
+    }
+
+    self.b = b
+  }
+
+  public convenience init() {
+    self.init(a: nil)
+    print(self.a)
+    print(self.b)
+  }
+
+  public convenience init(a: T?) {
+    self.init(a: a, b: "<placeholder>")
+    print(self.a)
+    print(self.b)
+
+    self.b = "<modified>"
+    print(self.b)
+  }
+}
