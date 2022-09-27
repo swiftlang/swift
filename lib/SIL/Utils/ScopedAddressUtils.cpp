@@ -86,6 +86,19 @@ bool ScopedAddressValue::visitScopeEndingUses(
   }
 }
 
+// Note: This is used to fixup an incomplete address scope, so cannot assume the
+// scope's lifetime is already complete. Therefore, it needs to transitively
+// process all address uses.
+//
+// FIXME: this should use the standard recursive lifetime completion
+// utility. Otherwise dealing with nested incomplete lifetimes becomes expensive
+// and complex. e.g.
+//
+//   %storeBorrow = store_borrow %_ to %adr
+//   %loadBorrow  = load_borrow %storeBorrow
+//   apply %f(%loadBorrow) : $@convention(thin) (...) -> Never
+//   unreachable
+//
 AddressUseKind ScopedAddressValue::
 computeLiveness(SSAPrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;

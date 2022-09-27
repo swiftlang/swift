@@ -923,6 +923,10 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
   return true;
 }
 
+// FIXME: This does not yet assume complete lifetimes. Therefore, it currently
+// recursively looks through scoped uses, such as load_borrow. We should
+// separate the logic for lifetime completion from the logic that can assume
+// complete lifetimes.
 AddressUseKind
 swift::findTransitiveUsesForAddress(SILValue projectedAddress,
                                     SmallVectorImpl<Operand *> *foundUses,
@@ -1019,10 +1023,12 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     // If we have a load_borrow, add it's end scope to the liveness requirement.
     if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
       if (foundUses) {
-        for (Operand *use : lbi->getUses()) {
-          if (use->endsLocalBorrowScope()) {
-            leafUse(use);
-          }
+        // FIXME: if we can assume complete lifetimes, then this should be
+        // as simple as:
+        //   for (Operand *use : lbi->getUses()) {
+        //     if (use->endsLocalBorrowScope()) {
+        if (!findInnerTransitiveGuaranteedUses(lbi, foundUses)) {
+          result = meet(result, AddressUseKind::PointerEscape);
         }
       }
       continue;
@@ -1064,7 +1070,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     if (onError) {
       (*onError)(op);
     }
-    result = AddressUseKind::Unknown;
+    result = meet(result, AddressUseKind::Unknown);
   }
   return result;
 }
