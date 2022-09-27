@@ -44,6 +44,29 @@ namespace ns {
     struct NonTrivialImplicitMove {
         NonTrivialTemplate<int> member;
     };
+
+    #define IMMORTAL_REF                                \
+         __attribute__((swift_attr("import_as_ref")))   \
+         __attribute__((swift_attr("retain:immortal"))) \
+         __attribute__((swift_attr("release:immortal")))
+    struct IMMORTAL_REF Immortal {
+    public:
+    };
+
+    inline Immortal *makeNewImmortal() {
+        return new Immortal;
+    }
+
+    template<class T>
+    struct IMMORTAL_REF ImmortalTemplate {
+    public:
+    };
+
+    inline ImmortalTemplate<int> *makeNewImmortalInt() {
+        return new ImmortalTemplate<int>;
+    }
+
+    using ImmortalCInt = ImmortalTemplate<int>;
 }
 
 //--- module.modulemap
@@ -54,6 +77,16 @@ module CxxTest {
 
 //--- use-cxx-types.swift
 import CxxTest
+
+@_expose(Cxx)
+public func retImmortal() -> ns.Immortal {
+    return ns.makeNewImmortal()
+}
+
+@_expose(Cxx)
+public func retImmortalTemplate() -> ns.ImmortalCInt {
+    return ns.makeNewImmortalInt()
+}
 
 @_expose(Cxx)
 public func retNonTrivial() -> ns.NonTrivialTemplate<CInt> {
@@ -81,6 +114,14 @@ public func retTrivial() -> Trivial {
 }
 
 @_expose(Cxx)
+public func takeImmortal(_ x: ns.Immortal) {
+}
+
+@_expose(Cxx)
+public func takeImmortalTemplate(_ x: ns.ImmortalCInt) {
+}
+
+@_expose(Cxx)
 public func takeNonTrivial2(_ x: ns.NonTrivialTemplate<ns.TrivialinNS>) {
 }
 
@@ -103,6 +144,14 @@ public func takeTrivialInout(_ x: inout Trivial) {
 
 // CHECK: SWIFT_EXTERN void $s8UseCxxTy13retNonTrivialSo2nsO02__b18TemplateInstN2ns18efH4IiEEVyF(SWIFT_INDIRECT_RESULT void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL; // retNonTrivial()
 // CHECK: SWIFT_EXTERN struct swift_interop_returnStub_UseCxxTy_uint32_t_0_4 $s8UseCxxTy10retTrivialSo0E0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retTrivial()
+
+// CHECK: ns::Immortal *_Nonnull retImmortal() noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: return _impl::$s8UseCxxTy11retImmortalSo2nsO0E0VyF();
+// CHECK-NEXT: }
+
+// CHECK:  ns::ImmortalTemplate<int> *_Nonnull retImmortalTemplate() noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: return _impl::$s8UseCxxTy19retImmortalTemplateSo2nsO02__bf10InstN2ns16eF4IiEEVyF();
+// CHECK-NEXT: }
 
 // CHECK: } // end namespace
 // CHECK-EMPTY:
@@ -198,6 +247,14 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<Trivial *>(storage);
 // CHECK-NEXT: _impl::swift_interop_returnDirect_UseCxxTy_uint32_t_0_4(storage, _impl::$s8UseCxxTy10retTrivialSo0E0VyF());
 // CHECK-NEXT: return *storageObjectPtr;
+// CHECK-NEXT: }
+
+// CHECK: void takeImmortal(ns::Immortal *_Nonnull x) noexcept {
+// CHECK-NEXT: return _impl::$s8UseCxxTy12takeImmortalyySo2nsO0E0VF(x);
+// CHECK-NEXT: }
+
+// CHECK: void takeImmortalTemplate(ns::ImmortalTemplate<int> *_Nonnull x) noexcept {
+// CHECK-NEXT:   return _impl::$s8UseCxxTy20takeImmortalTemplateyySo2nsO02__bf10InstN2ns16eF4IiEEVF(x);
 // CHECK-NEXT: }
 
 // CHECK: inline void takeNonTrivial2(const ns::NonTrivialTemplate<ns::TrivialinNS>& x) noexcept {

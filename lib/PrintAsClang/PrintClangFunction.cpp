@@ -268,13 +268,13 @@ public:
                                      bool isInOutParam) {
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
-      ClangSyntaxPrinter(os).printIdentifier(
-          cast<clang::NamedDecl>(cd->getClangDecl())->getName());
+      ClangSyntaxPrinter(os).printNominalClangTypeReference(cd->getClangDecl());
       os << " *"
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
       if (isInOutParam) {
-        os << " __strong";
+        if (isa<clang::ObjCContainerDecl>(cd->getClangDecl()))
+          os << " __strong";
         printInoutTypeModifier();
       }
       // FIXME: Mark that this is only ObjC representable.
@@ -1151,7 +1151,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       return;
     }
     if (auto *classDecl = resultTy->getClassOrBoundGenericClass()) {
-      assert(!classDecl->hasClangNode());
+      if (classDecl->hasClangNode()) {
+        assert(!isa<clang::ObjCContainerDecl>(classDecl->getClangDecl()));
+        os << "return ";
+        printCallToCFunc(/*additionalParam=*/None);
+        os << ";\n";
+        return;
+      }
       ClangClassTypePrinter::printClassTypeReturnScaffold(
           os, classDecl, moduleContext,
           [&]() { printCallToCFunc(/*additionalParam=*/None); });
