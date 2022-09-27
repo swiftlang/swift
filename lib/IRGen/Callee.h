@@ -366,8 +366,11 @@ namespace irgen {
 
     static FunctionPointer createSigned(Kind kind, llvm::Value *value,
                                         PointerAuthInfo authInfo,
-                                        const Signature &signature) {
-      return FunctionPointer(kind, value, authInfo, signature);
+                                        const Signature &signature,
+                                        bool useSignature = false) {
+      auto res = FunctionPointer(kind, value, authInfo, signature);
+      res.useSignature = useSignature;
+      return res;
     }
     static FunctionPointer createSignedClosure(Kind kind, llvm::Value *value,
                                         PointerAuthInfo authInfo,
@@ -379,8 +382,11 @@ namespace irgen {
 
 
     static FunctionPointer createUnsigned(Kind kind, llvm::Value *value,
-                                          const Signature &signature) {
-      return FunctionPointer(kind, value, signature);
+                                          const Signature &signature,
+                                          bool useSignature = false) {
+      auto res = FunctionPointer(kind, value, signature);
+      res.useSignature = useSignature;
+      return res;
     }
 
     static FunctionPointer forDirect(IRGenModule &IGM, llvm::Constant *value,
