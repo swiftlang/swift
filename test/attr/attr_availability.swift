@@ -23,6 +23,18 @@ func unavailable_bad_platform() {}
 @available(macos, unavailable) // expected-warning {{unknown platform 'macos' for attribute 'available'; did you mean 'macOS'?}} {{12-17=macOS}}
 func incorrect_platform_case() {}
 
+@available(mscos, unavailable) // expected-warning {{unknown platform 'mscos' for attribute 'available'; did you mean 'macOS'?}} {{12-17=macOS}}
+func incorrect_platform_similar1() {}
+
+@available(macoss, unavailable) // expected-warning {{unknown platform 'macoss' for attribute 'available'; did you mean 'macOS'?}} {{12-18=macOS}}
+func incorrect_platform_similar2() {}
+
+@available(mac, unavailable) // expected-warning {{unknown platform 'mac' for attribute 'available'; did you mean 'macOS'?}} {{12-15=macOS}}
+func incorrect_platform_similar3() {}
+
+@available(notValid, unavailable) // expected-warning {{unknown platform 'notValid' for attribute 'available'}} {{none}}
+func incorrect_platform_not_similar() {}
+
 // Handle unknown platform.
 @available(HAL9000, unavailable) // expected-warning {{unknown platform 'HAL9000'}}
 func availabilityUnknownPlatform() {}
@@ -233,6 +245,10 @@ func shortFormWithTwoUnrecognizedPlatforms() {
 // expected-warning@-2 {{unrecognized platform name 'macos'; did you mean 'macOS'?}}
 func shortFormWithTwoPlatformsIncorrectCase() {
 }
+
+@available(os 8.0, *)
+// expected-warning@-1 {{unrecognized platform name 'os'; did you mean 'iOS'?}} {{12-14=iOS}}
+func iosIsClosestThanMacOS() {}
 
 // Make sure that even after the parser hits an unrecognized
 // platform it validates the availability.

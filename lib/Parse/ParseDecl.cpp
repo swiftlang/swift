@@ -567,7 +567,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   if (AnyArgumentInvalid)
     return nullptr;
   if (!PlatformKind.hasValue()) {
-    if (auto CorrectedPlatform = caseCorrectedPlatformString(Platform)) {
+    if (auto CorrectedPlatform = closestCorrectedPlatformString(Platform)) {
       diagnose(PlatformLoc, diag::attr_availability_suggest_platform, Platform,
                AttrName, *CorrectedPlatform)
           .fixItReplace(SourceRange(PlatformLoc), *CorrectedPlatform);
@@ -1845,7 +1845,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
   consumeToken();
 
   if (!MaybePlatform.hasValue()) {
-    if (auto correctedPlatform = caseCorrectedPlatformString(platformText)) {
+    if (auto correctedPlatform = closestCorrectedPlatformString(platformText)) {
       diagnose(PlatformLoc, diag::attr_availability_suggest_platform,
                platformText, AttrName, *correctedPlatform)
           .fixItReplace(SourceRange(PlatformLoc), *correctedPlatform);
