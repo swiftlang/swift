@@ -761,6 +761,9 @@ private:
   /// The range in which variable types are to be collected.
   SourceRange TotalRange;
 
+  // Specified by the client whether we should print fully qualified types
+  const bool FullyQualified;
+
   /// The output vector for VariableTypeInfos emitted during traversal.
   std::vector<VariableTypeInfo> &Results;
 
@@ -793,10 +796,12 @@ private:
 
 public:
   VariableTypeCollector(const SourceFile &SF, SourceRange Range,
+                        bool FullyQualified,
                         std::vector<VariableTypeInfo> &Results,
                         llvm::raw_ostream &OS)
       : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
-        TotalRange(Range), Results(Results), OS(OS) {}
+        TotalRange(Range), FullyQualified(FullyQualified), Results(Results),
+        OS(OS) {}
 
   bool walkToDeclPre(Decl *D, CharSourceRange DeclNameRange) override {
     if (DeclNameRange.isInvalid()) {
@@ -816,6 +821,7 @@ public:
         llvm::raw_svector_ostream OS(Buffer);
         PrintOptions Options;
         Options.SynthesizeSugarOnTypes = true;
+        Options.FullyQualifiedTypes = FullyQualified;
         auto Ty = VD->getType();
         // Skip this declaration and its children if the type is an error type.
         if (Ty->is<ErrorType>()) {
@@ -856,9 +862,10 @@ VariableTypeInfo::VariableTypeInfo(uint32_t Offset, uint32_t Length,
       TypeOffset(TypeOffset) {}
 
 void swift::collectVariableType(
-    SourceFile &SF, SourceRange Range,
+    SourceFile &SF, SourceRange Range, bool FullyQualified,
     std::vector<VariableTypeInfo> &VariableTypeInfos, llvm::raw_ostream &OS) {
-  VariableTypeCollector Walker(SF, Range, VariableTypeInfos, OS);
+  VariableTypeCollector Walker(SF, Range, FullyQualified, VariableTypeInfos,
+                               OS);
   Walker.walk(SF);
 }
 

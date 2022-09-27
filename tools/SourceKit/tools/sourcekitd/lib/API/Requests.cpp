@@ -1251,8 +1251,10 @@ static void handleSemanticRequest(
         [](int64_t v) -> unsigned { return v; });
     Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).map(
         [](int64_t v) -> unsigned { return v; });
+    int64_t FullyQualified = false;
+    Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
     return Lang.collectVariableTypes(
-        *SourceFile, Args, Offset, Length, CancellationToken,
+        *SourceFile, Args, Offset, Length, FullyQualified, CancellationToken,
         [Rec](const RequestResult<VariableTypesInFile> &Result) {
           reportVariableTypeInfo(Result, Rec);
         });

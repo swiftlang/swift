@@ -264,6 +264,7 @@ namespace swift {
   /// \c VariableTypeInfos will index into the string that backs this
   /// stream.
   void collectVariableType(SourceFile &SF, SourceRange Range,
+                           bool FullyQualified,
                            std::vector<VariableTypeInfo> &VariableTypeInfos,
                            llvm::raw_ostream &OS);
 
