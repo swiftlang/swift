@@ -1059,6 +1059,20 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       emitNewParam();
       std::string paramName;
       if (param.isSelfParameter()) {
+        bool needsStaticSelf = isa<ConstructorDecl>(FD);
+        if (needsStaticSelf) {
+          os << "swift::TypeMetadataTrait<";
+          CFunctionSignatureTypePrinter typePrinter(
+              os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+              interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+              moduleContext, declPrinter,
+              FunctionSignatureTypeUse::TypeReference);
+          auto result = typePrinter.visit(param.getType(), OTK_None,
+                                          /*isInOutParam=*/false);
+          assert(!result.isUnsupported());
+          os << ">::getTypeMetadata()";
+          return;
+        }
         paramName = "*this";
       } else if (param.getName().empty()) {
         llvm::raw_string_ostream paramOS(paramName);

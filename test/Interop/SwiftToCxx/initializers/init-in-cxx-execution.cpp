@@ -46,5 +46,20 @@ int main() {
 // CHECK-NEXT: create RefCountedClass 22
 // CHECK-NEXT: destroy RefCountedClass 22
 // CHECK-NEXT: destroy RefCountedClass -1
+
+  {
+    auto x = FinalClass::init(FirstSmallStruct::init(78));
+    assert(x.getProp().getX() == 78);
+  }
+
+  {
+    auto x = DerivedClass::init(1, 2);
+    assert(x.getX() == 5);
+  }
+
+  {
+    auto x = DerivedClassTwo::init(1, 2);
+    assert(x.getX() == 3);
+  }
   return 0;
 }
