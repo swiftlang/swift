@@ -5,6 +5,10 @@
 
 // RUN: %FileCheck %s < %t/UseObjCTy.h
 
+// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTyExposeOnly.h -I %t -enable-experimental-cxx-interop
+
+// RUN: %FileCheck %s < %t/UseObjCTyExposeOnly.h
+
 // FIXME: remove once https://github.com/apple/swift/pull/60971 lands.
 // RUN: echo "#include \"header.h\"" > %t/full-header.h
 // RUN: cat %t/UseObjCTy.h >> %t/full-header.h
@@ -27,19 +31,24 @@ module ObjCTest {
 //--- use-objc-types.swift
 import ObjCTest
 
+@_expose(Cxx)
 public func retObjClass() -> ObjCKlass {
     return ObjCKlass()
 }
 
+@_expose(Cxx)
 public func takeObjCClass(_ x: ObjCKlass) {
 }
 
+@_expose(Cxx)
 public func takeObjCClassInout(_ x: inout ObjCKlass) {
 }
 
+@_expose(Cxx)
 public func takeObjCClassNullable(_ x: ObjCKlass?) {
 }
 
+@_expose(Cxx)
 public func retObjClassNullable() -> ObjCKlass? {
     return nil
 }

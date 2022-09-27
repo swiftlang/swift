@@ -5,6 +5,10 @@
 
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTyExposeOnly.h -I %t -enable-experimental-cxx-interop
+
+// RUN: %FileCheck %s < %t/UseCxxTyExposeOnly.h
+
 // FIXME: remove once https://github.com/apple/swift/pull/60971 lands.
 // RUN: echo "#include \"header.h\"" > %t/full-cxx-swift-cxx-bridging.h
 // RUN: cat %t/UseCxxTy.h >> %t/full-cxx-swift-cxx-bridging.h
@@ -51,32 +55,40 @@ module CxxTest {
 //--- use-cxx-types.swift
 import CxxTest
 
+@_expose(Cxx)
 public func retNonTrivial() -> ns.NonTrivialTemplate<CInt> {
     return ns.NonTrivialTemplate<CInt>()
 }
 
+@_expose(Cxx)
 public func retNonTrivial2() -> ns.NonTrivialTemplate<ns.TrivialinNS> {
     return ns.NonTrivialTemplate<ns.TrivialinNS>()
 }
 
+@_expose(Cxx)
 public func retNonTrivialImplicitMove() -> ns.NonTrivialImplicitMove {
     return ns.NonTrivialImplicitMove()
 }
 
+@_expose(Cxx)
 public func retNonTrivialTypeAlias() -> ns.TypeAlias {
     return ns.TypeAlias()
 }
 
+@_expose(Cxx)
 public func retTrivial() -> Trivial {
     return Trivial()
 }
 
+@_expose(Cxx)
 public func takeNonTrivial2(_ x: ns.NonTrivialTemplate<ns.TrivialinNS>) {
 }
 
+@_expose(Cxx)
 public func takeTrivial(_ x: Trivial) {
 }
 
+@_expose(Cxx)
 public func takeTrivialInout(_ x: inout Trivial) {
 }
 
