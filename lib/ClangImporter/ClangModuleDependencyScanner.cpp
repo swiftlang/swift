@@ -137,55 +137,31 @@ void ClangImporter::recordModuleDependencies(
     }
 
     std::vector<std::string> swiftArgs;
-    // We are using Swift frontend mode.
-    swiftArgs.push_back("-frontend");
-    // We pass the entire argument list via -Xcc, so the invocation should
-    // use extra clang options alone.
-    swiftArgs.push_back("-only-use-extra-clang-opts");
     auto addClangArg = [&](Twine arg) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(arg.str());
     };
-    auto addClangFrontendArg = [&](Twine arg) {
-      addClangArg("-Xclang");
-      addClangArg(arg);
-    };
 
-    // Add args reported by the scanner.
-    auto It = clangModuleDep.BuildArguments.begin();
-    auto ItEnd = clangModuleDep.BuildArguments.end();
-    // Skip -cc1.
-    ++It;
+    // We are using Swift frontend mode.
+    swiftArgs.push_back("-frontend");
 
-    while(It != ItEnd) {
-      StringRef arg = *It;
-      // Remove the -target arguments because we should use the target triple
-      // specified with `-clang-target` on the scanner invocation, or
-      // from the depending Swift modules.
-      if (arg == "-target") {
-        It += 2;
-      } else if (arg.startswith("-fapinotes-swift-version=")) {
-        // Remove the apinotes version because we should use the language version
-        // specified in the interface file.
-        It += 1;
-      } else {
-        addClangFrontendArg(*It);
-        ++ It;
-      }
-    }
-
-    // If the scanner is invoked with '-clang-target', ensure this is the target
-    // used to build this PCM.
-    if (Impl.SwiftContext.LangOpts.ClangTarget.hasValue()) {
-      llvm::Triple triple = Impl.SwiftContext.LangOpts.ClangTarget.getValue();
-      addClangArg("-target");
-      addClangArg(triple.str());
-    }
+    // We pass the entire argument list via -Xcc, so the invocation should
+    // use extra clang options alone.
+    swiftArgs.push_back("-only-use-extra-clang-opts");
 
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
+
+    // Ensure that the resulting PCM build invocation uses Clang frontend directly
+    swiftArgs.push_back("-direct-clang-cc1-module-build");
+
+    // Swift frontend option for input file path (Foo.modulemap).
+    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
+
+    // Add args reported by the scanner.
+    llvm::for_each(clangModuleDep.BuildArguments, addClangArg);
 
     // Pass down search paths to the -emit-module action.
     // Unlike building Swift modules, we need to include all search paths to
@@ -201,8 +177,6 @@ void ClangImporter::recordModuleDependencies(
       addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
     }
 
-    // Swift frontend option for input file path (Foo.modulemap).
-    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(

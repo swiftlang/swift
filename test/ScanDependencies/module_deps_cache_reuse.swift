@@ -114,7 +114,6 @@ import SubE
 // CHECK-NEXT: "-frontend"
 // CHECK-NEXT: "-only-use-extra-clang-opts
 // CHECK-NOT: "BUILD_DIR/bin/clang"
-// CHECK: "-fsystem-module",
 // CHECK: "-emit-pcm",
 // CHECK: "-module-name",
 // CHECK-NEXT: "C"
