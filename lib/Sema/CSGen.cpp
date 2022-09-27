@@ -4369,10 +4369,15 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
       continue;
 
     case StmtConditionElement::CK_HasSymbol: {
-      ASTContext &ctx = getASTContext();
-      ctx.Diags.diagnose(condElement.getStartLoc(),
-                         diag::has_symbol_unsupported_in_closures);
-      return true;
+      Expr *symbolExpr = condElement.getHasSymbolInfo()->getSymbolExpr();
+      auto target = SolutionApplicationTarget(symbolExpr, dc, CTP_Unused,
+                                              Type(), /*isDiscarded=*/false);
+
+      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+        return true;
+
+      setSolutionApplicationTarget(&condElement, target);
+      continue;
     }
 
     case StmtConditionElement::CK_Boolean: {

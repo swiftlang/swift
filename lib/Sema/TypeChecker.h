@@ -441,6 +441,10 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
                                    DeclContext *dc);
 
+/// Returns the unique decl ref identified by the expr according to the
+/// requirements of the \c #_hasSymbol() condition type.
+ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
+
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 

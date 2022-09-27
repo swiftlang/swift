@@ -93,6 +93,7 @@ func testNotWeakDeclDiagnostics(_ s: LocalStruct) {
 }
 
 func testInvalidExpressionsDiagnostics() {
+  if #_hasSymbol(unknownDecl) {} // expected-error {{cannot find 'unknownDecl' in scope}}
   if #_hasSymbol(noArgFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
   if #_hasSymbol(global - 1) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
   if #_hasSymbol(S.staticFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
@@ -101,15 +102,36 @@ func testInvalidExpressionsDiagnostics() {
   if #_hasSymbol(1 as S) {} // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
 }
 
-func testMultiStatementClosure() {
-  let _: () -> Void = { // expected-error {{unable to infer closure type in the current context}}
-    if #_hasSymbol(global) {} // expected-error 2 {{#_hasSymbol is not supported in closures}}
-  }
-  
-  let _: () -> Void = { // expected-error {{unable to infer closure type in the current context}}
-    if #_hasSymbol(global) {} // expected-error 2 {{#_hasSymbol is not supported in closures}}
-    localFunc()
-  }
+func testGuard() {
+  guard #_hasSymbol(global) else { return }
+  guard #_hasSymbol(unknownDecl) else { return } // expected-error {{cannot find 'unknownDecl' in scope}}
+  guard #_hasSymbol(localFunc) else { return } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
+}
+
+func testWhile() {
+  while #_hasSymbol(global) { break }
+  while #_hasSymbol(unknownDecl) { break } // expected-error {{cannot find 'unknownDecl' in scope}}
+  while #_hasSymbol(localFunc) { break } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
+}
+
+func doIt(_ closure: () -> ()) {
+  closure()
+}
+
+func testClosure() {
+  doIt { if #_hasSymbol(global) {} }
+  doIt { if #_hasSymbol(noArgFunc) {} }
+  doIt { if #_hasSymbol(ambiguousFunc as () -> Int) {} }
+  doIt { if #_hasSymbol(S.self) {} }
+  doIt { if #_hasSymbol(ambiguousFunc) {} } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
+  doIt { if #_hasSymbol(localFunc) {} } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
+  doIt { if #_hasSymbol(unknownDecl) {} } // expected-error {{cannot find 'unknownDecl' in scope}}
+  doIt { if #_hasSymbol(noArgFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(global - 1) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(S.staticFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(C.classFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(1 as Int) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(1 as S) {} } // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
 }
 
 protocol View {}
@@ -120,15 +142,23 @@ protocol View {}
   static func buildEither<Content>(second content: Content) -> Content where Content : View { fatalError() }
 }
 
-struct Image : View {
-}
+struct Image : View {}
 
 struct MyView {
-  @ViewBuilder var body: some View {
-    if #_hasSymbol(global) { // expected-error {{#_hasSymbol is not supported in closures}}
-      Image()
-    } else {
-      Image()
-    }
+  let image = Image()
+  
+  @ViewBuilder var globalView: some View {
+    if #_hasSymbol(global) { image }
+    else { image }
+  }
+  
+  @ViewBuilder var ambiguousFuncView: some View {
+    if #_hasSymbol(ambiguousFunc) { image } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
+    else { image }
+  }
+    
+  @ViewBuilder var localFuncView: some View {
+    if #_hasSymbol(localFunc) { image } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
+    else { image }
   }
 }

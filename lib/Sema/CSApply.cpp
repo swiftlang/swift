@@ -8923,8 +8923,22 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     for (auto &condElement : *stmtCondition) {
       switch (condElement.getKind()) {
       case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_HasSymbol:
         continue;
+
+      case StmtConditionElement::CK_HasSymbol: {
+        ConstraintSystem &cs = solution.getConstraintSystem();
+        auto target = *cs.getSolutionApplicationTarget(&condElement);
+        auto resolvedTarget = rewriteTarget(target);
+        if (!resolvedTarget)
+          return None;
+
+        auto info = condElement.getHasSymbolInfo();
+        auto rewrittenExpr = resolvedTarget->getAsExpr();
+        info->setSymbolExpr(rewrittenExpr);
+        info->setReferencedDecl(
+            TypeChecker::getReferencedDeclForHasSymbolCondition(rewrittenExpr));
+        continue;
+      }
 
       case StmtConditionElement::CK_Boolean: {
         auto condExpr = condElement.getBoolean();
