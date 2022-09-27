@@ -20,6 +20,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Frontend/FrontendOptions.h"
 
 #include "clang/Basic/Module.h"
 
@@ -506,7 +507,7 @@ static std::string getModuleContentsCxxString(
 
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                StringRef bridgingHeader,
-                               bool ExposePublicDeclsInClangHeader,
+                               const FrontendOptions &frontendOpts,
                                const IRGenOptions &irGenOpts) {
   llvm::PrettyStackTraceString trace("While generating Clang header");
 
@@ -523,12 +524,15 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
-    if (ExposePublicDeclsInClangHeader ||
-        M->DeclContext::getASTContext().LangOpts.EnableCXXInterop) {
+    bool enableCxx = frontendOpts.ExposePublicDeclsInClangHeader ||
+                     frontendOpts.EnableExperimentalCxxInteropInClangHeader ||
+                     M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
+    if (enableCxx) {
       SmallPtrSet<ImportModuleTy, 8> imports;
       auto contents = getModuleContentsCxxString(
           *M, imports, interopContext,
-          /*requiresExposedAttribute=*/!ExposePublicDeclsInClangHeader);
+          /*requiresExposedAttribute=*/
+          !frontendOpts.ExposePublicDeclsInClangHeader);
       // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
       writeImports(os, imports, *M, bridgingHeader, /*useCxxImport=*/true);
       os << contents;

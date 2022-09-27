@@ -630,6 +630,11 @@ def enable_experimental_cxx_interop :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
+def enable_experimental_cxx_interop_in_clang_header :
+  Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Enable experimental Swift to C++ interop code generation in generated Clang header">;
+
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   Flags<[HelpHidden]>,
