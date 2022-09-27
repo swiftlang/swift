@@ -5056,8 +5056,7 @@ StringRef FunctionPointer::getName(IRGenModule &IGM) const {
     return getRawPointer()->getName();
   case BasicKind::AsyncFunctionPointer: {
     auto *asyncFnPtr = getDirectPointer();
-    if (isa<llvm::BitCastInst>(asyncFnPtr))
-      asyncFnPtr = cast<llvm::Constant>(asyncFnPtr->getOperand(0));
+    asyncFnPtr = cast<llvm::Constant>(asyncFnPtr->stripPointerCasts());
     return IGM
         .getSILFunctionForAsyncFunctionPointer(asyncFnPtr)->getName();
   }
