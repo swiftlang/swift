@@ -41,9 +41,10 @@ StringRef platformString(PlatformKind platform);
 /// or None if such a platform kind does not exist.
 Optional<PlatformKind> platformFromString(StringRef Name);
 
-/// Returns a valid platform string if the candidate string would be a valid
-/// platform string if its case were adjusted (e.g. "macos" -> "macOS").
-Optional<StringRef> caseCorrectedPlatformString(StringRef candidate);
+/// Returns a valid platform string that is closest to the candidate string
+/// based on edit distance. Returns \c None if the closest valid platform
+/// distance is not within a minimum threshold.
+Optional<StringRef> closestCorrectedPlatformString(StringRef candidate);
 
 /// Returns a human-readable version of the platform name as a string, suitable
 /// for emission in diagnostics (e.g., "macOS").

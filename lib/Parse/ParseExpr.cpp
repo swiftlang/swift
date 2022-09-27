@@ -3953,7 +3953,7 @@ Parser::parsePlatformVersionConstraintSpec() {
 
   if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
     if (auto CorrectedPlatform =
-            caseCorrectedPlatformString(PlatformIdentifier.str())) {
+            closestCorrectedPlatformString(PlatformIdentifier.str())) {
       diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
                PlatformIdentifier, *CorrectedPlatform)
           .fixItReplace(PlatformLoc, *CorrectedPlatform);

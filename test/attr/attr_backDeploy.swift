@@ -257,6 +257,10 @@ public func transparentFunc() {}
 @_backDeploy(before: macos 12.0, iOS 15.0) // expected-warning {{unknown platform 'macos' for attribute '@_backDeploy'; did you mean 'macOS'?}} {{22-27=macOS}}
 public func incorrectPlatformCaseFunc() {}
 
+@available(macOS 11.0, iOS 14.0, *)
+@_backDeploy(before: mscos 12.0, iOS 15.0) // expected-warning {{unknown platform 'mscos' for attribute '@_backDeploy'; did you mean 'macOS'?}} {{22-27=macOS}}
+public func incorrectPlatformSimilarFunc() {}
+
 @available(macOS 11.0, *)
 @_backDeploy(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@_backDeploy'}}
 public func unknownOSFunc() {}
