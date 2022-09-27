@@ -163,7 +163,7 @@ This status table describes which of the following Swift language features have 
 | Copy and destroy semantics   | Yes                                                      |
 | Creation                     | Yes                                                      |
 | Enums with associated values | Partially: only support structs and enums                |
-| Enums with raw values        | No                                                       |
+| Enums with raw values        | Yes                                                       |
 | Indirect enums               | No                                                       |
 
 **Class types**

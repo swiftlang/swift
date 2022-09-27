@@ -20,6 +20,12 @@ public struct SmallStruct {
 }
 
 @_expose(Cxx)
+public enum RawEnum: Int16 {
+    case first = 1
+    case second = 3
+}
+
+@_expose(Cxx)
 public class Klass {
     public let x: Int16
 
@@ -114,5 +120,14 @@ int main() {
 // CHECK-NEXT: Optional(UseOptional.Klass)
 // CHECK-NEXT: nil
 // CHECK-NEXT: deinit-Klass
+
+  {
+    auto val = RawEnum::init(1);
+    assert(val.isSome());
+    assert(val.getUnsafelyUnwrapped() == RawEnum::first);
+    assert(val.getUnsafelyUnwrapped().getRawValue() == 1);
+    auto val2 = RawEnum::init(2);
+    assert(val2.isNone());
+  }
   return 0;
 }
