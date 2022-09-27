@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
+
+import Swift
+
+public protocol AnElt {
+}
+
+public protocol HasElt {
+  associatedtype Elt
+  init(e: Elt)
+}
+
+struct X : AnElt {
+  @_hasStorage var i: Int { get set }
+  init(i: Int)
+}
+
+struct S : HasElt {
+  typealias Elt = X
+  @_hasStorage var e: X { get set }
+  init(e: Elt)
+}
+
+class Klass {}
+
+class EltTrivialKlass : AnElt {
+  var i: Int { get set }
+  init(i: Int) {}
+}
+
+class ContainerKlass : HasElt {
+  typealias Elt = EltTrivialKlass
+  var e: Elt { get set }
+  required init(e: Elt)
+}
+
+public struct G<Container : HasElt> {
+  var container: Container? = nil
+  public func getContainer(e: Container.Elt) -> Container
+  init()
+}
+
+public struct GTrivial<Container : HasElt> {
+  public func getContainer(e: Container.Elt) -> Container
+  init()
+}
+
+sil [ossa] @callee : $@convention(method) <Container where Container : HasElt> (@in Container.Elt, @in_guaranteed G<Container>) -> @out Container {
+bb0(%0 : $*Container, %1 : $*Container.Elt, %2 : $*G<Container>):
+  %4 = witness_method $Container, #HasElt.init!allocator : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
+  %5 = metatype $@thick Container.Type
+  %6 = apply %4<Container>(%0, %1, %5) : $@convention(witness_method: HasElt) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @thick τ_0_0.Type) -> @out τ_0_0
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil {{.*}}@$s6caller4main1SV_Tg5 : {{.*}}{
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $G<S>, {{%[^,]+}} :
+// CHECK-LABEL: } // end sil function '$s6caller4main1SV_Tg5'
+
+sil [_specialize where T == S] [ossa] @caller : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (@in_guaranteed G<T>, @in T.Elt) -> @out T {
+bb0(%0 : $*T, %1 : @_eagerMove $*G<T>, %2 : $*T.Elt):
+  %5 = function_ref @callee : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @in_guaranteed G<τ_0_0>) -> @out τ_0_0
+  %6 = apply %5<T>(%0, %2, %1) : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, @in_guaranteed G<τ_0_0>) -> @out τ_0_0
+  %7 = tuple ()
+  return %7 : $()
+}
+

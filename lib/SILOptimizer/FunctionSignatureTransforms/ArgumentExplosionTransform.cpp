@@ -390,9 +390,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
 
     for (auto *Node : LeafNodes) {
       auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());
-      LeafValues.push_back(
+      auto *Argument =
           BB->insertFunctionArgument(ArgOffset, Node->getType(), OwnershipKind,
-                                     BB->getArgument(OldArgIndex)->getDecl()));
+                                     BB->getArgument(OldArgIndex)->getDecl());
+      Argument->setNoImplicitCopy(AD.Arg->isNoImplicitCopy());
+      Argument->setLifetimeAnnotation(AD.Arg->getLifetimeAnnotation());
+      LeafValues.push_back(Argument);
       TransformDescriptor.AIM[TotalArgIndex - 1] = AD.Index;
       ++ArgOffset;
       ++TotalArgIndex;
