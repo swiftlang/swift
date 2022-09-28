@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/def_structA.swift
-// RUN: %target-swift-emit-silgen %s -I %t | %FileCheck %s
+
+// This uses '-primary-file' to ensure we're conservative with lazy SIL emission.
+// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
+
 import def_structA
 
 public struct Projection<T> {
@@ -388,6 +391,15 @@ struct HasPrivate {
 
   // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter10HasPrivateV08testFileE7Wrapper{{.*}}LL1xyAA0H0VySiG_tF : $@convention(method) (Wrapper<Int>, HasPrivate) -> ()
   fileprivate func testFilePrivateWrapper(@Wrapper x: Int) {}
+
+  func usesWrapperFunctions() {
+    // These are needed to ensure we emit the backing initializers. Otherwise
+    // lazy SILGen emission is happy to drop them.
+    testPrivateWrapper(x: 0)
+    testPrivateWrapper($x: Projection(wrappedValue: 0))
+    testFilePrivateWrapper(x: 0)
+    testFilePrivateWrapper($x: Projection(wrappedValue: 0))
+  }
 }
 
 @propertyWrapper
