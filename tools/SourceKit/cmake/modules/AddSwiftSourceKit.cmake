@@ -167,7 +167,12 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
           target_link_directories(${target} PRIVATE "${sdk_dir}")
 
           # Include the abi stable system stdlib in our rpath.
-         set(swift_runtime_rpath "/usr/lib/swift")
+          set(swift_runtime_rpath "/usr/lib/swift")
+
+          # Add in the toolchain directory so we can grab compatibility libraries
+          get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+          get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+          target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
         endif()
       endif()
     endif()
