@@ -134,6 +134,7 @@ class ModuleWriter {
   llvm::raw_string_ostream outOfLineDefinitionsOS;
   DeclAndTypePrinter printer;
   OutputLanguageMode outputLangMode;
+  bool dependsOnStdlib = false;
 
 public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
@@ -149,6 +150,11 @@ public:
 
   PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
 
+  /// Returns true if a Stdlib dependency was seen during the emission of this module.
+  bool isStdlibRequired() const {
+    return dependsOnStdlib;
+  }
+
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
   ///
@@ -159,8 +165,10 @@ public:
 
     if (otherModule == &M)
       return false;
-    if (otherModule->isStdlibModule() ||
-        otherModule->isBuiltinModule())
+    if (otherModule->isStdlibModule()) {
+      dependsOnStdlib = true;
+      return true;
+    } else if (otherModule->isBuiltinModule())
       return true;
     // Don't need a module for SIMD types in C.
     if (otherModule->getName() == M.getASTContext().Id_simd)
@@ -734,20 +742,22 @@ void swift::printModuleContentsAsObjC(
       .write();
 }
 
-void swift::printModuleContentsAsCxx(
-    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
+    raw_ostream &os,
     ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     bool requiresExposedAttribute) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
   llvm::raw_string_ostream prologueOS{modulePrologueBuf};
+  EmittedClangHeaderDependencyInfo info;
 
   // FIXME: Use getRequiredAccess once @expose is supported.
-  ModuleWriter writer(moduleOS, prologueOS, imports, M, interopContext,
+  ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
                       AccessLevel::Public, requiresExposedAttribute,
                       OutputLanguageMode::Cxx);
   writer.write();
+  info.dependsOnStandardLibrary = writer.isStdlibRequired();
 
   os << "#ifndef SWIFT_PRINTED_CORE\n";
   os << "#define SWIFT_PRINTED_CORE\n";
@@ -778,4 +788,5 @@ void swift::printModuleContentsAsCxx(
   ClangSyntaxPrinter(os).printNamespace(
       [&](raw_ostream &os) { M.ValueDecl::getName().print(os); },
       [&](raw_ostream &os) { os << moduleOS.str(); });
+  return info;
 }

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -clang-header-expose-public-decls -emit-clang-header-path %t/empty.h
+// RUN: %target-swift-frontend %s -typecheck -clang-header-expose-decls=all-public -emit-clang-header-path %t/empty.h
 // RUN: %FileCheck %s < %t/empty.h
 
 // CHECK-LABEL: #ifndef EMPTY_SWIFT_H

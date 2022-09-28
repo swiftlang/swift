@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -clang-header-expose-public-decls -emit-clang-header-path %t/cdecl.h
+// RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -clang-header-expose-decls=all-public -emit-clang-header-path %t/cdecl.h
 // RUN: %FileCheck %s < %t/cdecl.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -emit-clang-header-path %t/useopt.h
+// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/useopt.h
 
 // RUN: %FileCheck %s < %t/useopt.h
 

@@ -1081,11 +1081,12 @@ def skip_import_in_public_interface:
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
 
-def clang_header_expose_public_decls:
-  Flag<["-"], "clang-header-expose-public-decls">,
-  HelpText<"Expose all public declarations in the generated clang header">,
-  Flags<[FrontendOption, HelpHidden]>;
-  
+def clang_header_expose_decls:
+  Joined<["-"], "clang-header-expose-decls=">,
+  HelpText<"Which declarations should be exposed in the generated clang header.">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"all-public|has-expose-attr">;
+
 def weak_link_at_target :
   Flag<["-"], "weak-link-at-target">,
   HelpText<"Weakly link symbols for declarations that were introduced at the "

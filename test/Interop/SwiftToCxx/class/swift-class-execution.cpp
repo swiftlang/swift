@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-public-decls -emit-clang-header-path %t/class.h
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-class-execution.o
 // RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t/swift-class-execution -Xlinker %t/swift-class-execution.o -module-name Class -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -10,7 +10,7 @@
 
 // RUN: %empty-directory(%t-evo)
 
-// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-public-decls -enable-library-evolution -emit-clang-header-path %t-evo/class.h
+// RUN: %target-swift-frontend %S/swift-class-in-cxx.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -enable-library-evolution -emit-clang-header-path %t-evo/class.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t-evo -o %t-evo/swift-class-execution.o
 // RUN: %target-interop-build-swift %S/swift-class-in-cxx.swift -o %t-evo/swift-class-execution-evo -Xlinker %t-evo/swift-class-execution.o -module-name Class -enable-library-evolution -Xfrontend -entry-point-function-name -Xfrontend swiftMain
