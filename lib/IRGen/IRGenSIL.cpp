@@ -5250,9 +5250,8 @@ static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
   auto &operTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(operand->getType()));
   LoadedRef ref =
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));
-
   return
-    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull());
+    IGF.emitIsUniqueCall(ref.getValue(), ref.getStyle(), loc, ref.isNonNull());
 }
 
 void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
@@ -5283,7 +5282,7 @@ void IRGenSILFunction::visitBeginCOWMutationInst(BeginCOWMutationInst *i) {
       llvm::Value *castBuffer =
         Builder.CreateBitCast(buffer, IGM.getReferenceType(style));
 
-      isUnique.add(emitIsUniqueCall(castBuffer, i->getLoc().getSourceLoc(),
+      isUnique.add(emitIsUniqueCall(castBuffer, style, i->getLoc().getSourceLoc(),
                                     /*isNonNull*/ true));
     }
   } else {

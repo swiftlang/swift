@@ -183,7 +183,7 @@ unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
   llvm_unreachable("don't need payload size for this enum kind");
 }
 
-llvm::Value *EnumImplStrategy::
+LoadedRef EnumImplStrategy::
 loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
   IGF.IGM.error(loc, "Can only load from an address of an optional "
                 "reference.");
@@ -2803,13 +2803,11 @@ namespace {
       }
     }
 
-    llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
+    LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                    Address addr) const override {
       // There is no need to bitcast from the enum address. Loading from the
       // reference type emits a bitcast to the proper reference type first.
-      return getLoadablePayloadTypeInfo()
-        .loadRefcountedPtr(IGF, loc, addr)
-        .getValue();
+      return getLoadablePayloadTypeInfo().loadRefcountedPtr(IGF, loc, addr);
     }
   private:
     llvm::ConstantInt *getZeroExtraTagConstant(IRGenModule &IGM) const {

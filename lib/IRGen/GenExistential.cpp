@@ -1266,7 +1266,7 @@ public:
   LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                               Address existential) const override {
     Address valueAddr = projectValue(IGF, existential);
-    return LoadedRef(IGF.emitLoadRefcountedPtr(valueAddr, Refcounting), true);
+    return LoadedRef(IGF.emitLoadRefcountedPtr(valueAddr, Refcounting), true, Refcounting);
   }
 
   llvm::StructType *buildReferenceStorageType(IRGenModule &IGM,

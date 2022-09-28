@@ -1345,17 +1345,30 @@ llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
 }
 
 llvm::Value *IRGenFunction::
-emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
+emitIsUniqueCall(llvm::Value *value, ReferenceCounting style, SourceLoc loc, bool isNonNull) {
   FunctionPointer fn;
   bool nonObjC = !IGM.getAvailabilityContext().isContainedIn(
       IGM.Context.getObjCIsUniquelyReferencedAvailability());
-
-  if (value->getType() == IGM.RefCountedPtrTy) {
+  switch (style) {
+  case ReferenceCounting::Native: {
     if (isNonNull)
       fn = IGM.getIsUniquelyReferenced_nonNull_nativeFunctionPointer();
     else
       fn = IGM.getIsUniquelyReferenced_nativeFunctionPointer();
-  } else if (value->getType() == IGM.UnknownRefCountedPtrTy) {
+  }
+  break;
+  case ReferenceCounting::Bridge: {
+    if (!isNonNull)
+      unimplemented(loc, "optional bridge ref");
+
+    if (nonObjC)
+      fn =
+          IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFunctionPointer();
+    else
+      fn = IGM.getIsUniquelyReferenced_nonNull_bridgeObjectFunctionPointer();
+  }
+  break;
+  case ReferenceCounting::Unknown: {
     if (nonObjC) {
       if (isNonNull)
         fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFunctionPointer();
@@ -1367,18 +1380,16 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
       else
         fn = IGM.getIsUniquelyReferencedFunctionPointer();
     }
-  } else if (value->getType() == IGM.BridgeObjectPtrTy) {
-    if (!isNonNull)
-      unimplemented(loc, "optional bridge ref");
-
-    if (nonObjC)
-      fn =
-          IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFunctionPointer();
-    else
-      fn = IGM.getIsUniquelyReferenced_nonNull_bridgeObjectFunctionPointer();
-  } else {
+  }
+  break;
+  case ReferenceCounting::Error:
+  case ReferenceCounting::ObjC:
+  case ReferenceCounting::Block:
+  case ReferenceCounting::Custom:
+  case ReferenceCounting::None:
     llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
   }
+
   llvm::CallInst *call = Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
   return call;
