@@ -9,12 +9,12 @@
 
 // Check if the optimizer is able to convert array literals to constant statically initialized arrays.
 
-// CHECK: @"$s4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @_swiftStaticArrayMetadata, {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @_swiftStaticArrayMetadata, {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @_swiftStaticArrayMetadata, {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @_swiftStaticArrayMetadata, {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @_swiftStaticArrayMetadata, {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test3StrV14staticVariable_WZTv_r" = {{.*}} constant {{.*}} @_swiftStaticArrayMetadata, {{.*}} @_swiftImmortalRefCount
+// CHECK: @"$s4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK: @"$s4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK: @"$s4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK: @"$s4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK: @"$s4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK: @"$s4test3StrV14staticVariable_WZTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
 // CHECK-NOT: swift_initStaticObject
 
 // UNSUPPORTED: use_os_stdlib
