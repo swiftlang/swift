@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Class -clang-header-expose-public-decls -emit-clang-header-path %t/class.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
 // RUN: %FileCheck %s < %t/class.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t/class-evo.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/class-evo.h
 // RUN: %FileCheck %s < %t/class-evo.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class-evo.h)

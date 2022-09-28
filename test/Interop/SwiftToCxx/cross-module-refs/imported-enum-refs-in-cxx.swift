@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/enums.swift -module-name Enums -emit-module -emit-module-path %t/Enums.swiftmodule -clang-header-expose-public-decls -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %S/Inputs/enums.swift -module-name Enums -emit-module -emit-module-path %t/Enums.swiftmodule -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UsesEnums -I %t -clang-header-expose-public-decls -emit-clang-header-path %t/uses-enums.h
+// RUN: %target-swift-frontend %s -typecheck -module-name UsesEnums -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-enums.h
 
 // FIXME: add import automatically?
 // RUN: echo '#include "enums.h"' > %t/fixed-uses-enums.h

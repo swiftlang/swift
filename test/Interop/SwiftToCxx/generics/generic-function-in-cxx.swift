@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-generic-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t/functions-evo.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Functions -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions-evo.h
 // RUN: %FileCheck %s < %t/functions-evo.h
 
 // RUN: %check-generic-interop-cxx-header-in-clang(%t/functions-evo.h -Wno-unused-function)

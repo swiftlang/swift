@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Enums -clang-header-expose-public-decls -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
 // RUN: %FileCheck --check-prefixes=CHECK,OLD_CASE %s < %t/enums.h
 
-// RUN: %target-swift-frontend %s -enable-library-evolution -D NEW_CASE -typecheck -module-name Enums -clang-header-expose-public-decls -emit-clang-header-path %t/enums_new_case.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -D NEW_CASE -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums_new_case.h
 // RUN: %FileCheck --check-prefixes=CHECK,NEW_CASE %s < %t/enums_new_case.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)

@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
-
 // RUN: %target-swift-frontend -typecheck %t/use-array.swift -typecheck -module-name UseArray -enable-experimental-cxx-interop -emit-clang-header-path %t/UseArray.h
 
 // RUN: %target-interop-build-clangxx -fno-exceptions -std=gnu++20 -c %t/array-execution.cpp -I %t -o %t/swift-stdlib-execution.o
@@ -31,7 +29,6 @@ public func printArray(_ val: Array<CInt>) {
 //--- array-execution.cpp
 
 #include <cassert>
-#include "Swift.h"
 #include "UseArray.h"
 
 int main() {
