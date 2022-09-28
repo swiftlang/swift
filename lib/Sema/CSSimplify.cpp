@@ -3640,7 +3640,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               if (result == SolutionKind::Solved) {
                 auto fix = ForceOptional::create(*this, type1, proto,
                                                  getConstraintLocator(locator));
-                if (recordFix(fix, /*impact=*/1))
+                if (recordFix(fix))
                   return getTypeMatchFailure(locator);
                 break;
               }
