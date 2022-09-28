@@ -325,7 +325,7 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   if (!(parent && parent->hasTypeWrapper()))
     return false;
 
-  if (property->isStatic() || property->isLet())
+  if (property->isStatic())
     return false;
 
   // If this property has `@typeWrapperIgnored` attribute

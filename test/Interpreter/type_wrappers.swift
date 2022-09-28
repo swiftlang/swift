@@ -358,10 +358,11 @@ testPropertyWrappers()
 
 do {
   var person = PersonWithUnmanagedTest(name: "Arthur Dent")
-  // CHECK: Wrapper.init($Storage(_favoredColor: type_wrapper_defs.PropWrapper<Swift.String>(value: "red")))
+  // CHECK: Wrapper.init($Storage(name: "Arthur Dent", _favoredColor: type_wrapper_defs.PropWrapper<Swift.String>(value: "red")))
 
   print(person.name)
-  // CHECK: Arthur Dent
+  // CHECK: in read-only getter
+  // CHECK-NEXT: Arthur Dent
 
   print(person.age)
   // CHECK: 30

@@ -7,6 +7,13 @@ public struct Wrapper<S> {
     self.underlying = memberwise
   }
 
+  public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    get {
+      print("in read-only getter")
+      return underlying[keyPath: path]
+    }
+  }
+
   public subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get {
       print("in getter")

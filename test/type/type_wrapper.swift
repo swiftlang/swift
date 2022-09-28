@@ -351,7 +351,7 @@ func testDeclarationsWithUnmanagedProperties() {
   }
 
   _ = WithDefaultedLet(age: 32) // Ok
-  _ = WithDefaultedLet(name: "", age: 0) // expected-error {{extra argument 'name' in call}}
+  _ = WithDefaultedLet(name: "", age: 0) // Ok
 
   @NoopWrapper
   struct WithLazy {
