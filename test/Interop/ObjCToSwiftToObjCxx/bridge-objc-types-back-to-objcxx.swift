@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-public-decls
+// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
 // RUN: %FileCheck %s < %t/UseObjCTy.h
 
-// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTyExposeOnly.h -I %t -enable-experimental-cxx-interop
+// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTyExposeOnly.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr
 
 // RUN: %FileCheck %s < %t/UseObjCTyExposeOnly.h
 

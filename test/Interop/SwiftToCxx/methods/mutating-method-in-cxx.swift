@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Methods -clang-header-expose-public-decls -emit-clang-header-path %t/methods.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Methods -clang-header-expose-decls=all-public -emit-clang-header-path %t/methods.h
 // RUN: %FileCheck %s < %t/methods.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/methods.h)

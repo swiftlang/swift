@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-public-decls -emit-clang-header-path %t/inits.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits.h
 // RUN: %FileCheck %s < %t/inits.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function)
