@@ -3780,7 +3780,7 @@ namespace {
       return result;
     }
 
-    Expr *visitIfExpr(IfExpr *expr) {
+    Expr *visitTernaryExpr(TernaryExpr *expr) {
       auto resultTy = simplifyType(cs.getType(expr));
       cs.setType(expr, resultTy);
 
@@ -8081,18 +8081,18 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(
       return {parent, 0};
     if (BE->getRHS() == expr)
       return {parent, 1};
-  } else if (auto ifExpr = dyn_cast<IfExpr>(parent)) {
+  } else if (auto *ternary = dyn_cast<TernaryExpr>(parent)) {
     unsigned index;
-    if (expr == ifExpr->getCondExpr()) {
+    if (expr == ternary->getCondExpr()) {
       index = 0;
-    } else if (expr == ifExpr->getThenExpr()) {
+    } else if (expr == ternary->getThenExpr()) {
       index = 1;
-    } else if (expr == ifExpr->getElseExpr()) {
+    } else if (expr == ternary->getElseExpr()) {
       index = 2;
     } else {
-      llvm_unreachable("expr not found in parent IfExpr");
+      llvm_unreachable("expr not found in parent TernaryExpr");
     }
-    return { ifExpr, index };
+    return { ternary, index };
   } else if (auto assignExpr = dyn_cast<AssignExpr>(parent)) {
     unsigned index;
     if (expr == assignExpr->getSrc()) {

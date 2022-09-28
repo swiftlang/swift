@@ -6,7 +6,7 @@
 // CHECK-NOT: return
 // CHECK: increment_profiler_counter
 
-// rdar://problem/23256795 - Avoid crash if an if_expr has no parent
+// rdar://problem/23256795 - Avoid crash if an ternary_expr has no parent
 // CHECK: sil_coverage_map {{.*}}// variable initialization expression of coverage_ternary.bar.m1 : Swift.String
 class bar {
   var m1 = flag == 0   // CHECK: [[@LINE]]:12 -> [[@LINE+2]]:22 : 0
