@@ -3646,7 +3646,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               }
             }
             auto fix = AllowArgumentMismatch::create(
-                *this, type1, proto, getConstraintLocator(anchor, path));
+                  *this, type1, proto, getConstraintLocator(anchor, path));
             if (recordFix(fix, /*impact=*/2))
               return getTypeMatchFailure(locator);
             break;
