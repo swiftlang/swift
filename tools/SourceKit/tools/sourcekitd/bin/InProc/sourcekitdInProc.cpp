@@ -200,3 +200,9 @@ void postNotification(sourcekitd_response_t Notification) {
     NotificationReceiver(Notification);
   });
 }
+
+extern "C" void parseTopLevelSwift(const char *buffer,
+                                   void *declContext,
+                                   void *astContext,
+                                   void *outputContext,
+                                   void (*)(void *, void *)) {}

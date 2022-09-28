@@ -7,6 +7,8 @@ add_swift_host_tool(swift-syntax-test
 )
 target_link_libraries(swift-syntax-test
                       PRIVATE
+                        ASTGen
+                        swiftCore
                         swiftAST
                         swiftDriver
                         swiftFrontend

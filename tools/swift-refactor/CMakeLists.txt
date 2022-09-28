@@ -5,6 +5,8 @@ add_swift_host_tool(swift-refactor
 )
 target_link_libraries(swift-refactor
                       PRIVATE
+                        ASTGen
+                        swiftCore
                         swiftDriver
                         swiftFrontend
                         swiftIDE)

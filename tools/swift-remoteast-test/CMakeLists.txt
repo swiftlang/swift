@@ -5,6 +5,8 @@ add_swift_host_tool(swift-remoteast-test
 )
 target_link_libraries(swift-remoteast-test
                       PRIVATE
+                        ASTGen
+                        swiftCore
                         swiftFrontendTool
                         swiftRemoteAST)
 set_target_properties(swift-remoteast-test PROPERTIES ENABLE_EXPORTS 1)

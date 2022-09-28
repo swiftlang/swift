@@ -414,3 +414,9 @@ void SKUIDToUIDMap::set(sourcekitd_uid_t SKDUID, UIdent UID) {
     this->Map[SKDUID] = UID;
   });
 }
+
+extern "C" void parseTopLevelSwift(const char *buffer,
+                                   void *declContext,
+                                   void *astContext,
+                                   void *outputContext,
+                                   void (*)(void *, void *)) {}

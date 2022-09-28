@@ -5,6 +5,8 @@ add_swift_host_tool(lldb-moduleimport-test
 target_link_libraries(lldb-moduleimport-test
                       PRIVATE
                         swiftAST
+                        ASTGen
+                        swiftCore
                         swiftASTSectionImporter
                         swiftClangImporter
                         swiftFrontend)

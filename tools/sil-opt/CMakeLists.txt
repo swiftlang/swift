@@ -5,6 +5,8 @@ add_swift_host_tool(sil-opt
 )
 target_link_libraries(sil-opt
                       PRIVATE
+                        ASTGen
+                        swiftCore
                         swiftFrontend
                         swiftIRGen
                         swiftSIL

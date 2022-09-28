@@ -628,3 +628,9 @@ swiftparse_diagnostic_get_severity(swiftparser_diagnostic_t diag) {
 unsigned swiftparse_diagnostic_get_source_loc(swiftparser_diagnostic_t diag) {
   return static_cast<const DiagnosticDetail*>(diag)->Offset;
 }
+
+extern "C" void parseTopLevelSwift(const char *buffer,
+                                   void *declContext,
+                                   void *astContext,
+                                   void *outputContext,
+                                   void (*)(void *, void *)) {}
