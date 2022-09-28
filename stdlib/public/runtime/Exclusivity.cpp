@@ -75,8 +75,7 @@ static inline void _flockfile_stderr() {
 #if defined(_WIN32)
   _lock_file(stderr);
 #elif defined(__wasi__)
-  // WebAssembly/WASI doesn't support file locking yet
-  // https://bugs.swift.org/browse/SR-12097
+  // FIXME: WebAssembly/WASI doesn't support file locking yet (https://github.com/apple/swift/issues/54533).
 #else
   flockfile(stderr);
 #endif
@@ -86,8 +85,7 @@ static inline void _funlockfile_stderr() {
 #if defined(_WIN32)
   _unlock_file(stderr);
 #elif defined(__wasi__)
-  // WebAssembly/WASI doesn't support file locking yet
-  // https://bugs.swift.org/browse/SR-12097
+  // FIXME: WebAssembly/WASI doesn't support file locking yet (https://github.com/apple/swift/issues/54533).
 #else
   funlockfile(stderr);
 #endif
