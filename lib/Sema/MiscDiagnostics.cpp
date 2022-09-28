@@ -1526,6 +1526,15 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
+namespace DiagnosticsContext {
+/// A mapping of replacement `ValueDecl`s to use in `VarDeclUsageAnalysis`
+/// instead of the actual `ValueDecl` of the associated `DeclRefExpr`.
+/// This lets `VarDeclUsageAnalysis` avoid emitting false-positive warnings
+/// in certain circumstances.
+static llvm::SmallDenseMap<DeclRefExpr *, ValueDecl *>
+    DeclMappingForUsageAnalysis;
+}
+
 /// Look for any property references in closures that lack a 'self.' qualifier.
 /// Within a closure, we require that the source code contain 'self.' explicitly
 /// (or that the closure explicitly capture 'self' in the capture list) because
@@ -1650,7 +1659,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // When `VarDeclUsageChecker` checks this DRE, we need to use
         // the base we looked up here instead, since otherwise
         // we'll emit confusing false-positive warnings.
-        DRE->setDeclForUsageAnalysis(lookupResult);
+        DiagnosticsContext::DeclMappingForUsageAnalysis[DRE] = lookupResult;
 
         selfDecl = lookupResult;
       }
@@ -1677,17 +1686,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
           if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
             if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
-              if (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
-                // Mark this `OptionalStatementPattern` as enabling implicit
-                // self for this weak self capture. This lets us avoid emitting
-                // a false-positive warning in `VarDeclUsageChecker` in
-                // Swift 5 mode (this is unnecessary in Swift 6).
-                if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
-                  OSP->setEnablesImplicitSelfForWeakSelfCapture(true);
-                }
-
-                return true;
-              }
+              return selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
             }
           }
         }
@@ -2636,7 +2635,15 @@ public:
 
     VarDecls[vd] |= Flag;
   }
-  
+
+  ValueDecl *getDecl(DeclRefExpr *DRE) {
+    if (auto decl = DiagnosticsContext::DeclMappingForUsageAnalysis[DRE]) {
+      return decl;
+    }
+
+    return DRE->getDecl();
+  }
+
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
   void markBaseOfStorageUse(Expr *E, bool isMutating);
   
@@ -3318,19 +3325,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 if (initExpr->getStartLoc().isValid()) {
                   unsigned noParens = initExpr->canAppendPostfixExpression();
 
-                  // Don't emit an "unused value" warning if this is a
-                  // `let self = self` condition being used to enable
-                  // implicit self for the remainder of this scope,
-                  // since it would be a false positive. This is only
-                  // necessary in Swift 5 mode, because in Swift 6
-                  // this new self decl is correctly used as the base of
-                  // implicit self calls for the remainder of the scope.
-                  auto &ctx = var->getASTContext();
-                  if (!ctx.LangOpts.isSwiftVersionAtLeast(6) &&
-                      OSP->getEnablesImplicitSelfForWeakSelfCapture()) {
-                    continue;
-                  }
-
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
                   ConditionalCheckedCastExpr *CCE = nullptr;
@@ -3549,7 +3543,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   
   // If we found a decl that is being assigned to, then mark it.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(DRE->getDeclForUsageAnalysis(), Flags);
+    addMark(getDecl(DRE), Flags);
     return;
   }
   
@@ -3634,10 +3628,10 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(DRE->getDeclForUsageAnalysis(), RK_Read);
+    addMark(getDecl(DRE), RK_Read);
 
     // If the Expression is a read of a getter, track for diagnostics
-    if (auto VD = dyn_cast<VarDecl>(DRE->getDeclForUsageAnalysis())) {
+    if (auto VD = dyn_cast<VarDecl>(getDecl(DRE))) {
       AssociatedGetterRefExpr.insert(std::make_pair(VD, DRE));
     }
   }
@@ -3711,7 +3705,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // conservatively mark it read and written.  This will silence "variable
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(DRE->getDeclForUsageAnalysis(), RK_Read | RK_Written);
+        VDUC.addMark(VDUC.getDecl(DRE), RK_Read | RK_Written);
       else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
         auto name = declRef->getName();
         auto loc = declRef->getLoc();

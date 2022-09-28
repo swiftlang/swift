@@ -608,7 +608,6 @@ class OptionalSomePattern : public Pattern {
   Pattern *SubPattern;
   SourceLoc QuestionLoc;
   EnumElementDecl *ElementDecl = nullptr;
-  bool EnablesImplicitSelfForWeakSelfCapture = false;
 
 public:
   explicit OptionalSomePattern(Pattern *SubPattern,
@@ -627,17 +626,6 @@ public:
 
   EnumElementDecl *getElementDecl() const { return ElementDecl; }
   void setElementDecl(EnumElementDecl *d) { ElementDecl = d; }
-
-  /// Whether or not this pattern is used to enable implicit self
-  /// for weak self captures in the following scope. This is used
-  /// in Swift 5 language modes to prevent a false-positive
-  /// "unused value" warning, and is not necessary in Swift 6+.
-  bool getEnablesImplicitSelfForWeakSelfCapture() {
-    return EnablesImplicitSelfForWeakSelfCapture;
-  }
-  void setEnablesImplicitSelfForWeakSelfCapture(bool value) {
-    EnablesImplicitSelfForWeakSelfCapture = value;
-  }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::OptionalSome;
