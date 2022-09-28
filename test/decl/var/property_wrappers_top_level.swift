@@ -8,7 +8,6 @@ struct Wrapper<T> {
   }
 }
 
-// expected-error@+1{{property wrappers are not yet supported in top-level code}}
 @Wrapper var value: Int = 17
 
 func f() { }

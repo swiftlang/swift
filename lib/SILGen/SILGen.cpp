@@ -1786,6 +1786,35 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
+    // We handle emitting the variable storage when we see the pattern binding.
+
+    // Emit lazy and property wrapper backing storage.
+    vd->visitAuxiliaryDecls([&](VarDecl *var) {
+        if (auto *patternBinding = var->getParentPatternBinding()){
+            if (TopLevelSGF){
+                TopLevelSGF->visitPatternBindingDecl(patternBinding);
+                TopLevelSGF->visit(var);
+
+            } else {
+                //Call SGM::visitPatternBindingDecl if not in script mode
+                visitPatternBindingDecl(patternBinding);
+                visit(var);
+            }
+        }
+
+        if (var->hasStorage())
+          addGlobalVariable(var);
+
+        var->visitEmittedAccessors([&](AccessorDecl *accessor){
+          emitFunction(accessor);
+        });
+
+        /*auto *asd = dyn_cast<AbstractStorageDecl>(var);
+        asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+          visitFuncDecl(accessor);
+        });*/
+    });
+
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
@@ -1996,7 +2025,7 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       TopLevelSGF->emitIgnoredExpr(E);
     } else {
-      TopLevelSGF->visit(ESD.get<Decl*>());
+        TopLevelSGF->visit(ESD.get<Decl*>());
     }
   }
 }

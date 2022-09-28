@@ -458,12 +458,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     // Check various restrictions on which properties can have wrappers
     // attached to them.
 
-    // Nor does top-level code.
-    if (var->getDeclContext()->isModuleScopeContext()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_top_level);
-      continue;
-    }
-
 //    // If the property wrapper requested an `_enclosingInstance: Never`
 //    // it must be declared as static. TODO: or global once we allow wrappers on top-level code
 //    auto wrappedInfo = var->getPropertyWrapperTypeInfo();

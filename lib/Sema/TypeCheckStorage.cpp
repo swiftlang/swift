@@ -2959,6 +2959,7 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
                                    name, dc);
     backingVar->setImplicit();
     backingVar->setOriginalWrappedProperty(var);
+    backingVar->setPropertyWrapperBackingProperty(true);
 
     // The backing storage is 'private'.
     backingVar->overwriteAccess(AccessLevel::Private);
@@ -3004,7 +3005,6 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   Type storageType = dc->mapTypeIntoContext(wrapperType);
   Expr *initializer = nullptr;
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
-
   auto createPBD = [&](VarDecl *singleVar) -> PatternBindingDecl * {
     Pattern *pattern = NamedPattern::createImplicit(ctx, singleVar);
     pattern->setType(singleVar->getType());
