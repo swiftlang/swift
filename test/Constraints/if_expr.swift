@@ -66,7 +66,7 @@ let conditional = eb ? "Broken" : "Heart" // expected-error {{value of optional 
 // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 
-// <rdar://problem/39586166> - crash when IfExpr has UnresolvedType in condition
+// <rdar://problem/39586166> - crash when TernaryExpr has UnresolvedType in condition
 struct Delegate {
   var shellTasks: [ShellTask]
 }

@@ -322,7 +322,7 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(E);
     }
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
+    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       mapRegion(IE->getThenExpr());
     }
 
@@ -711,7 +711,7 @@ struct PGOMapping : public ASTWalker {
     if (Parent.isNull())
       setKnownExecutionCount(E);
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
+    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       auto thenExpr = IE->getThenExpr();
       auto thenCount = loadExecutionCount(thenExpr);
       setExecutionCount(thenExpr, thenCount);
@@ -1234,7 +1234,7 @@ public:
 
     assert(!RegionStack.empty() && "Must be within a region");
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
+    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
       assignCounter(IE->getElseExpr(),
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));

@@ -126,10 +126,10 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
   };
   
   auto &Context = DC->getASTContext();
-  if (auto ifExpr = dyn_cast<IfExpr>(E)) {
+  if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
     // Ternary has fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_TernaryPrecedence,
-                                     diagnose ? ifExpr->getQuestionLoc()
+                                     diagnose ? ternary->getQuestionLoc()
                                               : SourceLoc());
   }
 
@@ -229,8 +229,8 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     // Find the RHS of the current binary expr.
     if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
       E = assignExpr->getSrc();
-    } else if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
-      E = ifExpr->getElseExpr();
+    } else if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
+      E = ternary->getElseExpr();
     } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
       E = binaryExpr->getRHS();
     } else {
@@ -320,10 +320,10 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
       llvm_unreachable("unknown try-like expression");
     }
 
-    if (isa<IfExpr>(Op) ||
+    if (isa<TernaryExpr>(Op) ||
         (opPrecedence && opPrecedence->isAssignment())) {
       if (!isEndOfSequence) {
-        if (isa<IfExpr>(Op)) {
+        if (isa<TernaryExpr>(Op)) {
           Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
                              static_cast<unsigned>(tryKind));
         } else {
@@ -338,17 +338,17 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     }
   }
 
-  if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
+  if (auto *ternary = dyn_cast<TernaryExpr>(Op)) {
     // Resolve the ternary expression.
     if (!Ctx.CompletionCallback) {
       // In code completion we might call preCheckExpression twice - once for
       // the first pass and once for the second pass. This is fine since
       // preCheckExpression idempotent.
-      assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+      assert(!ternary->isFolded() && "already folded if expr in sequence?!");
     }
-    ifExpr->setCondExpr(LHS);
-    ifExpr->setElseExpr(RHS);
-    return ifExpr;
+    ternary->setCondExpr(LHS);
+    ternary->setElseExpr(RHS);
+    return ternary;
   }
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
