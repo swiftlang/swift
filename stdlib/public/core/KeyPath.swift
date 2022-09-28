@@ -35,8 +35,6 @@ internal func _abstract(
 /// type.
 @_objcRuntimeName(_TtCs11_AnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
-  internal var _isPureStructKeyPath: Bool?
-  internal var _pureStructValueOffset: Int = 0
   /// The root type for this key path.
   @inlinable
   public static var rootType: Any.Type {
@@ -49,6 +47,9 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return _rootAndValueType.value
   }
 
+  /// Used to store the offset from the root to the value
+  /// in the case of a pure struct KeyPath.
+  /// It's a regular kvcKeyPathStringPtr otherwise.
   internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
   
   /// The hash value.
@@ -120,12 +121,86 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
       }
     }
   }
+    
+  /*
+  The following pertains to 32-bit architectures only.
+  We assume everything is a valid pointer to a potential
+  _kvcKeyPathStringPtr except for the first 4KB page which is reserved
+  for the nil pointer. Note that we have to distinguish between a valid
+  keypath offset of 0, and the nil pointer itself.
+  We use maximumOffsetOn32BitArchitecture + 1 for this case.
+    
+  The variable maximumOffsetOn32BitArchitecture is duplicated in the two
+  functions below since having it as a global would make accesses slower,
+  given getOffsetFromStorage() gets called on each KeyPath read. Further,
+  having it as an instance variable in AnyKeyPath would increase the size
+  of AnyKeyPath by 8 bytes.
+  TODO: Find a better method of refactoring this variable if possible.
+  */
+
+  func assignOffsetToStorage(offset: Int) {
+    let maximumOffsetOn32BitArchitecture = 4094
+
+    guard offset >= 0 else {
+      return
+    }
+    // TODO: This just gets the architecture size (32 or 64 bits).
+    // Is there a more efficient way? Something in Builtin maybe?
+    let architectureSize = MemoryLayout<Int>.size
+    if architectureSize == 8 {
+      _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: -offset - 1)
+    } else {
+      if offset == 0 {
+        _kvcKeyPathStringPtr =
+          UnsafePointer<CChar>(bitPattern: maximumOffsetOn32BitArchitecture + 1)
+      } else if offset < maximumOffsetOn32BitArchitecture {
+        _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: offset)
+      } else {
+        _kvcKeyPathStringPtr = nil
+      }
+    }
+  }
+
+  // TODO: See if this can be @inlinable since it gets called on each
+  // KeyPath access. It would mean _kvcKeyPathStringPtr would need
+  // to be @usableFromInline. What effect would that have on ABI stability?
+  func getOffsetFromStorage() -> Int? {
+    let maximumOffsetOn32BitArchitecture = 4094
+    guard let storage = _kvcKeyPathStringPtr else {
+      return nil
+    }
+
+    // TODO: Maybe we can get a pointer's raw bits instead of doing
+    // a distance calculation. Note: offsetBase can't be unwrapped
+    // forcefully if its bitPattern is 0x00. Hence the 0x01.
+    let offsetBase = UnsafePointer<CChar>(bitPattern: 0x01)
+    let architectureSize = MemoryLayout<Int>.size
+    if architectureSize == 8 {
+      let storageDistance = storage.distance(to: offsetBase!) - 2
+      guard storageDistance >= 0 else {
+        // This happens to be an actual _kvcKeyPathStringPtr, not an offset, if we get here.
+        return nil
+      }
+      return storageDistance
+    } else {
+      let storageDistance = offsetBase!.distance(to: storage) + 1
+      if storageDistance == maximumOffsetOn32BitArchitecture + 1 {
+        return 0
+      } else if storageDistance > maximumOffsetOn32BitArchitecture {
+        return nil
+      }
+      return storageDistance
+    }
+  }
 
   // SPI for the Foundation overlay to allow interop with KVC keypath-based
   // APIs.
   public var _kvcKeyPathString: String? {
     @_semantics("keypath.kvcKeyPathString")
     get {
+      guard self.getOffsetFromStorage() == nil else {
+        return nil
+      }
       guard let ptr = _kvcKeyPathStringPtr else { return nil }
 
       return String(validatingUTF8: ptr)
@@ -152,15 +227,15 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ) -> Self {
     _internalInvariant(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
-    let keypath = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
+    let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
-    keypath._kvcKeyPathStringPtr = nil
-    let base = UnsafeMutableRawPointer(Builtin.projectTailElems(keypath,
+    result._kvcKeyPathStringPtr = nil
+    let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))
     body(UnsafeMutableRawBufferPointer(start: base, count: bytes))
-    keypath._pureStructValueOffset = 0
-    return keypath
+    return result
   }
+  
   final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
@@ -168,23 +243,16 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return try f(KeyPathBuffer(base: base))
   }
 
-  internal var isPureStructKeyPath: Bool {
-    return _isPureStructKeyPath ?? false
-  }
-
-  internal func isClass(_ item: Any.Type) -> Bool {
-    // Displays "warning: 'is' test is always true" at compile time,
-    // but that's not actually the case.
-    return (item is AnyObject)
-  }
-
   // TODO: Find a quicker way to see if this is a tuple.
   internal func isTuple(_ item: Any) -> Bool {
     // Unwraps type information if possible.
-    // Otherwise, everything the Mirror handling "item" sees would be "Optional<Any.Type>".
+    // Otherwise, everything the Mirror handling "item"
+    // sees would be "Optional<Any.Type>".
     func unwrapType<T>(_ any: T) -> Any {
       let mirror = Mirror(reflecting: any)
-      guard mirror.displayStyle == .optional, let first = mirror.children.first else {
+      guard mirror.displayStyle == .optional,
+        let first = mirror.children.first
+      else {
         return any
       }
       return first.value
@@ -193,40 +261,40 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     let mirror = Mirror(reflecting: unwrapType(item))
     let description = mirror.description
     let offsetOfFirstBracketForMirrorDescriptionOfTuple = 11
-    let idx = description.index(description.startIndex,
-                offsetBy: offsetOfFirstBracketForMirrorDescriptionOfTuple)
+    let idx = description.index(
+      description.startIndex,
+      offsetBy: offsetOfFirstBracketForMirrorDescriptionOfTuple)
     if description[idx] == "(" {
       return true
     }
     return false
   }
-    
-    @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
-    internal var _storedInlineOffset: Int? {
-      return withBuffer {
-        var buffer = $0
+  
+  @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
+  internal var _storedInlineOffset: Int? {
+    return withBuffer {
+      var buffer = $0
 
-        // The identity key path is effectively a stored keypath of type Self
-        // at offset zero
-        if buffer.data.isEmpty { return 0 }
+      // The identity key path is effectively a stored keypath of type Self
+      // at offset zero
+      if buffer.data.isEmpty { return 0 }
 
-        var offset = 0
-        while true {
-          let (rawComponent, optNextType) = buffer.next()
-          switch rawComponent.header.kind {
-          case .struct:
-            offset += rawComponent._structOrClassOffset
+      var offset = 0
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        switch rawComponent.header.kind {
+        case .struct:
+          offset += rawComponent._structOrClassOffset
 
-          case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
-            return .none
-          }
-
-          if optNextType == nil { return .some(offset) }
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+          return .none
         }
+
+        if optNextType == nil { return .some(offset) }
       }
     }
   }
-
+}
 
 /// A partially type-erased key path, from a concrete root type to any
 /// resulting value type.
@@ -282,13 +350,12 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   
   @usableFromInline
   internal final func _projectReadOnly(from root: Root) -> Value {
-   
-    //One performance improvement is to skip right to Value
-    //if this keypath traverses through structs only.
-    if isPureStructKeyPath
-    {
+      
+    // One performance improvement is to skip right to Value
+    // if this keypath traverses through structs only.
+    if let offset = getOffsetFromStorage() {
       return withUnsafeBytes(of: root) {
-        let pointer = $0.baseAddress.unsafelyUnwrapped.advanced(by: _pureStructValueOffset)
+        let pointer = $0.baseAddress.unsafelyUnwrapped.advanced(by: offset)
         return pointer.assumingMemoryBound(to: Value.self).pointee
       }
     }
@@ -349,14 +416,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   @usableFromInline
   internal func _projectMutableAddress(from base: UnsafePointer<Root>)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
-          
-    // Don't declare "p" above this if-statement; it may slow things down.
-    if isPureStructKeyPath
-    {
-      let p = UnsafeRawPointer(base).advanced(by: _pureStructValueOffset)
-      return (pointer: UnsafeMutablePointer(
-        mutating: p.assumingMemoryBound(to: Value.self)), owner: nil)
-    }
     var p = UnsafeRawPointer(base)
     var type: Any.Type = Root.self
     var keepAlive: AnyObject?
@@ -2307,23 +2366,23 @@ extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
   }
 }
 
-/// Updates information pertaining to the types associated with each key path.
+/// Updates information pertaining to the types associated with each KeyPath.
 ///
-/// Note: Currently we only distinguish between keypaths that traverse only structs to get to the final value,
-/// and all other types. This is done for performance reasons.
+/// Note: Currently we only distinguish between keypaths that traverse
+/// only structs to get to the final value, and all other types.
+/// This is done for performance reasons.
 /// Other type information may be handled in the future to improve performance.
 internal func _processOffsetForAppendedKeyPath(
   appendedKeyPath: inout AnyKeyPath,
   root: AnyKeyPath,
   leaf: AnyKeyPath
 ) {
-  appendedKeyPath._isPureStructKeyPath = root.isPureStructKeyPath && leaf.isPureStructKeyPath
-  if let isPureStruct = appendedKeyPath._isPureStructKeyPath, isPureStruct {
-    appendedKeyPath._pureStructValueOffset = root._pureStructValueOffset + leaf
-      ._pureStructValueOffset
+  if let rootOffset = root.getOffsetFromStorage(),
+    let leafOffset = leaf.getOffsetFromStorage()
+  {
+    appendedKeyPath.assignOffsetToStorage(offset: rootOffset + leafOffset)
   }
 }
-
 
 @usableFromInline
 internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
@@ -2351,7 +2410,11 @@ internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
     return _openExistential(rootValue, do: open2)
   }
   var returnValue: AnyKeyPath = _openExistential(rootRoot, do: open)
-  _processOffsetForAppendedKeyPath(appendedKeyPath: &returnValue, root: root, leaf: leaf)
+  _processOffsetForAppendedKeyPath(
+    appendedKeyPath: &returnValue,
+    root: root,
+    leaf: leaf
+  )
   if let returnValue = returnValue as? Result {
     return returnValue
   }
@@ -2367,7 +2430,7 @@ internal func _appendingKeyPaths<
   leaf: KeyPath<Value, AppendedValue>
 ) -> Result {
   let resultTy = type(of: root).appendedType(with: type(of: leaf))
-  var returnValue:AnyKeyPath = root.withBuffer {
+    var returnValue: AnyKeyPath = root.withBuffer {
     var rootBuffer = $0
     return leaf.withBuffer {
       var leafBuffer = $0
@@ -2385,8 +2448,9 @@ internal func _appendingKeyPaths<
       // KVC-compatible.
       let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
 
-      if let rootPtr = root._kvcKeyPathStringPtr,
-         let leafPtr = leaf._kvcKeyPathStringPtr {
+      if root.getOffsetFromStorage() == nil, leaf.getOffsetFromStorage() == nil,
+        let rootPtr = root._kvcKeyPathStringPtr,
+        let leafPtr = leaf._kvcKeyPathStringPtr {
         rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
         leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
@@ -2482,27 +2546,36 @@ internal func _appendingKeyPaths<
       }
 
       // Build the KVC string if there is one.
-      if let kvcStringBuffer = kvcStringBuffer {
-        let rootPtr = root._kvcKeyPathStringPtr.unsafelyUnwrapped
-        let leafPtr = leaf._kvcKeyPathStringPtr.unsafelyUnwrapped
-        _memcpy(dest: kvcStringBuffer,
-                src: rootPtr,
-                size: UInt(rootKVCLength))
-        kvcStringBuffer.advanced(by: rootKVCLength)
-          .storeBytes(of: 0x2E /* '.' */, as: CChar.self)
-        _memcpy(dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
-                src: leafPtr,
-                size: UInt(leafKVCLength))
-        result._kvcKeyPathStringPtr =
-          UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))
-        kvcStringBuffer.advanced(by: rootKVCLength + leafKVCLength + 1)
-          .storeBytes(of: 0 /* '\0' */, as: CChar.self)
+      if root.getOffsetFromStorage() == nil,
+        leaf.getOffsetFromStorage() == nil {
+        if let kvcStringBuffer = kvcStringBuffer {
+          let rootPtr = root._kvcKeyPathStringPtr.unsafelyUnwrapped
+          let leafPtr = leaf._kvcKeyPathStringPtr.unsafelyUnwrapped
+          _memcpy(
+            dest: kvcStringBuffer,
+            src: rootPtr,
+            size: UInt(rootKVCLength))
+          kvcStringBuffer.advanced(by: rootKVCLength)
+            .storeBytes(of: 0x2E /* '.' */, as: CChar.self)
+          _memcpy(
+            dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
+            src: leafPtr,
+            size: UInt(leafKVCLength))
+          result._kvcKeyPathStringPtr =
+            UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))
+          kvcStringBuffer.advanced(by: rootKVCLength + leafKVCLength + 1)
+            .storeBytes(of: 0 /* '\0' */, as: CChar.self)
+        }
       }
       return unsafeDowncast(result, to: Result.self)
     }
   }
-    _processOffsetForAppendedKeyPath(appendedKeyPath: &returnValue, root: root, leaf: leaf)
-   return returnValue as! Result
+  _processOffsetForAppendedKeyPath(
+    appendedKeyPath: &returnValue,
+    root: root,
+    leaf: leaf
+  )
+  return returnValue as! Result
 }
 
 // The distance in bytes from the address point of a KeyPath object to its
@@ -2585,20 +2658,27 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   let (keyPathClass, rootType, size, _)
     = _getKeyPathClassAndInstanceSizeFromPattern(patternPtr, arguments)
 
+  // Used to process offsets for pure struct KeyPaths.
   var offset = UInt32(0)
   var isPureStruct = true
   var keyPathBase: Any.Type?
+        
   // Allocate the instance.
   let instance = keyPathClass._create(capacityInBytes: size) { instanceData in
     // Instantiate the pattern into the instance.
-    let returnValue = _instantiateKeyPathBuffer(patternPtr, instanceData, rootType, arguments)
+    let returnValue = _instantiateKeyPathBuffer(
+      patternPtr,
+      instanceData,
+      rootType,
+      arguments
+    )
     offset += returnValue.structOffset
 
-    let booleans = returnValue.componentStructList
-    if(booleans.count == 0) {
+    let componentStructList = returnValue.componentStructList
+    if componentStructList.count == 0 {
       isPureStruct = false
     }
-    for value in booleans {
+    for value in componentStructList {
       isPureStruct = isPureStruct && value
     }
     keyPathBase = rootType
@@ -2609,8 +2689,9 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   if let keyPathBase = keyPathBase, instance.isTuple(keyPathBase) {
     isPureStruct = false
   }
-  instance._pureStructValueOffset = Int(offset)
-  instance._isPureStructKeyPath = isPureStruct
+  if isPureStruct {
+    instance.assignOffsetToStorage(offset: Int(offset))
+  }
 
   // Adopt the KVC string from the pattern.
   let kvcStringBase = patternPtr.advanced(by: 12)
@@ -2625,6 +2706,9 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
       kvcStringPtr.assumingMemoryBound(to: CChar.self)
   }
 
+  if instance._kvcKeyPathStringPtr == nil, isPureStruct {
+    instance.assignOffsetToStorage(offset: Int(offset))
+  }
   // If we can cache this instance as a shared instance, do so.
   if let oncePtr = oncePtr {
     // Try to replace a null pointer in the cache variable with the instance
@@ -2815,10 +2899,6 @@ internal protocol KeyPathPatternVisitor {
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference)
 
   mutating func finish()
-    
-  // Offset for pure-struct keypaths.
-  var structOffset: UInt32 { get set }
-  var isPureStruct: [Bool] { get set }
 }
 
 internal func _resolveRelativeAddress(_ base: UnsafeRawPointer,
@@ -3458,11 +3538,13 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
              break
         }
       case .outOfLine(let offset):
+        isPureStruct.append(false)
         let header = RawKeyPathComponent.Header(storedWithOutOfLineOffset: kind,
                                                 mutable: mutable)
         pushDest(header)
         pushDest(offset)
       case .unresolvedFieldOffset(let offsetOfOffset):
+        isPureStruct.append(false)
         // Look up offset in the type metadata. The value in the pattern is
         // the offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
@@ -3481,6 +3563,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
         pushDest(header)
         pushDest(offset)
       case .unresolvedIndirectOffset(let pointerToOffset):
+        isPureStruct.append(false)
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
         _internalInvariant(pointerToOffset.pointee <= UInt32.max)
@@ -3717,6 +3800,8 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     instantiateVisitor.visitStoredComponent(kind: kind, mutable: mutable,
                                             offset: offset)
     checkSizeConsistency()
+    structOffset = instantiateVisitor.structOffset
+    isPureStruct = instantiateVisitor.isPureStruct
   }
   mutating func visitComputedComponent(mutating: Bool,
                                    idKind: KeyPathComputedIDKind,
