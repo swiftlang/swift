@@ -1514,7 +1514,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (!effectiveCtx)
     return ImportedName();
   result.effectiveContext = effectiveCtx;
-
   // Gather information from the swift_async attribute, if there is one.
   Optional<unsigned> completionHandlerParamIndex;
   bool completionHandlerFlagIsZeroOnError = false;
@@ -1620,12 +1619,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // If we have a swift_name attribute, use that.
   if (auto nameAttr = findSwiftNameAttr(D, version)) {
     bool skipCustomName = false;
-
     // Parse the name.
     ParsedDeclName parsedName = parseDeclName(nameAttr->name);
     if (!parsedName || parsedName.isOperator())
       return result;
-
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
     // convention for factory methods), make sure that it can be
@@ -1747,7 +1744,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       return result;
     }
   }
-
   if (D->getDeclName().isEmpty()) {
     // If the type has no name and no structure name, but is not anonymous,
     // generate a name for it. Specifically this is for cases like:
@@ -1806,7 +1802,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         }
       }
     }
-
     // Otherwise, for empty names, there is nothing to do.
     return result;
   }
@@ -1819,6 +1814,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallVector<StringRef, 4> argumentNames;
   SmallString<16> selectorSplitScratch;
   ArrayRef<const clang::ParmVarDecl *> params;
+  D->getDeclName().dump();
   switch (D->getDeclName().getNameKind()) {
   case clang::DeclarationName::CXXConstructorName: {
     isInitializer = true;
@@ -1836,11 +1832,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   }
 
   case clang::DeclarationName::CXXConversionFunctionName: {
-    baseName = swiftCtx.getIdentifier("__conversionTo" + dyn_cast<clang::CXXConversionDecl>(D)->getConversionType().getBaseTypeIdentifier()->getName().str()).str();
-    auto functionDecl = dyn_cast<clang::FunctionDecl>(D);
-    isFunction = true;
-    addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
-    break;
+    return ImportedName();
   }
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:

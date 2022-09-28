@@ -2062,7 +2062,7 @@ static std::pair<BraceStmt *, bool>
 synthesizeConversionCtorMethodBody(AbstractFunctionDecl *afd, void *context) {
   ASTContext &ctx = afd->getASTContext();
 
-  auto ctorDecl = cast<FuncDecl>(afd); /* The ctor */
+  auto ctorDecl = cast<ConstructorDecl>(afd); /* The ctor */
   auto methodDecl =
       static_cast<FuncDecl *>(context); /* Swift version of CXXConversionDecl */
 
