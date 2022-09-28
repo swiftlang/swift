@@ -5,6 +5,46 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 ## Swift 5.8
 
+* [SE-0365][]:
+ 
+  Implicit `self` is now permitted for `weak self` captures, after `self` is unwrapped.
+
+  For example, the usage of implicit `self` below is now permitted:
+
+  ```swift
+  class ViewController {
+    let button: Button
+
+    func setup() {
+        button.tapHandler = { [weak self] in
+            guard let self else { return }
+            dismiss() // refers to `self.dismiss()`
+        }
+    }
+
+    func dismiss() { ... }
+  }
+  ```
+
+  In Swift 5 language modes, implicit `self` is permitted for `weak self` captures in _non-escaping_ closures even before `self` is unwrapped. For example, this code compiles successfully in Swift 5 language modes:
+
+  ```swift
+  class ExampleClass {
+    func makeArray() -> [String] {
+      // `Array.map` takes a non-escaping closure:
+      ["foo", "bar", "baaz"].map { [weak self] string in
+        double(string) // implicitly refers to `self!.double(string)`
+      }
+    } 
+
+    func double(_ string: String) -> String {
+      string + string
+    }
+  }
+  ```
+
+  Starting in Swift 6, the above code will no longer compile. `weak self` captures in non-escaping closures will have the same behavior as captures in escaping closures (as described in [SE-0365][]). Code relying on the previous behavior will need to be updated to either unwrap `self` (e.g. by adding a `guard let self else return` statement), or to use a different capture method (e.g. using `[self]` or `[unowned self]` instead of `[weak self]`).
+
 * [SE-0362][]:
 
   The compiler flag `-enable-upcoming-feature X` can now be used to enable a specific feature `X` that has been accepted by the evolution process, but whose introduction into the language is waiting for the next major version (e.g., version 6). The `X` is specified by any proposal that falls into this category:
@@ -9559,6 +9599,7 @@ Swift 1.0
 [SE-0357]: <https://github.com/apple/swift-evolution/blob/main/proposals/0357-regex-string-processing-algorithms.md>
 [SE-0358]: <https://github.com/apple/swift-evolution/blob/main/proposals/0358-primary-associated-types-in-stdlib.md>
 [SE-0362]: <https://github.com/apple/swift-evolution/blob/main/proposals/0362-piecemeal-future-features.md>
+[SE-0365]: <https://github.com/apple/swift-evolution/blob/main/proposals/0365-implicit-self-weak-capture.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
