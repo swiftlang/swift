@@ -786,12 +786,14 @@ tryCastToAnyHashable(
 #endif
   }
   case MetadataKind::Optional: {
-    // Until SR-9047 fixes the interactions between AnyHashable and Optional, we
-    // avoid directly injecting Optionals.  In particular, this allows
-    // casts from [String?:String] to [AnyHashable:Any] to work the way people
-    // expect. Otherwise, without SR-9047, the resulting dictionary can only be
-    // indexed with an explicit Optional<String>, not a plain String.
-    // After SR-9047, we can consider dropping this special case entirely.
+    // FIXME: https://github.com/apple/swift/issues/51550
+    // Until the interactions between AnyHashable and Optional is fixed, we
+    // avoid directly injecting Optionals.  In particular, this allows casts
+    // from [String?:String] to [AnyHashable:Any] to work the way people
+    // expect. Otherwise, the resulting dictionary can only be indexed with an
+    // explicit Optional<String>, not a plain String.
+    // After fixing the issue, we can consider dropping this special
+    // case entirely.
 
     // !!!!  This breaks compatibility with compiler-optimized casts
     // (which just inject) and violates the Casting Spec.  It just preserves

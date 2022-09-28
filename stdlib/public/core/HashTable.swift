@@ -107,8 +107,8 @@ extension _HashTable {
   ) -> Int {
     // We generate a new hash seed whenever a new hash table is allocated and
     // whenever an existing table is resized, so that we avoid certain copy
-    // operations becoming quadratic.  (For background details, see
-    // https://bugs.swift.org/browse/SR-3268)
+    // operations becoming quadratic. For background details, see
+    // https://github.com/apple/swift/issues/45856.
     //
     // Note that we do reuse the existing seed when making copy-on-write copies
     // so that we avoid breaking value semantics.

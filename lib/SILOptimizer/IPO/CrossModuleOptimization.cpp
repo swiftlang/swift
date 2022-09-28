@@ -185,6 +185,10 @@ bool CrossModuleOptimization::canSerializeFunction(
   if (iter != canSerializeFlags.end())
     return iter->second;
 
+  // Temporarily set the flag to false (to avoid infinite recursion) until we set
+  // it to true at the end of this function.
+  canSerializeFlags[function] = false;
+
   if (DeclContext *funcCtxt = function->getDeclContext()) {
     if (!canUseFromInline(funcCtxt))
       return false;

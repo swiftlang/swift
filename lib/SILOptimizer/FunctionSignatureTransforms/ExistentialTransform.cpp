@@ -165,6 +165,8 @@ void ExistentialSpecializerCloner::cloneArguments(
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       auto *NewArg =
           ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
+      NewArg->setNoImplicitCopy(ArgDesc.Arg->isNoImplicitCopy());
+      NewArg->setLifetimeAnnotation(ArgDesc.Arg->getLifetimeAnnotation());
       NewArg->setOwnershipKind(ValueOwnershipKind(
           NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
       entryArgs.push_back(NewArg);
@@ -180,6 +182,8 @@ void ExistentialSpecializerCloner::cloneArguments(
         GenericSILType, ArgDesc.Decl,
         ValueOwnershipKind(NewF, GenericSILType,
                            ArgDesc.Arg->getArgumentConvention()));
+    NewArg->setNoImplicitCopy(ArgDesc.Arg->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(ArgDesc.Arg->getLifetimeAnnotation());
     // Determine the Conformances.
     SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
     CanType OpenedType = NewArg->getType().getASTType();
@@ -402,7 +406,10 @@ void ExistentialTransform::populateThunkBody() {
   auto *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
     auto argumentType = ArgDesc.Arg->getType();
-    ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
+    auto *NewArg =
+        ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
+    NewArg->setNoImplicitCopy(ArgDesc.Arg->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(ArgDesc.Arg->getLifetimeAnnotation());
   }
 
   /// Builder to add new instructions in the Thunk.
