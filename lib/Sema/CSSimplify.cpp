@@ -3634,27 +3634,18 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             // mismatches.
             if (type1->isOptional()) {
               auto unwrappedType = type1->lookThroughAllOptionalTypes();
-              auto result = simplifyConformsToConstraint(
-                  unwrappedType, type2, ConstraintKind::ConformsTo,
-                  getConstraintLocator(locator),
-                  TypeMatchFlags::TMF_ApplyingFix);
+              auto result = simplifyConformsToConstraint(unwrappedType, protoDecl,
+                  kind, locator, subflags | TMF_ApplyingFix);
               if (result == SolutionKind::Solved) {
-                auto matchTypeResult =
-                    matchTypes(unwrappedType, type2, ConstraintKind::Conversion,
-                               subflags, locator);
-                if (matchTypeResult.isSuccess()) {
-                  // Impact here is a 1 because there is only one failure before
-                  // we need to force type1 to be
-                  auto fix = ForceOptional::create(
-                      *this, type1, proto, getConstraintLocator(locator));
-                  if (recordFix(fix, /*impact=*/1))
-                    return getTypeMatchFailure(locator);
-                  break;
-                }
+                auto fix = ForceOptional::create(
+                    *this, type1, proto, getConstraintLocator(locator));
+                if (recordFix(fix, /*impact=*/1))
+                  return getTypeMatchFailure(locator);
+                break;
               }
             }
             auto fix = AllowArgumentMismatch::create(
-                *this, type1, proto, getConstraintLocator(anchor, path));
+                  *this, type1, proto, getConstraintLocator(anchor, path));
             if (recordFix(fix, /*impact=*/2))
               return getTypeMatchFailure(locator);
             break;
