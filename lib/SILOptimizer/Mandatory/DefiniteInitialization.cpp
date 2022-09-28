@@ -1077,6 +1077,8 @@ void LifetimeChecker::injectActorHops() {
     injectExecutorHopAfter(point);
 }
 
+/// TODO: Move this and \c injectActorHops into a separate file
+///       i.e. `DICodeSynthesis.cpp`.
 void LifetimeChecker::injectTypeWrapperStorageInitalization() {
   auto *storageVar = TheMemory.getAsTypeWrapperLocalStorageVar();
   if (!storageVar)
