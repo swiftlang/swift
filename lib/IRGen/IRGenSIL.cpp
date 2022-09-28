@@ -7154,7 +7154,9 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
       fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
     }
 
-    auto sig = IGM.getSignature(methodType);
+    auto fnType = IGM.getSILTypes().getConstantFunctionType(
+      IGM.getMaximalTypeExpansionContext(), method);
+    auto sig = IGM.getSignature(fnType);
     auto fn = FunctionPointer::createUnsigned(methodType, fnPtr, sig, true);
 
     setLoweredFunctionPointer(i, fn);

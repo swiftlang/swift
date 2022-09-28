@@ -5358,10 +5358,18 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
       return Sig.getType();
     }
 
-    if (useSignature) // Because of various casting (e.g thin_to_thick) the
+    if (useSignature) { // Because of various casting (e.g thin_to_thick) the
                       // signature of the function Value might mismatch
                       // (e.g no context argument).
+      if (!llvm::cast<llvm::PointerType>(Value->getType())
+                 ->isOpaqueOrPointeeTypeMatches(Sig.getType())) {
+        Value->getType()->dump();
+        Sig.getType()->dump();
+      }
+      assert(llvm::cast<llvm::PointerType>(Value->getType())
+                 ->isOpaqueOrPointeeTypeMatches(Sig.getType()));
       return Sig.getType();
+    }
 
     assert(llvm::cast<llvm::PointerType>(Value->getType())
                ->isOpaqueOrPointeeTypeMatches(gv->getValueType()));
