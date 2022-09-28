@@ -181,15 +181,15 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \see swift::printAsClangHeader
 static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
                                        StringRef bridgingHeader,
-                                       bool ExposePublicDeclsInClangHeader,
+                                       const FrontendOptions &frontendOpts,
                                        const IRGenOptions &irGenOpts) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(
-      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
-        return printAsClangHeader(out, M, bridgingHeader,
-                                  ExposePublicDeclsInClangHeader, irGenOpts);
-      });
+  return withOutputFile(M->getDiags(), outputPath,
+                        [&](raw_ostream &out) -> bool {
+                          return printAsClangHeader(out, M, bridgingHeader,
+                                                    frontendOpts, irGenOpts);
+                        });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -936,8 +936,8 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     }
     hadAnyError |= printAsClangHeaderIfNeeded(
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), BridgingHeaderPathForPrint,
-        opts.ExposePublicDeclsInClangHeader, Invocation.getIRGenOptions());
+        Instance.getMainModule(), BridgingHeaderPathForPrint, opts,
+        Invocation.getIRGenOptions());
   }
 
   // Only want the header if there's been any errors, ie. there's not much

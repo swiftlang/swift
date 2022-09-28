@@ -392,6 +392,10 @@ public:
   /// header.
   bool ExposePublicDeclsInClangHeader = false;
 
+  /// Emit C++ bindings for the exposed Swift declarations in the generated
+  /// clang header.
+  bool EnableExperimentalCxxInteropInClangHeader = false;
+
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);
 

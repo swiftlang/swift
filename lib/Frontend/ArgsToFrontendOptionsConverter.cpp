@@ -286,6 +286,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
   Opts.ExposePublicDeclsInClangHeader =
       Args.hasArg(OPT_clang_header_expose_public_decls);
+  Opts.EnableExperimentalCxxInteropInClangHeader =
+      Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
