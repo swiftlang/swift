@@ -26,7 +26,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-  In Swift 5 language modes, implicit `self` is permitted for `weak self` captures in _non-escaping_ closures even before `self` is unwrapped. For example, this code compiles successfully in Swift 5 language modes:
+  In Swift 5 language modes, implicit `self` is permitted for `weak self` captures in _non-escaping_ closures even before `self` is unwrapped. For example, this code compiles successfully in Swift 5 language mode:
 
   ```swift
   class ExampleClass {
