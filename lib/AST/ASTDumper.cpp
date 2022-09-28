@@ -2714,8 +2714,8 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitIfExpr(IfExpr *E) {
-    printCommon(E, "if_expr") << '\n';
+  void visitTernaryExpr(TernaryExpr *E) {
+    printCommon(E, "ternary_expr") << '\n';
     printRec(E->getCondExpr());
     OS << '\n';
     printRec(E->getThenExpr());

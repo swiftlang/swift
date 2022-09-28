@@ -2089,18 +2089,18 @@ public:
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(IfExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying IfExpr", E);
+    void verifyChecked(TernaryExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying TernaryExpr", E);
 
       auto condTy = E->getCondExpr()->getType();
       if (!condTy->isBool()) {
-        Out << "IfExpr condition is not Bool\n";
+        Out << "TernaryExpr condition is not Bool\n";
         abort();
       }
 
       checkSameType(E->getThenExpr()->getType(),
                     E->getElseExpr()->getType(),
-                    "then and else branches of an if-expr");
+                    "then and else branches of a TernaryExpr");
       verifyCheckedBase(E);
     }
     

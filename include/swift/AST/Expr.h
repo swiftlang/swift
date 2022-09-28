@@ -5061,25 +5061,21 @@ public:
     return E->getKind() == ExprKind::RebindSelfInConstructor;
   }
 };
-  
-/// The conditional expression 'x ? y : z'.
-class IfExpr : public Expr {
+
+/// The ternary conditional expression 'x ? y : z'.
+class TernaryExpr : public Expr {
   Expr *CondExpr, *ThenExpr, *ElseExpr;
   SourceLoc QuestionLoc, ColonLoc;
 public:
-  IfExpr(Expr *CondExpr,
-         SourceLoc QuestionLoc, Expr *ThenExpr,
-         SourceLoc ColonLoc, Expr *ElseExpr,
-         Type Ty = Type())
-    : Expr(ExprKind::If, /*Implicit=*/false, Ty),
-      CondExpr(CondExpr), ThenExpr(ThenExpr), ElseExpr(ElseExpr),
-      QuestionLoc(QuestionLoc), ColonLoc(ColonLoc)
-  {}
-  
-  IfExpr(SourceLoc QuestionLoc, Expr *ThenExpr, SourceLoc ColonLoc)
-    : IfExpr(nullptr, QuestionLoc, ThenExpr, ColonLoc, nullptr)
-  {}
-  
+  TernaryExpr(Expr *CondExpr, SourceLoc QuestionLoc, Expr *ThenExpr,
+              SourceLoc ColonLoc, Expr *ElseExpr, Type Ty = Type())
+      : Expr(ExprKind::Ternary, /*Implicit=*/false, Ty), CondExpr(CondExpr),
+        ThenExpr(ThenExpr), ElseExpr(ElseExpr), QuestionLoc(QuestionLoc),
+        ColonLoc(ColonLoc) {}
+
+  TernaryExpr(SourceLoc QuestionLoc, Expr *ThenExpr, SourceLoc ColonLoc)
+      : TernaryExpr(nullptr, QuestionLoc, ThenExpr, ColonLoc, nullptr) {}
+
   SourceLoc getLoc() const { return QuestionLoc; }
   SourceLoc getStartLoc() const {
     return (isFolded() ? CondExpr->getStartLoc() : QuestionLoc);
@@ -5103,7 +5099,7 @@ public:
   bool isFolded() const { return CondExpr && ElseExpr; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::If;
+    return E->getKind() == ExprKind::Ternary;
   }
 };
 
@@ -5979,7 +5975,7 @@ public:
 };
 
 inline bool Expr::isInfixOperator() const {
-  return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
+  return isa<BinaryExpr>(this) || isa<TernaryExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
 }
 

@@ -257,8 +257,8 @@ parse_operator:
       SourceLoc questionLoc = consumeToken();
       
       // Parse the middle expression of the ternary.
-      ParserResult<Expr> middle =
-          parseExprSequence(diag::expected_expr_after_if_question, isExprBasic);
+      ParserResult<Expr> middle = parseExprSequence(
+          diag::expected_expr_after_ternary_question, isExprBasic);
       SequenceStatus |= middle;
       ParserStatus Status = middle;
       if (middle.isNull())
@@ -267,27 +267,24 @@ parse_operator:
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
         if (middle.hasCodeCompletion()) {
-          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
-                                                        middle.get(),
-                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) TernaryExpr(
+              questionLoc, middle.get(), PreviousLoc));
           SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
           goto done;
         }
-        
-        diagnose(questionLoc, diag::expected_colon_after_if_question);
+
+        diagnose(questionLoc, diag::expected_colon_after_ternary_question);
         Status.setIsParseError();
         return makeParserResult(Status, new (Context) ErrorExpr(
             {startLoc, middle.get()->getSourceRange().End}));
       }
 
       SourceLoc colonLoc = consumeToken();
-      
-      auto *unresolvedIf
-        = new (Context) IfExpr(questionLoc,
-                               middle.get(),
-                               colonLoc);
-      SequencedExprs.push_back(unresolvedIf);
-      Message = diag::expected_expr_after_if_colon;
+
+      auto *unresolvedTernary =
+          new (Context) TernaryExpr(questionLoc, middle.get(), colonLoc);
+      SequencedExprs.push_back(unresolvedTernary);
+      Message = diag::expected_expr_after_ternary_colon;
       break;
     }
         

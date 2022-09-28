@@ -1070,7 +1070,7 @@ ERROR(invalid_force_unwrap,none,
 ERROR(invalid_optional_chain,none,
       "cannot use optional chaining on non-optional value of type %0",
       (Type))
-ERROR(if_expr_cases_mismatch,none,
+ERROR(ternary_expr_cases_mismatch,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
 

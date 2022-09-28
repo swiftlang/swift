@@ -507,8 +507,8 @@ namespace {
                                                 SGFContext C);
     RValue visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E,
                                              SGFContext C);
-    RValue visitIfExpr(IfExpr *E, SGFContext C);
-    
+    RValue visitTernaryExpr(TernaryExpr *E, SGFContext C);
+
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
     RValue visitEnumIsCaseExpr(EnumIsCaseExpr *E, SGFContext C);
 
@@ -4560,7 +4560,7 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
   return RValue(SGF, E, v);
 }
 
-RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
+RValue RValueEmitter::visitTernaryExpr(TernaryExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
 
   auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());

@@ -2111,7 +2111,7 @@ bool AssignmentFailure::diagnoseAsError() {
     }
   }
 
-  if (auto IE = dyn_cast<IfExpr>(immutableExpr)) {
+  if (auto IE = dyn_cast<TernaryExpr>(immutableExpr)) {
     emitDiagnosticAt(Loc, DeclDiagnostic,
                      "result of conditional operator '? :' is never mutable")
         .highlight(IE->getQuestionLoc())
@@ -2437,10 +2437,10 @@ bool ContextualFailure::diagnoseAsError() {
   }
 
   case ConstraintLocator::TernaryBranch: {
-    auto *ifExpr = castToExpr<IfExpr>(getRawAnchor());
-    fromType = getType(ifExpr->getThenExpr());
-    toType = getType(ifExpr->getElseExpr());
-    diagnostic = diag::if_expr_cases_mismatch;
+    auto *ternaryExpr = castToExpr<TernaryExpr>(getRawAnchor());
+    fromType = getType(ternaryExpr->getThenExpr());
+    toType = getType(ternaryExpr->getElseExpr());
+    diagnostic = diag::ternary_expr_cases_mismatch;
     break;
   }
 
@@ -8076,7 +8076,7 @@ CoercibleOptionalCheckedCastFailure::unwrappedTypes() const {
                          fromOptionals.size() - toOptionals.size());
 }
 
-bool CoercibleOptionalCheckedCastFailure::diagnoseIfExpr() const {
+bool CoercibleOptionalCheckedCastFailure::diagnoseTernaryExpr() const {
   auto *expr = getAsExpr<IsExpr>(CastExpr);
   if (!expr)
     return false;
@@ -8258,7 +8258,7 @@ bool NoopExistentialToCFTypeCheckedCast::diagnoseAsError() {
 }
 
 bool CoercibleOptionalCheckedCastFailure::diagnoseAsError() {
-  if (diagnoseIfExpr())
+  if (diagnoseTernaryExpr())
     return true;
 
   if (diagnoseForcedCastExpr())
