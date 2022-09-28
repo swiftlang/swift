@@ -210,7 +210,7 @@ extension RawRepresentable where RawValue: Hashable, Self: Hashable {
     // so code that used to work in 5.0 remains working whether or not the
     // original definition was inlined.
     //
-    // See https://bugs.swift.org/browse/SR-10734
+    // See https://github.com/apple/swift/issues/53126.
     var hasher = Hasher(_seed: seed)
     self.hash(into: &hasher)
     return hasher._finalize()

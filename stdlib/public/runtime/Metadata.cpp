@@ -1498,7 +1498,7 @@ public:
 class TupleCacheStorage :
   public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
-// FIXME: https://bugs.swift.org/browse/SR-1155
+// FIXME: https://github.com/apple/swift/issues/43763.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *

@@ -952,7 +952,7 @@ extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
 %   if bits == builtinFloatLiteralBits:
     self = ${Self}(value)
 %   elif bits < builtinFloatLiteralBits:
-    // FIXME: This can result in double rounding errors (SR-7124).
+    // FIXME: This can result in double rounding errors (https://github.com/apple/swift/issues/49672).
     self = ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
 %   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
