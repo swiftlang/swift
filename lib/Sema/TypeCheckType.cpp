@@ -678,7 +678,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
   if (!generic) {
     if (auto *const unboundTy = type->getAs<UnboundGenericType>()) {
-      if (!options.is(TypeResolverContext::TypeAliasDecl)) {
+      if (!options.is(TypeResolverContext::TypeAliasDecl) &&
+          !options.is(TypeResolverContext::ExtensionBinding)) {
         // If the resolution object carries an opener, attempt to open
         // the unbound generic type.
         // TODO: We should be able to just open the generic arguments as N
@@ -1699,6 +1700,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
+  auto isExtenstionBinding = options.is(TypeResolverContext::ExtensionBinding);
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
@@ -1712,14 +1714,14 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
     }
 
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
-      if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
-                                                     hasUnboundOpener)
-            != TypeChecker::UnsupportedMemberTypeAccessKind::None)
+      if (TypeChecker::isUnsupportedMemberTypeAccess(
+              parentTy, member, hasUnboundOpener, isExtenstionBinding) !=
+          TypeChecker::UnsupportedMemberTypeAccessKind::None)
         return ErrorType::get(ctx);
     }
 
-    switch (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
-                                                       hasUnboundOpener)) {
+    switch (TypeChecker::isUnsupportedMemberTypeAccess(
+        parentTy, member, hasUnboundOpener, isExtenstionBinding)) {
     case TypeChecker::UnsupportedMemberTypeAccessKind::None:
       break;
 
@@ -1870,7 +1872,8 @@ resolveIdentTypeComponent(TypeResolution resolution,
   if (result->is<UnboundGenericType>() &&
       !isa<GenericIdentTypeRepr>(lastComp) &&
       !resolution.getUnboundTypeOpener() &&
-      !options.is(TypeResolverContext::TypeAliasDecl)) {
+      !options.is(TypeResolverContext::TypeAliasDecl) &&
+      !options.is(TypeResolverContext::ExtensionBinding)) {
 
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       // Tailored diagnostic for custom attributes.
