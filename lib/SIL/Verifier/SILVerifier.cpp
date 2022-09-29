@@ -2446,8 +2446,9 @@ public:
 
     SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
+    // FIXME: with complete lifetimes, this should not be a transitive check.
     AddressUseKind useKind =
-      scopedAddress.computeLiveness(scopedAddressLiveness);
+        scopedAddress.computeTransitiveLiveness(scopedAddressLiveness);
     bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(

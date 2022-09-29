@@ -90,27 +90,30 @@ bool ScopedAddressValue::visitScopeEndingUses(
 // scope's lifetime is already complete. Therefore, it needs to transitively
 // process all address uses.
 //
-// FIXME: this should use the standard recursive lifetime completion
-// utility. Otherwise dealing with nested incomplete lifetimes becomes expensive
-// and complex. e.g.
+// FIXME: users of this should use the standard recursive lifetime completion
+// utility. Otherwise dealing with nested incomplete lifetimes becomes
+// expensive and complex. e.g.
 //
 //   %storeBorrow = store_borrow %_ to %adr
 //   %loadBorrow  = load_borrow %storeBorrow
 //   apply %f(%loadBorrow) : $@convention(thin) (...) -> Never
 //   unreachable
 //
-AddressUseKind ScopedAddressValue::
-computeLiveness(SSAPrunedLiveness &liveness) const {
+AddressUseKind ScopedAddressValue::computeTransitiveLiveness(
+    SSAPrunedLiveness &liveness) const {
   liveness.initializeDef(value);
-  return updateLiveness(liveness);
+  return updateTransitiveLiveness(liveness);
 }
 
-AddressUseKind ScopedAddressValue::
-updateLiveness(PrunedLiveness &liveness) const {
+AddressUseKind
+ScopedAddressValue::updateTransitiveLiveness(PrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
   for (auto *use : uses) {
+    if (isScopeEndingUse(use))
+      continue;
+
     // Update all collected uses as non-lifetime ending.
     liveness.updateForUse(use->getUser(), /* lifetimeEnding */ false);
   }
@@ -187,8 +190,11 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
   SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
-  
-  AddressUseKind useKind = scopedAddress.computeLiveness(storeBorrowLiveness);
+
+  // FIXME: if OSSA lifetimes are complete, then we don't need transitive
+  // liveness here.
+  AddressUseKind useKind =
+      scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
 
   // If all new uses are within store_borrow boundary, no need for extension.
   if (storeBorrowLiveness.areUsesWithinBoundary(newUses, deadEndBlocks)) {

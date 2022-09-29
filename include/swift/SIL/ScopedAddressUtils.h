@@ -89,13 +89,25 @@ struct ScopedAddressValue {
   /// Pass all scope ending instructions to the visitor.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
-  /// Optimistically computes liveness for all known uses, and adds this scope's
-  /// live blocks into the SSA PrunedLiveness result. Returns AddressUseKind
-  /// indicated whether a PointerEscape or Unknown use was encountered.
-  AddressUseKind computeLiveness(SSAPrunedLiveness &liveness) const;
+  /// Optimistically computes liveness for all transitive uses, and adds this
+  /// scope's live blocks into the SSA PrunedLiveness result. Returns
+  /// AddressUseKind indicated whether a PointerEscape or Unknown use was
+  /// encountered.
+  ///
+  /// This transitively finds uses within nested borrow scopes to handle
+  /// incomplete nested lifetimes. Here, liveness will consider the apply to be
+  /// a live use of the store_borrow:
+  ///   %a = store_borrow
+  ///   %v = load_borrow
+  ///   apply (%v)
+  ///   unreachable
+  ///
+  /// FIXME: with complete OSSA lifetimes, store borrow liveness is simply
+  /// computed by visiting the end_borrow users.
+  AddressUseKind computeTransitiveLiveness(SSAPrunedLiveness &liveness) const;
 
-  /// Update \p liveness for all the address uses.
-  AddressUseKind updateLiveness(PrunedLiveness &liveness) const;
+  /// Update \p liveness for all the transitive address uses.
+  AddressUseKind updateTransitiveLiveness(PrunedLiveness &liveness) const;
 
   /// Create appropriate scope ending instruction at \p insertPt.
   void createScopeEnd(SILBasicBlock::iterator insertPt, SILLocation loc) const;
