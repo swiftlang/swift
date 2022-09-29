@@ -169,8 +169,7 @@ class ABIDependencyEvaluator {
 
   /// Check if a Swift module is an overlay for some Clang module.
   ///
-  /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
-  /// right API which we can use directly.
+  /// FIXME: Delete this hack once https://github.com/apple/swift/issues/55804 is fixed and ModuleDecl has the right API which we can use directly.
   bool isOverlayOfClangModule(ModuleDecl *swiftModule);
 
   /// Check for cases where we have a fake cycle through an overlay.

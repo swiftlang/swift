@@ -329,7 +329,7 @@ SemaAnnotator::walkToArgumentListPre(ArgumentList *ArgList) {
   if (ArgList->isImplicit())
     return Action::Continue(ArgList);
 
-  // FIXME: What about SubscriptExpr and KeyPathExpr arg labels? (SR-15063)
+  // FIXME(https://github.com/apple/swift/issues/57390): What about SubscriptExpr and KeyPathExpr arg labels?
   if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
     if (!passCallArgNames(CallE->getFn(), ArgList))
       return doStopTraversal();

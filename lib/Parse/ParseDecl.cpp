@@ -7343,7 +7343,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // Skip parsing the var-get-set clause if '{' is at start of line
       // and next token is not 'didSet' or 'willSet'. Parsing as 'do'
       // statement gives useful errors for missing 'do' before brace.
-      // See SR-14836.
+      // See https://github.com/apple/swift/issues/57183.
       if (!PatternInit || !Tok.isAtStartOfLine() || isStartOfGetSetAccessor()) {
         HasAccessors = true;
         auto boundVar = parseDeclVarGetSet(

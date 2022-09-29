@@ -1035,7 +1035,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 }
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-// FIXME(SR-14131): Also consider derived declaration `@derivative` attributes.
+// FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
   assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");
