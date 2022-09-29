@@ -401,9 +401,8 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   };
 
   CanonicalizeOSSALifetime canonicalizer(
-      false /*pruneDebugMode*/, false /*poisonRefsMode*/, accessBlockAnalysis,
-      domTree, deleter, foundConsumingUseNeedingCopy,
-      foundConsumingUseNotNeedingCopy);
+      false /*pruneDebugMode*/, accessBlockAnalysis, domTree, deleter,
+      foundConsumingUseNeedingCopy, foundConsumingUseNotNeedingCopy);
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
   SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
