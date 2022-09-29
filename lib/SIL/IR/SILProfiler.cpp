@@ -98,17 +98,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   return true;
 }
 
-namespace swift {
-bool doesASTRequireProfiling(SILModule &M, ASTNode N, SILDeclRef Constant) {
-  // If profiling isn't enabled, don't profile anything.
-  auto &Opts = M.getOptions();
-  if (Opts.UseProfile.empty() && !Opts.GenerateProfile)
-    return false;
-
-  return shouldProfile(N, Constant);
-}
-} // namespace swift
-
 /// Get the DeclContext for the decl referenced by \p forDecl.
 DeclContext *getProfilerContextForDecl(ASTNode N, SILDeclRef forDecl) {
   if (auto *D = N.dyn_cast<Decl *>())
@@ -159,8 +148,12 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
 }
 
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
+  // If profiling isn't enabled, don't profile anything.
   const auto &Opts = M.getOptions();
-  if (!doesASTRequireProfiling(M, N, Ref))
+  if (!Opts.GenerateProfile && Opts.UseProfile.empty())
+    return nullptr;
+
+  if (!shouldProfile(N, Ref))
     return nullptr;
 
   if (!canCreateProfilerForAST(N, Ref)) {
