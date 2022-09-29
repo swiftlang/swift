@@ -714,7 +714,9 @@ Expr *swift::buildPropertyWrapperInitCall(
   ApplyExpr *innermostInit = nullptr;
 
   // Projected-value initializers don't compose, so no need to iterate
-  // over the wrapper attributes.
+  // over the wrapper attributes. NOTE: If this ever changes, you'll need to
+  // update SILDeclRef::hasUserWrittenCode to account for any spliced in
+  // user-written code.
   if (initKind == PropertyWrapperInitKind::ProjectedValue) {
     auto typeExpr = TypeExpr::createImplicit(backingStorageType, ctx);
     auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_projectedValue,
