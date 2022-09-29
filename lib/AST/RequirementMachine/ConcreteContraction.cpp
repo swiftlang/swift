@@ -554,7 +554,8 @@ bool ConcreteContraction::performConcreteContraction(
     auto kind = req.req.getKind();
     switch (kind) {
     case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+      assert(req.req.getSecondType()->isTypeParameter());
+      continue;
 
     case RequirementKind::SameType: {
       auto constraintType = req.req.getSecondType();

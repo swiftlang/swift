@@ -299,7 +299,8 @@ void RuleBuilder::addRequirement(const Requirement &req,
 
   switch (req.getKind()) {
   case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    // TODO
+    return;
 
   case RequirementKind::Conformance: {
     // A conformance requirement T : P becomes a rewrite rule

@@ -350,6 +350,23 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
   }
 }
 
+/// Desugar same-shape requirements by equating the shapes of the
+/// root pack types, and diagnose shape requirements on non-pack
+/// types.
+static void desugarSameShapeRequirement(Type lhs, Type rhs, SourceLoc loc,
+                                        SmallVectorImpl<Requirement> &result,
+                                        SmallVectorImpl<RequirementError> &errors) {
+  // For now, only allow shape requirements directly between pack types.
+  if (!lhs->isTypeSequenceParameter() || !rhs->isTypeSequenceParameter()) {
+    errors.push_back(RequirementError::forInvalidShapeRequirement(
+        {RequirementKind::SameCount, lhs, rhs}, loc));
+  }
+
+  result.emplace_back(RequirementKind::SameCount,
+                      lhs->getRootGenericParam(),
+                      rhs->getRootGenericParam());
+}
+
 /// Convert a requirement where the subject type might not be a type parameter,
 /// or the constraint type in the conformance requirement might be a protocol
 /// composition, into zero or more "proper" requirements which can then be
@@ -362,7 +379,9 @@ swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
 
   switch (req.getKind()) {
   case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+    desugarSameShapeRequirement(firstType, req.getSecondType(),
+                                loc, result, errors);
+    break;
 
   case RequirementKind::Conformance:
     desugarConformanceRequirement(firstType, req.getSecondType(),
@@ -472,6 +491,23 @@ struct InferRequirementsWalker : public TypeWalker {
       }
 
       return Action::Continue;
+    }
+
+    // Infer same-length requirements between pack references that
+    // are expanded in parallel.
+    if (auto packExpansion = ty->getAs<PackExpansionType>()) {
+      // Get all pack parameters referenced from the pattern.
+      SmallVector<Type, 2> packReferences;
+      packExpansion->getPatternType()->getTypeSequenceParameters(packReferences);
+
+      if (packReferences.size() > 1) {
+        auto first = packReferences.begin();
+        auto second = first + 1;
+        while (second != packReferences.end()) {
+          Requirement req(RequirementKind::SameCount, *first++, *second++);
+          desugarRequirement(req, SourceLoc(), reqs, errors);
+        }
+      }
     }
 
     // Infer requirements from `@differentiable` function types.

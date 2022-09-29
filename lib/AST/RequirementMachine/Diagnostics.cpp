@@ -105,6 +105,20 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::InvalidShapeRequirement: {
+      if (error.requirement.hasError())
+        break;
+
+      auto lhs = error.requirement.getFirstType();
+      auto rhs = error.requirement.getSecondType();
+
+      // FIXME: Add tailored messages for specific issues.
+      ctx.Diags.diagnose(loc, diag::invalid_shape_requirement,
+                         lhs, rhs);
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::ConflictingRequirement: {
       auto requirement = error.requirement;
       auto conflict = error.conflictingRequirement;
