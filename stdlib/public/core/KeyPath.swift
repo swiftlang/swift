@@ -416,6 +416,17 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   @usableFromInline
   internal func _projectMutableAddress(from base: UnsafePointer<Root>)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
+   
+    // One performance improvement is to skip right to Value
+    // if this keypath traverses through structs only.
+          
+    // Don't declare "p" above this if-statement; it may slow things down.
+    if let offset = getOffsetFromStorage()
+    {
+      let p = UnsafeRawPointer(base).advanced(by: offset)
+      return (pointer: UnsafeMutablePointer(
+        mutating: p.assumingMemoryBound(to: Value.self)), owner: nil)
+    }
     var p = UnsafeRawPointer(base)
     var type: Any.Type = Root.self
     var keepAlive: AnyObject?
@@ -3544,7 +3555,6 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
         pushDest(header)
         pushDest(offset)
       case .unresolvedFieldOffset(let offsetOfOffset):
-        isPureStruct.append(false)
         // Look up offset in the type metadata. The value in the pattern is
         // the offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
@@ -3556,6 +3566,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
         case .struct:
           offset = UInt32(metadataPtr.load(fromByteOffset: Int(offsetOfOffset),
                                            as: UInt32.self))
+          structOffset += offset
         }
 
         let header = RawKeyPathComponent.Header(storedWithOutOfLineOffset: kind,
