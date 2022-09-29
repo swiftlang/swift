@@ -654,35 +654,6 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
-static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
-  return constant.isDefaultArgGenerator() || constant.isForeign;
-}
-
-/// Set up the function for profiling instrumentation.
-static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
-                              ForDefinition_t forDefinition) {
-  if (!forDefinition || F->getProfiler())
-    return;
-
-  ASTNode profiledNode;
-  if (!haveProfiledAssociatedFunction(constant)) {
-    if (constant.hasDecl()) {
-      if (auto *fd = constant.getFuncDecl()) {
-        if (fd->hasBody()) {
-          F->createProfiler(fd, constant);
-          profiledNode = fd->getBody(/*canSynthesize=*/false);
-        }
-      }
-    } else if (auto *ace = constant.getAbstractClosureExpr()) {
-      F->createProfiler(ace, constant);
-      profiledNode = ace;
-    }
-    // Set the function entry count for PGO.
-    if (SILProfiler *SP = F->getProfiler())
-      F->setEntryCount(SP->getExecutionCount(profiledNode));
-  }
-}
-
 static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (!constant.hasDecl())
     return false;
@@ -730,12 +701,9 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
-  // If we already emitted the function, return it (potentially preparing it
-  // for definition).
-  if (auto emitted = getEmittedFunction(constant, forDefinition)) {
-    setUpForProfiling(constant, emitted, forDefinition);
+  // If we already emitted the function, return it.
+  if (auto emitted = getEmittedFunction(constant, forDefinition))
     return emitted;
-  }
 
   auto getBestLocation = [](SILDeclRef ref) -> SILLocation {
     if (ref.hasDecl())
@@ -755,7 +723,6 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
         return IGM.getFunction(constant, NotForDefinition);
       });
-  setUpForProfiling(constant, F, forDefinition);
 
   assert(F && "SILFunction should have been defined");
 
@@ -889,6 +856,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     if (auto *ce = constant.getAbstractClosureExpr()) {
       preEmitFunction(constant, f, ce);
       PrettyStackTraceSILFunction X("silgen closureexpr", f);
+      f->createProfiler(ce, constant);
       SILGenFunction(*this, *f, ce).emitClosure(ce);
       postEmitFunction(constant, f);
       break;
@@ -898,6 +866,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
     preEmitFunction(constant, f, fd);
     PrettyStackTraceSILFunction X("silgen emitFunction", f);
+    f->createProfiler(fd, constant);
     SILGenFunction(*this, *f, fd).emitFunction(fd);
     postEmitFunction(constant, f);
     break;
