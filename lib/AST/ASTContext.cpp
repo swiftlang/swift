@@ -3173,8 +3173,14 @@ PackExpansionType::PackExpansionType(Type patternType, Type countType,
                                      const ASTContext *canCtx)
   : TypeBase(TypeKind::PackExpansion, canCtx, properties),
     patternType(patternType), countType(countType) {
-  assert(countType->is<TypeVariableType>() ||
+
+  // TODO: it would be nice if the solver didn't stick PlaceholderTypes and
+  // UnresolvedTypes in here.
+  assert(countType->is<PackType>() ||
+         countType->is<TypeVariableType>() ||
          countType->is<PackArchetypeType>() ||
+         countType->is<PlaceholderType>() ||
+         countType->is<UnresolvedType>() ||
          countType->castTo<GenericTypeParamType>()->isParameterPack());
 }
 
