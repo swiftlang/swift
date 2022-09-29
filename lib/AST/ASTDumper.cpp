@@ -3729,9 +3729,7 @@ namespace {
       printField("num_elements", T->getNumElements());
       Indent += 2;
       for (Type elt : T->getElementTypes()) {
-        OS.indent(Indent) << "(";
         printRec(elt);
-        OS << ")";
       }
       Indent -= 2;
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3739,8 +3737,8 @@ namespace {
 
     void visitPackExpansionType(PackExpansionType *T, StringRef label) {
       printCommon(label, "pack_expansion_type");
-      printField("pattern", T->getPatternType());
-      printField("count", T->getCountType());
+      printRec("pattern", T->getPatternType());
+      printRec("count", T->getCountType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
