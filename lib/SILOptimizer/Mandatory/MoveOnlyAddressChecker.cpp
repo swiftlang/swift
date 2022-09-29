@@ -746,8 +746,7 @@ struct MoveOnlyChecker {
           instToDelete->eraseFromParent();
         })),
         canonicalizer(
-            false /*pruneDebugMode*/, false /*poisonRefsMode*/,
-            accessBlockAnalysis, domTree, deleter,
+            false /*pruneDebugMode*/, accessBlockAnalysis, domTree, deleter,
             [&](Operand *use) { consumingUsesNeedingCopy.push_back(use); },
             [&](Operand *use) { finalConsumingUses.push_back(use); }) {}
 

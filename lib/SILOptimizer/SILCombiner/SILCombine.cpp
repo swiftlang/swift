@@ -350,8 +350,8 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   InstructionDeleter deleter(std::move(canonicalizeCallbacks));
 
   DominanceInfo *domTree = DA->get(&Builder.getFunction());
-  CanonicalizeOSSALifetime canonicalizer(
-      false /*prune debug*/, false /*poison refs*/, NLABA, domTree, deleter);
+  CanonicalizeOSSALifetime canonicalizer(false /*prune debug*/, NLABA, domTree,
+                                         deleter);
   CanonicalizeBorrowScope borrowCanonicalizer(deleter);
 
   while (!defsToCanonicalize.empty()) {
