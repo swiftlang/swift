@@ -81,5 +81,10 @@ module std {
       requires cplusplus
       export *
     }
+    module stddef_h {
+      header "stddef.h"
+      requires cplusplus
+      export *
+    }
   }
 }
