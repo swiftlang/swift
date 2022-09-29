@@ -374,7 +374,8 @@ public:
           return;
 
         // Bridge, if necessary.
-        TD = printer.getObjCTypeDecl(TD);
+        if (outputLangMode != OutputLanguageMode::Cxx)
+          TD = printer.getObjCTypeDecl(TD);
 
         if (finder.needsDefinition() && isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
