@@ -19,51 +19,13 @@
 #include "ThreadingHelpers.h"
 #include "LockingHelpers.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 using namespace swift;
 
 template <typename Body>
 std::chrono::duration<double> measureDuration(Body body) {
-#ifdef _WIN32
-  using namespace std::chrono_literals;
-
-  /* On Windows, we use SleepConditionVariableSRW() to implement
-     ConditionVariable.  The way Windows implements the SleepXXX() functions,
-     if you specify a timeout smaller than the current system tick rate,
-     the function may return early.  See
-
-     https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-sleep
-
-     This causes flakiness in this test, which is undesirable.
-
-     To combat this, we adjust the system tick rate temporarily here.
-
-     Even *after* doing that, measurement suggests that Windows can return
-     early by an amount not exceeding a system tick. */
-  TIMECAPS tc;
-  UINT uTimerRes;
-
-  ASSERT_NE(timeGetDevCaps(&tc, sizeof(TIMECAPS)), TIMERR_NOERROR);
-
-  uTimerRes = min(max(tc.wPeriodMin, 1/*ms*/), tc.wPeriodMax);
-  timeBeginPeriod(uTimerRes);
-#endif
-
   auto start = std::chrono::steady_clock::now();
   body();
-  std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start;
-
-#ifdef _WIN32
-  timeEndPeriod(uTimerRes);
-
-  // Lie about the elapsed time to make the test more robust
-  elapsed += 0.001s;
-#endif
-
-  return elapsed;
+  return std::chrono::steady_clock::now() - start;
 }
 
 // -----------------------------------------------------------------------------
