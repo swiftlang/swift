@@ -2446,7 +2446,17 @@ public:
 
     SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
-    // FIXME: with complete lifetimes, this should not be a transitive check.
+    // FIXME: Reenable @test_load_borrow_store_borrow_nested in
+    // store_borrow_verify_errors once computeLivess can successfully handle a
+    // store_borrow within a load_borrow. This can be fixed in two ways
+    //
+    // (1) With complete lifetimes, this no longer needs to perform transitive
+    // liveness at all.
+    //
+    // (2) findInnerTransitiveGuaranteedUses, which ends up being called on the
+    // load_borrow to compute liveness, can be taught to transitively process
+    // InteriorPointer uses instead of returning PointerEscape. We need to make
+    // sure all uses of the utility need to handle this first.
     AddressUseKind useKind =
         scopedAddress.computeTransitiveLiveness(scopedAddressLiveness);
     bool success = useKind == AddressUseKind::NonEscaping;
