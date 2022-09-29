@@ -5,17 +5,6 @@
 
 // Most CopyPropagation tests are still in copy_propagation_opaque.sil.
 
-// Ideally, the -mandatory-copy-propagation line above would write to
-// %.sil then both be piped to CHECK-ONONE and used as the input for an
-// optimized round-trip. It's important to ensure that importing
-// -Onone code into a -O pipeline does not impair optimization. This
-// doesn't work yet because mandatory copy-propatation handles all
-// defs (not just copied ones). This could be fixed with an internal
-// option. We would also need a way to strip the [poison] from
-// destroys that aren't regenerated, otherwise the check lines
-// won't match:
-//   %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %t.sil | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
-
 sil_stage canonical
 
 import Builtin
@@ -37,13 +26,11 @@ sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
 
 // -O hoists the destroy
-// -Onone hoists the destroy and adds a poison flag.
 //
 // CHECK-LABEL: sil [ossa] @testDestroyAfterCall : {{.*}} {
 // CHECK: bb0:
 // CHECK: [[ARG:%.*]] = apply
-// CHECK-ONONE:   destroy_value [poison] [[ARG]] : $B
-// CHECK-OPT:   destroy_value [[ARG]] : $B
+// CHECK:   destroy_value [[ARG]] : $B
 // CHECK:   apply
 // CHECK-LABEL: } // end sil function 'testDestroyAfterCall'
 sil [ossa] @testDestroyAfterCall : $@convention(thin) () -> () {
@@ -58,19 +45,14 @@ bb0:
 }
 
 // -O removes the copy/destroy
-// -Onone requres a destroy at the lifetime end. It reuses the
-// existing one without adding poison.
 //
 // CHECK-LABEL: sil [ossa] @testDestroyAfterConsumingStore : {{.*}} {
 // CHECK: bb0:
 // CHECK: [[ARG:%.*]] = apply
 // CHECK: [[ADR:%.*]] = alloc_stack $C
-// CHECK-OPT-NOT: copy_value
-// CHECK-OPT: store [[ARG]] to [init] [[ADR]] : $*C
-// CHECK-ONONE: [[CP:%.*]] = copy_value [[ARG]] : $C
-// CHECK-ONONE: store [[CP]] to [init] [[ADR]] : $*C
-// CHECK-OPT-NOT: destroy_value
-// CHECK-ONONE: destroy_value [[ARG]] : $C
+// CHECK-NOT: copy_value
+// CHECK: store [[ARG]] to [init] [[ADR]] : $*C
+// CHECK-NOT: destroy_value
 // CHECK: destroy_addr
 // CHECK-LABEL: } // end sil function 'testDestroyAfterConsumingStore'
 sil [ossa] @testDestroyAfterConsumingStore : $@convention(thin) () -> () {
@@ -88,17 +70,14 @@ bb0:
 }
 
 // -O removes the copy/destroy
-// -Onone requres a destroy at the lifetime end. It creates a new poison one.
 //
 // CHECK-LABEL: sil [ossa] @testDestroyAfterConsumingStoreAndCall : {{.*}} {
 // CHECK: bb0:
 // CHECK: [[ARG:%.*]] = apply
 // CHECK: [[ADR:%.*]] = alloc_stack $C
-// CHECK-OPT-NOT: copy_value
-// CHECK-ONONE: copy_value [[ARG]] : $C
+// CHECK-NOT: copy_value
 // CHECK: store %{{.*}} to [init] [[ADR]] : $*C
-// CHECK-OPT-NOT: destroy_value
-// CHECK-ONONE: destroy_value [poison] [[ARG]] : $C
+// CHECK-NOT: destroy_value
 // CHECK: apply
 // CHECK: destroy_addr
 // CHECK-LABEL: } // end sil function 'testDestroyAfterConsumingStoreAndCall'
@@ -119,16 +98,13 @@ bb0:
 }
 
 // -O removes the copy/destroy
-// -Onone reuses the existint lifetime-ending destroy.
 //
 // CHECK-LABEL: sil [ossa] @testDestroyAfterConsumingCall : {{.*}} {
 // CHECK: bb0:
 // CHECK: [[ARG:%.*]] = apply
-// CHECK-OPT-NOT: copy_value
-// CHECK-ONONE:   copy_value [[ARG]] : $C
+// CHECK-NOT: copy_value
 // CHECK: apply {{.*}} : $@convention(thin) (@owned C) -> ()
-// CHECK-OPT-NOT: destroy_value
-// CHECK-ONONE:   destroy_value [[ARG]] : $C
+// CHECK-NOT: destroy_value
 // CHECK-LABEL: } // end sil function 'testDestroyAfterConsumingCall'
 sil [ossa] @testDestroyAfterConsumingCall : $@convention(thin) () -> () {
 bb0:
@@ -143,16 +119,13 @@ bb0:
 }
 
 // -O removes the copy/destroy
-// -Onone requres a destroy at the lifetime end. It creates a new poison one.
 //
 // CHECK-LABEL: sil [ossa] @testDestroyAfterConsumingCallAndCall : {{.*}} {
 // CHECK: bb0:
 // CHECK: [[ARG:%.*]] = apply
-// CHECK-OPT-NOT: copy_value
-// CHECK-ONONE: copy_value [[ARG]] : $C
+// CHECK-NOT: copy_value
 // CHECK: apply %{{.*}}(%{{.*}}) : $@convention(thin) (@owned C) -> ()
-// CHECK-OPT-NOT: destroy_value
-// CHECK-ONONE:  destroy_value [poison] [[ARG]] : $C
+// CHECK-NOT: destroy_value
 // CHECK: apply
 // CHECK-LABEL: } // end sil function 'testDestroyAfterConsumingCallAndCall'
 sil [ossa] @testDestroyAfterConsumingCallAndCall : $@convention(thin) () -> () {
@@ -177,15 +150,11 @@ bb0:
 // CHECK:        apply %{{.*}}([[C]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK:        cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK-OPT-NOT: copy_value
-// CHECK-OPT-NOT: destroy_value
-// CHECK-OPT:     br bb3([[C]] : $C)
-// CHECK-ONONE:  [[CP:%.*]] = copy_value [[C]] : $C
-// CHECK-ONONE:  destroy_value [poison] [[C]] : $C
-// CHECK-ONONE:  br bb3([[CP]] : $C)
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK:     br bb3([[C]] : $C)
 // CHECK:      bb2:
-// CHECK-OPT:    destroy_value %1 : $C
-// CHECK-ONONE:  destroy_value [poison] %1 : $C
+// CHECK:    destroy_value %1 : $C
 // CHECK:        apply %0() : $@convention(thin) () -> @owned C
 // CHECK:        br bb3(
 // CHECK:      bb3(%{{.*}} : @owned $C)
@@ -236,8 +205,7 @@ sil @modifyInt : $@convention(thin) (@inout Int) -> ()
 // CHECK-NOT: destroy
 // CHECK: end_apply
 // CHECK-NOT: destroy
-// CHECK-OPT: destroy_value %{{.*}} : $WritableKeyPath<Struct, Int>
-// CHECK-ONONE: destroy_value %{{.*}} : $WritableKeyPath<Struct, Int>
+// CHECK: destroy_value %{{.*}} : $WritableKeyPath<Struct, Int>
 // CHECK-NOT: destroy
 // CHECK-LABEL: } // end sil function 'testBeginApply'
 sil hidden [ossa] @testBeginApply : $@convention(thin) (@inout Struct) -> () {
@@ -305,8 +273,8 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
 // -----------------------------------------------------------------------------
 
 // CHECK-LABEL: sil [ossa] @testBitwiseEscape : $@convention(thin) (@guaranteed C) -> Builtin.RawPointer {
-// CHECK-OPT-NOT: copy_value
-// CHECK-OPT-NOT: destroy_value
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
 // CHECK-LABEL: } // end sil function 'testBitwiseEscape'
 sil [ossa] @testBitwiseEscape : $@convention(thin) (@guaranteed C) -> Builtin.RawPointer {
 bb0(%0 : @guaranteed $C):
@@ -334,10 +302,8 @@ sil [ossa] @getObject : $@convention(thin) () -> @owned AnyObject
 //
 // CHECK-LABEL: sil [ossa] @testNoOverlapInLiveBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK-OPT-NOT: copy_value
-// CHECK-OPT:   store [[DEF]] to [init]
-// CHECK-ONONE: [[CP:%.*]] = copy_value
-// CHECK-ONONE: store [[CP]] to [init]
+// CHECK-NOT: copy_value
+// CHECK:   store [[DEF]] to [init]
 // CHECK:   begin_access
 // CHECK:   end_access
 // CHECK: bb1:
@@ -380,10 +346,8 @@ bb1:
 //
 // CHECK-LABEL: sil [ossa] @testNoOverlapInDeadBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
-// CHECK-OPT-NOT: copy_value
-// CHECK-OPT:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
-// CHECK-ONONE: [[CP:%.*]] = copy_value
-// CHECK-ONONE: store [[CP]] to [init] %{{.*}} : $*AnyObject
+// CHECK-NOT: copy_value
+// CHECK:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
 // CHECK: br bb1
 // CHECK: bb1:
 // CHECK:   begin_access
@@ -434,8 +398,7 @@ bb2:
 // CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
 // CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
 // CHECK:   end_access
-// CHECK-OPT:   destroy_value [[DEF]] : $AnyObject
-// CHECK-ONONE: destroy_value [poison] [[DEF]] : $AnyObject
+// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK: br bb1
 // CHECK: bb1:
 // CHECK-NOT: destroy_value [[DEF]] : $AnyObject
@@ -483,8 +446,7 @@ bb1:
 // CHECK: br bb1
 // CHECK: bb1:
 // CHECK:   end_access
-// CHECK-OPT:   destroy_value [[DEF]] : $AnyObject
-// CHECK-ONONE: destroy_value [poison] [[DEF]] : $AnyObject
+// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK: br bb2
 // CHECK: bb2:
 // CHECK-NOT: destroy_value [[DEF]] : $AnyObject
@@ -530,8 +492,7 @@ bb2:
 // CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
 // CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
 // CHECK:   end_access
-// CHECK-OPT:   destroy_value [[DEF]] : $AnyObject
-// CHECK-ONONE:   destroy_value [poison] [[DEF]] : $AnyObject
+// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK: br bb1
 // CHECK: bb1:
 // CHECK-NOT: destroy_value [[DEF]] : $AnyObject
@@ -579,8 +540,7 @@ bb1:
 // CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
 // CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
 // CHECK:   end_access
-// CHECK-OPT:   destroy_value [[DEF]] : $AnyObject
-// CHECK-ONONE: destroy_value [poison] [[DEF]] : $AnyObject
+// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK: br bb2
 // CHECK: bb2:
 // CHECK-NOT: destroy_value [[DEF]] : $AnyObject
@@ -625,10 +585,7 @@ bb2:
 // CHECK-LABEL: sil [ossa] @testOriginalOverlapInLiveBlock : $@convention(thin) () -> () {
 // CHECK:         [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
 // CHECK:         begin_access
-// CHECK-OPT:     store [[DEF]] to [init] %{{.*}} : $*AnyObject
-// CHECK-ONONE:   [[COPY:%[^,]+]] = copy_value [[DEF]]
-// CHECK-ONONE:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
-// CHECK-ONONE:   destroy_value [[DEF]]
+// CHECK:     store [[DEF]] to [init] %{{.*}} : $*AnyObject
 // CHECK:         end_access
 // CHECK:         br bb1
 // CHECK-LABEL: } // end sil function 'testOriginalOverlapInLiveBlock'
@@ -726,8 +683,7 @@ bb1:
 // CHECK:   begin_access {{.*}} : $*Y
 // CHECK:   end_access {{.*}} : $*X
 // CHECK:   end_access {{.*}} : $*Y
-// CHECK-OPT:   destroy_value [[DEF]] : $AnyObject
-// CHECK-ONONE: destroy_value [poison] [[DEF]] : $AnyObject
+// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK-NOT: destroy_value {{.*}} : $AnyObject
@@ -792,8 +748,7 @@ bb1:
 // CHECK:   br bb3
 // CHECK: bb3:
 // CHECK:   end_access {{.*}} : $*Y
-// CHECK-OPT:   destroy_value [[DEF]] : $AnyObject
-// CHECK-ONONE:   destroy_value [poison] [[DEF]] : $AnyObject
+// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK:   br bb4
 // CHECK: bb4:
 // CHECK-NOT: destroy_value {{.*}} : $AnyObject
@@ -857,15 +812,6 @@ bb0(%0 : @owned $C):
 
 // Test that copy propagation doesn't hoist a destroy_value corresponding to
 // a move value [lexical] over a barrier.
-// CHECK-ONONE-LABEL: sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : {{.*}} {
-// CHECK-ONONE:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK-ONONE:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
-// CHECK-ONONE:         [[BARRIER:%[^,]+]] = function_ref @barrier
-// CHECK-ONONE:         [[TAKE_GUARANTEED_C:%[^,]+]] = function_ref @takeGuaranteedC
-// CHECK-ONONE:         apply [[TAKE_GUARANTEED_C]]([[LIFETIME]])
-// CHECK-ONONE:         apply [[BARRIER]]()
-// CHECK-ONONE:         destroy_value [[LIFETIME]]
-// CHECK-ONONE-LABEL: } // end sil function 'dont_hoist_move_value_lexical_destroy_over_barrier_apply'
 sil [ossa] @dont_hoist_move_value_lexical_destroy_over_barrier_apply : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
   %lifetime = move_value [lexical] %instance : $C
