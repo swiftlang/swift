@@ -16,7 +16,6 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -31,7 +30,7 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
-class PrunedLiveness;
+class MultiDefPrunedLiveness;
 struct BorrowedValue;
 
 /// Returns true if v is an address or trivial.

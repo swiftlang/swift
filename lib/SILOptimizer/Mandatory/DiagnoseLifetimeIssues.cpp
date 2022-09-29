@@ -238,9 +238,11 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
           return CanEscape;
         break;
       case OperandOwnership::Borrow: {
-        if (updateLivenessAndWeakStores &&
-            !liveness.updateForBorrowingOperand(use))
+        if (updateLivenessAndWeakStores
+            && (liveness.updateForBorrowingOperand(use)
+                != InnerBorrowKind::Contained)) {
           return CanEscape;
+        }
         BorrowingOperand borrowOper(use);
         if (borrowOper.hasBorrowIntroducingUser()) {
           if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(user))

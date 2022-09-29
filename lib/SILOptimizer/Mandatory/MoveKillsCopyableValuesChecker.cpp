@@ -152,9 +152,10 @@ bool CheckerLivenessInfo::compute() {
             // Otherwise, try to update liveness for a borrowing operand
             // use. This will make it so that we add the end_borrows of the
             // liveness use. If we have a reborrow here, we will bail.
-            bool failed = !liveness.updateForBorrowingOperand(use);
-            if (failed)
+            if (liveness.updateForBorrowingOperand(use)
+                != InnerBorrowKind::Contained) {
               return false;
+            }
           }
         }
         break;

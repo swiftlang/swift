@@ -166,8 +166,10 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         recordConsumingUse(use);
         break;
       case OperandOwnership::Borrow:
-        if (!liveness.updateForBorrowingOperand(use))
+        if (liveness.updateForBorrowingOperand(use)
+            != InnerBorrowKind::Contained) {
           return false;
+        }
         break;
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::ForwardingBorrow:

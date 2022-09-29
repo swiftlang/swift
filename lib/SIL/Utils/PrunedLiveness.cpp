@@ -16,6 +16,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
@@ -111,8 +112,8 @@ void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
     iterAndSuccess.first->second &= lifetimeEnding;
 }
 
-bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
-  assert(op->getOperandOwnership() == OperandOwnership::Borrow);
+InnerBorrowKind PrunedLiveness::updateForBorrowingOperand(Operand *operand) {
+  assert(operand->getOperandOwnership() == OperandOwnership::Borrow);
 
   // A nested borrow scope is considered a use-point at each scope ending
   // instruction.
@@ -120,16 +121,31 @@ bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
   // TODO: Handle reborrowed copies by considering the extended borrow
   // scope. Temporarily bail-out on reborrows because we can't handle uses
   // that aren't dominated by currentDef.
-  if (!BorrowingOperand(op).visitScopeEndingUses([this](Operand *end) {
+  if (!BorrowingOperand(operand).visitScopeEndingUses([this](Operand *end) {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
         }
         updateForUse(end->getUser(), /*lifetimeEnding*/ false);
         return true;
       })) {
-    return false;
+    return InnerBorrowKind::Reborrowed;
   }
-  return true;
+  return InnerBorrowKind::Contained;
+}
+
+void PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
+  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
+
+  if (auto *svi = dyn_cast<SingleValueInstruction>(operand->getUser())) {
+    if (auto scopedAddress = ScopedAddressValue(svi)) {
+      scopedAddress.visitScopeEndingUses([this](Operand *end) {
+        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+        return true;
+      });
+      return;
+    }
+  }
+  updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
 }
 
 void PrunedLiveness::extendAcrossLiveness(PrunedLiveness &otherLivesness) {
@@ -240,7 +256,8 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 //===----------------------------------------------------------------------===//
 
 template <typename LivenessWithDefs>
-void PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+  SimpleLiveRangeSummary summary;
   // Note: Uses with OperandOwnership::NonUse cannot be considered normal uses
   // for liveness. Otherwise, liveness would need to separately track non-uses
   // everywhere. Non-uses cannot be treated like normal non-lifetime-ending uses
@@ -250,16 +267,23 @@ void PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
   // type-dependent operands exist.
   for (Operand *use : def->getUses()) {
     switch (use->getOperandOwnership()) {
-    default:
-      updateForUse(use->getUser(), use->isLifetimeEnding());
-      break;
     case OperandOwnership::NonUse:
       break;
     case OperandOwnership::Borrow:
-      updateForBorrowingOperand(use);
+      summary.meet(updateForBorrowingOperand(use));
+      break;
+    case OperandOwnership::PointerEscape:
+      summary.meet(AddressUseKind::PointerEscape);
+      break;
+    case OperandOwnership::InteriorPointer:
+      checkAndUpdateInteriorPointer(use);
+      break;
+    default:
+      updateForUse(use->getUser(), use->isLifetimeEnding());
       break;
     }
   }
+  return summary;
 }
 
 template <typename LivenessWithDefs>
@@ -457,18 +481,20 @@ MultiDefPrunedLiveness::findPreviousDef(SILInstruction *searchPos,
   return nullptr;
 }
 
-void MultiDefPrunedLiveness::compute() {
+SimpleLiveRangeSummary MultiDefPrunedLiveness::computeSimple() {
   assert(isInitialized() && "defs uninitialized");
 
+  SimpleLiveRangeSummary summary;
   for (SILNode *defNode : defs) {
     if (auto *arg = dyn_cast<SILArgument>(defNode))
-      updateForDef(arg);
+      summary.meet(updateForDef(arg));
     else {
       for (auto result : cast<SILInstruction>(defNode)->getResults()) {
-        updateForDef(result);
+        summary.meet(updateForDef(result));
       }
     }
   }
+  return summary;
 }
 
 //===----------------------------------------------------------------------===//

@@ -88,10 +88,14 @@ struct ScopedAddressValue {
   bool isScopeEndingUse(Operand *op) const;
   /// Pass all scope ending instructions to the visitor.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
+
   /// Optimistically computes liveness for all known uses, and adds this scope's
   /// live blocks into the SSA PrunedLiveness result. Returns AddressUseKind
   /// indicated whether a PointerEscape or Unknown use was encountered.
   AddressUseKind computeLiveness(SSAPrunedLiveness &liveness) const;
+
+  /// Update \p liveness for all the address uses.
+  AddressUseKind updateLiveness(PrunedLiveness &liveness) const;
 
   /// Create appropriate scope ending instruction at \p insertPt.
   void createScopeEnd(SILBasicBlock::iterator insertPt, SILLocation loc) const;

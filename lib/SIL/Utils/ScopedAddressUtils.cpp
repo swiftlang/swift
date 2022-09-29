@@ -101,11 +101,15 @@ bool ScopedAddressValue::visitScopeEndingUses(
 //
 AddressUseKind ScopedAddressValue::
 computeLiveness(SSAPrunedLiveness &liveness) const {
+  liveness.initializeDef(value);
+  return updateLiveness(liveness);
+}
+
+AddressUseKind ScopedAddressValue::
+updateLiveness(PrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
-
-  liveness.initializeDef(value);
   for (auto *use : uses) {
     // Update all collected uses as non-lifetime ending.
     liveness.updateForUse(use->getUser(), /* lifetimeEnding */ false);

@@ -1089,12 +1089,19 @@ bool AddressOwnership::areUsesWithinLifetime(
   if (borrow)
     return borrow.areUsesWithinTransitiveScope(uses, &deadEndBlocks);
 
-  // --- A reference no borrow scope. Currently happens for project_box.
+  // --- A reference with no borrow scope! Currently happens for project_box.
 
   // Compute the reference value's liveness.
   SSAPrunedLiveness liveness;
   liveness.initializeDef(root);
-  liveness.compute();
+  SimpleLiveRangeSummary summary = liveness.computeSimple();
+  // Conservatively ignore InnerBorrowKind::Reborrowed and
+  // AddressUseKind::PointerEscape and Reborrowed. The resulting liveness at
+  // least covers the known uses.
+  (void)summary;
+
+  // FIXME (implicit borrow): handle reborrows transitively just like above so
+  // we don't bail out if a uses is within the reborrowed scope.
   return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
 }
 

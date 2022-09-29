@@ -91,6 +91,7 @@
 #include "swift/AST/TypeExpansionContext.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/NodeDatastructures.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/MapVector.h"
@@ -329,6 +330,51 @@ protected:
                                unsigned endBitNo);
 };
 
+/// If inner borrows are 'Contained', then liveness is fully described by the
+/// scope-ending instructions of any inner borrow scopes, and those scope-ending
+/// uses are dominated by the current def. This is known as a "simple" live
+/// range.
+///
+/// If nested borrows are 'Reborrowed' then simple liveness computed here based
+/// on dominated uses is not sufficient to guarantee the value's lifetime. To do
+/// that, the client needs to consider the reborrow scopes. OSSALiveness handles
+/// those details.
+///
+/// Reborrows are only relevant when they apply to the first level of borrow
+/// scope. Reborrows within nested borrows scopes are already summarized by the
+/// outer borrow scope.
+enum class InnerBorrowKind {
+  Contained, // any borrows are fully contained within this live range
+  Reborrowed // at least one immediately nested borrow is reborrowed
+};
+
+inline InnerBorrowKind meet(InnerBorrowKind lhs, InnerBorrowKind rhs) {
+  return (lhs > rhs) ? lhs : rhs;
+}
+
+/// Summarize reborrows and pointer escapes that affect a live range. Reborrows
+/// and pointer escapes that are encapsulated in a nested borrow don't affect
+/// the outer live range.
+struct SimpleLiveRangeSummary {
+  InnerBorrowKind innerBorrowKind;
+  AddressUseKind addressUseKind;
+
+  SimpleLiveRangeSummary(): innerBorrowKind(InnerBorrowKind::Contained),
+                            addressUseKind(AddressUseKind::NonEscaping)
+  {}
+
+  void meet(const InnerBorrowKind lhs) {
+    innerBorrowKind = swift::meet(innerBorrowKind, lhs);
+  }
+  void meet(const AddressUseKind lhs) {
+    addressUseKind = swift::meet(addressUseKind, lhs);
+  }
+  void meet(const SimpleLiveRangeSummary lhs) {
+    meet(lhs.innerBorrowKind);
+    meet(lhs.addressUseKind);
+  }
+};
+
 /// PrunedLiveness tracks PrunedLiveBlocks along with "interesting" use
 /// points. The set of interesting uses is a superset of all uses on the
 /// liveness boundary. Filtering out uses that are obviously not on the liveness
@@ -403,8 +449,15 @@ public:
   void updateForUse(SILInstruction *user, bool lifetimeEnding);
 
   /// Updates the liveness for a whole borrow scope, beginning at \p op.
-  /// Returns false if this cannot be done.
-  bool updateForBorrowingOperand(Operand *op);
+  /// Returns false if this cannot be done. This assumes that nested OSSA
+  /// lifetimes are complete.
+  InnerBorrowKind updateForBorrowingOperand(Operand *operand);
+
+  /// Update liveness for an interior pointer use. These are normally handled
+  /// like an instantaneous use. But if \p operand "borrows" a value for the
+  /// duration of a scoped address (store_borrow), then update liveness for the
+  /// entire scope. This assumes that nested OSSA lifetimes are complete.
+  void checkAndUpdateInteriorPointer(Operand *operand);
 
   /// Update this liveness to extend across the given liveness.
   void extendAcrossLiveness(PrunedLiveness &otherLiveness);
@@ -494,8 +547,8 @@ protected:
 
 public:
   /// Update liveness for all direct uses of \p def.
-  void updateForDef(SILValue def);
-  
+  SimpleLiveRangeSummary updateForDef(SILValue def);
+
   /// Check if \p inst occurs in between the definition this def and the
   /// liveness boundary.
   bool isWithinBoundary(SILInstruction *inst) const;
@@ -613,11 +666,27 @@ public:
   }
 
   /// Compute liveness for a single SSA definition. The lifetime-ending uses are
-  /// also recorded--destroy_value or end_borrow. However destroy_values might
-  /// not jointly-post dominate if dead-end blocks are present.
-  void compute() {
+  /// also recorded--destroy_value or end_borrow.
+  ///
+  /// This only handles simple liveness in which this definition reaches all
+  /// uses without involving phis. If the returned summary includes
+  /// InnerBorrowKind::Reborrow, then the potentially non-dominated uses are
+  /// not included.
+  ///
+  /// This only handles simple liveness in which all uses are dominated by the
+  /// definition. If the returned summary includes InnerBorrowKind::Reborrow,
+  /// then the resulting liveness does not includes potentially non-dominated
+  /// uses within the reborrow scope. If the summary returns something other
+  /// than AddressUseKind::NonEscaping, then the resulting liveness does not
+  /// necessarilly encapsulate value ownership.
+  ///
+  /// Warning: If OSSA lifetimes are incomplete, then destroy_values might not
+  /// jointly-post dominate if dead-end blocks are present. Nested scopes may
+  /// also lack scope-ending instructions, so the liveness of their nested uses
+  /// may be ignored.
+  SimpleLiveRangeSummary computeSimple() {
     assert(def && "SSA def uninitialized");
-    updateForDef(def);
+    return updateForDef(def);
   }
 };
 
@@ -683,7 +752,19 @@ public:
   /// lifetime-ending uses are also recorded--destroy_value or
   /// end_borrow. However destroy_values might not jointly-post dominate if
   /// dead-end blocks are present.
-  void compute();
+  ///
+  /// This only handles simple liveness in which all uses are dominated by the
+  /// definition. If the returned summary includes InnerBorrowKind::Reborrow,
+  /// then the resulting liveness does not includes potentially non-dominated
+  /// uses within the reborrow scope. If the summary returns something other
+  /// than AddressUseKind::NonEscaping, then the resulting liveness does not
+  /// necessarilly encapsulate value ownership.
+  ///
+  /// Warning: If OSSA lifetimes are incomplete, then destroy_values might not
+  /// jointly-post dominate if dead-end blocks are present. Nested scopes may
+  /// also lack scope-ending instructions, so the liveness of their nested uses
+  /// may be ignored.
+  SimpleLiveRangeSummary computeSimple();
 };
 
 //===----------------------------------------------------------------------===//
