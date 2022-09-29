@@ -107,14 +107,16 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";
         out << "#include <type_traits>\n";
-        // FIXME: Look for the header in the SDK.
         out << "// Look for the C++ interop support header relative to clang's resource dir:\n";
-        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/shims'.\n";
-        out << "#if __has_include(<../../../swift/shims/_SwiftCxxInteroperability.h>)\n";
-        out << "#include <../../../swift/shims/_SwiftCxxInteroperability.h>\n";
-        out << "// Alternatively, allow user to find the header using additional include path into 'swift'.\n";
-        out << "#elif __has_include(<shims/_SwiftCxxInteroperability.h>)\n";
-        out << "#include <shims/_SwiftCxxInteroperability.h>\n";
+        out << "//  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.\n";
+        out << "#if __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>\n";
+        out << "#elif __has_include(<../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>)\n";
+        out << "//  '<toolchain>/usr/local/lib/clang/<version>/include/../../../../lib/swift/swiftToCxx'.\n";
+        out << "#include <../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>\n";
+        out << "// Alternatively, allow user to find the header using additional include path into '<toolchain>/lib/swift'.\n";
+        out << "#elif __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)\n";
+        out << "#include <swiftToCxx/_SwiftCxxInteroperability.h>\n";
         out << "#endif\n";
       },
       [&] {
