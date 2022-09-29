@@ -1186,10 +1186,30 @@ namespace {
       thunk->setParameterList(thunkParamList);
       thunk->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
       cs.cacheType(thunk);
+      
+      // If the `self` type is existential, it must be opened.
+      OpaqueValueExpr *baseOpened = nullptr;
+      Expr *origBaseExpr = baseExpr;
+      if (baseExpr) {
+        auto baseTy = cs.getType(baseExpr);
+        if (baseTy->isAnyExistentialType()) {
+          Type openedTy = solution.OpenedExistentialTypes.lookup(
+              cs.getConstraintLocator(locator));
+          assert(openedTy);
+
+          Type opaqueValueTy = openedTy;
+          if (baseTy->is<ExistentialMetatypeType>())
+            opaqueValueTy = MetatypeType::get(opaqueValueTy);
+
+          baseOpened = new (ctx) OpaqueValueExpr(SourceLoc(), opaqueValueTy);
+          cs.cacheType(baseOpened);
+          baseExpr = baseOpened;
+        }
+      }
 
       Expr *thunkBody = buildSingleCurryThunkBodyCall(
           baseExpr, fnExpr, declOrClosure, thunkParamList, locator);
-
+          
       // If we called a function with a dynamic 'Self' result, we may need some
       // special handling.
       if (baseExpr) {
@@ -1218,6 +1238,15 @@ namespace {
 
       // Now, coerce to the result type of the thunk.
       thunkBody = coerceToType(thunkBody, thunkTy->getResult(), locator);
+
+      // Close up the existential if necessary.
+      if (baseOpened) {
+        thunkBody = new (ctx) OpenExistentialExpr(origBaseExpr,
+                                                  baseOpened,
+                                                  thunkBody,
+                                                  thunkBody->getType());
+        cs.cacheType(thunkBody);
+      }
 
       if (thunkTy->getExtInfo().isThrowing()) {
         thunkBody = new (ctx)
@@ -1529,13 +1558,14 @@ namespace {
         // inside the curry thunk as well. This reduces abstraction and
         // post-factum function type conversions, and results in better SILGen.
         //
-        // For a partial application of a class method, however, we always want
-        // the thunk to accept a class to avoid potential abstraction, so the
-        // existential base must be opened eagerly in order to be upcast to the
-        // appropriate class reference type before it is passed to the thunk.
+        // For a partial application of a class instance method, however, we
+        // always want the thunk to accept a class to avoid potential
+        // abstraction, so the existential base must be opened eagerly in order
+        // to be upcast to the appropriate class reference type before it is
+        //  passed to the thunk.
         if (!needsCurryThunk ||
             (!member->getDeclContext()->getSelfProtocolDecl() &&
-             !isUnboundInstanceMember)) {
+             baseIsInstance && member->isInstanceMember())) {
           // Open the existential before performing the member reference.
           base = openExistentialReference(base, knownOpened->second, member);
           baseTy = knownOpened->second;
@@ -1745,26 +1775,79 @@ namespace {
                                     memberLocator);
       } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
-        // we have a partial application of a static member on a statically-
-        // derived metatype value. Again, there are no order of evaluation
-        // concerns here, and keeping the call and base together in the AST
-        // improves SILGen.
-        if ((isa<ConstructorDecl>(member)
-             || member->isStatic()) &&
-            cs.isStaticallyDerivedMetatype(base)) {
-          // Add a useless ".self" to avoid downstream diagnostics.
-          base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
-                                           cs.getType(base));
-          cs.setType(base, base->getType());
+        // we have a partial application of a static member. It is better
+        // to either push the base reference down into the closure (if it's
+        // just a literal type reference, in which case there are no order of
+        // operation concerns with capturing vs. evaluating it in the closure),
+        // or to evaluate the base as a capture and hand it down via the
+        // capture list.
+        if (isa<ConstructorDecl>(member) || member->isStatic()) {
+          if (cs.isStaticallyDerivedMetatype(base)) {
+            // Add a useless ".self" to avoid downstream diagnostics.
+            base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
+                                             cs.getType(base));
+            cs.setType(base, base->getType());
 
-          auto *closure = buildSingleCurryThunk(
-              base, declRefExpr, cast<AbstractFunctionDecl>(member),
+            auto *closure = buildSingleCurryThunk(
+                base, declRefExpr, cast<AbstractFunctionDecl>(member),
+                memberLocator);
+
+            // Skip the code below -- we're not building an extra level of
+            // call by applying the metatype; instead, the closure we just
+            // built is the curried reference.
+            return closure;
+          } else {
+            // Add a useless ".self" to avoid downstream diagnostics, in case
+            // the type ref is still a TypeExpr.
+            base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
+                                             cs.getType(base));
+            // Introduce a capture variable.
+            cs.cacheType(base);
+            solution.setExprTypes(base);
+            auto capture = new (context) VarDecl(/*static*/ false,
+                                                 VarDecl::Introducer::Let,
+                                                 SourceLoc(),
+                                                 context.getIdentifier("$base$"),
+                                                 dc);
+            capture->setImplicit();
+            capture->setInterfaceType(base->getType()->mapTypeOutOfContext());
+            
+            NamedPattern *capturePat = new (context) NamedPattern(capture);
+            capturePat->setImplicit();
+            capturePat->setType(base->getType());
+            
+            auto capturePBE = PatternBindingEntry(capturePat,
+                                                  SourceLoc(), base, dc);
+            auto captureDecl = PatternBindingDecl::create(context, SourceLoc(),
+                                                          {}, SourceLoc(),
+                                                          capturePBE,
+                                                          dc);
+            captureDecl->setImplicit();
+            
+            // Write the closure in terms of the capture.
+            auto baseRef = new (context)
+              DeclRefExpr(capture, DeclNameLoc(base->getLoc()), /*implicit*/ true);
+            baseRef->setType(base->getType());
+            cs.cacheType(baseRef);
+            
+            auto *closure = buildSingleCurryThunk(
+              baseRef, declRefExpr, cast<AbstractFunctionDecl>(member),
+              simplifyType(adjustedOpenedType)->castTo<FunctionType>(),
               memberLocator);
-
-          // Skip the code below -- we're not building an extra level of
-          // call by applying the metatype; instead, the closure we just
-          // built is the curried reference.
-          return closure;
+              
+            // Wrap the closure in a capture list.
+            auto captureEntry = CaptureListEntry(captureDecl);
+            auto captureExpr = CaptureListExpr::create(context, captureEntry,
+                                                       closure);
+            captureExpr->setImplicit();
+            captureExpr->setType(cs.getType(closure));
+            cs.cacheType(captureExpr);
+            
+            Expr *finalExpr = captureExpr;
+            closeExistentials(finalExpr, locator,
+                              /*force*/ openedExistential);
+            return finalExpr;
+          }
         }
 
         FunctionType *curryThunkTy = nullptr;
