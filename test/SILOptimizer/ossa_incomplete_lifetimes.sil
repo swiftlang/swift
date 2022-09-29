@@ -1,0 +1,120 @@
+// RUN: %target-sil-opt %s -ossa-lifetime-analysis -o /dev/null | %FileCheck %s
+//
+// These tests rely on "incomplete" OSSA lifetimes. Incomplete OSSA
+// lifetimes are invalid SIL, but the OSSA liveness utilities still
+// need to handle them! SILGen and textual SIL is allowed to produce
+// incomplete lifetimes. The OSSA liveness utilities need to be able
+// to fixup those incomplete lifetimes. So the utilities need to
+// handle invalid SIL in order to produce valid SIL.
+
+sil_stage canonical
+
+import Builtin
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+enum Never {}
+
+class C {}
+
+// CHECK-LABEL: @testDeadTerminatorResult
+// CHECK-LABEL: SSA lifetime analysis: %{{.*}} = argument of bb1 : $C
+// CHECK: bb1: LiveWithin
+// CHECK-NOT: "last user"
+// CHECK-NOT: "boundary edge"
+// CHECK: dead def: %{{.*}} = argument of bb1 : $C
+sil [ossa] @testDeadTerminatorResult : $@convention(thin) (@owned FakeOptional<C>) -> () {
+bb0(%0 : @owned $FakeOptional<C>):
+  switch_enum %0 : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%payload : @owned $C):
+  debug_value [trace] %payload : $C
+  unreachable
+
+bb2:
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testDeadPhi
+// CHECK: SSA lifetime analysis: %{{.*}} = argument of bb3 : $C
+// CHECK: bb3: LiveWithin
+// CHECK: dead def: %{{.*}} = argument of bb3 : $C
+sil [ossa] @testDeadPhi : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $C)
+
+bb2:
+  br bb3(%1 : $C)
+
+bb3(%2 : @owned $C):
+  debug_value [trace] %2 : $C
+  unreachable
+}
+
+// CHECK-LABEL: @testDeadInstruction
+// CHECK: SSA lifetime analysis:   %{{.*}} = copy_value %0 : $C
+// CHECK: bb0: LiveWithin
+// CHECK: dead def:   %{{.*}} = copy_value %0 : $C
+sil [ossa] @testDeadInstruction : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0 : $C
+  debug_value [trace] %1 : $C
+  unreachable
+}
+
+// A single instruction occurs twice on the same liveness
+// boundary. Once as a last use, and once as a dead def.
+// This is a particularly problematic corner case.
+//
+// CHECK-LABEL: @testDeadSelfKill
+// CHECK: MultiDef lifetime analysis:
+// CHECK: def: %1 = argument of bb1 : $C
+// CHECK: def: [[V:%.*]] = move_value %1 : $C
+// CHECK: bb1: LiveWithin
+// CHECK: lifetime-ending user:   [[V]] = move_value %1 : $C
+// CHECK: last user:   [[V]] = move_value %1 : $C
+// CHECK: dead def:   [[V]] = move_value %1 : $C
+sil [ossa] @testDeadSelfKill : $@convention(thin) () -> () {
+bb0:
+  br bb3
+
+bb1(%1 : @owned $C):
+  debug_value [trace] %1 : $C
+  %2 = move_value %1 : $C
+  debug_value [trace] %2 : $C
+  unreachable
+
+bb3:
+  %99 = tuple()
+  return %99 : $()
+}
+
+sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
+
+// The store_borrow scope has an inner load_borrow scope, which is
+// incomplete. Since the store_borrow produces an address, the load
+// borrow is considered a ScopedAddressUse, and all of its uses,
+// including the Apply will contribute to the store_borrow liveness.
+// CHECK-LABEL: @testInnerUnreachable
+// CHECK: Scoped address analysis: [[SB:%.*]] = store_borrow %0
+// CHECK: bb0: LiveWithin
+// CHECK-NEXT: regular user: %{{.*}} = apply
+// CHECK-NEXT: last user:    %{{.*}} = apply
+sil shared [ossa] @testInnerUnreachable : $@convention(thin) (@guaranteed C, @thick Never.Type) -> () {
+bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
+  %2 = alloc_stack $C
+  %3 = store_borrow %0 to %2 : $*C
+  debug_value [trace] %3 : $*C
+  %5 = load_borrow %3 : $*C
+  %6 = function_ref @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
+  %7 = alloc_stack $Never
+  %8 = apply %6<Never>(%7, %5) : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
+  unreachable
+}
