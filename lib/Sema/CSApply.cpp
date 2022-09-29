@@ -8927,12 +8927,14 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
 
       case StmtConditionElement::CK_HasSymbol: {
         ConstraintSystem &cs = solution.getConstraintSystem();
+        auto info = condElement.getHasSymbolInfo();
         auto target = *cs.getSolutionApplicationTarget(&condElement);
         auto resolvedTarget = rewriteTarget(target);
-        if (!resolvedTarget)
+        if (!resolvedTarget) {
+          info->setInvalid();
           return None;
+        }
 
-        auto info = condElement.getHasSymbolInfo();
         auto rewrittenExpr = resolvedTarget->getAsExpr();
         info->setSymbolExpr(rewrittenExpr);
         info->setReferencedDecl(

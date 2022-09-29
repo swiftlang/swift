@@ -504,10 +504,13 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
     auto exprTy = TypeChecker::typeCheckExpression(E, dc);
     Info->setSymbolExpr(E);
 
-    if (exprTy)
-      Info->setReferencedDecl(getReferencedDeclForHasSymbolCondition(E));
+    if (!exprTy) {
+      Info->setInvalid();
+      return true;
+    }
 
-    return !exprTy;
+    Info->setReferencedDecl(getReferencedDeclForHasSymbolCondition(E));
+    return false;
   }
 
   if (auto E = elt.getBooleanOrNull()) {

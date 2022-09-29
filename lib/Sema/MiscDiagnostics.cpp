@@ -4319,6 +4319,9 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
 
     case StmtConditionElement::CK_HasSymbol: {
       auto info = elt.getHasSymbolInfo();
+      if (info->isInvalid())
+        break;
+
       auto symbolExpr = info->getSymbolExpr();
       if (!symbolExpr)
         break;
@@ -4334,11 +4337,13 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
           ctx.Diags.diagnose(symbolExpr->getLoc(),
                              diag::has_symbol_decl_must_be_weak,
                              decl->getDescriptiveKind(), decl->getName());
+          info->setInvalid();
         }
       } else {
         // Diagnose because we weren't able to interpret the expression as one
         // that uniquely identifies a single declaration.
         ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+        info->setInvalid();
       }
       break;
     }

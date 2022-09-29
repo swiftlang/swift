@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol_helper.swift -enable-library-evolution
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t -enable-experimental-feature ResultBuilderASTTransform
 
 // UNSUPPORTED: OS=windows-msvc
 
@@ -159,6 +160,11 @@ struct MyView {
     
   @ViewBuilder var localFuncView: some View {
     if #_hasSymbol(localFunc) { image } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
+    else { image }
+  }
+
+  @ViewBuilder var noArgFuncView: some View {
+    if #_hasSymbol(noArgFunc()) { image } // expected-error {{#_hasSymbol condition must refer to a declaration}}
     else { image }
   }
 }
