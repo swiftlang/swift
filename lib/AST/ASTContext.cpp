@@ -3068,9 +3068,16 @@ Type ErrorType::get(Type originalType) {
 }
 
 Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasPlaceholder;
+  if (auto type = originator.dyn_cast<TypeVariableType *>())
+    properties |= type->getRecursiveProperties();
+  else if (auto type = originator.dyn_cast<DependentMemberType *>())
+    properties |= type->getRecursiveProperties();
+
+  auto arena = getArena(properties);
+
   assert(originator);
-  return new (ctx, AllocationArena::Permanent)
-      PlaceholderType(ctx, originator, RecursiveTypeProperties::HasPlaceholder);
+  return new (ctx, arena) PlaceholderType(ctx, originator, properties);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

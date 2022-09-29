@@ -645,7 +645,7 @@ void TypeBase::getTypeVariables(
     // way.
     getCanonicalType().findIf(addTypeVariables);
     Type(this).findIf(addTypeVariables);
-    assert((!typeVariables.empty() || hasError()) &&
+    assert((!typeVariables.empty() || hasError() || hasPlaceholder()) &&
            "Did not find type variables!");
   }
 }
