@@ -14,7 +14,7 @@ extension std.string {
   public init(_ string: String) {
     self.init()
     for char in string.utf8 {
-      self.push_back(value_type(char))
+      self.push_back(value_type(bitPattern: char))
     }
   }
 }
