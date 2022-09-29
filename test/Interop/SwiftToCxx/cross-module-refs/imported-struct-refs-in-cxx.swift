@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/structs.swift -module-name Structs -emit-module -emit-module-path %t/Structs.swiftmodule -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %S/Inputs/structs.swift -module-name Structs -emit-module -emit-module-path %t/Structs.swiftmodule -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -clang-header-expose-public-decls -emit-clang-header-path %t/uses-structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-structs.h
 
 // FIXME: add import automatically?
 // RUN: echo '#include "structs.h"' > %t/fixed-uses-structs.h

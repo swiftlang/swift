@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-public-decls
+// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
 // RUN: %target-interop-build-clangxx -std=c++20 -fobjc-arc -c %t/use-swift-objc-types.mm -I %t -o %t/swift-objc-execution.o
 // RUN: %target-interop-build-swift %t/use-objc-types.swift -o %t/swift-objc-execution -Xlinker %t/swift-objc-execution.o -module-name UseObjCTy -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/generic-function-in-cxx.swift -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/generic-function-in-cxx.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -c %s -I %t -o /dev/null -DUSE_TYPE=int
 // RUN: not %target-interop-build-clangxx -std=gnu++20 -c %s -I %t -o /dev/null -DUSE_TYPE=CxxStruct
