@@ -392,6 +392,12 @@ def apply_default_arguments(toolchain, args):
             if (target.platform.is_darwin and
                 target.arch in supported_archs)
         ]
+    else:
+        # Clear the value explicitly from CMakeCache.txt
+        # to avoid picking up a stale value that can cause
+        # build failures
+        args.extra_cmake_options.append(
+            '-USWIFT_DARWIN_SUPPORTED_ARCHS')
 
     # Filter out any macOS stdlib deployment targets that are not supported
     # by the macOS SDK.

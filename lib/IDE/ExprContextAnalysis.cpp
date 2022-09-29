@@ -1016,8 +1016,8 @@ class ExprContextAnalyzer {
       }
       break;
     }
-    case ExprKind::If: {
-      auto *IE = cast<IfExpr>(Parent);
+    case ExprKind::Ternary: {
+      auto *IE = cast<TernaryExpr>(Parent);
       if (IE->isFolded() &&
           SM.rangeContains(IE->getCondExpr()->getSourceRange(),
                            ParsedExpr->getSourceRange())) {
@@ -1291,7 +1291,7 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
         case ExprKind::Dictionary:
-        case ExprKind::If:
+        case ExprKind::Ternary:
           return true;
         case ExprKind::Array:
           return (!Parent.getAsExpr() ||

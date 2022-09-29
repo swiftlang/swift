@@ -122,3 +122,14 @@ func joo() -> Int {
   } while false // CHECK: [[@LINE]]:11 {{.*}} : (1 - 2)
   return 1
 }
+
+// rdar://41010883 – Make sure we don't introduce an empty unreachable region.
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s14coverage_catch3kooSiyKF" {{.*}} // coverage_catch.koo
+func koo() throws -> Int { // CHECK-NEXT: [[@LINE]]:26 -> [[@LINE+7]]:2 : 0
+  do {                     // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE+3]]:4 : 0
+    try bar()
+    return 1
+  } catch is SomeErr {     // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+2]]:4 : 1
+    throw SomeErr.Err1
+  }
+}                          // CHECK-NEXT: }

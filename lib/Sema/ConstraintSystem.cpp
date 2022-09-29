@@ -5202,7 +5202,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       if (auto *condStmt = getAsStmt<LabeledConditionalStmt>(anchor)) {
         anchor = &condStmt->getCond().front();
       } else {
-        anchor = castToExpr<IfExpr>(anchor)->getCondExpr();
+        anchor = castToExpr<TernaryExpr>(anchor)->getCondExpr();
       }
 
       path = path.slice(1);
@@ -5216,7 +5216,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         anchor =
             branch.forThen() ? ifStmt->getThenStmt() : ifStmt->getElseStmt();
       } else {
-        auto *ifExpr = castToExpr<IfExpr>(anchor);
+        auto *ifExpr = castToExpr<TernaryExpr>(anchor);
         anchor =
             branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
       }
@@ -5574,8 +5574,8 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
   if (isa<ExplicitCastExpr>(fnExpr))
     return false;
 
-  // No direct callee for an if expr.
-  if (isa<IfExpr>(fnExpr))
+  // No direct callee for a ternary expr.
+  if (isa<TernaryExpr>(fnExpr))
     return false;
 
   // Assume that anything else would have a direct callee.

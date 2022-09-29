@@ -4473,8 +4473,7 @@ void PrintAST::visitErrorExpr(ErrorExpr *expr) {
   Printer << "<error>";
 }
 
-void PrintAST::visitIfExpr(IfExpr *expr) {
-}
+void PrintAST::visitTernaryExpr(TernaryExpr *expr) {}
 
 void PrintAST::visitIsExpr(IsExpr *expr) {
 }

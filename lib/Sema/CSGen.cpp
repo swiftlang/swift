@@ -215,7 +215,7 @@ namespace {
       }
 
       // Optimize branches of a conditional expression separately.
-      if (auto IE = dyn_cast<IfExpr>(expr)) {
+      if (auto IE = dyn_cast<TernaryExpr>(expr)) {
         CS.optimizeConstraints(IE->getCondExpr());
         CS.optimizeConstraints(IE->getThenExpr());
         CS.optimizeConstraints(IE->getElseExpr());
@@ -2994,8 +2994,8 @@ namespace {
       // The result is void.
       return TupleType::getEmpty(CS.getASTContext());
     }
-    
-    Type visitIfExpr(IfExpr *expr) {
+
+    Type visitTernaryExpr(TernaryExpr *expr) {
       // Condition must convert to Bool.
       auto boolDecl = CS.getASTContext().getBoolDecl();
       if (!boolDecl)
@@ -3786,11 +3786,11 @@ namespace {
         }
       }
 
-      // Don't visit IfExpr with empty sub expressions. They may occur
+      // Don't visit TernaryExpr with empty sub expressions. They may occur
       // if the body of a closure was not visited while pre-checking because
       // of an error in the closure's signature.
-      if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
-        if (!ifExpr->getThenExpr() || !ifExpr->getElseExpr())
+      if (auto *ternary = dyn_cast<TernaryExpr>(expr)) {
+        if (!ternary->getThenExpr() || !ternary->getElseExpr())
           return Action::SkipChildren(expr);
       }
 

@@ -19,6 +19,7 @@
 
 #include "Win32/Win32Defs.h"
 
+#include <chrono>
 #include <atomic>
 
 #include "llvm/ADT/Optional.h"
@@ -84,6 +85,54 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 }
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ReleaseSRWLockExclusive(&handle);
+}
+
+// .. ConditionVariable support ..............................................
+
+struct cond_handle {
+  SWIFT_CONDITION_VARIABLE condition;
+  SWIFT_SRWLOCK lock;
+};
+
+inline void cond_init(cond_handle &handle) {
+  handle.condition = CONDITION_VARIABLE_INIT;
+  handle.lock = SRWLOCK_INIT;
+}
+inline void cond_destroy(cond_handle &handle) {}
+inline void cond_lock(cond_handle &handle) {
+  AcquireSRWLockExclusive(&handle.lock);
+}
+inline void cond_unlock(cond_handle &handle) {
+  ReleaseSRWLockExclusive(&handle.lock);
+}
+inline void cond_signal(cond_handle &handle) {
+  WakeConditionVariable(&handle.condition);
+}
+inline void cond_broadcast(cond_handle &handle) {
+  WakeAllConditionVariable(&handle.condition);
+}
+inline void cond_wait(cond_handle &handle) {
+  SleepConditionVariableSRW(&handle.condition,
+                            &handle.lock,
+                            INFINITE,
+                            0);
+}
+template <class Rep, class Period>
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::duration<Rep, Period> duration) {
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+  return SleepConditionVariableSRW(&handle.condition,
+                                   &handle.lock,
+                                   DWORD(ms.count()),
+                                   0);
+}
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::system_clock::time_point deadline) {
+  std::chrono::system_clock::duration duration =
+    deadline - std::chrono::system_clock::now();
+  if (duration < std::chrono::system_clock::duration::zero())
+    duration = std::chrono::system_clock::duration::zero();
+  return cond_wait(handle, duration);
 }
 
 // .. Once ...................................................................

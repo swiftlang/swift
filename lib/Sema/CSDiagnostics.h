@@ -2570,7 +2570,7 @@ public:
 private:
   std::tuple<Type, Type, int> unwrappedTypes() const;
 
-  bool diagnoseIfExpr() const;
+  bool diagnoseTernaryExpr() const;
 
   bool diagnoseForcedCastExpr() const;
 

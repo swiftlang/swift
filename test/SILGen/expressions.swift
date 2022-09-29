@@ -418,8 +418,8 @@ func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s11expressions7if_expr{{[_0-9a-zA-Z]*}}F
-func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s11expressions12ternary_expr{{[_0-9a-zA-Z]*}}F
+func ternary_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var a = a
   var b = b
   var x = x

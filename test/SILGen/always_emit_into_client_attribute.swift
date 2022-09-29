@@ -29,3 +29,21 @@ public struct S {
     set { }
   }
 }
+
+public final class C {
+  // C.__allocating_init()
+  // CHECK-LABEL: sil non_abi [serialized] [exact_self_class] [ossa] @$s33always_emit_into_client_attribute1CCACycfC : $@convention(method) (@thick C.Type) -> @owned C
+
+  // C.init()
+  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute1CCACycfc : $@convention(method) (@owned C) -> @owned C
+  @_alwaysEmitIntoClient
+  public init() {}
+
+  // C.deinit
+  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
+
+  // C.__deallocating_deinit
+  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute1CCfD : $@convention(method) (@owned C) -> ()
+  @_alwaysEmitIntoClient
+  deinit {}
+}
