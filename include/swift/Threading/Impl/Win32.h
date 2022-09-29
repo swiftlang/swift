@@ -19,7 +19,8 @@
 
 #include "Win32/Win32Defs.h"
 
-#include <chrono>
+#include "chrono.h"
+
 #include <atomic>
 
 #include "llvm/ADT/Optional.h"
@@ -120,7 +121,7 @@ inline void cond_wait(cond_handle &handle) {
 template <class Rep, class Period>
 inline bool cond_wait(cond_handle &handle,
                       std::chrono::duration<Rep, Period> duration) {
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+  auto ms = chrono_utils::ceil<std::chrono::milliseconds>(duration);
   return SleepConditionVariableSRW(&handle.condition,
                                    &handle.lock,
                                    DWORD(ms.count()),
