@@ -1,5 +1,6 @@
 set(datafiles
     _SwiftCxxInteroperability.h
+    _SwiftStdlibCxxOverlay.h
 )
 
 set(SWIFTLIB_DIR
