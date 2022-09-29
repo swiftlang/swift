@@ -313,6 +313,25 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // user code into their body.
   switch (kind) {
   case Kind::Func: {
+    if (getAbstractClosureExpr()) {
+      // Auto-closures have user-written code.
+      if (auto *ACE = getAutoClosureExpr()) {
+        // Currently all types of auto-closures can contain user code. Note this
+        // logic does not affect delayed emission, as we eagerly emit all
+        // closure definitions. This does however affect profiling.
+        switch (ACE->getThunkKind()) {
+        case AutoClosureExpr::Kind::None:
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+        case AutoClosureExpr::Kind::AsyncLet:
+          return true;
+        }
+        llvm_unreachable("Unhandled case in switch!");
+      }
+      // Otherwise, assume an implicit closure doesn't have user code.
+      return false;
+    }
+
     // Lazy getters splice in the user-written initializer expr.
     if (auto *accessor = dyn_cast<AccessorDecl>(getFuncDecl())) {
       auto *storage = accessor->getStorage();
