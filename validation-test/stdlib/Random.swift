@@ -236,7 +236,8 @@ RandomTests.test("different random number generators") {
   expectEqual(shufflePasses[0], shufflePasses[1])
 }
 
-// Random floating points with max values (SR-8178)
+// https://github.com/apple/swift/issues/50710
+// Random floating points with max values
 
 var lcrng = LCRNG(seed: 1234567890)
 

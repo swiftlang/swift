@@ -10,5 +10,5 @@ class K<T> {
   init(with: @escaping (T, F) -> Void) {}
 }
 
-// Related: SR-2994
+// Related: https://github.com/apple/swift/issues/45584
 _ = K{ (c: C?, fn: F) in fn(&(c.s["hi"])) }
