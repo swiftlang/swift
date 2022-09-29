@@ -32,15 +32,6 @@
 
 using namespace swift;
 
-/// Check if a closure has a body.
-static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
-  if (auto *CE = dyn_cast<ClosureExpr>(ACE))
-    return CE->getBody();
-  if (auto *autoCE = dyn_cast<AutoClosureExpr>(ACE))
-    return autoCE->getBody();
-  return false;
-}
-
 /// Check whether a root AST node should be profiled.
 static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   // Do not profile AST nodes with invalid source locations.
@@ -71,28 +62,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   if (!Constant.hasUserWrittenCode()) {
     LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: no user-written code\n");
     return false;
-  }
-
-  if (auto *E = N.dyn_cast<Expr *>()) {
-    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-      // Only profile closure expressions with bodies.
-      if (!doesClosureHaveBody(CE)) {
-        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: closure without body\n");
-        return false;
-      }
-    }
-
-    // Profile all other kinds of expressions.
-    return true;
-  }
-
-  auto *D = N.get<Decl *>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // Don't profile functions without bodies.
-    if (!AFD->hasBody()) {
-      LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
-      return false;
-    }
   }
 
   return true;
@@ -127,21 +96,22 @@ static bool hasASTBeenTypeChecked(ASTNode N, SILDeclRef forDecl) {
   return !SF || SF->ASTStage >= SourceFile::TypeChecked;
 }
 
-/// Check whether a mapped AST node requires a new profiler.
+/// Check whether a mapped AST node is valid for profiling.
 static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
   assert(hasASTBeenTypeChecked(N, forDecl) &&
          "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
-    if (isa<AbstractFunctionDecl>(D))
-      return true;
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+      return AFD->hasBody();
 
     if (isa<TopLevelCodeDecl>(D))
       return true;
   } else if (N.get<Expr *>()) {
+    if (auto *closure = forDecl.getAbstractClosureExpr())
+      return closure->hasBody();
     if (forDecl.isStoredPropertyInitializer() ||
-        forDecl.isPropertyWrapperBackingInitializer() ||
-        forDecl.getAbstractClosureExpr())
+        forDecl.isPropertyWrapperBackingInitializer())
       return true;
   }
   return false;
