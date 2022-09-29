@@ -1526,15 +1526,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
-namespace DiagnosticsContext {
-/// A mapping of replacement `ValueDecl`s to use in `VarDeclUsageAnalysis`
-/// instead of the actual `ValueDecl` of the associated `DeclRefExpr`.
-/// This lets `VarDeclUsageAnalysis` avoid emitting false-positive warnings
-/// in certain circumstances.
-static llvm::SmallDenseMap<DeclRefExpr *, ValueDecl *>
-    DeclMappingForUsageAnalysis;
-}
-
 /// Look for any property references in closures that lack a 'self.' qualifier.
 /// Within a closure, we require that the source code contain 'self.' explicitly
 /// (or that the closure explicitly capture 'self' in the capture list) because
@@ -1589,15 +1580,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // let self = .someOptionalVariable else { return }` or `let self =
       // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
       // an optional, we would have already hit an error elsewhere.
-      //
-      // Always run the `implicitWeakSelfReferenceIsValid` check, since it
-      // annotates applicable decls / stmts with state used in
-      // `VarDeclUsageChecker`, and we need that state even in closures that
-      // don't directly capture self weakly (but are inner closures of a closure
-      // that does capture self weakly).
-      auto isValid = implicitWeakSelfReferenceIsValid(DRE, inClosure);
       if (closureHasWeakSelfCapture(inClosure)) {
-        return !isValid;
+        return !implicitWeakSelfReferenceIsValid(DRE);
       }
 
       // Defensive check for type. If the expression doesn't have type here, it
@@ -1636,37 +1620,12 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return true;
     }
 
-    static bool
-    implicitWeakSelfReferenceIsValid(DeclRefExpr *DRE,
-                                     const AbstractClosureExpr *inClosure) {
+    static bool implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE) {
       ASTContext &Ctx = DRE->getDecl()->getASTContext();
-      auto selfDecl = DRE->getDecl();
-
-      if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
-        // In Swift 5 language modes, the decl of this implicit `DeclRefExpr`
-        // incorrectly refers to the `self` `ParamDecl` of the closure
-        // (which is always non-optional), instead of the actual decl that
-        // an explicit `self` call would refer to. As a workaround, we can
-        // manually lookup what self "should" refer to, and then validate
-        // that decl instead.
-        auto lookupResult = ASTScope::lookupSingleLocalDecl(
-            inClosure->getParentSourceFile(), DeclName(Ctx.Id_self),
-            DRE->getLoc());
-        if (!lookupResult) {
-          return false;
-        }
-
-        // When `VarDeclUsageChecker` checks this DRE, we need to use
-        // the base we looked up here instead, since otherwise
-        // we'll emit confusing false-positive warnings.
-        DiagnosticsContext::DeclMappingForUsageAnalysis[DRE] = lookupResult;
-
-        selfDecl = lookupResult;
-      }
 
       // Check if the implicit self decl refers to a var in a conditional stmt
       LabeledConditionalStmt *conditionalStmt = nullptr;
-      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
         if (auto parentStmt = var->getParentPatternStmt()) {
           conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
         }
@@ -1686,7 +1645,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
           if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
             if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
-              return selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
+              return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
             }
           }
         }
@@ -1707,8 +1666,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     /// Return true if this is a closure expression that will require explicit
     /// use or capture of "self." for qualification of member references.
-    static bool
-    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE) {
+    static bool isClosureRequiringSelfQualification(
+                  const AbstractClosureExpr *CE) {
+      // If this closure capture self weakly, then we have to validate each
+      // usage of implicit self individually, even in a nonescaping closure
+      if (closureHasWeakSelfCapture(CE)) {
+        return true;
+      }
+
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
@@ -1737,11 +1702,8 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         // If this is a potentially-escaping closure expression, start looking
-        // for references to self if we aren't already. But if this closure
-        // captures self weakly, then we have to validate each usage of implicit
-        // self individually, even in a nonescaping closure
-        if (isClosureRequiringSelfQualification(CE) ||
-            closureHasWeakSelfCapture(CE))
+        // for references to self if we aren't already.
+        if (isClosureRequiringSelfQualification(CE))
           Closures.push_back(CE);
       }
 
@@ -1762,10 +1724,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // weakly, then we should always emit an error, since implicit self was
         // only allowed starting in Swift 5.8 and later.
         if (closureHasWeakSelfCapture(ACE)) {
-          // Implicit self was incorrectly permitted for weak self captures
-          // in non-escaping closures in Swift 5.7, so in that case we can
-          // only warn until Swift 6.
-          return !isClosureRequiringSelfQualification(ACE);
+          return false;
         }
 
         // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
@@ -2635,15 +2594,7 @@ public:
 
     VarDecls[vd] |= Flag;
   }
-
-  ValueDecl *getDecl(DeclRefExpr *DRE) {
-    if (auto decl = DiagnosticsContext::DeclMappingForUsageAnalysis[DRE]) {
-      return decl;
-    }
-
-    return DRE->getDecl();
-  }
-
+  
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
   void markBaseOfStorageUse(Expr *E, bool isMutating);
   
@@ -3324,7 +3275,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
                   unsigned noParens = initExpr->canAppendPostfixExpression();
-
+                  
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
                   ConditionalCheckedCastExpr *CCE = nullptr;
@@ -3543,7 +3494,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   
   // If we found a decl that is being assigned to, then mark it.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(getDecl(DRE), Flags);
+    addMark(DRE->getDecl(), Flags);
     return;
   }
   
@@ -3628,10 +3579,10 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(getDecl(DRE), RK_Read);
+    addMark(DRE->getDecl(), RK_Read);
 
     // If the Expression is a read of a getter, track for diagnostics
-    if (auto VD = dyn_cast<VarDecl>(getDecl(DRE))) {
+    if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
       AssociatedGetterRefExpr.insert(std::make_pair(VD, DRE));
     }
   }
@@ -3705,7 +3656,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // conservatively mark it read and written.  This will silence "variable
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(VDUC.getDecl(DRE), RK_Read | RK_Written);
+        VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
       else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
         auto name = declRef->getName();
         auto loc = declRef->getLoc();
