@@ -933,11 +933,6 @@ bool SILDeclRef::isBackDeployed() const {
   return false;
 }
 
-bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
-         isDistributedThunk() || isBackDeploymentThunk();
-}
-
 bool SILDeclRef::isForeignToNativeThunk() const {
   // If this isn't a native entry-point, it's not a foreign-to-native thunk.
   if (isForeign)
@@ -1101,7 +1096,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!NameA->Name.empty() && !isAnyThunk()) {
+      if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
       }
       
