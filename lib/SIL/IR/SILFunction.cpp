@@ -335,6 +335,20 @@ void SILFunction::deleteSnapshot(int ID) {
 void SILFunction::createProfiler(ASTNode Root, SILDeclRef Ref) {
   assert(!Profiler && "Function already has a profiler");
   Profiler = SILProfiler::create(Module, Root, Ref);
+  if (!Profiler || Ref.isNull())
+    return;
+
+  // If we loaded a profile, set the entry counts for functions and closures
+  // for PGO to use.
+  if (Ref.isFunc()) {
+    if (auto *Closure = Ref.getAbstractClosureExpr()) {
+      setEntryCount(Profiler->getExecutionCount(Closure));
+    } else {
+      auto *FD = Ref.getFuncDecl();
+      assert(FD);
+      setEntryCount(Profiler->getExecutionCount(FD->getBody()));
+    }
+  }
 }
 
 bool SILFunction::hasForeignBody() const {
