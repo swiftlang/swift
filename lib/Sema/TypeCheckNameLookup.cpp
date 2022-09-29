@@ -350,7 +350,8 @@ static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
 
 TypeChecker::UnsupportedMemberTypeAccessKind
 TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
-                                           bool hasUnboundOpener) {
+                                           bool hasUnboundOpener,
+                                           bool isExtensionBinding) {
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -377,7 +378,7 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
       return UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric;
 
     if (isa<NominalTypeDecl>(typeDecl))
-      if (!hasUnboundOpener)
+      if (!hasUnboundOpener && !isExtensionBinding)
         return UnsupportedMemberTypeAccessKind::NominalTypeOfUnboundGeneric;
   }
 
