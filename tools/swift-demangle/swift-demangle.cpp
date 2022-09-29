@@ -391,6 +391,13 @@ int main(int argc, char **argv) {
   } else {
     swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
+      if (name == "_") {
+        llvm::errs()
+            << "warning: input symbol '_' is likely the result of variable "
+               "expansion by the shell. Either remove the '_$' prefix, single "
+               "quote the symbol, or escape the '$' with a backslash";
+        continue;
+      }
       if (name.startswith("S") || name.startswith("s") ) {
         std::string correctedName = std::string("$") + name.str();
         demangle(llvm::outs(), correctedName, DCtx, options);
