@@ -22,7 +22,7 @@
 
 #include <threads.h>
 
-#include "chrono.h"
+#include "chrono_utils.h"
 
 #include "llvm/ADT/Optional.h"
 

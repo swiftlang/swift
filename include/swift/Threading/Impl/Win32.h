@@ -19,7 +19,7 @@
 
 #include "Win32/Win32Defs.h"
 
-#include "chrono.h"
+#include "chrono_utils.h"
 
 #include <atomic>
 

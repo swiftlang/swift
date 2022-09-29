@@ -1,4 +1,4 @@
-//===--- chrono.h - Utility functions for duration/time_point - -*- C++ -*-===//
+//===--- chrono_utils.h - Utility functions for duration ------ -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_THREADING_IMPL_CHRONO_H
-#define SWIFT_THREADING_IMPL_CHRONO_H
+#ifndef SWIFT_THREADING_IMPL_CHRONO_UTILS_H
+#define SWIFT_THREADING_IMPL_CHRONO_UTILS_H
 
 #include <chrono>
 #include <type_traits>
@@ -68,4 +68,4 @@ ceil(const std::chrono::duration<Rep, Period>& d)
 } // namespace threading_impl
 } // namespace swift
 
-#endif // SWIFT_THREADING_IMPL_CHRONO_H
+#endif // SWIFT_THREADING_IMPL_CHRONO_UTILS_H

@@ -21,7 +21,7 @@
 #include <os/lock.h>
 #include <pthread.h>
 
-#include "chrono.h"
+#include "chrono_utils.h"
 
 #include "llvm/ADT/Optional.h"
 
