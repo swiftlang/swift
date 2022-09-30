@@ -37,6 +37,12 @@ int main() {
   {
     Array<int> val = UseArray::createArray(2);
     UseArray::printArray(UseArray::passthroughArray(val));
+    int count = 2;
+    for (int x: val) {
+      assert(x == 2);
+      --count;
+    }
+    assert(count == 0);
   }
 // CHECK: [2, 2]
   {
