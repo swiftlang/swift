@@ -1043,6 +1043,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::TuplePatternElement;
   case SyntaxKind::AvailabilitySpecList:
     return SyntaxKind::AvailabilityArgument;
+  case SyntaxKind::YieldExprList:
+    return SyntaxKind::YieldExprListElement;
   default:
     return SyntaxKind::Unknown;
   }

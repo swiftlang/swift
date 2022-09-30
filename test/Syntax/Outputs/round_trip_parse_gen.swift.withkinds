@@ -557,11 +557,11 @@ struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</Simple
 struct ReadModify <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>st0 </IdentifierPattern><InitializerClause>= <TupleExpr>(<TupleExprElement><StringLiteralExpr>"<StringSegment>a</StringSegment>"</StringLiteralExpr>, </TupleExprElement><TupleExprElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr></TupleExprElement>)</TupleExpr></InitializerClause></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>rm0</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
-    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<TupleExpr>(<TupleExprElement><StringLiteralExpr>"<StringSegment>a</StringSegment>"</StringLiteralExpr>, </TupleExprElement><TupleExprElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr></TupleExprElement>)</TupleExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl><AccessorDecl>
+    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<YieldExprListElement><TupleExpr>(<TupleExprElement><StringLiteralExpr>"<StringSegment>a</StringSegment>"</StringLiteralExpr>, </TupleExprElement><TupleExprElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr></TupleExprElement>)</TupleExpr></YieldExprListElement>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl><AccessorDecl>
     _modify <CodeBlock>{ <YieldStmt>yield <InOutExpr>&<IdentifierExpr>st0 </IdentifierExpr></InOutExpr></YieldStmt>}</CodeBlock></AccessorDecl>
   }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>rm1</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
-    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<IdentifierExpr>st0</IdentifierExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl>
+    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<YieldExprListElement><IdentifierExpr>st0</IdentifierExpr></YieldExprListElement>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl>
   }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></StructDecl><StructDecl><CustomAttribute>
 
