@@ -57,25 +57,7 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
   if (BaseDC == nullptr)
     return nullptr;
 
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(BaseDC))
-    return AFD->getImplicitSelfDecl();
-
-  if (auto *PBI = dyn_cast<PatternBindingInitializer>(BaseDC)) {
-    auto *selfDecl = PBI->getImplicitSelfDecl();
-    assert(selfDecl);
-    return selfDecl;
-  }
-
-  if (auto *CE = dyn_cast<ClosureExpr>(BaseDC)) {
-    auto *selfDecl = CE->getCapturedSelfDecl();
-    assert(selfDecl);
-    assert(selfDecl->isSelfParamCapture());
-    return selfDecl;
-  }
-
-  auto *nominalDecl = BaseDC->getSelfNominalTypeDecl();
-  assert(nominalDecl);
-  return nominalDecl;
+  return BaseDecl;
 }
 
 void LookupResult::filter(

@@ -1567,9 +1567,29 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!DRE || !DRE->isImplicit())
         return false;
 
-      auto var = dyn_cast<VarDecl>(DRE->getDecl());
-      if (!var || !isEnclosingSelfReference(var, inClosure))
+      // If this decl isn't named "self", then it isn't an implicit self capture
+      // and we have no reason to reject it.
+      ASTContext &Ctx = DRE->getDecl()->getASTContext();
+      if (!DRE->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
         return false;
+      }
+
+      // If this is an explicit `weak self` capture, then implicit self is
+      // allowed once the closure's self param is unwrapped. We need to validate
+      // that the unwrapped `self` decl specifically refers to an unwrapped copy
+      // of the closure's `self` param, and not something else like in `guard
+      // let self = .someOptionalVariable else { return }` or `let self =
+      // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
+      // an optional, we would have already hit an error elsewhere.
+      //
+      // We can only enable this behavior in Swift 6 and later, due to a
+      // bug in Swift 5 where implicit self was always allowed for
+      // weak self captures (even before self was unwrapped) in
+      // non-escaping closures.
+      if (Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+          closureHasWeakSelfCapture(inClosure)) {
+        return !implicitWeakSelfReferenceIsValid(DRE);
+      }
 
       // Defensive check for type. If the expression doesn't have type here, it
       // should have been diagnosed somewhere else.
@@ -1587,13 +1607,85 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
 
+      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+          // If this capture is using the name `self` actually referring
+          // to some other variable (e.g. with `[self = "hello"]`)
+          // then implicit self is not allowed.
+          if (!selfDecl->isSelfParamCapture()) {
+            return true;
+          }
+        }
+      }
+
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (!isEnclosingSelfReference(var, inClosure)) {
+          return false;
+        }
+      }
+
       return true;
+    }
+
+    static bool implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE) {
+      ASTContext &Ctx = DRE->getDecl()->getASTContext();
+
+      // Check if the implicit self decl refers to a var in a conditional stmt
+      LabeledConditionalStmt *conditionalStmt = nullptr;
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (auto parentStmt = var->getParentPatternStmt()) {
+          conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
+        }
+      }
+
+      if (conditionalStmt == nullptr) {
+        return false;
+      }
+
+      // Find the condition that defined the self decl,
+      // and check that both its LHS and RHS are 'self'
+      for (auto cond : conditionalStmt->getCond()) {
+        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
+            continue;
+          }
+
+          if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
+            if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
+              return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
+            }
+          }
+        }
+      }
+
+      return false;
+    }
+
+    static bool closureHasWeakSelfCapture(const AbstractClosureExpr *ACE) {
+      if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+          return selfDecl->getType()->is<WeakStorageType>();
+        }
+      }
+
+      return false;
     }
 
     /// Return true if this is a closure expression that will require explicit
     /// use or capture of "self." for qualification of member references.
-    static bool isClosureRequiringSelfQualification(
-                  const AbstractClosureExpr *CE) {
+    static bool
+    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
+                                        ASTContext &Ctx) {
+      // If this closure capture self weakly, then we have to validate each
+      // usage of implicit self individually, even in a nonescaping closure.
+      //
+      // We can only do this in Swift 6 mode, since we didn't do this in Swift 5
+      // (and changing this behavior causes new errors to be emitted).
+      if (Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+          closureHasWeakSelfCapture(CE)) {
+        return true;
+      }
+
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
@@ -1623,7 +1715,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
-        if (isClosureRequiringSelfQualification(CE))
+        if (isClosureRequiringSelfQualification(CE, Ctx))
           Closures.push_back(CE);
       }
 
@@ -1643,9 +1735,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
         // which means all these casts are valid.
         return !cast<VarDecl>(cast<DeclRefExpr>(selfRef)->getDecl())
-                  ->isSelfParameter();
+                    ->isSelfParameter();
       };
-      
+
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
         if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase(), ACE)) {
@@ -1674,7 +1766,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return Action::SkipChildren(E);
       }
       
-      // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
              .warnUntilSwiftVersionIf(shouldOnlyWarn(E), 6);
@@ -1684,7 +1775,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        if (isClosureRequiringSelfQualification(CE)) {
+        if (isClosureRequiringSelfQualification(CE, Ctx)) {
           assert(Closures.size() > 0);
           Closures.pop_back();
         }
@@ -1705,7 +1796,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           // capture 'self' explicitly will result in an error, and using
           // 'self.' explicitly will be accessing something other than the
           // self param.
-          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
           return;
         }
         emitFixItsForExplicitClosure(Diags, memberLoc, CE);
@@ -1726,11 +1816,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // If we've already captured something with the name "self" other than
       // the actual self param, offer special diagnostics.
       if (auto *VD = closureExpr->getCapturedSelfDecl()) {
-        // Either this is a weak capture of self...
-        if (VD->getType()->is<WeakStorageType>()) {
-          Diags.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
-        // ...or something completely different.
-        } else {
+        if (!VD->getType()->is<WeakStorageType>()) {
           Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
         }
         
@@ -1812,16 +1898,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
   };
 
+  auto &ctx = DC->getASTContext();
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
-        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
+        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
           ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
-  auto &ctx = DC->getASTContext();
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
@@ -2513,7 +2599,7 @@ public:
 
     VarDecls[vd] |= Flag;
   }
-  
+
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
   void markBaseOfStorageUse(Expr *E, bool isMutating);
   
@@ -3204,7 +3290,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
                   unsigned noParens = initExpr->canAppendPostfixExpression();
-                  
+
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
                   ConditionalCheckedCastExpr *CCE = nullptr;
@@ -3585,7 +3671,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // conservatively mark it read and written.  This will silence "variable
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
+        VDUC.addMark(DRE->getDecl(), RK_Read | RK_Written);
       else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
         auto name = declRef->getName();
         auto loc = declRef->getLoc();

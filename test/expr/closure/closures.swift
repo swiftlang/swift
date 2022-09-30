@@ -176,10 +176,8 @@ class ExplicitSelfRequiredTest {
     doVoidStuff({ _ = "\(x)"}) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}}
     doVoidStuff({ [y = self] in x += 1 }) // expected-warning {{capture 'y' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{20-20=self, }} expected-note{{reference 'self.' explicitly}} {{33-33=self.}}
     doStuff({ [y = self] in x+1 }) // expected-warning {{capture 'y' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
-    doVoidStuff({ [weak self] in x += 1 }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doStuff({ [weak self] in x+1 }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doVoidStuff({ [self = self.x] in x += 1 }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doStuff({ [self = self.x] in x+1 }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    doVoidStuff({ [self = ExplicitSelfRequiredTest()] in x += 1 }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
+    doStuff({ [self = ExplicitSelfRequiredTest()] in x+1 }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
 
     // Methods follow the same rules as properties, uses of 'self' without capturing must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}} expected-note{{reference 'self.' explicitly}} {{15-15=self.}}
@@ -188,10 +186,8 @@ class ExplicitSelfRequiredTest {
     doVoidStuff { () -> () in _ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self]}} expected-note{{reference 'self.' explicitly}} {{35-35=self.}}
     doVoidStuff { [y = self] in _ = method() } // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{20-20=self, }} expected-note{{reference 'self.' explicitly}} {{37-37=self.}}
     doStuff({ [y = self] in method() }) // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
-    doVoidStuff({ [weak self] in _ = method() }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doStuff({ [weak self] in method() }) // expected-note {{weak capture of 'self' here does not enable implicit 'self'}} expected-warning {{variable 'self' was written to, but never read}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doVoidStuff({ [self = self.x] in _ = method() }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doStuff({ [self = self.x] in method() }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-warning {{capture 'self' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    doVoidStuff({ [self = ExplicitSelfRequiredTest()] in _ = method() }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
+    doStuff({ [self = ExplicitSelfRequiredTest()] in method() }) // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
     doVoidStuff { _ = self.method() }
     doVoidStuff { [self] in _ = method() }
     doVoidStuff { [self = self] in _ = method() }
@@ -227,7 +223,7 @@ class ExplicitSelfRequiredTest {
     }
     // expected-note@+2 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
     // Note: Trailing whitespace on the following line is intentional and should not be removed!
-    doStuff {             
+    doStuff {
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{7-7=self.}}
     }
     // expected-note@+1 {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in}}
@@ -259,6 +255,15 @@ class ExplicitSelfRequiredTest {
     // expected-warning @-1 {{capture 'myX' was never used}}
 
     return 42
+  }
+  
+  func weakSelfError() {
+    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
   }
 }
 
@@ -643,7 +648,7 @@ func callitArgsFn<T>(_ : Int, _ f: () -> () -> T) -> T {
   f()()
 }
 
-func callitGenericArg<T>(_ a: T, _ f: () -> T) -> T { 
+func callitGenericArg<T>(_ a: T, _ f: () -> T) -> T {
   f()
 }
 
@@ -659,7 +664,7 @@ func test_55680_Tuple() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitTuple(1) { // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
-    (print("hello"), 0) 
+    (print("hello"), 0)
   }
 }
 
@@ -675,7 +680,7 @@ func test_55680_Args() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
-    print("hello") 
+    print("hello")
   }
 }
 
@@ -683,7 +688,7 @@ func test_55680_ArgsFn() -> Int {
   // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
   // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
   callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
-    { print("hello") } 
+    { print("hello") }
   }
 }
 
@@ -731,6 +736,104 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
             }
         }
     }
+}
+
+public class TestImplicitSelfForWeakSelfCapture {
+  static var staticOptional: TestImplicitSelfForWeakSelfCapture? = .init()
+  func method() { }
+  
+  private init() {
+    doVoidStuff { [weak self] in
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      guard let self = self else { return }
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      self.method()
+    }
+    
+    doVoidStuff { [weak self] in
+      if let self = self {
+        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        self.method()
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self = self else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
+      doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return }
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      self.method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      method()
+      guard let self = self else { return }
+      method()
+      self.method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      if let self = self {
+        method()
+        self.method()
+      }
+    }
+    
+    doVoidStuff { [weak self] in
+      let `self`: TestImplicitSelfForWeakSelfCapture? = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional
+      guard let self = self else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
+      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      let `self`: TestImplicitSelfForWeakSelfCapture? = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional
+      guard let self = self else { return }
+      method()
+      self.method()
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return }
+      method()
+      self.method()
+    }
+  }
+}
+
+public class TestRebindingSelfIsDisallowed {
+  let count: Void = ()
+  
+  private init() {
+    doVoidStuff {
+      let `self` = "self shouldn't become a string"
+      let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
+    }
+    
+    doVoidStuffNonEscaping {
+      let `self` = "self shouldn't become a string"
+      let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
+    }
+    
+    doVoidStuff { [weak self] in
+      let `self` = "self shouldn't become a string"
+      let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
+    }
+    
+    doVoidStuffNonEscaping { [weak self] in
+      let `self` = "self shouldn't become a string"
+      let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
+    }
+  }
+  
+  func method() {
+    let `self` = "self shouldn't become a string"
+    let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
+  }
 }
 
 // https://github.com/apple/swift/issues/59716
