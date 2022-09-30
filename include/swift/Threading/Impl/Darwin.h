@@ -21,7 +21,7 @@
 #include <os/lock.h>
 #include <pthread.h>
 
-#include <chrono>
+#include "chrono_utils.h"
 
 #include "llvm/ADT/Optional.h"
 
@@ -157,14 +157,14 @@ inline void cond_wait(cond_handle &handle) {
 template <class Rep, class Period>
 inline bool cond_wait(cond_handle &handle,
                       std::chrono::duration<Rep, Period> duration) {
-  auto deadline = std::chrono::time_point_cast<
-    std::chrono::system_clock::duration>(std::chrono::system_clock::now()
-                                         + duration);
+  auto to_wait = chrono_utils::ceil<
+    std::chrono::system_clock::duration>(duration);
+  auto deadline = std::chrono::system_clock::now() + to_wait;
   return cond_wait(handle, deadline);
 }
 inline bool cond_wait(cond_handle &handle,
                       std::chrono::system_clock::time_point deadline) {
-  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+  auto ns = chrono_utils::ceil<std::chrono::nanoseconds>(
     deadline.time_since_epoch()).count();
   struct ::timespec ts = { ::time_t(ns / 1000000000), long(ns % 1000000000) };
   SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(
