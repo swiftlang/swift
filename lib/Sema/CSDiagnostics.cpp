@@ -1843,7 +1843,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
   if (!callExpr)
     return false;
 
-  // FIXME: We ought to handle multiple trailing closures here (SR-15054)
+  // FIXME(https://github.com/apple/swift/issues/57381): We ought to handle multiple trailing closures here.
   if (callExpr->getArgs()->getNumTrailingClosures() != 1)
     return false;
   if (callExpr->getFn() != anchor)
@@ -4535,9 +4535,7 @@ bool PartialApplicationFailure::diagnoseAsError() {
     kind = RefKind::SuperMethod;
   }
 
-  /* TODO(diagnostics): SR-15250, 
-  Add a "did you mean to call it?" note with a fix-it for inserting '()'
-  if function type has no params or all have a default value. */
+  // TODO(https://github.com/apple/swift/issues/57572, diagnosticsQoI): Add a "did you mean to call it?" note with a fix-it for inserting '()' if function type has no params or all have a default value.
   auto diagnostic = CompatibilityWarning
                         ? diag::partial_application_of_function_invalid_swift4
                         : diag::partial_application_of_function_invalid;
@@ -8282,9 +8280,7 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
 bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
   const auto toType = getToType();
   auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
-  // FIXME: This literal diagnostics needs to be revisited by a proposal
-  // to unify casting semantics for literals.
-  // https://bugs.swift.org/browse/SR-12093
+  // FIXME(https://github.com/apple/swift/issues/54529): This literal diagnostics needs to be revisited by a proposal to unify casting semantics for literals.
   auto &ctx = getASTContext();
   auto *dc = getDC();
   if (isa<LiteralExpr>(sub)) {

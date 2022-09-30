@@ -434,7 +434,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             // warn about the misuse of this syntax and offer to
             // fix it.
             // An exception to this rule is when the type is declared with type sugar
-            // Reference: SR-11724
+            // Reference: https://github.com/apple/swift/issues/54133
             if (isa<OptionalTypeRepr>(param.Type)
                 || isa<ImplicitlyUnwrappedOptionalTypeRepr>(param.Type)) {
                 diagnose(typeStartLoc, diag::parameter_unnamed)

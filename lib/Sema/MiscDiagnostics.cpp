@@ -3762,7 +3762,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
-      // FIXME: We ought to handle multiple trailing closures here (SR-15055)
+      // FIXME(https://github.com/apple/swift/issues/57382): We ought to handle multiple trailing closures here.
       auto *args = E->getArgs()->getOriginalArgs();
       if (args->getNumTrailingClosures() != 1)
         return;
