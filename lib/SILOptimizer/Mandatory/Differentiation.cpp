@@ -1317,7 +1317,7 @@ void Differentiation::run() {
         } else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
           // If linear map transposition is not enabled and an uncanonical
           // `linear_function` instruction is encountered, emit a diagnostic.
-          // FIXME(SR-11850): Finish support for linear map transposition.
+          // FIXME(https://github.com/apple/swift/issues/54256): Finish support for linear map transposition.
           if (!EnableExperimentalLinearMapTransposition) {
             if (!lfi->hasTransposeFunction()) {
               astCtx.Diags.diagnose(
