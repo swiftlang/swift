@@ -342,12 +342,12 @@ void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
         "swiftToCxx'.\n";
   os << "#if __has_include(<../../../swift/swiftToCxx/" << headerName << ">)\n";
   os << "#include <../../../swift/swiftToCxx/" << headerName << ">\n";
-  os << "#elif __has_include(<../../../../lib/swift/swiftToCxx/" << headerName
-     << ">)\n";
+  os << "#elif __has_include(<../../../../../lib/swift/swiftToCxx/"
+     << headerName << ">)\n";
   os << "//  "
-        "'<toolchain>/usr/local/lib/clang/<version>/include/../../../../lib/"
+        "'<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/"
         "swift/swiftToCxx'.\n";
-  os << "#include <../../../../lib/swift/swiftToCxx/" << headerName << ">\n";
+  os << "#include <../../../../../lib/swift/swiftToCxx/" << headerName << ">\n";
   os << "// Alternatively, allow user to find the header using additional "
         "include path into '<toolchain>/lib/swift'.\n";
   os << "#elif __has_include(<swiftToCxx/" << headerName << ">)\n";
