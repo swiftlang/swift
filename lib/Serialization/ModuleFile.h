@@ -13,12 +13,12 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
-#include "ModuleFormat.h"
 #include "ModuleFileSharedCore.h"
+#include "ModuleFormat.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/Basic/BasicSourceInfo.h"
@@ -30,6 +30,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitstream/BitstreamReader.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -344,31 +345,91 @@ public:
     return issue;
   }
 
-  /// Emits one last diagnostic, adds the current module details and errors to
-  /// the pretty stack trace, and then aborts.
-  [[noreturn]] void fatal(llvm::Error error) const;
-  void fatalIfNotSuccess(llvm::Error error) const {
-    if (error)
-      fatal(std::move(error));
+  /// Enrich \c error with contextual information, emits a fatal diagnostic in
+  ///  the ASTContext's DignosticsEngine, and return the augmented error.
+  llvm::Error diagnoseFatal(llvm::Error error) const;
+
+  /// Emit a generic deserialization error via \c diagnoseFatal().
+  llvm::Error diagnoseFatal() const {
+    return diagnoseFatal(createFatalError());
   }
-  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) const {
+
+  /// Emit a fatal error via \c diagnoseFatal() and consume it.
+  void diagnoseAndConsumeFatal(llvm::Error error) const {
+    llvm::consumeError(diagnoseFatal(std::move(error)));
+  }
+
+  /// Emit a generic fatal error via \c diagnoseFatal() and consume it.
+  void diagnoseAndConsumeFatal() const {
+    llvm::consumeError(diagnoseFatal());
+  }
+
+  /// Use this in \p void functions as:
+  ///
+  ///    if (diagnoseAndConsumeFatalIfNotSuccess(...)) return;
+  bool diagnoseAndConsumeFatalIfNotSuccess(llvm::Error error) const {
+    if (!error)
+      return false;
+    llvm::consumeError(diagnoseFatal(std::move(error)));
+    return true;
+  }
+
+  /// Use this in functions that return Expected<T> as:
+  ///
+  ///    if (auto error = diagnoseFatalIfNotSuccess(...)) return error;
+  llvm::Error diagnoseFatalIfNotSuccess(llvm::Error error) const {
+    if (!error)
+      return error;
+    return diagnoseFatal(std::move(error));
+  }
+
+  /// Emit and return a string error via \c diagnoseFatal().
+  llvm::Error diagnoseFatal(StringRef msg) const {
+    return diagnoseFatal(llvm::make_error<llvm::StringError>(
+        msg, llvm::inconvertibleErrorCode()));
+  }
+
+  /// Emit and consume a string error via \c diagnoseFatal().
+  void diagnoseAndConsumeFatal(StringRef msg) const {
+    return llvm::consumeError(diagnoseFatal(msg));
+  }
+
+
+  /// Report an unexpected format error that could happen only from a
+  /// memory-level inconsistency. Please prefer passing an error to
+  /// `fatal(llvm::Error error)` when possible.
+  static llvm::Error createFatalError(
+      llvm::StringRef msg =
+          "Memory corruption or serialization format inconsistency.") {
+    return llvm::make_error<llvm::StringError>(msg,
+                                               llvm::inconvertibleErrorCode());
+  }
+
+  /// Emit a fatal error and abort.  This function is deprecated, try to use
+  /// diagnoseFatal() instead. Clients such as LLDB really prefer not to be
+  /// killed.
+//  LLVM_DEPRECATED("Use diagnoseFatal and pass up the error instead.",
+//                  "diagnoseFatal")
+  [[noreturn]] void fatal(llvm::Error error = createFatalError()) const;
+
+  /// Emit a fatal error and abort.  This function is deprecated, try to use
+  /// diagnoseFatal() instead. Clients such as LLDB really prefer not to be
+  /// killed.
+//  LLVM_DEPRECATED("Use diagnoseFatal and pass up the error instead.",
+//                  "diagnoseFatal")
+  [[noreturn]] void fatal(llvm::StringRef msg) const {
+    fatal(createFatalError(msg));
+  }
+
+  /// Emit a fatal error and abort if unexpected. Try to avoid using this
+  /// function. See comment in \p fatal().
+//  LLVM_DEPRECATED("Use diagnoseFatal and pass up the error instead.",
+//                  "diagnoseFatal")
+  template <typename T>
+  T fatalIfUnexpected(llvm::Expected<T> expected) const {
     if (expected)
       return std::move(expected.get());
     fatal(expected.takeError());
-  }
-
-  /// Report an unexpected format error that could happen only from a memory-level
-  /// inconsistency. Please prefer passing an error to `fatal(llvm::Error error)` when possible.
-  [[noreturn]] void fatal() const {
-    fatal(llvm::make_error<llvm::StringError>(
-        "Memory corruption or serialization format inconsistency.",
-        llvm::inconvertibleErrorCode()));
-  }
-
-  [[noreturn]] void fatal(StringRef msg) const {
-    fatal(llvm::make_error<llvm::StringError>(
-          msg,
-          llvm::inconvertibleErrorCode()));
   }
 
   /// Outputs information useful for diagnostics to \p out
@@ -849,7 +910,8 @@ public:
   getDeclContextChecked(serialization::DeclContextID DCID);
 
   /// Returns the local decl context with the given ID, deserializing it if needed.
-  DeclContext *getLocalDeclContext(serialization::LocalDeclContextID DID);
+  llvm::Expected<DeclContext *>
+  getLocalDeclContext(serialization::LocalDeclContextID DID);
 
   /// Returns the appropriate module for the given ID.
   ModuleDecl *getModule(serialization::ModuleID MID);
