@@ -2657,7 +2657,7 @@ namespace {
       if (isSpecializationDepthGreaterThan(decl, 8))
         return nullptr;
 
-      if (Impl.templateSpecializationsCount[classTemplate] > 4096) {
+      if (Impl.templateSpecializationsCount[classTemplate] > 1000) {
         std::string name;
         llvm::raw_string_ostream os(name);
         decl->printQualifiedName(os);
