@@ -3840,6 +3840,11 @@ static MarkUninitializedInst *findLocalTypeWrapperStorageVar(SILFunction &F) {
   if (!BB)
     return nullptr;
 
+  // The variable in question - `_storage` is injected during Sema
+  // as a first declaration statement in the body of a user-defined
+  // designated initializer of a type wrapped type.
+  //
+  // See \c TypeCheckFunctionBodyRequest for more details.
   for (auto &I : *BB) {
     SILInstruction *Inst = &I;
     auto *MUI = dyn_cast<MarkUninitializedInst>(Inst);
