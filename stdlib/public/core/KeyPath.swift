@@ -149,21 +149,17 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     let architectureSize = MemoryLayout<Int>.size
     if architectureSize == 8 {
       _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: -offset - 1)
-    } else {
-      if offset == 0 {
-        _kvcKeyPathStringPtr =
-          UnsafePointer<CChar>(bitPattern: maximumOffsetOn32BitArchitecture + 1)
-      } else if offset < maximumOffsetOn32BitArchitecture {
-        _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: offset)
-      } else {
+    }
+    else {
+      if offset <= maximumOffsetOn32BitArchitecture {
+        _kvcKeyPathStringPtr = UnsafePointer<CChar>(bitPattern: (offset + 1))
+      }
+      else {
         _kvcKeyPathStringPtr = nil
       }
     }
   }
 
-  // TODO: See if this can be @inlinable since it gets called on each
-  // KeyPath access. It would mean _kvcKeyPathStringPtr would need
-  // to be @usableFromInline. What effect would that have on ABI stability?
   func getOffsetFromStorage() -> Int? {
     let maximumOffsetOn32BitArchitecture = 4094
     guard let storage = _kvcKeyPathStringPtr else {
@@ -182,14 +178,13 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
         return nil
       }
       return storageDistance
-    } else {
-      let storageDistance = offsetBase!.distance(to: storage) + 1
-      if storageDistance == maximumOffsetOn32BitArchitecture + 1 {
-        return 0
-      } else if storageDistance > maximumOffsetOn32BitArchitecture {
-        return nil
+    }
+    else {
+      let storageDistance = offsetBase!.distance(to: storage)
+      if (storageDistance <= maximumOffsetOn32BitArchitecture) {
+        return storageDistance
       }
-      return storageDistance
+      return nil
     }
   }
 
@@ -241,33 +236,6 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))
     return try f(KeyPathBuffer(base: base))
-  }
-
-  // TODO: Find a quicker way to see if this is a tuple.
-  internal func isTuple(_ item: Any) -> Bool {
-    // Unwraps type information if possible.
-    // Otherwise, everything the Mirror handling "item"
-    // sees would be "Optional<Any.Type>".
-    func unwrapType<T>(_ any: T) -> Any {
-      let mirror = Mirror(reflecting: any)
-      guard mirror.displayStyle == .optional,
-        let first = mirror.children.first
-      else {
-        return any
-      }
-      return first.value
-    }
-
-    let mirror = Mirror(reflecting: unwrapType(item))
-    let description = mirror.description
-    let offsetOfFirstBracketForMirrorDescriptionOfTuple = 11
-    let idx = description.index(
-      description.startIndex,
-      offsetBy: offsetOfFirstBracketForMirrorDescriptionOfTuple)
-    if description[idx] == "(" {
-      return true
-    }
-    return false
   }
   
   @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
@@ -2669,39 +2637,17 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   let (keyPathClass, rootType, size, _)
     = _getKeyPathClassAndInstanceSizeFromPattern(patternPtr, arguments)
 
-  // Used to process offsets for pure struct KeyPaths.
-  var offset = UInt32(0)
-  var isPureStruct = true
-  var keyPathBase: Any.Type?
+  var pureStructOffset: UInt32? = nil
         
   // Allocate the instance.
   let instance = keyPathClass._create(capacityInBytes: size) { instanceData in
     // Instantiate the pattern into the instance.
-    let returnValue = _instantiateKeyPathBuffer(
+    pureStructOffset = _instantiateKeyPathBuffer(
       patternPtr,
       instanceData,
       rootType,
       arguments
     )
-    offset += returnValue.structOffset
-
-    let componentStructList = returnValue.componentStructList
-    if componentStructList.count == 0 {
-      isPureStruct = false
-    }
-    for value in componentStructList {
-      isPureStruct = isPureStruct && value
-    }
-    keyPathBase = rootType
-  }
-
-  // TODO: See if there's a better way to eliminate
-  // tuples from the current `isPureStruct` optimization.
-  if let keyPathBase = keyPathBase, instance.isTuple(keyPathBase) {
-    isPureStruct = false
-  }
-  if isPureStruct {
-    instance.assignOffsetToStorage(offset: Int(offset))
   }
 
   // Adopt the KVC string from the pattern.
@@ -2716,8 +2662,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
     instance._kvcKeyPathStringPtr =
       kvcStringPtr.assumingMemoryBound(to: CChar.self)
   }
-
-  if instance._kvcKeyPathStringPtr == nil, isPureStruct {
+  if instance._kvcKeyPathStringPtr == nil, let offset = pureStructOffset {
     instance.assignOffsetToStorage(offset: Int(offset))
   }
   // If we can cache this instance as a shared instance, do so.
@@ -3885,7 +3830,7 @@ internal func _instantiateKeyPathBuffer(
   _ origDestData: UnsafeMutableRawBufferPointer,
   _ rootType: Any.Type,
   _ arguments: UnsafeRawPointer
-) -> (structOffset: UInt32, componentStructList: [Bool]) {
+) -> UInt32? {
   let destHeaderPtr = origDestData.baseAddress.unsafelyUnwrapped
   var destData = UnsafeMutableRawBufferPointer(
     start: destHeaderPtr.advanced(by: MemoryLayout<Int>.size),
@@ -3937,7 +3882,25 @@ internal func _instantiateKeyPathBuffer(
     endOfReferencePrefixComponent.storeBytes(of: componentHeader,
       as: RawKeyPathComponent.Header.self)
   }
-  return (walker.structOffset, walker.isPureStruct)
+  var isPureStruct = true
+  var offset: UInt32? = nil
+      
+  for value in walker.isPureStruct {
+    isPureStruct = isPureStruct && value
+  }
+
+  // Disable the optimization in the general case of 0 components.
+  // Note that a KeyPath such as \SomeStruct.self would still technically
+  // have a valid offset of 0.
+  // TODO: Add the logic to distinguish pure struct
+  // 0-component KeyPaths (tuples too?) from others.
+  if walker.isPureStruct.count == 0 {
+    isPureStruct = false
+  }
+  if isPureStruct {
+      offset = walker.structOffset
+  }
+  return offset
 }
 
 #if SWIFT_ENABLE_REFLECTION
