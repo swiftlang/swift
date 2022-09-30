@@ -2,6 +2,8 @@
 
 @interface ImplClass: NSObject
 
+- (nonnull instancetype)init;
+
 @property (assign) int implProperty;
 
 - (void)mainMethod:(int)param;

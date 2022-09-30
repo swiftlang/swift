@@ -3761,10 +3761,13 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         bool forConformance,
                         bool includeInlineable,
                         llvm::function_ref<AccessLevel()> getAccessLevel) {
-  // If this is an @_objcImplementation member implementation, unconditionally
-  // forbid access. Name lookups will instead find and use the matching
-  // interface decl.
-  if (isObjCMemberImplementation(VD, getAccessLevel))
+  // If this is an @_objcImplementation member implementation, and we aren't in
+  // a context where we would access its storage directly, forbid access. Name
+  // lookups will instead find and use the matching interface decl.
+  // FIXME: Passing `true` for `isAccessOnSelf` may cause false positives.
+  if (isObjCMemberImplementation(VD, getAccessLevel) &&
+      VD->getAccessSemanticsFromContext(useDC, /*isAccessOnSelf=*/true)
+          != AccessSemantics::DirectToStorage)
     return false;
 
   if (VD->getASTContext().isAccessControlDisabled())
