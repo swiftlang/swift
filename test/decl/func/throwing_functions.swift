@@ -279,3 +279,14 @@ struct FunctionHolder {
   }
 }
 
+// https://github.com/apple/swift/issues/61368
+
+@propertyWrapper
+struct Wrapper {
+  var wrappedValue: Int?
+  init() throws {}
+}
+
+struct Repro {
+  @Wrapper var x // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+}

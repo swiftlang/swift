@@ -1775,9 +1775,6 @@ public:
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
                                   const PotentialEffectReason &reason) {
-    if (E.isImplicit())
-      return;
-
     switch (getKind()) {
     case Kind::PotentiallyHandled:
       if (IsNonExhaustiveCatch) {
