@@ -448,8 +448,7 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   return E;
 }
 
-static ConcreteDeclRef
-getReferencedDeclForHasSymbolCondition(ASTContext &Context, Expr *E) {
+ConcreteDeclRef TypeChecker::getReferencedDeclForHasSymbolCondition(Expr *E) {
   // Match DotSelfExprs (e.g. `SomeStruct.self`) when the type is static.
   if (auto DSE = dyn_cast<DotSelfExpr>(E)) {
     if (DSE->isStaticallyDerivedMetatype())
@@ -461,7 +460,6 @@ getReferencedDeclForHasSymbolCondition(ASTContext &Context, Expr *E) {
       return CDR;
   }
 
-  Context.Diags.diagnose(E->getLoc(), diag::has_symbol_invalid_expr);
   return ConcreteDeclRef();
 }
 
@@ -506,19 +504,12 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
     auto exprTy = TypeChecker::typeCheckExpression(E, dc);
     Info->setSymbolExpr(E);
 
-    if (!exprTy)
+    if (!exprTy) {
+      Info->setInvalid();
       return true;
-
-    auto CDR = getReferencedDeclForHasSymbolCondition(Context, E);
-    if (!CDR)
-      return true;
-
-    auto decl = CDR.getDecl();
-    if (!decl->isWeakImported(dc->getParentModule())) {
-      Context.Diags.diagnose(E->getLoc(), diag::has_symbol_decl_must_be_weak,
-                             decl->getDescriptiveKind(), decl->getName());
     }
-    Info->setReferencedDecl(CDR);
+
+    Info->setReferencedDecl(getReferencedDeclForHasSymbolCondition(E));
     return false;
   }
 

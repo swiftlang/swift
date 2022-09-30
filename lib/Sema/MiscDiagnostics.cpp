@@ -4302,6 +4302,55 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
+/// Perform MiscDiagnostics for the conditions belonging to a \c
+/// LabeledConditionalStmt.
+static void checkLabeledStmtConditions(ASTContext &ctx,
+                                       const LabeledConditionalStmt *stmt,
+                                       DeclContext *DC) {
+  for (auto elt : stmt->getCond()) {
+    // Check for implicit optional promotions in stmt-condition patterns.
+    checkImplicitPromotionsInCondition(elt, ctx);
+
+    switch (elt.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+    case StmtConditionElement::CK_PatternBinding:
+    case StmtConditionElement::CK_Availability:
+      break;
+
+    case StmtConditionElement::CK_HasSymbol: {
+      auto info = elt.getHasSymbolInfo();
+      if (info->isInvalid())
+        break;
+
+      auto symbolExpr = info->getSymbolExpr();
+      if (!symbolExpr)
+        break;
+
+      if (!symbolExpr->getType())
+        break;
+
+      if (auto decl = info->getReferencedDecl().getDecl()) {
+        // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
+        // and may indicate the developer has mis-identified the declaration
+        // they want to check (or forgot to import the module weakly).
+        if (!decl->isWeakImported(DC->getParentModule())) {
+          ctx.Diags.diagnose(symbolExpr->getLoc(),
+                             diag::has_symbol_decl_must_be_weak,
+                             decl->getDescriptiveKind(), decl->getName());
+          info->setInvalid();
+        }
+      } else {
+        // Diagnose because we weren't able to interpret the expression as one
+        // that uniquely identifies a single declaration.
+        ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+        info->setInvalid();
+      }
+      break;
+    }
+    }
+  }
+}
+
 static void diagnoseUnintendedOptionalBehavior(const Expr *E,
                                                const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -5290,11 +5339,9 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
     checkSwitch(ctx, switchStmt, DC);
 
   checkStmtConditionTrailingClosure(ctx, S);
-  
-  // Check for implicit optional promotions in stmt-condition patterns.
+
   if (auto *lcs = dyn_cast<LabeledConditionalStmt>(S))
-    for (const auto &elt : lcs->getCond())
-      checkImplicitPromotionsInCondition(elt, ctx);
+    checkLabeledStmtConditions(ctx, lcs, DC);
 
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
