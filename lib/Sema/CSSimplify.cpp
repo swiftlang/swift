@@ -4167,9 +4167,19 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   bool possibleContextualMismatch = false;
   // If this is a conversion to a non-optional contextual type e.g.
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
-  // we should diagnose it as type mismatch instead of missing unwrap.
+  // we should diagnose it as type mismatch instead of missing unwrap
+  //
+  // We should also handle argument conversion mismatch e.g.
+  // `
+  // class Task: NSManagedObject { let notes: String = ""}
+  // struct Notes: View {
+  //   @Binding var selected : Task
+  //
+  //   var body: some View { TextEditor(text: selected?.notes) }
+  // }` where `init()` expects Binding<String> argument `
+  //
   if (auto last = locator.last()) {
-    possibleContextualMismatch = last->is<LocatorPathElt::ContextualType>() &&
+    possibleContextualMismatch = (last->is<LocatorPathElt::ContextualType>() || last->is<LocatorPathElt::ApplyArgToParam>()) &&
                                  !toType->getOptionalObjectType();
   }
 
