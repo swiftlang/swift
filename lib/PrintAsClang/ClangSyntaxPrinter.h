@@ -184,6 +184,9 @@ public:
   void printPrimaryCxxTypeName(const NominalTypeDecl *type,
                                const ModuleDecl *moduleContext);
 
+  // Print the #include sequence for the specified C++ interop shim header.
+  void printIncludeForShimHeader(StringRef headerName);
+
 protected:
   raw_ostream &os;
 };
