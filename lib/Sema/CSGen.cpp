@@ -4511,6 +4511,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
       auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
       addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
                     getConstraintLocator(param));
+      setType(param->getPropertyWrapperProjectionVar(), projectionType);
     }
 
     initKind = PropertyWrapperInitKind::ProjectedValue;
@@ -4518,6 +4519,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, wrappedValueType, locator);
     initKind = PropertyWrapperInitKind::WrappedValue;
+    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
   }
 
   appliedPropertyWrappers[anchor].push_back({ wrapperType, initKind });
