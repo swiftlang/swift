@@ -107,15 +107,20 @@ private:
   /// extension (if it found something at that level).
   DeclContext *BaseDC;
 
+  /// The declaration that defines the base of the call to `Value`.
+  /// This is always available, as long as `BaseDC` is not null.
+  ValueDecl *BaseDecl;
+
   /// The declaration corresponds to the given name; i.e. the decl we are
   /// looking up.
   ValueDecl *Value;
 
 public:
-  LookupResultEntry(ValueDecl *value) : BaseDC(nullptr), Value(value) {}
+  LookupResultEntry(ValueDecl *value)
+      : BaseDC(nullptr), BaseDecl(nullptr), Value(value) {}
 
-  LookupResultEntry(DeclContext *baseDC, ValueDecl *value)
-    : BaseDC(baseDC), Value(value) {}
+  LookupResultEntry(DeclContext *baseDC, ValueDecl *baseDecl, ValueDecl *value)
+      : BaseDC(baseDC), BaseDecl(baseDecl), Value(value) {}
 
   ValueDecl *getValueDecl() const { return Value; }
 

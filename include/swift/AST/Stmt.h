@@ -635,7 +635,7 @@ public:
 };
 
 /// Either an "if let" case or a simple boolean expression can appear as the
-/// condition of an 'if' or 'while' statement.
+/// condition of an 'if', 'guard', or 'while' statement.
 using StmtCondition = MutableArrayRef<StmtConditionElement>;
 
 /// This is the common base class between statements that can have labels, and

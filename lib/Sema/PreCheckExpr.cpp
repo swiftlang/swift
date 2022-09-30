@@ -856,14 +856,14 @@ namespace {
   /// Update a direct callee expression node that has a function reference kind
   /// based on seeing a call to this callee.
   template<typename E,
-           typename = decltype(((E*)nullptr)->getFunctionRefKind())> 
+           typename = decltype(((E*)nullptr)->getFunctionRefKind())>
   void tryUpdateDirectCalleeImpl(E *callee, int) {
     callee->setFunctionRefKind(addingDirectCall(callee->getFunctionRefKind()));
   }
 
   /// Version of tryUpdateDirectCalleeImpl for when the callee
   /// expression type doesn't carry a reference.
-  template<typename E> 
+  template<typename E>
   void tryUpdateDirectCalleeImpl(E *callee, ...) { }
 
   /// The given expression is the direct callee of a call expression; mark it to
