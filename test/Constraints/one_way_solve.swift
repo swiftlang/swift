@@ -27,23 +27,23 @@ func testTernaryOneWayOverload(b: Bool) {
   // CHECK: 2: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}}
   // CHECK: 0: $T{{[0-9]+}} $T{{[0-9]+}} $T{{[0-9]+}}
 
-  // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: Solving component #1
+  // CHECK: Attempting type variable [[C]] := Int8
 
-  // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: Solving component #1
+  // CHECK: Attempting type variable [[C]] := Int8
 
-  // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
+  // CHECK: Solving component #1
+  // CHECK: Attempting type variable [[C]] := Int8
 
-  // CHECK: solving component #1
-  // CHECK: (attempting type variable [[C]] := Int8
-  // CHECK: (considering -> $T{{[0-9]+}} conv [[C]]
-  // CHECK: (considering -> $T{{[0-9]+}} conv [[C]]
-  // CHECK: (considering -> [[C]] conv Int8
-  // CHECK: (found solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
+  // CHECK: Solving component #1
+  // CHECK: Attempting type variable [[C]] := Int8
+  // CHECK: `-> Considering -> [[A]] conv [[C]]
+  // CHECK: `-> Considering -> [[B]] conv [[C]]
+  // CHECK: `-> Considering -> [[C]] conv Int8
+  // CHECK: <! Found solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2]>
 
-  // CHECK: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
-  // CHECK-NOT: (composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2])
+  // CHECK: <! Composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2]>
+  // CHECK-NOT: <! Composed solution: [component: non-default literal(s), value: 2] [component: use of overloaded unapplied function(s), value: 2]>
   let _: Int8 = b ? Builtin.one_way(int8Or16(17)) : Builtin.one_way(int8Or16(42))
 }

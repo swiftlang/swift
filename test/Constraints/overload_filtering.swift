@@ -9,9 +9,9 @@ func foo(_: Int, _: Int) { }
 func foo(_: Int, _: Int, _: Int) { }
 
 func testModuleScope(i: Int) {
-  // CHECK: (disabled disjunction term {{.*}} (Int) -> ()
-  // CHECK-NEXT: (disabled disjunction term {{.*}} (Int, Int, Int) -> ()
-  // CHECK: (introducing single enabled disjunction term {{.*}} (Int, Int) -> ()
+  // CHECK:      | Disabled disjunction term {{.*}} (Int) -> ()
+  // CHECK-NEXT: | Disabled disjunction term {{.*}} (Int, Int, Int) -> ()
+  // CHECK:      | Introducing single enabled disjunction term {{.*}} (Int, Int) -> ()
   foo(i, i)
 }
 
@@ -26,20 +26,20 @@ struct X {
 }
 
 func testSubscript(x: X, i: Int) {
-  // CHECK: disabled disjunction term {{.*}}X.subscript(_:)
-  // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:_:_:)
-  // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.subscript(_:_:)
+  // CHECK:      | Disabled disjunction term {{.*}}X.subscript(_:)
+  // CHECK-NEXT: | Disabled disjunction term {{.*}}X.subscript(_:_:_:)
+  // CHECK-NEXT: | Introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.subscript(_:_:)
   _ = x[i, i]
 }
 
 func testUnresolvedMember(i: Int) -> X {
-  // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:)
-  // CHECK-NEXT: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:_:)
-  // CHECK-NEXT: (removed constraint: disjunction
+  // CHECK:      | Disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:)
+  // CHECK-NEXT: | Disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:_:)
+  // CHECK-NEXT: | `- Removed constraint: disjunction
   // CHECK-NEXT: > [[A:\$T[0-9]+]] bound to decl overload_filtering
   // CHECK-NEXT: > [disabled] [[A]] bound to decl overload_filtering
   // CHECK-NEXT: > [disabled] [[A]] bound to decl overload_filtering
-  // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:)
+  // CHECK-NEXT: | Introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:)
   return .init(i, i)
 }
 
@@ -58,13 +58,13 @@ func test_member_filtering() {
   }
 
   func test(s: S) {
-    // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar(v:)
-    // CHECK-NEXT: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar(a:b:)
-    // CHECK-NEXT: (removed constraint: disjunction
+    // CHECK:      | Disabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar(v:)
+    // CHECK-NEXT: | Disabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar(a:b:)
+    // CHECK-NEXT: `- Removed constraint: disjunction
     // CHECK-NEXT: > [[B:\$T[0-9]+]] bound to decl overload_filtering
     // CHECK-NEXT: > [disabled] [[B]] bound to decl overload_filtering
     // CHECK-NEXT: > [disabled] [[B]] bound to decl overload_filtering
-    // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar
+    // CHECK-NEXT: | Introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).test_member_filtering().S.bar
     s.foo(42).bar(42)
   }
 }

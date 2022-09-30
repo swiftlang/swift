@@ -14,9 +14,9 @@ import Foundation
 }
 
 func testOptional(obj: P) {
-  // CHECK: common result type for {{.*}} is Int
+  // CHECK: | Common result type for {{.*}} is Int
   _ = obj.opt?(1)
 
-  // CHECK: common result type for {{.*}} is Int
+  // CHECK: | Common result type for {{.*}} is Int
   _ = obj.opt!(1)
 }

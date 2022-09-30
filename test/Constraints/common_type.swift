@@ -27,27 +27,27 @@ func f(_: Int) -> X { return X() }
 func f(_: Double) -> Y { return Y() }
 
 func testCallCommonType() {
-  // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
-  // CHECK: (considering -> $T{{[0-9]+}}[.g: value] == [[G:\$T[0-9]+]]
-  // CHECK: (common result type for [[G]] is Int)
-  // CHECK: (overload set choice binding $T{{[0-9]+}} := (Double) -> Y)
-  // CHECK: (considering -> $T{{[0-9]+}}[.g: value] == [[F:\$T[0-9]+]]
-  // CHECK: (common result type for [[F]] is Double)
+  // CHECK: Overload set choice binding $T{{[0-9]+}} := (Int) -> X
+  // CHECK: `-> Considering -> $T{{[0-9]+}}[.g: value] == [[G:\$T[0-9]+]]
+  // CHECK: | Common result type for [[G]] is Int
+  // CHECK: Overload set choice binding $T{{[0-9]+}} := (Double) -> Y
+  // CHECK: `-> Considering -> $T{{[0-9]+}}[.g: value] == [[F:\$T[0-9]+]]
+  // CHECK: | Common result type for [[F]] is Double
   _ = f(0).g(0)
 }
 
 func testSubscriptCommonType() {
   // CHECK: subscript_expr
-  // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
-  // CHECK: (common result type for $T{{[0-9]+}} is String)
-  // CHECK: (overload set choice binding $T{{[0-9]+}} := (Double) -> Y)
-  // CHECK: (common result type for $T{{[0-9]+}} is Substring)
+  // CHECK: Overload set choice binding $T{{[0-9]+}} := (Int) -> X
+  // CHECK: | Common result type for $T{{[0-9]+}} is String
+  // CHECK: Overload set choice binding $T{{[0-9]+}} := (Double) -> Y
+  // CHECK: | Common result type for $T{{[0-9]+}} is Substring
   _ = f(0)[0]
 }
 
 func testCommonTypeIUO() {
-  // CHECK: overload set choice binding $T{{[0-9]+}} := (Int) -> X
-  // CHECK-NOT: common result type
+  // CHECK:     Overload set choice binding $T{{[0-9]+}} := (Int) -> X
+  // CHECK-NOT: | Common result type
     _ = f(0).iuo(0)
 }
 
@@ -60,10 +60,10 @@ struct Z {
 }
 
 func testCommonTypeInit() {
-  // CHECK: common result type for {{.*}} is Z
+  // CHECK: | Common result type for {{.*}} is Z
   _ = Z(a: 0)
 
-  // CHECK-NOT: common result type
+  // CHECK-NOT: | Common result type
   _ = Z(b: 0)
 }
 
@@ -76,9 +76,9 @@ class InheritsDynamicSelf: DynamicSelf {
 }
 
 func testCommonTypeDynamicSelf(ds: DynamicSelf, ids: InheritsDynamicSelf) {
-  // CHECK: common result type for {{.*}} is DynamicSelf
+  // CHECK: | Common result type for {{.*}} is DynamicSelf
   _ = ds.foo(0)
-  // CHECK: common result type for {{.*}} is InheritsDynamicSelf
+  // CHECK: | Common result type for {{.*}} is InheritsDynamicSelf
   _ = ids.foo(0)
 }
 
