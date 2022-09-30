@@ -1439,12 +1439,11 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
         (decl->isMemberwiseInitializer() ||
          decl == SD->getDefaultInitializer())) {
 #ifndef NDEBUG
-        auto *wrapped = SD->getDeclContext()->getSelfNominalTypeDecl();
-        assert(wrapped->hasTypeWrapper());
+      auto *wrapped = SD->getDeclContext()->getSelfNominalTypeDecl();
+      assert(wrapped->hasTypeWrapper());
 #endif
 
-      emitOrDelayFunction(*this, constant,
-                          /*forceEmission=*/true);
+      emitFunctionDefinition(constant, getFunction(constant, ForDefinition));
       return;
     }
   }
