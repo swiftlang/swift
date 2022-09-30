@@ -169,7 +169,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
       auto URC =
-          Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
+          Builder.createUncheckedForwardingCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
@@ -221,8 +221,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       for (auto e = newOpResultTypes.end(); newRetI != e;
            ++oldRetI, ++newRetI, ++origArgI) {
         auto arg = normalBB->createPhiArgument(*newRetI, (*origArgI)->getOwnershipKind());
-        auto converted = Builder.createUncheckedBitCast(AI.getLoc(),
-                                                                arg, *oldRetI);
+        auto converted =
+          Builder.createUncheckedForwardingCast(AI.getLoc(), arg, *oldRetI);
         branchArgs.push_back(converted);
       }
       
@@ -246,7 +246,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   SILInstruction *result = NAI;
   
   if (oldResultTy != newResultTy) {
-    result = Builder.createUncheckedBitCast(AI.getLoc(), NAI, oldResultTy);
+    result =
+      Builder.createUncheckedForwardingCast(AI.getLoc(), NAI, oldResultTy);
   }
   
   return result;
