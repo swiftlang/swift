@@ -36,9 +36,9 @@
 // CHECK-NEXT:  //  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
 // CHECK-NEXT:  #if __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)
 // CHECK-NEXT:  #include <../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>
-// CHECK-NEXT:  #elif __has_include(<../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>)
-// CHECK-NEXT:  //  '<toolchain>/usr/local/lib/clang/<version>/include/../../../../lib/swift/swiftToCxx'.
-// CHECK-NEXT:  #include <../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>
+// CHECK-NEXT:  #elif __has_include(<../../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>)
+// CHECK-NEXT:  //  '<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/swift/swiftToCxx'.
+// CHECK-NEXT:  #include <../../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  // Alternatively, allow user to find the header using additional include path into '<toolchain>/lib/swift'.
 // CHECK-NEXT:  #elif __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)
 // CHECK-NEXT:  #include <swiftToCxx/_SwiftCxxInteroperability.h>
