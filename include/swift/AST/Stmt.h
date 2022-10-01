@@ -398,6 +398,7 @@ public:
 class PoundHasSymbolInfo final : public ASTAllocated<PoundHasSymbolInfo> {
   Expr *SymbolExpr;
   ConcreteDeclRef ReferencedDecl;
+  bool Invalid;
 
   SourceLoc PoundLoc;
   SourceLoc LParenLoc;
@@ -405,7 +406,7 @@ class PoundHasSymbolInfo final : public ASTAllocated<PoundHasSymbolInfo> {
 
   PoundHasSymbolInfo(SourceLoc PoundLoc, SourceLoc LParenLoc, Expr *SymbolExpr,
                      SourceLoc RParenLoc)
-      : SymbolExpr(SymbolExpr), ReferencedDecl(), PoundLoc(PoundLoc),
+      : SymbolExpr(SymbolExpr), ReferencedDecl(), Invalid(), PoundLoc(PoundLoc),
         LParenLoc(LParenLoc), RParenLoc(RParenLoc){};
 
 public:
@@ -418,6 +419,10 @@ public:
 
   ConcreteDeclRef getReferencedDecl() { return ReferencedDecl; }
   void setReferencedDecl(ConcreteDeclRef CDR) { ReferencedDecl = CDR; }
+
+  /// Returns true if the referenced decl has been diagnosed as invalid.
+  bool isInvalid() const { return Invalid; }
+  void setInvalid() { Invalid = true; }
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
@@ -630,7 +635,7 @@ public:
 };
 
 /// Either an "if let" case or a simple boolean expression can appear as the
-/// condition of an 'if' or 'while' statement.
+/// condition of an 'if', 'guard', or 'while' statement.
 using StmtCondition = MutableArrayRef<StmtConditionElement>;
 
 /// This is the common base class between statements that can have labels, and

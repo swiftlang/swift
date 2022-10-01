@@ -6594,7 +6594,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // foo(bar) // This expression should compile in Swift 3 mode
       // ```
       //
-      // See also: https://bugs.swift.org/browse/SR-6796
+      // See also: https://github.com/apple/swift/issues/49345
       if (cs.getASTContext().isSwiftVersionAtLeast(4) &&
           !cs.getASTContext().isSwiftVersionAtLeast(5)) {
         auto obj1 = fromType->getOptionalObjectType();
@@ -8923,8 +8923,24 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     for (auto &condElement : *stmtCondition) {
       switch (condElement.getKind()) {
       case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_HasSymbol:
         continue;
+
+      case StmtConditionElement::CK_HasSymbol: {
+        ConstraintSystem &cs = solution.getConstraintSystem();
+        auto info = condElement.getHasSymbolInfo();
+        auto target = *cs.getSolutionApplicationTarget(&condElement);
+        auto resolvedTarget = rewriteTarget(target);
+        if (!resolvedTarget) {
+          info->setInvalid();
+          return None;
+        }
+
+        auto rewrittenExpr = resolvedTarget->getAsExpr();
+        info->setSymbolExpr(rewrittenExpr);
+        info->setReferencedDecl(
+            TypeChecker::getReferencedDeclForHasSymbolCondition(rewrittenExpr));
+        continue;
+      }
 
       case StmtConditionElement::CK_Boolean: {
         auto condExpr = condElement.getBoolean();

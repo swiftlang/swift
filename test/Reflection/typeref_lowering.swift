@@ -2,6 +2,9 @@
 // XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 
+// rdar://100558042
+// UNSUPPORTED: CPU=arm64e
+
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypeLowering -o %t/TypesToReflect
 

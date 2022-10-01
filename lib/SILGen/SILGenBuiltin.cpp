@@ -1152,7 +1152,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, unsigned arity,
     bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
-  // FIXME(SR-11853): Support throwing functions.
+  // FIXME(https://github.com/apple/swift/issues/54259): Support throwing functions.
   assert(!throws && "Throwing functions are not yet supported");
 
   auto origFnVal = args[0].getValue();
@@ -1221,7 +1221,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
 static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
     unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
-  // FIXME(SR-11853): Support throwing functions.
+  // FIXME(https://github.com/apple/swift/issues/54259): Support throwing functions.
   assert(!throws && "Throwing functions are not yet supported");
 
   auto origFnVal = args.front().getValue();

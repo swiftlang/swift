@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_property_wrapper_backing %s | %FileCheck %s
+// This uses '-primary-file' to ensure we're conservative with lazy SIL emission.
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_property_wrapper_backing -primary-file %s | %FileCheck %s
 // RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir %s
 
 @propertyWrapper
@@ -7,6 +8,11 @@ struct Wrapper<T> {
   init(wrappedValue: T, _ x: Int) {
     self.wrappedValue = wrappedValue
   }
+}
+
+@propertyWrapper
+struct PassThroughWrapper<T> {
+  var wrappedValue: T
 }
 
 // rdar://99931619 – Make sure we emit the profiler increment for the backing
@@ -32,6 +38,20 @@ struct S {
   // CHECK-NEXT: }
 }
 
-// FIXME(rdar://99962285): This is currently needed to SILGen the property
-// initializer for 'i'.
-_ = S().i
+struct T {
+  // The backing initializer for j has no user-written code, so no coverage map needed.
+  // CHECK-NOT: sil_coverage_map {{.*}} "s33coverage_property_wrapper_backing1TV1jSivpfP"
+  @PassThroughWrapper
+  var j = 3
+
+  // FIXME: Ideally the region here would only span the length of the @Wrapper
+  // argument list.
+  // CHECK-LABEL: sil_coverage_map {{.*}} "$s33coverage_property_wrapper_backing1TV1kSivpfP" {{.*}} // property wrapper backing initializer of coverage_property_wrapper_backing.T.k
+  // CHECK-NEXT:  [[@LINE+4]]:4 -> [[@LINE+5]]:30 : 0
+  // CHECK-NEXT:  [[@LINE+4]]:24 -> [[@LINE+4]]:25 : 1
+  // CHECK-NEXT:  [[@LINE+3]]:28 -> [[@LINE+3]]:29 : (0 - 1)
+  // CHECK-NEXT:  }
+  @PassThroughWrapper
+  @Wrapper(.random() ? 1 : 2)
+  var k = 3
+}

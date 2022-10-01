@@ -380,14 +380,12 @@ class CopyPropagation : public SILFunctionTransform {
   /// If true, then borrow scopes will be canonicalized, allowing copies of
   /// guaranteed values to be optimized. Does *not* shrink the borrow scope.
   bool canonicalizeBorrows;
-  /// If true, then new destroy_value instructions will be poison.
-  bool poisonRefs;
 
 public:
   CopyPropagation(bool pruneDebug, bool canonicalizeAll,
-                  bool canonicalizeBorrows, bool poisonRefs)
+                  bool canonicalizeBorrows)
       : pruneDebug(pruneDebug), canonicalizeAll(canonicalizeAll),
-        canonicalizeBorrows(canonicalizeBorrows), poisonRefs(poisonRefs) {}
+        canonicalizeBorrows(canonicalizeBorrows) {}
 
   /// The entry point to this function transformation.
   void run() override;
@@ -439,8 +437,8 @@ void CopyPropagation::run() {
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
-  CanonicalizeOSSALifetime canonicalizer(pruneDebug, poisonRefs,
-                                         accessBlockAnalysis, domTree, deleter);
+  CanonicalizeOSSALifetime canonicalizer(pruneDebug, accessBlockAnalysis,
+                                         domTree, deleter);
 
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
@@ -583,12 +581,10 @@ void CopyPropagation::run() {
 // because it may negatively affect the debugging experience.
 SILTransform *swift::createMandatoryCopyPropagation() {
   return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
-                             /*canonicalizeBorrows*/ false,
-                             /*poisonRefs*/ true);
+                             /*canonicalizeBorrows*/ false);
 }
 
 SILTransform *swift::createCopyPropagation() {
   return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
-                             /*canonicalizeBorrows*/ EnableRewriteBorrows,
-                             /*poisonRefs*/ false);
+                             /*canonicalizeBorrows*/ EnableRewriteBorrows);
 }
