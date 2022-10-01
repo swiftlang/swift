@@ -2078,62 +2078,37 @@ Parser::parseDocumentationAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   return makeParserResult(new (Context) DocumentationAttr(Loc, range, FinalMetadata, Visibility, false));
 }
 
-enum class SingleAttrOptionParseStatus : uint8_t {
-  Success,
-  ExpectedLParen,
-  ExpectedIdentifier,
-  ExpectedRParen
-};
-
-void diagnoseSingleAttrOptionParseStatus(
-      Parser &P, SingleAttrOptionParseStatus status,
-      SourceLoc Loc,  StringRef AttrName,
-      DeclAttrKind DK, Diagnostic nonIdentifierDiagnostic) {
-  bool isDeclModifier = DeclAttribute::isDeclModifier(DK);
-  
-  switch (status) {
-  case SingleAttrOptionParseStatus::Success:
-    break;
-    
-  case SingleAttrOptionParseStatus::ExpectedLParen:
-    P.diagnose(Loc, diag::attr_expected_lparen, AttrName, isDeclModifier);
-    break;
-    
-  case SingleAttrOptionParseStatus::ExpectedIdentifier:
-    P.diagnose(Loc, nonIdentifierDiagnostic);
-    break;
-    
-  case SingleAttrOptionParseStatus::ExpectedRParen:
-    P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isDeclModifier);
-    break;
-  }
-}
-
-/// Parses an attribute argument list that allows a single identifier with a
-/// known set of permitted options:
+/// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.
 ///
-/// \verbatim
-///     '(' identifier ')'
-/// \endverbatim
+/// \param P The parser object.
+/// \param Loc The location of the attribute name (before the \c tok::l_paren, if any).
+/// \param AttrRange Will be set to the range of the entire attribute, including its option if any.
+/// \param AttrName The spelling of the attribute in the source code. Used in diagnostics.
+/// \param DK The kind of the attribute being parsed.
+/// \param allowOmitted If true, treat a missing argument list as permitted and return
+///        \c Identifier() ; if false, diagnose a missing argument list as an error.
+/// \param nonIdentifierDiagnostic The diagnostic to emit if something other than a
+///        \c tok::identifier is used as an argument.
 ///
-/// Returns an object of type \c AttrOptionSwitch, a type loosely inspired by
-/// \c llvm::StringSwitch which can be used in a fluent style to map each
-/// permitted identifier to a value. Together, they will automatically
-/// diagnose \c diag::attr_expected_lparen,
-/// \c diag::attr_expected_option_such_as, \c diag::attr_unknown_option, and
-/// \c diag::attr_expected_rparen when needed.
-///
-/// \seealso AttrOptionSwitch
-static SingleAttrOptionParseStatus
+/// \returns \c None if an error was diagnosed; \c Identifier() if the argument list was permissibly
+///          omitted; the identifier written by the user otherwise.
+static Optional<Identifier>
 parseSingleAttrOptionImpl(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
-                          DeclAttrKind DK, StringRef &Result) {
-  Result = "";
+                          StringRef AttrName, DeclAttrKind DK,
+                          bool allowOmitted,
+                          Diagnostic nonIdentifierDiagnostic) {
   SWIFT_DEFER {
     AttrRange = SourceRange(Loc, P.PreviousLoc);
   };
-  
-  if (!P.Tok.is(tok::l_paren))
-    return SingleAttrOptionParseStatus::ExpectedLParen;
+  bool isDeclModifier = DeclAttribute::isDeclModifier(DK);
+
+  if (!P.Tok.is(tok::l_paren)) {
+    if (allowOmitted)
+      return Identifier();
+    
+    P.diagnose(Loc, diag::attr_expected_lparen, AttrName, isDeclModifier);
+    return None;
+  }
 
   llvm::Optional<SyntaxParsingContext> ModDetailContext;
   if (DK == DAK_ReferenceOwnership) {
@@ -2143,147 +2118,78 @@ parseSingleAttrOptionImpl(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
   P.consumeToken(tok::l_paren);
 
   StringRef parsedName = P.Tok.getText();
-  if (!P.consumeIf(tok::identifier))
-    return SingleAttrOptionParseStatus::ExpectedIdentifier;
+  if (!P.consumeIf(tok::identifier)) {
+    P.diagnose(Loc, nonIdentifierDiagnostic);
+    return None;
+  }
   
-  if (!P.consumeIf(tok::r_paren))
-    return SingleAttrOptionParseStatus::ExpectedRParen;
-
-  Result = parsedName;
-  return SingleAttrOptionParseStatus::Success;
-}
-
-/// Processes a parsed option name by attempting to match it to a list of
-/// alternative name/value pairs provided by a chain of \c when() calls, ending
-/// in either \c whenOmitted() if omitting the option is allowed, or
-/// \c diagnoseWhenOmitted() if the option is mandatory.
-template<typename T, typename R = T>
-class LLVM_NODISCARD AttrOptionSwitch {
-  // Inputs:
-  StringRef parsedName;                   // empty: omitted or parse error
-  Parser &P;
-  SourceLoc loc;
-  StringRef attrName;
-  SingleAttrOptionParseStatus parseStatus;
-  DeclAttrKind attrKind;
-
-  // State:
-  StringRef exampleName;                  // empty: when() was never called
-  Optional<R> result;                     // None: no when() has matched
-
-public:
-  /// \param parseStatus The status of the option parse (whether it succeeded or expeienced
-  ///        some error). If
-  /// \param parsedName The name of the option parsed out of the source code. If \p parseStatus is
-  ///        an error, this should be empty.
-  /// \param P The parser used to diagnose errors concerning this attribute
-  ///        option.
-  /// \param loc The source location to diagnose errors at.
-  /// \param attrName The name of the attribute, used in diagnostics.
-  /// \param attrKind The kind of the attribute, used in diagnostics.
-  AttrOptionSwitch(SingleAttrOptionParseStatus parseStatus,
-                   StringRef parsedName, Parser &P, SourceLoc loc,
-                   StringRef attrName, DeclAttrKind attrKind)
-    :  parsedName(parsedName), P(P), loc(loc), attrName(attrName),
-       parseStatus(parseStatus), attrKind(attrKind) { }
-
-  /// If the option has the identifier \p name, give it value \p value.
-  AttrOptionSwitch<R, T> &when(StringLiteral name, T value) {
-    // Save this to use in a future diagnostic, if needed.
-    if (exampleName.empty() && !name.empty())
-      exampleName = name;
-
-    // Does this string match?
-    if (parseStatus == SingleAttrOptionParseStatus::Success
-        && parsedName == name) {
-      assert(!result && "overlapping AttrOptionSwitch::when()s?");
-      result = std::move(value);
-    }
-
-    return *this;
-  }
-
-  /// Diagnose if the option is missing or was not matched, returning either the
-  /// option's value or \c None if an error was diagnosed.
-  Optional<R> diagnoseWhenOmitted() {
-    assert(!exampleName.empty() && "No AttrOptionSwitch::when() calls");
-
-    if (parseStatus != SingleAttrOptionParseStatus::Success) {
-      // Any sort of parse error (other than an ExpectedLParen permitted by
-      // whenOmitted().)
-      diagnoseSingleAttrOptionParseStatus(
-          P, parseStatus, loc, attrName, attrKind,
-          { diag::attr_expected_option_such_as, attrName, exampleName });
-    }
-    else if (!result)
-      // We parsed an identifier, but it didn't match any of the when() calls.
-      P.diagnose(loc, diag::attr_unknown_option, parsedName, attrName);
-
-    return result;
-  }
-
-  /// Diagnose if the option is missing or not matched, returning:
-  ///
-  /// \returns \c None if an error was diagnosed; \p value if the option was
-  /// omitted; the value the option was matched to otherwise.
-  Optional<R> whenOmitted(T value) {
-    // Treat an ExpectedLParen as successful.
-    if (parseStatus == SingleAttrOptionParseStatus::ExpectedLParen)
-      parseStatus = SingleAttrOptionParseStatus::Success;
-    
-    return when("", value).diagnoseWhenOmitted();
-  }
-};
-
-/// Parses an attribute argument list that allows a single identifier with a
-/// known set of permitted options:
-///
-/// \verbatim
-///     '(' identifier ')'
-/// \endverbatim
-///
-/// Returns an object of type \c AttrOptionSwitch, a type loosely inspired by
-/// \c llvm::StringSwitch which can be used in a fluent style to map each
-/// permitted identifier to a value. Together, they will automatically
-/// diagnose \c diag::attr_expected_lparen,
-/// \c diag::attr_expected_option_such_as, \c diag::attr_unknown_option, and
-/// \c diag::attr_expected_rparen when needed.
-///
-/// \seealso AttrOptionSwitch
-template<typename R>
-static AttrOptionSwitch<R>
-parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
-                      StringRef AttrName, DeclAttrKind DK) {
-  StringRef parsedName;
-  auto status = parseSingleAttrOptionImpl(P, Loc, AttrRange, DK, parsedName);
-  return AttrOptionSwitch<R>(status, parsedName, P, Loc, AttrName, DK);
-}
-
-static Optional<Identifier>
-parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc,
-                                SourceRange &AttrRange, StringRef AttrName,
-                                DeclAttrKind DK, bool allowOmitted = false) {
-  StringRef parsedName;
-  auto status = parseSingleAttrOptionImpl(P, Loc, AttrRange, DK, parsedName);
-  
-  switch (status) {
-  case SingleAttrOptionParseStatus::Success:
-    break;
-    
-  case SingleAttrOptionParseStatus::ExpectedLParen:
-    if (allowOmitted)
-      break;
-    LLVM_FALLTHROUGH;
-    
-  case SingleAttrOptionParseStatus::ExpectedRParen:
-  case SingleAttrOptionParseStatus::ExpectedIdentifier:
-    diagnoseSingleAttrOptionParseStatus(
-        P, status, Loc, AttrName, DK,
-        { diag::attr_expected_option_identifier, AttrName });
+  if (!P.consumeIf(tok::r_paren)) {
+    P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isDeclModifier);
     return None;
   }
 
   return P.Context.getIdentifier(parsedName);
+}
+
+/// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
+///
+/// \param P The parser object.
+/// \param Loc The location of the attribute name (before the \c tok::l_paren, if any).
+/// \param AttrRange Will be set to the range of the entire attribute, including its option if any.
+/// \param AttrName The spelling of the attribute in the source code. Used in diagnostics.
+/// \param DK The kind of the attribute being parsed.
+/// \param allowOmitted If true, treat a missing argument list as permitted and return
+///        \c Identifier() ; if false, diagnose a missing argument list as an error.
+///
+/// \returns \c None if an error was diagnosed; \c Identifier() if the argument list was permissibly
+///          omitted; the identifier written by the user otherwise.
+static Optional<Identifier>
+parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc,
+                                SourceRange &AttrRange, StringRef AttrName,
+                                DeclAttrKind DK, bool allowOmitted = false) {
+  return parseSingleAttrOptionImpl(
+             P, Loc, AttrRange, AttrName, DK, allowOmitted,
+             { diag::attr_expected_option_identifier, AttrName });
+}
+
+/// Parses a (possibly optional) argument for an attribute containing a single identifier from a known set of
+/// supported values, mapping it to a domain-specific type.
+///
+/// \param P The parser object.
+/// \param Loc The location of the attribute name (before the \c tok::l_paren, if any).
+/// \param AttrRange Will be set to the range of the entire attribute, including its option if any.
+/// \param AttrName The spelling of the attribute in the source code. Used in diagnostics.
+/// \param DK The kind of the attribute being parsed.
+/// \param options The set of permitted keywords and their corresponding values.
+/// \param valueIfOmitted If present, treat a missing argument list as permitted and return
+///        the provided value; if absent, diagnose a missing argument list as an error.
+///
+/// \returns \c None if an error was diagnosed; the value corresponding to the identifier written by the
+///          user otherwise.
+template<typename R>
+static Optional<R>
+parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
+                      StringRef AttrName, DeclAttrKind DK,
+                      ArrayRef<std::pair<Identifier, R>> options,
+                      Optional<R> valueIfOmitted = None) {
+  auto parsedIdentifier = parseSingleAttrOptionImpl(
+             P, Loc, AttrRange,AttrName, DK,
+             /*allowOmitted=*/valueIfOmitted.hasValue(),
+             Diagnostic(diag::attr_expected_option_such_as, AttrName,
+                        options.front().first.str()));
+  if (!parsedIdentifier)
+    return None;
+
+  // If omitted (and omission is permitted), return valueIfOmitted.
+  if (parsedIdentifier == Identifier())
+    return *valueIfOmitted;
+
+  for (auto &option : options)
+    if (option.first == *parsedIdentifier)
+      return option.second;
+
+  P.diagnose(Loc, diag::attr_unknown_option, parsedIdentifier->str(), AttrName);
+  return None;
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -2418,11 +2324,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_Inline: {
-    auto kind = parseSingleAttrOption<InlineKind>
-                         (*this, Loc, AttrRange, AttrName, DK)
-                    .when("never", InlineKind::Never)
-                    .when("__always", InlineKind::Always)
-                    .diagnoseWhenOmitted();
+    auto kind = parseSingleAttrOption<InlineKind>(
+        *this, Loc, AttrRange, AttrName, DK, {
+          { Context.Id_never,   InlineKind::Never },
+          { Context.Id__always, InlineKind::Always }
+        });
     if (!kind)
       return false;
 
@@ -2433,12 +2339,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_Optimize: {
-    auto optMode = parseSingleAttrOption<OptimizationMode>
-                            (*this, Loc, AttrRange, AttrName, DK)
-                       .when("speed", OptimizationMode::ForSpeed)
-                       .when("size", OptimizationMode::ForSize)
-                       .when("none", OptimizationMode::NoOptimization)
-                       .diagnoseWhenOmitted();
+    auto optMode = parseSingleAttrOption<OptimizationMode>(
+        *this, Loc, AttrRange, AttrName, DK, {
+          { Context.Id_speed, OptimizationMode::ForSpeed },
+          { Context.Id_size,  OptimizationMode::ForSize },
+          { Context.Id_none,  OptimizationMode::NoOptimization }
+        });
     if (!optMode)
       return false;
 
@@ -2449,11 +2355,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_Exclusivity: {
-    auto mode = parseSingleAttrOption<ExclusivityAttr::Mode>
-                            (*this, Loc, AttrRange, AttrName, DK)
-                       .when("checked", ExclusivityAttr::Mode::Checked)
-                       .when("unchecked", ExclusivityAttr::Mode::Unchecked)
-                       .diagnoseWhenOmitted();
+    auto mode = parseSingleAttrOption<ExclusivityAttr::Mode>(
+           *this, Loc, AttrRange, AttrName, DK, {
+             { Context.Id_checked, ExclusivityAttr::Mode::Checked },
+             { Context.Id_unchecked, ExclusivityAttr::Mode::Unchecked }
+           });
     if (!mode)
       return false;
 
@@ -2470,11 +2376,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (Kind == ReferenceOwnership::Unowned) {
       // Parse an optional specifier after unowned.
-      Kind = parseSingleAttrOption<ReferenceOwnership>
-                     (*this, Loc, AttrRange, AttrName, DK)
-                .when("unsafe", ReferenceOwnership::Unmanaged)
-                .when("safe", ReferenceOwnership::Unowned)
-                .whenOmitted(ReferenceOwnership::Unowned)
+      Kind = parseSingleAttrOption<ReferenceOwnership>(
+          *this, Loc, AttrRange, AttrName, DK, {
+            { Context.Id_unsafe, ReferenceOwnership::Unmanaged },
+            { Context.Id_safe,   ReferenceOwnership::Unowned }
+          }, ReferenceOwnership::Unowned)
             // Recover from errors by going back to Unowned.
             .getValueOr(ReferenceOwnership::Unowned);
     }
@@ -2490,10 +2396,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_NonSendable: {
-    auto kind = parseSingleAttrOption<NonSendableKind>
-                         (*this, Loc, AttrRange, AttrName, DK)
-                    .when("_assumed", NonSendableKind::Assumed)
-                    .whenOmitted(NonSendableKind::Specific);
+    auto kind = parseSingleAttrOption<NonSendableKind>(
+        *this, Loc, AttrRange, AttrName, DK, {
+          { Context.Id_assumed, NonSendableKind::Assumed }
+        }, NonSendableKind::Specific);
     if (!kind)
       return false;
 
