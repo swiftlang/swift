@@ -313,6 +313,25 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // user code into their body.
   switch (kind) {
   case Kind::Func: {
+    if (getAbstractClosureExpr()) {
+      // Auto-closures have user-written code.
+      if (auto *ACE = getAutoClosureExpr()) {
+        // Currently all types of auto-closures can contain user code. Note this
+        // logic does not affect delayed emission, as we eagerly emit all
+        // closure definitions. This does however affect profiling.
+        switch (ACE->getThunkKind()) {
+        case AutoClosureExpr::Kind::None:
+        case AutoClosureExpr::Kind::SingleCurryThunk:
+        case AutoClosureExpr::Kind::DoubleCurryThunk:
+        case AutoClosureExpr::Kind::AsyncLet:
+          return true;
+        }
+        llvm_unreachable("Unhandled case in switch!");
+      }
+      // Otherwise, assume an implicit closure doesn't have user code.
+      return false;
+    }
+
     // Lazy getters splice in the user-written initializer expr.
     if (auto *accessor = dyn_cast<AccessorDecl>(getFuncDecl())) {
       auto *storage = accessor->getStorage();
@@ -914,11 +933,6 @@ bool SILDeclRef::isBackDeployed() const {
   return false;
 }
 
-bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() ||
-         isDistributedThunk() || isBackDeploymentThunk();
-}
-
 bool SILDeclRef::isForeignToNativeThunk() const {
   // If this isn't a native entry-point, it's not a foreign-to-native thunk.
   if (isForeign)
@@ -1082,7 +1096,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!NameA->Name.empty() && !isAnyThunk()) {
+      if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
       }
       
@@ -1163,7 +1177,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 }
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-// FIXME(SR-14131): Also consider derived declaration `@derivative` attributes.
+// FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
   assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");

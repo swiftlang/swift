@@ -909,7 +909,7 @@ private:
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
-    // TODO(SR-15377): We currently cannot round trip some C++ types.
+    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
     if (!Opts.DisableRoundTripDebugTypes &&
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.

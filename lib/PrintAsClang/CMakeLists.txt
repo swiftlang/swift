@@ -1,5 +1,7 @@
 set(datafiles
     _SwiftCxxInteroperability.h
+    _SwiftStdlibCxxOverlay.h
+    experimental-interoperability-version.json
 )
 
 set(SWIFTLIB_DIR

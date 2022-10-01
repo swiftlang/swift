@@ -28,6 +28,22 @@ using namespace swift;
 using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
 
+static std::string lookupModuleOutput(const ModuleID &MID,
+                                      ModuleOutputKind MOK) {
+  // Deciding the output paths is done in swift-driver.
+  switch (MOK) {
+  case ModuleOutputKind::ModuleFile:
+    return "<replace-me>";
+  case ModuleOutputKind::DependencyFile:
+    return "<replace-me>";
+  case ModuleOutputKind::DependencyTargets:
+    return MID.ModuleName + "-" + MID.ContextHash;
+  case ModuleOutputKind::DiagnosticSerializationFile:
+    return "<replace-me>";
+  }
+  llvm_unreachable("Fully covered switch above!");
+}
+
 // Add search paths.
 // Note: This is handled differently for the Clang importer itself, which
 // adds search paths to Clang's data structures rather than to its
@@ -119,84 +135,33 @@ void ClangImporter::recordModuleDependencies(
     for (const auto &fileDep : clangModuleDep.FileDeps) {
       fileDeps.push_back(fileDep.getKey().str());
     }
-    // Inherit all Clang driver args when creating the clang importer.
-    ArrayRef<std::string> allArgs = Impl.ClangArgs;
-    ClangImporterOptions Opts;
-
-    // Ensure the arguments we collected is sufficient to create a Clang
-    // invocation.
-    assert(createClangInvocation(this, Opts, nullptr, allArgs));
 
     std::vector<std::string> swiftArgs;
-    // We are using Swift frontend mode.
-    swiftArgs.push_back("-frontend");
-    // We pass the entire argument list via -Xcc, so the invocation should
-    // use extra clang options alone.
-    swiftArgs.push_back("-only-use-extra-clang-opts");
     auto addClangArg = [&](Twine arg) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(arg.str());
     };
-    auto addClangFrontendArg = [&](Twine arg) {
-      addClangArg("-Xclang");
-      addClangArg(arg);
-    };
 
-    // Add all args inherited from creating the importer.
-    auto It = allArgs.begin();
+    // We are using Swift frontend mode.
+    swiftArgs.push_back("-frontend");
 
-    {
-      StringRef arg = *It;
-      if (arg == "clang" ||
-          arg.endswith(llvm::sys::path::get_separator().str() + "clang")) {
-        // Remove the initial path to clang executable argument, to avoid
-        // treating it as an executable input to compilation. It is not needed
-        // because the consumer of this command-line will invoke the emit-PCM
-        // action via swift-frontend.
-        It += 1;
-      }
-    }
-
-    while(It != allArgs.end()) {
-      StringRef arg = *It;
-      // Remove the -target arguments because we should use the target triple
-      // specified with `-clang-target` on the scanner invocation, or
-      // from the depending Swift modules.
-      if (arg == "-target") {
-        It += 2;
-      } else if (arg.startswith("-fapinotes-swift-version=")) {
-        // Remove the apinotes version because we should use the language version
-        // specified in the interface file.
-        It += 1;
-      } else {
-        addClangArg(*It);
-        ++ It;
-      }
-    }
-
-    // Add the equivalent of the old `getAdditionalArgsWithoutModulePaths`.
-    // TODO: Should we be passing all cc1 args (ie.
-    // `getCanonicalCommandLineWithoutModulePaths`)?
-    addClangFrontendArg("-fno-implicit-modules");
-    addClangFrontendArg("-emit-module");
-    addClangFrontendArg(Twine("-fmodule-name=") + clangModuleDep.ID.ModuleName);
-    if (clangModuleDep.IsSystem)
-      addClangFrontendArg("-fsystem-module");
-    if (clangModuleDep.BuildInvocation.getLangOpts()->NeededByPCHOrCompilationUsesPCH)
-      addClangFrontendArg("-fmodule-related-to-pch");
-
-    // If the scanner is invoked with '-clang-target', ensure this is the target
-    // used to build this PCM.
-    if (Impl.SwiftContext.LangOpts.ClangTarget.hasValue()) {
-      llvm::Triple triple = Impl.SwiftContext.LangOpts.ClangTarget.getValue();
-      addClangArg("-target");
-      addClangArg(triple.str());
-    }
+    // We pass the entire argument list via -Xcc, so the invocation should
+    // use extra clang options alone.
+    swiftArgs.push_back("-only-use-extra-clang-opts");
 
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
+
+    // Ensure that the resulting PCM build invocation uses Clang frontend directly
+    swiftArgs.push_back("-direct-clang-cc1-module-build");
+
+    // Swift frontend option for input file path (Foo.modulemap).
+    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
+
+    // Add args reported by the scanner.
+    llvm::for_each(clangModuleDep.BuildArguments, addClangArg);
 
     // Pass down search paths to the -emit-module action.
     // Unlike building Swift modules, we need to include all search paths to
@@ -212,8 +177,6 @@ void ClangImporter::recordModuleDependencies(
       addClangArg((path.IsSystem ? "-Fsystem": "-F") + path.Path);
     }
 
-    // Swift frontend option for input file path (Foo.modulemap).
-    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
@@ -267,7 +230,7 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
 
   auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
       commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-      moduleName);
+      lookupModuleOutput, moduleName);
   if (!clangDependencies) {
     auto errorStr = toString(clangDependencies.takeError());
     // We ignore the "module 'foo' not found" error, the Swift dependency
@@ -322,7 +285,8 @@ bool ClangImporter::addBridgingHeaderDependencies(
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
 
   auto clangDependencies = cache.getClangScannerTool().getFullDependencies(
-      commandLineArgs, workingDir, cache.getAlreadySeenClangModules());
+      commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
+      lookupModuleOutput);
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());

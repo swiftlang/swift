@@ -2399,7 +2399,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
     std::string executable = getSwiftProgramPath();
 
-    // FIXME: This bypasses mechanisms like -v and -###. (SR-12119)
+    // FIXME(https://github.com/apple/swift/issues/54554): This bypasses mechanisms like -v and -###.
     sys::TaskQueue queue;
     queue.addTask(executable.c_str(), commandLine);
     queue.execute(nullptr,

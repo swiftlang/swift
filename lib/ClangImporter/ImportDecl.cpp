@@ -2002,7 +2002,7 @@ namespace {
         return nullptr;
       }
 
-      // TODO(SR-13809): fix this once we support dependent types.
+      // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
       if (decl->getTypeForDecl()->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
@@ -2995,8 +2995,7 @@ namespace {
 
       auto templateParamTypeUsedInSignature =
           [decl](clang::TemplateTypeParmDecl *type) -> bool {
-        // TODO(SR-13809): we will want to update this to handle dependent
-        // types when those are supported.
+        // TODO(https://github.com/apple/swift/issues/56206): We will want to update this to handle dependent types when those are supported.
         if (hasSameUnderlyingType(decl->getReturnType().getTypePtr(), type))
           return true;
 
@@ -3027,8 +3026,7 @@ namespace {
           //
           // If the defaulted template type parameter is used in the signature,
           // then still add a generic so that it can be overrieded.
-          // TODO(SR-14837): in the future we might want to import two overloads
-          // in this case so that the default type could still be used.
+          // TODO(https://github.com/apple/swift/issues/57184): In the future we might want to import two overloads in this case so that the default type could still be used.
           if (templateTypeParam->hasDefaultArgument() &&
               !templateParamTypeUsedInSignature(templateTypeParam))
             continue;

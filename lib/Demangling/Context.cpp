@@ -94,9 +94,24 @@ static llvm::StringRef stripSuffix(llvm::StringRef Name) {
   return Name;
 }
 
+// Removes a 'TQ<index>' or 'TY<index>' from \p Name.
+static llvm::StringRef stripAsyncContinuation(llvm::StringRef Name) {
+  if (!Name.endswith("_"))
+    return Name;
+
+  StringRef Stripped = Name.drop_back();
+  while (!Stripped.empty() && swift::Mangle::isDigit(Stripped.back()))
+    Stripped = Stripped.drop_back();
+
+  if (Stripped.endswith("TQ") || Stripped.endswith("TY"))
+    return Stripped.drop_back(2);
+
+  return Name;
+}
+
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
   if (isMangledName(MangledName)) {
-    MangledName = stripSuffix(MangledName);
+    MangledName = stripAsyncContinuation(stripSuffix(MangledName));
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
@@ -151,6 +166,9 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     // If the symbol has a suffix we cannot derive the target.
     if (stripSuffix(MangledName) != MangledName)
       return std::string();
+
+    // Ignore any async continuation suffix
+    MangledName = stripAsyncContinuation(MangledName);
 
     // The targets of those thunks not derivable from the mangling.
     if (MangledName.endswith("TR") ||

@@ -71,7 +71,7 @@ bool isSemanticMemberAccessor(SILFunction *original) {
   if (!accessor)
     return false;
   // Currently, only getters and setters are supported.
-  // TODO(SR-12640): Support `modify` accessors.
+  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
   if (accessor->getAccessorKind() != AccessorKind::Get &&
       accessor->getAccessorKind() != AccessorKind::Set)
     return false;
