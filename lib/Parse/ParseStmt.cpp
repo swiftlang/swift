@@ -844,7 +844,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
 
     SmallVector<ExprListElt, 4> yieldElts;
     status = parseExprList(tok::l_paren, tok::r_paren, /*isArgumentList*/ false,
-                           lpLoc, yieldElts, rpLoc, SyntaxKind::ExprList);
+                           lpLoc, yieldElts, rpLoc, SyntaxKind::YieldExprList);
     for (auto &elt : yieldElts) {
       // We don't accept labels in a list of yields.
       if (elt.LabelLoc.isValid()) {

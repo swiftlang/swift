@@ -36,6 +36,9 @@
 // aren't compatible with the environment of the back deployment CI bots.
 // UNSUPPORTED: back_deployment_runtime
 
+// Remote test execution does not support dynamically loaded libraries.
+// UNSUPPORTED: remote_run
+
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)

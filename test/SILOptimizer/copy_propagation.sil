@@ -875,6 +875,7 @@ bb0(%instance : @owned $C):
 // CHECK-NOT:     destroy_value
 // CHECK-LABEL: } // end sil function 'dont_extend_beyond_nonoverlapping_endaccess_after_destroyvalue_in_consuming_block'
 sil [ossa] @dont_extend_beyond_nonoverlapping_endaccess_after_destroyvalue_in_consuming_block : $@convention(thin) () -> () {
+bb0:
   %instance = apply undef() : $@convention(thin) () -> @owned C
   %addr = alloc_stack [lexical] $C, var
   %access = begin_access [static] [modify] %addr : $*C
@@ -884,4 +885,53 @@ sil [ossa] @dont_extend_beyond_nonoverlapping_endaccess_after_destroyvalue_in_co
   dealloc_stack %addr : $*C
   %retval = tuple()
   return %retval : $()
+}
+
+sil @closureGetter : $@convention(thin) () -> @owned Optional<@Sendable @callee_guaranteed () -> ()>
+
+// This pattern is produced by SILGen doUncheckedConversion.
+// rdar://100527903 (Overrelease of optional closure when using shorthand syntax)
+//
+// Copy propagation cannot handle a PointerEscape.
+//
+// CHECK-LABEL: sil hidden [ossa] @testBitwiseClosureEscape : $@convention(thin) () -> () {
+// CHECK: [[V:%.*]] = apply %0() : $@convention(thin) () -> @owned Optional<@Sendable @callee_guaranteed () -> ()>
+// CHECK: [[CP1:%.*]] = copy_value [[V]] : $Optional<@Sendable @callee_guaranteed () -> ()>
+// CHECK: destroy_value [[V]] : $Optional<@Sendable @callee_guaranteed () -> ()>
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast [[CP1]] : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
+// CHECK-NEXT: [[CASTCP:%.*]] = copy_value [[CAST]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:      store [[CASTCP]] to [init]
+// CHECK:   destroy_value [[CP1]] : $Optional<@Sendable @callee_guaranteed () -> ()>
+// CHECK-LABEL: } // end sil function 'testBitwiseClosureEscape'
+sil hidden [ossa] @testBitwiseClosureEscape : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @closureGetter : $@convention(thin) () -> @owned Optional<@Sendable @callee_guaranteed () -> ()>
+  %3 = apply %2() : $@convention(thin) () -> @owned Optional<@Sendable @callee_guaranteed () -> ()>
+  %13 = copy_value %3 : $Optional<@Sendable @callee_guaranteed () -> ()>
+  %14 = alloc_stack $Optional<@callee_guaranteed () -> ()>
+  destroy_value %3 : $Optional<@Sendable @callee_guaranteed () -> ()>
+  %17 = unchecked_bitwise_cast %13 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
+  %18 = copy_value %17 : $Optional<@callee_guaranteed () -> ()>
+  store %18 to [init] %14 : $*Optional<@callee_guaranteed () -> ()>
+  destroy_addr %14 : $*Optional<@callee_guaranteed () -> ()>
+  destroy_value %13 : $Optional<@Sendable @callee_guaranteed () -> ()>
+  dealloc_stack %14 : $*Optional<@callee_guaranteed () -> ()>
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Lexical destroy hoisting cannot handle a PointerEscape.
+//
+// CHECK-LABEL: sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
+// CHECK: bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
+// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
+// CHECK:   [[COPY:%.*]] = copy_value [[CAST]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:   destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
+// CHECK-LABEL: } // end sil function 'testNoLexicalHoistEscape'
+sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
+bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
+  %cast = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
+  %copy = copy_value %cast : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
+  return %copy : $Optional<@callee_guaranteed () -> ()>
 }
