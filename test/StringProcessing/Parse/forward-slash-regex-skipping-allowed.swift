@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -parse -enable-bare-slash-regex -disable-availability-checking -experimental-skip-all-function-bodies -stats-output-dir %t %s
+// RUN: %target-swift-frontend -parse -enable-bare-slash-regex -disable-availability-checking -experimental-skip-all-function-bodies -verify -stats-output-dir %t %s
 // RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/stats.csv %t
 // RUN: %FileCheck -input-file %t/stats.csv %s
 
@@ -12,6 +12,9 @@
 // either print `"Parse.NumFunctionsParsed" 0` or not print it at all. Make sure
 // we don't output any non-zero value.
 // CHECK-NOT: {{"Parse.NumFunctionsParsed" [^0]}}
+
+// Ensures there is a parse error
+var : Int // expected-error{{expected pattern}}
 
 // Balanced `{}`, so okay.
 func a() { / {}/ }
