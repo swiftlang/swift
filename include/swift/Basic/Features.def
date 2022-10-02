@@ -141,8 +141,9 @@ EXPERIMENTAL_FEATURE(ParserSequenceFolding)
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome)
 
-/// Parse using the Swift (swift-syntax) parser and use ASTGen.
-EXPERIMENTAL_FEATURE(SwiftParser)
+/// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
+/// corresponding syntax tree.
+EXPERIMENTAL_FEATURE(ParserASTGen)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -3091,7 +3091,7 @@ static bool usesFeatureAdditiveArithmeticDerivedConformances(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureSwiftParser(Decl *decl) {
+static bool usesFeatureParserASTGen(Decl *decl) {
   return false;
 }
 
