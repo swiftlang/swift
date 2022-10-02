@@ -1,5 +1,4 @@
-CHANGELOG
-=========
+# CHANGELOG
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
@@ -57,6 +56,8 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   Features can be detected in source code with `#if hasFeature(X)`.
 
 ## Swift 5.7
+
+### 2022-09-12 (Xcode 14.0)
 
 * [SE-0327][]:
 
@@ -172,6 +173,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   `String`, `Regex` and arbitrary `Collection` types.
 
 * [SE-0329][]:
+
   New types representing time and clocks were introduced. This includes a protocol `Clock` defining clocks which allow for defining a concept of now and a way to wake up after a given instant. Additionally a new protocol `InstantProtocol` for defining instants in time was added. Furthermore a new protocol `DurationProtocol` was added to define an elapsed duration between two given `InstantProtocol` types. Most commonly the `Clock` types for general use are the `SuspendingClock` and `ContinuousClock` which represent the most fundamental clocks for the system. The `SuspendingClock` type does not progress while the machine is suspended whereas the `ContinuousClock` progresses no matter the state of the machine. 
 
   ```swift
@@ -643,8 +645,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
   }
   ```
 
-Swift 5.6
----------
+## Swift 5.6
 
 ### 2022-03-14 (Xcode 13.3)
 
@@ -876,8 +877,7 @@ Swift 5.6
   }
   ```
 
-Swift 5.5
----------
+## Swift 5.5
 
 ### 2021-09-20 (Xcode 13.0)
 
@@ -1294,8 +1294,7 @@ Swift 5.5
   Asynchronous for loops use asynchronous sequences, defined by the protocol
   `AsyncSequence` and its corresponding `AsyncIterator`.
 
-Swift 5.4
----------
+## Swift 5.4
 
 ### 2021-04-26 (Xcode 12.5)
 
@@ -1460,8 +1459,7 @@ Swift 5.4
   let _: Foo? = .bar.anotherFoo.getFoo().optionalFoo?.optionalFoo![]
   ```
 
-Swift 5.3
----------
+## Swift 5.3
 
 ### 2020-09-16 (Xcode 12.0)
 
@@ -1681,8 +1679,7 @@ Swift 5.3
   closure's capture list in addition to the existing 'use `self.` explicitly'
   fix-it.
 
-Swift 5.2
----------
+## Swift 5.2
 
 ### 2020-03-24 (Xcode 11.4)
 
@@ -1878,8 +1875,7 @@ Swift 5.2
   print(s[0])
   ```
 
-Swift 5.1
----------
+## Swift 5.1
 
 ### 2019-09-20 (Xcode 11.0)
 
@@ -2118,8 +2114,7 @@ Swift 5.1
   `Array` and `ContiguousArray` now have `init(unsafeUninitializedCapacity:initializingWith:)`,
   which provides access to the array's uninitialized storage.
 
-Swift 5.0
----------
+## Swift 5.0
 
 ### 2019-03-25 (Xcode 10.2)
 
@@ -2383,8 +2378,7 @@ Swift 5.0
   }
   ```
 
-Swift 4.2
----------
+## Swift 4.2
 
 ### 2018-09-17 (Xcode 10.0)
 
@@ -2632,8 +2626,7 @@ Swift 4.2
   conditionally conforms to `P`, will succeed when the conditional
   requirements are met.
 
-Swift 4.1
----------
+## Swift 4.1
 
 ### 2018-03-29 (Xcode 9.3)
 
@@ -2779,8 +2772,7 @@ Swift 4.1
 
   If you wish to provide your own implementation of `==`/`hashValue`, you still can; a custom implementation will replace the one synthesized by the compiler.
 
-Swift 4.0
----------
+## Swift 4.0
 
 ### 2017-09-19 (Xcode 9.0)
 
@@ -3068,8 +3060,7 @@ Swift 4.0
   #define LIMITED (SMALL || TINY)   // now imported as Bool.
   ```
 
-Swift 3.1
----------
+## Swift 3.1
 
 ### 2017-03-27 (Xcode 8.3)
 
@@ -3197,8 +3188,7 @@ Swift 3.1
   subsequence after dropping the longest subsequence satisfying a
   predicate.
 
-Swift 3.0
----------
+## Swift 3.0
 
 ### 2016-09-13 (Xcode 8.0)
 
@@ -3880,8 +3870,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
 
-Swift 2.2
----------
+## Swift 2.2
 
 ### 2016-03-21 (Xcode 7.3)
 
@@ -4096,8 +4085,7 @@ Swift 2.2
   construct Selectors to ensure that they are well-formed Objective-C
   selectors and that there is an `@objc` method with that selector.
 
-Swift 2.1
----------
+## Swift 2.1
 
 ### 2015-10-21 (Xcode 7.1)
 
@@ -4166,8 +4154,7 @@ Swift 2.1
   For example, it is legal to assign a function of type `Any -> Int` to a
   variable of type `String -> Any`. **(19517003)**
 
-Swift 2.0
----------
+## Swift 2.0
 
 ### 2015-09-17 (Xcode 7.0)
 
@@ -5117,8 +5104,7 @@ Swift 2.0
 * The `SinkType` protocol and `SinkOf` struct have been removed from the standard
   library in favor of `(T) -> ()` closures. **(21663799)**
 
-Swift 1.2
----------
+## Swift 1.2
 
 ### 2015-04-08 (Xcode 6.3)
 
@@ -5631,8 +5617,7 @@ Swift 1.2
 
   **(17627758)**
 
-Swift 1.1
----------
+## Swift 1.1
 
 ### 2014-12-02 (Xcode 6.1.1)
 
@@ -5740,8 +5725,7 @@ Swift 1.1
   need to replace its `convertFromXXX` static methods with the
   corresponding initializer.
 
-Swift 1.0
----------
+## Swift 1.0
 
 ### 2014-09-15 (Xcode 6.0)
 
