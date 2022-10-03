@@ -106,6 +106,16 @@ extension SmallProjectionWalkingPath {
   }
 }
 
+/// A walking path which matches everything.
+///
+/// Useful for walkers which don't care about the path and unconditionally walk to all defs/uses.
+struct UnusedWalkingPath : WalkingPath {
+  func merge(with: Self) -> Self { self }
+  func pop(kind: FieldKind) -> (index: Int, path: Self)? { nil }
+  func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? { self }
+  func push(_ kind: FieldKind, index: Int) -> Self { self }
+}
+
 /// Caches the state of a walk.
 ///
 /// A client must provide this cache in a `walkUpCache` or `walkDownCache` property.
