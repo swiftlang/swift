@@ -20,6 +20,9 @@ case some(T)
 }
 
 class C {}
+class D {
+  var object: C
+}
 
 // CHECK-LABEL: @testSelfLoop
 // CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
@@ -106,6 +109,26 @@ bb3(%reborrow : @guaranteed $C):
 
 bb4:
   destroy_value %0 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testGuaranteedForwarding
+// CHECK: SSA lifetime analysis:   [[C:%.*]] = unchecked_ref_cast %{{.*}} : $D to $C
+// CHECK: bb0: LiveWithin
+// CHECK: regular user: %{{.*}} = load [copy]
+// CHECK: last user:    %{{.*}} = load [copy]
+sil [ossa] @testGuaranteedForwarding : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %borrow0 = begin_borrow %0 : $D
+  %c = unchecked_ref_cast %borrow0 : $D to $C
+  debug_value [trace] %c : $C
+  %d = unchecked_ref_cast %c : $C to $D
+  %f = ref_element_addr %d : $D, #D.object
+  %o = load [copy] %f : $*C
+  end_borrow %borrow0 : $D
+  destroy_value %o : $C
+  destroy_value %0 : $D
   %99 = tuple()
   return %99 : $()
 }
