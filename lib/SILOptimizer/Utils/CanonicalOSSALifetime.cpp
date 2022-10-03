@@ -411,12 +411,12 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
 // liveness computed in Step 1.
 //===----------------------------------------------------------------------===//
 
-// Look past destroys and incidental uses to find a destroy on \p edgeBB that
+// Look past ignoreable instructions to find a destroy on \p edgeBB that
 // destroys \p def.
 static DestroyValueInst *findDestroyOnCFGEdge(SILBasicBlock *edgeBB,
                                               SILValue def) {
   for (auto &inst : *edgeBB) {
-    if (isIncidentalUse(&inst))
+    if (CanonicalizeOSSALifetime::ignoredByDestroyHoisting(inst.getKind()))
       continue;
     if (auto *destroy = dyn_cast<DestroyValueInst>(&inst)) {
       if (destroy->getOperand() == def)
