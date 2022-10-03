@@ -185,19 +185,15 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
   StringRef contents =
       SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
 
-  if (Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
+#ifdef SWIFT_SWIFT_PARSER
+  if (Context.LangOpts.hasFeature(Feature::ParserASTGen) &&
+      !SourceMgr.hasCodeCompletionBuffer() &&
+      SF.Kind != SourceFileKind::SIL) {
     parseTopLevelSwift(contents.data(), CurDeclContext, &Context, &decls, appendToVector);
-
-    for (auto decl : decls) {
-      decl->dump();
-
-      if (auto fn = dyn_cast<FuncDecl>(decl))
-        fn->getBody()->dump();
-    }
-
     return;
   }
-
+#endif
+  
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();
