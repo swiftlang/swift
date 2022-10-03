@@ -9,6 +9,36 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// Terminology:
+///
+/// Simple liveness:
+/// - Ends at lifetime-ending operations.
+/// - Transitively follows guaranteed forwarding operations and address uses
+///   within the current scope.
+/// - Assumes inner scopes are complete, including borrow and address scopes
+/// - Rarely returns AddressUseKind::PointerEscape.
+/// - Per-definition dominance holds
+/// - Insulates outer scopes from inner scope details. Maintains the
+///   invariant that inlining cannot pessimize optimization.
+///
+/// Transitive liveness
+/// - Transitively follows uses within inner scopes, including forwarding
+///   operations and address uses.
+/// - Much more likely to returns AddressUseKind::PointerEscape
+/// - Per-definition dominance holds
+/// - Does not assume that any scopes are complete.
+///
+/// Extended liveness (copy-extension and reborrow-extension)
+/// - Extends a live range across lifetime-ending operations
+/// - Depending on context: owned values are extended across copies or
+///   guaranteed values are extended across reborrows
+/// - Copy-extension is used to canonicalize an OSSA lifetime
+/// - Reborrow-extension is used to check borrow scopes relative to its inner
+///   uses and outer lifetime
+/// - Per-definition dominance does not hold
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_OWNERSHIPUTILS_H
 #define SWIFT_SIL_OWNERSHIPUTILS_H
