@@ -51,7 +51,7 @@ private func registerSwiftPasses() {
 
   // Function passes
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
-  registerPass(computeEffects, { computeEffects.run($0) })
+  registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
   registerPass(functionStackProtection, { functionStackProtection.run($0) })

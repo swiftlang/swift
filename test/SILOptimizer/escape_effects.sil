@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -compute-effects | %FileCheck %s
+// RUN: %target-sil-opt %s -compute-escape-effects | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

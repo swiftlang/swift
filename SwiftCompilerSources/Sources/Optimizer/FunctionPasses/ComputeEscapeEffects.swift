@@ -1,4 +1,4 @@
-//===--- ComputeEffects.swift - Compute function effects ------------------===//
+//===--- ComputeEscapeEffects.swift ----------------------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -25,7 +25,7 @@ import SIL
 /// ```
 /// The pass does not try to change or re-compute _defined_ effects.
 ///
-let computeEffects = FunctionPass(name: "compute-effects", {
+let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
   (function: Function, context: PassContext) in
 
   var newEffects = Stack<EscapeEffects.ArgumentEffect>(context)

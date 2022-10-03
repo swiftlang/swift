@@ -638,7 +638,7 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   addHighLevelLoopOptPasses(P);
   
   P.addStringOptimization();
-  P.addComputeEffects();
+  P.addComputeEscapeEffects();
 }
 
 // After "high-level" function passes have processed the entire call tree, run
@@ -653,7 +653,7 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
   // Do the first stack promotion on high-level SIL before serialization.
   //
   // FIXME: why does StackPromotion need to run in the module pipeline?
-  P.addComputeEffects();
+  P.addComputeEscapeEffects();
   P.addStackPromotion();
 
   P.addGlobalOpt();
@@ -694,7 +694,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   
   // ComputeEffects should be done at the end of a function-pipeline. The next
   // pass (GlobalOpt) is a module pass, so this is the end of a function-pipeline.
-  P.addComputeEffects();
+  P.addComputeEscapeEffects();
 
   // Hoist globals out of loops.
   // Global-init functions should not be inlined GlobalOpt is done.
@@ -725,7 +725,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // passes can expose more inlining opportunities.
   addSimplifyCFGSILCombinePasses(P);
 
-  P.addComputeEffects();
+  P.addComputeEscapeEffects();
 
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
@@ -746,7 +746,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   // We've done a lot of optimizations on this function, attempt to FSO.
   P.addFunctionSignatureOpts();
-  P.addComputeEffects();
+  P.addComputeEscapeEffects();
 }
 
 static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
@@ -775,7 +775,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Sometimes stack promotion can catch cases only at this late stage of the
   // pipeline, after FunctionSignatureOpts.
-  P.addComputeEffects();
+  P.addComputeEscapeEffects();
   P.addStackPromotion();
 
   // Optimize overflow checks.

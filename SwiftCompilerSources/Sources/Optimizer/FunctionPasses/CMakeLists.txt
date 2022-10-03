@@ -8,7 +8,7 @@
 
 swift_compiler_sources(Optimizer
   AssumeSingleThreaded.swift
-  ComputeEffects.swift
+  ComputeEscapeEffects.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift
   ReleaseDevirtualizer.swift
