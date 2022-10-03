@@ -56,6 +56,8 @@ struct BasicBlockWorklist : CustomStringConvertible, NoReflectionChildren {
     """
   }
 
+  var function: Function { pushedBlocks.function }
+
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
     pushedBlocks.deinitialize()

@@ -46,12 +46,12 @@ struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
   }
 
   var description: String {
-    let function = BasicBlockSet_getFunction(bridged).function
     let blockNames = function.blocks.enumerated().filter { contains($0.1) }
                                                  .map { "bb\($0.0)"}
     return "{" + blockNames.joined(separator: ", ") + "}"
   }
 
+  var function: Function { BasicBlockSet_getFunction(bridged).function }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {

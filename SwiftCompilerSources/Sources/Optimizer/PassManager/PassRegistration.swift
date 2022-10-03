@@ -70,6 +70,7 @@ private func registerSwiftPasses() {
   registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
   registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
   registerPass(accessDumper, { accessDumper.run($0) })
+  registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
   registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(runUnitTests, { runUnitTests.run($0) })
 }

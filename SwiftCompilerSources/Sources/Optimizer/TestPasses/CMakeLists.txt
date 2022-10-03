@@ -9,6 +9,7 @@
 swift_compiler_sources(Optimizer
   FunctionUsesDumper.swift
   AccessDumper.swift
+  DeadEndBlockDumper.swift
   EscapeInfoDumper.swift
   SILPrinter.swift
   RangeDumper.swift
