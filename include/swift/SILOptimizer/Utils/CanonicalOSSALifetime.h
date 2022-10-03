@@ -134,18 +134,10 @@ class CanonicalOSSAConsumeInfo {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 4> finalBlockConsumes;
 
-  /// Record any debug_value instructions found after a final consume.
-  SmallVector<DebugValueInst *, 8> debugAfterConsume;
-
 public:
-  void clear() {
-    finalBlockConsumes.clear();
-    debugAfterConsume.clear();
-  }
+  void clear() { finalBlockConsumes.clear(); }
 
-  bool empty() {
-    return finalBlockConsumes.empty() && debugAfterConsume.empty();
-  }
+  bool empty() { return finalBlockConsumes.empty(); }
 
   bool hasUnclaimedConsumes() const { return !finalBlockConsumes.empty(); }
 
@@ -165,21 +157,6 @@ public:
       return true;
     }
     return false;
-  }
-
-  /// Record a debug_value that is known to be outside pruned liveness. Assumes
-  /// that instructions are only visited once.
-  void recordDebugAfterConsume(DebugValueInst *dvi) {
-    debugAfterConsume.push_back(dvi);
-  }
-
-  void popDebugAfterConsume(DebugValueInst *dvi) {
-    if (!debugAfterConsume.empty() && debugAfterConsume.back() == dvi)
-      debugAfterConsume.pop_back();
-  }
-
-  ArrayRef<DebugValueInst *> getDebugInstsAfterConsume() const {
-    return debugAfterConsume;
   }
 
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
@@ -357,9 +334,7 @@ public:
   InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
 
 protected:
-  void recordDebugValue(DebugValueInst *dvi) {
-    debugValues.insert(dvi);
-  }
+  void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
   void recordConsumingUse(Operand *use) {
     consumingBlocks.insert(use->getUser()->getParent());
@@ -370,12 +345,9 @@ protected:
 
   void extendLivenessThroughOverlappingAccess();
 
-  void findOrInsertDestroyInBlock(SILBasicBlock *bb);
+  void findExtendedBoundary(PrunedLivenessBoundary &boundary);
 
-  void findOrInsertDestroys();
-
-  void findOrInsertDestroyOnCFGEdge(SILBasicBlock *predBB,
-                                    SILBasicBlock *succBB);
+  void insertDestroysOnBoundary(PrunedLivenessBoundary &boundary);
 
   void rewriteCopies();
 };
