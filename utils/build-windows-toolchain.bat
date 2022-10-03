@@ -655,15 +655,15 @@ FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestSwift
 
 SET SKIP_TEST=0
-FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==dispatch SET SKIP_TEST=1)
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==dispatch SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestDispatch
 
 SET SKIP_TEST=0
-FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==foundation SET SKIP_TEST=1)
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==foundation SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestFoundation
 
 SET SKIP_TEST=0
-FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==xctest SET SKIP_TEST=1)
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==xctest SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestXCTest
 
 :: Clean up the module cache
