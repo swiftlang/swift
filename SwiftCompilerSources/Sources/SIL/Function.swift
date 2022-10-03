@@ -213,33 +213,47 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       // writeFn
       { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
         let s: String
+        let effects = f.function.effects
         if idx >= 0 {
-          s = f.function.effects.argumentEffects[idx].bodyDescription
+          if idx < effects.escapeEffects.arguments.count {
+            s = effects.escapeEffects.arguments[idx].bodyDescription
+          } else {
+            let globalIdx = idx - effects.escapeEffects.arguments.count
+            if globalIdx == 0 {
+              s = effects.sideEffects!.global.description
+            } else {
+              let seIdx = globalIdx - 1
+              s = effects.sideEffects!.getArgumentEffects(for: seIdx).bodyDescription
+            }
+          }
         } else {
-          s = f.function.effects.argumentEffectsDescription
+          s = effects.description
         }
         s._withStringRef { OStream_write(os, $0) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: llvm.StringRef, fromSIL: Int, argumentIndex: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
+      { (f: BridgedFunction, str: llvm.StringRef, mode: ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
         do {
           var parser = StringParser(str.string)
+          let function = f.function
 
-          if fromSIL != 0 && argumentIndex < 0 {
-            try parser.parseEffectsFromSIL(to: &f.function.effects)
-          } else {
-            let effect: ArgumentEffect
-            if fromSIL != 0 {
-              effect = try parser.parseEffectFromSIL(argumentIndex: argumentIndex, isDerived: isDerived != 0)
-            } else {
-              let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
-                  (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
-                let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
-                return Dictionary(uniqueKeysWithValues: keyValPairs)
-              }
-              effect = try parser.parseEffectFromSource(for: f.function, params: paramToIdx)
+          switch mode {
+          case ParseArgumentEffectsFromSource:
+            let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
+                (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
+              let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
+              return Dictionary(uniqueKeysWithValues: keyValPairs)
             }
-            f.function.effects.argumentEffects.append(effect)
+            let effect = try parser.parseEffectFromSource(for: function, params: paramToIdx)
+            function.effects.escapeEffects.arguments.append(effect)
+          case ParseArgumentEffectsFromSIL:
+            try parser.parseEffectsFromSIL(argumentIndex: argumentIndex, to: &function.effects)
+          case ParseGlobalEffectsFromSIL:
+            try parser.parseGlobalSideEffectsFromSIL(to: &function.effects)
+          case ParseMultipleEffectsFromSIL:
+            try parser.parseEffectsFromSIL(to: &function.effects)
+          default:
+            fatalError("invalid ParseEffectsMode")
           }
           if !parser.isEmpty() { try parser.throwError("syntax error") }
         } catch let error as ParsingError {
@@ -269,12 +283,24 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       },
       // getEffectInfo
       {  (f: BridgedFunction, idx: Int) -> BridgedEffectInfo in
-        let argEffects = f.function.effects.argumentEffects
-        if idx >= argEffects.count {
-          return BridgedEffectInfo(argumentIndex: -1, isDerived: false)
+        let effects = f.function.effects
+        if idx < effects.escapeEffects.arguments.count {
+          let effect = effects.escapeEffects.arguments[idx]
+          return BridgedEffectInfo(argumentIndex: effect.argumentIndex,
+                                   isDerived: effect.isDerived, isEmpty: false, isValid: true)
         }
-        let effect = argEffects[idx]
-        return BridgedEffectInfo(argumentIndex: effect.argumentIndex, isDerived: effect.isDerived)
+        if let sideEffects = effects.sideEffects {
+          let globalIdx = idx - effects.escapeEffects.arguments.count
+          if globalIdx == 0 {
+            return BridgedEffectInfo(argumentIndex: -1, isDerived: true, isEmpty: false, isValid: true)
+          }
+          let seIdx = globalIdx - 1
+          if seIdx < sideEffects.arguments.count {
+            return BridgedEffectInfo(argumentIndex: seIdx, isDerived: true,
+                                     isEmpty: sideEffects.arguments[seIdx].isEmpty, isValid: true)
+          }
+        }
+        return BridgedEffectInfo(argumentIndex: -1, isDerived: false, isEmpty: true, isValid: false)
       }
     )
   }

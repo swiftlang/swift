@@ -529,10 +529,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
       IdentifierID effectsStrID = S.addUniquedStringRef(OS.str());
       unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
+      bool isGlobalSideEffects = (argumentIndex < 0);
+      unsigned argIdx = (isGlobalSideEffects ? 0 : (unsigned)argumentIndex);
 
       SILArgEffectsAttrLayout::emitRecord(
-          Out, ScratchRecord, abbrCode,
-          effectsStrID, (unsigned)argumentIndex, (unsigned)isDerived);
+          Out, ScratchRecord, abbrCode, effectsStrID,
+          argIdx, (unsigned)isGlobalSideEffects, (unsigned)isDerived);
     });
 
   if (NoBody)
