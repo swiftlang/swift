@@ -468,22 +468,35 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
-  // If we aren't representing 'self' in a non-delegating initializer, then we
-  // can't have 'let' properties.
-  if (!isNonDelegatingInit())
-    return IsLet;
+  NullablePtr<NominalTypeDecl> NTD;
 
-  auto &Module = MemoryInst->getModule();
+  // If this is an element of a `_storage` tuple, we need to
+  // check the `$Storage` to determine whether underlying storage
+  // backing element is immutable.
+  if (auto *storageVar = getAsTypeWrapperLocalStorageVar()) {
+    auto *wrappedType = cast<NominalTypeDecl>(
+        storageVar->getDeclContext()->getInnermostTypeContext());
+    assert(wrappedType && "_storage reference without type wrapper");
+    NTD = wrappedType->getTypeWrapperStorageDecl();
+  } else {
+    // If we aren't representing 'self' in a non-delegating initializer, then we
+    // can't have 'let' properties.
+    if (!isNonDelegatingInit())
+      return IsLet;
 
-  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
+    NTD = MemorySILType.getNominalOrBoundGenericNominal();
+  }
+
   if (!NTD) {
     // Otherwise, we miscounted elements?
     assert(Element == 0 && "Element count problem");
     return false;
   }
 
+  auto &Module = MemoryInst->getModule();
+
   auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
-  for (auto *VD : NTD->getStoredProperties()) {
+  for (auto *VD : NTD.get()->getStoredProperties()) {
     auto FieldType = MemorySILType.getFieldType(VD, Module, expansionContext);
     unsigned NumFieldElements =
         getElementCountRec(expansionContext, Module, FieldType, false);
