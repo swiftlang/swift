@@ -457,7 +457,7 @@ public:
   /// like an instantaneous use. But if \p operand "borrows" a value for the
   /// duration of a scoped address (store_borrow), then update liveness for the
   /// entire scope. This assumes that nested OSSA lifetimes are complete.
-  void checkAndUpdateInteriorPointer(Operand *operand);
+  AddressUseKind checkAndUpdateInteriorPointer(Operand *operand);
 
   /// Update this liveness to extend across the given liveness.
   void extendAcrossLiveness(PrunedLiveness &otherLiveness);

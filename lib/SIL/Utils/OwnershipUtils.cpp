@@ -1087,7 +1087,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   SILValue root = base.getOwnershipReferenceRoot();
   BorrowedValue borrow(root);
   if (borrow)
-    return borrow.areUsesWithinExtendedTransitiveScope(uses, &deadEndBlocks);
+    return borrow.areUsesWithinExtendedScope(uses, &deadEndBlocks);
 
   // --- A reference with no borrow scope! Currently happens for project_box.
 

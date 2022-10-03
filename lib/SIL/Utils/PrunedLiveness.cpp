@@ -133,7 +133,7 @@ InnerBorrowKind PrunedLiveness::updateForBorrowingOperand(Operand *operand) {
   return InnerBorrowKind::Contained;
 }
 
-void PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
+AddressUseKind PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
   assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
 
   if (auto *svi = dyn_cast<SingleValueInstruction>(operand->getUser())) {
@@ -142,10 +142,17 @@ void PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
         updateForUse(end->getUser(), /*lifetimeEnding*/ false);
         return true;
       });
-      return;
+      return AddressUseKind::NonEscaping;
     }
   }
-  updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
+  // FIXME: findTransitiveUses should be a visitor so we're not recursively
+  // allocating use vectors and potentially merging the use points.
+  SmallVector<Operand *, 8> uses;
+  auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
+  for (auto *use : uses) {
+    updateForUse(use->getUser(), /*lifetimeEnding*/ false);
+  }
+  return useKind;
 }
 
 void PrunedLiveness::extendAcrossLiveness(PrunedLiveness &otherLivesness) {
@@ -276,8 +283,18 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
       summary.meet(AddressUseKind::PointerEscape);
       break;
     case OperandOwnership::InteriorPointer:
-      checkAndUpdateInteriorPointer(use);
+      summary.meet(checkAndUpdateInteriorPointer(use));
       break;
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result->getOwnershipKind() != OwnershipKind::None) {
+          updateForDef(result);
+        }
+        return true;
+      });
+      break;
+    }
     default:
       updateForUse(use->getUser(), use->isLifetimeEnding());
       break;
