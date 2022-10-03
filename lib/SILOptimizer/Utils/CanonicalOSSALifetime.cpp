@@ -54,6 +54,7 @@
 
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
@@ -609,7 +610,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
 void CanonicalizeOSSALifetime::rewriteCopies() {
   assert(getCurrentDef()->getOwnershipKind() == OwnershipKind::Owned);
 
-  SmallSetVector<SILInstruction *, 8> instsToDelete;
+  InstructionSetVector instsToDelete(getCurrentDef()->getFunction());
   defUseWorklist.clear();
 
   // Visit each operand in the def-use chain.
@@ -707,8 +708,9 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   }
 
   // Remove the leftover copy_value and destroy_value instructions.
-  for (unsigned idx = 0, eidx = instsToDelete.size(); idx != eidx; ++idx) {
-    deleter.forceDelete(instsToDelete[idx]);
+  for (auto iter = instsToDelete.begin(), end = instsToDelete.end();
+       iter != end; ++iter) {
+    deleter.forceDelete(*iter);
   }
 }
 
