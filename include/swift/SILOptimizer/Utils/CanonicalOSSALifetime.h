@@ -137,35 +137,14 @@ class CanonicalOSSAConsumeInfo {
   /// Record any debug_value instructions found after a final consume.
   SmallVector<DebugValueInst *, 8> debugAfterConsume;
 
-  /// The set of non-destroy consumes that need to be poisoned. This is
-  /// determined in two steps. First findOrInsertDestroyInBlock() checks if the
-  /// lifetime shrank within the block. Second rewriteCopies() checks if the
-  /// consume is in remnantLiveOutBlock(). Finally injectPoison() inserts new
-  /// copies and poison destroys for everything in this set.
-  SmallPtrSetVector<SILInstruction *, 4> needsPoisonConsumes;
-
 public:
   void clear() {
     finalBlockConsumes.clear();
     debugAfterConsume.clear();
-    needsPoisonConsumes.clear();
   }
 
   bool empty() {
-    return finalBlockConsumes.empty() && debugAfterConsume.empty()
-           && needsPoisonConsumes.empty();
-  }
-
-  void recordNeedsPoison(SILInstruction *consume) {
-    needsPoisonConsumes.insert(consume);
-  }
-
-  bool needsPoison(SILInstruction *consume) const {
-    return needsPoisonConsumes.count(consume);
-  }
-
-  ArrayRef<SILInstruction *> getNeedsPoisonConsumes() const {
-    return needsPoisonConsumes.getArrayRef();
+    return finalBlockConsumes.empty() && debugAfterConsume.empty();
   }
 
   bool hasUnclaimedConsumes() const { return !finalBlockConsumes.empty(); }
