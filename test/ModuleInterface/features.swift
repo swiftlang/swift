@@ -125,13 +125,6 @@ extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 extension OldSchool: UnsafeSendable { }
 // CHECK-NEXT: }
 
-// CHECK: #if compiler(>=5.3) && $GlobalActors
-// CHECK-NEXT: @globalActor public struct SomeGlobalActor
-@globalActor
-public struct SomeGlobalActor {
-  public static let shared = MyActor()
-}
-
 
 // CHECK: #if compiler(>=5.3) && $AsyncAwait
 // CHECK-NEXT: func runSomethingSomewhere
@@ -196,7 +189,3 @@ public func unavailableFromAsyncFunc() { }
 public func noAsyncFunc() { }
 
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
-
-// CHECK: #if compiler(>=5.3) && $GlobalActors
-// CHECK-NEXT: extension FeatureTest.SomeGlobalActor : _Concurrency.GlobalActor {}
-// CHECK-NEXT: #endif
