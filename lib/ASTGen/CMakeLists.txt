@@ -1,35 +1,34 @@
-# TODO: why do we need these on Linux?
-set(CMAKE_Swift_ARCHIVE_CREATE "<CMAKE_AR> crs <TARGET> <OBJECTS>")
-set(CMAKE_Swift_ARCHIVE_FINISH "")
-
 if (SWIFT_SWIFT_PARSER)
-    add_library(ASTGen
-            Sources/ASTGen/ASTGen.swift
-            Sources/ASTGen/Decls.swift
-            Sources/ASTGen/Exprs.swift
-            Sources/ASTGen/Literals.swift
-            Sources/ASTGen/Misc.swift
-            Sources/ASTGen/Stmts.swift)
+  add_swift_host_library(swiftASTGen STATIC
+    Sources/ASTGen/ASTGen.swift
+    Sources/ASTGen/Decls.swift
+    Sources/ASTGen/Exprs.swift
+    Sources/ASTGen/Literals.swift
+    Sources/ASTGen/Misc.swift
+    Sources/ASTGen/Stmts.swift
+  )
 
-    target_link_libraries(ASTGen PUBLIC
-            SwiftSyntax
-            SwiftParser
-            SwiftDiagnostics)
+  # Link against the SwiftSyntax parser and libraries it depends on. The actual
+  # formulation of this is a hack to work around a CMake bug in Ninja file
+  # generation that results in multiple Ninja targets producing the same file in
+  # a downstream SourceKit target. This should be expressed as:
+  #
+  #   target_link_libraries(swiftASTGen
+  #     PRIVATE
+  #     SwiftSyntax::SwiftCompilerSupport
+  #   )
+  target_link_libraries(swiftASTGen
+    PRIVATE
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftBasicFormat>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
+  )
 
-    target_link_directories(ASTGen PUBLIC
-            "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib")
+  target_include_directories(swiftASTGen PUBLIC
+    "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
 
-    target_include_directories(ASTGen PUBLIC
-            "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
-else()
-    add_library(ASTGen
-            Sources/ASTGen/DummyASTGen.swift)
+  add_dependencies(swiftASTGen swiftAST)
 endif()
-
-set_target_properties(ASTGen PROPERTIES LINKER_LANGUAGE Swift)
-
-target_compile_options(ASTGen PUBLIC
-        "-emit-module-interface"
-        "-g")
-
-add_dependencies(ASTGen swiftAST)
