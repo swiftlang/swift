@@ -245,6 +245,8 @@ SWIFT_FUNCTION_PASS(AccessDumper, "dump-access",
      "Dump access information")
 SWIFT_FUNCTION_PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
+SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
+     "Computes function side effects")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",
