@@ -154,6 +154,11 @@ extension Value {
     return self.at(SmallProjectionPath()).isEscaping(using: visitor, context)
   }
 
+  func isEscapingWhenWalkingDown<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
+                                                   _ context: PassContext) -> Bool {
+    return self.at(SmallProjectionPath()).isEscapingWhenWalkingDown(using: visitor, context)
+  }
+
   /// The un-projected version of `ProjectedValue.visit()`.
   func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
     return self.at(SmallProjectionPath()).visit(using: visitor, context)
