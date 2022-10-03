@@ -2845,19 +2845,6 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   SILFunctionConventions FnConv(CurCallee.getSubstFunctionType(),
                                 IGF.getSILModule());
 
-  llvm::Type *storageTy = result.getElementType();
-  if (FnConv.getNumIndirectSILResults() == 1) {
-    for (auto indirectResultType : FnConv.getIndirectSILResultTypes(
-             IGF.IGM.getMaximalTypeExpansionContext())) {
-      bool isFixedSize =
-          isa<FixedTypeInfo>(IGF.IGM.getTypeInfo(indirectResultType));
-      storageTy =
-          isFixedSize ? IGF.IGM.getStorageType(indirectResultType) : storageTy;
-    }
-  }
-  addIndirectResultAttributes(IGF.IGM, CurCallee.getMutableAttributes(), 0,
-                              FnConv.getNumIndirectSILResults() <= 1,
-                              storageTy);
 #ifndef NDEBUG
   LastArgWritten = 0; // appease an assert
 #endif
