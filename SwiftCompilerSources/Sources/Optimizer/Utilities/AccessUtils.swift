@@ -462,11 +462,7 @@ extension Value {
 ///   %addr = struct_element_addr %base : $X, #X.e
 ///   store %v to [trivial] %addr : $*Int
 /// ```
-protocol AccessStoragePathWalker : ValueUseDefWalker where Path == SmallProjectionPath {
-  mutating func visit(accessStoragePath: ProjectedValue)
-}
-
-extension AccessStoragePathWalker {
+extension ValueUseDefWalker where Path == SmallProjectionPath {
   /// The main entry point.
   /// Given an `accessPath` where the access base is a reference (class, tail, box), call
   /// the `visit` function for all storage roots with a the corresponding path.
@@ -485,10 +481,5 @@ extension AccessStoragePathWalker {
       case .stack, .global, .argument, .yield, .pointer, .unidentified:
         return false
     }
-  }
-
-  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
-    visit(accessStoragePath: value.at(path))
-    return .continueWalk
   }
 }

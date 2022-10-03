@@ -48,11 +48,12 @@ let accessDumper = FunctionPass(name: "dump-access", {
   print("End accesses for \(function.name)")
 })
 
-private struct AccessStoragePathVisitor : AccessStoragePathWalker {
+private struct AccessStoragePathVisitor : ValueUseDefWalker {
   var walkUpCache = WalkerCache<Path>()
-  mutating func visit(accessStoragePath: ProjectedValue) {
-    print("    Storage: \(accessStoragePath.value)")
-    print("    Path: \"\(accessStoragePath.path)\"")
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    print("    Storage: \(value)")
+    print("    Path: \"\(path)\"")
+    return .continueWalk
   }
 }
 
