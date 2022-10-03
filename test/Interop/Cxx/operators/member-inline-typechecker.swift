@@ -30,6 +30,15 @@ var writeOnlyIntArray = WriteOnlyIntArray()
 writeOnlyIntArray[2] = 654
 let writeOnlyValue = writeOnlyIntArray[2]
 
+var readOnlyRvalueParam = ReadOnlyRvalueParam()
+let readOnlyRvalueVal = readOnlyRvalueParam[1] // expected-error {{value of type 'ReadOnlyRvalueParam' has no subscripts}}
+
+var readWriteRvalueParam = ReadWriteRvalueParam()
+let readWriteRvalueVal = readWriteRvalueParam[1] // expected-error {{value of type 'ReadWriteRvalueParam' has no subscripts}}
+
+var readWriteRvalueGetterParam = ReadWriteRvalueGetterParam()
+let readWriteRvalueGetterVal = readWriteRvalueGetterParam[1]
+
 var diffTypesArray = DifferentTypesArray()
 let diffTypesResultInt: Int32 = diffTypesArray[0]
 let diffTypesResultDouble: Double = diffTypesArray[0.5]

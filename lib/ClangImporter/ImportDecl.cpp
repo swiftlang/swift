@@ -3200,8 +3200,12 @@ namespace {
         if (importedName.isSubscriptAccessor()) {
           assert(func->getParameters()->size() == 1);
           auto typeDecl = dc->getSelfNominalTypeDecl();
-          auto parameterType = func->getParameters()->get(0)->getType();
+          auto parameter = func->getParameters()->get(0);
+          auto parameterType = parameter->getType();
           if (!typeDecl || !parameterType)
+            return nullptr;
+          if (parameter->isInOut())
+            // Subscripts with inout parameters are not allowed in Swift.
             return nullptr;
 
           auto &getterAndSetter = Impl.cxxSubscripts[{ typeDecl,
