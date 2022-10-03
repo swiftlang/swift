@@ -59,8 +59,7 @@ private struct AccessStoragePathVisitor : AccessStoragePathWalker {
 private func printAccessInfo(address: Value) {
   print("Value: \(address)")
 
-  var apw = AccessPathWalker()
-  let (ap, scope) = apw.getAccessPathWithScope(of: address)
+  let (ap, scope) = address.accessPathWithScope
   if let beginAccess = scope {
     print("  Scope: \(beginAccess)")
   } else {
@@ -79,9 +78,8 @@ private func printAccessInfo(address: Value) {
 private func checkAliasInfo(forArgumentsOf apply: ApplyInst, expectDistinct: Bool) {
   let address1 = apply.arguments[0]
   let address2 = apply.arguments[1]
-  var apw = AccessPathWalker()
-  let path1 = apw.getAccessPath(of: address1)
-  let path2 = apw.getAccessPath(of: address2)
+  let path1 = address1.accessPath
+  let path2 = address2.accessPath
 
   if path1.isDistinct(from: path2) != expectDistinct {
     print("wrong isDistinct result of \(apply)")
