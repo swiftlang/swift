@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-public struct Type : CustomStringConvertible, CustomReflectable {
+public struct Type : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedType
   
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
@@ -53,8 +53,6 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var description: String {
     String(_cxxString: SILType_debugDescription(bridged))
   }
-
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
 extension Type: Equatable {

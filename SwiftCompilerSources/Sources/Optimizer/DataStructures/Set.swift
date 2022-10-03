@@ -21,7 +21,7 @@ import OptimizerBridging
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct BasicBlockSet : CustomStringConvertible, CustomReflectable {
+struct BasicBlockSet : CustomStringConvertible, NoReflectionChildren {
 
   private let context: PassContext
   private let bridged: BridgedBasicBlockSet
@@ -52,7 +52,6 @@ struct BasicBlockSet : CustomStringConvertible, CustomReflectable {
     return "{" + blockNames.joined(separator: ", ") + "}"
   }
 
-  var customMirror: Mirror { Mirror(self, children: []) }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
@@ -68,7 +67,7 @@ struct BasicBlockSet : CustomStringConvertible, CustomReflectable {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct ValueSet : CustomStringConvertible, CustomReflectable {
+struct ValueSet : CustomStringConvertible, NoReflectionChildren {
 
   private let context: PassContext
   private let bridged: BridgedNodeSet
@@ -113,8 +112,6 @@ struct ValueSet : CustomStringConvertible, CustomReflectable {
     return d
   }
 
-  var customMirror: Mirror { Mirror(self, children: []) }
-
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
     PassContext_freeNodeSet(context._bridged, bridged)
@@ -129,7 +126,7 @@ struct ValueSet : CustomStringConvertible, CustomReflectable {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionSet : CustomStringConvertible, CustomReflectable {
+struct InstructionSet : CustomStringConvertible, NoReflectionChildren {
 
   private let context: PassContext
   private let bridged: BridgedNodeSet
@@ -164,8 +161,6 @@ struct InstructionSet : CustomStringConvertible, CustomReflectable {
     d += "}\n"
     return d
   }
-
-  var customMirror: Mirror { Mirror(self, children: []) }
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
