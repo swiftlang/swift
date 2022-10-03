@@ -107,6 +107,9 @@ struct ScopedAddressValue {
   AddressUseKind computeTransitiveLiveness(SSAPrunedLiveness &liveness) const;
 
   /// Update \p liveness for all the transitive address uses.
+  ///
+  /// Valid for any type of liveness, SSA or MultiDef, that may be used by a
+  /// scoped address.
   AddressUseKind updateTransitiveLiveness(PrunedLiveness &liveness) const;
 
   /// Create appropriate scope ending instruction at \p insertPt.
