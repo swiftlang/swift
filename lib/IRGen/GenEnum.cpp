@@ -1710,6 +1710,8 @@ namespace {
 
       IRGenFunction IGF(IGM, func);
       Explosion src = IGF.collectParameters();
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
 
       EnumPayload payload;
       llvm::Value *extraTag;
@@ -1747,6 +1749,8 @@ namespace {
 
       IRGenFunction IGF(IGM, func);
       Explosion src = IGF.collectParameters();
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
 
       EnumPayload payload;
       llvm::Value *extraTag;
@@ -3532,7 +3536,8 @@ namespace {
 
       IRGenFunction IGF(IGM, func);
       Explosion src = IGF.collectParameters();
-
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
       auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src);
 
       forNontrivialPayloads(IGF, parts.tag, [&](unsigned tagIndex,
@@ -3561,6 +3566,8 @@ namespace {
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
       Explosion src = IGF.collectParameters();
       auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src);
 

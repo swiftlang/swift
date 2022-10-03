@@ -1967,6 +1967,8 @@ void IRGenerator::emitEagerClassInitialization() {
                                 "_swift_eager_class_initialization");
   IGM->Module.getFunctionList().push_back(RegisterFn);
   IRGenFunction RegisterIGF(*IGM, RegisterFn);
+  if (IGM->DebugInfo)
+    IGM->DebugInfo->emitArtificialFunction(RegisterIGF, RegisterIGF.CurFn);
   RegisterFn->setAttributes(IGM->constructInitialAttributes());
   RegisterFn->setCallingConv(IGM->DefaultCC);
 
@@ -2008,6 +2010,8 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
                                 "_swift_objc_actor_initialization");
   IGM->Module.getFunctionList().push_back(RegisterFn);
   IRGenFunction RegisterIGF(*IGM, RegisterFn);
+  if (IGM->DebugInfo)
+    IGM->DebugInfo->emitArtificialFunction(RegisterIGF, RegisterIGF.CurFn);
   RegisterFn->setAttributes(IGM->constructInitialAttributes());
   RegisterFn->setCallingConv(IGM->DefaultCC);
 

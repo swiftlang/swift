@@ -2325,6 +2325,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       subIGF.CurFn->setOnlyReadsMemory();
       subIGF.CurFn->setWillReturn();
       subIGF.CurFn->setCallingConv(IGM.SwiftCC);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(subIGF, subIGF.CurFn);
       IGM.setHasNoFramePointer(subIGF.CurFn);
 
       auto params = subIGF.collectParameters();
@@ -2913,6 +2915,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     subIGF.CurFn->setOnlyReadsMemory();
     subIGF.CurFn->setWillReturn();
     IGM.setHasNoFramePointer(subIGF.CurFn);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->emitArtificialFunction(subIGF, subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
     auto cache = params.claimNext();
