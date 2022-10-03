@@ -582,8 +582,8 @@ struct BorrowedValue {
   ///
   /// \p deadEndBlocks is optional during transition. It will be completely
   /// removed in an upcoming commit.
-  bool areUsesWithinTransitiveScope(ArrayRef<Operand *> uses,
-                                    DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesWithinExtendedScope(ArrayRef<Operand *> uses,
+                                  DeadEndBlocks *deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
