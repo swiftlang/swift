@@ -896,7 +896,7 @@ public:
   
   /// Parse the specified expected token and return its location on success.  On failure, emit the specified
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
-  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.

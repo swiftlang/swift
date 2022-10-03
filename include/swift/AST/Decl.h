@@ -3775,9 +3775,18 @@ public:
   /// applicable property access routing).
   VarDecl *getTypeWrapperProperty() const;
 
-  /// Get an initializer that could be used to instantiate a
-  /// type wrapped type.
+  /// If this declaration has a type wrapper, return `$Storage`
+  /// declaration that contains all the stored properties managed
+  /// by the wrapper.
+  NominalTypeDecl *getTypeWrapperStorageDecl() const;
+
+  /// If this declaration is a type wrapper, retrieve
+  /// its required initializer - `init(storage:)`.
   ConstructorDecl *getTypeWrapperInitializer() const;
+
+  /// Get a memberwise initializer that could be used to instantiate a
+  /// type wrapped type.
+  ConstructorDecl *getTypeWrappedTypeMemberwiseInitializer() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -7648,6 +7657,12 @@ public:
   /// @objc init(forMemory: ())
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
+
+  /// If this is a user-defined constructor that belongs to
+  /// a type wrapped type return a local `_storage` variable
+  /// injected by the compiler for aid with type wrapper
+  /// initialization.
+  VarDecl *getLocalTypeWrapperStorageVar() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

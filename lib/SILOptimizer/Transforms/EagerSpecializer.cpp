@@ -438,7 +438,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
 
     SILValue CastResult =
-        Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
+        Builder.createUncheckedForwardingCast(Loc, Result, GenResultTy);
 
     addReturnValue(Builder.getInsertionBB(), OldReturnBB, CastResult);
   }
@@ -640,7 +640,7 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
   if (CastTy.isAddress())
     return Builder.createUncheckedAddrCast(Loc, OrigArg, CastTy);
 
-  return Builder.createUncheckedBitCast(Loc, OrigArg, CastTy);
+  return Builder.createUncheckedForwardingCast(Loc, OrigArg, CastTy);
 }
 
 /// Converts each generic function argument into a SILValue that can be passed
