@@ -1687,6 +1687,20 @@ public:
   }
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
+    {
+      *this << "origin ";
+
+      switch (AI->getOriginator()) {
+      case AssignByWrapperInst::Originator::TypeWrapper:
+        *this << "type_wrapper";
+        break;
+      case AssignByWrapperInst::Originator::PropertyWrapper:
+        *this << "property_wrapper";
+      }
+
+      *this << ", ";
+    }
+
     *this << getIDAndType(AI->getSrc()) << " to ";
     switch (AI->getMode()) {
     case AssignByWrapperInst::Unknown:
@@ -1701,9 +1715,13 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
+
+    *this << getIDAndType(AI->getDest());
+
+    if (AI->getOriginator() == AssignByWrapperInst::Originator::PropertyWrapper)
+      *this << ", init " << getIDAndType(AI->getInitializer());
+
+    *this << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
