@@ -119,7 +119,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
         self.counter += 1
         return self.counter
       }
-      return LocalTestingActorID(parse: "\(id)")
+      return LocalTestingActorID(id: "\(id)")
     }
   }
 }
