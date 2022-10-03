@@ -668,11 +668,6 @@ public:
   /// Compute liveness for a single SSA definition. The lifetime-ending uses are
   /// also recorded--destroy_value or end_borrow.
   ///
-  /// This only handles simple liveness in which this definition reaches all
-  /// uses without involving phis. If the returned summary includes
-  /// InnerBorrowKind::Reborrow, then the potentially non-dominated uses are
-  /// not included.
-  ///
   /// This only handles simple liveness in which all uses are dominated by the
   /// definition. If the returned summary includes InnerBorrowKind::Reborrow,
   /// then the resulting liveness does not includes potentially non-dominated
