@@ -3987,21 +3987,21 @@ store_borrow
 
   sil-instruction ::= 'store_borrow' sil-value 'to' sil-operand
 
-  store_borrow %0 to %1 : $*T
+  %2 = store_borrow %0 to %1 : $*T
   // $T must be a loadable type
   // %1 must be an alloc_stack $T
+  // %2 is the return address
 
 Stores the value ``%0`` to a stack location ``%1``, which must be an
 ``alloc_stack $T``.
 The stack location must not be modified by other instructions than
 ``store_borrow``.
-The stored value is alive until the ``dealloc_stack`` or until another
-``store_borrow`` overwrites the value. During the its lifetime, the stored
-value must not be modified or destroyed.
+All uses of the store_borrow destination ```%1`` should be via the store_borrow
+return address ``%2`` except dealloc_stack.
+The stored value is alive until the ``end_borrow``. During the its lifetime,the
+stored value must not be modified or destroyed.
 The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
 must outlive the lifetime of the stored value.
-
-Note: This is the current implementation and the design is not final.
 
 begin_borrow
 ````````````
