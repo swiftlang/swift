@@ -113,6 +113,10 @@ public:
     /// An unbound identifier name.
     Name,
 
+    /// A shape term 'T.[shape]'. The parent term must be a
+    /// generic parameter.
+    Shape,
+
     //////
     ////// "Property-like" symbol kinds:
     //////
@@ -130,7 +134,7 @@ public:
     ConcreteType,
   };
 
-  static const unsigned NumKinds = 8;
+  static const unsigned NumKinds = 9;
 
   static const StringRef Kinds[];
 

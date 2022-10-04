@@ -303,6 +303,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
+      case Symbol::Kind::Shape:
         llvm::errs() << "Invalid root symbol: " << MutableTerm(begin, end) << "\n";
         abort();
       }
