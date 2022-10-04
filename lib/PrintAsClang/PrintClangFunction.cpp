@@ -465,6 +465,13 @@ public:
     return ClangRepresentation::representable;
   }
 
+  ClangRepresentation
+  visitDynamicSelfType(DynamicSelfType *ds,
+                       Optional<OptionalTypeKind> optionalKind,
+                       bool isInOutParam) {
+    return visitPart(ds->getSelfType(), optionalKind, isInOutParam);
+  }
+
   ClangRepresentation visitPart(Type Ty,
                                 Optional<OptionalTypeKind> optionalKind,
                                 bool isInOutParam) {
