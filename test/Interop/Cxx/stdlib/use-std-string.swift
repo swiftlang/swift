@@ -31,12 +31,26 @@ StdStringTestSuite.test("init") {
     expectTrue(s.empty())
 }
 
+StdStringTestSuite.test("wstring init") {
+    let s = CxxWideString()
+    expectEqual(s.size(), 0)
+    expectTrue(s.empty())
+}
+
 StdStringTestSuite.test("push back") {
     var s = CxxString()
     s.push_back(42)
     expectEqual(s.size(), 1)
     expectFalse(s.empty())
     expectEqual(s[0], 42)
+}
+
+StdStringTestSuite.test("wstring push back") {
+    var s = CxxWideString()
+    s.push_back(CWideChar(43))
+    expectEqual(s.size(), 1)
+    expectFalse(s.empty())
+    expectEqual(s[0], CWideChar(43))
 }
 
 runAllTests()

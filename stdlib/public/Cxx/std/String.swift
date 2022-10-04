@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// MARK: Initializing C++ string from a Swift String
+
 extension std.string {
   public init(_ string: String) {
     self.init()
@@ -19,11 +21,33 @@ extension std.string {
   }
 }
 
+extension std.wstring {
+  public init(_ string: String) {
+    self.init()
+    for char in string.utf16 {
+      guard let wideChar = CWideChar(char) else {
+        fatalError("Invalid UTF-16 character: \(char)")
+      }
+      self.push_back(wideChar)
+    }
+  }
+}
+
+// MARK: Initializing C++ string from a Swift String literal
+
 extension std.string: ExpressibleByStringLiteral {
   public init(stringLiteral value: String) {
     self.init(value)
   }
 }
+
+extension std.wstring: ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+    self.init(value)
+  }
+}
+
+// MARK: Initializing Swift String from a C++ string
 
 extension String {
   public init(cxxString: std.string) {
@@ -34,5 +58,15 @@ extension String {
       String(decoding: $0, as: UTF8.self)
     }
     withExtendedLifetime(cxxString) {}
+  }
+
+  public init(cxxWideString: std.wstring) {
+    let buffer = UnsafeBufferPointer<CWideChar>(
+      start: cxxWideString.__c_strUnsafe(),
+      count: cxxWideString.size())
+    self = buffer.withMemoryRebound(to: UInt16.self) {
+      String(decoding: $0, as: UTF16.self)
+    }
+    withExtendedLifetime(cxxWideString) {}
   }
 }

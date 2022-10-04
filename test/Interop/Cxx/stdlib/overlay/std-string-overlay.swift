@@ -37,6 +37,31 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
   expectEqual(swift6, "xyz\0abc")
 }
 
+StdStringOverlayTestSuite.test("std::wstring <=> Swift.String") {
+  let cxx1 = std.wstring()
+  let swift1 = String(cxxWideString: cxx1)
+  expectEqual(swift1, "")
+
+  let cxx2 = std.wstring("something123")
+  expectEqual(cxx2.size(), 12)
+  let swift2 = String(cxxWideString: cxx2)
+  expectEqual(swift2, "something123")
+
+  let cxx3: std.wstring = "literal"
+  expectEqual(cxx3.size(), 7)
+
+  let cxx4: std.wstring = "тест"
+  expectEqual(cxx4.size(), 4)
+  let swift4 = String(cxxWideString: cxx4)
+  expectEqual(swift4, "тест")
+
+  // Emojis are represented by more than one CWideChar.
+  let cxx5: std.wstring = "emoji_🤖"
+  expectEqual(cxx5.size(), 10)
+  let swift5 = String(cxxWideString: cxx5)
+  expectEqual(swift5, "emoji_🤖")
+}
+
 extension std.string.const_iterator: UnsafeCxxInputIterator {
   // This func should not be required.
   public static func ==(lhs: std.string.const_iterator,
