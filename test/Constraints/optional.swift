@@ -566,15 +566,13 @@ func testFunctionContainerMethodCall(container: FunctionContainer?) {
   // expected-note@-4 {{force-unwrap}}
 }
 
-// Test for Issue: 60730 (https://github.com/apple/swift/issues/60730)
-// Rdar: rdar://94037733
-func issue60730Test() {
+// Test for https://github.com/apple/swift/issues/60730
+// rdar://94037733
+do {
   struct S: P {}
   func takesP(_: any P) {}
   func passOptional(value: (any P)?) {
     takesP(value)
-    // Add full error message
-    // Don't include the error message yet - run it and see the test fail first, and go from there.
     // expected-error@-1 {{value of optional type '(any P)?' must be unwrapped to a value of type 'any P'}}
     // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
     // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
