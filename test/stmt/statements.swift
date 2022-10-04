@@ -381,7 +381,7 @@ func test_guard(_ x : Int, y : Int??, z: Int?, cond : Bool) {
 
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
 
-  // SR-7567
+  // https://github.com/apple/swift/issues/50109
   guard let outer = y else {
     // FIXME: Bring back the tailored diagnostic
     guard true else {

@@ -40,23 +40,33 @@ using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
+                                     GenericSignature unerasedSpecializedSig,
+                                     ArrayRef<Type> typeErasedParams,
                                      SILFunction *target, Identifier spiGroup,
                                      const ModuleDecl *spiModule,
                                      AvailabilityContext availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
-      spiGroup(spiGroup), availability(availability), spiModule(spiModule), targetFunction(target) {
+      unerasedSpecializedSignature(unerasedSpecializedSig),
+      typeErasedParams(typeErasedParams.begin(), typeErasedParams.end()),
+      spiGroup(spiGroup), availability(availability), spiModule(spiModule),
+      targetFunction(target) {
   if (targetFunction)
     targetFunction->incrementRefCount();
 }
 
 SILSpecializeAttr *
 SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
+                          ArrayRef<Type> typeErasedParams,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
                           AvailabilityContext availability) {
+  auto erasedSpecializedSig = specializedSig.typeErased(typeErasedParams);
+
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target,
+
+  return ::new (buf) SILSpecializeAttr(exported, kind, erasedSpecializedSig,
+                                       specializedSig, typeErasedParams, target,
                                        spiGroup, spiModule, availability);
 }
 
@@ -135,7 +145,7 @@ static FunctionRegisterFn destroyFunction = nullptr;
 static FunctionWriteFn writeFunction = nullptr;
 static FunctionParseFn parseFunction = nullptr;
 static FunctionCopyEffectsFn copyEffectsFunction = nullptr;
-static FunctionGetEffectFlagsFn getEffectFlagsFunction = nullptr;
+static FunctionGetEffectInfoFn getEffectInfoFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
@@ -186,6 +196,7 @@ void SILFunction::init(
   this->IsDynamicReplaceable = isDynamic;
   this->ExactSelfClass = isExactSelfClass;
   this->IsDistributed = isDistributed;
+  this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
   this->HasOwnership = true,
@@ -321,10 +332,23 @@ void SILFunction::deleteSnapshot(int ID) {
   } while ((f = f->snapshots) != nullptr);
 }
 
-void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
-                                 ForDefinition_t forDefinition) {
+void SILFunction::createProfiler(ASTNode Root, SILDeclRef Ref) {
   assert(!Profiler && "Function already has a profiler");
-  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
+  Profiler = SILProfiler::create(Module, Root, Ref);
+  if (!Profiler || Ref.isNull())
+    return;
+
+  // If we loaded a profile, set the entry counts for functions and closures
+  // for PGO to use.
+  if (Ref.isFunc()) {
+    if (auto *Closure = Ref.getAbstractClosureExpr()) {
+      setEntryCount(Profiler->getExecutionCount(Closure));
+    } else {
+      auto *FD = Ref.getFuncDecl();
+      assert(FD);
+      setEntryCount(Profiler->getExecutionCount(FD->getBody()));
+    }
+  }
 }
 
 bool SILFunction::hasForeignBody() const {
@@ -906,22 +930,23 @@ void Function_register(SwiftMetatype metatype,
             FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectFlagsFn getEffectFlagsFn) {
+            FunctionGetEffectInfoFn effectInfoFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
   writeFunction = writeFn;
   parseFunction = parseFn;
   copyEffectsFunction = copyEffectsFn;
-  getEffectFlagsFunction = getEffectFlagsFn;
+  getEffectInfoFunction = effectInfoFn;
 }
 
 std::pair<const char *, int> SILFunction::
-parseEffects(StringRef attrs, bool fromSIL, bool isDerived,
+parseEffects(StringRef attrs, bool fromSIL, int argumentIndex, bool isDerived,
              ArrayRef<StringRef> paramNames) {
   if (parseFunction) {
     BridgedParsingError error = parseFunction(
-        {this}, attrs, (SwiftInt)fromSIL, (SwiftInt)isDerived,
+        {this}, attrs, (SwiftInt)fromSIL,
+        (SwiftInt)argumentIndex, (SwiftInt)isDerived,
         {(const unsigned char *)paramNames.data(), paramNames.size()});
     return {(const char *)error.message, (int)error.position};
   }
@@ -941,25 +966,25 @@ void SILFunction::copyEffects(SILFunction *from) {
 }
 
 bool SILFunction::hasArgumentEffects() const {
-  if (getEffectFlagsFunction) {
-    return getEffectFlagsFunction({const_cast<SILFunction *>(this)}, 0) != 0;
+  if (getEffectInfoFunction) {
+    BridgedFunction f = {const_cast<SILFunction *>(this)};
+    return getEffectInfoFunction(f, 0).argumentIndex >= 0;
   }
   return false;
 }
 
 void SILFunction::
-visitArgEffects(std::function<void(int, bool, ArgEffectKind)> c) const {
-  if (!getEffectFlagsFunction)
+visitArgEffects(std::function<void(int, int, bool)> c) const {
+  if (!getEffectInfoFunction)
     return;
     
   int idx = 0;
   BridgedFunction bridgedFn = {const_cast<SILFunction *>(this)};
-  while (int flags = getEffectFlagsFunction(bridgedFn, idx)) {
-    ArgEffectKind kind = ArgEffectKind::Unknown;
-    if (flags & EffectsFlagEscape)
-      kind = ArgEffectKind::Escape;
-
-    c(idx, (flags & EffectsFlagDerived) != 0, kind);
+  while (true) {
+    BridgedEffectInfo ei = getEffectInfoFunction(bridgedFn, idx);
+    if (ei.argumentIndex < 0)
+      return;
+    c(idx, ei.argumentIndex, ei.isDerived);
     idx++;
   }
 }

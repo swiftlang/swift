@@ -26,12 +26,20 @@ namespace swift {
 class PersistentParserState;
 
 /// Kind of import affecting how a decl can be reexported.
+///
+/// This is sorted in order of priority in case the same module is imported
+/// differently. e.g. a normal import (None) offers more visibility than
+/// an @_spiOnly import, which offers more visibility than an
+/// @_implementationOnly import. The logic of \c getRestrictedImportKind relies
+/// on the order of this enum.
+///
 /// This is a subset of \c DisallowedOriginKind.
 ///
 /// \sa getRestrictedImportKind
 enum class RestrictedImportKind {
+  MissingImport,
   ImplementationOnly,
-  Implicit,
+  SPIOnly,
   None // No restriction, i.e. the module is imported publicly.
 };
 

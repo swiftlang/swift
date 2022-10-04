@@ -973,8 +973,11 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
-ERROR(import_implementation_cannot_be_exported,none,
-      "module %0 cannot be both exported and implementation-only", (Identifier))
+ERROR(import_restriction_conflict,none,
+      "module %0 cannot be both "
+      "%select{implementation-only|SPI only|exported}1 and "
+      "%select{implementation-only|SPI only|exported}2 ",
+      (Identifier, unsigned, unsigned))
 
 WARNING(module_not_compiled_with_library_evolution,none,
         "module %0 was not compiled with library evolution support; "
@@ -1067,7 +1070,7 @@ ERROR(invalid_force_unwrap,none,
 ERROR(invalid_optional_chain,none,
       "cannot use optional chaining on non-optional value of type %0",
       (Type))
-ERROR(if_expr_cases_mismatch,none,
+ERROR(ternary_expr_cases_mismatch,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
 
@@ -1201,6 +1204,12 @@ NOTE(optional_key_path_root_base_chain, none,
 NOTE(optional_key_path_root_base_unwrap, none,
      "unwrap the optional using '!.' to access unwrapped type member %0",
      (DeclNameRef))
+
+ERROR(optional_self_not_unwrapped,none,
+      "explicit use of 'self' is required when 'self' is optional, "
+      "to make control flow explicit", ())
+NOTE(optional_self_chain,none,
+     "reference 'self?.' explicitly", ())
     
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
@@ -1653,6 +1662,14 @@ WARNING(spi_preferred_over_spi_available,none,
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
+
+// Dependency Scanning
+ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+NOTE(dependency_as_imported_by_main_module,none,
+     "a dependency of main module '%0'", (StringRef))
+NOTE(dependency_as_imported_by, none,
+     "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
@@ -2944,6 +2961,7 @@ ERROR(decl_from_hidden_module,none,
       "%select{%3 has been imported as implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 WARNING(decl_from_hidden_module_warn,none,
@@ -2952,7 +2970,7 @@ WARNING(decl_from_hidden_module_warn,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances}2; "
       "%select{%3 has been imported as implementation-only|"
-      "<<ERROR>>|<<ERROR>>|"
+      "<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
@@ -2964,6 +2982,7 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
+      "%4 was imported for SPI only|"
       "%4 was not imported by this file}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
@@ -2974,6 +2993,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
@@ -2992,9 +3012,16 @@ WARNING(warn_implementation_only_conflict,none,
         (Identifier))
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
+
+ERROR(spi_only_import_conflict,none,
+      "%0 inconsistently imported for SPI only",
+      (Identifier))
+NOTE(spi_only_import_conflict_here,none,
+     "imported for SPI only here", ())
+
 ERROR(error_public_import_of_private_module,none,
-        "private module %0 is imported publicly from the public module %1",
-        (Identifier, Identifier))
+      "private module %0 is imported publicly from the public module %1",
+      (Identifier, Identifier))
 
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())
@@ -3240,7 +3267,7 @@ ERROR(inherits_executor_without_async,none,
 ERROR(lifetime_invalid_global_scope,none, "%0 is only valid on methods",
       (DeclAttribute))
 ERROR(eagermove_and_lexical_combined,none,
-      "@_eagerMove and @_lexical attributes are alternate styles of lifetimes "
+      "@_eagerMove and @_noEagerMove attributes are alternate styles of lifetimes "
       "and can't be combined", ())
 
 ERROR(autoclosure_function_type,none,
@@ -3918,8 +3945,6 @@ NOTE(note_reference_self_explicitly,none,
 NOTE(note_other_self_capture,none,
       "variable other than 'self' captured here under the name 'self' does not "
       "enable implicit 'self'", ())
-NOTE(note_self_captured_weakly,none,
-      "weak capture of 'self' here does not enable implicit 'self'", ())
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
@@ -4025,8 +4050,8 @@ WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))
 WARNING(nonoptional_compare_to_nil,none,
-        "comparing non-optional value of type %0 to 'nil' always returns"
-        " %select{false|true}1", (Type, bool))
+        "comparing non-optional value of type %0 to '%select{Optional.none|nil}1' always returns"
+        " %select{false|true}2", (Type, bool, bool))
 WARNING(optional_check_nonoptional,none,
         "non-optional expression of type %0 used in a check for optionals",
         (Type))
@@ -4621,6 +4646,10 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
+ERROR(distributed_func_cannot_overload_on_async_only,none,
+      "ambiguous distributed func declaration %0, cannot overload distributed methods on effect only", (DeclName))
+NOTE(distributed_func_other_ambiguous_overload_here,none,
+      "ambiguous distributed func %0 declared here", (DeclName))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
@@ -5168,8 +5197,6 @@ ERROR(opened_bad_interface_type,none,
       "@opened interface type %0 is not a type parameter", (Type))
 ERROR(sil_function_input_label,PointsToFirstBadToken,
       "SIL function types cannot have labeled inputs", ())
-ERROR(sil_function_output_label,PointsToFirstBadToken,
-      "SIL function types cannot have labeled results", ())
 ERROR(sil_non_coro_yields,PointsToFirstBadToken,
       "non-coroutine SIL function types cannot have @yield results", ())
 ERROR(sil_function_repeat_convention,PointsToFirstBadToken,
@@ -5673,13 +5700,21 @@ ERROR(availability_decl_more_than_enclosing, none,
       "%0 cannot be more available than enclosing scope",
       (DescriptiveDeclKind))
 
+WARNING(availability_decl_more_than_unavailable_enclosing, none,
+        "%0 cannot be more available than unavailable enclosing scope",
+        (DescriptiveDeclKind))
+
 NOTE(availability_implicit_decl_here, none,
      "%0 implicitly declared here with availability of %1 %2 or newer",
      (DescriptiveDeclKind, StringRef, llvm::VersionTuple))
 
-NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
+NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
      (StringRef, llvm::VersionTuple))
+
+NOTE(availability_decl_more_than_unavailable_enclosing_here, none,
+     "enclosing scope has been explicitly marked unavailable here",
+     ())
 
 ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
@@ -5760,9 +5795,9 @@ ERROR(availability_protocol_requires_version,
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
 
-WARNING(public_decl_needs_availability, none,
-        "public declarations should have an availability attribute when building "
-        "with -require-explicit-availability", ())
+ERROR(public_decl_needs_availability, none,
+      "public declarations should have an availability attribute "
+      "with an introduction version", ())
 
 ERROR(attr_requires_decl_availability_for_platform,none,
       "'%0' requires that %1 have explicit availability for %2",
@@ -5884,12 +5919,13 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "because %select{%3 was imported implementation-only|"
       "it is an SPI imported from %3|"
       "it is SPI|"
+      "%3 was imported for SPI only|"
       "%3 was not imported by this file}4",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
       none, "%0 %1 cannot be used in " FRAGILE_FUNC_KIND "2 "
-      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|"
+      "because %select{<<ERROR>>|<<ERROR>>|<<ERROR>>|<<ERROR>>|"
       "%3 was not imported by this file}4"
       "; this is an error in Swift 6",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier, unsigned))
@@ -5899,6 +5935,7 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
+      "%4 was imported for SPI only|"
       "%4 was not imported by this file}5",
       (DeclName, StringRef, StringRef, unsigned, Identifier, unsigned))
 
@@ -6546,6 +6583,40 @@ ERROR(type_wrapper_type_requirement_not_accessible,none,
       "more restrictive access than its enclosing type wrapper type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+
+ERROR(type_wrapper_ignored_on_local_properties,none,
+      "%0 must not be used on local properties", (DeclAttribute))
+ERROR(type_wrapper_ignored_on_computed_properties,none,
+      "%0 must not be used on computed properties", (DeclAttribute))
+ERROR(type_wrapper_ignored_on_static_properties,none,
+      "%0 must not be used on static properties", (DeclAttribute))
+ERROR(type_wrapper_ignored_on_lazy_properties,none,
+      "%0 must not be used on lazy properties", (DeclAttribute))
+
+//------------------------------------------------------------------------------
+// MARK: #_hasSymbol
+//------------------------------------------------------------------------------
+
+WARNING(has_symbol_decl_must_be_weak,none,
+        "%0 %1 is not a weakly linked declaration",
+        (DescriptiveDeclKind, DeclName))
+ERROR(has_symbol_invalid_expr,none,
+      "#_hasSymbol condition must refer to a declaration", ())
+ERROR(has_symbol_unsupported_in_closures,none,
+      "#_hasSymbol is not supported in closures", ())
+
+//------------------------------------------------------------------------------
+// MARK: Type erasure
+//------------------------------------------------------------------------------
+
+ERROR(no_metadata_on_non_generic_param, none,
+"'@_noMetadata' must appear on a generic parameter",
+())
+ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental layout based"
+      " pre-specializations are disabled! Pass the frontend flag"
+      " -enable-experimental-layout-prespecialization to swift to enable "
+      " the usage of this language feature", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

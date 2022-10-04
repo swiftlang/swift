@@ -149,6 +149,8 @@ const char ExtensionError::ID = '\0';
 void ExtensionError::anchor() {}
 const char DeclAttributesDidNotMatch::ID = '\0';
 void DeclAttributesDidNotMatch::anchor() {}
+const char InvalidRecordKindError::ID = '\0';
+void InvalidRecordKindError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -239,8 +241,8 @@ ParameterList *ModuleFile::readParameterList() {
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   unsigned recordID =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  assert(recordID == PARAMETERLIST);
-  (void) recordID;
+  if (recordID != PARAMETERLIST)
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::ParameterListLayout::readRecord(scratch, rawMemberIDs);
@@ -312,7 +314,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       assert(next.Kind == llvm::BitstreamEntry::Record);
 
       kind = fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
-      assert(kind == decls_block::TUPLE_PATTERN_ELT);
+      if (kind != decls_block::TUPLE_PATTERN_ELT)
+        fatal(llvm::make_error<InvalidRecordKindError>(kind));
 
       // FIXME: Add something for this record or remove it.
       IdentifierID labelID;
@@ -393,7 +396,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   }
 
   default:
-    return nullptr;
+    return llvm::make_error<InvalidRecordKindError>(kind);
   }
 }
 
@@ -432,7 +435,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     return SILLayout::get(getContext(), canSig, fields, capturesGenerics);
   }
   default:
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
 
@@ -503,7 +506,7 @@ ProtocolConformanceDeserializer::read(
 
   // Not a protocol conformance.
   default:
-    MF.fatal();
+    MF.fatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
 
@@ -1172,7 +1175,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   }
   default:
     // Not a generic signature; no way to recover.
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   // If we've already deserialized this generic signature, start over to return
@@ -1214,7 +1217,7 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != GENERIC_ENVIRONMENT)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   GenericSignatureID parentSigID;
   TypeID existentialID;
@@ -1273,7 +1276,7 @@ ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != SUBSTITUTION_MAP)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   GenericSignatureID genericSigID;
   uint64_t numReplacementIDs;
@@ -1629,7 +1632,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   default:
     // Unknown xref kind.
     pathTrace.addUnknown(recordID);
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   auto getXRefDeclNameForError = [&]() -> DeclName {
@@ -1894,7 +1897,8 @@ giveUpFastPath:
       }
         
       default:
-        llvm_unreachable("Unhandled path piece");
+        fatal(llvm::make_error<InvalidRecordKindError>(recordID,
+                                                       "Unhandled path piece"));
       }
 
       pathTrace.addValue(memberName);
@@ -2100,7 +2104,7 @@ giveUpFastPath:
     default:
       // Unknown xref path piece.
       pathTrace.addUnknown(recordID);
-      fatal();
+      fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
 
     Optional<PrettyStackTraceModuleFile> traceMsg;
@@ -2273,7 +2277,8 @@ DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
   }
 
   default:
-    llvm_unreachable("Unknown record ID found when reading local DeclContext.");
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID,
+                   "Unknown record ID found when reading local DeclContext."));
   }
   return declContextOrOffset;
 }
@@ -4772,15 +4777,16 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         uint64_t numArgs;
         uint64_t numSPIGroups;
         uint64_t numAvailabilityAttrs;
+        uint64_t numTypeErasedParams;
         DeclID targetFunID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
             scratch, exported, specializationKindVal, specializedSigID,
             targetFunID, numArgs, numSPIGroups, numAvailabilityAttrs,
-            rawPieceIDs);
+            numTypeErasedParams, rawPieceIDs);
 
-        assert(rawPieceIDs.size() == numArgs + numSPIGroups ||
-               rawPieceIDs.size() == (numArgs - 1 + numSPIGroups));
+        assert(rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams ||
+               rawPieceIDs.size() == (numArgs - 1 + numSPIGroups + numTypeErasedParams));
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
@@ -4802,11 +4808,21 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         SmallVector<Identifier, 4> spis;
         if (numSPIGroups) {
           auto numTargetFunctionPiecesToSkip =
-              (rawPieceIDs.size() == numArgs + numSPIGroups) ? numArgs
+              (rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams) ? numArgs
                                                              : numArgs - 1;
           for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
             spis.push_back(MF.getIdentifier(id));
         }
+
+        SmallVector<Type, 4> typeErasedParams;
+        if (numTypeErasedParams) {
+          auto numTargetFunctionPiecesToSkip =
+              (rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams) ? numArgs + numSPIGroups
+                                                             : numArgs - 1 + numSPIGroups;
+          for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
+            typeErasedParams.push_back(MF.getType(id));
+        }
+
         SmallVector<AvailableAttr *, 4> availabilityAttrs;
         while (numAvailabilityAttrs) {
           // Prepare to read the next record.
@@ -4835,8 +4851,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         auto specializedSig = MF.getGenericSignature(specializedSigID);
         Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
-                                      spis, availabilityAttrs, specializedSig,
-                                      replacedFunctionName, &MF, targetFunID);
+                                      spis, availabilityAttrs, typeErasedParams,
+                                      specializedSig, replacedFunctionName, &MF,
+                                      targetFunID);
         break;
       }
 
@@ -5085,7 +5102,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       default:
         // We don't know how to deserialize this kind of attribute.
-        MF.fatal();
+        MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
       }
 
       if (!skipAttr) {
@@ -5211,7 +5228,7 @@ DeclDeserializer::getDeclCheckedImpl(
   
   default:
     // We don't know how to deserialize this kind of decl.
-    MF.fatal();
+    MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 }
 
@@ -6431,7 +6448,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   #undef TYPE
     default:
       // We don't know how to deserialize this kind of type.
-      fatal();
+      fatal(llvm::make_error<InvalidRecordKindError>(recordID));
     }
   }
 
@@ -6550,7 +6567,7 @@ ModuleFile::getClangType(ClangTypeID TID) {
     DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
   if (recordID != decls_block::CLANG_TYPE)
-    fatal();
+    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
   auto &clangLoader = *getContext().getClangModuleLoader();
   auto clangType =
@@ -6640,8 +6657,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   unsigned kind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, memberIDBuffer));
-  assert(kind == decls_block::MEMBERS);
-  (void)kind;
+  if (kind != decls_block::MEMBERS)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind));
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
@@ -6845,9 +6862,10 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   unsigned kind =
       fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
-  (void) kind;
-  assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
-         "registered lazy loader incorrectly");
+  if (kind != NORMAL_PROTOCOL_CONFORMANCE)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind,
+                    "registered lazy loader incorrectly"));
+
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,

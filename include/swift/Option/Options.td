@@ -241,6 +241,9 @@ def tools_directory : Separate<["-"], "tools-directory">,
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
+  
+def e : JoinedOrSeparate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
+  HelpText<"Executes a line of code provided on the command line">;
 
 def F : JoinedOrSeparate<["-"], "F">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
@@ -411,7 +414,13 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
 
 def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Require explicit availability on public declarations">;
+  HelpText<"Warn on public declarations without an availability attribute">;
+
+def require_explicit_availability_EQ : Joined<["-"], "require-explicit-availability=">,
+  MetaVarName<"<error,warn,ignore>">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Set diagnostic level to report public declarations without an availability attribute">;
+
 def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
@@ -620,6 +629,11 @@ def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
+
+def enable_experimental_cxx_interop_in_clang_header :
+  Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Enable experimental Swift to C++ interop code generation in generated Clang header">;
 
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
@@ -1351,6 +1365,11 @@ def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Pretty-print the output JSON">;
 
+def emit_extension_block_symbols: Flag<["-"], "emit-extension-block-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+        NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit 'swift.extension' symbols for extensions to external types instead of directly associating members and conformances with the extended nominal when generating symbol graphs">;
+
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
@@ -1614,9 +1633,14 @@ def use_frontend_parseable_output:
 
 def print_explicit_dependency_graph:
   Flag<["-"], "print-explicit-dependency-graph">,
-  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  Flags<[DoesNotAffectIncrementalBuild, HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Print the result of module dependency scanning after external "
            "module resolution to output">;
+
+def explicit_dependency_graph_format:
+  Joined<["-"], "explicit-dependency-graph-format=">,
+  Flags<[DoesNotAffectIncrementalBuild, HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Specify the explicit dependency graph output format to either 'json' or 'dot'">;
 
 def print_preprocessed_explicit_dependency_graph:
   Flag<["-"], "print-preprocessed-explicit-dependency-graph">,

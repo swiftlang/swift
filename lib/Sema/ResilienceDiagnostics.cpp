@@ -132,7 +132,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersion(6);
+        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
+                                 6);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -140,11 +141,12 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD->getName(), definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersion(6);
+        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
+                                 6);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
-  if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+  if (originKind == DisallowedOriginKind::MissingImport &&
       !ctx.LangOpts.isSwiftVersionAtLeast(6))
     ctx.Diags.diagnose(loc, diag::missing_import_inserted,
                        definingModule->getName());
@@ -185,7 +187,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     // Only implicitly imported decls should be reported as a warning,
     // and only for language versions below Swift 6.
     assert(downgradeToWarning == DowngradeToWarning::No ||
-           originKind == DisallowedOriginKind::ImplicitlyImported &&
+           originKind == DisallowedOriginKind::MissingImport &&
            "Only implicitly imported decls should be reported as a warning.");
     auto errorOrWarning = downgradeToWarning == DowngradeToWarning::Yes?
                               diag::inlinable_decl_ref_from_hidden_module_warn:
@@ -196,7 +198,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind));
 
-    if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+    if (originKind == DisallowedOriginKind::MissingImport &&
         downgradeToWarning == DowngradeToWarning::Yes)
       ctx.Diags.diagnose(loc, diag::missing_import_inserted,
                          definingModule->getName());
@@ -253,11 +255,12 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      M->getName(),
                      static_cast<unsigned>(originKind))
       .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
-                                !ctx.LangOpts.EnableConformanceAvailabilityErrors) ||
-                               originKind == DisallowedOriginKind::ImplicitlyImported,
+                                !ctx.LangOpts.EnableConformanceAvailabilityErrors &&
+                                originKind != DisallowedOriginKind::SPIOnly) ||
+                               originKind == DisallowedOriginKind::MissingImport,
                                6);
 
-    if (originKind == DisallowedOriginKind::ImplicitlyImported &&
+    if (originKind == DisallowedOriginKind::MissingImport &&
         !ctx.LangOpts.isSwiftVersionAtLeast(6))
       ctx.Diags.diagnose(loc, diag::missing_import_inserted,
                          M->getName());

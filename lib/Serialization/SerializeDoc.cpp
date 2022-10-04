@@ -413,45 +413,47 @@ static void writeDeclCommentTable(
                          SourceOrder++ });
     }
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/true))
-        return false;
+        return Action::SkipChildren();
       if (!shouldSerializeDoc(D))
-        return true;
+        return Action::Continue();
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         writeDocForExtensionDecl(ED);
-        return true;
+        return Action::Continue();
       }
 
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD)
-        return true;
+        return Action::Continue();
 
       // Compute USR.
       {
         USRBuffer.clear();
         llvm::raw_svector_ostream OS(USRBuffer);
         if (ide::printValueDeclUSR(VD, OS))
-          return true;
+          return Action::Continue();
       }
 
       generator.insert(copyString(USRBuffer.str()),
                        { VD->getBriefComment(), D->getRawComment(),
                          GroupContext.getGroupSequence(VD),
                          SourceOrder++ });
-      return true;
+      return Action::Continue();
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::SkipChildren(S);
     }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      return { false, E };
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      return Action::SkipChildren(E);
     }
-
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+      return Action::SkipChildren();
+    }
   };
 
   DeclCommentTableWriter Writer(GroupContext);
@@ -692,10 +694,18 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
                            FWriter(FWriter),
                            DocWriter(DocWriter) {}
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
-  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-  bool walkToParameterListPre(ParameterList *PL) override { return false; }
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    return Action::SkipChildren(S);
+  }
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    return Action::SkipChildren(E);
+  }
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+    return Action::SkipChildren();
+  }
 
   Optional<uint32_t> calculateNewUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
@@ -711,24 +721,24 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     return true;
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     // .swiftdoc doesn't include comments for double underscored symbols, but
     // for .swiftsourceinfo, having the source location for these symbols isn't
     // a concern because these symbols are in .swiftinterface anyway.
     if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
-      return false;
+      return Action::SkipChildren();
     if (!shouldSerializeSourceLoc(D))
-      return true;
+      return Action::Continue();
 
     auto *File = D->getDeclContext()->getModuleScopeContext();
     auto RawLocs = cast<FileUnit>(File)->getExternalRawLocsForDecl(D);
     if (!RawLocs.hasValue())
-      return true;
+      return Action::Continue();
 
     // If we have handled this USR before, don't proceed
     auto USR = calculateNewUSRId(D);
     if (!USR.hasValue())
-      return true;
+      return Action::Continue();
 
     llvm::SmallString<128> AbsolutePath = RawLocs->SourceFilePath;
     llvm::sys::fs::make_absolute(AbsolutePath);
@@ -742,7 +752,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     writeRawLoc(RawLocs->StartLoc, Writer, FWriter);
     writeRawLoc(RawLocs->EndLoc, Writer, FWriter);
 
-    return true;
+    return Action::Continue();
   }
 };
 

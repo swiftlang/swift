@@ -1158,21 +1158,13 @@ void IRGenModule::emitGlobalLists() {
                  /*isConstant*/false, /*asContiguousArray*/true);
 }
 
-static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
-  return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
-}
-
-// Eagerly emit functions that are externally visible. Functions with code
-// coverage instrumentation must also be eagerly emitted. So must functions
-// that are a dynamic replacement for another.
+// Eagerly emit functions that are externally visible. Functions that are
+// dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   if (f.isPossiblyUsedExternally())
     return false;
 
   if (f.getDynamicallyReplacedFunction())
-    return false;
-
-  if (hasCodeCoverageInstrumentation(f, m))
     return false;
 
   // Needed by lldb to print global variables which are propagated by the
@@ -1256,12 +1248,6 @@ void IRGenerator::emitGlobalTopLevel(
     CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction());
 
     IGM->emitSILDifferentiabilityWitness(&dw);
-  }
-
-  // Emit code coverage mapping data for all modules
-  for (auto Iter : *this) {
-    IRGenModule *IGM = Iter.second;
-    IGM->emitCoverageMapping();
   }
 
   for (auto Iter : *this) {
@@ -2106,6 +2092,14 @@ void IRGenerator::emitEntryPointInfo() {
   auto entrypointInfo = builder.beginStruct();
   entrypointInfo.addCompactFunctionReference(
       IGM.getAddrOfSILFunction(entrypoint, NotForDefinition));
+  uint32_t flags = 0;
+  enum EntryPointFlags : unsigned {
+    HasAtMainTypeFlag = 1 << 0,
+  };
+  if (auto *mainTypeDecl = SIL.getSwiftModule()->getMainTypeDecl()) {
+    flags |= HasAtMainTypeFlag;
+  }
+  entrypointInfo.addInt(IGM.Int32Ty, flags);
   auto var = entrypointInfo.finishAndCreateGlobal(
       "\x01l_entry_point", Alignment(4),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
@@ -2452,6 +2446,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::MissingMember:
     llvm_unreachable("there are no global member placeholders");
+
+  case DeclKind::BuiltinTuple:
+    llvm_unreachable("BuiltinTupleType made it to IRGen");
 
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
@@ -3201,7 +3198,9 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
 }
 
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {
-  return IRGen.Opts.getStackProtectorMode();
+  const SILOptions &opts = IRGen.SIL.getOptions();
+  return (opts.EnableStackProtection && f->needsStackProtection()) ?
+    StackProtectorMode::StackProtector : StackProtectorMode::NoStackProtector;
 }
 
 /// Find the entry point for a SIL function.
@@ -5267,6 +5266,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
       llvm_unreachable("decl not allowed in type context");
+
+    case DeclKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType made it to IRGen");
 
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:

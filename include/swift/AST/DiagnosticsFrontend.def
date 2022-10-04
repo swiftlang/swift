@@ -48,6 +48,11 @@ ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi' or 'other'", (StringRef))
 
+ERROR(error_unknown_require_explicit_availability, none,
+      "unknown argument '%0', passed to -require-explicit-availability, "
+      "expected 'error', 'warn' or 'ignore'",
+      (StringRef))
+
 ERROR(error_unsupported_opt_for_target, none,
       "unsupported option '%0' for target '%1'", (StringRef, StringRef))
 
@@ -101,6 +106,8 @@ WARNING(warning_cannot_multithread_batch_mode,none,
       "ignoring -num-threads argument; cannot multithread batch mode", ())
 ERROR(error_cannot_explicit_interface_build_in_mode,none,
       "'-explicit-interface-module-build' only supported when building a module from interface ('-compile-module-from-interface')'", ())
+ERROR(error_cannot_direct_cc1_pcm_build_in_mode,none,
+      "'-direct-clang-cc1-module-build' only supported when building a PCM ('-emit-pcm')'", ())
 ERROR(error_unsupported_option_argument,none,
       "unsupported argument '%1' to option '%0'", (StringRef, StringRef))
 ERROR(error_immediate_mode_missing_stdlib,none,

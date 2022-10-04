@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Class -clang-header-expose-public-decls -emit-clang-header-path %t/class.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
 // RUN: %FileCheck %s < %t/class.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-public-decls -emit-clang-header-path %t/class-evo.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/class-evo.h
 // RUN: %FileCheck %s < %t/class-evo.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class-evo.h)
@@ -30,7 +30,23 @@ public final class ClassWithIntField {
 
 // CHECK: namespace Class {
 
-// CHECK: namespace _impl {
+// CHECK: class ClassWithIntField;
+// CHECK-NEXT: } // end namespace
+
+// CHECK: namespace
+// CHECK-SAME: swift {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+
+// CHECK: namespace
+// CHECK-SAME: Class {
+
+// CHECK: namespace
+// CHECK-SAME: _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_ClassWithIntField;
 // CHECK-NEXT: // Type metadata accessor for ClassWithIntField
@@ -63,8 +79,6 @@ public final class ClassWithIntField {
 // CHECK-NEXT: namespace swift {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
-// CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Class::ClassWithIntField> {
 // CHECK-NEXT:   inline void * _Nonnull getTypeMetadata() {

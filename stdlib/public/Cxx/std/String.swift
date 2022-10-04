@@ -14,7 +14,7 @@ extension std.string {
   public init(_ string: String) {
     self.init()
     for char in string.utf8 {
-      self.push_back(value_type(char))
+      self.push_back(value_type(bitPattern: char))
     }
   }
 }
@@ -27,7 +27,12 @@ extension std.string: ExpressibleByStringLiteral {
 
 extension String {
   public init(cxxString: std.string) {
-    self.init(cString: cxxString.__c_strUnsafe())
+    let buffer = UnsafeBufferPointer<CChar>(
+      start: cxxString.__c_strUnsafe(),
+      count: cxxString.size())
+    self = buffer.withMemoryRebound(to: UInt8.self) {
+      String(decoding: $0, as: UTF8.self)
+    }
     withExtendedLifetime(cxxString) {}
   }
 }

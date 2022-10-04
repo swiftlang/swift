@@ -482,8 +482,7 @@ public struct Mirror {
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
   ) where C.Element == Child {
-    // Can't use Builtin.unreachable() due to
-    // https://bugs.swift.org/browse/SR-15300
+    // FIXME: Can't use Builtin.unreachable() due to https://github.com/apple/swift/issues/57622.
     self.init(reflecting: subject)
   }
   public init<Subject, C: Collection>(
@@ -492,8 +491,7 @@ public struct Mirror {
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
   ) {
-    // Can't use Builtin.unreachable() due to
-    // https://bugs.swift.org/browse/SR-15300
+    // FIXME: Can't use Builtin.unreachable() due to https://github.com/apple/swift/issues/57622.
     self.init(reflecting: subject)
   }
   public init<Subject>(
@@ -502,8 +500,7 @@ public struct Mirror {
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
   ) {
-    // Can't use Builtin.unreachable() due to
-    // https://bugs.swift.org/browse/SR-15300
+    // FIXME: Can't use Builtin.unreachable() due to https://github.com/apple/swift/issues/57622.
     self.init(reflecting: subject)
   }
   public let subjectType: Any.Type

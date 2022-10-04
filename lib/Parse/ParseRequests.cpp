@@ -27,7 +27,7 @@
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 
 #ifdef SWIFT_SWIFT_PARSER
-#include "SwiftParserCompilerSupport.h"
+#include "SwiftCompilerSupport.h"
 #endif
 
 using namespace swift;
@@ -194,19 +194,35 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
     tokensRef = ctx.AllocateCopy(*tokens);
 
 #ifdef SWIFT_SWIFT_PARSER
-  if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
-      ctx.SourceMgr.getCodeCompletionBufferID() != bufferID) {
+  if ((ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
+       ctx.LangOpts.hasFeature(Feature::ParserValidation)) &&
+      ctx.SourceMgr.getCodeCompletionBufferID() != bufferID &&
+      SF->Kind != SourceFileKind::SIL) {
     auto bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
-    unsigned int flags = SPCC_RoundTrip;
+    unsigned int flags = 0;
 
-    int roundTripResult =
-      swift_parser_consistencyCheck(
-        bufferRange.str().data(), bufferRange.getByteLength(),
-        SF->getFilename().str().c_str(), flags);
+    if (ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) &&
+        !parser.L->lexingCutOffOffset()) {
+      flags |= SCC_RoundTrip;
+    }
 
-    // FIXME: Produce an error on round-trip failure.
-    if (roundTripResult)
-      abort();
+    if (!ctx.Diags.hadAnyError() &&
+        ctx.LangOpts.hasFeature(Feature::ParserValidation))
+      flags |= SCC_ParseDiagnostics;
+
+    if (ctx.LangOpts.hasFeature(Feature::ParserSequenceFolding) &&
+        !parser.L->lexingCutOffOffset())
+      flags |= SCC_FoldSequences;
+
+    if (flags) {
+      int roundTripResult = swift_parser_consistencyCheck(
+          bufferRange.str().data(), bufferRange.getByteLength(),
+          SF->getFilename().str().c_str(), flags);
+
+      // FIXME: Produce an error on round-trip failure.
+      if (roundTripResult)
+        abort();
+    }
   }
 #endif
 

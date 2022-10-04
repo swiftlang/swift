@@ -184,6 +184,12 @@ namespace {
     std::vector<BitOffset> VTableOffset;
     uint32_t /*DeclID*/ NextVTableID = 1;
 
+    /// Maps nominal type name to a MoveOnlyDeinit ID.
+    Table MoveOnlyDeinitList;
+    /// Holds the list of MoveOnlyDeinits.
+    std::vector<BitOffset> MoveOnlyDeinitOffset;
+    uint32_t /*DeclID*/ NextMoveOnlyDeinitOffsetID = 1;
+
     /// Maps global variable name to an ID.
     Table GlobalVarList;
     /// Holds the list of SIL global variables.
@@ -264,6 +270,7 @@ namespace {
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
     void writeSILVTable(const SILVTable &vt);
+    void writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit);
     void writeSILGlobalVar(const SILGlobalVariable &g);
     void writeSILWitnessTable(const SILWitnessTable &wt);
     void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry);
@@ -482,7 +489,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
   F.visitArgEffects(
-    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+    [&](int effectIdx, int argumentIndex, bool isDerived) {
       if (isDerived && resilience == ResilienceStrategy::Resilient)
         return;
       numAttrs++;
@@ -512,7 +519,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       genericSigID, clangNodeOwnerID, parentModuleID, SemanticsIDs);
 
   F.visitArgEffects(
-    [&](int effectIdx, bool isDerived, SILFunction::ArgEffectKind) {
+    [&](int effectIdx, int argumentIndex, bool isDerived) {
       if (isDerived && resilience == ResilienceStrategy::Resilient)
         return;
 
@@ -524,7 +531,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       unsigned abbrCode = SILAbbrCodes[SILArgEffectsAttrLayout::Code];
 
       SILArgEffectsAttrLayout::emitRecord(
-          Out, ScratchRecord, abbrCode, effectsStrID, (unsigned)isDerived);
+          Out, ScratchRecord, abbrCode,
+          effectsStrID, (unsigned)argumentIndex, (unsigned)isDerived);
     });
 
   if (NoBody)
@@ -550,12 +558,18 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     }
     ENCODE_VER_TUPLE(available, available)
 
+    llvm::SmallVector<IdentifierID, 4> typeErasedParamsIDs;
+    for (auto ty : SA->getTypeErasedParams()) {
+      typeErasedParamsIDs.push_back(S.addTypeRef(ty));
+    }
+
     SILSpecializeAttrLayout::emitRecord(
         Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()),
         targetFunctionNameID, spiGroupID, spiModuleDeclID,
-        LIST_VER_TUPLE_PIECES(available));
+        LIST_VER_TUPLE_PIECES(available), typeErasedParamsIDs
+        );
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1611,6 +1625,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
       operand2 = IAI->getIndex();
+      Attr = (IAI->needsStackProtection() ? 1 : 0);
     }
     SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILTwoOperandsLayout::Code],
@@ -1787,6 +1802,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         attrs |= 0x01;
     } else if (auto *refCast = dyn_cast<UncheckedRefCastInst>(&SI)) {
       attrs = encodeValueOwnership(refCast->getOwnershipKind());
+    } else if (auto *atp = dyn_cast<AddressToPointerInst>(&SI)) {
+      attrs = atp->needsStackProtection() ? 1 : 0;
     }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI), attrs);
     break;
@@ -2480,6 +2497,7 @@ static void writeIndexTable(Serializer &S,
                             const SILSerializer::Table &table) {
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
           kind == sil_index_block::SIL_VTABLE_NAMES ||
+          kind == sil_index_block::SIL_MOVEONLYDEINIT_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
           kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
@@ -2517,6 +2535,13 @@ void SILSerializer::writeIndexTables() {
     writeIndexTable(S, List, sil_index_block::SIL_VTABLE_NAMES, VTableList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_VTABLE_OFFSETS,
                 VTableOffset);
+  }
+
+  if (!MoveOnlyDeinitList.empty()) {
+    writeIndexTable(S, List, sil_index_block::SIL_MOVEONLYDEINIT_NAMES,
+                    MoveOnlyDeinitList);
+    Offset.emit(ScratchRecord, sil_index_block::SIL_MOVEONLYDEINIT_OFFSETS,
+                MoveOnlyDeinitOffset);
   }
 
   if (!GlobalVarList.empty()) {
@@ -2627,6 +2652,38 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
           ListOfValues);
     }
   }
+}
+
+void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
+  // Do not emit deinit for non-public nominal types unless everything has to be
+  // serialized.
+  if (!ShouldSerializeAll && deinit.getNominalDecl()->getEffectiveAccess() <
+                                 swift::AccessLevel::Public)
+    return;
+
+  SILFunction *impl = deinit.getImplementation();
+  if (!ShouldSerializeAll && !impl->hasValidLinkageForFragileRef())
+    return;
+
+  // Use the mangled name of the class as a key to distinguish between classes
+  // which have the same name (but are in different contexts).
+  Mangle::ASTMangler mangler;
+  std::string mangledNominalName =
+      mangler.mangleNominalType(deinit.getNominalDecl());
+  size_t nameLength = mangledNominalName.size();
+  char *stringStorage = (char *)StringTable.Allocate(nameLength, 1);
+  std::memcpy(stringStorage, mangledNominalName.data(), nameLength);
+
+  MoveOnlyDeinitList[StringRef(stringStorage, nameLength)] =
+      NextMoveOnlyDeinitOffsetID++;
+  MoveOnlyDeinitOffset.push_back(Out.GetCurrentBitNo());
+
+  addReferencedSILFunction(impl, true);
+  MoveOnlyDeinitLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[MoveOnlyDeinitLayout::Code],
+      S.addDeclRef(deinit.getNominalDecl()),
+      S.addUniquedStringRef(impl->getName()),
+      deinit.isSerialized() == IsSerialized ? 1 : 0);
 }
 
 void SILSerializer::writeSILProperty(const SILProperty &prop) {
@@ -2865,6 +2922,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
+  registerSILAbbr<MoveOnlyDeinitLayout>();
   registerSILAbbr<SILGlobalVarLayout>();
   registerSILAbbr<WitnessTableLayout>();
   registerSILAbbr<WitnessMethodEntryLayout>();
@@ -2887,7 +2945,14 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt->getClass()))
       writeSILVTable(*vt);
   }
-  
+
+  for (const auto &deinit : SILMod->getMoveOnlyDeinits()) {
+    if ((ShouldSerializeAll || deinit->isSerialized()) &&
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+            deinit->getNominalDecl()))
+      writeSILMoveOnlyDeinit(*deinit);
+  }
+
   // Write out property descriptors.
   for (const SILProperty &prop : SILMod->getPropertyList()) {
     if ((ShouldSerializeAll || prop.isSerialized()) &&

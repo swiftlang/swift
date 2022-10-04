@@ -37,7 +37,7 @@ public struct VTable : CustomStringConvertible, CustomReflectable {
     public var endIndex: Int { return Int(bridgedArray.numElements) }
     
     public subscript(_ index: Int) -> Entry {
-      precondition(index >= 0 && index < endIndex)
+      assert(index >= 0 && index < endIndex)
       return Entry(bridged: BridgedVTableEntry(ptr: bridgedArray.data! + index &* BridgedVTableEntrySize))
     }
   }

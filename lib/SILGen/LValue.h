@@ -105,7 +105,6 @@ public:
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
     PhysicalKeyPathApplicationKind, // applying a key path
-    ABISafeConversionKind,        // unchecked_addr_cast
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
@@ -118,6 +117,7 @@ public:
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
+    UncheckedConversionKind,    // unchecked_X_cast
 
     FirstLogicalKind = GetterSetterKind,
     FirstTranslationKind = OrigToSubstKind,

@@ -806,8 +806,12 @@ void ClosureSpecCloner::populateCloned() {
 
     // Otherwise, create a new argument which copies the original argument
     auto typeInContext = Cloned->getLoweredType(Arg->getType());
-    SILValue MappedValue =
+    auto *MappedValue =
         ClonedEntryBB->createFunctionArgument(typeInContext, Arg->getDecl());
+    MappedValue->setNoImplicitCopy(
+        cast<SILFunctionArgument>(Arg)->isNoImplicitCopy());
+    MappedValue->setLifetimeAnnotation(
+        cast<SILFunctionArgument>(Arg)->getLifetimeAnnotation());
     entryArgs.push_back(MappedValue);
   }
 
@@ -1283,7 +1287,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
 
-        // We currently only support copying intermediate reabastraction
+        // We currently only support copying intermediate reabstraction
         // closures if the closure is ultimately passed trivially.
         bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()

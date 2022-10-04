@@ -266,7 +266,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
 
   // If we have a synthesized target, map from its base type into the this
   // declaration's innermost type context, or if we're dealing with the
-  // synthesized extention itself rather than a member, into its extended
+  // synthesized extension itself rather than a member, into its extended
   // nominal (the extension's own requirements shouldn't be considered in the
   // substitution).
   unsigned TypeContextDepth = 0;
@@ -968,15 +968,15 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return false; // Skip body.
+      return Action::SkipChildren(); // Skip body.
 
     if (FuncEnts.empty())
-      return false;
+      return Action::SkipChildren();
 
     if (!isa<AbstractFunctionDecl>(D) && !isa<SubscriptDecl>(D))
-      return true;
+      return Action::Continue();
 
     unsigned Offset = SM.getLocOffsetInBuffer(D->getLoc(), BufferID);
     auto Found = FuncEnts.end();
@@ -989,14 +989,14 @@ public:
         });
     }
     if (Found == FuncEnts.end() || (*Found)->LocOffset != Offset)
-      return false;
+      return Action::SkipChildren();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(D)) {
       addParameters(FD, **Found, SM, BufferID);
     } else {
       addParameters(cast<SubscriptDecl>(D), **Found, SM, BufferID);
     }
     FuncEnts = llvm::MutableArrayRef<TextEntity*>(Found+1, FuncEnts.end());
-    return false; // skip body.
+    return Action::SkipChildren(); // skip body.
   }
 };
 } // end anonymous namespace
@@ -1087,7 +1087,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
 
-  // Load implict imports so that Clang importer can use it.
+  // Load implicit imports so that Clang importer can use it.
   for (auto unloadedImport :
        CI.getMainModule()->getImplicitImportInfo().AdditionalUnloadedImports) {
     (void)Ctx.getModule(unloadedImport.module.getModulePath());

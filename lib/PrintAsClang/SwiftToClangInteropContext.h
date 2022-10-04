@@ -13,6 +13,9 @@
 #ifndef SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 #define SWIFT_PRINTASCLANG_SWIFTTOCLANGINTEROPCONTEXT_H
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include <memory>
@@ -23,6 +26,8 @@ class Decl;
 class IRABIDetailsProvider;
 class IRGenOptions;
 class ModuleDecl;
+class ExtensionDecl;
+class NominalTypeDecl;
 
 /// The \c SwiftToClangInteropContext class is responsible for providing
 /// access to the other required subsystems of the compiler during the emission
@@ -40,11 +45,19 @@ public:
   void runIfStubForDeclNotEmitted(llvm::StringRef stubName,
                                   llvm::function_ref<void(void)> function);
 
+  void recordExtensions(const NominalTypeDecl *typeDecl,
+                        const ExtensionDecl *ext);
+
+  llvm::ArrayRef<const ExtensionDecl *>
+  getExtensionsForNominalType(const NominalTypeDecl *typeDecl) const;
+
 private:
   ModuleDecl &mod;
   const IRGenOptions &irGenOpts;
   std::unique_ptr<IRABIDetailsProvider> irABIDetails;
   llvm::StringSet<> emittedStubs;
+  llvm::DenseMap<const NominalTypeDecl *, std::vector<const ExtensionDecl *>>
+      extensions;
 };
 
 } // end namespace swift

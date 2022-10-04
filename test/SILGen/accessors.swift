@@ -133,18 +133,20 @@ func test_rec2(_ outer: inout Rec2Outer) -> Int {
 // CHECK: sil hidden [ossa] @$s9accessors9test_rec2ySiAA9Rec2OuterVzF : $@convention(thin) (@inout Rec2Outer) -> Int {
 // CHECK:   function_ref @$s9accessors9Rec2OuterV5innerAA0B5InnerVvau : $@convention(method) (@inout Rec2Outer) -> UnsafeMutablePointer<Rec2Inner>
 
-// SR-12456: Compiler crash on class var override adding observer.
-class SR12456Base {
-  open class var instance: SR12456Base {
+// https://github.com/apple/swift/issues/54895
+// Compiler crash on 'class var' override adding observer
+
+class OverrideAddingObserver_Base {
+  open class var instance: OverrideAddingObserver_Base {
     get {
-      return SR12456Base()
+      return OverrideAddingObserver_Base()
     }
     set {}
   }
 }
 
-class SR12456Subclass : SR12456Base {
-  override class var instance: SR12456Base {
+class OverrideAddingObserver_Derived : OverrideAddingObserver_Base {
+  override class var instance: OverrideAddingObserver_Base {
     didSet {}
   }
 }

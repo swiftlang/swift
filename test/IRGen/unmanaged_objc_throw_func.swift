@@ -4,12 +4,14 @@
 
 import Foundation
 
-@objc protocol SR_9035_P {
+// https://github.com/apple/swift/issues/51538
+
+@objc protocol P {
   func returnUnmanagedCFArray() throws -> Unmanaged<CFArray>
 }
 
-// CHECK-LABEL: define hidden swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func9SR_9035_CC22returnUnmanagedCFArrays0G0VySo0H3RefaGyKF"
-@objc class SR_9035_C: NSObject, SR_9035_P {
+// CHECK-LABEL: define hidden swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func1CC22returnUnmanagedCFArrays0F0VySo0G3RefaGyKF"
+@objc class C: NSObject, P {
   func returnUnmanagedCFArray() throws -> Unmanaged<CFArray> {
     // CHECK: %[[T0:.+]] = call swiftcc { %swift.bridge*, i8* } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{32|64}} 1, %swift.type* @"$sSiN")
     // CHECK-NEXT: %[[T1:.+]] = extractvalue { %swift.bridge*, i8* } %[[T0]], 0
@@ -29,7 +31,7 @@ import Foundation
   } 
 }
 
-// CHECK: %[[T0:.+]] = call swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func9SR_9035_CC22returnUnmanagedCFArrays0G0VySo0H3RefaGyKF"
+// CHECK: %[[T0:.+]] = call swiftcc %TSo10CFArrayRefa* @"$s25unmanaged_objc_throw_func1CC22returnUnmanagedCFArrays0F0VySo0G3RefaGyKF"
 // CHECK-NEXT: %[[T2:.+]] = load %swift.error*, %swift.error** %swifterror, align {{[0-9]+}}
 // CHECK-NEXT: %[[T3:.+]] = icmp ne %swift.error* %[[T2]], null
 // CHECK-NEXT: br i1 %[[T3]], label %[[L1:.+]], label %[[L2:.+]]
@@ -66,7 +68,7 @@ import Foundation
 
 // CHECK: [[L3]]:                                     ; preds = %[[L2]], %[[L7]]
 // CHECK-NEXT: %[[T12:.+]] = phi i{{32|64}} [ 0, %[[L7]] ], [ %[[T5]], %[[L2]] ]
-// CHECK-NEXT: %[[T13:.+]] = bitcast %T25unmanaged_objc_throw_func9SR_9035_CC* %{{.+}} to i8*
+// CHECK-NEXT: %[[T13:.+]] = bitcast %T25unmanaged_objc_throw_func1CC* %{{.+}} to i8*
 // CHECK-NEXT: call void @llvm.objc.release(i8* %[[T13]])
 // CHECK-NEXT: %[[T14:.+]] = inttoptr i{{32|64}} %[[T12]] to %struct.__CFArray*
 // CHECK-NEXT: ret %struct.__CFArray* %[[T14]]

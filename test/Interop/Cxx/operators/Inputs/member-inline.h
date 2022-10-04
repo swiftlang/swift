@@ -7,6 +7,11 @@ struct LoadableIntWrapper {
     return LoadableIntWrapper{.value = value - rhs.value};
   }
 
+  LoadableIntWrapper operator+=(LoadableIntWrapper rhs) {
+    value += rhs.value;
+    return *this;
+  }
+
   int operator()() {
     return value;
   }
@@ -30,6 +35,11 @@ struct LoadableIntWrapper {
 
   friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
     return LoadableIntWrapper{.value = -obj.value};
+  }
+
+  friend LoadableIntWrapper operator-=(LoadableIntWrapper& lhs, const LoadableIntWrapper& rhs) {
+    lhs.value -= rhs.value;
+    return lhs;
   }
 };
 
@@ -85,6 +95,18 @@ struct HasPreIncrementOperatorWithVoidReturnType {
   void operator++() { ++value; }
 };
 
+struct __attribute__((swift_attr("import_reference"),
+                      swift_attr("retain:immortal"),
+                      swift_attr("release:immortal"))) ImmortalCounter {
+  int value = 0;
+
+  ImmortalCounter &operator++() {
+    value++;
+    return *this;
+  }
+};
+static ImmortalCounter myCounter;
+
 struct HasDeletedOperator {
   void operator!=(HasDeletedOperator) const = delete;
 };
@@ -135,6 +157,32 @@ public:
   int &operator[](int x) {
     return values[x];
   }
+};
+
+struct ReadOnlyRvalueParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+};
+
+struct ReadWriteRvalueParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+  int &operator[](int&& x) { return values[x]; }
+};
+
+struct ReadWriteRvalueGetterParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+  
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+  int &operator[](int x) { return values[x]; }
 };
 
 struct DifferentTypesArray {

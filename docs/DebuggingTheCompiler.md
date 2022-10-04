@@ -163,47 +163,49 @@ This will cause the typechecker to log its internal state as it solves
 constraints and present the final type checked solution, e.g.:
 
 ```
----Constraint solving for the expression at [test.swift:3:10 - line:3:10]---
+---Constraint solving at [test.swift:3:1 - line:3:1]---
 ---Initial constraints for the given expression---
-(integer_literal_expr type='$T0' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)
-Score: 0 0 0 0 0 0 0 0 0 0 0 0 0
-Contextual Type: Int
-Type Variables:
-  #0 = $T0 [inout allowed]
+(integer_literal_expr type='$T0' location=test.swift:3:1 range=[test.swift:3:1 - line:3:1] value=0 builtin_initializer=**NULL** initializer=**NULL**)
 
-Active Constraints:
+Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
+Type Variables:
+   ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
 Inactive Constraints:
-  $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
-  $T0 conv Int [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
-($T0 literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
-Active bindings: $T0 := Int
-(trying $T0 := Int
-  (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
-)
+  $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];
+
+  (Potential Binding(s): 
+    ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int])
+  (attempting type variable $T0 := Int
+    (considering -> $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];
+      (simplification result:
+        (removed constraint: $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];)
+      )
+      (outcome: simplified)
+    )
+    (Changes:
+      (Newly Bound: 
+        > $T0 := Int
+      )
+      (Removed Constraint: 
+        > $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x13e009800 [IntegerLiteral@test.swift:3:1]]];
+      )
+    )
+    (found solution: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>)
+  )
+
+---Solver statistics---
+Total number of scopes explored: 2
+Maximum depth reached while exploring solutions: 2
+Time: 2.164000e+00ms
+
 ---Solution---
-Fixed score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+Fixed score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type variables:
-  $T0 as Int
+  $T0 as Int @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
-Overload choices:
-
-Constraint restrictions:
-
-Disjunction choices:
-
-Conformances:
-  At locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]
-(normal_conformance type=Int protocol=ExpressibleByIntegerLiteral lazy
-  (normal_conformance type=Int protocol=_ExpressibleByBuiltinIntegerLiteral lazy))
-(found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
 ---Type-checked expression---
-(call_expr implicit type='Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] arg_labels=_builtinIntegerLiteral:
-  (constructor_ref_call_expr implicit type='(_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10]
-    (declref_expr implicit type='(Int.Type) -> (_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] decl=Swift.(file).Int.init(_builtinIntegerLiteral:) function_ref=single)
-    (type_expr implicit type='Int.Type' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] typerepr='Int'))
-  (tuple_expr implicit type='(_builtinIntegerLiteral: Int2048)' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] names=_builtinIntegerLiteral
-    (integer_literal_expr type='Int2048' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)))
+(integer_literal_expr type='Int' location=test.swift:3:1 range=[test.swift:3:1 - line:3:1] value=0 builtin_initializer=Swift.(file).Int.init(_builtinIntegerLiteral:) initializer=**NULL**)
 ```
 
 When using swift LLDB REPL, one can dump the same output for each

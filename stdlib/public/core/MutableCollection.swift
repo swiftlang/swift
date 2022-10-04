@@ -488,8 +488,13 @@ extension MutableCollection {
 public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
+#if $BuiltinUnprotectedAddressOf
+  let p1 = Builtin.unprotectedAddressOf(&a)
+  let p2 = Builtin.unprotectedAddressOf(&b)
+#else
   let p1 = Builtin.addressof(&a)
   let p2 = Builtin.addressof(&b)
+#endif
   _debugPrecondition(
     p1 != p2,
     "swapping a location with itself is not supported")

@@ -111,8 +111,8 @@ public:
   getEnumTagMapping(const EnumDecl *ED) {
     llvm::MapVector<EnumElementDecl *, IRABIDetailsProvider::EnumElementInfo>
         elements;
-    auto &enumImplStrat =
-        getEnumImplStrategy(IGM, ED->getDeclaredType()->getCanonicalType());
+    auto &enumImplStrat = getEnumImplStrategy(
+        IGM, ED->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
 
     for (auto *element : ED->getAllElements()) {
       auto tagIdx = enumImplStrat.getTagIndex(element);
@@ -134,6 +134,16 @@ public:
       return None;
     if (silFuncType->getLanguage() != SILFunctionLanguage::Swift)
       return None;
+
+    // FIXME: Tuple parameter mapping support.
+    llvm::SmallVector<const ParamDecl *, 8> silParamMapping;
+    for (auto param : *fd->getParameters()) {
+      if (auto *tuple =
+              param->getType()->getDesugaredType()->getAs<TupleType>()) {
+        if (tuple->getNumElements() > 0)
+          return None;
+      }
+    }
 
     auto funcPointerKind =
         FunctionPointerKind(FunctionPointerKind::BasicKind::Function);
@@ -292,7 +302,8 @@ void LoweredFunctionSignature::visitParameterList(
   for (auto param : *FD->getParameters()) {
     // FIXME: tuples map to more than one sil param (but they're not yet
     // representable by the consumer).
-    silParamMapping.push_back(param);
+    if (!param->getInterfaceType()->isVoid())
+      silParamMapping.push_back(param);
   }
   size_t currentSilParam = 0;
   for (const auto &abiParam : abiDetails.parameters) {

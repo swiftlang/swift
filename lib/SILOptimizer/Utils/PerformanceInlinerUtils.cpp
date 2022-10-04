@@ -872,7 +872,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 /// might prevent inlining a pure function.
 static bool hasInterestingSideEffect(SILInstruction *I) {
   switch (I->getKind()) {
-    // Those instructions turn into no-ops after inlining, redundante load
+    // Those instructions turn into no-ops after inlining, redundant load
     // elimination, constant folding and dead-object elimination.
     case swift::SILInstructionKind::StrongRetainInst:
     case swift::SILInstructionKind::StrongReleaseInst:

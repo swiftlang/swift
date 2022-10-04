@@ -93,9 +93,20 @@ public:
   static void printTypeGenericTraits(
       raw_ostream &os, const NominalTypeDecl *typeDecl,
       StringRef typeMetadataFuncName,
-      ArrayRef<GenericRequirement> typeMetadataFuncRequirements);
+      ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
+      const ModuleDecl *moduleContext);
+
+  static void printTypePrecedingGenericTraits(raw_ostream &os,
+                                              const NominalTypeDecl *typeDecl,
+                                              const ModuleDecl *moduleContext);
 
   static void forwardDeclType(raw_ostream &os, const NominalTypeDecl *typeDecl);
+
+  /// Print out the type traits that allow a C++ type be used a Swift generic
+  /// context.
+  static void printClangTypeSwiftGenericTraits(raw_ostream &os,
+                                               const NominalTypeDecl *typeDecl,
+                                               const ModuleDecl *moduleContext);
 
 private:
   raw_ostream &os;

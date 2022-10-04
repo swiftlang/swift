@@ -1133,10 +1133,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
 
     interleave(requirements,
-               [&](Requirement req) {
-                 req.print(Printer, Options);
-               },
-               [&] { Printer << ", "; });
+                [&](Requirement req) {
+                  bool typeErased = false;
+                  if (req.getKind() == RequirementKind::Layout &&
+                      !attr->getTypeErasedParams().empty()) {
+                    const auto &erasedParams = attr->getTypeErasedParams();
+                    typeErased = std::any_of(erasedParams.begin(),
+                                           erasedParams.end(),
+                                           [&](Type t) { return t->isEqual(req.getFirstType()); });
+                    if (typeErased)
+                      Printer << "@_noMetadata ";
+                  }
+                  auto OptionsCopy = Options;
+                  OptionsCopy.PrintClassLayoutName = typeErased;
+                  req.print(Printer, OptionsCopy);
+                },
+                [&] { Printer << ", "; });
 
     Printer << ")";
     break;
@@ -1695,6 +1707,10 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
+bool BackDeployAttr::isActivePlatform(const ASTContext &ctx) const {
+  return isPlatformActive(Platform, ctx.LangOpts);
+}
+
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
   return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
                                implicit ? SourceRange() : getRange(),
@@ -1868,12 +1884,15 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                GenericSignature specializedSignature,
                                DeclNameRef targetFunctionName,
                                ArrayRef<Identifier> spiGroups,
-                               ArrayRef<AvailableAttr *> availableAttrs)
+                               ArrayRef<AvailableAttr *> availableAttrs,
+                               size_t typeErasedParamsCount)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause), specializedSignature(specializedSignature),
       targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()),
-      numAvailableAttrs(availableAttrs.size()) {
+      numAvailableAttrs(availableAttrs.size()),
+      numTypeErasedParams(typeErasedParamsCount),
+      typeErasedParamsInitialized(false) {
   std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
                           getTrailingObjects<Identifier>());
   std::uninitialized_copy(availableAttrs.begin(), availableAttrs.end(),
@@ -1894,13 +1913,14 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        DeclNameRef targetFunctionName,
                                        ArrayRef<Identifier> spiGroups,
                                        ArrayRef<AvailableAttr *> availableAttrs,
+                                       size_t typeErasedParamsCount,
                                        GenericSignature specializedSignature) {
-  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *>(
-      spiGroups.size(), availableAttrs.size());
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
+      spiGroups.size(), availableAttrs.size(), typeErasedParamsCount);
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem)
       SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
-                     targetFunctionName, spiGroups, availableAttrs);
+                     targetFunctionName, spiGroups, availableAttrs, typeErasedParamsCount);
 }
 
 SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
@@ -1909,25 +1929,27 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
                                        ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature,
                                        DeclNameRef targetFunctionName) {
-  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *>(
-      spiGroups.size(), availableAttrs.size());
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
+      spiGroups.size(), availableAttrs.size(), 0);
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem) SpecializeAttr(
       SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
-      targetFunctionName, spiGroups, availableAttrs);
+      targetFunctionName, spiGroups, availableAttrs, 0);
 }
 
 SpecializeAttr *SpecializeAttr::create(
     ASTContext &ctx, bool exported, SpecializationKind kind,
     ArrayRef<Identifier> spiGroups, ArrayRef<AvailableAttr *> availableAttrs,
-    GenericSignature specializedSignature, DeclNameRef targetFunctionName,
-    LazyMemberLoader *resolver, uint64_t data) {
-  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *>(
-      spiGroups.size(), availableAttrs.size());
+    ArrayRef<Type> typeErasedParams, GenericSignature specializedSignature,
+    DeclNameRef targetFunctionName, LazyMemberLoader *resolver,
+    uint64_t data) {
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *, Type>(
+      spiGroups.size(), availableAttrs.size(), typeErasedParams.size());
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
   auto *attr = new (mem) SpecializeAttr(
       SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
-      targetFunctionName, spiGroups, availableAttrs);
+      targetFunctionName, spiGroups, availableAttrs, typeErasedParams.size());
+  attr->setTypeErasedParams(typeErasedParams);
   attr->resolver = resolver;
   attr->resolverContextData = data;
   return attr;

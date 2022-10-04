@@ -27,6 +27,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/TypeRepr.h"
 
 namespace swift {
 class ASTContext;
@@ -36,11 +37,14 @@ class TypeDecl;
 class ValueDecl;
 struct SelfBounds;
 class NominalTypeDecl;
-
 namespace ast_scope {
 class ASTSourceFileScope;
 class ASTScopeImpl;
 } // namespace ast_scope
+
+/// Walk the type representation recursively, collecting any
+/// `OpaqueReturnTypeRepr`s, `CompositionTypeRepr`s  or `IdentTypeRepr`s.
+CollectedOpaqueReprs collectOpaqueReturnTypeReprs(TypeRepr *, ASTContext &ctx, DeclContext *dc);
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
@@ -103,15 +107,20 @@ private:
   /// extension (if it found something at that level).
   DeclContext *BaseDC;
 
+  /// The declaration that defines the base of the call to `Value`.
+  /// This is always available, as long as `BaseDC` is not null.
+  ValueDecl *BaseDecl;
+
   /// The declaration corresponds to the given name; i.e. the decl we are
   /// looking up.
   ValueDecl *Value;
 
 public:
-  LookupResultEntry(ValueDecl *value) : BaseDC(nullptr), Value(value) {}
+  LookupResultEntry(ValueDecl *value)
+      : BaseDC(nullptr), BaseDecl(nullptr), Value(value) {}
 
-  LookupResultEntry(DeclContext *baseDC, ValueDecl *value)
-    : BaseDC(baseDC), Value(value) {}
+  LookupResultEntry(DeclContext *baseDC, ValueDecl *baseDecl, ValueDecl *value)
+      : BaseDC(baseDC), BaseDecl(baseDecl), Value(value) {}
 
   ValueDecl *getValueDecl() const { return Value; }
 
@@ -637,8 +646,8 @@ private:
   void visitDoCatchStmt(DoCatchStmt *S);
   
 };
-  
-  
+
+
 /// The bridge between the legacy UnqualifiedLookupFactory and the new ASTScope
 /// lookup system
 class AbstractASTScopeDeclConsumer {

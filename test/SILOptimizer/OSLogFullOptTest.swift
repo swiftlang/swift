@@ -15,7 +15,7 @@
 // dead_array_elim.swift. The problem can be overcome by handling
 // non-trivial stores in OSSA, as described here:
 //   [OSSA] Improve DeadObjectElimination to handle array copies
-//   https://bugs.swift.org/browse/SR-13782
+//   https://github.com/apple/swift/issues/56179
 // Once that bug is fixed, remove the requirement: swift_stdlib_no_asserts.
 
 import OSLogTestHelper

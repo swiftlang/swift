@@ -169,10 +169,11 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
   // TODO: Support AllocBoxInst
 
   if (!VarInfo)
-    return VarInfo;
+    return {};
 
-  // Copy everything but the DIExpr
-  VarInfo->DIExpr.clear();
+  // TODO: Support variables with expressions.
+  if (VarInfo->DIExpr)
+    return {};
 
   // Coalesce the debug loc attached on AI into VarInfo
   SILType Type = AI->getType();
@@ -350,7 +351,7 @@ SILType AllocBoxInst::getAddressType() const {
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                SILDebugVariable Var, bool poisonRefs,
-                               bool wasMoved)
+                               bool wasMoved, bool trace)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.hasValue(), Var.Loc.hasValue(),
@@ -364,21 +365,22 @@ DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
   setPoisonRefs(poisonRefs);
   if (wasMoved)
     markAsMoved();
+  setTrace(trace);
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
                                        SILDebugVariable Var, bool poisonRefs,
-                                       bool wasMoved) {
+                                       bool wasMoved, bool trace) {
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
-      DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved);
+    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
 }
 
 DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
                                            SILValue Operand, SILModule &M,
                                            SILDebugVariable Var,
-                                           bool wasMoved) {
+                                           bool wasMoved, bool trace) {
   // For alloc_stack, debug_value is used to annotate the associated
   // memory location, so we shouldn't attach op_deref.
   if (!isa<AllocStackInst>(Operand))
@@ -386,7 +388,7 @@ DebugValueInst *DebugValueInst::createAddr(SILDebugLocation DebugLoc,
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf) DebugValueInst(DebugLoc, Operand, Var,
-                                    /*poisonRefs=*/false, wasMoved);
+                                    /*poisonRefs=*/false, wasMoved, trace);
 }
 
 bool DebugValueInst::exprStartsWithDeref() const {
@@ -1162,12 +1164,13 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
 }
 
 AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                           SILValue Src, SILValue Dest,
-                                           SILValue Initializer,
-                                           SILValue Setter,
-                                           AssignByWrapperInst::Mode mode) :
-    AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
+                                         AssignByWrapperInst::Originator origin,
+                                         SILValue Src, SILValue Dest,
+                                         SILValue Initializer, SILValue Setter,
+                                         AssignByWrapperInst::Mode mode)
+    : AssignInstBase(Loc, Src, Dest, Initializer, Setter), originator(origin) {
+  assert(Initializer->getType().is<SILFunctionType>() ||
+         (isa<SILUndef>(Initializer) && originator == Originator::TypeWrapper));
   sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
 }
 

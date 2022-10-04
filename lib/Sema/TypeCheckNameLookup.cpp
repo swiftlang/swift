@@ -92,18 +92,22 @@ namespace {
     /// \param baseDC The declaration context through which we found the
     /// declaration.
     ///
+    /// \param baseDecl The declaration that defines the base of the
+    /// call to `found`
+    ///
     /// \param foundInType The type through which we found the
     /// declaration.
     ///
     /// \param isOuter Whether this is an outer result (i.e. a result that isn't
     /// from the innermost scope with results)
-    void add(ValueDecl *found, DeclContext *baseDC, Type foundInType,
-             bool isOuter) {
+    void add(ValueDecl *found, DeclContext *baseDC, ValueDecl *baseDecl,
+             Type foundInType, bool isOuter) {
       DeclContext *foundDC = found->getDeclContext();
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          Result.add(LookupResultEntry(baseDC, result), isOuter);
+          // HERE, need to look up base decl
+          Result.add(LookupResultEntry(baseDC, baseDecl, result), isOuter);
           if (isOuter)
             FoundOuterDecls.push_back(result);
           else
@@ -267,7 +271,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
+    builder.add(found.getValueDecl(), found.getDeclContext(),
+                found.getBaseDecl(), foundInType,
                 /*isOuter=*/idx >= lookup.getIndexOfFirstOuterResult());
   }
   return result;
@@ -327,7 +332,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   dc->lookupQualified(type, name, subOptions, lookupResults);
 
   for (auto found : lookupResults)
-    builder.add(found, nullptr, type, /*isOuter=*/false);
+    builder.add(found, nullptr, nullptr, type, /*isOuter=*/false);
 
   return result;
 }
@@ -350,7 +355,8 @@ static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
 
 TypeChecker::UnsupportedMemberTypeAccessKind
 TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
-                                           bool hasUnboundOpener) {
+                                           bool hasUnboundOpener,
+                                           bool isExtensionBinding) {
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -377,7 +383,7 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
       return UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric;
 
     if (isa<NominalTypeDecl>(typeDecl))
-      if (!hasUnboundOpener)
+      if (!hasUnboundOpener && !isExtensionBinding)
         return UnsupportedMemberTypeAccessKind::NominalTypeOfUnboundGeneric;
   }
 

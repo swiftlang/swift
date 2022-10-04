@@ -2517,12 +2517,12 @@ sil @alloc_ref_dynamic_with_metatype : $() -> () {
   return %4 : $()
 }
 
-// CHECK: sil @alloc_ref_dynamic_with_metatype_genneric
+// CHECK: sil @alloc_ref_dynamic_with_metatype_generic
 // CHECK: metatype
 // CHECK: upcast
 // CHECK: alloc_ref_dynamic
 // CHECK: return
-sil @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
+sil @alloc_ref_dynamic_with_metatype_generic : $<T where T : B>() -> () {
   %1 = metatype $@thick T.Type
   %2 = upcast %1 : $@thick T.Type to $@thick B.Type
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -3840,6 +3840,34 @@ bb0:
   %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
   return %4 : $Builtin.Int32
 }
+
+// Test the following transformation:
+// (convert_escape_to_noescape (convert_function (thin_to_thick_function x))) =>
+// (thin_to_thick_function (convert_function x))
+
+sil @returnIndirectInt : $@convention(thin) () -> @out Builtin.Int32
+
+// CHECK-LABEL: sil @optimize_convert_escape_to_noescape_convert_function : $@convention(thin) () -> Builtin.Int32
+// CHECK:   [[FN_REF:%.*]] = function_ref @returnIndirectInt : $@convention(thin) () -> @out Builtin.Int32
+// CHECK:   [[INDIRECT_RESULT:%.*]] = alloc_stack $Builtin.Int32
+// CHECK:   apply [[FN_REF]]([[INDIRECT_RESULT]]) : $@convention(thin) () -> @out Builtin.Int32
+// CHECK:   [[RESULT:%.*]] = load [[INDIRECT_RESULT]] : $*Builtin.Int32
+// CHECK:   dealloc_stack [[INDIRECT_RESULT]] : $*Builtin.Int32
+// CHECK:   return [[RESULT]] : $Builtin.Int32
+
+sil @optimize_convert_escape_to_noescape_convert_function : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @returnIndirectInt : $@convention(thin) () -> @out Builtin.Int32
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> @out Builtin.Int32 to $@callee_guaranteed () -> @out Builtin.Int32
+  %2 = convert_function %1 : $@callee_guaranteed () -> @out Builtin.Int32 to $@callee_guaranteed @substituted <A> () -> @out A for <Builtin.Int32>
+  %3 = convert_escape_to_noescape %2: $@callee_guaranteed @substituted <A> () -> @out A for <Builtin.Int32> to $@noescape @callee_guaranteed @substituted <A> () -> @out A for <Builtin.Int32>
+  %4 = alloc_stack $Builtin.Int32
+  %5 = apply %3(%4) : $@noescape @callee_guaranteed @substituted <A> () -> @out A for <Builtin.Int32>
+  %6 = load %4 : $*Builtin.Int32
+  dealloc_stack %4 : $*Builtin.Int32
+  return %6 : $Builtin.Int32
+}
+
 
 // CHECK-LABEL: sil @optimize_arc_with_value_to_bridge_object
 // CHECK:      bb0(%0 : $Builtin.Int64):

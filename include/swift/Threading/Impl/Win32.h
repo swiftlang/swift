@@ -19,6 +19,8 @@
 
 #include "Win32/Win32Defs.h"
 
+#include "chrono_utils.h"
+
 #include <atomic>
 
 #include "llvm/ADT/Optional.h"
@@ -84,6 +86,121 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 }
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ReleaseSRWLockExclusive(&handle);
+}
+
+// .. ConditionVariable support ..............................................
+
+struct cond_handle {
+  SWIFT_CONDITION_VARIABLE condition;
+  SWIFT_SRWLOCK lock;
+};
+
+inline void cond_init(cond_handle &handle) {
+  handle.condition = CONDITION_VARIABLE_INIT;
+  handle.lock = SRWLOCK_INIT;
+}
+inline void cond_destroy(cond_handle &handle) {}
+inline void cond_lock(cond_handle &handle) {
+  AcquireSRWLockExclusive(&handle.lock);
+}
+inline void cond_unlock(cond_handle &handle) {
+  ReleaseSRWLockExclusive(&handle.lock);
+}
+inline void cond_signal(cond_handle &handle) {
+  WakeConditionVariable(&handle.condition);
+}
+inline void cond_broadcast(cond_handle &handle) {
+  WakeAllConditionVariable(&handle.condition);
+}
+inline void cond_wait(cond_handle &handle) {
+  SleepConditionVariableSRW(&handle.condition,
+                            &handle.lock,
+                            INFINITE,
+                            0);
+}
+template <class Rep, class Period>
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::duration<Rep, Period> duration) {
+  auto ms = chrono_utils::ceil<std::chrono::milliseconds>(duration);
+
+  /* If you are paying attention to the next line, you are now asking
+
+       "Why are you adding 16 - that seems mad?"
+
+     To explain, we need to understand how the Sleep...() APIs in
+     Windows work.
+
+     The Windows kernel runs a timer, the system tick, which is
+     used for scheduling; the timer in question, for historical
+     reasons, by default runs at 64Hz.  Every time the timer fires,
+     Windows updates the tick count, schedules processes and so on.
+
+     When you ask to sleep, there are two cases:
+
+     1. You've asked to sleep for less than a tick, or
+
+     2. You've asked to sleep for at least a tick.
+
+     In case 1, the sleep functions appear to run a delay loop; this
+     is by its very nature inaccurate and you may or may not wait less
+     than the time you requested.  You might also get rescheduled,
+     in which case you'll wait at least a whole tick.
+
+     In case 2, Windows appears to be adding the requested wait to
+     its current tick count to work out when to wake your thread.
+     That *sounds* sensible, until you realise that if it does this
+     towards the end of a tick period, you will wait for that much
+     less time.  i.e. the sleep functions will return *early* by
+     up to one tick period.
+
+     This is especially unfortunate if you ask to wait for exactly
+     one tick period, because you will end up waiting for anything
+     between no time at all and a full tick period.
+
+     To complicate matters, the system tick rate might not be 64Hz;
+     the multimedia timer API can cause it to change to as high as
+     1kHz, and on *some* machines this happens globally for all
+     processes, while on *other* machines the kernel is actually using
+     a separate system tick rate and merely pretending to Win32
+     processes that things still work this way.
+
+     On other platforms, these kinds of functions are guaranteed to
+     wait for at least the time you requested, and we'd like for that
+     to be true for the Threading package's APIs here.  One way to
+     achieve that is to add a whole tick's worth of milliseconds
+     to the time we're requesting to wait for.  In that case, we'll
+     avoid the delay loop from case (1), and we'll also guarantee that
+     we wait for at least the amount of time the caller of this
+     function expected.
+
+     It would be nice if there were a Windows API we could call to
+     obtain the current system tick period.  The Internet suggests
+     that the undocumented call NtQueryTimerResolution() might be of
+     some use for this, but it turns out that that just gives you
+     the kernel's idea of the system tick period, which isn't the
+     same as Win32's idea necessarily.  e.g. on my test system, I
+     can see that the tick period is 15.625ms, while that call tells
+     me 1ms.
+
+     We don't want to change the system tick rate using the multimedia
+     timer API mentioned earlier, because on some machines that is
+     global and will use extra power and CPU cycles.
+
+     The upshot is that the best choice here appears to be to add
+     15.625ms (1/64s) to the time we're asking to wait.  That rounds
+     up to 16ms, which is why there's a +16. */
+  return SleepConditionVariableSRW(&handle.condition,
+                                   &handle.lock,
+                                   DWORD(ms.count()) + 16,
+                                   0);
+}
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::system_clock::time_point deadline) {
+  std::chrono::system_clock::duration duration =
+    deadline - std::chrono::system_clock::now();
+  if (duration < std::chrono::system_clock::duration::zero())
+    duration = std::chrono::system_clock::duration::zero();
+  return cond_wait(handle, duration);
 }
 
 // .. Once ...................................................................

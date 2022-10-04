@@ -159,7 +159,7 @@ that releases of the value may be hoisted without respect to deinit barriers.
 
 When applied to a type, indicates that all values which are _statically_
 instances of that type are themselves `@_eagerMove` as above, unless overridden
-with `@_lexical`.
+with `@_noEagerMove`.
 
 Aggregates all of whose fields are `@_eagerMove` or trivial are inferred to be
 `@_eagerMove`.
@@ -534,7 +534,7 @@ initializers from its superclass. This implies that all designated initializers
 overridden. This attribute is often printed alongside
 `@_hasMissingDesignatedInitializers` in this case.
 
-## `@_lexical`
+## `@_noEagerMove`
 
 When applied to a value, indicates that the value's lifetime is lexical, that
 releases of the value may not be hoisted over deinit barriers.  
@@ -544,7 +544,7 @@ This is the default behavior, unless the value's type is annotated
 annotation.
 
 When applied to a type, indicates that all values which are instances of that
-type are themselves `@_lexical` as above.
+type are themselves `@_noEagerMove` as above.
 
 This is the default behavior, unless the type annotated is an aggregate that
 consists entirely of `@_eagerMove` or trivial values, in which case the

@@ -1587,6 +1587,7 @@ namespace  {
     UNINTERESTING_ATTR(Custom)
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(TypeWrapper)
+    UNINTERESTING_ATTR(TypeWrapperIgnored)
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(ResultBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
@@ -1610,6 +1611,7 @@ namespace  {
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
     UNINTERESTING_ATTR(TypeSequence)
+    UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
     UNINTERESTING_ATTR(BackDeploy)
@@ -1620,7 +1622,7 @@ namespace  {
     UNINTERESTING_ATTR(AlwaysEmitConformanceMetadata)
 
     UNINTERESTING_ATTR(EagerMove)
-    UNINTERESTING_ATTR(Lexical)
+    UNINTERESTING_ATTR(NoEagerMove)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

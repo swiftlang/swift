@@ -858,7 +858,7 @@ bb3(%result : @owned $C1):
   return %result : $C1
 }
 
-// In thsi case, we only have a destroy_value,s o we just put it on %0 and
+// In this case, we only have a destroy_value,s o we just put it on %0 and
 // eliminate it, implying we should have a single upcast.
 //
 // CHECK-LABEL: sil [ossa] @upcast_upcast_merge_owned_different_bb_1 :
@@ -3045,13 +3045,13 @@ sil [ossa] @alloc_ref_dynamic_with_metatype : $() -> () {
   return %4 : $()
 }
 
-// CHECK: sil [ossa] @alloc_ref_dynamic_with_metatype_genneric :
+// CHECK: sil [ossa] @alloc_ref_dynamic_with_metatype_generic :
 // CHECK: metatype
 // CHECK: upcast
 // CHECK: alloc_ref_dynamic
 // CHECK: return
-// CHECK: } // end sil function 'alloc_ref_dynamic_with_metatype_genneric'
-sil [ossa] @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
+// CHECK: } // end sil function 'alloc_ref_dynamic_with_metatype_generic'
+sil [ossa] @alloc_ref_dynamic_with_metatype_generic : $<T where T : B>() -> () {
   %1 = metatype $@thick T.Type
   %2 = upcast %1 : $@thick T.Type to $@thick B.Type
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -3361,7 +3361,7 @@ enum ErrorEnum: Error {
     case other
 }
 
-// In OSSA we can compeltely remove this test case from sil_combine.sil. I added
+// In OSSA we can completely remove this test case from sil_combine.sil. I added
 // a version afterwards that is too complicated for sil-combine that should show
 // the behavior specified.
 //

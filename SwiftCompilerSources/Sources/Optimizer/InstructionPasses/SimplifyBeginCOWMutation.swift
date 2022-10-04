@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Basic
 import SIL
 
 /// Simplify begin_cow_mutation instructions.

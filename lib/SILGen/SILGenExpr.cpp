@@ -507,8 +507,8 @@ namespace {
                                                 SGFContext C);
     RValue visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E,
                                              SGFContext C);
-    RValue visitIfExpr(IfExpr *E, SGFContext C);
-    
+    RValue visitTernaryExpr(TernaryExpr *E, SGFContext C);
+
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
     RValue visitEnumIsCaseExpr(EnumIsCaseExpr *E, SGFContext C);
 
@@ -1748,12 +1748,32 @@ static bool canPeepholeLiteralClosureConversion(Type literalType,
   
   if (!literalFnType || !convertedFnType)
     return false;
-  
-  // Does the conversion only add `throws`?
-  if (literalFnType->isEqual(convertedFnType->getWithoutThrowing())) {
+    
+  // Is it an identity conversion?
+  if (literalFnType->isEqual(convertedFnType)) {
     return true;
   }
   
+  // Are the types equivalent aside from effects (throws) or coeffects
+  // (escaping)? Then we should emit the literal as having the destination type
+  // (co)effects, even if it doesn't exercise them.
+  //
+  // TODO: We could also in principle let `async` through here, but that
+  // interferes with the implementation of `reasync`.
+  auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
+    .withThrows(false)
+    .withNoEscape(false)
+    .build();
+    
+  auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
+    .withThrows(false)
+    .withNoEscape(false)
+    .build();
+  if (literalFnType->withExtInfo(literalWithoutEffects)
+        ->isEqual(convertedFnType->withExtInfo(convertedWithoutEffects))) {
+    return true;
+  }
+
   return false;
 }
 
@@ -1799,7 +1819,20 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // TODO: Move this up when we can emit closures directly with C calling
   // convention.
   auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
-  if (isa<AbstractClosureExpr>(subExpr)
+  // Look through `as` type ascriptions that don't induce bridging too.
+  while (auto subCoerce = dyn_cast<CoerceExpr>(subExpr)) {
+    // Coercions that introduce bridging aren't simple type ascriptions.
+    // (Maybe we could still peephole through them eventually, though, by
+    // performing the bridging in the closure prolog/epilog and/or emitting
+    // the closure with the correct contextual block/closure/C function pointer
+    // representation.)
+    if (!subCoerce->getSubExpr()->getType()->isEqual(subCoerce->getType())) {
+      break;
+    }
+    subExpr = subCoerce->getSubExpr()->getSemanticsProvidingExpr();
+  }
+  
+  if ((isa<AbstractClosureExpr>(subExpr) || isa<CaptureListExpr>(subExpr))
       && canPeepholeLiteralClosureConversion(subExpr->getType(),
                                              e->getType())) {
     // If we're emitting into a context with a preferred abstraction pattern
@@ -4006,7 +4039,8 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 
       auto ImageBaseAddr = B.createGlobalAddr(SILLoc, ImageBase);
       auto ImageBasePointer =
-          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy);
+          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy,
+              /*needsStackProtection=*/ false);
       S = B.createStruct(SILLoc, UnsafeRawPtrTy, { ImageBasePointer });
     } else {
       auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
@@ -4018,7 +4052,8 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 
       auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
       auto DSOPointer =
-          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy);
+          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy,
+              /*needsStackProtection=*/ false);
       S = B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
     }
 
@@ -4063,7 +4098,8 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     if (index != 0) {
       SILValue indexValue = SGF.B.createIntegerLiteral(
           loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue);
+      destAddr = SGF.B.createIndexAddr(loc, destAddr, indexValue,
+              /*needsStackProtection=*/ false);
     }
     auto &destTL = varargsInfo.getBaseTypeLowering();
     // Create a dormant cleanup for the value in case we exit before the
@@ -4524,7 +4560,7 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
   return RValue(SGF, E, v);
 }
 
-RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
+RValue RValueEmitter::visitTernaryExpr(TernaryExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
 
   auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());
@@ -5622,7 +5658,8 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   SILValue address =
     emitAddressOfLValue(loc, std::move(lv)).getUnmanagedValue();
   address = B.createAddressToPointer(loc, address,
-                               SILType::getRawPointerType(getASTContext()));
+                               SILType::getRawPointerType(getASTContext()),
+              /*needsStackProtection=*/ true);
   
   // Disable nested writeback scopes for any calls evaluated during the
   // conversion intrinsic.

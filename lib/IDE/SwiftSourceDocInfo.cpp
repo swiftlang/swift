@@ -196,7 +196,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
   return !isDone();
 }
 
-bool NameMatcher::walkToDeclPre(Decl *D) {
+ASTWalker::PreWalkAction NameMatcher::walkToDeclPre(Decl *D) {
   // Handle occurrences in any preceding doc comments
   RawComment R = D->getRawComment(/*SerializedOK=*/false);
   if (!R.isEmpty()) {
@@ -205,17 +205,19 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
         tryResolve(ASTWalker::ParentTy(), nextLoc());
     }
   }
+  if (isDone())
+    return Action::Stop();
 
   // FIXME: Even implicit Decls should have proper ranges if they include any
   // non-implicit children (fix implicit Decls created for lazy vars).
   if (D->isImplicit())
-    return !isDone();
+    return Action::Continue();
 
   if (shouldSkip(D->getSourceRangeIncludingAttrs()))
-    return false;
-  
+    return Action::SkipChildren();
+
   if (!handleCustomAttrs(D))
-    return false;
+    return Action::Stop();
 
   if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
     for (auto Clause : ICD->getClauses()) {
@@ -231,7 +233,7 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
         --InactiveConfigRegionNestings;
       }
     }
-    return false;
+    return Action::SkipChildren();
   } else if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     std::vector<CharSourceRange> LabelRanges;
     if (AFD->getNameLoc() == nextLoc()) {
@@ -261,25 +263,17 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
              isa<PrecedenceGroupDecl>(D)) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc());
   }
-  return !isDone();
+  return Action::StopIf(isDone());
 }
 
-bool NameMatcher::walkToDeclPost(Decl *D) {
-  return !isDone();
-}
+ASTWalker::PreWalkResult<Stmt *> NameMatcher::walkToStmtPre(Stmt *S) {
+  if (isDone())
+    return Action::Stop();
 
-std::pair<bool, Stmt *> NameMatcher::walkToStmtPre(Stmt *S) {
   // FIXME: Even implicit Stmts should have proper ranges that include any
   // non-implicit Stmts (fix Stmts created for lazy vars).
-  if (!S->isImplicit() && shouldSkip(S->getSourceRange()))
-    return std::make_pair(false, isDone()? nullptr : S);
-  return std::make_pair(true, S);
-}
-
-Stmt *NameMatcher::walkToStmtPost(Stmt *S) {
-  if (isDone())
-    return nullptr;
-  return S;
+  auto ShouldSkip = !S->isImplicit() && shouldSkip(S->getSourceRange());
+  return Action::SkipChildrenIf(ShouldSkip, S);
 }
 
 ArgumentList *NameMatcher::getApplicableArgsFor(Expr *E) {
@@ -308,7 +302,7 @@ static Expr *extractNameExpr(Expr *Fn) {
   return nullptr;
 }
 
-std::pair<bool, ArgumentList *>
+ASTWalker::PreWalkResult<ArgumentList *>
 NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
   if (!ArgList->isImplicit()) {
     auto Labels = getCallArgLabelRanges(getSourceMgr(), ArgList,
@@ -317,7 +311,7 @@ NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
              Labels.first, Labels.second);
   }
   if (isDone())
-    return {false, ArgList};
+    return Action::Stop();
 
   // Handle arg label locations (the index reports property occurrences on them
   // for memberwise inits).
@@ -327,20 +321,29 @@ NameMatcher::walkToArgumentListPre(ArgumentList *ArgList) {
     if (!Name.empty()) {
       tryResolve(Parent, Arg.getLabelLoc());
       if (isDone())
-        return {false, ArgList};
+        return Action::Stop();
     }
     if (!E->walk(*this))
-      return {false, ArgList};
+      return Action::Stop();
   }
-  // We already visited the children.
-  if (!walkToArgumentListPost(ArgList))
-    return {false, nullptr};
-  return {false, ArgList};
+  // TODO: We should consider changing Action::SkipChildren to still call
+  // walkToArgumentListPost, which would eliminate the need for this.
+  auto postWalkResult = walkToArgumentListPost(ArgList);
+  switch (postWalkResult.Action.Action) {
+  case PostWalkAction::Stop:
+    return Action::Stop();
+  case PostWalkAction::Continue:
+    // We already visited the children.
+    return Action::SkipChildren(*postWalkResult.Value);
+  }
+  llvm_unreachable("Unhandled case in switch!");
 }
 
-std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkResult<Expr *> NameMatcher::walkToExprPre(Expr *E) {
+  if (isDone())
+    return Action::Stop();
   if (shouldSkip(E))
-    return std::make_pair(false, isDone()? nullptr : E);
+    return Action::SkipChildren(E);
 
   if (isa<ObjCSelectorExpr>(E)) {
       ++SelectorNestings;
@@ -388,16 +391,23 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
         BinaryExpr *BinE = cast<BinaryExpr>(E);
         // Visit in source order.
         if (!BinE->getLHS()->walk(*this))
-          return {false, nullptr};
+          return Action::Stop();
         if (!BinE->getFn()->walk(*this))
-          return {false, nullptr};
+          return Action::Stop();
         if (!BinE->getRHS()->walk(*this))
-          return {false, nullptr};
+          return Action::Stop();
 
-        // We already visited the children.
-        if (!walkToExprPost(E))
-          return {false, nullptr};
-        return {false, E};
+        // TODO: We should consider changing Action::SkipChildren to still call
+        // walkToArgumentListPost, which would eliminate the need for this.
+        auto postWalkResult = walkToExprPost(E);
+        switch (postWalkResult.Action.Action) {
+        case PostWalkAction::Stop:
+          return Action::Stop();
+        case PostWalkAction::Continue:
+          // We already visited the children.
+          return Action::SkipChildren(*postWalkResult.Value);
+        }
+        llvm_unreachable("Unhandled case in switch!");
       }
       case ExprKind::KeyPath: {
         KeyPathExpr *KP = cast<KeyPathExpr>(E);
@@ -434,12 +444,12 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
         break;
     }
   }
-  return std::make_pair(!isDone(), isDone()? nullptr : E);
+  return Action::StopIf(isDone(), E);
 }
 
-Expr *NameMatcher::walkToExprPost(Expr *E) {
+ASTWalker::PostWalkResult<Expr *> NameMatcher::walkToExprPost(Expr *E) {
   if (isDone())
-    return nullptr;
+    return Action::Stop();
 
   if (!E->isImplicit()) {
     // Try to resolve against the below kinds *after* their children have been
@@ -469,12 +479,14 @@ Expr *NameMatcher::walkToExprPost(Expr *E) {
     --SelectorNestings;
   }
 
-  return E;
+  return Action::StopIf(isDone(), E);
 }
 
-bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
-  if (isDone() || shouldSkip(T->getSourceRange()))
-    return false;
+ASTWalker::PreWalkAction NameMatcher::walkToTypeReprPre(TypeRepr *T) {
+  if (isDone())
+    return Action::Stop();
+  if (shouldSkip(T->getSourceRange()))
+    return Action::SkipChildren();
 
   if (isa<ComponentIdentTypeRepr>(T)) {
     // If we're walking a CustomAttr's type we may have an associated call
@@ -489,19 +501,17 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }
   }
-  return !isDone();
+  return Action::StopIf(isDone());
 }
 
-bool NameMatcher::walkToTypeReprPost(TypeRepr *T) {
-  return !isDone();
-}
-
-std::pair<bool, Pattern*> NameMatcher::walkToPatternPre(Pattern *P) {
-  if (isDone() || shouldSkip(P->getSourceRange()))
-    return std::make_pair(false, P);
+ASTWalker::PreWalkResult<Pattern *> NameMatcher::walkToPatternPre(Pattern *P) {
+  if (isDone())
+    return Action::Stop();
+  if (shouldSkip(P->getSourceRange()))
+    return Action::SkipChildren(P);
 
   tryResolve(ASTWalker::ParentTy(P), P->getStartLoc());
-  return std::make_pair(!isDone(), P);
+  return Action::StopIf(isDone(), P);
 }
 
 bool NameMatcher::checkComments() {

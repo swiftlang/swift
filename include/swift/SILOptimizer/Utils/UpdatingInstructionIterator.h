@@ -86,7 +86,7 @@ public:
   }
 
   Self &operator=(const Self &rhs) {
-    this->regsitry = rhs.registry;
+    this->registry = rhs.registry;
     this->base = rhs.base;
     this->advanced = rhs.advanced;
     registry->registerIterator(this);
@@ -153,11 +153,11 @@ using UpdatingReverseInstructionIterator =
     UpdatingListIterator<SILBasicBlock::reverse_iterator, true,
                          UpdatingInstructionIteratorRegistry>;
 
-/// Track instruction iterators that need updating when intructions are added or
+/// Track instruction iterators that need updating when instructions are added or
 /// deleted. Iterators can be tracked across multiple levels of the call
 /// stack. This registry object must outlive any iterators that it vends.
 ///
-/// While the registry is active, all instruction modificaiton must go through
+/// While the registry is active, all instruction modification must go through
 /// its callbacks.
 class UpdatingInstructionIteratorRegistry {
 

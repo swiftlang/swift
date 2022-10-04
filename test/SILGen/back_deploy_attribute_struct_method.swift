@@ -8,13 +8,13 @@
 @available(macOS 10.50, *)
 public struct TopLevelStruct {
   // -- Fallback definition for TopLevelStruct.trivialMethod()
-  // CHECK-LABEL: sil non_abi [serialized] [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwB : $@convention(method) (TopLevelStruct) -> ()
+  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwB : $@convention(method) (TopLevelStruct) -> ()
   // CHECK: bb0({{%.*}} : $TopLevelStruct):
   // CHECK:   [[RESULT:%.*]] = tuple ()
   // CHECK:   return [[RESULT]] : $()
 
   // -- Back deployment thunk for TopLevelStruct.trivialMethod()
-  // CHECK-LABEL: sil non_abi [serialized] [thunk] [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwb : $@convention(method) (TopLevelStruct) -> ()
+  // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyFTwb : $@convention(method) (TopLevelStruct) -> ()
   // CHECK: bb0([[BB0_ARG:%.*]] : $TopLevelStruct):
   // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
   // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
@@ -38,7 +38,7 @@ public struct TopLevelStruct {
   // CHECK:   return [[RESULT]] : $()
 
   // -- Original definition of TopLevelStruct.trivialMethod()
-  // CHECK-LABEL: sil [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyF : $@convention(method) (TopLevelStruct) -> ()
+  // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV13trivialMethodyyF : $@convention(method) (TopLevelStruct) -> ()
   @available(macOS 10.51, *)
   @_backDeploy(before: macOS 10.52)
   public func trivialMethod() {}

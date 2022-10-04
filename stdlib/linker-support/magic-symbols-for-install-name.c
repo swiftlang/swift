@@ -21,7 +21,7 @@
 
 #include <Availability.h>
 #include <TargetConditionals.h>
-#include "../public/SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 #define RPATH_INSTALL_NAME_DIRECTIVE_IMPL2(name, major, minor) \
   SWIFT_RUNTIME_EXPORT const char install_name_ ## major ## _ ## minor \

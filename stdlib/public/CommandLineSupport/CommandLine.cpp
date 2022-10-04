@@ -26,9 +26,9 @@
 
 #include "swift/Runtime/Debug.h"
 
-#include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/RuntimeStubs.h"
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/GlobalObjects.h"
+#include "swift/shims/RuntimeStubs.h"
+#include "swift/shims/Visibility.h"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN

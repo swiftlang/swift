@@ -260,6 +260,8 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::DependentMember:
     assert(sig && "dependent types can't answer reference semantics query");
     return sig->requiresClass(type);
+  case TypeKind::BuiltinTuple:
+    llvm_unreachable("Should not get a BuiltinTupleType here");
   }
 
   llvm_unreachable("Unhandled type kind!");
@@ -1576,6 +1578,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
+  case TypeKind::BuiltinTuple:
     llvm_unreachable("these types are always canonical");
 
 #define SUGARED_TYPE(id, parent) \
@@ -4830,8 +4833,30 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (!genericSig)
     return substitutions;
 
-  // Find the superclass type with the context matching that of the member.
   auto *ownerNominal = dc->getSelfNominalTypeDecl();
+
+  // If the declaration context is Builtin.TheTupleType or an extension thereof,
+  // the base type must be a tuple type. Build a pack type from the tuple's
+  // elements and construct a substitution map replacing the generic parameter
+  // of Builtin.TheTupleType with the pack.
+  if (isa<BuiltinTupleDecl>(ownerNominal)) {
+    SmallVector<Type, 2> packElts;
+    for (auto type : castTo<TupleType>()->getElementTypes())
+      packElts.push_back(type);
+
+    auto *packType = PackType::get(dc->getASTContext(), packElts);
+
+    assert(genericSig.getGenericParams().size() == 1);
+    auto elementsParam = cast<SubstitutableType>(
+        genericSig.getGenericParams()[0]->getCanonicalType());
+    substitutions[elementsParam] = packType;
+    return substitutions;
+  }
+
+  // If the declaration context is a class or an extension thereof, the base
+  // type must be a class, class-constrained archetype, or self-conforming
+  // existential with a superclass bound. Get the base type's superclass type
+  // for the corresponding declaration context.
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal)) {
     baseTy = baseTy->getSuperclassForDecl(ownerClass,
                                       /*usesArchetypes=*/genericEnv != nullptr);
@@ -5121,6 +5146,7 @@ case TypeKind::Id:
   case TypeKind::GenericTypeParam:
   case TypeKind::SILToken:
   case TypeKind::Module:
+  case TypeKind::BuiltinTuple:
     return *this;
 
   case TypeKind::Enum:
@@ -5534,8 +5560,12 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      elements.push_back(transformedEltTy);
-      ++Index;
+      if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
+        elements.append(transformedPack->getElementTypes().begin(),
+                        transformedPack->getElementTypes().end());
+      } else {
+        elements.push_back(transformedEltTy);
+      }
     }
 
     if (!anyChanged)
@@ -5672,17 +5702,12 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      if (eltTy->isTypeSequenceParameter() &&
-          transformedEltTy->is<PackType>()) {
-        assert(anyChanged);
-        // Splat the tuple in by copying in all of the transformed elements.
-        auto tuple = dyn_cast<PackType>(transformedEltTy.getPointer());
-        elements.append(tuple->getElementTypes().begin(),
-                        tuple->getElementTypes().end());
+      if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
+        elements.append(transformedPack->getElementTypes().begin(),
+                        transformedPack->getElementTypes().end());
       } else {
         // Add the new tuple element, with the transformed type.
         elements.push_back(elt.getWithType(transformedEltTy));
-        ++Index;
       }
     }
 
@@ -6153,6 +6178,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::DependentMember:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
+  case TypeKind::BuiltinTuple:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"

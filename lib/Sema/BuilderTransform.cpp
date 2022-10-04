@@ -48,6 +48,7 @@ const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
     switch (cond.getKind()) {
     case StmtConditionElement::CK_Boolean:
     case StmtConditionElement::CK_PatternBinding:
+    case StmtConditionElement::CK_HasSymbol:
       continue;
 
     case StmtConditionElement::CK_Availability:
@@ -2360,9 +2361,11 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     cs.solveForCodeCompletion(solutions);
 
     CompletionContextFinder analyzer(func, func->getDeclContext());
-    filterSolutionsForCodeCompletion(solutions, analyzer);
-    for (const auto &solution : solutions) {
-      cs.getASTContext().CompletionCallback->sawSolution(solution);
+    if (analyzer.hasCompletion()) {
+      filterSolutionsForCodeCompletion(solutions, analyzer);
+      for (const auto &solution : solutions) {
+        cs.getASTContext().CompletionCallback->sawSolution(solution);
+      }
     }
     return nullptr;
   }
@@ -2694,9 +2697,9 @@ public:
     return ResultBuilderBodyPreCheck::Okay;
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (SkipPrecheck)
-      return std::make_pair(false, E);
+      return Action::SkipChildren(E);
 
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
@@ -2720,21 +2723,24 @@ public:
       if (SuppressDiagnostics)
         transaction.abort();
 
-      return std::make_pair(false, HasError ? nullptr : E);
+      if (HasError)
+        return Action::Stop();
+
+      return Action::SkipChildren(E);
     }
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     // If we see a return statement, note it..
     if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
       if (!returnStmt->isImplicit()) {
         ReturnStmts.push_back(returnStmt);
-        return std::make_pair(false, S);
+        return Action::SkipChildren(S);
       }
     }
 
     // Otherwise, recurse into the statement normally.
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
   /// Check whether given expression (including single-statement
@@ -2761,8 +2767,8 @@ public:
   }
 
   /// Ignore patterns.
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
-    return { false, pat };
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+    return Action::SkipChildren(pat);
   }
 };
 

@@ -1473,9 +1473,10 @@ void PrintAST::printInheritedFromRequirementSignature(ProtocolDecl *proto,
       [&](const Requirement &req) {
         // Skip the inferred 'Self : AnyObject' constraint if this is an
         // @objc protocol.
-        if (req.getKind() == RequirementKind::Layout &&
+        if ((req.getKind() == RequirementKind::Layout) &&
             req.getFirstType()->isEqual(proto->getProtocolSelfType()) &&
-            req.getLayoutConstraint()->getKind() == LayoutConstraintKind::Class &&
+            req.getLayoutConstraint()->getKind() ==
+                LayoutConstraintKind::Class &&
             proto->isObjC()) {
           return false;
         }
@@ -2737,10 +2738,6 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureActors2(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->isSendable())
@@ -2843,17 +2840,6 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
 }
 
 static bool usesFeatureGlobalActors(Decl *decl) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    if (nominal->getAttrs().hasAttribute<GlobalActorAttr>())
-      return true;
-  }
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto nominal = ext->getExtendedNominal())
-      if (usesFeatureGlobalActors(nominal))
-        return true;
-  }
-
   return false;
 }
 
@@ -2921,6 +2907,8 @@ static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
 static bool usesFeatureBuiltinTaskRunInline(Decl *) { return false; }
 
+static bool usesFeatureBuiltinUnprotectedAddressOf(Decl *) { return false; }
+
 static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
@@ -2936,6 +2924,14 @@ static bool usesFeatureTypeWrappers(Decl *decl) {
 }
 
 static bool usesFeatureParserRoundTrip(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureParserValidation(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureParserSequenceFolding(Decl *decl) {
   return false;
 }
 
@@ -3035,6 +3031,10 @@ static bool usesFeatureExistentialAny(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureImplicitSome(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureForwardTrailingClosures(Decl *decl) {
   return false;
 }
@@ -3044,6 +3044,10 @@ static bool usesFeatureBareSlashRegexLiterals(Decl *decl) {
 }
 
 static bool usesFeatureVariadicGenerics(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureLayoutPrespecialization(Decl *decl) {
   return false;
 }
 
@@ -3667,6 +3671,11 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
                        Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
+
+void PrintAST::visitBuiltinTupleDecl(BuiltinTupleDecl *decl) {
+  llvm_unreachable("Not implemented");
+}
+
 static bool isStructOrClassContext(DeclContext *dc) {
   auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
@@ -4449,8 +4458,7 @@ void PrintAST::visitErrorExpr(ErrorExpr *expr) {
   Printer << "<error>";
 }
 
-void PrintAST::visitIfExpr(IfExpr *expr) {
-}
+void PrintAST::visitTernaryExpr(TernaryExpr *expr) {}
 
 void PrintAST::visitIsExpr(IsExpr *expr) {
 }
@@ -5557,13 +5565,6 @@ public:
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
-    // Single-element tuples can only appear in SIL mode.
-    if (T->getNumElements() == 1 &&
-        !T->getElement(0).hasName() &&
-        !T->getElementType(0)->is<PackExpansionType>()) {
-      Printer << "@tuple ";
-    }
-
     Printer << "(";
 
     auto Fields = T->getElements();
@@ -5581,6 +5582,10 @@ public:
       if (TD.hasName()) {
         Printer.printName(TD.getName(), PrintNameContext::TupleElement);
         Printer << ": ";
+      } else if (e == 1 && !EltType->is<PackExpansionType>()) {
+        // Unlabeled one-element tuples always print the empty label to
+        // distinguish them from the older syntax for ParenType.
+        Printer << "_: ";
       }
       visit(EltType);
     }
@@ -6328,6 +6333,10 @@ public:
     }
   }
 
+  void visitBuiltinTupleType(BuiltinTupleType *T) {
+    printQualifiedType(T);
+  }
+
   void visitLValueType(LValueType *T) {
     Printer << "@lvalue ";
     visit(T->getObjectType());
@@ -6606,7 +6615,7 @@ void LayoutConstraint::print(raw_ostream &OS,
 
 void LayoutConstraintInfo::print(ASTPrinter &Printer,
                                  const PrintOptions &PO) const {
-  Printer << getName();
+  Printer << getName(PO.PrintClassLayoutName);
   switch (getKind()) {
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:

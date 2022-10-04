@@ -283,7 +283,7 @@ sil_witness_table S: P module test {}
 
 // The guaranteed concrete argument cannot be consumed. The
 // existential created in the prolog must be destroyed before
-// returing.
+// returning.
 //
 // CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout any P) -> () {
 // CHECK: bb0(%0 : $*τ_0_0, %1 : $*any P):
@@ -383,8 +383,11 @@ bb0(%0 : $S, %1 : $*P):
 
 //===----------------------------------------------------------------------===//
 // Test an existential with a generic constraint
-// rdar://56923071; [SR-11714]: Compiler crash when generic class is passed as
-// a parameter to a function accepting a generic class
+//
+// rdar://56923071
+// https://github.com/apple/swift/issues/54123
+// Compiler crash when generic class is passed as a parameter to a function
+// accepting a generic class
 //
 // Allowing this results in the error:
 // SIL verification failed: Operand is of an ArchetypeType that does not exist

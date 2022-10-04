@@ -154,6 +154,18 @@ This status table describes which of the following Swift language features have 
 | Copy and destroy semantics     | Yes                                                      |
 | Initializers                   | Partially, as static `init` methods. No failable support |
 
+**Enums**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Fixed layout enums           | Yes                                                      |
+| Resilient / opaque enums     | Yes                                                      |
+| Copy and destroy semantics   | Yes                                                      |
+| Creation                     | Yes                                                      |
+| Enums with associated values | Partially: only support structs and enums                |
+| Enums with raw values        | Yes                                                       |
+| Indirect enums               | No                                                       |
+
 **Class types**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
@@ -166,13 +178,34 @@ This status table describes which of the following Swift language features have 
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Instance methods               | Yes, for structs and classes only                                    |
+| Instance methods               | Yes                                                      |
 | Static methods                 | No                                                       |
 
 **Properties**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name. For structs and classes only                   |
-| Setter accessors               | Yes, via `set<name>`. For structs and classes only                   |
+| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name                         |
+| Setter accessors               | Yes, via `set<name>`                                     |
 | Mutation accessors             | No                                                       |
+| Static property accessors      | Yes                         |
+
+**Generics**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Generic functions            | Partially, only without generic constraints              |
+| Generic methods              | Partially, only without generic constraints              |
+| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
+| Generic `enum` types         | Partially, only without generic constraints and less than 4 generic parameters |
+| Generic `class` types        | No |
+
+### Swift standard library
+
+This status table describes which of the following Swift standard library APIs have some experimental support for using them in C++.
+
+| **Swift Library Type**     | **Can be used from C++** |
+|--------------------------------|----------------------------------------------------------|
+| `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++   |
+| `Array<T>`   | Can be used as a type in C++. Limited set of APIs in some extensions are exposed to C++.   |
+| `Optional<T>`   | Can be used as a type in C++. APIs in extensions are not exposed to C++   |

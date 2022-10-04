@@ -2,13 +2,14 @@
 // RUN: %target-swift-frontend %S/Inputs/RemoteP.swift -module-name RemoteP -emit-module -emit-module-path %t/RemoteP.swiftmodule -emit-module-source-info-path %t/RemoteP.swiftsourceinfo -emit-module-doc-path %t/RemoteP.swiftdoc
 // RUN: %target-swift-frontend %s -module-name RemoteInheritedDocs -emit-module -emit-module-path %t/RemoteInheritedDocs.swiftmodule -emit-module-source-info-path %t/RemoteInheritedDocs.swiftsourceinfo -emit-module-doc-path %t/RemoteInheritedDocs.swiftdoc -I %t
 
-// RUN: %target-swift-symbolgraph-extract -module-name RemoteInheritedDocs -I %t -pretty-print -output-dir %t
+// RUN: %target-swift-symbolgraph-extract -module-name RemoteInheritedDocs -I %t -pretty-print -output-dir %t -emit-extension-block-symbols
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix SOME
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix OTHER
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix BONUS
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix INHERIT
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix LOCAL
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix OVERRIDE
+// RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs@RemoteP.symbols.json --check-prefix EXTENSION
 
 // RUN: %target-swift-symbolgraph-extract -module-name RemoteInheritedDocs -I %t -pretty-print -output-dir %t -skip-inherited-docs
 // RUN: %FileCheck %s --input-file %t/RemoteInheritedDocs.symbols.json --check-prefix SOME
@@ -44,6 +45,8 @@
 // OVERRIDE-NOT: Extra default docs!
 // OVERRIDE-NOT: Extension override!
 
+// EXTENSION-NOT: Some Protocol
+
 import RemoteP
 
 // The `RemoteP.P` protocol has three methods: `someFunc` and `bonusFunc` don't have docs upstream,
@@ -52,6 +55,9 @@ import RemoteP
 
 // `RemoteP.P` also has an extension with a default implementation for `extraFunc` that does have
 // docs, but overriding it here should prevent those from appearing
+
+// When emitting extension block symbols, local extension blocks should never inherit documentation
+// from the original type declaration.
 
 public struct S: P {
     public func someFunc() {}
@@ -68,4 +74,3 @@ public extension P {
     /// Extension override!
     func someFunc() {}
 }
-

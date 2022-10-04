@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/init-in-cxx.swift -typecheck -module-name Init -clang-header-expose-public-decls -emit-clang-header-path %t/inits.h
+// RUN: %target-swift-frontend %S/init-in-cxx.swift -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-init-execution.o
 // RUN: %target-interop-build-swift %S/init-in-cxx.swift -o %t/swift-init-execution -Xlinker %t/swift-init-execution.o -module-name Init -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -46,5 +46,20 @@ int main() {
 // CHECK-NEXT: create RefCountedClass 22
 // CHECK-NEXT: destroy RefCountedClass 22
 // CHECK-NEXT: destroy RefCountedClass -1
+
+  {
+    auto x = FinalClass::init(FirstSmallStruct::init(78));
+    assert(x.getProp().getX() == 78);
+  }
+
+  {
+    auto x = DerivedClass::init(1, 2);
+    assert(x.getX() == 5);
+  }
+
+  {
+    auto x = DerivedClassTwo::init(1, 2);
+    assert(x.getX() == 3);
+  }
   return 0;
 }

@@ -19,6 +19,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
@@ -431,8 +432,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
     if (vers.hasValue()) {
       if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
@@ -445,8 +446,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     if (vers.hasValue()) {
       Opts.PackageDescriptionVersion = vers.getValue();
     } else {
@@ -587,13 +588,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
-  if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
-    Opts.RequireExplicitAvailability = true;
-    if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
-      Opts.RequireExplicitAvailabilityTarget = A->getValue();
-    }
-  }
-
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
@@ -690,9 +684,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
+  if (Args.hasArg(OPT_enable_experimental_layout_prespecialization))
+    Opts.Features.insert(Feature::LayoutPrespecialization);
   
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);
+  if (Args.hasArg(OPT_enable_experimental_implicit_some)){
+      Opts.Features.insert(Feature::ImplicitSome);
+      Opts.Features.insert(Feature::ExistentialAny);
+  }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
@@ -719,6 +719,29 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
+    StringRef diagLevel = A->getValue();
+    if (diagLevel == "warn") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+    } else if (diagLevel == "error") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
+    } else if (diagLevel == "ignore") {
+      Opts.RequireExplicitAvailability = None;
+    } else {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unknown_require_explicit_availability,
+                     diagLevel);
+    }
+  } else if (Args.getLastArg(OPT_require_explicit_availability,
+                             OPT_require_explicit_availability_target) ||
+             Opts.LibraryLevel == LibraryLevel::API) {
+    Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailabilityTarget = A->getValue();
   }
 
   Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
@@ -910,8 +933,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()) == "target")
       return Opts.getMinPlatformVersion();
 
-    if (auto vers = version::Version::parseVersionString(A->getValue(),
-                                                         SourceLoc(), &Diags))
+    if (auto vers = VersionParser::parseVersionString(A->getValue(),
+                                                      SourceLoc(), &Diags))
       return (llvm::VersionTuple)*vers;
 
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -1251,6 +1274,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
+  Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
@@ -1283,6 +1307,8 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+  Opts.EmitExtensionBlockSymbols =
+      Args.hasArg(OPT_emit_extension_block_symbols);
 
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =
@@ -1764,6 +1790,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
+  Opts.EnableStackProtection =
+      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableStackProtection);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -2413,10 +2442,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_disable_new_llvm_pass_manager,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
-
-  Opts.EnableStackProtector =
-      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
-                   Opts.EnableStackProtector);
 
   return false;
 }

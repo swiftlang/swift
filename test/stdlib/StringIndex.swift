@@ -1060,7 +1060,9 @@ suite.test("String.replaceSubrange index validation")
   }
 }
 
-suite.test("Substring.removeSubrange entire range") {
+suite.test("Substring.removeSubrange entire range")
+.skip(.always("Disabled due to rdar://99627624"))
+.code {
   guard #available(SwiftStdlib 5.7, *) else {
     // This is a regression found in 5.7+
     return

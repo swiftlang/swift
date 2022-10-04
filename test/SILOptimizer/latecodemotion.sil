@@ -1371,12 +1371,12 @@ bb3(%3 : $X):
   return %23 : $()
 }
 
-// CHECK: sil @dont_hoist_release_accross_cast
+// CHECK: sil @dont_hoist_release_across_cast
 // CHECK: retain
 // CHECK: apply
 // CHECK: unconditional_checked_cast
 // CHECK: release
-sil @dont_hoist_release_accross_cast : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+sil @dont_hoist_release_across_cast : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1: $Builtin.NativeObject):
   strong_retain %0: $Builtin.NativeObject
   %2 = function_ref @blocker : $@convention(thin) () -> ()

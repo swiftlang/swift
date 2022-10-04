@@ -118,6 +118,16 @@ bool ValueBase::isLexical() const {
   return false;
 }
 
+bool ValueBase::hasDebugTrace() const {
+  for (auto *op : getUses()) {
+    if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
+      if (debugValue->hasTrace())
+        return true;
+    }
+  }
+  return false;
+}
+
 SILBasicBlock *SILNode::getParentBlock() const {
   if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();

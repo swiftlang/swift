@@ -37,8 +37,8 @@ extension Sequence where Element: Comparable {
   ///     print(descendingStudents)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
-  /// preserves the relative order of elements that compare equal.
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
+  /// preserves the relative order of elements that compare as equal.
   ///
   /// - Returns: A sorted array of the sequence's elements.
   ///
@@ -117,7 +117,7 @@ extension Sequence {
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.
   ///   (Transitive incomparability)
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
   /// preserves the relative order of elements for which
   /// `areInIncreasingOrder` does not establish an order.
   ///
@@ -162,8 +162,8 @@ where Self: RandomAccessCollection, Element: Comparable {
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
-  /// preserves the relative order of elements that compare equal.
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
+  /// preserves the relative order of elements that compare as equal.
   ///
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
@@ -231,7 +231,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.
   ///   (Transitive incomparability)
   ///
-  /// The sorting algorithm is not guaranteed to be stable. A stable sort
+  /// The sorting algorithm is guaranteed to be stable. A stable sort
   /// preserves the relative order of elements for which
   /// `areInIncreasingOrder` does not establish an order.
   ///
@@ -334,7 +334,8 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// as out-of-place storage. Stable.
 ///
 /// The unused return value is legacy ABI. It was originally added as a
-/// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+/// workaround for a compiler bug (now fixed). See
+/// https://github.com/apple/swift/issues/57100 (rdar://45044610).
 ///
 /// - Precondition: `lo..<mid` and `mid..<hi` must already be sorted according
 ///   to `areInIncreasingOrder`.
@@ -515,7 +516,8 @@ extension UnsafeMutableBufferPointer {
   /// out-of-place storage.
   ///
   /// The unused return value is legacy ABI. It was originally added as a
-  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  /// workaround for a compiler bug (now fixed). See
+  /// https://github.com/apple/swift/issues/57100 (rdar://45044610).
   ///
   /// - Precondition: `runs.count > 1` and `i > 0`
   /// - Precondition: `buffer` must have at least
@@ -551,7 +553,8 @@ extension UnsafeMutableBufferPointer {
   /// satisfied.
   ///
   /// The unused return value is legacy ABI. It was originally added as a
-  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  /// workaround for a compiler bug (now fixed). See
+  /// https://github.com/apple/swift/issues/57100 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
@@ -628,7 +631,8 @@ extension UnsafeMutableBufferPointer {
   /// Merges elements of `runs` until only one run remains.
   ///
   /// The unused return value is legacy ABI. It was originally added as a
-  /// workaround for a compiler bug (now fixed). See SR-14750 (rdar://45044610).
+  /// workaround for a compiler bug (now fixed). See
+  /// https://github.com/apple/swift/issues/57100 (rdar://45044610).
   ///
   /// - Precondition: `buffer` must have at least
   ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.

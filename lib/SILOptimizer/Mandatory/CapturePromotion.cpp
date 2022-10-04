@@ -491,8 +491,12 @@ void ClosureCloner::populateCloned() {
   for (; ai != ae; ++argNo, ++ai) {
     if (!promotableIndices.count(argNo)) {
       // Simply create a new argument which copies the original argument
-      SILValue mappedValue = clonedEntryBB->createFunctionArgument(
+      auto *mappedValue = clonedEntryBB->createFunctionArgument(
           (*ai)->getType(), (*ai)->getDecl());
+      mappedValue->setNoImplicitCopy(
+          cast<SILFunctionArgument>(*ai)->isNoImplicitCopy());
+      mappedValue->setLifetimeAnnotation(
+          cast<SILFunctionArgument>(*ai)->getLifetimeAnnotation());
       entryArgs.push_back(mappedValue);
       continue;
     }
@@ -504,8 +508,13 @@ void ClosureCloner::populateCloned() {
     auto boxedTy = getSILBoxFieldType(TypeExpansionContext(*cloned), boxTy,
                                       cloned->getModule().Types, 0)
                        .getObjectType();
-    SILValue mappedValue =
+    auto *newArg =
         clonedEntryBB->createFunctionArgument(boxedTy, (*ai)->getDecl());
+    newArg->setNoImplicitCopy(
+        cast<SILFunctionArgument>(*ai)->isNoImplicitCopy());
+    newArg->setLifetimeAnnotation(
+        cast<SILFunctionArgument>(*ai)->getLifetimeAnnotation());
+    SILValue mappedValue = newArg;
 
     // If SIL ownership is enabled, we need to perform a borrow here if we have
     // a non-trivial value. We know that our value is not written to and it does

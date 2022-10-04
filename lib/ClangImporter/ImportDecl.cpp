@@ -2002,7 +2002,7 @@ namespace {
         return nullptr;
       }
 
-      // TODO(SR-13809): fix this once we support dependent types.
+      // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
       if (decl->getTypeForDecl()->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
@@ -2221,7 +2221,10 @@ namespace {
               MD->overwriteAccess(AccessLevel::Private);
             } else if (cxxOperatorKind ==
                        clang::OverloadedOperatorKind::OO_PlusPlus) {
-              if (cxxMethod->param_empty()) {
+              // Make sure the type is not a foreign reference type.
+              // We cannot handle `operator++` for those types, since the
+              // current implementation creates a new instance of the type.
+              if (cxxMethod->param_empty() && !isa<ClassDecl>(result)) {
                 // This is a pre-increment operator. We synthesize a
                 // non-mutating function called `successor() -> Self`.
                 FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(MD);
@@ -2684,17 +2687,6 @@ namespace {
       if (isSpecializationDepthGreaterThan(def, 8))
         return nullptr;
 
-      // If we have an inline data member, it won't get eagerly instantiated
-      // when we instantiate the class. So, make sure we do that now to catch
-      // any instantiation errors.
-      for (auto member : decl->decls()) {
-        if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
-          if (varDecl->getTemplateInstantiationPattern())
-            clangSema.InstantiateVariableDefinition(varDecl->getLocation(),
-                                                    varDecl);
-        }
-      }
-
       return VisitCXXRecordDecl(def);
     }
 
@@ -3003,8 +2995,7 @@ namespace {
 
       auto templateParamTypeUsedInSignature =
           [decl](clang::TemplateTypeParmDecl *type) -> bool {
-        // TODO(SR-13809): we will want to update this to handle dependent
-        // types when those are supported.
+        // TODO(https://github.com/apple/swift/issues/56206): We will want to update this to handle dependent types when those are supported.
         if (hasSameUnderlyingType(decl->getReturnType().getTypePtr(), type))
           return true;
 
@@ -3035,8 +3026,7 @@ namespace {
           //
           // If the defaulted template type parameter is used in the signature,
           // then still add a generic so that it can be overrieded.
-          // TODO(SR-14837): in the future we might want to import two overloads
-          // in this case so that the default type could still be used.
+          // TODO(https://github.com/apple/swift/issues/57184): In the future we might want to import two overloads in this case so that the default type could still be used.
           if (templateTypeParam->hasDefaultArgument() &&
               !templateParamTypeUsedInSignature(templateTypeParam))
             continue;
@@ -3210,8 +3200,12 @@ namespace {
         if (importedName.isSubscriptAccessor()) {
           assert(func->getParameters()->size() == 1);
           auto typeDecl = dc->getSelfNominalTypeDecl();
-          auto parameterType = func->getParameters()->get(0)->getType();
+          auto parameter = func->getParameters()->get(0);
+          auto parameterType = parameter->getType();
           if (!typeDecl || !parameterType)
+            return nullptr;
+          if (parameter->isInOut())
+            // Subscripts with inout parameters are not allowed in Swift.
             return nullptr;
 
           auto &getterAndSetter = Impl.cxxSubscripts[{ typeDecl,
@@ -3390,7 +3384,6 @@ namespace {
     }
 
     Decl *VisitVarDecl(const clang::VarDecl *decl) {
-
       // Variables are imported as... variables.
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
@@ -3402,34 +3395,6 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
-
-      // If the declaration is const, consider it audited.
-      // We can assume that loading a const global variable doesn't
-      // involve an ownership transfer.
-      bool isAudited = decl->getType().isConstQualified();
-
-      auto declType = decl->getType();
-
-      // Special case: NS Notifications
-      if (isNSNotificationGlobal(decl))
-        if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
-                                                Impl.CurrentVersion))
-          declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
-
-      // Note that we deliberately don't bridge most globals because we want to
-      // preserve pointer identity.
-      auto importedType =
-          Impl.importType(declType,
-                          (isAudited ? ImportTypeKind::AuditedVariable
-                                     : ImportTypeKind::Variable),
-                          ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                          isInSystemModule(dc), Bridgeability::None,
-                          getImportTypeAttrs(decl));
-
-      if (!importedType)
-        return nullptr;
-
-      auto type = importedType.getType();
 
       // If we've imported this variable as a member, it's a static
       // member.
@@ -3451,9 +3416,6 @@ namespace {
                        name, dc);
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      result->setInterfaceType(type);
-      Impl.recordImplicitUnwrapForDecl(result,
-                                       importedType.isImplicitlyUnwrapped());
 
       // If imported as member, the member should be final.
       if (dc->getSelfClassDecl())

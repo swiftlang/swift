@@ -56,7 +56,7 @@ public:
 };
 
 /// Computes the set of blocks from which a path to the return-block exists.
-/// This does not include pathes to a throw-block.
+/// This does not include paths to a throw-block.
 class ReachingReturnBlocks {
     BasicBlockWorklist worklist;
 
@@ -182,7 +182,7 @@ public:
 /// instead.
 ///
 /// After cloning, call updateSSAAfterCloning. This is decoupled from cloning
-/// becaused some clients perform CFG edges updates after cloning but before
+/// because some clients perform CFG edges updates after cloning but before
 /// splitting CFG edges.
 class BasicBlockCloner : public SILCloner<BasicBlockCloner> {
   using SuperTy = SILCloner<BasicBlockCloner>;
@@ -195,7 +195,7 @@ protected:
   /// Will cloning require an SSA update?
   bool needsSSAUpdate = false;
 
-  /// Transient object for analyzing a single address projction chain. It's
+  /// Transient object for analyzing a single address projection chain. It's
   /// state is reset each time analyzeAddressProjections is called.
   SinkAddressProjections sinkProj;
 

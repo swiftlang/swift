@@ -376,6 +376,11 @@ public:
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
+    if (Addr->getType().isMoveOnly()) {
+      // TODO: Handle no implicit copy here.
+      Addr = SGF.B.createMarkMustCheckInst(
+          decl, Addr, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+    }
 
     // Push a cleanup to destroy the local variable.  This has to be
     // inactive until the variable is initialized.
@@ -1295,7 +1300,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     SILLocation loc(PBD);
     SILValue resultBuf = emitTemporaryAllocation(loc, initLoweredTy);
     SILValue resultBufPtr = B.createAddressToPointer(loc, resultBuf,
-                          SILType::getPrimitiveObjectType(C.TheRawPointerType));
+                          SILType::getPrimitiveObjectType(C.TheRawPointerType),
+                          /*needsStackProtection=*/ false);
     
     // Emit the closure for the child task.
     // Prepare the opaque `AsyncLet` representation.
@@ -1482,7 +1488,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       booleanTestLoc = expr;
       break;
     }
-    case StmtConditionElement::CK_Availability:
+
+    case StmtConditionElement::CK_Availability: {
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       PoundAvailableInfo *availability = elt.getAvailability();
@@ -1512,6 +1519,12 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         }
       }
       break;
+    }
+
+    case StmtConditionElement::CK_HasSymbol: {
+      llvm::report_fatal_error("Can't SILGen #_hasSymbol yet!");
+      break;
+    }
     }
 
     // Now that we have a boolean test as a Builtin.i1, emit the branch.

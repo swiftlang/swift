@@ -19,7 +19,7 @@
 /// The "extended lifetime" of the references defined by 'def' transitively
 /// includes the uses of 'def' itself along with the uses of any copies of
 /// 'def'. Canonicalization provably minimizes the OSSA lifetime and its copies
-/// by rewriting all copies and destroys. Only consusming uses that are not on
+/// by rewriting all copies and destroys. Only consuming uses that are not on
 /// the liveness boundary require a copy.
 ///
 /// Example #1: The last consuming use ends the reference lifetime.
@@ -249,9 +249,6 @@ private:
   /// liveness may be pruned during canonicalization.
   bool pruneDebugMode;
 
-  /// If true, then new destroy_value instructions will be poison.
-  bool poisonRefsMode;
-
   /// If true and we are processing a value of move_only type, emit a diagnostic
   /// when-ever we need to insert a copy_value.
   std::function<void(Operand *)> moveOnlyCopyValueNotification;
@@ -284,7 +281,7 @@ private:
 
   /// Record all interesting debug_value instructions here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie
-  /// outisde the pruned liveness at the time it is discovered.
+  /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
@@ -348,12 +345,11 @@ public:
   }
 
   CanonicalizeOSSALifetime(
-      bool pruneDebugMode, bool poisonRefsMode,
-      NonLocalAccessBlockAnalysis *accessBlockAnalysis, DominanceInfo *domTree,
-      InstructionDeleter &deleter,
+      bool pruneDebugMode, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+      DominanceInfo *domTree, InstructionDeleter &deleter,
       std::function<void(Operand *)> moveOnlyCopyValueNotification = nullptr,
       std::function<void(Operand *)> moveOnlyFinalConsumingUse = nullptr)
-      : pruneDebugMode(pruneDebugMode), poisonRefsMode(poisonRefsMode),
+      : pruneDebugMode(pruneDebugMode),
         moveOnlyCopyValueNotification(moveOnlyCopyValueNotification),
         moveOnlyFinalConsumingUse(moveOnlyFinalConsumingUse),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
@@ -414,11 +410,9 @@ protected:
   void findOrInsertDestroys();
 
   void findOrInsertDestroyOnCFGEdge(SILBasicBlock *predBB,
-                                    SILBasicBlock *succBB, bool needsPoison);
+                                    SILBasicBlock *succBB);
 
   void rewriteCopies();
-
-  void injectPoison();
 };
 
 } // end namespace swift

@@ -19,6 +19,22 @@ StdStringOverlayTestSuite.test("std::string <=> Swift.String") {
 
   let cxx3: std.string = "literal"
   expectEqual(cxx3.size(), 7)
+
+  // Non-ASCII characters are represented by more than one CChar.
+  let cxx4: std.string = "тест"
+  expectEqual(cxx4.size(), 8)
+  let swift4 = String(cxxString: cxx4)
+  expectEqual(swift4, "тест")
+
+  let cxx5: std.string = "emoji_🤖"
+  expectEqual(cxx5.size(), 10)
+  let swift5 = String(cxxString: cxx5)
+  expectEqual(swift5, "emoji_🤖")
+
+  let cxx6 = std.string("xyz\0abc")
+  expectEqual(cxx6.size(), 7)
+  let swift6 = String(cxxString: cxx6)
+  expectEqual(swift6, "xyz\0abc")
 }
 
 extension std.string.const_iterator: UnsafeCxxInputIterator {

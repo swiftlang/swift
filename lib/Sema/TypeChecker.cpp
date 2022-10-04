@@ -337,6 +337,11 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   evaluateOrDefault(
       Ctx.evaluator,
+      CheckInconsistentSPIOnlyImportsRequest{SF},
+      {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Perform various AST transforms we've been asked to perform.
@@ -386,7 +391,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   public:
     DerivativeFinder() {}
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
         for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
           // Resolve derivative function configurations from `@derivative`
@@ -395,7 +400,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
         }
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 
@@ -462,7 +467,7 @@ namespace {
                             GenericParamList *params)
         : dc(dc), params(params) {}
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
         auto firstComponent = ident->getComponentRange().front();
         auto name = firstComponent->getNameRef().getBaseIdentifier();
@@ -470,7 +475,7 @@ namespace {
           firstComponent->setValue(paramDecl, dc);
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 }

@@ -960,7 +960,7 @@ bb3:
 }
 
 // rdar://87985420 - crash in nullptr returned by findGuaranteedReferenceRoots
-// Test that a boorrow scope introduced by unchecked_ownership_conversion is not
+// Test that a borrow scope introduced by unchecked_ownership_conversion is not
 // deleted by DCE.
 sil [ossa] @testUncheckedConvertToGuaranteed : $@convention(thin) (@sil_unmanaged AnyObject) -> () {
 bb0(%0 : $@sil_unmanaged AnyObject):
@@ -971,4 +971,27 @@ bb0(%0 : $@sil_unmanaged AnyObject):
   end_borrow %4 : $AnyObject
   %242 = tuple ()
   return %242 : $()
+}
+
+sil @foo : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [ossa] @test_escape : {{.*}} {
+// CHECK: br bb1
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'test_escape'
+sil [ossa] @test_escape : $@convention(thin) () -> () {
+bb0:
+  %13 = function_ref @foo : $@convention(thin) () -> ()
+  %14 = partial_apply [callee_guaranteed] %13() : $@convention(thin) () -> ()
+  %15 = convert_escape_to_noescape %14 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %17 = begin_borrow %14 : $@callee_guaranteed () -> ()
+  %18 = mark_dependence %15 : $@noescape @callee_guaranteed () -> () on %17 : $@callee_guaranteed () -> ()
+  br bb1(%18 : $@noescape @callee_guaranteed () -> (), %17 : $@callee_guaranteed () -> (), %14 : $@callee_guaranteed () -> ())
+
+bb1(%21 : $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@callee_guaranteed () -> (), %23 : @owned $@callee_guaranteed () -> ()):
+  %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
+  end_borrow %22 : $@callee_guaranteed () -> ()
+  destroy_value %23 : $@callee_guaranteed () -> ()
+  %28 = tuple ()
+  return %28: $()
 }

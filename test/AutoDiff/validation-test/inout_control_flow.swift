@@ -6,7 +6,8 @@ import _Differentiation
 
 var InoutControlFlowTests = TestSuite("InoutControlFlow")
 
-// SR-14218
+// https://github.com/apple/swift/issues/55999
+
 struct Model: Differentiable {
   var first: Float = 3
   var second: Float = 1
@@ -38,7 +39,8 @@ InoutControlFlowTests.test("MutatingBeforeControlFlow") {
   expectEqual(0, grad.second)
 }
 
-// SR-14053
+// https://github.com/apple/swift/issues/56444
+
 @differentiable(reverse)
 func adjust(model: inout Model, multiplier: Float) {
   model.first = model.second * multiplier

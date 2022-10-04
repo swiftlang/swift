@@ -135,7 +135,7 @@ func eraseFictionalServerError() -> Error {
 }
 // CHECK: } // end sil function '$s10objc_error25eraseFictionalServerErrors0F0_pyF'
 
-// SR-1562
+// https://github.com/apple/swift/issues/44171
 extension Error {
   // CHECK-LABEL: sil hidden [ossa] @$ss5ErrorP10objc_errorE16convertToNSErrorSo0F0CyF
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)

@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -sil-partial-specialization -sil-partial-specialization-with-generic-substitutions  %s | %FileCheck %s
 
 // Test different cases of partial specialization.
-// In particular, test the correctness of partial specializaitons where substitutions may be generic.
+// In particular, test the correctness of partial specializations where substitutions may be generic.
 
 sil_stage canonical
 

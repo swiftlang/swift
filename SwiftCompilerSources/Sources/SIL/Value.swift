@@ -118,6 +118,30 @@ public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
   return !(lhs === rhs)
 }
 
+/// A projected value, which is defined by the original value and a projection path.
+///
+/// For example, if the `value` is of type `struct S { var x: Int }` and `path` is `s0`,
+/// then the projected value represents field `x` of the original value.
+/// An empty path means represents the "whole" original value.
+///
+public struct ProjectedValue {
+  public let value: Value
+  public let path: SmallProjectionPath
+}
+
+extension Value {
+  /// Returns a projected value, defined by this value and `path`.
+  public func at(_ path: SmallProjectionPath) -> ProjectedValue {
+    ProjectedValue(value: self, path: path)
+  }
+
+  /// Returns a projected value, defined by this value and path containig a single field of `kind` and `index`.
+  public func at(_ kind: SmallProjectionPath.FieldKind, index: Int = 0) -> ProjectedValue {
+    ProjectedValue(value: self, path: SmallProjectionPath(kind, index: index))
+  }
+}
+
+
 extension BridgedValue {
   public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
 

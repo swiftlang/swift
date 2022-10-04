@@ -111,12 +111,44 @@ extension SmallProjectionWalkingPath {
 /// A client must provide this cache in a `walkUpCache` or `walkDownCache` property.
 struct WalkerCache<Path : WalkingPath> {
   mutating func needWalk(for value: Value, path: Path) -> Path? {
+  
+    // Handle the first inline entry.
+    guard let e = inlineEntry0 else {
+      inlineEntry0 = (value, path)
+      return path
+    }
+    if e.value == value {
+      let newPath = e.path.merge(with: path)
+      if newPath != e.path {
+        inlineEntry0 = (value, newPath)
+        return newPath
+      }
+      return nil
+    }
+    
+    // Handle the second inline entry.
+    guard let e = inlineEntry1 else {
+      inlineEntry1 = (value, path)
+      return path
+    }
+    if e.value == value {
+      let newPath = e.path.merge(with: path)
+      if newPath != e.path {
+        inlineEntry1 = (value, newPath)
+        return newPath
+      }
+      return nil
+    }
+    
+    // If there are more than two elements, it goes into the `cache` Dictionary.
     return cache[value.hashable, default: CacheEntry()].needWalk(path: path)
   }
 
-  var isEmpty: Bool { cache.isEmpty }
-  
-  mutating func clear() { cache.removeAll(keepingCapacity: true) }
+  mutating func clear() {
+    inlineEntry0 = nil
+    inlineEntry1 = nil
+    cache.removeAll(keepingCapacity: true)
+  }
 
   private struct CacheEntry {
     var cachedPath: Path?
@@ -135,6 +167,13 @@ struct WalkerCache<Path : WalkingPath> {
     }
   }
 
+  // If there are no more than 2 elements in the cache, we can avoid using the `cache` Dictionary,
+  // which avoids memory allocations.
+  // Fortunately this is the common case by far (about 97% of all walker invocations).
+  private var inlineEntry0: (value: Value, path: Path)?
+  private var inlineEntry1: (value: Value, path: Path)?
+
+  // All elements, which don't fit into the inline entries.
   private var cache = Dictionary<HashableValue, CacheEntry>()
 }
 
@@ -294,7 +333,7 @@ extension ValueDefUseWalker {
     case is InitExistentialRefInst, is OpenExistentialRefInst,
       is BeginBorrowInst, is CopyValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst:
+      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
     case let mdi as MarkDependenceInst:
       if operand.index == 0 {
@@ -419,7 +458,7 @@ extension AddressDefUseWalker {
         return unmatchedPath(address: operand, path: path)
       }
     case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst,
-      is IndexAddrInst:
+         is IndexAddrInst, is MarkMustCheckInst:
       // FIXME: for now `index_addr` is treated as a forwarding instruction since
       // SmallProjectionPath does not track indices.
       // This is ok since `index_addr` is eventually preceeded by a `tail_addr`
@@ -558,7 +597,7 @@ extension ValueUseDefWalker {
     case is InitExistentialRefInst, is OpenExistentialRefInst,
       is BeginBorrowInst, is CopyValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst:
+      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkMustCheckInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let arg as BlockArgument:
       if arg.isPhiArgument {
@@ -643,7 +682,8 @@ extension AddressUseDefWalker {
     case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
       return walkUp(address: (def as! UnaryInstruction).operand,
                     path: path.push(.enumCase, index: (def as! EnumInstruction).caseIndex))
-    case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst, is IndexAddrInst:
+    case is InitExistentialAddrInst, is OpenExistentialAddrInst, is BeginAccessInst, is IndexAddrInst,
+         is MarkMustCheckInst:
       // FIXME: for now `index_addr` is treated as a forwarding instruction since
       // SmallProjectionPath does not track indices.
       // This is ok since `index_addr` is eventually preceeded by a `tail_addr`

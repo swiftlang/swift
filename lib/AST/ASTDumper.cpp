@@ -123,6 +123,15 @@ static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
   Params->print(OS);
 }
 
+static void printSourceRange(raw_ostream &OS, const SourceRange R,
+                             const ASTContext &Ctx) {
+  if (!R.isValid())
+    return;
+
+  PrintWithColorRAII(OS, RangeColor) << " range=";
+  R.print(PrintWithColorRAII(OS, RangeColor).getOS(), Ctx.SourceMgr,
+          /*PrintText=*/false);
+}
 
 static StringRef
 getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
@@ -497,12 +506,7 @@ namespace {
       if (D->isHoisted())
         PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
 
-      auto R = D->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                D->getASTContext().SourceMgr, /*PrintText=*/false);
-      }
+      printSourceRange(OS, D->getSourceRange(), D->getASTContext());
 
       if (D->TrailingSemiLoc.isValid())
         PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
@@ -847,6 +851,11 @@ namespace {
       printCommonPost(CD);
     }
 
+    void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {
+      printCommon(BTD, "builtin_tuple_decl");
+      printCommonPost(BTD);
+    }
+
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
 
@@ -1013,12 +1022,7 @@ namespace {
         ctx = &params->get(0)->getASTContext();
 
       if (ctx) {
-        auto R = params->getSourceRange();
-        if (R.isValid()) {
-          PrintWithColorRAII(OS, RangeColor) << " range=";
-          R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                  ctx->SourceMgr, /*PrintText=*/false);
-        }
+        printSourceRange(OS, params->getSourceRange(), *ctx);
       }
 
       Indent += 2;
@@ -1483,6 +1487,18 @@ public:
       PrintWithColorRAII(OS, ParenthesisColor) << ")";
       Indent -= 2;
       break;
+    case StmtConditionElement::CK_HasSymbol:
+      Indent += 2;
+      OS.indent(Indent);
+      PrintWithColorRAII(OS, ParenthesisColor) << '(';
+      OS << "#_hasSymbol";
+      if (Ctx)
+        printSourceRange(OS, C.getSourceRange(), *Ctx);
+      OS << "\n";
+      printRec(C.getHasSymbolInfo()->getSymbolExpr());
+      PrintWithColorRAII(OS, ParenthesisColor) << ")";
+      Indent -= 2;
+      break;
     }
   }
 
@@ -1494,14 +1510,8 @@ public:
     if (S->isImplicit())
       OS << " implicit";
 
-    if (Ctx) {
-      auto R = S->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx->SourceMgr, /*PrintText=*/false);
-      }
-    }
+    if (Ctx)
+      printSourceRange(OS, S->getSourceRange(), *Ctx);
 
     if (S->TrailingSemiLoc.isValid())
       OS << " trailing_semi";
@@ -1555,9 +1565,10 @@ public:
 
   void visitIfStmt(IfStmt *S) {
     printCommon(S, "if_stmt") << '\n';
-    for (auto elt : S->getCond())
+    for (auto elt : S->getCond()) {
       printRec(elt);
-    OS << '\n';
+      OS << "\n";
+    }
     printRec(S->getThenStmt());
     if (S->getElseStmt()) {
       OS << '\n';
@@ -1826,12 +1837,7 @@ public:
         L.print(PrintWithColorRAII(OS, LocationColor).getOS(), Ctx.SourceMgr);
       }
 
-      auto R = E->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx.SourceMgr, /*PrintText=*/false);
-      }
+      printSourceRange(OS, E->getSourceRange(), Ctx);
     }
 
     if (E->TrailingSemiLoc.isValid())
@@ -2708,8 +2714,8 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitIfExpr(IfExpr *E) {
-    printCommon(E, "if_expr") << '\n';
+  void visitTernaryExpr(TernaryExpr *E) {
+    printCommon(E, "ternary_expr") << '\n';
     printRec(E->getCondExpr());
     OS << '\n';
     printRec(E->getThenExpr());
@@ -3797,6 +3803,12 @@ namespace {
       printField("decl", T->getDecl()->printRef());
       if (T->getParent())
         printRec("parent", T->getParent());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitBuiltinTupleType(BuiltinTupleType *T, StringRef label) {
+      printCommon(label, "builtin_tuple_type");
+      printField("decl", T->getDecl()->printRef());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

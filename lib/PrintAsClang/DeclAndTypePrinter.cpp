@@ -297,6 +297,8 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       // FIXME: Print availability.
+      // FIXME: forward decl should be handled by ModuleWriter.
+      ClangValueTypePrinter::forwardDeclType(os, CD);
       ClangClassTypePrinter(os).printClassTypeDecl(
           CD, [&]() { printMembers(CD->getMembers()); });
       return;
@@ -348,8 +350,17 @@ private:
     // FIXME: Print struct's availability.
     ClangValueTypePrinter printer(os, owningPrinter.prologueOS,
                                   owningPrinter.interopContext);
-    printer.printValueTypeDecl(
-        SD, /*bodyPrinter=*/[&]() { printMembers(SD->getMembers()); });
+    printer.printValueTypeDecl(SD, /*bodyPrinter=*/[&]() {
+      printMembers(SD->getMembers());
+      for (const auto *ed :
+           owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
+        auto sign = ed->getGenericSignature();
+        // FIXME: support requirements.
+        if (!sign.getRequirements().empty())
+          continue;
+        printMembers(ed->getMembers());
+      }
+    });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -425,12 +436,15 @@ private:
 
       os << "  inline bool is" << name << "() const;\n";
 
+      outOfLineSyntaxPrinter
+          .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
       outOfLineOS << "  inline bool ";
-      outOfLineSyntaxPrinter.printBaseName(ED);
-      outOfLineOS << "::is" << name << "() const {\n";
+      outOfLineSyntaxPrinter.printNominalTypeQualifier(
+          ED, /*moduleContext=*/ED->getModuleContext());
+      outOfLineOS << "is" << name << "() const {\n";
       outOfLineOS << "    return *this == ";
-      outOfLineSyntaxPrinter.printBaseName(ED);
-      outOfLineOS << "::";
+      outOfLineSyntaxPrinter.printNominalTypeQualifier(
+          ED, /*moduleContext=*/ED->getModuleContext());
       outOfLineSyntaxPrinter.printIdentifier(caseName);
       outOfLineOS << ";\n";
       outOfLineOS << "  }\n";
@@ -443,12 +457,7 @@ private:
           associatedValueList->size() > 1) {
         return;
       }
-      auto paramType = associatedValueList->front()->getType();
-      Type objectType;
-      OptionalTypeKind optKind;
-      std::tie(objectType, optKind) = getObjectTypeAndOptionality(
-          paramType->getNominalOrBoundGenericNominal(), paramType);
-      auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+      auto paramType = associatedValueList->front()->getInterfaceType();
 
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
@@ -460,9 +469,12 @@ private:
           [&](auto &types) {
             // Printing function name and return type
             os << "  inline " << types[paramType] << " get" << name;
+            outOfLineSyntaxPrinter
+                .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
             outOfLineOS << "  inline " << types[paramType] << ' ';
-            outOfLineSyntaxPrinter.printBaseName(ED);
-            outOfLineOS << "::get" << name;
+            outOfLineSyntaxPrinter.printNominalTypeQualifier(
+                ED, /*moduleContext=*/ED->getModuleContext());
+            outOfLineOS << "get" << name;
           },
           [&](auto &types) {}, true,
           [&](auto &types) {
@@ -478,6 +490,20 @@ private:
             outOfLineOS << "(*this);\n";
             outOfLineOS << "    char * _Nonnull payloadFromDestruction = "
                            "thisCopy->_destructiveProjectEnumData();\n";
+            if (const auto *gtpt = paramType->getAs<GenericTypeParamType>()) {
+              DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
+                  outOfLineOS, gtpt, [](StringRef) {},
+                  /*initializeWithTake=*/StringRef("payloadFromDestruction"));
+              return;
+            }
+            // FIXME: unify non-generic return with regular function emission
+            // return path.
+            Type objectType;
+            OptionalTypeKind optKind;
+            std::tie(objectType, optKind) = getObjectTypeAndOptionality(
+                paramType->getNominalOrBoundGenericNominal(), paramType);
+            auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
+
             if (auto knownCxxType =
                     owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
@@ -544,107 +570,115 @@ private:
           neededTypes.push_back(paramType);
         }
 
-        clangFuncPrinter.printCustomCxxFunction(
-            neededTypes,
-            [&](auto &types) {
-              // Printing function name and return type
-              os << "    inline ";
-              syntaxPrinter.printBaseName(elementDecl->getParentEnum());
-              os << " operator()";
+        // FIXME: support generic constructor.
+        if (!ED->isGeneric())
+          clangFuncPrinter.printCustomCxxFunction(
+              neededTypes,
+              [&](auto &types) {
+                // Printing function name and return type
+                os << "    inline ";
+                syntaxPrinter.printBaseName(elementDecl->getParentEnum());
+                os << " operator()";
 
-              outOfLineOS << "  inline ";
-              outOfLineSyntaxPrinter.printBaseName(
-                  elementDecl->getParentEnum());
-              outOfLineOS << ' ';
-              outOfLineSyntaxPrinter.printBaseName(
-                  elementDecl->getParentEnum());
-              outOfLineOS << "::_impl_" << elementDecl->getNameStr()
-                          << "::operator()";
-            },
-            [&](auto &types) {
-              // Printing parameters
-              if (!paramType) {
-                return;
-              }
-              assert(objectTypeDecl != nullptr);
-              if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                      objectTypeDecl)) {
-                os << types[paramType] << " val";
-                outOfLineOS << types[paramType] << " val";
-              } else {
-                os << "const " << types[paramType] << " &val";
-                outOfLineOS << "const " << types[paramType] << " &val";
-              }
-            },
-            true,
-            [&](auto &types) {
-              // Printing function body
-              outOfLineOS << "    auto result = ";
-              outOfLineSyntaxPrinter.printBaseName(
-                  elementDecl->getParentEnum());
-              outOfLineOS << "::_make();\n";
-
-              if (paramType) {
+                outOfLineOS << "  inline ";
+                outOfLineSyntaxPrinter.printBaseName(
+                    elementDecl->getParentEnum());
+                outOfLineOS << ' ';
+                outOfLineSyntaxPrinter.printBaseName(
+                    elementDecl->getParentEnum());
+                outOfLineOS << "::_impl_" << elementDecl->getNameStr()
+                            << "::operator()";
+              },
+              [&](auto &types) {
+                // Printing parameters
+                if (!paramType) {
+                  return;
+                }
                 assert(objectTypeDecl != nullptr);
-
                 if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
                         objectTypeDecl)) {
-                  outOfLineOS << "    memcpy(result._getOpaquePointer(), &val, "
-                                 "sizeof(val));\n";
+                  os << types[paramType] << " val";
+                  outOfLineOS << types[paramType] << " val";
                 } else {
-                  outOfLineOS << "    alignas(";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ") unsigned char buffer[sizeof(";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ")];\n";
-                  outOfLineOS << "    auto *valCopy = new(buffer) ";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << "(val);\n";
-                  outOfLineOS << "    ";
-                  outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
-                              << "::";
-                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
-                  outOfLineOS << "::implClassFor<";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ">::type::initializeWithTake(result._"
-                                 "getOpaquePointer(), ";
-                  outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
-                              << "::";
-                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
-                  outOfLineOS << "::implClassFor<";
-                  outOfLineSyntaxPrinter.printModuleNamespaceQualifiersIfNeeded(
-                      objectTypeDecl->getModuleContext(),
-                      ED->getModuleContext());
-                  outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
-                  outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
-                  outOfLineOS << ");\n";
+                  os << "const " << types[paramType] << " &val";
+                  outOfLineOS << "const " << types[paramType] << " &val";
                 }
-              }
+              },
+              true,
+              [&](auto &types) {
+                // Printing function body
+                outOfLineOS << "    auto result = ";
+                outOfLineSyntaxPrinter.printBaseName(
+                    elementDecl->getParentEnum());
+                outOfLineOS << "::_make();\n";
 
-              outOfLineOS << "    result._destructiveInjectEnumTag(";
-              if (ED->isResilient()) {
-                outOfLineOS << cxx_synthesis::getCxxImplNamespaceName()
-                            << "::" << elementInfo->globalVariableName;
-              } else {
-                outOfLineOS << elementInfo->tag;
-              }
-              outOfLineOS << ");\n";
-              outOfLineOS << "    return result;\n";
-              outOfLineOS << "  ";
-            },
-            ED->getModuleContext(), outOfLineOS);
+                if (paramType) {
+                  assert(objectTypeDecl != nullptr);
+
+                  if (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                          objectTypeDecl)) {
+                    outOfLineOS
+                        << "    memcpy(result._getOpaquePointer(), &val, "
+                           "sizeof(val));\n";
+                  } else {
+                    outOfLineOS << "    alignas(";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ") unsigned char buffer[sizeof(";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ")];\n";
+                    outOfLineOS << "    auto *valCopy = new(buffer) ";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << "(val);\n";
+                    outOfLineOS << "    ";
+                    outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                                << "::";
+                    outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
+                    outOfLineOS << "::implClassFor<";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ">::type::initializeWithTake(result._"
+                                   "getOpaquePointer(), ";
+                    outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
+                                << "::";
+                    outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
+                    outOfLineOS << "::implClassFor<";
+                    outOfLineSyntaxPrinter
+                        .printModuleNamespaceQualifiersIfNeeded(
+                            objectTypeDecl->getModuleContext(),
+                            ED->getModuleContext());
+                    outOfLineSyntaxPrinter.printBaseName(objectTypeDecl);
+                    outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
+                    outOfLineOS << ");\n";
+                  }
+                }
+
+                outOfLineOS << "    result._destructiveInjectEnumTag(";
+                if (ED->isResilient()) {
+                  outOfLineOS << cxx_synthesis::getCxxImplNamespaceName()
+                              << "::" << elementInfo->globalVariableName;
+                } else {
+                  outOfLineOS << elementInfo->tag;
+                }
+                outOfLineOS << ");\n";
+                outOfLineOS << "    return result;\n";
+                outOfLineOS << "  ";
+              },
+              ED->getModuleContext(), outOfLineOS);
       }
       os << "  } ";
       syntaxPrinter.printIdentifier(caseName);
@@ -720,6 +754,8 @@ private:
       }
       os << "  }\n"; // operator cases()'s closing bracket
       os << "\n";
+      
+      printMembers(ED->getMembers());
     });
   }
 
@@ -864,7 +900,8 @@ private:
 
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
-                                     bool isNSUIntegerSubscript = false) {
+                                     bool isNSUIntegerSubscript = false,
+                                     const SubscriptDecl *SD = nullptr) {
     printDocumentationComment(AFD);
 
     Optional<ForeignAsyncConvention> asyncConvention =
@@ -877,11 +914,11 @@ private:
         getForeignResultType(AFD, methodTy, asyncConvention, errorConvention);
 
     if (outputLang == OutputLanguageMode::Cxx) {
-      // FIXME: Support static methods.
-      if (isClassMethod)
-        return;
-      assert(!AFD->isStatic());
-      auto *typeDeclContext = cast<NominalTypeDecl>(AFD->getParent());
+      auto *typeDeclContext = dyn_cast<NominalTypeDecl>(AFD->getParent());
+      if (!typeDeclContext) {
+        typeDeclContext =
+            cast<ExtensionDecl>(AFD->getParent())->getExtendedNominal();
+      }
 
       std::string cFuncDecl;
       llvm::raw_string_ostream cFuncPrologueOS(cFuncDecl);
@@ -897,10 +934,17 @@ private:
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-        declPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSignature(),
-            funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/false);
+        if (SD)
+          declPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isDefinition=*/false);
+        else
+          declPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isStatic=*/isClassMethod,
+              /*isDefinition=*/false);
       } else {
         declPrinter.printCxxMethod(typeDeclContext, AFD,
                                    funcABI->getSignature(),
@@ -914,11 +958,16 @@ private:
           owningPrinter);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-
-        defPrinter.printCxxPropertyAccessorMethod(
-            typeDeclContext, accessor, funcABI->getSignature(),
-            funcABI->getSymbolName(), resultTy,
-            /*isDefinition=*/true);
+        if (SD)
+          defPrinter.printCxxSubscriptAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy, /*isDefinition=*/true);
+        else
+          defPrinter.printCxxPropertyAccessorMethod(
+              typeDeclContext, accessor, funcABI->getSignature(),
+              funcABI->getSymbolName(), resultTy,
+              /*isStatic=*/isClassMethod,
+              /*isDefinition=*/true);
       } else {
         defPrinter.printCxxMethod(typeDeclContext, AFD, funcABI->getSignature(),
                                   funcABI->getSymbolName(), resultTy,
@@ -1546,6 +1595,9 @@ private:
         return;
       }
 
+      // FIXME: Support static methods.
+      if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
+        return;
       if (FD->getDeclContext()->isTypeContext())
         return printAbstractFunctionAsMethod(FD, FD->isStatic());
 
@@ -1638,13 +1690,10 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
       // FIXME: availability.
-      // FIXME: support static properties.
-      if (VD->isStatic())
-        return;
       auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
-      printAbstractFunctionAsMethod(getter, /*isStatic=*/false);
+      printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
       if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
-        printAbstractFunctionAsMethod(setter, /*isStatic=*/false);
+        printAbstractFunctionAsMethod(setter, /*isStatic=*/VD->isStatic());
       return;
     }
 
@@ -1805,6 +1854,14 @@ private:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!SD->isInstanceMember())
+        return;
+      auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+      printAbstractFunctionAsMethod(getter, false,
+                                    /*isNSUIntegerSubscript=*/false, SD);
+      return;
+    }
     assert(SD->isInstanceMember() && "static subscripts not supported");
 
     bool isNSUIntegerSubscript = false;
@@ -2509,16 +2566,43 @@ static bool isAsyncAlternativeOfOtherDecl(const ValueDecl *VD) {
   return false;
 }
 
-static bool hasExposeAttr(const ValueDecl *VD) {
+static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   if (isa<NominalTypeDecl>(VD) && VD->getModuleContext()->isStdlibModule()) {
-    if (VD == VD->getASTContext().getStringDecl())
+    if (VD == VD->getASTContext().getStringDecl() && !isExtension)
+      return true;
+    if (VD == VD->getASTContext().getArrayDecl())
+      return true;
+    if (VD == VD->getASTContext().getOptionalDecl() && !isExtension)
       return true;
     return false;
   }
+  // Clang decls don't need to be explicitly exposed.
+  if (VD->hasClangNode())
+    return true;
   if (VD->getAttrs().hasAttribute<ExposeAttr>())
     return true;
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+    // FIXME: Do not expose 'index' methods as the overloads are conflicting.
+    // this should either be prohibited in the stdlib module, or the overloads
+    // should be renamed automatically or using the expose attribute.
+    if (ED->getExtendedNominal() == VD->getASTContext().getArrayDecl()) {
+      if (isa<AbstractFunctionDecl>(VD) &&
+          !cast<AbstractFunctionDecl>(VD)
+               ->getName()
+               .getBaseName()
+               .isSpecial() &&
+          cast<AbstractFunctionDecl>(VD)
+              ->getName()
+              .getBaseName()
+              .getIdentifier()
+              .str()
+              .contains_insensitive("index"))
+        return false;
+    }
+    return hasExposeAttr(ED->getExtendedNominal(), /*isExtension=*/true);
+  }
   return false;
 }
 

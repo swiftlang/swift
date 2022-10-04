@@ -273,9 +273,9 @@ bb0:
 // A sil_global such as this without a corresponding Swift declaration must be
 // defined in another module. Such a global can only be identified when accessed
 // via global_addr instruction (as happens with C imports). Any access via an
-// addessor (as with Swift imports) will be Unidentified. For the purpose of
-// access analysis, a global is considered "external" based on the availabitiy
-// of a Swift declaraion. We only consider an global to be a disjoint access
+// accessor (as with Swift imports) will be Unidentified. For the purpose of
+// access analysis, a global is considered "external" based on the availability
+// of a Swift declaration. We only consider an global to be a disjoint access
 // location if its declaration is available.
 sil_global @external_global : $Int64
 

@@ -438,7 +438,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
 
     SILValue CastResult =
-        Builder.createUncheckedBitCast(Loc, Result, GenResultTy);
+        Builder.createUncheckedForwardingCast(Loc, Result, GenResultTy);
 
     addReturnValue(Builder.getInsertionBB(), OldReturnBB, CastResult);
   }
@@ -490,7 +490,7 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
   Builder.emitBlock(SuccessBB);
 }
 
-static SubstitutionMap getSingleSubstititutionMap(SILFunction *F,
+static SubstitutionMap getSingleSubstitutionMap(SILFunction *F,
                                                   Type Ty) {
   return SubstitutionMap::get(
     F->getGenericEnvironment()->getGenericSignature(),
@@ -507,7 +507,7 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
   auto GenericMT = Builder.createMetatype(
       Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
-  SubstitutionMap SubMap = getSingleSubstititutionMap(GenericFunc, ContextTy);
+  SubstitutionMap SubMap = getSingleSubstitutionMap(GenericFunc, ContextTy);
 
   // Emit a check that it is a pod object.
   auto IsPOD = Builder.createBuiltin(Loc, Ctx.getIdentifier("ispod"), BoolTy,
@@ -534,7 +534,7 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
 
   auto WordTy = SILType::getBuiltinWordType(Ctx);
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
-  SubstitutionMap SubMap = getSingleSubstititutionMap(GenericFunc, ContextTy);
+  SubstitutionMap SubMap = getSingleSubstitutionMap(GenericFunc, ContextTy);
   auto ParamSize = Builder.createBuiltin(Loc, Ctx.getIdentifier("sizeof"),
                                          WordTy, SubMap, { GenericMT });
   auto LayoutSize =
@@ -571,7 +571,7 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
 
   auto Int8Ty = SILType::getBuiltinIntegerType(8, Ctx);
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
-  SubstitutionMap SubMap = getSingleSubstititutionMap(GenericFunc, ContextTy);
+  SubstitutionMap SubMap = getSingleSubstitutionMap(GenericFunc, ContextTy);
 
   // Emit a check that it is a reference-counted object.
   // TODO: Perform this check before all fixed size checks.
@@ -640,7 +640,7 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
   if (CastTy.isAddress())
     return Builder.createUncheckedAddrCast(Loc, OrigArg, CastTy);
 
-  return Builder.createUncheckedBitCast(Loc, OrigArg, CastTy);
+  return Builder.createUncheckedForwardingCast(Loc, OrigArg, CastTy);
 }
 
 /// Converts each generic function argument into a SILValue that can be passed

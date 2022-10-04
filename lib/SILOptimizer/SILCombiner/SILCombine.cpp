@@ -52,10 +52,10 @@ STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
 static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
     "silcombine-owned-code-sinking",
-    llvm::cl::desc("Enable sinking of owened forwarding insts"),
+    llvm::cl::desc("Enable sinking of owned forwarding insts"),
     llvm::cl::init(true), llvm::cl::Hidden);
 
-// Allow disabling general optimization for targetted unit tests.
+// Allow disabling general optimization for targeted unit tests.
 static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
     "sil-combine-canonicalize",
     llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
@@ -350,8 +350,8 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   InstructionDeleter deleter(std::move(canonicalizeCallbacks));
 
   DominanceInfo *domTree = DA->get(&Builder.getFunction());
-  CanonicalizeOSSALifetime canonicalizer(
-      false /*prune debug*/, false /*poison refs*/, NLABA, domTree, deleter);
+  CanonicalizeOSSALifetime canonicalizer(false /*prune debug*/, NLABA, domTree,
+                                         deleter);
   CanonicalizeBorrowScope borrowCanonicalizer(deleter);
 
   while (!defsToCanonicalize.empty()) {
@@ -434,7 +434,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       // only has consuming uses. If so, we can duplicate the instruction into
       // the consuming use blocks and destroy any destroy_value uses of it that
       // we see. This makes it easier for SILCombine to fold instructions with
-      // owned paramaters since chains of these values will be in the same
+      // owned parameters since chains of these values will be in the same
       // block.
       if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
         if ((isa<FirstArgOwnershipForwardingSingleValueInst>(svi) ||

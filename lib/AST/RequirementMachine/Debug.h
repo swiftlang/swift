@@ -78,6 +78,10 @@ enum class DebugFlags : unsigned {
 
   /// Print conflicting rules.
   ConflictingRules = (1<<18),
+
+  /// Print debug output from concrete equivalence class splitting during
+  /// minimization.
+  SplitConcreteEquivalenceClass = (1<<19),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

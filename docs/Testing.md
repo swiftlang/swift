@@ -344,6 +344,12 @@ code for the target that is not the build machine:
   swiftinterface to the given path and passing additional default flags
   appropriate for resilient frameworks.
 
+* ``%target-swift-emit-module-interfaces(`` *swift interface path*,
+  *swift private interface path* ``)`` *other arguments*:
+  run ``swift-frontend`` for the target, emitting both swiftinterfaces
+  to the given paths and passing additional default flags appropriate for
+  resilient frameworks.
+
 * ``%target-swift-typecheck-module-from-interface(`` *swift interface path*
   ``)`` *other arguments*: run ``swift-frontend`` for the target, verifying
   the swiftinterface at the given path and passing additional default flags

@@ -841,6 +841,8 @@ public:
     return EntryPointInfo.hasEntryPoint();
   }
 
+  NominalTypeDecl *getMainTypeDecl() const;
+
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule() const;
 

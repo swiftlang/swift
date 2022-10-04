@@ -1067,7 +1067,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return true;
   }
 
-  // Collect all destroys of the closure (transitively including destorys of
+  // Collect all destroys of the closure (transitively including destroys of
   // copies) and check if those are the only uses of the closure.
   SmallVector<Operand *, 16> closureDestroys;
   if (!collectDestroys(closure, closureDestroys))
@@ -1084,7 +1084,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                        callbacks))
         return false;
     } else {
-      // A preceeding partial_apply -> apply conversion (done in
+      // A preceding partial_apply -> apply conversion (done in
       // tryOptimizeApplyOfPartialApply) already ensured that the arguments are
       // kept alive until the end of the partial_apply's lifetime.
       SmallVector<Operand *, 8> argsToHandle;
@@ -1635,7 +1635,7 @@ swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
 }
 
 /// Given that we are going to replace use's underlying value, if the use is a
-/// lifetime ending use, insert an end scope scope use for the underlying value
+/// lifetime ending use, insert an end scope use for the underlying value
 /// before we RAUW.
 static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
                                          SILLocation loc,
@@ -1843,7 +1843,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       if (VarInfo->DIExpr.hasFragment())
         // Since we can't merge two different op_fragment
         // now, we're simply bailing out if there is an
-        // existing op_fragment in DIExpresison.
+        // existing op_fragment in DIExpression.
         // TODO: Try to merge two op_fragment expressions here.
         continue;
       for (VarDecl *FD : FieldDecls) {

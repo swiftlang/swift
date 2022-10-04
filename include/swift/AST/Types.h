@@ -58,6 +58,7 @@ class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
+class BuiltinTupleDecl;
 class ClassDecl;
 class ClangModuleLoader;
 class DependentMemberType;
@@ -899,20 +900,24 @@ public:
   bool satisfiesClassConstraint();
 
   /// Determine whether this type can be used as a base type for AST
-  /// name lookup, which is the case for nominal types, protocol compositions
-  /// and archetypes.
+  /// name lookup, which is the case for nominal types, existential types,
+  /// archetypes, and tuples.
   ///
   /// Generally, the static vs instance and mutating vs nonmutating distinction
   /// is handled elsewhere, so metatypes, lvalue types and inout types are not
   /// allowed here.
   ///
-  /// Similarly, tuples formally have members, but this does not go through
-  /// name lookup.
+  /// Tuples have formal members to project elements by index or by label; these
+  /// are handled directly by Sema and do not go through name lookup.
+  ///
+  /// Bona fide members on tuples are defined on extensions of
+  /// Builtin.TheTupleType.
   bool mayHaveMembers() {
     return (is<ArchetypeType>() ||
             is<ModuleType>() ||
             isExistentialType() ||
-            getAnyNominal());
+            getAnyNominal() ||
+            is<TupleType>());
   }
 
   /// Checks whether this type may potentially be callable. This returns true
@@ -4671,6 +4676,17 @@ public:
   /// differentiability from all parameters.
   CanSILFunctionType getWithoutDifferentiability();
 
+  /// Given that `this` is a `@differentiable` function type, returns the type
+  /// of the given `@differentiable` function type component.
+  CanSILFunctionType getDifferentiableComponentType(
+      NormalDifferentiableFunctionTypeComponent component, SILModule &module);
+
+  /// Given that `this` is a `@differentiable(linear)` function type, returns
+  /// the type of the given `@differentiable(linear)` function type component.
+  CanSILFunctionType
+  getLinearComponentType(LinearDifferentiableFunctionTypeComponent component,
+                         SILModule &module);
+
   /// Returns the type of the derivative function for the given parameter
   /// indices, result indices, derivative function kind, derivative function
   /// generic signature (optional), and other auxiliary parameters.
@@ -5488,6 +5504,23 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialType, Type)
   static CanExistentialType get(CanType constraint);
   PROXY_CAN_TYPE_SIMPLE_GETTER(getConstraintType)
 END_CAN_TYPE_WRAPPER(ExistentialType, Type)
+
+
+/// BuiltinTupleType - A singleton nominal type which serves as the declared
+/// interface type of Builtin.TheTupleType.
+class BuiltinTupleType : public NominalType {
+public:
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinTuple;
+  }
+
+private:
+  friend class ASTContext;
+  BuiltinTupleType(BuiltinTupleDecl *TheDecl, const ASTContext &Ctx);
+};
+BEGIN_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
+END_CAN_TYPE_WRAPPER(BuiltinTupleType, NominalType)
 
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value

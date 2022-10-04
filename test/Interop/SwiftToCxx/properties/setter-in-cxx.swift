@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Properties -clang-header-expose-public-decls -emit-clang-header-path %t/properties.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Properties -clang-header-expose-decls=all-public -emit-clang-header-path %t/properties.h
 // RUN: %FileCheck %s < %t/properties.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/properties.h)
@@ -10,18 +10,28 @@ public struct FirstSmallStruct {
 
 // CHECK: class FirstSmallStruct final {
 // CHECK: public:
-// CHECK:   inline FirstSmallStruct(FirstSmallStruct &&) = default;
+// CHECK:   inline FirstSmallStruct(FirstSmallStruct &&)
 // CHECK-NEXT:   inline uint32_t getX() const;
 // CHECK-NEXT:   inline void setX(uint32_t value);
 // CHECK-NEXT:   private:
 
 public struct LargeStruct {
     public var x1, x2, x3, x4, x5, x6: Int
+
+    private static var _statX: Int = 0
+    public static var staticX: Int {
+        get {
+            return _statX
+        }
+        set {
+            _statX = newValue
+        }
+    }
 }
 
 // CHECK: class LargeStruct final {
 // CHECK: public:
-// CHECK: inline LargeStruct(LargeStruct &&) = default;
+// CHECK: inline LargeStruct(LargeStruct &&)
 // CHECK-NEXT: inline swift::Int getX1() const;
 // CHECK-NEXT: inline void setX1(swift::Int value);
 // CHECK-NEXT: inline swift::Int getX2() const;
@@ -34,6 +44,8 @@ public struct LargeStruct {
 // CHECK-NEXT: inline void setX5(swift::Int value);
 // CHECK-NEXT: inline swift::Int getX6() const;
 // CHECK-NEXT: inline void setX6(swift::Int value);
+// CHECK-NEXT: static inline swift::Int getStaticX();
+// CHECK-NEXT: static inline void setStaticX(swift::Int newValue);
 // CHECK-NEXT: private:
 
 public struct LargeStructWithProps {
@@ -97,7 +109,7 @@ public struct SmallStructWithProps {
 
 // CHECK: class SmallStructWithProps final {
 // CHECK: public:
-// CHECK:   inline SmallStructWithProps(SmallStructWithProps &&) = default;
+// CHECK:   inline SmallStructWithProps(SmallStructWithProps &&)
 // CHECK-NEXT:    inline uint32_t getStoredInt() const;
 // CHECK-NEXT:    inline void setStoredInt(uint32_t value);
 // CHECK-NEXT:    inline swift::Int getComputedInt() const;
@@ -127,6 +139,13 @@ public func createFirstSmallStruct(_ x: UInt32) -> FirstSmallStruct {
 // CHECK-NEXT:   inline void LargeStruct::setX1(swift::Int value) {
 // CHECK-NEXT:   return _impl::$s10Properties11LargeStructV2x1Sivs(value, _getOpaquePointer());
 // CHECK-NEXT:   }
+
+// CHECK:      inline swift::Int LargeStruct::getStaticX() {
+// CHECK-NEXT: return _impl::$s10Properties11LargeStructV7staticXSivgZ();
+// CHECK-NEXT: }
+// CHECK-NEXT: inline void LargeStruct::setStaticX(swift::Int newValue) {
+// CHECK-NEXT: return _impl::$s10Properties11LargeStructV7staticXSivsZ(newValue);
+// CHECK-NEXT: }
 
 // CHECK:        inline LargeStruct LargeStructWithProps::getStoredLargeStruct() const {
 // CHECK-NEXT:    return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {

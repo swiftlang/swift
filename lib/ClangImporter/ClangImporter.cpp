@@ -41,6 +41,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -73,8 +74,8 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include <algorithm>
-#include <string>
 #include <memory>
+#include <string>
 
 using namespace swift;
 using namespace importer;
@@ -608,7 +609,7 @@ importer::getNormalInvocationArguments(
 
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
-    auto V = version::Version::getCurrentCompilerVersion();
+    auto V = version::getCurrentCompilerVersion();
     if (!V.empty()) {
       // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
       // "X" component resided in its digits.
@@ -992,27 +993,51 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   invocationArgs.reserve(invocationArgStrs.size());
   for (auto &argStr : invocationArgStrs)
     invocationArgs.push_back(argStr.c_str());
-  // Set up a temporary diagnostic client to report errors from parsing the
-  // command line, which may be important for Swift clients if, for example,
-  // they're using -Xcc options. Unfortunately this diagnostic engine has to
-  // use the default options because the /actual/ options haven't been parsed
-  // yet.
-  //
-  // The long-term client for Clang diagnostics is set up below, after the
-  // clang::CompilerInstance is created.
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
-    new clang::DiagnosticOptions
-  };
 
-  ClangDiagnosticConsumer tempDiagClient{importer->Impl, *tempDiagOpts,
-                                         importerOpts.DumpClangDiagnostics};
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> tempClangDiags =
-      clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
-                                                 &tempDiagClient,
-                                                 /*owned*/false);
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> clangDiags;
+  std::unique_ptr<clang::CompilerInvocation> CI;
+  if (importerOpts.DirectClangCC1ModuleBuild) {
+    // In this mode, we bypass createInvocationFromCommandLine, which goes
+    // through the Clang driver, and use strictly cc1 arguments to instantiate a
+    // clang Instance directly, assuming that the set of '-Xcc <X>' frontend flags is
+    // fully sufficient to do so.
 
-  auto CI = clang::createInvocationFromCommandLine(
-      invocationArgs, tempClangDiags, VFS, false, CC1Args);
+    // Because we are bypassing the Clang driver, we must populate
+    // the diagnostic options here explicitly.
+    std::unique_ptr<clang::DiagnosticOptions> clangDiagOpts =
+        clang::CreateAndPopulateDiagOpts(invocationArgs);
+    ClangDiagnosticConsumer diagClient{importer->Impl, *clangDiagOpts,
+                                       importerOpts.DumpClangDiagnostics};
+    clangDiags = clang::CompilerInstance::createDiagnostics(
+        clangDiagOpts.release(), &diagClient,
+        /*owned*/ false);
+
+    // Finally, use the CC1 command-line and the diagnostic engine
+    // to instantiate our Invocation.
+    CI = std::make_unique<clang::CompilerInvocation>();
+    if (!clang::CompilerInvocation::CreateFromArgs(
+        *CI, invocationArgs, *clangDiags, invocationArgs[0]))
+      return nullptr;
+  } else {
+    // Set up a temporary diagnostic client to report errors from parsing the
+    // command line, which may be important for Swift clients if, for example,
+    // they're using -Xcc options. Unfortunately this diagnostic engine has to
+    // use the default options because the /actual/ options haven't been parsed
+    // yet.
+    //
+    // The long-term client for Clang diagnostics is set up below, after the
+    // clang::CompilerInstance is created.
+    llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
+        new clang::DiagnosticOptions};
+
+    ClangDiagnosticConsumer tempDiagClient{importer->Impl, *tempDiagOpts,
+                                           importerOpts.DumpClangDiagnostics};
+    clangDiags = clang::CompilerInstance::createDiagnostics(tempDiagOpts.get(),
+                                                            &tempDiagClient,
+                                                            /*owned*/ false);
+    CI = clang::createInvocationFromCommandLine(invocationArgs, clangDiags, VFS,
+                                                false, CC1Args);
+  }
 
   if (!CI) {
     return CI;
@@ -1029,8 +1054,9 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   // rdar://77516546 is tracking that the clang importer should be more
   // resilient and provide a module even if there were building it.
   auto TempVFS = clang::createVFSFromCompilerInvocation(
-      *CI, *tempClangDiags,
+      *CI, *clangDiags,
       VFS ? VFS : importer->Impl.SwiftContext.SourceMgr.getFileSystem());
+
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
     if (TempVFS->exists(ModuleMapFile)) {
@@ -1057,12 +1083,10 @@ ClangImporter::create(ASTContext &ctx,
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "'";
     llvm::interleave(
-        invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
-        [] { llvm::errs() << "' '"; });
+                     invocationArgStrs, [](StringRef arg) { llvm::errs() << arg; },
+                     [] { llvm::errs() << "' '"; });
     llvm::errs() << "'\n";
   }
-
-
 
   if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
     importer->Impl.setSinglePCHImport(importerOpts.BridgingHeader);
@@ -2000,6 +2024,14 @@ ClangImporter::loadModule(SourceLoc importLoc,
 ModuleDecl *ClangImporter::Implementation::loadModule(
     SourceLoc importLoc, ImportPath::Module path) {
   ModuleDecl *MD = nullptr;
+  ASTContext &ctx = getNameImporter().getContext();
+
+  if (path.front().Item == ctx.Id_CxxStdlib) {
+    ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
+    adjustedPath.append(path.getSubmodulePath());
+    path = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
+  }
+
   if (!DisableSourceImport)
     MD = loadModuleClang(importLoc, path);
   if (!MD)
@@ -3116,7 +3148,7 @@ public:
 };
 } // unnamed namespace
 
-// FIXME: should submodules still be crawled for the symbol graph? (SR-15753)
+// FIXME(https://github.com/apple/swift-docc/issues/190): Should submodules still be crawled for the symbol graph?
 bool ClangModuleUnit::shouldCollectDisplayDecls() const { return isTopLevel(); }
 
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
@@ -5234,6 +5266,48 @@ Type ClangImporter::importFunctionReturnType(
               .getType())
     return imported;
   return dc->getASTContext().getNeverType();
+}
+
+Type ClangImporter::importVarDeclType(
+    const clang::VarDecl *decl, VarDecl *swiftDecl, DeclContext *dc) {
+  if (decl->getTemplateInstantiationPattern())
+    Impl.getClangSema().InstantiateVariableDefinition(
+        decl->getLocation(),
+        const_cast<clang::VarDecl *>(decl));
+
+  // If the declaration is const, consider it audited.
+  // We can assume that loading a const global variable doesn't
+  // involve an ownership transfer.
+  bool isAudited = decl->getType().isConstQualified();
+
+  auto declType = decl->getType();
+
+  // Special case: NS Notifications
+  if (isNSNotificationGlobal(decl))
+    if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
+                                            Impl.CurrentVersion))
+      declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
+
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+
+  // Note that we deliberately don't bridge most globals because we want to
+  // preserve pointer identity.
+  auto importedType =
+      Impl.importType(declType,
+                      (isAudited ? ImportTypeKind::AuditedVariable
+                                 : ImportTypeKind::Variable),
+                      ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+                      isInSystemModule, Bridgeability::None,
+                      getImportTypeAttrs(decl));
+
+  if (!importedType)
+    return nullptr;
+
+  if (importedType.isImplicitlyUnwrapped())
+    swiftDecl->setImplicitlyUnwrappedOptional(true);
+
+  return importedType.getType();
 }
 
 bool ClangImporter::isInOverlayModuleForImportedModule(

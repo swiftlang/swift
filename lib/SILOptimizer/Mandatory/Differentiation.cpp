@@ -62,12 +62,6 @@ using llvm::SmallSet;
 static llvm::cl::opt<bool> EnableExperimentalLinearMapTransposition(
     "enable-experimental-linear-map-transposition", llvm::cl::init(false));
 
-/// This flag is used to disable `differentiable_function_extract` instruction
-/// folding for SIL testing purposes.
-static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
-    "differentiation-skip-folding-differentiable-function-extraction",
-    llvm::cl::init(true));
-
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -127,17 +121,6 @@ public:
   /// Process the given `linear_function` instruction, filling in the missing
   /// transpose function if necessary.
   bool processLinearFunctionInst(LinearFunctionInst *lfi);
-
-  /// Fold `differentiable_function_extract` users of the given
-  /// `differentiable_function` instruction, directly replacing them with
-  /// `differentiable_function` instruction operands. If the
-  /// `differentiable_function` instruction has no remaining uses, delete the
-  /// instruction itself after folding.
-  ///
-  /// Folding can be disabled by the
-  /// `SkipFoldingDifferentiableFunctionExtraction` flag for SIL testing
-  /// purposes.
-  void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 };
 
 } // end anonymous namespace
@@ -427,7 +410,7 @@ static SILValue reapplyFunctionConversion(
       newArgs.back() = dfi;
     }
     // Compute substitution map for reapplying `partial_apply`.
-    // - If reapplied functoin is not polymorphic, use empty substitution map
+    // - If reapplied function is not polymorphic, use empty substitution map
     //   regardless of the original `partial_apply`'s substitution map.
     //   - This case is triggered for reapplying `partial_apply` where `newFunc`
     //     is a `differentiability_witness_function` where the witness generic
@@ -517,7 +500,7 @@ emitDerivativeFunctionReference(
     auto *desiredResultIndices = desiredConfig.resultIndices;
     // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
     // parameters corresponding to captured variables.
-    // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+    // TODO: If possible, change `autodiff::getLoweredParameterIndices` to
     // take `CaptureInfo` into account.
     if (originalFnTy->getNumParameters() >
         desiredParameterIndices->getCapacity()) {
@@ -1239,51 +1222,6 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   return newLinearFn;
 }
 
-/// Fold `differentiable_function_extract` users of the given
-/// `differentiable_function` instruction, directly replacing them with
-/// `differentiable_function` instruction operands. If the
-/// `differentiable_function` instruction has no remaining uses, delete the
-/// instruction itself after folding.
-///
-/// Folding can be disabled by the `SkipFoldingDifferentiableFunctionExtraction`
-/// flag for SIL testing purposes.
-// FIXME: This function is not correctly detecting the foldable pattern and
-// needs to be rewritten.
-void DifferentiationTransformer::foldDifferentiableFunctionExtraction(
-    DifferentiableFunctionInst *source) {
-  // Iterate through all `differentiable_function` instruction uses.
-  for (auto use : source->getUses()) {
-    auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(use->getUser());
-    // If user is not an `differentiable_function_extract` instruction, set flag
-    // to false.
-    if (!dfei)
-      continue;
-    // Fold original function extractors.
-    if (dfei->getExtractee() ==
-        NormalDifferentiableFunctionTypeComponent::Original) {
-      auto originalFnValue = source->getOriginalFunction();
-      dfei->replaceAllUsesWith(originalFnValue);
-      dfei->eraseFromParent();
-      continue;
-    }
-    // Fold derivative function extractors.
-    auto derivativeFnValue =
-        source->getDerivativeFunction(dfei->getDerivativeFunctionKind());
-    dfei->replaceAllUsesWith(derivativeFnValue);
-    dfei->eraseFromParent();
-  }
-  // If the `differentiable_function` instruction has no remaining uses, erase
-  // it.
-  if (isInstructionTriviallyDead(source)) {
-    SILBuilder builder(source);
-    builder.emitDestroyAddrAndFold(source->getLoc(), source->getJVPFunction());
-    builder.emitDestroyAddrAndFold(source->getLoc(), source->getVJPFunction());
-    source->eraseFromParent();
-  }
-  // Mark `source` as processed so that it won't be reprocessed after deletion.
-  context.markDifferentiableFunctionInstAsProcessed(source);
-}
-
 bool DifferentiationTransformer::processDifferentiableFunctionInst(
     DifferentiableFunctionInst *dfi) {
   PrettyStackTraceSILNode dfiTrace("canonicalizing `differentiable_function`",
@@ -1312,14 +1250,6 @@ bool DifferentiationTransformer::processDifferentiableFunctionInst(
   // Destroy the original operand.
   builder.emitDestroyValueOperation(loc, dfi->getOriginalFunction());
   dfi->eraseFromParent();
-  // If the promoted `@differentiable` function-typed value is an
-  // `differentiable_function` instruction, fold
-  // `differentiable_function_extract` instructions. If
-  // `differentiable_function_extract` folding is disabled, return.
-  if (!SkipFoldingDifferentiableFunctionExtraction)
-    if (auto *newDFI =
-            dyn_cast<DifferentiableFunctionInst>(differentiableFnValue))
-      foldDifferentiableFunctionExtraction(newDFI);
   transform.invalidateAnalysis(parent,
                                SILAnalysis::InvalidationKind::FunctionBody);
   return false;
@@ -1387,7 +1317,7 @@ void Differentiation::run() {
         } else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
           // If linear map transposition is not enabled and an uncanonical
           // `linear_function` instruction is encountered, emit a diagnostic.
-          // FIXME(SR-11850): Finish support for linear map transposition.
+          // FIXME(https://github.com/apple/swift/issues/54256): Finish support for linear map transposition.
           if (!EnableExperimentalLinearMapTransposition) {
             if (!lfi->hasTransposeFunction()) {
               astCtx.Diags.diagnose(

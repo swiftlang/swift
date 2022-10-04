@@ -2001,14 +2001,14 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
   return false;
 }
 
-/// Abstract helper class containing info about an IfExpr
+/// Abstract helper class containing info about a TernaryExpr
 /// that can be expanded into an IfStmt.
 class ExpandableTernaryExprInfo {
 
 public:
   virtual ~ExpandableTernaryExprInfo() {}
 
-  virtual IfExpr *getIf() = 0;
+  virtual TernaryExpr *getTernary() = 0;
 
   virtual SourceRange getNameRange() = 0;
 
@@ -2021,7 +2021,7 @@ public:
   virtual bool isValid() {
 
     //Ensure all public properties are non-nil and valid
-    if (!getIf() || !getNameRange().isValid())
+    if (!getTernary() || !getNameRange().isValid())
       return false;
     if (shouldDeclareNameAndType() && getType().isNull())
       return false;
@@ -2035,16 +2035,16 @@ public:
 };
 
 /// Concrete subclass containing info about an AssignExpr
-/// where the source is the expandable IfExpr.
+/// where the source is the expandable TernaryExpr.
 class ExpandableAssignTernaryExprInfo: public ExpandableTernaryExprInfo {
 
 public:
   ExpandableAssignTernaryExprInfo(AssignExpr *Assign): Assign(Assign) {}
 
-  IfExpr *getIf() override {
+  TernaryExpr *getTernary() override {
     if (!Assign)
       return nullptr;
-    return dyn_cast_or_null<IfExpr>(Assign->getSrc());
+    return dyn_cast_or_null<TernaryExpr>(Assign->getSrc());
   }
 
   SourceRange getNameRange() override {
@@ -2068,17 +2068,17 @@ private:
 };
 
 /// Concrete subclass containing info about a PatternBindingDecl
-/// where the pattern initializer is the expandable IfExpr.
+/// where the pattern initializer is the expandable TernaryExpr.
 class ExpandableBindingTernaryExprInfo: public ExpandableTernaryExprInfo {
 
 public:
   ExpandableBindingTernaryExprInfo(PatternBindingDecl *Binding):
   Binding(Binding) {}
 
-  IfExpr *getIf() override {
+  TernaryExpr *getTernary() override {
     if (Binding && Binding->getNumPatternEntries() == 1) {
       if (auto *Init = Binding->getInit(0)) {
-        return dyn_cast<IfExpr>(Init);
+        return dyn_cast<TernaryExpr>(Init);
       }
     }
 
@@ -2153,16 +2153,16 @@ bool RefactoringActionExpandTernaryExpr::performChange() {
 
   auto NameCharRange = Target->getNameCharRange(SM);
 
-  auto IfRange = Target->getIf()->getSourceRange();
+  auto IfRange = Target->getTernary()->getSourceRange();
   auto IfCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, IfRange);
 
-  auto CondRange = Target->getIf()->getCondExpr()->getSourceRange();
+  auto CondRange = Target->getTernary()->getCondExpr()->getSourceRange();
   auto CondCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, CondRange);
 
-  auto ThenRange = Target->getIf()->getThenExpr()->getSourceRange();
+  auto ThenRange = Target->getTernary()->getThenExpr()->getSourceRange();
   auto ThenCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, ThenRange);
 
-  auto ElseRange = Target->getIf()->getElseExpr()->getSourceRange();
+  auto ElseRange = Target->getTernary()->getElseExpr()->getSourceRange();
   auto ElseCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, ElseRange);
 
   SmallString<64> DeclBuffer;
@@ -2387,17 +2387,18 @@ isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
     bool ConditionUseOnlyAllowedFunctions = false;
     StringRef ExpectName;
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
-        return E;
+        return Action::Continue(E);
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
       if (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param)
         ParamsUseSameVars = checkName(dyn_cast<VarDecl>(D));
       if (D->getKind() == DeclKind::Func)
         ConditionUseOnlyAllowedFunctions = checkName(dyn_cast<FuncDecl>(D));
       if (allCheckPassed())
-        return E;
-      return nullptr;
+        return Action::Continue(E);
+
+      return Action::Stop();
     }
 
     bool allCheckPassed() {
@@ -2484,14 +2485,14 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
   public:
     std::string VarName;
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (E->getKind() != ExprKind::DeclRef)
-        return E;
+        return Action::Continue(E);
       auto D = dyn_cast<DeclRefExpr>(E)->getDecl();
       if (D->getKind() != DeclKind::Var && D->getKind() != DeclKind::Param)
-        return E;
+        return Action::Continue(E);
       VarName = dyn_cast<VarDecl>(D)->getName().str().str();
-      return nullptr;
+      return Action::Stop();
     }
   };
 
@@ -2501,20 +2502,20 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
 
     SmallString<64> ConditionalPattern = SmallString<64>();
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       auto *BE = dyn_cast<BinaryExpr>(E);
       if (!BE)
-        return E;
+        return Action::Continue(E);
       if (isFunctionNameAllowed(BE))
         appendPattern(BE->getLHS(), BE->getRHS());
-      return E;
+      return Action::Continue(E);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
       ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, P->getSourceRange()).str());
       if (P->getKind() == PatternKind::OptionalSome)
         ConditionalPattern.append("?");
-      return { true, nullptr };
+      return Action::Stop();
     }
 
   private:
@@ -2652,7 +2653,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
   return false;
 }
 
-/// Struct containing info about an IfStmt that can be converted into an IfExpr.
+/// Struct containing info about an IfStmt that can be converted into a
+/// TernaryExpr.
 struct ConvertToTernaryExprInfo {
   ConvertToTernaryExprInfo() {}
 
@@ -3638,13 +3640,13 @@ private:
 public:
   SynthesizedCodablePrinter(ASTPrinter &Printer) : Printer(Printer) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
-      return false;
+      return Action::SkipChildren();
 
     if (!VD->isSynthesized()) {
-      return true;
+      return Action::Continue();
     }
     SmallString<32> Scratch;
     auto name = VD->getName().getString(Scratch);
@@ -3654,7 +3656,7 @@ public:
         isa<EnumDecl>(VD) || name == "init(from:)" || name == "encode(to:)";
     if (!shouldPrint) {
       // Some other synthesized decl that we don't want to print.
-      return false;
+      return Action::SkipChildren();
     }
 
     Printer.printNewline();
@@ -3674,7 +3676,7 @@ public:
       }
       Printer.printNewline();
       Printer << "}";
-      return false;
+      return Action::SkipChildren();
     }
 
     PrintOptions Options;
@@ -3688,7 +3690,7 @@ public:
     Printer.printNewline();
     D->print(Printer, Options);
 
-    return false;
+    return Action::SkipChildren();
   }
 };
 
@@ -3816,7 +3818,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(
 
     explicit FindLiteralNumber(Expr *parent) : parent(parent) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (auto *literal = dyn_cast<NumberLiteralExpr>(expr)) {
         // The sub-expression must have the same start loc with the outermost
         // expression, i.e. the cursor position.
@@ -3826,8 +3828,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(
           found = literal;
         }
       }
-
-      return { found == nullptr, expr };
+      return Action::SkipChildrenIf(found, expr);
     }
   };
 
@@ -5372,40 +5373,40 @@ private:
           : ErrParam(ErrParam) {}
       bool foundUnwrap() const { return FoundUnwrap; }
 
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         // Don't walk into ternary conditionals as they may have additional
         // conditions such as err != nil that make a force unwrap now valid.
-        if (isa<IfExpr>(E))
-          return {false, E};
+        if (isa<TernaryExpr>(E))
+          return Action::SkipChildren(E);
 
         auto *FVE = dyn_cast<ForceValueExpr>(E);
         if (!FVE)
-          return {true, E};
+          return Action::Continue(E);
 
         auto *DRE = dyn_cast<DeclRefExpr>(FVE->getSubExpr());
         if (!DRE)
-          return {true, E};
+          return Action::Continue(E);
 
         if (DRE->getDecl() != ErrParam)
-          return {true, E};
+          return Action::Continue(E);
 
         // If we find the node we're looking for, make a note of it, and abort
         // the walk.
         FoundUnwrap = true;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
         // Don't walk into new explicit scopes, we only want to consider force
         // unwraps in the immediate conditional body.
         if (!S->isImplicit() && startsNewScope(S))
-          return {false, S};
-        return {true, S};
+          return Action::SkipChildren(S);
+        return Action::Continue(S);
       }
 
-      bool walkToDeclPre(Decl *D) override {
+      PreWalkAction walkToDeclPre(Decl *D) override {
         // Don't walk into new explicit DeclContexts.
-        return D->isImplicit() || !isa<DeclContext>(D);
+        return Action::VisitChildrenIf(D->isImplicit() || !isa<DeclContext>(D));
       }
     };
     for (auto Node : Nodes) {
@@ -7315,7 +7316,7 @@ private:
     if (auto Closure = dyn_cast<ClosureExpr>(E)) {
       return Closure;
     } else if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
-      return CaptureList->getClosureBody();
+      return dyn_cast<ClosureExpr>(CaptureList->getClosureBody());
     } else {
       return nullptr;
     }

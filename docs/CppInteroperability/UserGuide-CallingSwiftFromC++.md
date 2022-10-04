@@ -447,10 +447,10 @@ The following interface will be generated:
 // "Navigation-Swift.h" - C++ interface for Swift's Navigation module.
 class CompassDirection {
 public:
-  static const struct { ... } north;
-  static const struct { ... } south;
-  static const struct { ... } east;
-  static const struct { ... } west;
+  inline const static struct { ... } north;
+  inline const static struct { ... } south;
+  inline const static struct { ... } east;
+  inline const static struct { ... } west;
 private:
   // type representation details.
   ...
@@ -549,14 +549,12 @@ class Barcode {
 public:
   Barcode() = delete;
 
-  static const struct { ... } qrCode;
-  static const struct { ... } upc;
+  inline const static struct { ... } qrCode;
+  inline const static struct { ... } upc;
  
   bool isUpc() const;
 
   using UpcType = swift::Tuple<swift::Int, swift::Int, swift::Int, swift::Int>;
-
-  bool isUpc() const;
 
   // Extracts the associated valus from Barcode.upc enum case
   UpcType getUpc() const;

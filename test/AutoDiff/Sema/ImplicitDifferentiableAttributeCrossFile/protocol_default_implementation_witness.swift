@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -c -verify -primary-file %s %S/Inputs/other_file_protocol_default_implementation_witness.swift
 
-// SR-13455: Test missing protocol requirement `@differentiable` attribute
-// errors for protocol witnesses declared in a different file than the protocol
+// https://github.com/apple/swift/issues/55897
+// Test missing protocol requirement `@differentiable` attribute errors for
+// protocol witnesses declared in a different file than the protocol
 // conformance.
 //
 // This test case specifically tests protocol extension method witnesses.

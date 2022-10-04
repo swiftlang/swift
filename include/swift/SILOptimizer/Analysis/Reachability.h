@@ -81,7 +81,7 @@ public:
     }
   }
 
-  // Data flow "meet": interesection of successor reachability.
+  // Data flow "meet": intersection of successor reachability.
   void solveBackward() {
     while (SILBasicBlock *block = cfgWorklist.popAndForget()) {
       if (!meetOverSuccessors(block))

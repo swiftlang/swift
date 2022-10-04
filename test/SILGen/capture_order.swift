@@ -119,7 +119,8 @@ func captureInClosure() {
 
 /// Regression tests
 
-class SR4812 {
+// https://github.com/apple/swift/issues/47389
+class С_47389 {
   public func foo() {
     let bar = { [weak self] in
     // expected-error@-1 {{closure captures 'bar' before it is declared}}
@@ -134,19 +135,22 @@ class SR4812 {
   }
 }
 
-func timeout(_ f: @escaping () -> Void) {
-  f()
-}
-
-func sr10687() {
-  timeout { // expected-error {{closure captures 'x' before it is declared}}
-    proc()
+// https://github.com/apple/swift/issues/53085
+do {
+  func timeout(_ f: @escaping () -> Void) {
+    f()
   }
-  
-  let x = 0 // expected-note {{captured value declared here}}
-  
-  func proc() {
-    _ = x // expected-note {{captured here}}
+
+  func f() {
+    timeout { // expected-error {{closure captures 'x' before it is declared}}
+      proc()
+    }
+
+    let x = 0 // expected-note {{captured value declared here}}
+
+    func proc() {
+      _ = x // expected-note {{captured here}}
+    }
   }
 }
 
@@ -166,8 +170,9 @@ class rdar40600800 {
   }
 }
 
+// https://github.com/apple/swift/issues/57097
 // Make sure we can't capture an uninitialized 'var' box, either.
-func SR14747() {
+func f_57097() {
   func g() -> Int { // expected-error {{closure captures 'r' before it is declared}}
     _ = r // expected-note {{captured here}}
     return 5

@@ -107,73 +107,84 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 static PrecedenceGroupDecl *lookupPrecedenceGroupForOperator(DeclContext *DC,
                                                              Identifier name,
                                                              SourceLoc loc) {
-  auto *op = DC->lookupInfixOperator(name).getSingleOrDiagnose(loc);
+  auto result = DC->lookupInfixOperator(name);
+  auto *op =
+      loc.isValid() ? result.getSingleOrDiagnose(loc) : result.getSingle();
   return op ? op->getPrecedenceGroup() : nullptr;
 }
 
 PrecedenceGroupDecl *
-TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
+TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E,
+                                                   bool diagnose) {
   /// Look up the builtin precedence group with the given name.
 
   auto getBuiltinPrecedenceGroup = [&](DeclContext *DC, Identifier name,
                                        SourceLoc loc) -> PrecedenceGroupDecl * {
     auto groups = TypeChecker::lookupPrecedenceGroup(DC, name, loc);
-    return groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true);
+    return loc.isValid() ? groups.getSingleOrDiagnose(loc, /*forBuiltin*/ true)
+                         : groups.getSingle();
   };
   
   auto &Context = DC->getASTContext();
-  if (auto ifExpr = dyn_cast<IfExpr>(E)) {
+  if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
     // Ternary has fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_TernaryPrecedence,
-                                     ifExpr->getQuestionLoc());
+                                     diagnose ? ternary->getQuestionLoc()
+                                              : SourceLoc());
   }
 
   if (auto assignExpr = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_AssignmentPrecedence,
-                                     assignExpr->getEqualLoc());
+                                     diagnose ? assignExpr->getEqualLoc()
+                                              : SourceLoc());
   }
 
   if (auto castExpr = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     return getBuiltinPrecedenceGroup(DC, Context.Id_CastingPrecedence,
-                                     castExpr->getAsLoc());
+                                     diagnose ? castExpr->getAsLoc()
+                                              : SourceLoc());
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     Identifier name = DRE->getDecl()->getBaseIdentifier();
-    return lookupPrecedenceGroupForOperator(DC, name, DRE->getLoc());
+    return lookupPrecedenceGroupForOperator(
+        DC, name, diagnose ? DRE->getLoc() : SourceLoc());
   }
 
   if (auto *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     Identifier name = OO->getDecls()[0]->getBaseIdentifier();
-    return lookupPrecedenceGroupForOperator(DC, name, OO->getLoc());
+    return lookupPrecedenceGroupForOperator(
+        DC, name, diagnose ? OO->getLoc() : SourceLoc());
   }
 
   if (auto arrowExpr = dyn_cast<ArrowExpr>(E)) {
-    return getBuiltinPrecedenceGroup(DC,
-                                     Context.Id_FunctionArrowPrecedence,
-                                     arrowExpr->getArrowLoc());
+    return getBuiltinPrecedenceGroup(DC, Context.Id_FunctionArrowPrecedence,
+                                     diagnose ? arrowExpr->getArrowLoc()
+                                              : SourceLoc());
   }
 
   // An already-folded binary operator comes up for non-primary use cases
   // of this function.
   if (auto binaryExpr = dyn_cast<BinaryExpr>(E)) {
-    return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn());
+    return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn(),
+                                                 diagnose);
   }
 
   if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
-    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn());
+    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn(), diagnose);
   }
 
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     Identifier name = MRE->getDecl().getDecl()->getBaseIdentifier();
-    return lookupPrecedenceGroupForOperator(DC, name, MRE->getLoc());
+    return lookupPrecedenceGroupForOperator(
+        DC, name, diagnose ? MRE->getLoc() : SourceLoc());
   }
 
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
-  if (!isa<ErrorExpr>(E))
+  if (diagnose && !isa<ErrorExpr>(E))
     Context.Diags.diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
@@ -203,7 +214,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
       continue;
     }
 
-    auto left = lookupPrecedenceGroupForInfixOperator(DC, E);
+    auto left = lookupPrecedenceGroupForInfixOperator(DC, E, /*diagnose=*/true);
     if (!left)
       // LHS is not binary expression.
       return E;
@@ -218,8 +229,8 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     // Find the RHS of the current binary expr.
     if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
       E = assignExpr->getSrc();
-    } else if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
-      E = ifExpr->getElseExpr();
+    } else if (auto *ternary = dyn_cast<TernaryExpr>(E)) {
+      E = ternary->getElseExpr();
     } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
       E = binaryExpr->getRHS();
     } else {
@@ -309,10 +320,10 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
       llvm_unreachable("unknown try-like expression");
     }
 
-    if (isa<IfExpr>(Op) ||
+    if (isa<TernaryExpr>(Op) ||
         (opPrecedence && opPrecedence->isAssignment())) {
       if (!isEndOfSequence) {
-        if (isa<IfExpr>(Op)) {
+        if (isa<TernaryExpr>(Op)) {
           Ctx.Diags.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
                              static_cast<unsigned>(tryKind));
         } else {
@@ -327,17 +338,17 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     }
   }
 
-  if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
+  if (auto *ternary = dyn_cast<TernaryExpr>(Op)) {
     // Resolve the ternary expression.
     if (!Ctx.CompletionCallback) {
       // In code completion we might call preCheckExpression twice - once for
       // the first pass and once for the second pass. This is fine since
       // preCheckExpression idempotent.
-      assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+      assert(!ternary->isFolded() && "already folded if expr in sequence?!");
     }
-    ifExpr->setCondExpr(LHS);
-    ifExpr->setElseExpr(RHS);
-    return ifExpr;
+    ternary->setCondExpr(LHS);
+    ternary->setElseExpr(RHS);
+    return ternary;
   }
 
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
@@ -425,7 +436,8 @@ static Expr *foldSequence(DeclContext *DC,
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
-    auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, op);
+    auto opPrecedence = TypeChecker::lookupPrecedenceGroupForInfixOperator(
+        DC, op, /*diagnose=*/true);
     if (!precedenceBound.shouldConsider(opPrecedence))
       return {nullptr, nullptr};
     return {op, opPrecedence};
@@ -457,7 +469,8 @@ static Expr *foldSequence(DeclContext *DC,
     }
     
     // Pull out the next binary operator.
-    Op op2{ S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, S[0]) };
+    Op op2{S[0], TypeChecker::lookupPrecedenceGroupForInfixOperator(
+                     DC, S[0], /*diagnose=*/true)};
 
     // If the second operator's precedence is lower than the
     // precedence bound, break out of the loop.
@@ -765,17 +778,19 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
     bool FoundResultReturn = false;
     bool FoundNoResultReturn = false;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      return {false, expr};
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      return Action::SkipChildren(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *decl) override {
+      return Action::SkipChildren();
+    }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Record return statements.
       if (auto ret = dyn_cast<ReturnStmt>(stmt)) {
         if (ret->isImplicit())
-          return {true, stmt};
+          return Action::Continue(stmt);
 
         // If it has a result, remember that we saw one, but keep
         // traversing in case there's a no-result return somewhere.
@@ -785,10 +800,10 @@ bool ClosureHasExplicitResultRequest::evaluate(Evaluator &evaluator,
           // Otherwise, stop traversing.
         } else {
           FoundNoResultReturn = true;
-          return {false, nullptr};
+          return Action::Stop();
         }
       }
-      return {true, stmt};
+      return Action::Continue(stmt);
     }
 
   public:

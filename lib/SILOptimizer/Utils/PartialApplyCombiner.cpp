@@ -74,7 +74,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   // temporaries.
   SmallVector<Operand *, 16> paiUses;
 
-  // Of course we must inlude all apply instructions which we want to optimize.
+  // Of course we must include all apply instructions which we want to optimize.
   for (FullApplySite ai : applies) {
     paiUses.push_back(ai.getCalleeOperand());
   }

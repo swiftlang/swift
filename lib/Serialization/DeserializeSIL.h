@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILFormat.h"
 #include "ModuleFile.h"
+#include "SILFormat.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -56,6 +58,10 @@ namespace swift {
 
     std::unique_ptr<SerializedFuncTable> VTableList;
     MutableArrayRef<ModuleFile::PartiallySerialized<SILVTable *>> VTables;
+
+    std::unique_ptr<SerializedFuncTable> MoveOnlyDeinitList;
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILMoveOnlyDeinit *>>
+        MoveOnlyDeinits;
 
     std::unique_ptr<SerializedFuncTable> WitnessTableList;
     MutableArrayRef<ModuleFile::PartiallySerialized<SILWitnessTable *>>
@@ -139,6 +145,7 @@ namespace swift {
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
     SILFunction *getFuncForReference(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
+    SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
 
@@ -179,6 +186,7 @@ public:
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
     SILVTable *lookupVTable(StringRef MangledClassName);
+    SILMoveOnlyDeinit *lookupMoveOnlyDeinit(StringRef mangledNominalTypeName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
@@ -256,6 +264,7 @@ public:
       getAllDefaultWitnessTables();
       getAllProperties();
       getAllDifferentiabilityWitnesses();
+      getAllMoveOnlyDeinits();
     }
 
     /// Deserialize all SILFunctions inside the module and add them to SILMod.
@@ -267,6 +276,10 @@ public:
 
     /// Deserialize all VTables inside the module and add them to SILMod.
     void getAllVTables();
+
+    /// Deserialize all move only deinit tables inside the module and add them
+    /// to SILMod.
+    void getAllMoveOnlyDeinits();
 
     /// Deserialize all WitnessTables inside the module and add them to SILMod.
     void getAllWitnessTables();

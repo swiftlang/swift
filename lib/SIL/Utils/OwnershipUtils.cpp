@@ -25,6 +25,64 @@
 
 using namespace swift;
 
+bool swift::hasPointerEscape(BorrowedValue value) {
+  assert(value.kind == BorrowedValueKind::BeginBorrow ||
+         value.kind == BorrowedValueKind::LoadBorrow);
+  GraphNodeWorklist<Operand *, 8> worklist;
+  for (Operand *use : value->getUses()) {
+    if (use->getOperandOwnership() != OperandOwnership::NonUse)
+      worklist.insert(use);
+  }
+
+  while (Operand *op = worklist.pop()) {
+    switch (op->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      llvm_unreachable("this operand cannot handle an inner guaranteed use");
+
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return true;
+
+    case OperandOwnership::Borrow:
+    case OperandOwnership::EndBorrow:
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::InteriorPointer:
+    case OperandOwnership::BitwiseEscape:
+      break;
+
+    case OperandOwnership::Reborrow: {
+      SILArgument *phi = cast<BranchInst>(op->getUser())
+                             ->getDestBB()
+                             ->getArgument(op->getOperandNumber());
+      for (auto *use : phi->getUses()) {
+        if (use->getOperandOwnership() != OperandOwnership::NonUse)
+          worklist.insert(use);
+      }
+      break;
+    }
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(op).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result->getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            worklist.insert(resultUse);
+          }
+        }
+        return true;
+      });
+      break;
+    }
+    }
+  }
+  return false;
+}
+
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
          v->getOwnershipKind() == OwnershipKind::None;
@@ -319,19 +377,26 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
+// TODO: refactor this with SSAPrunedLiveness::computeLiveness.
 bool swift::findUsesOfSimpleValue(SILValue value,
                                   SmallVectorImpl<Operand *> *usePoints) {
   for (auto *use : value->getUses()) {
-    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::PointerEscape:
+      return false;
+    case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
-            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-              return false;
-            }
-            usePoints->push_back(end);
-            return true;
-          })) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        usePoints->push_back(end);
+        return true;
+      })) {
         return false;
       }
+      break;
+    default:
+      break;
     }
     usePoints->push_back(use);
   }
@@ -936,7 +1001,7 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
         isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
-        isa<UncheckedAddrCastInst>(user)) {
+        isa<UncheckedAddrCastInst>(user) || isa<MarkMustCheckInst>(user)) {
       transitiveResultUses(op);
       continue;
     }

@@ -525,7 +525,7 @@ public:
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
   };
 
-  /// Execute \p PerformOperation sychronously with the parameters necessary to
+  /// Execute \p PerformOperation synchronously with the parameters necessary to
   /// invoke a completion-like operation on \c CompletionInstance.
   void performWithParamsToCompletionLikeOperation(
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
@@ -686,14 +686,14 @@ public:
 
   void collectExpressionTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-      SourceKitCancellationToken CancellationToken,
+      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+      bool CanonicalType, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
   void collectVariableTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length,
+      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;

@@ -129,17 +129,26 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
 
-
   //===---
-  // Ownership Optimizations
+  // Begin Ownership Optimizations
   //
 
-  P.addMoveKillsCopyableAddressesChecker();
-  P.addMoveOnlyObjectChecker(); // Check noImplicitCopy and move only
-                                // types.
-  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
-                                         //   value.
+  // Check noImplicitCopy and move only types for addresses.
+  P.addMoveOnlyAddressChecker();
+  // Check noImplicitCopy and move only types for objects
+  P.addMoveOnlyObjectChecker();
+  // Convert last destroy_value to deinits.
+  P.addMoveOnlyDeinitInsertion();
+  // Lower move only wrapped trivial types.
   P.addTrivialMoveOnlyTypeEliminator();
+  // Check no uses after _move of a value in an address.
+  P.addMoveKillsCopyableAddressesChecker();
+  // No uses after _move of copyable value.
+  P.addMoveKillsCopyableValuesChecker();
+
+  //
+  // End Ownership Optimizations
+  //===---
 
   P.addAddressLowering();
 
@@ -193,7 +202,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addPredictableDeadAllocationElimination();
 
   // Now that we have finished performing diagnostics that rely on lexical
-  // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
+  // scopes, if lexical lifetimes are not enabled, eliminate lexical lifetimes.
   if (Options.LexicalLifetimes != LexicalLifetimesOption::On) {
     P.addLexicalLifetimeEliminator();
   }
@@ -292,7 +301,7 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
   P.addSILCombine();
-  // Which can expose opportunity for simplifcfg.
+  // Which can expose opportunity for simplifycfg.
   P.addSimplifyCFG();
 }
 
@@ -811,6 +820,9 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
 
+  // In optimized builds, do the inter-procedural analysis in a module pass.
+  P.addStackProtection();
+
   // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
   // P.addPruneVTables();
 }
@@ -982,6 +994,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   if (P.getOptions().AssumeSingleThreaded) {
     P.addAssumeSingleThreaded();
   }
+
+  // In Onone builds, do a function-local analysis in a function pass.
+  P.addFunctionStackProtection();
 
   // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();

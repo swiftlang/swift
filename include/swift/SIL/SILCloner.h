@@ -1242,12 +1242,11 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getSrc()),
-                                      getOpValue(Inst->getDest()),
-                                      getOpValue(Inst->getInitializer()),
-                                      getOpValue(Inst->getSetter()),
-                                      Inst->getMode()));
+      Inst, getBuilder().createAssignByWrapper(
+                getOpLocation(Inst->getLoc()), Inst->getOriginator(),
+                getOpValue(Inst->getSrc()), getOpValue(Inst->getDest()),
+                getOpValue(Inst->getInitializer()),
+                getOpValue(Inst->getSetter()), Inst->getMode()));
 }
 
 template<typename ImplClass>
@@ -1283,7 +1282,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), VarInfo,
-      Inst->poisonRefs(), Inst->getWasMoved());
+      Inst->poisonRefs(), Inst->getWasMoved(), Inst->hasTrace());
   remapDebugVarInfo(DebugVarCarryingInst(NewInst));
   recordClonedInstruction(Inst, NewInst);
 }
@@ -1461,7 +1460,8 @@ SILCloner<ImplClass>::visitAddressToPointerInst(AddressToPointerInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createAddressToPointer(getOpLocation(Inst->getLoc()),
                                                 getOpValue(Inst->getOperand()),
-                                                getOpType(Inst->getType())));
+                                                getOpType(Inst->getType()),
+                                                Inst->needsStackProtection()));
 }
 
 template<typename ImplClass>
@@ -2638,7 +2638,8 @@ SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createIndexAddr(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getBase()),
-                                         getOpValue(Inst->getIndex())));
+                                         getOpValue(Inst->getIndex()),
+                                         Inst->needsStackProtection()));
 }
 
 template<typename ImplClass>

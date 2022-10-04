@@ -385,8 +385,12 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         if (var->isImplicit())
           continue;
 
-        // Computed properties are not included.
-        if (!var->hasStorage())
+        // Computed properties are not included, except in cases
+        // where property has a property wrapper and `@typeWrapperIgnored`
+        // attribute.
+        if (!var->hasStorage() &&
+            !(var->hasAttachedPropertyWrapper() &&
+              var->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>()))
           continue;
 
         // If this is a memberwise initializeable property include
@@ -1261,7 +1265,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       // designated initializers, synthesize a special
       // memberwise initializer that would instantiate `$_storage`.
       if (!hasUserDefinedDesignatedInit(ctx.evaluator, decl))
-        (void)decl->getTypeWrapperInitializer();
+        (void)decl->getTypeWrappedTypeMemberwiseInitializer();
     }
 
     decl->setAddedImplicitInitializers();
@@ -1584,9 +1588,8 @@ void swift::addNonIsolatedToSynthesized(
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
 }
 
-ConstructorDecl *
-SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
-                                           NominalTypeDecl *wrappedType) const {
+ConstructorDecl *SynthesizeTypeWrappedTypeMemberwiseInitializer::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *wrappedType) const {
   if (!wrappedType->hasTypeWrapper())
     return nullptr;
 
@@ -1597,7 +1600,8 @@ SynthesizeTypeWrapperInitializer::evaluate(Evaluator &evaluator,
   wrappedType->addMember(ctor);
 
   auto *body = evaluateOrDefault(
-      evaluator, SynthesizeTypeWrapperInitializerBody{ctor}, nullptr);
+      evaluator, SynthesizeTypeWrappedTypeMemberwiseInitializerBody{ctor},
+      nullptr);
   if (!body)
     return nullptr;
 

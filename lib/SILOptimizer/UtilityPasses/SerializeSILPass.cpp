@@ -88,6 +88,10 @@ void MapOpaqueArchetypes::replace() {
     SILType mappedType = remapType(origArg->getType());
     auto *NewArg = clonedEntryBlock->createFunctionArgument(
         mappedType, origArg->getDecl(), true);
+    NewArg->setNoImplicitCopy(
+        cast<SILFunctionArgument>(origArg)->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(
+        cast<SILFunctionArgument>(origArg)->getLifetimeAnnotation());
     entryArgs.push_back(NewArg);
   }
 

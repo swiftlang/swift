@@ -81,7 +81,7 @@ llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
                      ": (.+)$", llvm::Regex::Newline);
 }
 
-// MARK: Module name shadowing warnings (SR-898)
+// MARK(https://github.com/apple/swift/issues/43510): Module name shadowing warnings
 //
 // When swiftc emits a module interface, it qualifies most types with their
 // module name. This usually makes the interface less ambiguous, but if a type

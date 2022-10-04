@@ -40,7 +40,7 @@
 /// considerable difference in the implementation. For example,
 /// DiagnoseStaticExclusivity must be able to fully analyze all @inout_aliasable
 /// parameters because they aren't dynamically enforced. This optimization
-/// completely ignores @inout_aliasable paramters because it only cares about
+/// completely ignores @inout_aliasable parameters because it only cares about
 /// dynamic enforcement. This optimization also does not attempt to
 /// differentiate accesses on disjoint subaccess paths, because it should not
 /// weaken enforcement in any way--a program that traps at -Onone should also
@@ -54,11 +54,11 @@
 ///
 /// When none of the local accesses on local storage (box/stack) have nested
 /// conflicts, then all the local accesses may be disabled by setting their
-/// enforcement to `static`. This is somwhat rare because static diagnostics
+/// enforcement to `static`. This is somewhat rare because static diagnostics
 /// already promote the obvious cases to static checks. However, there are two
 /// reasons that dynamic local markers may be disabled: (1) inlining may cause
 /// closure access to become local access (2) local storage may truly escape,
-/// but none of the the local access scopes cross a call site.
+/// but none of the local access scopes cross a call site.
 ///
 /// TODO: Perform another run of AccessEnforcementSelection immediately before
 /// this pass. Currently, that pass only works well when run before
@@ -73,7 +73,7 @@
 /// When a pair of non-overlapping accesses, where the first access dominates
 /// the second and there are no conflicts on the same storage in the paths
 /// between them, and they are part of the same sub-region
-/// be it the same block or the sampe loop, merge those accesses to create
+/// be it the same block or the sample loop, merge those accesses to create
 /// a new, larger, scope with a single begin_access for the accesses.
 //===----------------------------------------------------------------------===//
 
@@ -630,7 +630,7 @@ void AccessConflictAndMergeAnalysis::propagateAccessSetsBottomUp(
             accessResult.mergeFrom(calleeAccess.getResult());
             continue;
           }
-          // FIXME: Treat may-release conservatively in the anlysis itself by
+          // FIXME: Treat may-release conservatively in the analysis itself by
           // adding a mayRelease flag, in addition to the unidentified flag.
           accessResult.analyzeInstruction(&instr);
         }
@@ -695,7 +695,7 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   // end_access %x
   if (BeginAccessInst *mergeableAccess =
           findMergeableOutOfScopeAccess(state, beginAccess)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found mergable pair: " << *mergeableAccess
+    LLVM_DEBUG(llvm::dbgs() << "Found mergeable pair: " << *mergeableAccess
                             << "  with " << *beginAccess << "\n");
     result.mergePairs.emplace_back(mergeableAccess, beginAccess);
   }
@@ -743,7 +743,7 @@ void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
   // If they don't alias - we might get away with not recording a conflict
   LLVM_DEBUG(llvm::dbgs() << "MayRelease Instruction: " << *instr);
 
-  // This is similar to recordUnknownConflict, but only class and and global
+  // This is similar to recordUnknownConflict, but only class and global
   // accesses can be affected by a deinitializer.
   auto isHeapAccess = [](AccessStorage::Kind accessKind) {
     return accessKind == AccessStorage::Class
@@ -814,7 +814,7 @@ RegionState &AccessConflictAndMergeAnalysis::mergePredAccesses(
     (void)bbRegionParentID;
     auto predStateIter = localRegionStates.find(pred);
     if (predStateIter == localRegionStates.end()) {
-      // Backedge / irreducable control flow - bail
+      // Backedge / irreducible control flow - bail
       state.reset();
       break;
     }

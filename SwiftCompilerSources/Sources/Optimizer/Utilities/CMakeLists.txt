@@ -7,7 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
-  EscapeInfo.swift
+  EscapeUtils.swift
   OptUtils.swift
   WalkUtils.swift
   AccessUtils.swift

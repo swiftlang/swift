@@ -119,30 +119,21 @@ class TypeAccessScopeDiagnoser : private ASTWalker {
   bool treatUsableFromInlineAsPublic;
   const ComponentIdentTypeRepr *offendingType = nullptr;
 
-  bool walkToTypeReprPre(TypeRepr *TR) override {
-    // Exit early if we've already found a problem type.
-    if (offendingType)
-      return false;
-
+  PreWalkAction walkToTypeReprPre(TypeRepr *TR) override {
     auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
     if (!CITR)
-      return true;
+      return Action::Continue();
 
     const ValueDecl *VD = CITR->getBoundDecl();
     if (!VD)
-      return true;
+      return Action::Continue();
 
     if (VD->getFormalAccessScope(useDC, treatUsableFromInlineAsPublic)
         != accessScope)
-      return true;
+      return Action::Continue();
 
     offendingType = CITR;
-    return false;
-  }
-
-  bool walkToTypeReprPost(TypeRepr *T) override {
-    // Exit early if we've already found a problem type.
-    return offendingType != nullptr;
+    return Action::Stop();
   }
 
   explicit TypeAccessScopeDiagnoser(AccessScope accessScope,
@@ -486,6 +477,9 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+
+  UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
+
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1107,6 +1101,7 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -1548,13 +1543,18 @@ swift::getDisallowedOriginKind(const Decl *decl,
   if (howImported != RestrictedImportKind::None) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
-    if (where.isSPI())
+    if (where.isSPI() &&
+        where.getFragileFunctionKind().kind == FragileFunctionKind::None &&
+        !SF->getASTContext().LangOpts.EnableSPIOnlyImports)
       downgradeToWarning = DowngradeToWarning::Yes;
+
+    if (where.isSPI() && howImported == RestrictedImportKind::SPIOnly)
+      return DisallowedOriginKind::None;
 
     // Before Swift 6, implicit imports were not reported unless an
     // implementation-only import was also present. Downgrade to a warning
     // just in this case.
-    if (howImported == RestrictedImportKind::Implicit &&
+    if (howImported == RestrictedImportKind::MissingImport &&
         !SF->getASTContext().isSwiftVersionAtLeast(6) &&
         !SF->hasImportsWithFlag(ImportFlags::ImplementationOnly)) {
       downgradeToWarning = DowngradeToWarning::Yes;
@@ -1599,9 +1599,16 @@ swift::getDisallowedOriginKind(const Decl *decl,
     }
 
     // Restrictively imported, cannot be reexported.
-    if (howImported == RestrictedImportKind::Implicit)
-      return DisallowedOriginKind::ImplicitlyImported;
-    return DisallowedOriginKind::ImplementationOnly;
+    switch (howImported) {
+    case RestrictedImportKind::MissingImport:
+      return DisallowedOriginKind::MissingImport;
+    case RestrictedImportKind::SPIOnly:
+      return DisallowedOriginKind::SPIOnly;
+    case RestrictedImportKind::ImplementationOnly:
+      return DisallowedOriginKind::ImplementationOnly;
+    default:
+      llvm_unreachable("RestrictedImportKind isn't handled");
+    }
   } else if ((decl->isSPI() || decl->isAvailableAsSPI()) && !where.isSPI()) {
     if (decl->isAvailableAsSPI() && !decl->isSPI()) {
       // Allowing unavailable context to use @_spi_available decls.

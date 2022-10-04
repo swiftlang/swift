@@ -114,7 +114,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
       ++ii;
 
-      if (!mmci || !mmci->hasMoveCheckerKind())
+      if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isObject())
         continue;
 
       // Handle guaranteed/owned move arguments and values.
@@ -299,8 +299,13 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       // We then RAUW the mark_must_check once we have emitted the error since
       // later passes expect that mark_must_check has been eliminated by
       // us. Since we are failing already, this is ok to do.
-      diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
-               diag::sil_moveonlychecker_not_understand_mark_move);
+      if (mmci->getType().isMoveOnlyWrapped()) {
+        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_no_implicit_copy);
+      } else {
+        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_moveonly);
+      }
       mmci->replaceAllUsesWith(mmci->getOperand());
       mmci->eraseFromParent();
       changed = true;
@@ -396,9 +401,8 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   };
 
   CanonicalizeOSSALifetime canonicalizer(
-      false /*pruneDebugMode*/, false /*poisonRefsMode*/, accessBlockAnalysis,
-      domTree, deleter, foundConsumingUseNeedingCopy,
-      foundConsumingUseNotNeedingCopy);
+      false /*pruneDebugMode*/, accessBlockAnalysis, domTree, deleter,
+      foundConsumingUseNeedingCopy, foundConsumingUseNotNeedingCopy);
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
   SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
@@ -502,6 +506,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
             b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
         cvi->replaceAllUsesWith(expCopy);
         cvi->eraseFromParent();
+        changed = true;
       }
     }
   }

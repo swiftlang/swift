@@ -1436,6 +1436,12 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Functions accessible at runtime (i.e. distributed method accessors).
   const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
+
+  /// C type GetExtraInhabitantTag function descriminator
+  const uint16_t GetExtraInhabitantTagFunction = 0x392e; // = 14638
+
+  /// C type StoreExtraInhabitantTag function descriminator
+  const uint16_t StoreExtraInhabitantTagFunction = 0x9bf6; // = 39926
 }
 
 /// The number of arguments that will be passed directly to a generic

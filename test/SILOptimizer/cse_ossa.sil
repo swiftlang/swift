@@ -1071,7 +1071,7 @@ protocol Proto : class {
   func doThat()
 }
 
-// Check that we don't CSE open_existential_ref if they are not compeltely equal.
+// Check that we don't CSE open_existential_ref if they are not completely equal.
 // CHECK-LABEL: sil [ossa] @dont_cse_open_existential_ref :
 // CHECK: open_existential_ref
 // CHECK: open_existential_ref

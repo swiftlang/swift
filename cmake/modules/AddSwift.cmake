@@ -6,10 +6,9 @@ include(SwiftAndroidSupport)
 include(SwiftCXXUtils)
 
 function(_swift_gyb_target_sources target scope)
-  set(SWIFT_SYNTAX_GYB_SUPPORT_DIR "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/Sources/generate-swift-syntax-builder")
   file(GLOB GYB_UNICODE_DATA ${SWIFT_SOURCE_DIR}/utils/UnicodeData/*)
   file(GLOB GYB_STDLIB_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py)
-  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_SYNTAX_GYB_SUPPORT_DIR}/gyb_syntax_support/*.py)
+  file(GLOB GYB_SYNTAX_SUPPORT ${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}/gyb_syntax_support/*.py)
   file(GLOB GYB_SOURCEKIT_SUPPORT ${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/*.py)
   set(GYB_SOURCES
     ${SWIFT_SOURCE_DIR}/utils/gyb
@@ -27,7 +26,7 @@ function(_swift_gyb_target_sources target scope)
 
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
-        ${CMAKE_COMMAND} -E env PYTHONPATH=${SWIFT_SYNTAX_GYB_SUPPORT_DIR} $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
+        ${CMAKE_COMMAND} -E env PYTHONPATH=${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE} $<TARGET_FILE:Python3::Interpreter> ${SWIFT_SOURCE_DIR}/utils/gyb -D CMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P} ${SWIFT_GYB_FLAGS} -o ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${absolute}
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/${generated}.tmp ${CMAKE_CURRENT_BINARY_DIR}/${generated}
       COMMAND
@@ -565,6 +564,29 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       message(FATAL_ERROR "BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
     else()
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
+    endif()
+  endif()
+
+  if(SWIFT_SWIFT_PARSER)
+    # Make sure we can find the early SwiftSyntax libraries.
+    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib")
+
+    # For the "end step" of bootstrapping configurations on Darwin, need to be
+    # able to fall back to the SDK directory for libswiftCore et al.
+    if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+      if (NOT "${bootstrapping}" STREQUAL "1")
+        if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+          target_link_directories(${target} PRIVATE "${sdk_dir}")
+
+          # Include the abi stable system stdlib in our rpath.
+          set(swift_runtime_rpath "/usr/lib/swift")
+
+          # Add in the toolchain directory so we can grab compatibility libraries
+          get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+          get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+          target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
+        endif()
+      endif()
     endif()
   endif()
 

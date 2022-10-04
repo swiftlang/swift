@@ -186,10 +186,12 @@ let _ : inout @convention(c) (Int) -> Int // expected-error {{'inout' may only b
 func foo3(inout a: Int -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{11-16=}} {{20-20=inout }}
                                    // expected-error @-1 {{single argument function types require parentheses}} {{20-20=(}} {{23-23=)}}
 
-func sr5505(arg: Int) -> String {
-  return "hello"
+// https://github.com/apple/swift/issues/48077
+do {
+  func imAFunction(arg: Int) -> String {}
+  var _: imAFunction = imAFunction
+  // expected-error@-1 {{cannot find type 'imAFunction' in scope}}
 }
-var _: sr5505 = sr5505 // expected-error {{cannot find type 'sr5505' in scope}}
 
 typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'inout' must not be used on variadic parameters}}
                                                           // expected-error@-1 {{only a single element can be variadic}} {{35-39=}}

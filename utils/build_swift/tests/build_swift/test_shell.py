@@ -279,7 +279,7 @@ class TestSubprocessWrappers(unittest.TestCase):
 
     # NOTE: Testing the Popen class is harder than it might appear. We're not
     # able to mock out the subprocess.Popen superclass as one might initially
-    # expect. Rather that shell.Popen class object already exists and inherts
+    # expect. Rather that shell.Popen class object already exists and inherits
     # from subprocess.Popen, thus mocking it out does not change the behavior.
     # Ultimately this class is merely a wrapper that uses already tested
     # decorators to add functionality so testing here might not provide any

@@ -36,42 +36,34 @@ func testFunction() {
 
 // RUN: %target-swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -emit-silgen -o - | %FileCheck %s
 
-// COM: FIXME: should it be @in_guaranteed OptionsStruct? https://github.com/apple/swift/issues/60601
 // CHECK: [[FN1:%[0-9]+]] = function_ref @$sSo19OptionsConsumerObjCC7optionsABSo0A6StructV_tcfC : $@convention(method) (OptionsStruct, @thick OptionsConsumerObjC.Type) -> @owned OptionsConsumerObjC
 // CHECK-NEXT: apply [[FN1]]
 // CHECK-SAME: : $@convention(method) (OptionsStruct, @thick OptionsConsumerObjC.Type) -> @owned OptionsConsumerObjC
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
-// CHECK: [[FN2:%[0-9]+]] = objc_method {{%[0-9]+}} : $OptionsConsumerObjC, #OptionsConsumerObjC.doOtherThing!foreign : (OptionsConsumerObjC) -> (OptionsStruct) -> Float, $@convention(objc_method) (@in OptionsStruct, OptionsConsumerObjC) -> Float
+// CHECK: [[FN2:%[0-9]+]] = objc_method {{%[0-9]+}} : $OptionsConsumerObjC, #OptionsConsumerObjC.doOtherThing!foreign : (OptionsConsumerObjC) -> (OptionsStruct) -> Float, $@convention(objc_method) (@in_guaranteed OptionsStruct, OptionsConsumerObjC) -> Float
 // CHECK-NEXT: apply [[FN2]]
-// CHECK-SAME: : $@convention(objc_method) (@in OptionsStruct, OptionsConsumerObjC) -> Float
+// CHECK-SAME: : $@convention(objc_method) (@in_guaranteed OptionsStruct, OptionsConsumerObjC) -> Float
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
-// CHECK: [[FN3:%[0-9]+]] = objc_method {{%[0-9]+}} : $@objc_metatype OptionsConsumerObjC.Type, #OptionsConsumerObjC.consumer!foreign : (OptionsConsumerObjC.Type) -> (OptionsStruct) -> @dynamic_self OptionsConsumerObjC, $@convention(objc_method) (@in OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> @autoreleased OptionsConsumerObjC
+// CHECK: [[FN3:%[0-9]+]] = objc_method {{%[0-9]+}} : $@objc_metatype OptionsConsumerObjC.Type, #OptionsConsumerObjC.consumer!foreign : (OptionsConsumerObjC.Type) -> (OptionsStruct) -> @dynamic_self OptionsConsumerObjC, $@convention(objc_method) (@in_guaranteed OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> @autoreleased OptionsConsumerObjC
 // CHECK-NEXT: apply [[FN3]]
-// CHECK-SAME: : $@convention(objc_method) (@in OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> @autoreleased OptionsConsumerObjC
+// CHECK-SAME: : $@convention(objc_method) (@in_guaranteed OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> @autoreleased OptionsConsumerObjC
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
-// CHECK: [[FN4:%[0-9]+]] = objc_method {{%[0-9]+}} : $@objc_metatype OptionsConsumerObjC.Type, #OptionsConsumerObjC.doThing!foreign : (OptionsConsumerObjC.Type) -> (OptionsStruct) -> Int32, $@convention(objc_method) (@in OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> Int32
+// CHECK: [[FN4:%[0-9]+]] = objc_method {{%[0-9]+}} : $@objc_metatype OptionsConsumerObjC.Type, #OptionsConsumerObjC.doThing!foreign : (OptionsConsumerObjC.Type) -> (OptionsStruct) -> Int32, $@convention(objc_method) (@in_guaranteed OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> Int32
 // CHECK-NEXT: apply [[FN4]]
-// CHECK-SAME: : $@convention(objc_method) (@in OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> Int32
+// CHECK-SAME: : $@convention(objc_method) (@in_guaranteed OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> Int32
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
 // CHECK: [[FN5:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxxC1ERK13OptionsStruct : $@convention(c) (OptionsStruct) -> @out OptionsConsumerCxx
 // CHECK-NEXT: apply [[FN5]]
 // CHECK-SAME: : $@convention(c) (OptionsStruct) -> @out OptionsConsumerCxx
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
-// CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx12doOtherThingERK13OptionsStruct : $@convention(cxx_method) (@in OptionsStruct, @inout OptionsConsumerCxx) -> Float
+// CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx12doOtherThingERK13OptionsStruct : $@convention(cxx_method) (@in_guaranteed OptionsStruct, @inout OptionsConsumerCxx) -> Float
 // CHECK-NEXT: apply [[FN6]]
-// CHECK-SAME: : $@convention(cxx_method) (@in OptionsStruct, @inout OptionsConsumerCxx) -> Float
+// CHECK-SAME: : $@convention(cxx_method) (@in_guaranteed OptionsStruct, @inout OptionsConsumerCxx) -> Float
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
-// CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx5buildERK13OptionsStruct : $@convention(c) (@in OptionsStruct) -> OptionsConsumerCxx
+// CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx5buildERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> OptionsConsumerCxx
 // CHECK-NEXT: apply [[FN6]]
-// CHECK-SAME: : $@convention(c) (@in OptionsStruct) -> OptionsConsumerCxx
+// CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> OptionsConsumerCxx
 
-// COM: FIXME: should it be @in_guaranteed OptionStruct? https://github.com/apple/swift/issues/60601
-// CHECK: [[FN7:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx7doThingERK13OptionsStruct : $@convention(c) (@in OptionsStruct) -> Int32
+// CHECK: [[FN7:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx7doThingERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32
 // CHECK-NEXT: apply [[FN7]]
-// CHECK-SAME: : $@convention(c) (@in OptionsStruct) -> Int32
+// CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32

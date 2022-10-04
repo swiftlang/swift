@@ -234,14 +234,14 @@ namespace {
     UnresolvedPatternFinder(bool &HadUnresolvedPattern)
       : HadUnresolvedPattern(HadUnresolvedPattern) {}
     
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find an UnresolvedPatternExpr, return true.
       if (isa<UnresolvedPatternExpr>(E)) {
         HadUnresolvedPattern = true;
-        return { false, E };
+        return Action::SkipChildren(E);
       }
       
-      return { true, E };
+      return Action::Continue(E);
     }
     
     static bool hasAny(Expr *E) {
@@ -937,7 +937,8 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 ///
 /// We also emit diagnostics and potentially a fix-it to help the user.
 ///
-/// See SR-11160 and SR-11212 for more discussion.
+/// See https://github.com/apple/swift/issues/53557 and
+/// https://github.com/apple/swift/issues/53611 for more discussion.
 //
 // type ~ (T1, ..., Tn) (n >= 2)
 //   1a. pat ~ ((P1, ..., Pm)) (m >= 2) -> untuple the pattern

@@ -473,7 +473,7 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
 ///     %otherCopy = copy_value %borrowedValue
 ///     %newPhi = phi(%ownedValue, %otherCopy)
 ///
-/// The immediate effect is to produce an unnecesssary copy, but it avoids
+/// The immediate effect is to produce an unnecessary copy, but it avoids
 /// extending %ownedValue's liveness to new paths and hopefully simplifies
 /// downstream optimization and debugging. Unnecessary copies could be
 /// avoided with simple dominance check if it becomes desirable to do so.
@@ -591,7 +591,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
 // same type.
 //
 // TODO: consider reusing copies that dominate multiple reborrowed
-// operands. Howeer, this requires copying in an earlier block and inserting
+// operands. However, this requires copying in an earlier block and inserting
 // post-dominating destroys, which may be better handled in an ownership phi
 // canonicalization pass.
 SILValue BorrowedLifetimeExtender::createCopyAtEdge(PhiOperand reborrowOper) {
@@ -971,7 +971,7 @@ static SILBasicBlock::iterator getBorrowPoint(SILValue newValue,
 /// newValue. This may allow newValue's original borrow scope to be removed,
 /// which then allows the copy to be removed. The result would be a single
 /// borrow scope over all newValue's and guaranteedValue's uses, which is
-/// usually preferrable to a new copy and separate borrow scope. When doing
+/// usually preferable to a new copy and separate borrow scope. When doing
 /// this, we can use newValue as the borrow point instead of getBorrowPoint.
 SILValue
 OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
@@ -997,7 +997,7 @@ OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
 // Borrow \p newValue over \p singleGuaranteedUse. Return the new guaranteed
 // value.
 //
-// Precondition: \p newValue dominates dominates \p singleGuaranteedUse.
+// Precondition: \p newValue dominates \p singleGuaranteedUse.
 //
 // Precondition: If \p singleGuaranteedUse ends a borrowed lifetime, the \p
 // newValue also dominates the beginning of the borrow scope.
@@ -1700,7 +1700,7 @@ SILBasicBlock::iterator OwnershipReplaceSingleUseHelper::perform() {
 /// Create end_borrows at all points that cover the inner uses.
 ///
 /// The client must check canCloneTerminator() first to make sure that the
-/// search for transitive uses does not encouter a PointerEscape.
+/// search for transitive uses does not encounter a PointerEscape.
 class GuaranteedPhiBorrowFixup {
   // A phi in mustConvertPhis has already been determined to be part of this
   // new nested borrow scope.

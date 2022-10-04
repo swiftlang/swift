@@ -104,24 +104,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
 #include "swift/SIL/SILNodes.def"
 
-SILFunction *SILInstruction::getFunction() const {
-  return getParent()->getParent();
-}
-
-SILModule &SILInstruction::getModule() const {
-  return getFunction()->getModule();
-}
-
-SILInstruction *SILInstruction::getPreviousInstruction() {
-  auto pos = getIterator();
-  return pos == getParent()->begin() ? nullptr : &*std::prev(pos);
-}
-
-SILInstruction *SILInstruction::getNextInstruction() {
-  auto nextPos = std::next(getIterator());
-  return nextPos == getParent()->end() ? nullptr : &*nextPos;
-}
-
 void SILInstruction::removeFromParent() {
 #ifndef NDEBUG
   for (auto result : getResults()) {
@@ -663,9 +645,8 @@ namespace {
     }
 
     bool visitIndexAddrInst(IndexAddrInst *RHS) {
-      // We have already compared the operands/types, so we should have equality
-      // at this point.
-      return true;
+      auto *lhs = cast<IndexAddrInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
@@ -772,7 +753,8 @@ namespace {
     }
 
     bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
-      return true;
+      auto *lhs = cast<AddressToPointerInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {

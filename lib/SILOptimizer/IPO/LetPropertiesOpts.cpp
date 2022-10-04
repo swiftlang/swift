@@ -90,7 +90,7 @@
 // 
 // When viewed this way, the fact that a property is declared 'let' is mostly
 // irrelevant to this optimization--it can be expanded to handle non-'let'
-// properties. The more salient feature is whether the propery has a public
+// properties. The more salient feature is whether the property has a public
 // setter.
 //
 // For now, this optimization only recognizes class properties because class

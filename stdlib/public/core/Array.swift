@@ -751,8 +751,8 @@ extension Array: RandomAccessCollection, MutableCollection {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_mutating(index)
       let address = _buffer.mutableFirstElementAddress + index
+      defer { _endMutation() }
       yield &address.pointee
-      _endMutation();
     }
   }
 

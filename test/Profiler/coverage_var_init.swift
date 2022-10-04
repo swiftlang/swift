@@ -32,13 +32,13 @@ struct S {
 }
 
 final class VarInit {
-  // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC018initializedWrapperE0SivpfP"
-  // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+1]]:42 : 0
-  @Wrapper var initializedWrapperInit = 2
-
   // CHECK: sil_coverage_map {{.*}} // variable initialization expression of coverage_var_init.VarInit.(_autoclosureWrapperInit
   // CHECK-NEXT: [[@LINE+1]]:52 -> [[@LINE+1]]:53
   @AutoClosureWrapper var autoclosureWrapperInit = 3
+
+  // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC019_initializedWrapper{{.*}}" {{.*}} // variable initialization expression of coverage_var_init.VarInit.(_initializedWrapperInit
+  // CHECK-NEXT: [[@LINE+1]]:41 -> [[@LINE+1]]:42 : 0
+  @Wrapper var initializedWrapperInit = 2
 
   // CHECK: sil_coverage_map {{.*}} "$s17coverage_var_init7VarInitC04lazydE033_49373CB2DFB47C8DC62FA963604688DFLLSSvgSSyXEfU_"
   // CHECK-NEXT: [[@LINE+1]]:42 -> [[@LINE+3]]:4 : 0

@@ -3289,6 +3289,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Check that if one import in a file uses \c @_spiOnly, all imports from the
+/// same file are consistently using \c @_spiOnly.
+class CheckInconsistentSPIOnlyImportsRequest
+    : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Checks to see if any of the imports in a module use \c @_weakLinked
 /// in one file and not in another.
 ///
@@ -3470,6 +3489,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class IsSemanticallyUnavailableRequest
+    : public SimpleRequest<IsSemanticallyUnavailableRequest,
+                           bool(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ClosureEffectsRequest
     : public SimpleRequest<ClosureEffectsRequest,
                            FunctionType::ExtInfo(ClosureExpr *),
@@ -3638,8 +3673,8 @@ public:
   bool isCached() const { return true; }
 };
 
-class SynthesizeTypeWrapperInitializer
-    : public SimpleRequest<SynthesizeTypeWrapperInitializer,
+class SynthesizeTypeWrappedTypeMemberwiseInitializer
+    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializer,
                            ConstructorDecl *(NominalTypeDecl *),
                            RequestFlags::Cached> {
 public:
@@ -3654,8 +3689,8 @@ public:
   bool isCached() const { return true; }
 };
 
-class SynthesizeTypeWrapperInitializerBody
-    : public SimpleRequest<SynthesizeTypeWrapperInitializerBody,
+class SynthesizeTypeWrappedTypeMemberwiseInitializerBody
+    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
                            BraceStmt *(ConstructorDecl *),
                            RequestFlags::Cached> {
 public:
@@ -3665,6 +3700,37 @@ private:
   friend SimpleRequest;
 
   BraceStmt *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SynthesizeLocalVariableForTypeWrapperStorage
+    : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
+                           VarDecl *(ConstructorDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class GetTypeWrapperInitializer
+    : public SimpleRequest<GetTypeWrapperInitializer,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }

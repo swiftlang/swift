@@ -64,10 +64,9 @@ LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
 LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
 LANGUAGE_FEATURE(Actors, 0, "actors", true)
-LANGUAGE_FEATURE(Actors2, 0, "actors #2 (TEMPORARY)", true)
 LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions", true)
 LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol", true)
-LANGUAGE_FEATURE(GlobalActors, 0, "Global actors", langOpts.EnableExperimentalConcurrency)
+LANGUAGE_FEATURE(GlobalActors, 316, "Global actors", true)
 LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
 LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
 LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type", true)
@@ -82,6 +81,7 @@ LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building 
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
 LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
 LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline", true)
+LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor", true)
@@ -102,6 +102,7 @@ EXPERIMENTAL_FEATURE(MoveOnly)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
 EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
+EXPERIMENTAL_FEATURE(LayoutPrespecialization)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
@@ -128,6 +129,17 @@ EXPERIMENTAL_FEATURE(TypeWrappers)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
 EXPERIMENTAL_FEATURE(ParserRoundTrip)
+
+/// Whether to perform validation of the parse tree produced by the Swift
+/// Swift parser.
+EXPERIMENTAL_FEATURE(ParserValidation)
+
+/// Whether to fold sequence expressions in the syntax tree produced by the
+/// Swift Swift parser.
+EXPERIMENTAL_FEATURE(ParserSequenceFolding)
+
+/// Enables implicit some while also enabling existential `any`
+EXPERIMENTAL_FEATURE(ImplicitSome)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

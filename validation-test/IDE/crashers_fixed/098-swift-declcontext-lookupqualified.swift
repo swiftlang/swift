@@ -1,3 +1,5 @@
 // RUN: %target-swift-ide-test -code-completion -code-completion-token=A -source-filename=%s
-// https://bugs.swift.org/browse/SR-3354
+
+// https://github.com/apple/swift/issues/45942
+
 protocol A{class T#^A^#class b:Array<T>

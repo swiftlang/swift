@@ -48,6 +48,7 @@ func run(on object: PFXObject) async throws {
 
 @main struct Main {
   static func main() async throws {
+    _ = JSONDecoder()
     let object = PFXObject()
     try await run(on: object)
   }

@@ -18,9 +18,10 @@ import SwiftShims
 // SILCombine should bailout since it does not propagate
 // type substitutions on the return value.
 //
-// <rdar://40555427> [SR-7773]:
-// SILCombiner::propagateConcreteTypeOfInitExistential fails to full propagate
-// type substitutions.
+// rdar://40555427
+// https://github.com/apple/swift/issues/50312
+// 'SILCombiner::propagateConcreteTypeOfInitExistential' fails to fully
+// propagate type substitutions.
 //===----------------------------------------------------------------------===//
 public protocol P : AnyObject {
 }
@@ -310,7 +311,7 @@ sil @$s32sil_combine_concrete_existential1PPA2A1QRzrlE18witnessCompositionyyF : 
 //   pp.witnessComposition()
 // }
 //
-// SILCombine substitutes the applies opened existention parameter with a concrete type <C : P & Q>
+// SILCombine substitutes the applies opened extension parameter with a concrete type <C : P & Q>
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential32testExtensionProtocolComposition1cyAA4C_PQC_tF : $@convention(thin) (@guaranteed C_PQ) -> () {
 // CHECK-NOT: init_existential_ref
 // CHECK-NOT: open_existential_ref
@@ -439,7 +440,7 @@ bb0:
 }
 
 // <rdar://problem/46322928> Failure to devirtualize a protocol method
-// applied to an opened existential blocks implemention of
+// applied to an opened existential blocks implementation of
 // DataProtocol.
 public protocol ContiguousBytes {
   func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
@@ -657,7 +658,7 @@ extension MyObject : SubscriptionViewControllerDelegate { }
 
 sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 
-// CHECK: sil @test_opend_archeype_concrete_conformance_substitution : $@convention(method) (@guaranteed any ResourceKitProtocol, @guaranteed ViewController) -> () {
+// CHECK: sil @test_opend_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed any ResourceKitProtocol, @guaranteed ViewController) -> () {
 // CHECK: bb0([[ARG:%.*]] : $any ResourceKitProtocol, [[ARG2:%.*]] : $ViewController):
 // CHECK:   [[T1:%.*]] = metatype $@thick SubscriptionViewControllerBuilder.Type
 // CHECK:   [[T2:%.*]] = open_existential_ref [[ARG]] : $any ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
@@ -671,7 +672,7 @@ sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControl
 // CHECK:  (normal_conformance type=MyObject protocol=SubscriptionViewControllerDelegate))>:
 // CHECK:   apply [[T5]]<@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self>([[T6]], [[T1]])
 
-sil @test_opend_archeype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
+sil @test_opend_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
 bb0(%0 : $ResourceKitProtocol, %1 : $ViewController):
   %4 = metatype $@thick SubscriptionViewControllerBuilder.Type
   %5 = open_existential_ref %0 : $ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", ResourceKitProtocol) Self
@@ -722,7 +723,9 @@ bb3(%20 : $Error):
 }
 
 // -----------------------------------------------------------------------------
-// rdar://88664423 (SR-15791: Miscompile under -O with mutating protocol method)
+// rdar://88664423
+// https://github.com/apple/swift/issues/58068
+// Miscompile under -O with mutating protocol method
 //
 // Basic outline (test case has more copies):
 //   %1 = alloc_stack $PPP

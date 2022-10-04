@@ -22,7 +22,9 @@ func test_call_as_function<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
   // CHECK: switch_enum %{{.+}} : $Optional<Int>
   let _: Int = s(0)
 
-  // SR-12590: SILGen crash on existential callAsFunction.
+  // https://github.com/apple/swift/issues/55035
+  // SILGen crash on existential callAsFunction.
+  //
   // CHECK: witness_method $@opened({{.+}}, any P1) Self, #P1.callAsFunction : <Self where Self : P1> (Self) -> () -> ()
   p1()
 

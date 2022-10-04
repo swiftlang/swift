@@ -909,7 +909,7 @@ private:
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
-    // TODO(SR-15377): We currently cannot round trip some C++ types.
+    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
     if (!Opts.DisableRoundTripDebugTypes &&
         !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
@@ -1532,6 +1532,9 @@ private:
     case TypeKind::Pack:
     case TypeKind::PackExpansion:
       llvm_unreachable("Unimplemented!");
+
+    case TypeKind::BuiltinTuple:
+      llvm_unreachable("BuiltinTupleType should not show up here");
 
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral

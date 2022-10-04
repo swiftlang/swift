@@ -848,7 +848,7 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
   // %88 = index_addr %84 : $*Int, %87 : $Builtin.Word
   // store %some_value to %88 : $*Int
 
-  // If this an ArrayUinitializedIntrinsic then the ElementBuffer is a
+  // If this an ArrayUninitializedIntrinsic then the ElementBuffer is a
   // builtin.RawPointer. Otherwise, it is an UnsafeMutablePointer, which would
   // be struct-extracted to obtain a builtin.RawPointer.
   SILValue UnsafeMutablePointerExtract =

@@ -1396,7 +1396,7 @@ public:
 class SpecializeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<SpecializeAttr, Identifier,
-                                    AvailableAttr *> {
+                                    AvailableAttr *, Type> {
   friend class SpecializeAttrTargetDeclRequest;
   friend TrailingObjects;
 
@@ -1416,12 +1416,15 @@ private:
   uint64_t resolverContextData;
   size_t numSPIGroups;
   size_t numAvailableAttrs;
+  size_t numTypeErasedParams;
+  bool typeErasedParamsInitialized;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
                  DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
-                 ArrayRef<AvailableAttr *> availabilityAttrs);
+                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                 size_t typeErasedParamsCount);
 
 public:
   static SpecializeAttr *
@@ -1429,6 +1432,7 @@ public:
          TrailingWhereClause *clause, bool exported, SpecializationKind kind,
          DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
+         size_t typeErasedParamsCount,
          GenericSignature specializedSignature = nullptr);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,
@@ -1442,6 +1446,7 @@ public:
                                 SpecializationKind kind,
                                 ArrayRef<Identifier> spiGroups,
                                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                                ArrayRef<Type> typeErasedParams,
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
@@ -1465,6 +1470,22 @@ public:
   ArrayRef<AvailableAttr *> getAvailableAttrs() const {
     return {this->template getTrailingObjects<AvailableAttr *>(),
             numAvailableAttrs};
+  }
+
+  ArrayRef<Type> getTypeErasedParams() const {
+    if (!typeErasedParamsInitialized)
+      return {};
+
+    return {this->template getTrailingObjects<Type>(),
+            numTypeErasedParams};
+  }
+
+  void setTypeErasedParams(const ArrayRef<Type> typeErasedParams) {
+    assert(typeErasedParams.size() == numTypeErasedParams);
+    if (!typeErasedParamsInitialized) {
+      std::uninitialized_copy(typeErasedParams.begin(), typeErasedParams.end(), getTrailingObjects<Type>());
+      typeErasedParamsInitialized = true;
+    }
   }
 
   TrailingWhereClause *getTrailingWhereClause() const;
@@ -2221,6 +2242,9 @@ public:
   /// The earliest platform version that may use the back deployed implementation.
   const llvm::VersionTuple Version;
 
+  /// Returns true if this attribute is active given the current platform.
+  bool isActivePlatform(const ASTContext &ctx) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_BackDeploy;
   }
@@ -2541,9 +2565,6 @@ public:
     unsigned index;
   };
   Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
-
-  // Force construction of a one-element tuple type.
-  bool IsTuple = false;
 
   TypeAttributes() {}
 

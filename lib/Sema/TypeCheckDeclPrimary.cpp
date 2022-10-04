@@ -31,6 +31,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -1881,6 +1883,7 @@ public:
       auto importer = ID->getModuleContext();
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+          !ID->getAttrs().hasAttribute<SPIOnlyAttr>() &&
           target->getLibraryLevel() == LibraryLevel::SPI) {
 
         auto &diags = ID->getASTContext().Diags;
@@ -1899,8 +1902,10 @@ public:
 #endif
 
         bool isImportOfUnderlying = importer->getName() == target->getName();
+        auto *SF = ID->getDeclContext()->getParentSourceFile();
         bool treatAsError = enableTreatAsError &&
-                            !isImportOfUnderlying;
+                            !isImportOfUnderlying &&
+                            SF->Kind != SourceFileKind::Interface;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
@@ -3346,6 +3351,15 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
+    // Only check again for destructor decl outside of a class if our dstructor
+    // is not marked as invalid.
+    if (!DD->isInvalid()) {
+      auto *nom = dyn_cast<NominalTypeDecl>(DD->getDeclContext());
+      if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
+        DD->diagnose(diag::destructor_decl_outside_class);
+      }
+    }
+
     TypeChecker::checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
@@ -3356,6 +3370,10 @@ public:
     } else {
       addDelayedFunction(DD);
     }
+  }
+
+  void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
 };
 } // end anonymous namespace

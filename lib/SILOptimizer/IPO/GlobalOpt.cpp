@@ -339,7 +339,7 @@ bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG,
 
 /// Replace loads from \a addr by the \p initVal of a global.
 ///
-/// Recuresively walk over all uses of \p addr and look through address
+/// Recursively walk over all uses of \p addr and look through address
 /// projections. The \p initVal is an instruction in the static initializer of
 /// a SILGlobalVariable. It is cloned into the current function with \p cloner.
 static void replaceLoadsFromGlobal(SILValue addr,
@@ -539,7 +539,7 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
 }
 
 /// If there are no loads or accesses of a given global, then remove its
-/// associated global addr and all asssociated instructions.
+/// associated global addr and all associated instructions.
 bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
   if (!isSafeToRemove(global))
     return false;
@@ -778,7 +778,7 @@ bool SILGlobalOpt::run() {
     }
   } while (changed);
 
-  // This is similiar to optimizeInitializer, but it's for globals which are
+  // This is similar to optimizeInitializer, but it's for globals which are
   // initialized in the "main" function and not by an initializer function.
   for (auto &Init : GlobalVarStore) {
     // Don't optimize functions that are marked with the opt.never attribute.

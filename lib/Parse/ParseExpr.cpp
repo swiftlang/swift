@@ -235,7 +235,8 @@ parse_operator:
       // if we're in a stmt-condition.
       if (Tok.getText() == "&&" &&
           peekToken().isAny(tok::pound_available, tok::pound_unavailable,
-                            tok::kw_let, tok::kw_var, tok::kw_case))
+                            tok::pound__hasSymbol, tok::kw_let, tok::kw_var,
+                            tok::kw_case))
         goto done;
       
       // Parse the operator.
@@ -256,8 +257,8 @@ parse_operator:
       SourceLoc questionLoc = consumeToken();
       
       // Parse the middle expression of the ternary.
-      ParserResult<Expr> middle =
-          parseExprSequence(diag::expected_expr_after_if_question, isExprBasic);
+      ParserResult<Expr> middle = parseExprSequence(
+          diag::expected_expr_after_ternary_question, isExprBasic);
       SequenceStatus |= middle;
       ParserStatus Status = middle;
       if (middle.isNull())
@@ -266,27 +267,24 @@ parse_operator:
       // Make sure there's a matching ':' after the middle expr.
       if (!Tok.is(tok::colon)) {
         if (middle.hasCodeCompletion()) {
-          SequencedExprs.push_back(new (Context) IfExpr(questionLoc,
-                                                        middle.get(),
-                                                        PreviousLoc));
+          SequencedExprs.push_back(new (Context) TernaryExpr(
+              questionLoc, middle.get(), PreviousLoc));
           SequencedExprs.push_back(new (Context) CodeCompletionExpr(PreviousLoc));
           goto done;
         }
-        
-        diagnose(questionLoc, diag::expected_colon_after_if_question);
+
+        diagnose(questionLoc, diag::expected_colon_after_ternary_question);
         Status.setIsParseError();
         return makeParserResult(Status, new (Context) ErrorExpr(
             {startLoc, middle.get()->getSourceRange().End}));
       }
 
       SourceLoc colonLoc = consumeToken();
-      
-      auto *unresolvedIf
-        = new (Context) IfExpr(questionLoc,
-                               middle.get(),
-                               colonLoc);
-      SequencedExprs.push_back(unresolvedIf);
-      Message = diag::expected_expr_after_if_colon;
+
+      auto *unresolvedTernary =
+          new (Context) TernaryExpr(questionLoc, middle.get(), colonLoc);
+      SequencedExprs.push_back(unresolvedTernary);
+      Message = diag::expected_expr_after_ternary_colon;
       break;
     }
         
@@ -621,7 +619,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 ///   !
 ///   [ expression ]
 ParserResult<Expr> Parser::parseExprKeyPath() {
-  SyntaxParsingContext KeyPathCtx(SyntaxContext, SyntaxKind::KeyPathExpr);
+  SyntaxParsingContext KeyPathCtx(SyntaxContext, SyntaxKind::OldKeyPathExpr);
   // Consume '\'.
   SourceLoc backslashLoc = consumeToken(tok::backslash);
   llvm::SaveAndRestore<bool> S(InSwiftKeyPath, true);
@@ -1143,7 +1141,7 @@ static MagicIdentifierLiteralExpr::Kind
 getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
   switch (Kind) {
   case tok::pound_file:
-    // TODO: Enable by default at the next source break. (SR-13199)
+    // TODO(https://github.com/apple/swift/issues/55639): Enable by default at the next source break.
     return Opts.hasFeature(Feature::ConciseMagicFile)
          ? MagicIdentifierLiteralExpr::FileIDSpelledAsFile
          : MagicIdentifierLiteralExpr::FilePathSpelledAsFile;
@@ -1829,9 +1827,23 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::pound_unavailable: {
     // For better error recovery, parse but reject availability in an expr
     // context.
-    diagnose(Tok.getLoc(), diag::availability_query_outside_if_stmt_guard, 
+    diagnose(Tok.getLoc(), diag::special_condition_outside_if_stmt_guard,
              Tok.getText());
     auto res = parseStmtConditionPoundAvailable();
+    if (res.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+    if (res.isParseErrorOrHasCompletion() || res.isNull())
+      return nullptr;
+    return makeParserResult(new (Context)
+                                ErrorExpr(res.get()->getSourceRange()));
+  }
+
+  case tok::pound__hasSymbol: {
+    // For better error recovery, parse but reject #_hasSymbol in an expr
+    // context.
+    diagnose(Tok.getLoc(), diag::special_condition_outside_if_stmt_guard,
+             Tok.getText());
+    auto res = parseStmtConditionPoundHasSymbol();
     if (res.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (res.isParseErrorOrHasCompletion() || res.isNull())
@@ -3181,9 +3193,16 @@ ParserResult<Expr> Parser::parseTupleOrParenExpr(tok leftTok, tok rightTok) {
                     rightLoc, SyntaxKind::TupleExprElementList);
 
   // A tuple with a single, unlabeled element is just parentheses.
-  if (elts.size() == 1 && elts[0].Label.empty()) {
-    return makeParserResult(
-        status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
+  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+    if (elts.size() == 1 && elts[0].LabelLoc.isInvalid()) {
+      return makeParserResult(
+          status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
+    }
+  } else {
+    if (elts.size() == 1 && elts[0].Label.empty()) {
+      return makeParserResult(
+          status, new (Context) ParenExpr(leftLoc, elts[0].E, rightLoc));
+    }
   }
 
   SmallVector<Expr *, 8> exprs;
@@ -3929,8 +3948,15 @@ Parser::parsePlatformVersionConstraintSpec() {
       platformFromString(PlatformIdentifier.str());
 
   if (!Platform.hasValue() || Platform.getValue() == PlatformKind::none) {
-    diagnose(Tok, diag::avail_query_unrecognized_platform_name,
-             PlatformIdentifier);
+    if (auto CorrectedPlatform =
+            closestCorrectedPlatformString(PlatformIdentifier.str())) {
+      diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
+               PlatformIdentifier, *CorrectedPlatform)
+          .fixItReplace(PlatformLoc, *CorrectedPlatform);
+    } else {
+      diagnose(PlatformLoc, diag::avail_query_unrecognized_platform_name,
+               PlatformIdentifier);
+    }
     Platform = PlatformKind::none;
   }
 

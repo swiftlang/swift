@@ -17,7 +17,7 @@
 #ifndef SWIFT_CONCURRENCY_ERROR_BACKDEPLOY56_H
 #define SWIFT_CONCURRENCY_ERROR_BACKDEPLOY56_H
 
-#include "public/SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 #include <cstdint>
 #include <stdlib.h>
 

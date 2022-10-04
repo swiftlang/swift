@@ -261,76 +261,77 @@ class ClassWithLoadableStructWithBiggerString {
 }
 
 //===----------------------------------------------------------------------===//
-// SR-8076
+// https://github.com/apple/swift/issues/50609
 //===----------------------------------------------------------------------===//
-public typealias sr8076_Filter = (BigStruct) -> Bool
 
-public protocol sr8076_Query {
+public typealias Filter = (BigStruct) -> Bool
+
+public protocol Query {
     associatedtype Returned
 }
 
-public protocol sr8076_ProtoQueryHandler {
-    func forceHandle_1<Q: sr8076_Query>(query: Q) -> Void
-    func forceHandle_2<Q: sr8076_Query>(query: Q) -> (Q.Returned, BigStruct?)
-    func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?)
-    func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?)
+public protocol ProtoQueryHandler {
+    func forceHandle_1<Q: Query>(query: Q) -> Void
+    func forceHandle_2<Q: Query>(query: Q) -> (Q.Returned, BigStruct?)
+    func forceHandle_3<Q: Query>(query: Q) -> (Q.Returned, Filter?)
+    func forceHandle_4<Q: Query>(query: Q) throws -> (Q.Returned, Filter?)
 }
 
-public protocol sr8076_QueryHandler: sr8076_ProtoQueryHandler {
-    associatedtype Handled: sr8076_Query
+public protocol QueryHandler: ProtoQueryHandler {
+    associatedtype Handled: Query
     func handle_1(query: Handled) -> Void
     func handle_2(query: Handled) -> (Handled.Returned, BigStruct?)
-    func handle_3(query: Handled) -> (Handled.Returned, sr8076_Filter?)
-    func handle_4(query: Handled) throws -> (Handled.Returned, sr8076_Filter?)
+    func handle_3(query: Handled) -> (Handled.Returned, Filter?)
+    func handle_4(query: Handled) throws -> (Handled.Returned, Filter?)
 }
 
 
-public extension sr8076_QueryHandler {
+public extension QueryHandler {
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_15queryyqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_15queryyqd___tAA0E0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.QueryHandler, i8** {{.*}}.Query, %swift.opaque* noalias nocapture swiftself %1)
 // CHECK: call swiftcc void {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK: ret void
-    func forceHandle_1<Q: sr8076_Query>(query: Q) -> Void {
+    func forceHandle_1<Q: Query>(query: Q) -> Void {
         guard let body = handle_1 as? (Q) -> Void else {
             fatalError("handler \(self) is expected to handle query \(query)")
         }
         body(query)
     }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0e1_F0Rd__lF"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.opaque* noalias nocapture %2, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0E0Rd__lF"(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.opaque* noalias nocapture %2, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.QueryHandler, i8** {{.*}}.Query, %swift.opaque* noalias nocapture swiftself %3)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructVSg* noalias nocapture sret({{.*}}) [[ALLOC]], %swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK: ret void
-    func forceHandle_2<Q: sr8076_Query>(query: Q) -> (Q.Returned, BigStruct?) {
+    func forceHandle_2<Q: Query>(query: Q) -> (Q.Returned, BigStruct?) {
         guard let body = handle_2 as? (Q) -> (Q.Returned, BigStruct?) else {
             fatalError("handler \(self) is expected to handle query \(query)")
         }
         return body(query)
     }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself %2)
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0E0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.QueryHandler, i8** {{.*}}.Query, %swift.opaque* noalias nocapture swiftself %2)
 // CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK-64: ret { i64, i64 }
 
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself %2)
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0E0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.QueryHandler, i8** {{.*}}.Query, %swift.opaque* noalias nocapture swiftself %2)
 // CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}})
 // CHECK-32: ret { i32, i32 }
-    func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?) {
-        guard let body = handle_3 as? (Q) -> (Q.Returned, sr8076_Filter?) else {
+    func forceHandle_3<Q: Query>(query: Q) -> (Q.Returned, Filter?) {
+        guard let body = handle_3 as? (Q) -> (Q.Returned, Filter?) else {
             fatalError("handler \(self) is expected to handle query \(query)")
         }
         return body(query)
     }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself %2, %swift.error** swifterror %3)
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0E0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.QueryHandler, i8** {{.*}}.Query, %swift.opaque* noalias nocapture swiftself %2, %swift.error** swifterror %3)
 // CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture swifterror {{.*}})
 // CHECK-64: ret { i64, i64 }
 
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases19sr8076_QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0e1_F0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.sr8076_QueryHandler, i8** {{.*}}.sr8076_Query, %swift.opaque* noalias nocapture swiftself %2, %swift.error** swifterror %3)
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0E0Rd__lF"(%swift.opaque* noalias nocapture %0, %swift.opaque* noalias nocapture %1, %swift.type*{{.*}}, %swift.type*{{.*}}, i8** {{.*}}.QueryHandler, i8** {{.*}}.Query, %swift.opaque* noalias nocapture swiftself %2, %swift.error** swifterror %3)
 // CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(%swift.opaque* noalias nocapture {{.*}}, %swift.opaque* noalias nocapture {{.*}}, %swift.refcounted* swiftself {{.*}}, %swift.error** noalias nocapture {{.*}})
 // CHECK-32: ret { i32, i32 }
-    func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {
-        guard let body = handle_4 as? (Q) throws -> (Q.Returned, sr8076_Filter?) else {
+    func forceHandle_4<Q: Query>(query: Q) throws -> (Q.Returned, Filter?) {
+        guard let body = handle_4 as? (Q) throws -> (Q.Returned, Filter?) else {
             fatalError("handler \(self) is expected to handle query \(query)")
         }
         return try body(query)

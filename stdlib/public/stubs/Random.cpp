@@ -45,7 +45,7 @@
 
 #include <stdlib.h>
 
-#include "SwiftShims/Random.h"
+#include "swift/shims/Random.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Threading/Mutex.h"
 

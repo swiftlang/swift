@@ -1,6 +1,4 @@
 // REQUIRES: objc_interop, OS=macosx
-// Temporarily disable on arm64e (rdar://88579818)
-// UNSUPPORTED: CPU=arm64e
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/includes)

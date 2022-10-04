@@ -48,8 +48,10 @@ struct TestInitSubscript {
   var color: Color
 }
 
+// https://github.com/apple/swift/issues/58201
+
 @propertyWrapper
-public class SR_15940Bar<Value> {
+public class W_58201<Value> {
   private var _value: Value
 
   public var wrappedValue: Value {
@@ -64,20 +66,20 @@ public class SR_15940Bar<Value> {
   }
 }
 
-// CHECK-LABEL: struct_decl{{.*}}SR_15940_A
-struct SR_15940_A {
+// CHECK-LABEL: struct_decl{{.*}}S1_58201
+struct S1_58201 {
   // CHECK:      argument_list implicit labels=wrappedValue:
   // CHECK-NEXT:   argument label=wrappedValue
   // CHECK-NEXT:     autoclosure_expr implicit type='() -> Bool?' discriminator=0 captures=(<opaque_value> ) escaping
   // CHECK:            autoclosure_expr implicit type='() -> Bool?' discriminator=1 escaping
-  @SR_15940Bar var a: Bool?
+  @W_58201 var a: Bool?
 }
 
-// CHECK-LABEL: struct_decl{{.*}}SR_15940_B
-struct SR_15940_B {
+// CHECK-LABEL: struct_decl{{.*}}S2_58201
+struct S2_58201 {
   // CHECK:      argument_list implicit labels=wrappedValue:
   // CHECK-NEXT:   argument label=wrappedValue
-  // CHECK-NEXT:     autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+2]]:30 range=[{{.+}}] discriminator=0 captures=(<opaque_value> ) escaping
-  // CHECK:            autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+1]]:30 range=[{{.+}}] discriminator=1 escaping
-  @SR_15940Bar var b: Bool = false
+  // CHECK-NEXT:     autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+2]]:26 range=[{{.+}}] discriminator=0 captures=(<opaque_value> ) escaping
+  // CHECK:            autoclosure_expr implicit type='() -> Bool' location={{.*}}.swift:[[@LINE+1]]:26 range=[{{.+}}] discriminator=1 escaping
+  @W_58201 var b: Bool = false
 }

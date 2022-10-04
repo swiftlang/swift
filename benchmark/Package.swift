@@ -78,6 +78,7 @@ var multiSourceLibraries: [(parentSubDir: String, name: String)] = multiSourceLi
 
 var products: [Product] = []
 products.append(.library(name: "TestsUtils", type: .static, targets: ["TestsUtils"]))
+products.append(.library(name: "SimpleArray", type: .static, targets: ["SimpleArray"]))
 products.append(.library(name: "DriverUtils", type: .static, targets: ["DriverUtils"]))
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 products.append(.library(name: "ObjectiveCTests", type: .static, targets: ["ObjectiveCTests"]))
@@ -96,6 +97,12 @@ products += multiSourceLibraries.map {
 
 var targets: [Target] = []
 targets.append(.target(name: "TestsUtils", path: "utils", sources: ["TestsUtils.swift"]))
+targets.append(.target(
+  name: "SimpleArray",
+  path: "utils",
+  sources: ["SimpleArray.swift"],
+  swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                "-enable-experimental-layout-prespecialization"])]))
 targets.append(.systemLibrary(name: "LibProc", path: "utils/LibProc"))
 targets.append(
   .target(name: "DriverUtils",
@@ -129,7 +136,7 @@ targets.append(
     publicHeadersPath: "."))
 #endif
 
-var singleSourceDeps: [Target.Dependency] = [.target(name: "TestsUtils")]
+var singleSourceDeps: [Target.Dependency] = [.target(name: "TestsUtils"), .target(name: "SimpleArray")]
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 singleSourceDeps.append(.target(name: "ObjectiveCTests"))
 #endif
@@ -147,7 +154,9 @@ targets += singleSourceLibraries.map { name in
   return .target(name: name,
       dependencies: singleSourceDeps,
       path: "single-source",
-      sources: ["\(name).swift"])
+      sources: ["\(name).swift"],
+      swiftSettings: [.unsafeFlags(["-Xfrontend",
+                                    "-enable-experimental-layout-prespecialization"])])
 }
 
 targets += cxxSingleSourceLibraries.map { name in

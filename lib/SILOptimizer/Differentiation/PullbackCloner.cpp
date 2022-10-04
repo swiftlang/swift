@@ -231,8 +231,7 @@ private:
     // $L            | address-only           | address, $*A' (no alternative)
     // $*A           | address-only           | address, $*A' (no alternative)
 
-    // TODO(SR-13077): Make "tangent value category" depend solely on whether
-    // the tangent type is loadable or address-only.
+    // TODO(https://github.com/apple/swift/issues/55523): Make "tangent value category" depend solely on whether the tangent type is loadable or address-only.
     //
     // For loadable tangent types, using symbolic adjoint values instead of
     // concrete adjoint buffers is more efficient.
@@ -357,7 +356,7 @@ private:
       builder.emitZeroIntoBuffer(loc, destAddress, IsInitialization);
       break;
     /// If adjoint value is a symbolic aggregate (tuple or struct), recursively
-    /// materialize materialize the symbolic tuple or struct, filling the
+    /// materialize the symbolic tuple or struct, filling the
     /// buffer.
     case AdjointValueKind::Aggregate: {
       if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
@@ -2045,7 +2044,7 @@ bool PullbackCloner::Implementation::run() {
       return true;
   }
   // Otherwise, perform standard pullback generation.
-  // Visit original blocks blocks in post-order and perform differentiation
+  // Visit original blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
     for (auto *bb : originalBlocks) {
@@ -2599,7 +2598,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberAccessor() {
     return runForSemanticMemberGetter();
   case AccessorKind::Set:
     return runForSemanticMemberSetter();
-  // TODO(SR-12640): Support `modify` accessors.
+  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
   default:
     llvm_unreachable("Unsupported accessor kind; inconsistent with "
                      "`isSemanticMemberAccessor`?");

@@ -26,6 +26,8 @@
 #include "WeakReference.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/InstrumentsSupport.h"
+#include "swift/shims/GlobalObjects.h"
+#include "swift/shims/RuntimeShims.h"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -33,8 +35,6 @@
 #include <cstdlib>
 #include <new>
 #include <thread>
-#include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/RuntimeShims.h"
 #if SWIFT_OBJC_INTEROP
 # include <objc/NSObject.h>
 # include <objc/runtime.h>
@@ -90,8 +90,7 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
 //
 // NOTE: the memcpy and asm("") naming shenanigans are to convince the compiler
 // not to emit a bunch of ptrauth instructions just to perform the comparison.
-// We only want to authenticate the function pointer if we actually call it. We
-// can revert to a straight comparison once rdar://problem/55267009 is fixed.
+// We only want to authenticate the function pointer if we actually call it.
 SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,

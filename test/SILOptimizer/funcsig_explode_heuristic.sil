@@ -54,7 +54,7 @@ bb0(%0 : $BigTrivial):
 }
 
 // If a value is never used, do not touch it. We leave it for dead argument
-// elimination. We have delibrately turned this off to test that behavior.
+// elimination. We have deliberately turned this off to test that behavior.
 //
 // CHECK-LABEL: sil @big_arg_with_no_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
 // CHECK-NOT: apply
@@ -183,7 +183,7 @@ bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
 
 // If we have two non-trivial values that are live and one is always dead and
 // the other is kept alive due to a release, we can get rid of both since FSO
-// reruns with o2g. Test here that we explode it appropriatel even though we
+// reruns with o2g. Test here that we explode it appropriately even though we
 // aren't reducing the number of non-trivial uses. The
 // funcsig_explode_heuristic_inline.sil test makes sure we in combination
 // produce the appropriate SIL.

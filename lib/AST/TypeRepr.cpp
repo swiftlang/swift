@@ -83,10 +83,12 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred) {
     explicit Walker(llvm::function_ref<bool(TypeRepr *)> pred)
         : Pred(pred), FoundIt(false) {}
 
-    bool walkToTypeReprPre(TypeRepr *ty) override {
-      // Returning false skips any child nodes. If we "found it", we can bail by
-      // returning false repeatedly back up the type tree.
-      return !(FoundIt || (FoundIt = Pred(ty)));
+    PreWalkAction walkToTypeReprPre(TypeRepr *ty) override {
+      if (Pred(ty)) {
+        FoundIt = true;
+        return Action::Stop();
+      }
+      return Action::Continue();
     }
   };
 
@@ -110,29 +112,6 @@ TypeRepr *TypeRepr::getWithoutParens() const {
     repr = tupleRepr->getElementType(0);
   }
   return repr;
-}
-
-CollectedOpaqueReprs TypeRepr::collectOpaqueReturnTypeReprs() {
-  class Walker : public ASTWalker {
-    CollectedOpaqueReprs &Reprs;
-
-  public:
-    explicit Walker(CollectedOpaqueReprs &reprs) : Reprs(reprs) {}
-
-    bool walkToTypeReprPre(TypeRepr *repr) override {
-      // Don't allow variadic opaque parameter or return types.
-      if (isa<PackExpansionTypeRepr>(repr))
-        return false;
-
-      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr))
-        Reprs.push_back(opaqueRepr);
-      return true;
-    }
-  };
-
-  CollectedOpaqueReprs reprs;
-  walk(Walker(reprs));
-  return reprs;
 }
 
 SourceLoc TypeRepr::findUncheckedAttrLoc() const {
@@ -262,8 +241,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_opened))
     Printer.printSimpleAttr("@opened") << " ";
 
-  if (hasAttr(TAK_tuple))
-    Printer.printSimpleAttr("@tuple") << " ";
+  if (hasAttr(TAK__noMetadata))
+    Printer.printSimpleAttr("@_noMetadata") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,

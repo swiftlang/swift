@@ -193,6 +193,7 @@ static int run_driver(StringRef ExecName,
   bool isRepl = false;
 
   // Handle integrated tools.
+  StringRef DriverModeArg;
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
 
@@ -219,6 +220,8 @@ static int run_driver(StringRef ExecName,
     if (FirstArg == "repl") {
       isRepl = true;
       argv = argv.drop_front();
+    } else if (FirstArg.startswith("--driver-mode=")) {
+      DriverModeArg = FirstArg;
     }
   }
 
@@ -239,7 +242,9 @@ static int run_driver(StringRef ExecName,
       std::vector<const char *> subCommandArgs;
       // Rewrite the program argument.
       subCommandArgs.push_back(NewDriverPath.c_str());
-      if (ExecName == "swiftc") {
+      if (!DriverModeArg.empty()) {
+        subCommandArgs.push_back(DriverModeArg.data());
+      } else if (ExecName == "swiftc") {
         subCommandArgs.push_back("--driver-mode=swiftc");
       } else {
         assert(ExecName == "swift");

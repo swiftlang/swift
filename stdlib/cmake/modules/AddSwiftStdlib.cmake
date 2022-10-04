@@ -104,7 +104,6 @@ function(_add_target_variant_c_compile_link_flags)
     # of options by target_compile_options -- this way no undesired
     # side effects are introduced should a new search path be added.
     list(APPEND result
-      "-arch" "${CFLAGS_ARCH}"
       "-F${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
@@ -464,7 +463,8 @@ function(_add_target_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      list(APPEND result "-resource-dir=${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/${SWIFT_ANDROID_NDK_CLANG_VERSION}")
+      file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+      list(APPEND result "-resource-dir=${RESOURCE_DIR}")
     endif()
 
     # link against the custom C++ library
@@ -1916,10 +1916,11 @@ function(add_swift_target_library name)
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
     elseif(${sdk} STREQUAL WINDOWS)
-      # FIXME(SR2005) static and shared are not mutually exclusive; however
-      # since we do a single build of the sources, this doesn't work for
-      # building both simultaneously.  Effectively, only shared builds are
-      # supported on windows currently.
+      # FIXME: https://github.com/apple/swift/issues/44614
+      # static and shared are not mutually exclusive; however since we do a
+      # single build of the sources, this doesn't work for building both
+      # simultaneously.  Effectively, only shared builds are supported on
+      # windows currently.
       if(SWIFTLIB_SHARED)
         list(APPEND swiftlib_swift_compile_flags_all -D_WINDLL)
         if(SWIFTLIB_IS_STDLIB_CORE)

@@ -296,7 +296,8 @@ bb0(%0 : @owned $(String, (Int, Int, String))):
 
 // Test fix_lifetime of a struct and tuple. It cannot be removed
 // without proving reference uniqueness first.
-// rdar://36038096 ([SR-6608] DeadCodeElimination removes fix_lifetime instructions.)
+// rdar://36038096
+// https://github.com/apple/swift/issues/49158
 //
 // CHECK-LABEL: @testFixLifetimeTuple : $@convention(thin) (@owned S, @owned AnyObject) -> () {
 // CHECK: bb0(%0 : $S, %1 : $AnyObject):

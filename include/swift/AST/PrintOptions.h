@@ -307,6 +307,10 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
+  /// Whether to print the real layout name instead of AnyObject
+  /// for class layout
+  bool PrintClassLayoutName = false;
+
   /// Suppress emitting @available(*, noasync)
   bool SuppressNoAsyncAvailabilityAttr = false;
 

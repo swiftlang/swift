@@ -531,7 +531,7 @@ void Rewriter::fold(Match candidate, ArrayRef<int> rewritableArgumentIndices) {
   //   apply %fn(%move)
   //   end_borrow %lifetime
   //
-  // This isn't valid, though, because the apply consumes the the %move but
+  // This isn't valid, though, because the apply consumes the %move but
   // the borrow scope guarantees it until the subsequent end_borrow.
   //
   // Fix this by hoisting the end_borrow above the apply.

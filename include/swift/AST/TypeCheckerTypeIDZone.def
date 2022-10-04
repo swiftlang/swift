@@ -33,6 +33,8 @@ SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
               Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentImplementationOnlyImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckInconsistentSPIOnlyImportsRequest,
+              evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckInconsistentWeakLinkedImportsRequest,
               evaluator::SideEffect(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CheckRedeclarationRequest,
@@ -393,6 +395,9 @@ SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *, const AvailableAttr *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsSemanticallyUnavailableRequest,
+              bool(const Decl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
               FunctionType::ExtInfo(ClosureExpr *),
               Cached, NoLocationInfo)
@@ -423,9 +428,15 @@ SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedPropertySetterBody,
 SWIFT_REQUEST(TypeChecker, IsPropertyAccessedViaTypeWrapper,
               bool(VarDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrapperInitializer,
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeMemberwiseInitializer,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrapperInitializerBody,
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
               BraceStmt *(ConstructorDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeLocalVariableForTypeWrapperStorage,
+              VarDecl *(ConstructorDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
+              ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)

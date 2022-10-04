@@ -48,7 +48,7 @@ raw_ostream &getADDebugStream();
 /// Given an element address from an `array.uninitialized_intrinsic` `apply`
 /// instruction, returns the `apply` instruction. The element address is either
 /// a `pointer_to_address` or `index_addr` instruction to the `RawPointer`
-/// result of the instrinsic:
+/// result of the intrinsic:
 ///
 ///     %result = apply %array.uninitialized_intrinsic : $(Array<T>, RawPointer)
 ///     (%array, %ptr) = destructure_tuple %result

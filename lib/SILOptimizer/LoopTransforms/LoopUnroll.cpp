@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -48,6 +49,8 @@ public:
   /// Clone the basic blocks in the loop.
   void cloneLoop();
 
+  void sinkAddressProjections();
+
   // Update SSA helper.
   void collectLoopLiveOutValues(
       DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues);
@@ -69,10 +72,33 @@ protected:
 
 } // end anonymous namespace
 
+void LoopCloner::sinkAddressProjections() {
+  SinkAddressProjections sinkProj;
+  for (auto *bb : Loop->getBlocks()) {
+    for (auto &inst : *bb) {
+      for (auto res : inst.getResults()) {
+        if (!res->getType().isAddress()) {
+          continue;
+        }
+        for (auto use : res->getUses()) {
+          auto *user = use->getUser();
+          if (Loop->contains(user)) {
+            continue;
+          }
+          bool canSink = sinkProj.analyzeAddressProjections(&inst);
+          assert(canSink);
+          sinkProj.cloneProjections();
+        }
+      }
+    }
+  }
+}
+
 void LoopCloner::cloneLoop() {
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Loop->getExitBlocks(ExitBlocks);
 
+  sinkAddressProjections();
   // Clone the entire loop.
   cloneReachableBlocks(Loop->getHeader(), ExitBlocks,
                        /*insertAfter*/Loop->getLoopLatch());
@@ -194,7 +220,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
         if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
-          // If callee is rather big and potentialy inlinable, it may be better
+          // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
         }

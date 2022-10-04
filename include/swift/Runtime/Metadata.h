@@ -20,7 +20,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Runtime/Once.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 namespace swift {
 

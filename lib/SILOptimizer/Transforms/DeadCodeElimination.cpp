@@ -301,8 +301,18 @@ void DCE::markLive() {
           }
           continue;
         }
-        // If not populate reborrowDependencies for this borrow
+        // Populate reborrowDependencies for this borrow
         findReborrowDependencies(borrowInst);
+        // Don't optimize a borrow scope if it is lexical or has a pointer
+        // escape.
+        if (borrowInst->isLexical() ||
+            hasPointerEscape(BorrowedValue(borrowInst))) {
+          // Visit all end_borrows and mark them live
+          visitTransitiveEndBorrows(borrowInst, [&](EndBorrowInst *endBorrow) {
+            markInstructionLive(endBorrow);
+          });
+          continue;
+        }
         break;
       }
       default:

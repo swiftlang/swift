@@ -166,7 +166,7 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
     # markup for testing incremental parsing
     # =========================================================================
 
-    # Gather command line arguments for swift-syntax-test specifiying the
+    # Gather command line arguments for swift-syntax-test specifying the
     # performed edits in this list
     incremental_edit_args = []
     reparse_args = []
@@ -237,7 +237,7 @@ def main():
         description='Utility for testing incremental syntax parsing',
         epilog='''
     This utility can parse a special markup to dedicate a pre-edit and a
-    post-edit version of a file simulateously and generate a serialized version
+    post-edit version of a file simultaneously and generate a serialized version
     of the libSyntax tree by parsing either the pre-edit file, the post-edit
     file or the edits that are required to retrieve the post-edit file from the
     pre-edit file incrementally.
