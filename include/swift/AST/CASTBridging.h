@@ -13,6 +13,7 @@
 #ifndef SWIFT_C_AST_ASTBRIDGING_H
 #define SWIFT_C_AST_ASTBRIDGING_H
 
+#if __clang__
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
 #define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS                                    \
@@ -22,10 +23,18 @@
 
 #define SWIFT_END_NULLABILITY_ANNOTATIONS                                      \
   _Pragma("clang diagnostic pop") _Pragma("clang assume_nonnull end")
+#else
+#define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+#define SWIFT_END_NULLABILITY_ANNOTATIONS
+#endif
 
 //===----------------------------------------------------------------------===//
 // Diagnostic Engine
 //===----------------------------------------------------------------------===//
+
+#ifndef __has_attribute         // Optional of course.
+  #define __has_attribute(x) 0  // Compatibility with non-clang compilers.
+#endif
 
 // TODO: Move this to somewhere common header.
 #if __has_attribute(enum_extensibility)
