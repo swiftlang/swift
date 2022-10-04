@@ -9,6 +9,36 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// Terminology:
+///
+/// Simple liveness:
+/// - Ends at lifetime-ending operations.
+/// - Transitively follows guaranteed forwarding operations and address uses
+///   within the current scope.
+/// - Assumes inner scopes are complete, including borrow and address scopes
+/// - Rarely returns AddressUseKind::PointerEscape.
+/// - Per-definition dominance holds
+/// - Insulates outer scopes from inner scope details. Maintains the
+///   invariant that inlining cannot pessimize optimization.
+///
+/// Transitive liveness
+/// - Transitively follows uses within inner scopes, including forwarding
+///   operations and address uses.
+/// - Much more likely to returns AddressUseKind::PointerEscape
+/// - Per-definition dominance holds
+/// - Does not assume that any scopes are complete.
+///
+/// Extended liveness (copy-extension and reborrow-extension)
+/// - Extends a live range across lifetime-ending operations
+/// - Depending on context: owned values are extended across copies or
+///   guaranteed values are extended across reborrows
+/// - Copy-extension is used to canonicalize an OSSA lifetime
+/// - Reborrow-extension is used to check borrow scopes relative to its inner
+///   uses and outer lifetime
+/// - Per-definition dominance does not hold
+///
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_OWNERSHIPUTILS_H
 #define SWIFT_SIL_OWNERSHIPUTILS_H
@@ -30,7 +60,7 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
-class PrunedLiveness;
+class MultiDefPrunedLiveness;
 struct BorrowedValue;
 
 /// Returns true if v is an address or trivial.
@@ -566,8 +596,10 @@ struct BorrowedValue {
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
-  /// Add this scopes live blocks into the PrunedLiveness result.
-  void computeLiveness(PrunedLiveness &liveness) const;
+  /// Add this scope's live blocks into the PrunedLiveness result. This
+  /// includes reborrow scopes that are reachable from this borrow scope but not
+  /// necessarilly dominated by the borrow scope.
+  void computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.
@@ -580,8 +612,8 @@ struct BorrowedValue {
   ///
   /// \p deadEndBlocks is optional during transition. It will be completely
   /// removed in an upcoming commit.
-  bool areUsesWithinTransitiveScope(ArrayRef<Operand *> uses,
-                                    DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesWithinExtendedScope(ArrayRef<Operand *> uses,
+                                  DeadEndBlocks *deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p

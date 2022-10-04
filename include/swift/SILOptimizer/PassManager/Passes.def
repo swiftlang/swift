@@ -332,6 +332,8 @@ SWIFT_FUNCTION_PASS(ObjCBridgingOptimization, "objc-bridging-opt",
      "Optimize ObjectiveC briging operations")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
+PASS(OSSALifetimeAnalysis, "ossa-lifetime-analysis",
+     "Dump OSSA Lifetimes for Traced Values")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",

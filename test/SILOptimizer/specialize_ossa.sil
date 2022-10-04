@@ -1287,3 +1287,44 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
+
+// rdar://99874173: assert; PrunedLiveness; No user in LiveWithin block
+//
+// end_borrow becomes unreachable after specializing genericReturn with Never.
+//
+// The generic cloner needs to be able to compute liveness to fixup a
+// store borrow scope when the only use is in unreachable code.
+// specialized testNoReturnSpecialization
+// CHECK-LABEL: sil shared [ossa] @$s26testNoReturnSpecializations5NeverO_Tg5 : $@convention(thin) (@guaranteed AnyObject, @thick Never.Type) -> () {
+// CHECK:   [[SB:%.*]] = store_borrow %0 to %{{.*}} : $*AnyObject
+// CHECK:   [[LB:%.*]] = load_borrow [[SB]] : $*AnyObject
+// CHECK:   apply %{{.*}}<Never>(%{{.*}}, [[LB]]) : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
+// CHECK:   end_borrow [[SB]] : $*AnyObject
+// CHECK:   unreachable
+// CHECK: bb1:
+// CHECK:   end_borrow [[LB]] : $AnyObject
+// CHECK:   end_borrow [[SB]] : $*AnyObject
+// CHECK-LABEL: } // end sil function '$s26testNoReturnSpecializations5NeverO_Tg5'
+sil [ossa] @testNoReturnSpecialization : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> () {
+bb0(%0 : $*AnyObject, %1 : $@thick T.Type):
+  %2 = load_borrow %0 : $*AnyObject
+  %f = function_ref @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
+  %out = alloc_stack $T
+  %dummy = apply %f<T>(%out, %2) : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
+  destroy_addr %out : $*T
+  dealloc_stack %out : $*T
+  end_borrow %2 : $AnyObject
+  %99 = tuple ()
+  return %99 : $()
+}
+
+sil [ossa] @testCallNoReturnSpecialization : $@convention(thin) (@in_guaranteed AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %f = function_ref @testNoReturnSpecialization : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> ()
+  %m = metatype $@thick Never.Type
+  %r = apply %f<Never>(%0, %m) : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> ()
+  %t = tuple ()
+  return %t : $()
+}

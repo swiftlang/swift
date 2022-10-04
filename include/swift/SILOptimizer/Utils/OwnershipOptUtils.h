@@ -100,15 +100,16 @@ class GuaranteedOwnershipExtension {
   DeadEndBlocks &deBlocks;
 
   // --- analysis state
-  PrunedLiveness guaranteedLiveness;
-  PrunedLiveness ownedLifetime;
+  MultiDefPrunedLiveness guaranteedLiveness;
+  SSAPrunedLiveness ownedLifetime;
   SmallVector<SILBasicBlock *, 4> ownedConsumeBlocks;
   BeginBorrowInst *beginBorrow = nullptr;
 
 public:
   GuaranteedOwnershipExtension(InstructionDeleter &deleter,
-                               DeadEndBlocks &deBlocks)
-      : deleter(deleter), deBlocks(deBlocks) {}
+                               DeadEndBlocks &deBlocks, SILFunction *function)
+    : deleter(deleter), deBlocks(deBlocks),
+      guaranteedLiveness(function) {}
 
   void clear() {
     guaranteedLiveness.clear();

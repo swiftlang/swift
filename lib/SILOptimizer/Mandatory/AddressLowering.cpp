@@ -2857,13 +2857,14 @@ void UseRewriter::emitEndBorrows(SILValue value) {
   findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(&discoveredBlocks);
+  liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding());
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   PrunedLivenessBoundary guaranteedBoundary;
-  guaranteedBoundary.compute(liveness);
+  liveness.computeBoundary(guaranteedBoundary);
   guaranteedBoundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
         pass.getBuilder(insertPt).createEndBorrow(pass.genLoc(), value);

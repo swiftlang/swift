@@ -1009,7 +1009,8 @@ static bool extendOwnership(BeginAccessInst *parentInst,
                             BeginAccessInst *childInst,
                             InstructionDeleter &deleter,
                             DeadEndBlocks &deBlocks) {
-  GuaranteedOwnershipExtension extension(deleter, deBlocks);
+  GuaranteedOwnershipExtension extension(deleter, deBlocks,
+                                         parentInst->getFunction());
   auto status = extension.checkAddressOwnership(parentInst, childInst);
   switch (status) {
   case GuaranteedOwnershipExtension::Invalid:

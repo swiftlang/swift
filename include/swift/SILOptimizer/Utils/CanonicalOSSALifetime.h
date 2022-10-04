@@ -267,9 +267,6 @@ private:
 
   InstructionDeleter &deleter;
 
-  /// Current copied def for which this state describes the liveness.
-  SILValue currentDef;
-
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed. For guaranteed values it remains empty. A backward walk from
   /// these blocks must discover all uses on paths that lead to a return or
@@ -293,7 +290,7 @@ private:
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
 
   /// The destroys of the value.  These are not uses, but need to be recorded so
   /// that we know when the last use in a consuming block is (without having to
@@ -355,7 +352,7 @@ public:
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
         deleter(deleter) {}
 
-  SILValue getCurrentDef() const { return currentDef; }
+  SILValue getCurrentDef() const { return liveness.getDef(); }
 
   void initDef(SILValue def) {
     assert(consumingBlocks.empty() && debugValues.empty() && liveness.empty());
@@ -364,8 +361,7 @@ public:
     accessBlocks = nullptr;
     consumes.clear();
 
-    currentDef = def;
-    liveness.initializeDefBlock(def->getParentBlock());
+    liveness.initializeDef(def);
   }
 
   void clearLiveness() {
