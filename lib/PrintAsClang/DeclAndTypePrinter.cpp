@@ -902,8 +902,6 @@ private:
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false,
                                      const SubscriptDecl *SD = nullptr) {
-    printDocumentationComment(AFD);
-
     Optional<ForeignAsyncConvention> asyncConvention =
         AFD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention =
@@ -930,6 +928,7 @@ private:
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
+      printDocumentationComment(AFD);
       DeclAndTypeClangFunctionPrinter declPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
@@ -978,6 +977,7 @@ private:
       // FIXME: availability
       return;
     }
+    printDocumentationComment(AFD);
 
     if (isClassMethod)
       os << "+ (";
