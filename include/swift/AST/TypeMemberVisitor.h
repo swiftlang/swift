@@ -68,6 +68,14 @@ public:
     for (Decl *member : D->getImplementationContext()->getMembers()) {
       asImpl().visit(member);
     }
+    
+    // If this is a main-interface @_objcImplementation extension and the class
+    // has a synthesized destructor, visit it now.
+    if (auto cd = dyn_cast_or_null<ClassDecl>(D)) {
+      auto dd = cd->getDestructor();
+      if (dd->getDeclContext() == cd && cd->getImplementationContext() != cd)
+        asImpl().visit(dd);
+    }
   }
 };
 

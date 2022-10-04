@@ -4,31 +4,51 @@
 
 import Foundation
 
+// A class whose deallocation is detectable, so we can verify that deinits
+// are correctly synthesized.
+class LastWords {
+  var text: String
+  
+  init(text: String) {
+    self.text = text
+  }
+  
+  deinit {
+    print(text, "It's better to burn out than to fade away.")
+  }
+}
+
 @_objcImplementation extension ImplClass {
   @objc override init() {
     self.implProperty = 0
+    self.object = LastWords(text: String(describing: type(of: self)))
     super.init()
   }
 
   @objc var implProperty: Int
+  final var object: LastWords
 
   @objc class func runTests() {
-    let impl = ImplClass()
-    print("someMethod =", impl.someMethod())
-    print("implProperty =", impl.implProperty)
-    impl.implProperty = 42
-    print("implProperty =", impl.implProperty)
+    do {
+      let impl = ImplClass()
+      print("someMethod =", impl.someMethod())
+      print("implProperty =", impl.implProperty)
+      impl.implProperty = 42
+      print("implProperty =", impl.implProperty)
+    }
 
-    let swiftSub = SwiftSubclass()
-    print("someMethod =", swiftSub.someMethod())
-    print("implProperty =", swiftSub.implProperty)
-    swiftSub.implProperty = 42
-    print("implProperty =", swiftSub.implProperty)
-
-    print("otherProperty =", swiftSub.otherProperty)
-    swiftSub.otherProperty = 13
-    print("otherProperty =", swiftSub.otherProperty)
-    print("implProperty =", swiftSub.implProperty)
+    do {
+      let swiftSub = SwiftSubclass()
+      print("someMethod =", swiftSub.someMethod())
+      print("implProperty =", swiftSub.implProperty)
+      swiftSub.implProperty = 42
+      print("implProperty =", swiftSub.implProperty)
+      
+      print("otherProperty =", swiftSub.otherProperty)
+      swiftSub.otherProperty = 13
+      print("otherProperty =", swiftSub.otherProperty)
+      print("implProperty =", swiftSub.implProperty)
+    }
   }
 
   @objc func someMethod() -> String { "ImplClass.someMethod()" }
@@ -50,10 +70,12 @@ ImplClass.runTests()
 // CHECK: someMethod = ImplClass.someMethod()
 // CHECK: implProperty = 0
 // CHECK: implProperty = 42
+// CHECK: ImplClass It's better to burn out than to fade away.
 // CHECK: someMethod = SwiftSubclass.someMethod()
 // CHECK: implProperty = 0
 // CHECK: implProperty = 42
 // CHECK: otherProperty = 1
 // CHECK: otherProperty = 13
 // CHECK: implProperty = 42
+// CHECK: SwiftSubclass It's better to burn out than to fade away.
 #endif

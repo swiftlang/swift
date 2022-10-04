@@ -1231,7 +1231,7 @@ static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
          "@_objcImplementation on non-class or Swift class?");
 
   if (VD->isSemanticallyFinal() || VD->isObjC()) {
-    assert(!VD->isObjC() || VD->isDynamic() &&
+    assert(isa<DestructorDecl>(VD) || !VD->isObjC() || VD->isDynamic() &&
            "@objc decls in @_objcImplementations should be dynamic!");
     return;
   }
@@ -3208,6 +3208,18 @@ public:
     checkGenericParams(ED);
 
     TypeChecker::checkDeclAttributes(ED);
+
+    // If this is an @_objcImplementation of a class, set up some aspects of the
+    // class.
+    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+      // Force lowering of stored properties.
+      (void) CD->getStoredProperties();
+
+      // Force creation of an implicit destructor, if any.
+      (void) CD->getDestructor();
+      
+      // FIXME: Should we duplicate any other logic from visitClassDecl()?
+    }
 
     for (Decl *Member : ED->getMembers())
       visit(Member);

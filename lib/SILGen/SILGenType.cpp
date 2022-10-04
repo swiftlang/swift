@@ -1244,6 +1244,14 @@ public:
 
     for (Decl *member : e->getABIMembers())
       visit(member);
+    
+    // If this is a main-interface @_objcImplementation extension and the class
+    // has a synthesized destructor, emit it now.
+    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {
+      auto dd = cd->getDestructor();
+      if (dd->getDeclContext() == cd)
+        visit(dd);
+    }
 
     if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
       // Emit witness tables for protocol conformances introduced by the
@@ -1302,14 +1310,18 @@ public:
       SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
+    auto contextInterface = dd->getDeclContext()->getImplementedObjCContext();
+    if (auto cd = dyn_cast<ClassDecl>(contextInterface)) {
+      SGM.emitDestructor(cd, dd);
+      return;
+    }
     llvm_unreachable("destructor in extension?!");
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (auto i : range(pd->getNumPatternEntries())) {
-      if (pd->getExecutableInit(i)) {
-        assert(pd->isStatic() && "stored property in extension?!");
+      if (pd->getExecutableInit(i) && pd->isStatic()) {
         SGM.emitGlobalInitialization(pd, i);
       }
     }
