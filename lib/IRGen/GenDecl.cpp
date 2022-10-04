@@ -5444,9 +5444,20 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     return entry.second;
   }
 
+  SmallString<64> name;
+  (llvm::Twine(".str.") + llvm::Twine(data.size()) + "." + data).toVector(name);
+  
+  // \0 is not allowed in variable names. Rewrite any \0s into _s and append
+  // information about their original locations so the name remains unique.
+  for (size_t i = name.find('\0');
+       i != StringRef::npos;
+       i = name.find('\0', i)) {
+    name[i] = '_';
+    (llvm::Twine(".nul") + llvm::Twine(i)).toVector(name);
+  }
+  
   entry = createStringConstant(data, willBeRelativelyAddressed,
-                               /*sectionName*/ "",
-                               ".str" /* match how Clang creates strings */);
+                               /*sectionName*/ "", name);
   return entry.second;
 }
 
