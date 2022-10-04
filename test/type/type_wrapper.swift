@@ -480,3 +480,26 @@ func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
     }
   }
 }
+
+func testIncorrectUsesOfImmutableProperties() {
+  class X<T> {
+    var storage: [T]
+
+    init(storage: [T]) {
+      self.storage = storage
+    }
+  }
+
+  @NoopWrapper
+  struct Test<T> {
+    let x: T? // expected-note {{change 'let' to 'var' to make it mutable}}
+
+    init(x: T) {
+      self.x = x
+    }
+  }
+
+  let test = Test(x: X(storage: [1, 2, 3]))
+  test.x = X(storage: [0]) // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
+  test.x?.storage.append(0) // Ok
+}

@@ -588,3 +588,38 @@ do {
   // CHECK-NEXT: in getter
   // CHECK-NEXT: Optional((-1, "ultimate question", (a: 1, b: 2.0, c: 3)))
 }
+
+do {
+  class X : CustomStringConvertible {
+    var x: [Int] = []
+
+    var description: String {
+      "X(x: \(x))"
+    }
+  }
+
+  var arg = X()
+
+  let test1 = TypeWithLetProperties(a: arg, b: 42) {
+    arg.x.append(1)
+  }
+  // CHECK: Wrapper.init($Storage(a: X(x: []), b: 42))
+  // CHECK-NEXT: --Before onSet--
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: X(x: [])
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: 42
+  // CHECK-NEXT: --After onSet--
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: X(x: [1])
+  // CHECK-NEXT: in read-only getter
+  // CHECK-nEXT: 42
+
+  let test2 = TypeWithLetProperties(a: Optional.some([1, 2, 3]))
+  // CHECK: Wrapper.init($Storage(a: Optional([1, 2, 3]), b: 0))
+  // CHECK-NEXT: --Before onSet--
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: Optional([1, 2, 3])
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: 0
+}
