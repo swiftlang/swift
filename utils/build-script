@@ -679,12 +679,6 @@ def main_normal():
         toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
-    if args.sccache:
-        print("Ensuring the sccache server is running...")
-        # Use --show-stats to ensure the server is started, because using
-        # --start-server will fail if the server is already running.
-        # Capture the output because we don't want to see the stats.
-        shell.capture([toolchain.sccache, "--show-stats"])
 
     cmake = CMake(args=args, toolchain=toolchain)
     # Check the CMake version is sufficient on Linux and build from source
@@ -699,6 +693,13 @@ def main_normal():
 
     # Validate the arguments.
     validate_arguments(toolchain, args)
+
+    if args.sccache:
+        print("Ensuring the sccache server is running...")
+        # Use --show-stats to ensure the server is started, because using
+        # --start-server will fail if the server is already running.
+        # Capture the output because we don't want to see the stats.
+        shell.capture([toolchain.sccache, "--show-stats"])
 
     # Create the build script invocation.
     invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
