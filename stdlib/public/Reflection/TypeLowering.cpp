@@ -2226,29 +2226,43 @@ public:
   }
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
+    auto QueryExternalTypeInfoProvider = [&]() -> const TypeInfo * {
+      if (ExternalTypeInfo) {
+        std::string MangledName;
+        if (auto N = dyn_cast<NominalTypeRef>(TR))
+          MangledName = N->getMangledName();
+        else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
+          MangledName = BG->getMangledName();
+        if (!MangledName.empty())
+          if (auto *imported = ExternalTypeInfo->getTypeInfo(MangledName))
+            return imported;
+      }
+      return nullptr;
+    };
+
     auto FD = TC.getBuilder().getFieldTypeInfo(TR);
     if (FD == nullptr || FD->isStruct()) {
       // Maybe this type is opaque -- look for a builtin
       // descriptor to see if we at least know its size
       // and alignment.
-      if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
+      if (auto ImportedTypeDescriptor =
+              TC.getBuilder().getBuiltinTypeInfo(TR)) {
+        // This might be an external type we treat as opaque (like C structs),
+        // the external type info provider might have better type information,
+        // so ask it first.
+        if (auto External = QueryExternalTypeInfoProvider())
+          return External;
+
         return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(),
                                                 ImportedTypeDescriptor);
+      }
 
-      // Otherwise, we're out of luck.
       if (FD == nullptr) {
-        if (ExternalTypeInfo) {
-          // Ask the ExternalTypeInfo. It may be a Clang-imported type.
-          std::string MangledName;
-          if (auto N = dyn_cast<NominalTypeRef>(TR))
-            MangledName = N->getMangledName();
-          else if (auto BG = dyn_cast<BoundGenericTypeRef>(TR))
-            MangledName = BG->getMangledName();
-          if (!MangledName.empty())
-            if (auto *imported = ExternalTypeInfo->getTypeInfo(MangledName))
-              return imported;
-        }
+        // If we still have no type info ask the external provider.
+        if (auto External = QueryExternalTypeInfoProvider())
+          return External;
 
+        // If the external provider also fails we're out of luck.
         DEBUG_LOG(fprintf(stderr, "No TypeInfo for nominal type: "); TR->dump());
         return nullptr;
       }
