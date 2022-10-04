@@ -368,44 +368,6 @@ bool PrunedLiveRange<LivenessWithDefs>::areUsesOutsideBoundary(
 }
 
 template <typename LivenessWithDefs>
-void PrunedLiveRange<LivenessWithDefs>::findBoundariesInBlock(
-    SILBasicBlock *block, bool isLiveOut,
-    PrunedLivenessBoundary &boundary) const {
-  assert(asImpl().isInitialized());
-
-  bool isLive = isLiveOut;
-  bool isDefBlock = asImpl().isDefBlock(block);
-  SILInstruction *nextDef = nullptr;
-  SILInstruction *searchPos = block->getTerminator();
-  while (searchPos) {
-    if (isLive) {
-      nextDef = asImpl().findPreviousDef(searchPos, nextDef);
-      if (!nextDef)
-        return;
-
-      searchPos = nextDef;
-      isLive = false;
-    } else if (isDefBlock) {
-      // Check if the previous instruction is a def before checking whether it
-      // is a use. The same instruction can be both a dead def and boundary use.
-      if (asImpl().isDef(searchPos)) {
-        boundary.deadDefs.push_back(cast<SILNode>(searchPos));
-      }
-    }
-    if (isInterestingUser(searchPos)) {
-      boundary.lastUsers.push_back(searchPos);
-      isLive = true;
-    }
-    searchPos = searchPos->getPreviousInstruction();
-  }
-  if (!isLive && isDefBlock) {
-    if (SILArgument *deadArg = asImpl().getArgDef(block)) {
-      boundary.deadDefs.push_back(deadArg);
-    }
-  }
-}
-
-template <typename LivenessWithDefs>
 void PrunedLiveRange<LivenessWithDefs>::computeBoundary(
     PrunedLivenessBoundary &boundary) const {
   assert(asImpl().isInitialized());
@@ -419,10 +381,10 @@ void PrunedLiveRange<LivenessWithDefs>::computeBoundary(
           boundary.boundaryEdges.push_back(succBB);
         }
       }
-      findBoundariesInBlock(block, /*isLiveOut*/ true, boundary);
+      asImpl().findBoundariesInBlock(block, /*isLiveOut*/ true, boundary);
       break;
     case PrunedLiveBlocks::LiveWithin: {
-      findBoundariesInBlock(block, /*isLiveOut*/ false, boundary);
+      asImpl().findBoundariesInBlock(block, /*isLiveOut*/ false, boundary);
       break;
     }
     case PrunedLiveBlocks::Dead:
@@ -451,10 +413,10 @@ void PrunedLiveRange<LivenessWithDefs>::computeBoundary(
     // Process each block that has not been visited and is not LiveOut.
     switch (getBlockLiveness(block)) {
     case PrunedLiveBlocks::LiveOut:
-      findBoundariesInBlock(block, /*isLiveOut*/ true, boundary);
+      asImpl().findBoundariesInBlock(block, /*isLiveOut*/ true, boundary);
       break;
     case PrunedLiveBlocks::LiveWithin: {
-      findBoundariesInBlock(block, /*isLiveOut*/ false, boundary);
+      asImpl().findBoundariesInBlock(block, /*isLiveOut*/ false, boundary);
       break;
     }
     case PrunedLiveBlocks::Dead:
@@ -477,25 +439,70 @@ template class PrunedLiveRange<MultiDefPrunedLiveness>;
 } // namespace swift
 
 //===----------------------------------------------------------------------===//
+//                             SSAPrunedLiveness
+//===----------------------------------------------------------------------===//
+
+void SSAPrunedLiveness::findBoundariesInBlock(
+    SILBasicBlock *block, bool isLiveOut,
+    PrunedLivenessBoundary &boundary) const {
+  assert(isInitialized());
+
+  // For SSA, a live-out block cannot have a boundary.
+  if (isLiveOut)
+    return;
+
+  bool isDefBlockState = isDefBlock(block);
+  for (SILInstruction &inst : llvm::reverse(*block)) {
+    if (isDefBlockState && isDef(&inst)) {
+      boundary.deadDefs.push_back(cast<SILNode>(&inst));
+      return;
+    }
+    if (isInterestingUser(&inst)) {
+      boundary.lastUsers.push_back(&inst);
+      return;
+    }
+  }
+  auto *deadArg = dyn_cast<SILArgument>(def);
+  assert(deadArg && deadArg->getParent() == block
+         && "findBoundariesInBlock must be called on a live block");
+  boundary.deadDefs.push_back(deadArg);
+}
+
+//===----------------------------------------------------------------------===//
 //                           MultiDefPrunedLiveness
 //===----------------------------------------------------------------------===//
 
-SILInstruction *
-MultiDefPrunedLiveness::findPreviousDef(SILInstruction *searchPos,
-                                        SILInstruction *nextDef) const {
-  auto *block = searchPos->getParent();
-  if (!defBlocks.contains(block))
-    return nullptr;
+void MultiDefPrunedLiveness::findBoundariesInBlock(
+    SILBasicBlock *block, bool isLiveOut,
+    PrunedLivenessBoundary &boundary) const {
+  assert(isInitialized());
+  unsigned prevCount = boundary.deadDefs.size() + boundary.lastUsers.size();
 
-  auto it = searchPos->getReverseIterator();
-  if (searchPos == nextDef) {
-    ++it;
+  bool isLive = isLiveOut;
+  bool isDefBlockState = isDefBlock(block);
+  for (auto &inst : llvm::reverse(*block)) {
+    // Check if the instruction is a def before checking whether it is a
+    // use. The same instruction can be both a dead def and boundary use.
+    if (isDefBlockState && isDef(&inst)) {
+      if (!isLive) {
+        boundary.deadDefs.push_back(cast<SILNode>(&inst));
+      }
+      isLive = false;
+    }
+    if (!isLive && isInterestingUser(&inst)) {
+      boundary.lastUsers.push_back(&inst);
+      isLive = true;
+    }
   }
-  for (auto end = block->rend(); it != end; ++it) {
-    if (isDef(&*it))
-      return &*it;
+  if (!isLive && isDefBlockState) {
+    for (SILArgument *deadArg : block->getArguments()) {
+      if (defs.contains(deadArg)) {
+        boundary.deadDefs.push_back(deadArg);
+      }
+    }
   }
-  return nullptr;
+  assert(prevCount < boundary.deadDefs.size() + boundary.lastUsers.size()
+         && "findBoundariesInBlock must be called on a live block");
 }
 
 SimpleLiveRangeSummary MultiDefPrunedLiveness::computeSimple() {

@@ -530,11 +530,6 @@ struct PrunedLivenessBoundary {
 ///
 ///   bool isDefBlock(SILBasicBlock *block) const
 ///
-///   SILArgument *getArgDef(SILBasicBlock *block) const
-///
-///   SILInstruction *findPreviousDef(SILInstruction *searchPos,
-///                                   SILInstruction *nextDef)
-///
 template <typename LivenessWithDefs>
 class PrunedLiveRange : public PrunedLiveness {
 protected:
@@ -587,10 +582,6 @@ public:
   /// by DeadEndBlocks.
   void computeBoundary(PrunedLivenessBoundary &boundary,
                        ArrayRef<SILBasicBlock *> postDomBlocks) const;
-
-protected:
-  void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
-                             PrunedLivenessBoundary &boundary) const;
 };
 
 // Singly-defined liveness.
@@ -642,28 +633,9 @@ public:
     return def->getParentBlock() == block;
   }
 
-  /// If the argument list of \p block contains a definition, return it.
-  SILArgument *getArgDef(SILBasicBlock *block) const {
-    if (auto *arg = dyn_cast<SILArgument>(def)) {
-      if (arg->getParent() == block)
-        return arg;
-    }
-    return nullptr;
-  }
-
-  /// Return the definition if it occurs in the same block before \p searchPos.
-  ///
-  /// Precondition: if the definition occurs in the same block on or after \p
-  /// searchPos, then \p nextDef must point to the definition.
-  SILInstruction *findPreviousDef(SILInstruction *searchPos,
-                                  SILInstruction *nextDef) const {
-    if (!defInst || nextDef) {
-      assert(nextDef == defInst);
-      return nullptr;
-    }
-    auto *block = searchPos->getParent();
-    return defInst->getParent() == block ? defInst : nullptr;
-  }
+  /// SSA implementation of computeBoundary.
+  void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
+                             PrunedLivenessBoundary &boundary) const;
 
   /// Compute liveness for a single SSA definition. The lifetime-ending uses are
   /// also recorded--destroy_value or end_borrow.
@@ -722,26 +694,9 @@ public:
     return defBlocks.contains(block);
   }
 
-  /// If the argument list of \p block contains a definition, return it.
-  SILArgument *getArgDef(SILBasicBlock *block) const {
-    if (!isDefBlock(block))
-      return nullptr;
-
-    for (SILArgument *arg : block->getArguments()) {
-      if (defs.contains(arg))
-        return arg;
-    }
-    return nullptr;
-  }
-
-  /// Return the previous definition that occurs in the same block before \p
-  /// searchPos, or nullptr if none exists.
-  ///
-  /// Precondition: if a definition occurs in the same block on or after \p
-  /// searchPos, then \p nextDef must point to the next definition. searchPos
-  /// cannot point to nextDef.
-  SILInstruction *findPreviousDef(SILInstruction *searchPos,
-                                  SILInstruction *nextDef) const;
+  /// Multi-Def implementation of computeBoundary.
+  void findBoundariesInBlock(SILBasicBlock *block, bool isLiveOut,
+                             PrunedLivenessBoundary &boundary) const;
 
   /// Compute liveness for a all currently initialized definitions. The
   /// lifetime-ending uses are also recorded--destroy_value or
