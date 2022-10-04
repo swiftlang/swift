@@ -356,7 +356,7 @@ private:
       builder.emitZeroIntoBuffer(loc, destAddress, IsInitialization);
       break;
     /// If adjoint value is a symbolic aggregate (tuple or struct), recursively
-    /// materialize materialize the symbolic tuple or struct, filling the
+    /// materialize the symbolic tuple or struct, filling the
     /// buffer.
     case AdjointValueKind::Aggregate: {
       if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
@@ -2044,7 +2044,7 @@ bool PullbackCloner::Implementation::run() {
       return true;
   }
   // Otherwise, perform standard pullback generation.
-  // Visit original blocks blocks in post-order and perform differentiation
+  // Visit original blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
     for (auto *bb : originalBlocks) {

@@ -148,7 +148,7 @@ bool AccessStorageResult::mergeAccesses(
     otherRegionAccesses = &regionAccessCopy;
   }
   bool changed = false;
-  // Nondeterminstically iterate for the sole purpose of inserting into another
+  // Nondeterministically iterate for the sole purpose of inserting into another
   // unordered set.
   for (auto &rawStorageInfo : otherRegionAccesses->storageAccessSet) {
     const StorageAccessInfo &otherStorageInfo =

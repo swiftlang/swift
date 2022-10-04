@@ -307,7 +307,7 @@ bb0(%0 : $XXX):
 sil @silcombine_apply_opened_archetype : $@convention(thin) (@in P, Q) -> () {
 bb0(%0 : $*P, %1 : $Q):
   // A single operand instruction that uses an opened existential.
-  // For some reason this is handled specialy in
+  // For some reason this is handled specially in
   // SILBuilder::addOpenedArchetypeOperands.
   %ref = open_existential_ref %1 : $Q to $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0", Q) Self
   %om = objc_method %ref : $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0", Q) Self, #Q.bar!foreign : <Self where Self : Q> (Self) -> () -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()

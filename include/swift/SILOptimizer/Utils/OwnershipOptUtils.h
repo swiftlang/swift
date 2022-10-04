@@ -92,7 +92,7 @@ bool computeGuaranteedBoundary(SILValue value,
 //                        GuaranteedOwnershipExtension
 //===----------------------------------------------------------------------===//
 
-/// Extend existing guaranteed ownership to cover new guaranteeed uses that are
+/// Extend existing guaranteed ownership to cover new guaranteed uses that are
 /// dominated by the borrow introducer.
 class GuaranteedOwnershipExtension {
   // --- context

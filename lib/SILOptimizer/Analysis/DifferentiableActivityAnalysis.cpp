@@ -36,8 +36,8 @@ static bool isWithoutDerivative(SILValue v) {
 
 std::unique_ptr<DifferentiableActivityCollection>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
-  assert(dominanceAnalysis && "Expect a valid dominance anaysis");
-  assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
+  assert(dominanceAnalysis && "Expect a valid dominance analysis");
+  assert(postDominanceAnalysis && "Expect a valid post-dominance analysis");
   return std::make_unique<DifferentiableActivityCollection>(
       *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
 }

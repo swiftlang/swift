@@ -233,9 +233,9 @@ sil_witness_table hidden Klass2: P module dealloc {
 //
 // <rdar://problem/57025861> "Assertion failed: (conformances.size()
 // == numConformanceRequirements)" in ExistentialSpecializer on
-protocol Plotable {}
+protocol Plottable {}
 
-class PlotLayer : Plotable {
+class PlotLayer : Plottable {
   init()
 }
 
@@ -246,7 +246,7 @@ class PlotLayerInView : PlotLayer & InView {
 }
 
 class PlotView {
-  @_hasStorage @_hasInitialValue var layers: Container<PlotLayer & Plotable & InView> { get set }
+  @_hasStorage @_hasInitialValue var layers: Container<PlotLayer & Plottable & InView> { get set }
   public func resolveLayers()
   init()
 }
@@ -260,14 +260,14 @@ struct Container<T> {
 // requirements).  Relies on assertions during specialization and on
 // the SILVerifier to catch other inconsistencies.
 //
-// CHECK-LABEL: sil shared [ossa] @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<any PlotLayer & InView & Plotable>) -> () {
-// CHECK: bb0(%0 : @owned $τ_0_0, %1 : $*Container<any PlotLayer & InView & Plotable>):
-// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $any PlotLayer & InView & Plotable
+// CHECK-LABEL: sil shared [ossa] @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<any PlotLayer & InView & Plottable>) -> () {
+// CHECK: bb0(%0 : @owned $τ_0_0, %1 : $*Container<any PlotLayer & InView & Plottable>):
+// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $any PlotLayer & InView & Plottable
 // CHECK-LABEL: } // end sil function '$s40testExistentialSpecializeCompositeHelperTf4en_n'
-sil shared [ossa] @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> () {
-bb0(%0 : @owned $PlotLayer & Plotable & InView, %1 : $*Container<PlotLayer & Plotable & InView>):
-  %adr = struct_element_addr %1 : $*Container<PlotLayer & Plotable & InView>, #Container.val
-  store %0 to [assign] %adr : $*PlotLayer & Plotable & InView
+sil shared [ossa] @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plottable & InView, @inout Container<PlotLayer & Plottable & InView>) -> () {
+bb0(%0 : @owned $PlotLayer & Plottable & InView, %1 : $*Container<PlotLayer & Plottable & InView>):
+  %adr = struct_element_addr %1 : $*Container<PlotLayer & Plottable & InView>, #Container.val
+  store %0 to [assign] %adr : $*PlotLayer & Plottable & InView
   %v = tuple ()
   return %v : $()
 }
@@ -276,10 +276,10 @@ sil [ossa] @testExistentialSpecializeComposite : $@convention(method) (@guarante
 bb0(%0 : @guaranteed $PlotView):
   %ref = alloc_ref $PlotLayerInView
   %ref1 = copy_value %ref : $PlotLayerInView
-  %exis = init_existential_ref %ref1 : $PlotLayerInView : $PlotLayerInView, $PlotLayer & Plotable & InView
+  %exis = init_existential_ref %ref1 : $PlotLayerInView : $PlotLayerInView, $PlotLayer & Plottable & InView
   %array = ref_element_addr %0 : $PlotView, #PlotView.layers
-  %f = function_ref @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> ()
-  %call = apply %f(%exis, %array) : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> ()
+  %f = function_ref @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plottable & InView, @inout Container<PlotLayer & Plottable & InView>) -> ()
+  %call = apply %f(%exis, %array) : $@convention(method) (@owned PlotLayer & Plottable & InView, @inout Container<PlotLayer & Plottable & InView>) -> ()
   destroy_value %ref : $PlotLayerInView
   %v = tuple ()
   return %v : $()

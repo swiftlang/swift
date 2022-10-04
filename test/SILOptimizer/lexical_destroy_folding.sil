@@ -205,7 +205,7 @@ exit:
   return %retval : $()
 }
 
-// Enclose a single guaranteed lexical scope that contains two paralell
+// Enclose a single guaranteed lexical scope that contains two parallel
 // applies of owned arguments with the destroy at a noncanonical position
 // within a single owned lexical scope.
 //

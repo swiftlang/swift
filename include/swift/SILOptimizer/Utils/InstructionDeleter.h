@@ -24,7 +24,7 @@
 /// is highly bug prone and infeasible.
 ///
 /// 3. Fixup OSSA after deletion so SIL remains valid. Allowing OSSA to be
-/// invalid across API boundaries creates an intractible problem and makes it
+/// invalid across API boundaries creates an intractable problem and makes it
 /// impossible to design composable OSSA utilities.
 ///
 /// Strategies for SIL transformation:
@@ -53,7 +53,7 @@
 /// instruction iterators during deletion. This is because deleting a single
 /// instruction may require deleting other instructions, such as debug info and
 /// scope-ending instructions. In OSSA code, deleting an instruction may even
-/// cause new instructions to be inserted. This is best handled by aquiring an
+/// cause new instructions to be inserted. This is best handled by acquiring an
 /// UpdatingInstructionIterator from the InstructionDeleter. This is usually
 /// done via InstructionDeleter::updatingRange(SILBasicBlock *).
 /// InstructionDeleter::getIteratorRegistry().makeIterator() offers more
@@ -64,7 +64,7 @@
 /// For data structures that contain instruction pointers and persist across
 /// calls to forceDelete* or cleanupDeadInstructions... There is no need to
 /// create an updating iterator. Simply check Instruction::isDeleted() when
-/// retriving a pointer from the data structure.
+/// retrieving a pointer from the data structure.
 ///
 /// Using InstModCallbacks:
 ///
@@ -192,7 +192,7 @@ public:
   /// lifetimes of the operands of \c inst once it is deleted. This function
   /// will not clean up dead code resulting from the instruction's removal. To
   /// do so, invoke the method \c cleanupDeadCode of this instance, once the SIL
-  /// of the contaning function is made consistent.
+  /// of the containing function is made consistent.
   ///
   /// \pre the instruction to be deleted must not have any use other than
   /// incidental uses.
@@ -213,7 +213,7 @@ public:
   /// Clean up dead instructions that are tracked by this instance and all
   /// instructions that transitively become dead.
   ///
-  /// \pre the function contaning dead instructions must be consistent (i.e., no
+  /// \pre the function containing dead instructions must be consistent (i.e., no
   /// under or over releases). Note that if \c forceDelete call leaves the
   /// function body in an inconsistent state, it needs to be made consistent
   /// before this method is invoked.

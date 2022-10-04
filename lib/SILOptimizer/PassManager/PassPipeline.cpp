@@ -202,7 +202,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addPredictableDeadAllocationElimination();
 
   // Now that we have finished performing diagnostics that rely on lexical
-  // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
+  // scopes, if lexical lifetimes are not enabled, eliminate lexical lifetimes.
   if (Options.LexicalLifetimes != LexicalLifetimesOption::On) {
     P.addLexicalLifetimeEliminator();
   }
@@ -301,7 +301,7 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
   // Jump threading can expose opportunity for silcombine (enum -> is_enum_tag->
   // cond_br).
   P.addSILCombine();
-  // Which can expose opportunity for simplifcfg.
+  // Which can expose opportunity for simplifycfg.
   P.addSimplifyCFG();
 }
 

@@ -14,7 +14,7 @@ public struct Beta {
 }
 
 class Delta {
-  var epislon: Beta? = Beta(gamma: [])
+  var epsilon: Beta? = Beta(gamma: [])
 
   func main() {
     for _ in 1...100 { 
@@ -23,7 +23,7 @@ class Delta {
   }
 
   func crash() { 
-    epislon?.gamma = [0]
+    epsilon?.gamma = [0]
   }
 }
 

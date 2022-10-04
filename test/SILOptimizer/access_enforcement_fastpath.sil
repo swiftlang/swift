@@ -85,7 +85,7 @@ bb0(%0 : $TestEarlyBail):
 // CHECK: Processing Function: testEarlyBailMayMerge
 // CHECK: No conflict on one path from   [[ACCESS1:%.*]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
 // CHECK:  to end_access [[ACCESS1]] : $*Int
-// CHECK: Found mergable pair: [[ACCESS1]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
+// CHECK: Found mergeable pair: [[ACCESS1]] = begin_access [modify] [dynamic] %{{.*}} : $*Int
 // CHECK-NEXT: with [[ACCESS2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int
 // CHECK-NOT: No conflict on one path from [[ACCESS2]]
 // CHECK: Ignoring unmergeable access: [[ACCESS2]] = begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int

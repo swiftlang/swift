@@ -178,7 +178,7 @@ protected:
     if (isa<BuiltinRawPointerType>(use->get()->getType().getASTType())) {
       // Destroy hoisting considers address_to_pointer to be a leaf use because
       // any potential pointer access is already considered to be a
-      // deinitializtion barrier.  Consequently, any instruction that uses a
+      // deinitialization barrier.  Consequently, any instruction that uses a
       // value produced by address_to_pointer isn't regarded as a storage use.
       return true;
     }

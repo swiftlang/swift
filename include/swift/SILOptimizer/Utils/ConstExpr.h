@@ -170,7 +170,7 @@ public:
   /// Try evaluating an instruction and if the evaluation fails, skip the
   /// instruction and make it effects non constant. Note that it may not always
   /// be possible to skip an instruction whose evaluation failed and
-  /// continue evalution (e.g. a conditional branch).
+  /// continue evaluation (e.g. a conditional branch).
   /// See `evaluate` and `skipByMakingEffectsNonConstant` functions for their
   /// semantics.
   /// \param instI instruction to be evaluated in the current interpreter state.

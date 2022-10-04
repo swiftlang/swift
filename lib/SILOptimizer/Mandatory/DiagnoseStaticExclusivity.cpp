@@ -999,7 +999,7 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
     SILArgumentConvention conv = apply.getArgumentConvention(*memOper);
     // Captured addresses currently use the @inout_aliasable convention. They
     // are considered an access at any call site that uses the closure. However,
-    // those accesses are never explictly protected by access markers. Instead,
+    // those accesses are never explicitly protected by access markers. Instead,
     // exclusivity uses AccessSummaryAnalysis to check for conflicts. Here, we
     // can simply ignore any @inout_aliasable arguments.
     if (conv == SILArgumentConvention::Indirect_InoutAliasable)

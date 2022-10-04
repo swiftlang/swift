@@ -893,7 +893,7 @@ void COWArrayOpt::hoistAddressProjections(Operand &ArrayOp) {
 /// Check if this call to "make_mutable" is hoistable, and copy it, along with
 /// the corresponding end_mutation call, to the loop pre-header.
 ///
-/// The origial make_mutable/end_mutation calls remain in the loop, because
+/// The original make_mutable/end_mutation calls remain in the loop, because
 /// removing them would violate the COW representation rules.
 /// Having those calls in the pre-header will then enable COWOpts (after
 /// inlining) to constant fold the uniqueness check of the begin_cow_mutation
@@ -936,7 +936,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
     StructUses.collectUses(ArrayContainer, AccessPath);
   } else {
     // There are some unsafe operations in the loop. If the array is uniquely
-    // identifyable and not escaping, then we are good if all the array uses
+    // identifiable and not escaping, then we are good if all the array uses
     // are safe.
     if (!arrayContainerIsUnique) {
       LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: is not unique!\n");

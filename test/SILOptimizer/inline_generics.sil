@@ -143,7 +143,7 @@ extension MyNumber : SomeProto {}
 sil_vtable MyObject {}
 sil_vtable MyNumber {}
 
-// Make sure we subsitute the correct conformance when inlining. When
+// Make sure we substitute the correct conformance when inlining. When
 // substituting we need to pick up the normal_conformance.
 
 // CHECK-LABEL: sil @test_inlining : $@convention(objc_method) (@owned MyNumber) -> () {

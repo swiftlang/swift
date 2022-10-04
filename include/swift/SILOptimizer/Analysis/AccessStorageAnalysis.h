@@ -125,7 +125,7 @@ namespace swift {
 using AccessStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
 
 /// Records each unique AccessStorage in a set of StorageAccessInfo
-/// objects. Hashing and equality only sees the AccesedStorage data. The
+/// objects. Hashing and equality only sees the AccessedStorage data. The
 /// additional StorageAccessInfo bits are recorded as results of this analysis.
 ///
 /// Any unidentified accesses are summarized as a single unidentifiedAccess

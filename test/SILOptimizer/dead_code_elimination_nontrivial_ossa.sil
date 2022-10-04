@@ -960,7 +960,7 @@ bb3:
 }
 
 // rdar://87985420 - crash in nullptr returned by findGuaranteedReferenceRoots
-// Test that a boorrow scope introduced by unchecked_ownership_conversion is not
+// Test that a borrow scope introduced by unchecked_ownership_conversion is not
 // deleted by DCE.
 sil [ossa] @testUncheckedConvertToGuaranteed : $@convention(thin) (@sil_unmanaged AnyObject) -> () {
 bb0(%0 : $@sil_unmanaged AnyObject):

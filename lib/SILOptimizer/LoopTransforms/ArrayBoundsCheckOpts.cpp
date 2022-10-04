@@ -298,7 +298,7 @@ private:
 
 // Get the pair of array and index. Because we want to disambiguate between the
 // two types of check bounds checks merge in the type into the lower bit of one
-// of the addresse index.
+// of the addresses' index.
 static std::pair<ValueBase *, ArrayAccessDesc>
 getArrayIndexPair(SILValue Array, SILValue ArrayIndex, ArrayCallKind K) {
   assert((K == ArrayCallKind::kCheckIndex ||
@@ -1203,7 +1203,7 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
   }
 
   // Hoist the overflow check of induction variables out of the loop. This also
-  // needs to happen for memory safety. Also remove superflous range checks.
+  // needs to happen for memory safety. Also remove superfluous range checks.
   if (IVarsFound) {
     SILValue TrueVal;
     SILValue FalseVal;

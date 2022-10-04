@@ -49,7 +49,7 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
 
   void notifyHasNewUsers(SILValue) override { changed = true; }
 
-  /// Delete trivially dead instructions in non-determistic order.
+  /// Delete trivially dead instructions in non-deterministic order.
   ///
   /// We either have that nextII is endII or if nextII is not endII then endII
   /// is nextII->getParent()->end().

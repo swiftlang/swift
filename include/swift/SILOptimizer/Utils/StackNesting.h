@@ -139,13 +139,13 @@ private:
                       SILInstruction *InsertionPoint,
                       Optional<SILLocation> Location);
 
-  /// Reeturns the location bit number for a stack allocation instruction.
+  /// Returns the location bit number for a stack allocation instruction.
   int bitNumberForAlloc(SILInstruction *AllocInst) {
     assert(AllocInst->isAllocatingStack());
     return StackLoc2BitNumbers[cast<SingleValueInstruction>(AllocInst)];
   }
 
-  /// Reeturns the location bit number for a stack deallocation instruction.
+  /// Returns the location bit number for a stack deallocation instruction.
   int bitNumberForDealloc(SILInstruction *DeallocInst) {
     assert(DeallocInst->isDeallocatingStack());
     auto *AllocInst = cast<SingleValueInstruction>(DeallocInst->getOperand(0));

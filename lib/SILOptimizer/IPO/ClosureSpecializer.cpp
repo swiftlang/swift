@@ -1287,7 +1287,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
 
-        // We currently only support copying intermediate reabastraction
+        // We currently only support copying intermediate reabstraction
         // closures if the closure is ultimately passed trivially.
         bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()
