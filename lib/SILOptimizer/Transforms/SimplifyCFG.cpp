@@ -9,6 +9,24 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// Note: Unreachable blocks must always be eliminated before simplifying
+/// useless phis. Otherwise self-loops will result in invalid SIL:
+///
+///   bb1(%phi):
+///     apply %use(%phi)
+///     %def = apply %getValue()
+///     br bb1(%def)
+///
+/// When bb1 is unreachable, %phi will be removed as useless:
+///   bb1:
+///     apply %use(%def)
+///     %def = apply %getValue()
+///     br bb1(%def)
+///
+/// This is considered invalid SIL because SIL has a special SSA dominance rule
+/// that does not allow a use above a def in the same block.
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
 
