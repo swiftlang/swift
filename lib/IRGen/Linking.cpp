@@ -1021,13 +1021,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.Int8Ty;
     
   case Kind::ClassMetadataBaseOffset:
-    // TODO: put a cache variable on IGM
-    return llvm::StructType::get(IGM.getLLVMContext(), {
-      IGM.SizeTy,  // Immediate members offset
-      IGM.Int32Ty, // Negative size in words
-      IGM.Int32Ty  // Positive size in words
-    });
-    
+    return IGM.ClassMetadataBaseOffsetTy;
+
   case Kind::TypeMetadataInstantiationCache:
     // TODO: put a cache variable on IGM
     return llvm::ArrayType::get(IGM.Int8PtrTy,

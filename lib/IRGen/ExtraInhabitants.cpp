@@ -106,8 +106,8 @@ llvm::Value *PointerInfo::getExtraInhabitantIndex(IRGenFunction &IGF,
   llvm::BasicBlock *contBB = IGF.createBasicBlock("is-valid-pointer");
   SmallVector<std::pair<llvm::BasicBlock*, llvm::Value*>, 3> phiValues;
   auto invalidIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
-  
-  src = IGF.Builder.CreateBitCast(src, IGF.IGM.SizeTy->getPointerTo());
+
+  src = IGF.Builder.CreateElementBitCast(src, IGF.IGM.SizeTy);
 
   // Check if the inhabitant is below the least valid pointer value.
   llvm::Value *val = IGF.Builder.CreateLoad(src);
@@ -206,7 +206,7 @@ void PointerInfo::storeExtraInhabitant(IRGenFunction &IGF,
                   llvm::ConstantInt::get(IGF.IGM.SizeTy, NumReservedLowBits));
   }
 
-  dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.SizeTy->getPointerTo());
+  dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.SizeTy);
   IGF.Builder.CreateStore(index, dest);
 }
 

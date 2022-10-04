@@ -56,11 +56,10 @@ ConstantIntegerLiteral
 emitConstantIntegerLiteral(IRGenModule &IGM, IntegerLiteralInst *ILI);
 
 /// Emit a checked truncation of an IntegerLiteral value.
-void emitIntegerLiteralCheckedTrunc(IRGenFunction &IGF,
-                                    Explosion &in,
+void emitIntegerLiteralCheckedTrunc(IRGenFunction &IGF, Explosion &in,
+                                    llvm::Type *FromTy,
                                     llvm::IntegerType *resultTy,
-                                    bool resultIsSigned,
-                                    Explosion &out);
+                                    bool resultIsSigned, Explosion &out);
 
 /// Emit a sitofp operation on an IntegerLiteral value.
 llvm::Value *emitIntegerLiteralToFP(IRGenFunction &IGF,

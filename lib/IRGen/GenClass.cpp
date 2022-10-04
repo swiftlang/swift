@@ -415,8 +415,7 @@ ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
                                           bool completelyFragileLayout) const {
   ClassLayoutBuilder builder(IGM, classType, Refcount, completelyFragileLayout);
 
-  auto *classTy =
-      cast<llvm::StructType>(getStorageType()->getPointerElementType());
+  auto *classTy = classLayoutType;
 
   if (completelyFragileLayout) {
     // Create a name for the new llvm type.
@@ -442,11 +441,9 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
                              tailTypes);
 
   // Create a name for the new llvm type.
-  llvm::StructType *classTy =
-    cast<llvm::StructType>(getStorageType()->getPointerElementType());
   SmallString<32> typeName;
   llvm::raw_svector_ostream os(typeName);
-  os << classTy->getName() << "_tailelems" << IGM.TailElemTypeID++;
+  os << classLayoutType->getName() << "_tailelems" << IGM.TailElemTypeID++;
 
   // Create the llvm type.
   llvm::StructType *ResultTy = llvm::StructType::create(IGM.getLLVMContext(),
@@ -485,8 +482,7 @@ llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               const llvm::Twine &name) {
   assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
-  addr = Builder.CreateInBoundsGEP(
-      addr->getType()->getScalarType()->getPointerElementType(), addr, offset);
+  addr = Builder.CreateInBoundsGEP(IGM.Int8Ty, addr, offset);
   return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
 }
 
@@ -592,13 +588,13 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
   switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    Address baseAddr(base, classLayout.getAlignment());
+    Address baseAddr(base, classLayout.getType(), classLayout.getAlignment());
     auto element = fieldInfo.second;
     Address memberAddr = element.project(IGF, baseAddr, None);
     // We may need to bitcast the address if the field is of a generic type.
-    if (memberAddr.getType()->getPointerElementType() != fieldTI.getStorageType())
-      memberAddr = IGF.Builder.CreateBitCast(memberAddr,
-                                     fieldTI.getStorageType()->getPointerTo());
+    if (memberAddr.getElementType() != fieldTI.getStorageType())
+      memberAddr = IGF.Builder.CreateElementBitCast(memberAddr,
+                                                    fieldTI.getStorageType());
     return OwnedAddress(memberAddr, base);
   }
     
@@ -682,8 +678,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
   Offset = IGF.Builder.CreateAnd(Offset, InvertedMask);
 
-  llvm::Value *Addr = IGF.emitByteOffsetGEP(Base, Offset,
-                                            TailTI.getStorageType(), "tailaddr");
+  Address Addr = IGF.emitByteOffsetGEP(Base, Offset, TailTI, "tailaddr");
 
   if (auto *OffsetConst = dyn_cast<llvm::ConstantInt>(Offset)) {
     // Try to get an accurate alignment (only possible if the Offset is a
@@ -691,7 +686,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Size TotalOffset(OffsetConst->getZExtValue());
     Align = HeapObjAlign.alignmentAtOffset(TotalOffset);
   }
-  return Address(Addr, Align);
+  return Address(Addr.getAddress(), Addr.getElementType(), Align);
 }
 
 /// Try to stack promote a class instance with possible tail allocated arrays.
@@ -926,7 +921,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
     if (rootActorClass->isDefaultActor(IGF.IGM.getSwiftModule(),
                                        ResilienceExpansion::Maximal)) {
       selfValue = emitCastToHeapObject(IGF, selfValue);
-      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFn(),
+      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFunctionPointer(),
                              {selfValue});
       return;
     }
@@ -936,8 +931,9 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
         rootActorClass->isResilient(IGF.IGM.getSwiftModule(),
                                     ResilienceExpansion::Maximal)) {
       selfValue = emitCastToHeapObject(IGF, selfValue);
-      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateResilientFn(),
-                             {selfValue});
+      IGF.Builder.CreateCall(
+          IGF.IGM.getDefaultActorDeallocateResilientFunctionPointer(),
+          {selfValue});
       return;
     }
 
@@ -2356,7 +2352,7 @@ llvm::Constant *IRGenModule::emitObjCResilientClassStub(
   if (isPublic) {
     entity = LinkEntity::forObjCResilientClassStub(
         D, TypeMetadataAddress::AddressPoint);
-    defineAlias(entity, objcStub);
+    defineAlias(entity, objcStub, ObjCResilientClassStubTy);
   }
 
   return objcStub;
@@ -2503,11 +2499,9 @@ TypeConverter::convertClassType(CanType type, ClassDecl *D) {
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
   else
     spareBits = IGM.getHeapObjectSpareBits();
-  
-  return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           std::move(spareBits),
-                           IGM.getPointerAlignment(),
-                           D, refcount);
+
+  return new ClassTypeInfo(irType, IGM.getPointerSize(), std::move(spareBits),
+                           IGM.getPointerAlignment(), D, refcount, ST);
 }
 
 /// Lazily declare a fake-looking class to represent an ObjC runtime base class.
@@ -2719,13 +2713,14 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                   llvm::Value *metadata) {
   auto &layout = IGF.IGM.getClassMetadataLayout(theClass);
 
-  Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
-                          IGF.IGM.getPointerAlignment());
+  Address metadataAsBytes(
+      IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy), IGF.IGM.Int8Ty,
+      IGF.IGM.getPointerAlignment());
 
   Address slot = IGF.Builder.CreateConstByteArrayGEP(
       metadataAsBytes,
       layout.getInstanceSizeOffset());
-  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int32Ty);
   llvm::Value *size = IGF.Builder.CreateLoad(slot);
   if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
     size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
@@ -2733,7 +2728,7 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   slot = IGF.Builder.CreateConstByteArrayGEP(
       metadataAsBytes,
       layout.getInstanceAlignMaskOffset());
-  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int16Ty);
   llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
   alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
 
@@ -2754,9 +2749,7 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
   if (IGF.IGM.getOptions().VirtualFunctionElimination) {
     // For LLVM IR VFE, emit a @llvm.type.checked.load with the type of the
     // method.
-    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
-    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto slotAsPointer = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int8Ty);
     auto typeId = typeIdForMethod(IGF.IGM, method);
 
     // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
@@ -2769,8 +2762,8 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad =
-        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::type_checked_load, args);
     auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);
     return IGF.Builder.CreateBitCast(fnPtr,
                                      signature.getType()->getPointerTo());
@@ -2804,7 +2797,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(methodType, fnPtr, authInfo, signature);
+    return FunctionPointer::createSigned(methodType, fnPtr, authInfo,
+                                         signature);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),

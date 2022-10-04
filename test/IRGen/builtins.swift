@@ -637,7 +637,7 @@ func acceptsBuiltinNativeObject(_ ref: inout Builtin.NativeObject?) {}
 // CHECK-NEXT: entry:
 // CHECK:      %[[BITCAST_RC:.+]] = bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK:      %[[LD_RC:.+]] = load %swift.refcounted*, %swift.refcounted** %[[BITCAST_RC]]
-// CHECK-NEXT: %[[RET:.+]] = call i1 @swift_isUniquelyReferenced_native(%swift.refcounted* %[[LD_RC]])
+// CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(%swift.refcounted* %[[LD_RC]])
 // CHECK-NEXT: ret i1 %[[RET]]
 func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
   return Builtin.isUnique(&ref)
@@ -647,7 +647,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(%swift.refcounted** nocapture dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load %swift.refcounted*, %swift.refcounted** %0
-// CHECK:      %[[RET:.+]] = call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %[[LD_RC]])
+// CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %[[LD_RC]])
 // CHECK-NEXT: ret i1 %[[RET]]
 func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -662,8 +662,8 @@ func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY]], [[OPTIONAL_ANYOBJECT_TY]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[CASTED:%.+]] = bitcast {{.+}}* [[ADDR]] to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
 // CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[CASTED]]
-// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced{{(NonObjC)?}}([[UNKNOWN_OBJECT]]* [[REF]])
-// CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* [[REF]])
 // CHECK-NEXT: ret i1 [[RESULT]]
 func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
   return Builtin.isUnique(&ref)
@@ -675,8 +675,8 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds %AnyObject, %AnyObject* %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[ADDR]]
-// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull([[UNKNOWN_OBJECT]]* [[REF]])
-// CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* [[REF]])
 // CHECK-NEXT: ret i1 [[RESULT]]
 func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -686,7 +686,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load %swift.bridge*, %swift.bridge** %0
-// CHECK:      %[[RET:.+]] = call i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(%swift.bridge* %[[LD]])
+// CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(%swift.bridge* %[[LD]])
 // CHECK-NEXT: ret i1 %[[RET]]
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique(&ref)
@@ -703,7 +703,7 @@ func assumeTrue(_ x: Builtin.Int1) {
 // CHECK-NEXT: entry:
 // CHECK:      %[[BC:.+]] = bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK:      %[[LD:.+]] = load %swift.refcounted*, %swift.refcounted** %[[BC]]
-// CHECK-NEXT: %[[RET:.+]] = call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %[[LD]])
+// CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %[[LD]])
 // CHECK-NEXT: ret i1 %[[RET]]
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique_native(&ref)
@@ -712,7 +712,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 // ImplicitlyUnwrappedOptional argument to isUnique.
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(%{{.*}}* nocapture dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK: call i1 @swift_isUniquelyReferenced_native(%swift.refcounted*
+// CHECK: call zeroext i1 @swift_isUniquelyReferenced_native(%swift.refcounted*
 // CHECK: ret i1
 func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
   var iuo : Builtin.NativeObject! = ref
