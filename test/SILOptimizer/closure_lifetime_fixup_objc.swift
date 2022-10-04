@@ -54,20 +54,20 @@ public protocol DangerousEscaper {
 // Release of sentinel copy (4).
 // CHECK:   strong_release [[SENTINEL]]
 
-// Extendend lifetime (2).
+// Extended lifetime (2).
 // CHECK:   strong_release [[ARG]]
 // CHECK:   return
 // CHECK: } // end sil function '$s27closure_lifetime_fixup_objc19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF'
-public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
-  villian.malicious(closure)
+public func couldActuallyEscape(_ closure: @escaping () -> (), _ villain: DangerousEscaper) {
+  villain.malicious(closure)
 }
 
 // Make sure that we respect the ownership verifier.
 //
 // CHECK-LABEL: sil @$s27closure_lifetime_fixup_objc27couldActuallyEscapeWithLoopyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed any DangerousEscaper) -> () {
-public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
+public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain: DangerousEscaper) {
   for _ in 0..<2 {
-    villian.malicious(closure)
+    villain.malicious(closure)
   }
 }
 

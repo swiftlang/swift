@@ -102,7 +102,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     tmpForwardingConsumingUses.push_back(op);
 
     // If we have a non-terminator, just visit its users recursively to see if
-    // the the users force the live range to be alive.
+    // the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
         if (v->getOwnershipKind() != OwnershipKind::Owned)

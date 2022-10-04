@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -wmo -performance-constant-propagation -simplify-cfg -sil-combine -jumpthread-simplify-cfg -sil-combine -devirtualizer -generic-specializer %s | %FileCheck %s
 //
-// <rdar://problem/46322928> Failure to devirtualize a protocol method applied to an opened existential blocks implemention of
+// <rdar://problem/46322928> Failure to devirtualize a protocol method applied to an opened existential blocks implementation of
 // DataProtocol.
 sil_stage canonical
 

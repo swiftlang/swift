@@ -410,7 +410,7 @@ static SILValue reapplyFunctionConversion(
       newArgs.back() = dfi;
     }
     // Compute substitution map for reapplying `partial_apply`.
-    // - If reapplied functoin is not polymorphic, use empty substitution map
+    // - If reapplied function is not polymorphic, use empty substitution map
     //   regardless of the original `partial_apply`'s substitution map.
     //   - This case is triggered for reapplying `partial_apply` where `newFunc`
     //     is a `differentiability_witness_function` where the witness generic
@@ -500,7 +500,7 @@ emitDerivativeFunctionReference(
     auto *desiredResultIndices = desiredConfig.resultIndices;
     // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
     // parameters corresponding to captured variables.
-    // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+    // TODO: If possible, change `autodiff::getLoweredParameterIndices` to
     // take `CaptureInfo` into account.
     if (originalFnTy->getNumParameters() >
         desiredParameterIndices->getCapacity()) {

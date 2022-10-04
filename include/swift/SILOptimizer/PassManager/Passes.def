@@ -58,7 +58,7 @@
 ///   This macro follows the same conventions as PASS(Id, Tag, Description),
 ///   but is used for function passes which are implemented in Swift.
 ///
-///   No further code is need on the C++ side. On the swift swift a function
+///   No further code is need on the C++ side. On the swift function
 ///   pass with the same name must be registered with 'registerPass()'.
 ///
 #ifndef SWIFT_FUNCTION_PASS

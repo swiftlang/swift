@@ -350,7 +350,7 @@ static bool sinkOwnedForward(SILInstruction *ownedForward,
   if (lcaUses.empty()) {
     forwardPos = lca->getTerminator()->getIterator();
   } else {
-    // Start at the def or begining of the block and search forward.
+    // Start at the def or beginning of the block and search forward.
     if (ownedForward->getParent() == lca)
       forwardPos = std::next(ownedForward->getIterator());
     else

@@ -923,7 +923,7 @@ bb0(%0 : $*P, %1 : $*PP):
 }
 
 // Check that an unconditional_checked_cast_addr from a non-existential loadable type to a protocol
-// can be replaced by a more efficient code sequence if it is statitcally known that this
+// can be replaced by a more efficient code sequence if it is statistically known that this
 // type conforms to this protocol.
 // CHECK-LABEL: sil [ossa] @replace_unconditional_check_cast_addr_for_type_to_existential
 // CHECK-NOT: unconditional_checked_cast_addr
@@ -1143,7 +1143,7 @@ bb0:
   %3 = function_ref @klass_allocator : $@convention(method) (@thick Klass.Type) -> @owned Klass
   %4 = apply %3(%2) : $@convention(method) (@thick Klass.Type) -> @owned Klass
   // We can never in constant propagation forward %5 today since we would need
-  // to know that we are eliminting all of its uses. But the pass doesn't
+  // to know that we are eliminating all of its uses. But the pass doesn't
   // understand that today and so destroy_value %5 in bb2 stops our ability to
   // optimize.
   %5 = tuple (%1 : $Int, %4 : $Klass)

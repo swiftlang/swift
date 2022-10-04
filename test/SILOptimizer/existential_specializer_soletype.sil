@@ -283,7 +283,7 @@ sil_witness_table S: P module test {}
 
 // The guaranteed concrete argument cannot be consumed. The
 // existential created in the prolog must be destroyed before
-// returing.
+// returning.
 //
 // CHECK-LABEL: sil shared @$s6test3_6storePyyAA1P_pz_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @inout any P) -> () {
 // CHECK: bb0(%0 : $*τ_0_0, %1 : $*any P):

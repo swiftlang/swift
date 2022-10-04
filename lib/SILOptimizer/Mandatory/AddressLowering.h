@@ -41,7 +41,7 @@ namespace swift {
 ///
 ///   %result_addr = alloc_stack       // storage for %result
 ///   %result = apply : $() -> @out T
-///   %extract = struct_extact %result // def-projection of %result
+///   %extract = struct_extract %result // def-projection of %result
 ///
 /// Or, a projection may project into a composing use (use-projection):
 ///

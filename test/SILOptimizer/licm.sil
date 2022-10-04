@@ -770,7 +770,7 @@ bb3:
 // Reduced test case from rdar://61246061
 //
 // Test miscompilation of BidirectionalCollection<IndexSet>._distance with
-// combined load/store hoisting/sinking with mutiple loads from
+// combined load/store hoisting/sinking with multiple loads from
 // aliasing addresses.
 
 // getRange

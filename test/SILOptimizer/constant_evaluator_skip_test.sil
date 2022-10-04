@@ -292,8 +292,8 @@ bb0(%0 : $*Int64):
   return %15 : $()
 }
 
-// CHECK-LABEL: @interpretInteleavedSkipAndNonSkip
-sil @interpretInteleavedSkipAndNonSkip : $@convention(thin) () -> Builtin.Int64 {
+// CHECK-LABEL: @interpretInterleavedSkipAndNonSkip
+sil @interpretInterleavedSkipAndNonSkip : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Outer, var, name "outer"
   %1 = integer_literal $Builtin.Int64, 101
@@ -305,7 +305,7 @@ bb0:
   %8 = struct_element_addr %0 : $*Outer, #Outer.second
   store %7 to %8 : $*Inner
 
-  // Mutate the first component and second compoennt in an interleaved way.
+  // Mutate the first component and second component in an interleaved way.
   %9 = struct_element_addr %0: $*Outer, #Outer.first
   %10 = function_ref @increment : $@convention(thin) (@inout Int64) -> ()
   %11 = apply %10(%9) : $@convention(thin) (@inout Int64) -> ()

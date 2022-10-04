@@ -188,7 +188,7 @@ public:
   /// instructions of the frontier that are not in the critical edges. Note that
   /// the method getCriticalEdges can be used to retrieve the critical edges.
   ///
-  /// An edge is also considered as "critical" if it has a single precedessor
+  /// An edge is also considered as "critical" if it has a single predecessor
   /// but the predecessor's terminal instruction is a user of the value.
   ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
