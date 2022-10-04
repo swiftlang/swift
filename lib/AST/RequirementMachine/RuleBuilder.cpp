@@ -298,9 +298,25 @@ void RuleBuilder::addRequirement(const Requirement &req,
   MutableTerm constraintTerm;
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    // TODO
-    return;
+  case RequirementKind::SameCount: {
+    // A same-shape requirement length(T...) == length(U...)
+    // becomes a rewrite rule:
+    //
+    //    T.[shape] => U.[shape]
+    auto otherType = CanType(req.getSecondType());
+    assert(otherType->isTypeSequenceParameter());
+
+    constraintTerm = (substitutions
+                      ? Context.getRelativeTermForType(
+                            otherType, *substitutions)
+                      : Context.getMutableTermForType(
+                            otherType, proto));
+
+    // Add the [shape] symbol to both sides.
+    subjectTerm.add(Symbol::forShape(Context));
+    constraintTerm.add(Symbol::forShape(Context));
+    break;
+  }
 
   case RequirementKind::Conformance: {
     // A conformance requirement T : P becomes a rewrite rule

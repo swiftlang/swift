@@ -72,6 +72,14 @@ struct Symbol::Storage final
     GenericParam = param;
   }
 
+  /// A dummy type for overload resolution of the
+  /// 'shape' constructor for Storage.
+  struct ForShape {};
+
+  explicit Storage(ForShape shape) {
+    Kind = Kind::Shape;
+  }
+
   Storage(const ProtocolDecl *proto, Identifier name) {
     Kind = Symbol::Kind::AssociatedType;
     Proto = proto;
@@ -294,6 +302,30 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
 
   ctx.Symbols.InsertNode(symbol, insertPos);
   ctx.SymbolHistogram.add(unsigned(Kind::GenericParam));
+
+  return symbol;
+}
+
+Symbol Symbol::forShape(RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Shape));
+
+  void *insertPos = nullptr;
+  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+    return symbol;
+
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *symbol = new (mem) Storage(Storage::ForShape());
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  symbol->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::Shape));
 
   return symbol;
 }

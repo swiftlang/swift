@@ -204,6 +204,8 @@ public:
   static Symbol forGenericParam(GenericTypeParamType *param,
                                 RewriteContext &ctx);
 
+  static Symbol forShape(RewriteContext &ctx);
+
   static Symbol forLayout(LayoutConstraint layout,
                           RewriteContext &ctx);
 

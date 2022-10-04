@@ -250,6 +250,23 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
       llvm_unreachable("Invalid symbol kind");
     }
 
+    if (rule.getLHS().back().getKind() == Symbol::Kind::Shape) {
+      assert(rule.getRHS().back().getKind() == Symbol::Kind::Shape);
+
+      // Strip off the shape symbols from either side of the rule.
+      MutableTerm lhsTerm(rule.getLHS().begin(),
+                          rule.getLHS().end() - 1);
+      MutableTerm rhsTerm(rule.getRHS().begin(),
+                          rule.getRHS().end() - 1);
+
+      // Add a SameCount requirement between the two parameter packs.
+      auto constraintType = Map.getTypeForTerm(lhsTerm, GenericParams);
+      auto subjectType = Map.getTypeForTerm(rhsTerm, GenericParams);
+      Reqs.emplace_back(RequirementKind::SameCount,
+                        subjectType, constraintType);
+      return;
+    }
+
     assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
     auto constraintType = Map.getTypeForTerm(rule.getLHS(), GenericParams);
     auto subjectType = Map.getTypeForTerm(rule.getRHS(), GenericParams);
