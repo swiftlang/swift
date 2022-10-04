@@ -4,8 +4,12 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function)
 
+// RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -swift-version 5 -emit-clang-header-path %t/inits2.h
+// RUN: %FileCheck %s < %t/inits2.h
+
 
 // CHECK: SWIFT_EXTERN void * _Nonnull $s4Init9BaseClassCyACSi_SitcfC(ptrdiff_t x, ptrdiff_t y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:_:)
+// CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s4Init9BaseClassCyACSicfC(ptrdiff_t x, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:)
 // CHECK-NEXT: SWIFT_EXTERN void * _Nonnull $s4Init12DerivedClassCyACSi_SitcfC(ptrdiff_t x, ptrdiff_t y, SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init(_:_:)
 
 // CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Init_uint32_t_0_4 $s4Init16FirstSmallStructVACycfC(void) SWIFT_NOEXCEPT SWIFT_CALL; // init()
@@ -107,6 +111,10 @@ public class BaseClass {
     public var x: Int
 
     public init(_ x: Int, _ y: Int) { self.x = x + y }
+
+    public convenience init(_ x: Int) {
+        self.init(x, x * 2)
+    }
 }
 
 public class DerivedClass: BaseClass {

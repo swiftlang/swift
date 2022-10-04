@@ -326,10 +326,9 @@ namespace {
   };
 
   /// A type implementation for loadable record types imported from Clang.
-  class LoadableClangRecordTypeInfo final :
-    public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
-                              ClangFieldInfo> {
-    IRGenModule &IGM;
+  class LoadableClangRecordTypeInfo final
+      : public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
+                                  ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
     template <class Fn>
@@ -356,14 +355,14 @@ namespace {
 
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
-                                unsigned explosionSize, IRGenModule &IGM,
-                                llvm::Type *storageType, Size size,
-                                SpareBitVector &&spareBits, Alignment align,
+                                unsigned explosionSize, llvm::Type *storageType,
+                                Size size, SpareBitVector &&spareBits,
+                                Alignment align,
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, storageType, size,
                              std::move(spareBits), align, IsPOD, IsFixedSize),
-          IGM(IGM), ClangDecl(clangDecl) {}
+          ClangDecl(clangDecl) {}
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
@@ -1049,7 +1048,7 @@ public:
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
-        FieldInfos, NextExplosionIndex, IGM, llvmType, TotalStride,
+        FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment, ClangDecl);
   }
 
