@@ -2845,6 +2845,11 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
   if (!value)
     return { };
 
+  // Consider storage signature opaque parameters for accessor declaration. 
+  if (auto *AD = dyn_cast<AccessorDecl>(value)) {
+    value = AD->getStorage();
+  }
+
   // Functions, initializers, and subscripts can contain opaque parameters.
   ParameterList *params = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(value))
