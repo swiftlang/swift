@@ -2596,8 +2596,9 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   for (auto &u: options::UsrFilter)
     Usrs.push_back(u.c_str());
   // Collect all tags of expressions.
-  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch,
-                                     options::CanonicalizeType, OS)) {
+  for (auto R : collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch,
+                                      options::FullyQualifiedTypes,
+                                      options::CanonicalizeType, OS)) {
     SortedTags.push_back({R.offset,
       (llvm::Twine("<expr type:\"") + TypeBuffer.str().substr(R.typeOffset,
                                                   R.typeLength) + "\">").str()});
