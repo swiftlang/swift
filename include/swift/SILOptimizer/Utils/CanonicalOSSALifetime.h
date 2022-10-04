@@ -276,16 +276,6 @@ private:
   /// repeatedly do use-def walks from destroys).
   SmallPtrSet<SILInstruction *, 8> destroys;
 
-  /// remnantLiveOutBlocks are part of the original extended lifetime that are
-  /// not in canonical pruned liveness. There is a path from a PrunedLiveness
-  /// boundary to an original destroy that passes through a remnant block.
-  ///
-  /// These blocks would be equivalent to PrunedLiveness::LiveOut if
-  /// PrunedLiveness were recomputed using all original destroys as interesting
-  /// uses, minus blocks already marked PrunedLiveness::LiveOut. (Remnant blocks
-  /// may be in PrunedLiveness::LiveWithin).
-  SmallSetVector<SILBasicBlock *, 8> remnantLiveOutBlocks;
-
   /// Information about consuming instructions discovered in this canonical OSSA
   /// lifetime.
   CanonicalOSSAConsumeInfo consumes;
@@ -347,7 +337,6 @@ public:
     consumingBlocks.clear();
     debugValues.clear();
     liveness.clear();
-    remnantLiveOutBlocks.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
