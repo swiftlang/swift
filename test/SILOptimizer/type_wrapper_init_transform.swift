@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature TypeWrappers -module-name test -disable-availability-checking -Xllvm -sil-print-after=definite-init -emit-sil %s -o /dev/null 2>&1 | %FileCheck %s
 
+// REQUIRES: asserts
+
 @typeWrapper
 public struct Wrapper<S> {
   var underlying: S
