@@ -1,5 +1,5 @@
 if (SWIFT_SWIFT_PARSER)
-  add_swift_host_library(swiftASTGen STATIC
+  add_library(swiftASTGen
     Sources/ASTGen/ASTGen.swift
     Sources/ASTGen/Decls.swift
     Sources/ASTGen/Exprs.swift
