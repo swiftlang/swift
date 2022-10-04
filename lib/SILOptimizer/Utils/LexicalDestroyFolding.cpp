@@ -644,8 +644,8 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
 
 bool borroweeHasUsesWithinBorrowScope(Context const &context,
                                       BorroweeUsage const &usage) {
-  PrunedLiveness liveness;
-  context.borrowedValue.computeLiveness(liveness);
+  MultiDefPrunedLiveness liveness(context.function);
+  context.borrowedValue.computeTransitiveLiveness(liveness);
   DeadEndBlocks deadEndBlocks(context.function);
   return !liveness.areUsesOutsideBoundary(usage.uses, &deadEndBlocks);
 }
