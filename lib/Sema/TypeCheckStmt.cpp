@@ -448,8 +448,7 @@ static Expr *getDeclRefProvidingExpressionForHasSymbol(Expr *E) {
   return E;
 }
 
-static ConcreteDeclRef
-getReferencedDeclForHasSymbolCondition(ASTContext &Context, Expr *E) {
+ConcreteDeclRef TypeChecker::getReferencedDeclForHasSymbolCondition(Expr *E) {
   // Match DotSelfExprs (e.g. `SomeStruct.self`) when the type is static.
   if (auto DSE = dyn_cast<DotSelfExpr>(E)) {
     if (DSE->isStaticallyDerivedMetatype())
@@ -461,7 +460,6 @@ getReferencedDeclForHasSymbolCondition(ASTContext &Context, Expr *E) {
       return CDR;
   }
 
-  Context.Diags.diagnose(E->getLoc(), diag::has_symbol_invalid_expr);
   return ConcreteDeclRef();
 }
 
@@ -506,19 +504,12 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
     auto exprTy = TypeChecker::typeCheckExpression(E, dc);
     Info->setSymbolExpr(E);
 
-    if (!exprTy)
+    if (!exprTy) {
+      Info->setInvalid();
       return true;
-
-    auto CDR = getReferencedDeclForHasSymbolCondition(Context, E);
-    if (!CDR)
-      return true;
-
-    auto decl = CDR.getDecl();
-    if (!decl->isWeakImported(dc->getParentModule())) {
-      Context.Diags.diagnose(E->getLoc(), diag::has_symbol_decl_must_be_weak,
-                             decl->getDescriptiveKind(), decl->getName());
     }
-    Info->setReferencedDecl(CDR);
+
+    Info->setReferencedDecl(getReferencedDeclForHasSymbolCondition(E));
     return false;
   }
 
@@ -2129,19 +2120,35 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
       // what the type of the expression is.  Take the inserted return back out.
       body->setLastElement(func->getSingleExpressionBody());
     }
-  } else if (isa<ConstructorDecl>(AFD) &&
-             (body->empty() ||
-                !isKnownEndOfConstructor(body->getLastElement()))) {
-    // For constructors, we make sure that the body ends with a "return" stmt,
-    // which we either implicitly synthesize, or the user can write.  This
-    // simplifies SILGen.
-    SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
-                                 body->getElements().end());
-    Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
-                                        /*value*/nullptr,
-                                        /*implicit*/true));
-    body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
-                             body->getRBraceLoc(), body->isImplicit());
+  } else if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
+    // If this is user-defined constructor that requires `_storage`
+    // variable injection, do so now so now.
+    if (auto *storageVar = ctor->getLocalTypeWrapperStorageVar()) {
+      SmallVector<ASTNode, 8> Elts;
+
+      Elts.push_back(storageVar->getParentPatternBinding());
+      Elts.push_back(storageVar);
+
+      Elts.append(body->getElements().begin(),
+                  body->getElements().end());
+
+      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
+                               body->getRBraceLoc(), body->isImplicit());
+    }
+
+    if (body->empty() ||
+        !isKnownEndOfConstructor(body->getLastElement())) {
+      // For constructors, we make sure that the body ends with a "return" stmt,
+      // which we either implicitly synthesize, or the user can write.  This
+      // simplifies SILGen.
+      SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
+                                   body->getElements().end());
+      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
+                                          /*value*/nullptr,
+                                          /*implicit*/true));
+      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
+                               body->getRBraceLoc(), body->isImplicit());
+    }
   }
 
   // Typechecking, in particular ApplySolution is going to replace closures

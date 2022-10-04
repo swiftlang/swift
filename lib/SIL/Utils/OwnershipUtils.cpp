@@ -377,19 +377,26 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
+// TODO: refactor this with SSAPrunedLiveness::computeLiveness.
 bool swift::findUsesOfSimpleValue(SILValue value,
                                   SmallVectorImpl<Operand *> *usePoints) {
   for (auto *use : value->getUses()) {
-    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::PointerEscape:
+      return false;
+    case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
-            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-              return false;
-            }
-            usePoints->push_back(end);
-            return true;
-          })) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        usePoints->push_back(end);
+        return true;
+      })) {
         return false;
       }
+      break;
+    default:
+      break;
     }
     usePoints->push_back(use);
   }

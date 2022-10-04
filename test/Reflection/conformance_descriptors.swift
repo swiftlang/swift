@@ -3,7 +3,7 @@
 // Temporarily disable on AArch64 Linux (rdar://88451721)
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
-// Temporarily disable on arm64e (rdar://88579818)
+// rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
 // RUN: %empty-directory(%t)

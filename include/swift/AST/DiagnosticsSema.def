@@ -1070,7 +1070,7 @@ ERROR(invalid_force_unwrap,none,
 ERROR(invalid_optional_chain,none,
       "cannot use optional chaining on non-optional value of type %0",
       (Type))
-ERROR(if_expr_cases_mismatch,none,
+ERROR(ternary_expr_cases_mismatch,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
 
@@ -1204,6 +1204,12 @@ NOTE(optional_key_path_root_base_chain, none,
 NOTE(optional_key_path_root_base_unwrap, none,
      "unwrap the optional using '!.' to access unwrapped type member %0",
      (DeclNameRef))
+
+ERROR(optional_self_not_unwrapped,none,
+      "explicit use of 'self' is required when 'self' is optional, "
+      "to make control flow explicit", ())
+NOTE(optional_self_chain,none,
+     "reference 'self?.' explicitly", ())
     
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
@@ -3939,8 +3945,6 @@ NOTE(note_reference_self_explicitly,none,
 NOTE(note_other_self_capture,none,
       "variable other than 'self' captured here under the name 'self' does not "
       "enable implicit 'self'", ())
-NOTE(note_self_captured_weakly,none,
-      "weak capture of 'self' here does not enable implicit 'self'", ())
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())

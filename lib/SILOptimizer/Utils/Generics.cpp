@@ -2544,8 +2544,12 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   if (!SILModuleConventions(M).useLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
-      SILArgument *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
-                                                            SpecArg->getDecl());
+      auto *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
+                                                     SpecArg->getDecl());
+      NewArg->setNoImplicitCopy(
+          cast<SILFunctionArgument>(SpecArg)->isNoImplicitCopy());
+      NewArg->setLifetimeAnnotation(
+          cast<SILFunctionArgument>(SpecArg)->getLifetimeAnnotation());
       Arguments.push_back(NewArg);
     }
     FullApplySite ApplySite = createReabstractionThunkApply(Builder);
@@ -2642,8 +2646,12 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   auto cloneSpecializedArgument = [&]() {
     // No change to the argument.
     SILArgument *SpecArg = *SpecArgIter++;
-    SILArgument *NewArg =
+    auto *NewArg =
         EntryBB->createFunctionArgument(SpecArg->getType(), SpecArg->getDecl());
+    NewArg->setNoImplicitCopy(
+        cast<SILFunctionArgument>(SpecArg)->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(
+        cast<SILFunctionArgument>(SpecArg)->getLifetimeAnnotation());
     Arguments.push_back(NewArg);
   };
   // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
@@ -2685,6 +2693,10 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       SILArgument *SpecArg = *SpecArgIter++;
       SILFunctionArgument *NewArg =
           EntryBB->createFunctionArgument(ParamTy, SpecArg->getDecl());
+      NewArg->setNoImplicitCopy(
+          cast<SILFunctionArgument>(SpecArg)->isNoImplicitCopy());
+      NewArg->setLifetimeAnnotation(
+          cast<SILFunctionArgument>(SpecArg)->getLifetimeAnnotation());
       if (!NewArg->getArgumentConvention().isGuaranteedConvention()) {
         SILValue argVal = Builder.emitLoadValueOperation(
             Loc, NewArg, LoadOwnershipQualifier::Take);

@@ -654,35 +654,6 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
-static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
-  return constant.isDefaultArgGenerator() || constant.isForeign;
-}
-
-/// Set up the function for profiling instrumentation.
-static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
-                              ForDefinition_t forDefinition) {
-  if (!forDefinition || F->getProfiler())
-    return;
-
-  ASTNode profiledNode;
-  if (!haveProfiledAssociatedFunction(constant)) {
-    if (constant.hasDecl()) {
-      if (auto *fd = constant.getFuncDecl()) {
-        if (fd->hasBody()) {
-          F->createProfiler(fd, constant);
-          profiledNode = fd->getBody(/*canSynthesize=*/false);
-        }
-      }
-    } else if (auto *ace = constant.getAbstractClosureExpr()) {
-      F->createProfiler(ace, constant);
-      profiledNode = ace;
-    }
-    // Set the function entry count for PGO.
-    if (SILProfiler *SP = F->getProfiler())
-      F->setEntryCount(SP->getExecutionCount(profiledNode));
-  }
-}
-
 static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (!constant.hasDecl())
     return false;
@@ -730,12 +701,9 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
-  // If we already emitted the function, return it (potentially preparing it
-  // for definition).
-  if (auto emitted = getEmittedFunction(constant, forDefinition)) {
-    setUpForProfiling(constant, emitted, forDefinition);
+  // If we already emitted the function, return it.
+  if (auto emitted = getEmittedFunction(constant, forDefinition))
     return emitted;
-  }
 
   auto getBestLocation = [](SILDeclRef ref) -> SILLocation {
     if (ref.hasDecl())
@@ -755,7 +723,6 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
         return IGM.getFunction(constant, NotForDefinition);
       });
-  setUpForProfiling(constant, F, forDefinition);
 
   assert(F && "SILFunction should have been defined");
 
@@ -889,6 +856,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     if (auto *ce = constant.getAbstractClosureExpr()) {
       preEmitFunction(constant, f, ce);
       PrettyStackTraceSILFunction X("silgen closureexpr", f);
+      f->createProfiler(ce, constant);
       SILGenFunction(*this, *f, ce).emitClosure(ce);
       postEmitFunction(constant, f);
       break;
@@ -898,6 +866,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
     preEmitFunction(constant, f, fd);
     PrettyStackTraceSILFunction X("silgen emitFunction", f);
+    f->createProfiler(fd, constant);
     SILGenFunction(*this, *f, fd).emitFunction(fd);
     postEmitFunction(constant, f);
     break;
@@ -1025,7 +994,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     f->createProfiler(wrapperInfo.getInitFromWrappedValue(), constant);
     auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
-    SGF.emitGeneratorFunction(constant, wrapperInfo.getInitFromWrappedValue());
+    SGF.emitGeneratorFunction(constant, wrapperInfo.getInitFromWrappedValue(),
+                              /*EmitProfilerIncrement*/ true);
     postEmitFunction(constant, f);
     break;
   }
@@ -1172,24 +1142,20 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
 /// Emit a function now, if it's externally usable or has been referenced in
 /// the current TU, or remember how to emit it later if not.
-static void emitOrDelayFunction(SILGenModule &SGM,
-                                SILDeclRef constant,
-                                bool forceEmission = false) {
+static void emitOrDelayFunction(SILGenModule &SGM, SILDeclRef constant) {
   assert(!constant.isThunk());
   assert(!constant.isClangImported());
 
   auto emitAfter = SGM.lastEmittedFunction;
 
-  SILFunction *f = nullptr;
-
   // Implicit decls may be delayed if they can't be used externally.
   auto linkage = constant.getLinkage(ForDefinition);
-  bool mayDelay = !forceEmission &&
-             (constant.isImplicit() &&
-              !constant.isDynamicallyReplaceable() &&
-              !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
+  bool mayDelay = !constant.hasUserWrittenCode() &&
+                  !constant.isDynamicallyReplaceable() &&
+                  !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule());
 
   // Avoid emitting a delayable definition if it hasn't already been referenced.
+  SILFunction *f = nullptr;
   if (mayDelay)
     f = SGM.getEmittedFunction(constant, ForDefinition);
   else
@@ -1443,12 +1409,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   emitAbstractFuncDecl(fd);
 
-  if (fd->hasBody()) {
-    SILDeclRef constant(decl);
-    bool ForCoverageMapping = doesASTRequireProfiling(M, fd, constant);
-    emitOrDelayFunction(*this, constant,
-                        /*forceEmission=*/ForCoverageMapping);
-  }
+  if (fd->hasBody())
+    emitOrDelayFunction(*this, SILDeclRef(decl));
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
@@ -1467,6 +1429,24 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   SILDeclRef constant(decl);
   DeclContext *declCtx = decl->getDeclContext();
+
+  // Make sure that default & memberwise initializers of $Storage
+  // in a type wrapped type are always emitted because they would
+  // later be used to initialize its `$storage` property.
+  if (auto *SD = declCtx->getSelfStructDecl()) {
+    auto &ctx = SD->getASTContext();
+    if (SD->getName() == ctx.Id_TypeWrapperStorage &&
+        (decl->isMemberwiseInitializer() ||
+         decl == SD->getDefaultInitializer())) {
+#ifndef NDEBUG
+      auto *wrapped = SD->getDeclContext()->getSelfNominalTypeDecl();
+      assert(wrapped->hasTypeWrapper());
+#endif
+
+      emitFunctionDefinition(constant, getFunction(constant, ForDefinition));
+      return;
+    }
+  }
 
   if (declCtx->getSelfClassDecl()) {
     // Designated initializers for classes, as well as @objc convenience

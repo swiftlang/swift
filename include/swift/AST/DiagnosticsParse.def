@@ -1342,12 +1342,12 @@ ERROR(legacy_object_literal,none,
 ERROR(unknown_pound_expr,none,
       "use of unknown directive '#%0'", (StringRef))
 
-// If expressions
-ERROR(expected_expr_after_if_question,none,
+// Ternary expressions
+ERROR(expected_expr_after_ternary_question,none,
       "expected expression after '?' in ternary expression", ())
-ERROR(expected_colon_after_if_question,none,
+ERROR(expected_colon_after_ternary_question,none,
       "expected ':' after '? ...' in ternary expression", ())
-ERROR(expected_expr_after_if_colon,none,
+ERROR(expected_expr_after_ternary_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
 ERROR(expected_expr_after_try, none,
       "expected expression after 'try'", ())
@@ -1469,6 +1469,9 @@ ERROR(attr_expected_integer_literal,none,
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
+ERROR(attr_expected_option_identifier,none,
+      "expected '%0' option to be an identifier", (StringRef))
+
 ERROR(attr_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
@@ -1482,17 +1485,8 @@ ERROR(attr_expected_colon_after_label,none,
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
-ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
-      "@_swift_native_objc_runtime_base class name must be an identifier", ())
-
-ERROR(objc_runtime_name_must_be_identifier,none,
-      "@_objcRuntimeName name must be an identifier", ())
-
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
-
-ERROR(projection_value_property_not_identifier,none,
-      "@_projectedValueProperty name must be an identifier", ())
 
 // Access control
 ERROR(attr_access_expected_set,none,

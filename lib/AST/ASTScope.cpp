@@ -83,11 +83,11 @@ Pattern *AbstractPatternEntryScope::getPattern() const {
   return getPatternEntry().getPattern();
 }
 
-NullablePtr<ClosureExpr> BraceStmtScope::parentClosureIfAny() const {
+NullablePtr<AbstractClosureExpr> BraceStmtScope::parentClosureIfAny() const {
   return !getParent() ? nullptr : getParent().get()->getClosureIfClosureScope();
 }
 
-NullablePtr<ClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
+NullablePtr<AbstractClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
 }
 

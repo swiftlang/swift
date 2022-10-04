@@ -32,15 +32,6 @@
 
 using namespace swift;
 
-/// Check if a closure has a body.
-static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
-  if (auto *CE = dyn_cast<ClosureExpr>(ACE))
-    return CE->getBody();
-  if (auto *autoCE = dyn_cast<AutoClosureExpr>(ACE))
-    return autoCE->getBody();
-  return false;
-}
-
 /// Check whether a root AST node should be profiled.
 static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   // Do not profile AST nodes with invalid source locations.
@@ -67,61 +58,14 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
     }
   }
 
-  if (auto *E = N.dyn_cast<Expr *>()) {
-    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-      // Only profile closure expressions with bodies.
-      if (!doesClosureHaveBody(CE)) {
-        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: closure without body\n");
-        return false;
-      }
-
-      // Don't profile implicit closures, unless they're autoclosures.
-      if (!isa<AutoClosureExpr>(CE) && CE->isImplicit()) {
-        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
-        return false;
-      }
-    }
-
-    // Profile all other kinds of expressions.
-    return true;
-  }
-
-  auto *D = N.get<Decl *>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // Don't profile functions without bodies.
-    if (!AFD->hasBody()) {
-      LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
-      return false;
-    }
-
-    // Profile implicit getters for lazy variables.
-    if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
-      if (accessor->isImplicit() && accessor->isGetter() &&
-          accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
-        return true;
-      }
-    }
-  }
-
-  // Skip any remaining implicit, or otherwise unsupported decls.
-  if (D->isImplicit() || isa<EnumCaseDecl>(D)) {
-    LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit/unsupported decl\n");
+  // Do not profile code that hasn't been written by the user.
+  if (!Constant.hasUserWrittenCode()) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: no user-written code\n");
     return false;
   }
 
   return true;
 }
-
-namespace swift {
-bool doesASTRequireProfiling(SILModule &M, ASTNode N, SILDeclRef Constant) {
-  // If profiling isn't enabled, don't profile anything.
-  auto &Opts = M.getOptions();
-  if (Opts.UseProfile.empty() && !Opts.GenerateProfile)
-    return false;
-
-  return shouldProfile(N, Constant);
-}
-} // namespace swift
 
 /// Get the DeclContext for the decl referenced by \p forDecl.
 DeclContext *getProfilerContextForDecl(ASTNode N, SILDeclRef forDecl) {
@@ -152,29 +96,34 @@ static bool hasASTBeenTypeChecked(ASTNode N, SILDeclRef forDecl) {
   return !SF || SF->ASTStage >= SourceFile::TypeChecked;
 }
 
-/// Check whether a mapped AST node requires a new profiler.
+/// Check whether a mapped AST node is valid for profiling.
 static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
   assert(hasASTBeenTypeChecked(N, forDecl) &&
          "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
-    if (isa<AbstractFunctionDecl>(D))
-      return true;
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+      return AFD->hasBody();
 
     if (isa<TopLevelCodeDecl>(D))
       return true;
   } else if (N.get<Expr *>()) {
+    if (auto *closure = forDecl.getAbstractClosureExpr())
+      return closure->hasBody();
     if (forDecl.isStoredPropertyInitializer() ||
-        forDecl.isPropertyWrapperBackingInitializer() ||
-        forDecl.getAbstractClosureExpr())
+        forDecl.isPropertyWrapperBackingInitializer())
       return true;
   }
   return false;
 }
 
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
+  // If profiling isn't enabled, don't profile anything.
   const auto &Opts = M.getOptions();
-  if (!doesASTRequireProfiling(M, N, Ref))
+  if (!Opts.GenerateProfile && Opts.UseProfile.empty())
+    return nullptr;
+
+  if (!shouldProfile(N, Ref))
     return nullptr;
 
   if (!canCreateProfilerForAST(N, Ref)) {
@@ -322,7 +271,7 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(E);
     }
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
+    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       mapRegion(IE->getThenExpr());
     }
 
@@ -711,7 +660,7 @@ struct PGOMapping : public ASTWalker {
     if (Parent.isNull())
       setKnownExecutionCount(E);
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
+    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       auto thenExpr = IE->getThenExpr();
       auto thenCount = loadExecutionCount(thenExpr);
       setExecutionCount(thenExpr, thenCount);
@@ -1234,7 +1183,7 @@ public:
 
     assert(!RegionStack.empty() && "Must be within a region");
 
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
+    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
       assignCounter(IE->getElseExpr(),
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));

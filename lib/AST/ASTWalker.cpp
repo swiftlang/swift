@@ -94,31 +94,37 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
   };
 
+  LLVM_NODISCARD
   Expr *visit(Expr *E) {
     SetParentRAII SetParent(Walker, E);
     return inherited::visit(E);
   }
 
+  LLVM_NODISCARD
   Stmt *visit(Stmt *S) {
     SetParentRAII SetParent(Walker, S);
     return inherited::visit(S);
   }
-  
+
+  LLVM_NODISCARD
   Pattern *visit(Pattern *P) {
     SetParentRAII SetParent(Walker, P);
     return inherited::visit(P);
   }
 
+  LLVM_NODISCARD
   bool visit(Decl *D) {
     SetParentRAII SetParent(Walker, D);
     return inherited::visit(D);
   }
-  
+
+  LLVM_NODISCARD
   bool visit(TypeRepr *T) {
     SetParentRAII SetParent(Walker, T);
     return inherited::visit(T);
   }
-  
+
+  LLVM_NODISCARD
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
   }
@@ -127,17 +133,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                                 Decls
   //===--------------------------------------------------------------------===//
 
+  LLVM_NODISCARD
   bool visitGenericParamListIfNeeded(GenericContext *GC) {
     // Must check this first in case extensions have not been bound yet
     if (Walker.shouldWalkIntoGenericParams()) {
       if (auto *params = GC->getParsedGenericParams()) {
-        doIt(params);
+        if (doIt(params))
+          return true;
       }
       return true;
     }
     return false;
   }
 
+  LLVM_NODISCARD
   bool visitTrailingRequirements(GenericContext *GC) {
     if (const auto Where = GC->getTrailingWhereClause()) {
       for (auto &Req: Where->getRequirements())
@@ -368,7 +377,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visitSubscriptDecl(SubscriptDecl *SD) {
     bool WalkGenerics = visitGenericParamListIfNeeded(SD);
 
-    visit(SD->getIndices());
+    if (visit(SD->getIndices()))
+      return true;
+
     if (auto *const TyR = SD->getElementTypeRepr())
       if (doIt(TyR))
         return true;
@@ -399,9 +410,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         // accessor generics are visited from the storage decl
         !isa<AccessorDecl>(AFD) && visitGenericParamListIfNeeded(AFD);
 
-    if (auto *PD = AFD->getImplicitSelfDecl(/*createIfNeeded=*/false))
-      visit(PD);
-    visit(AFD->getParameters());
+    if (auto *PD = AFD->getImplicitSelfDecl(/*createIfNeeded=*/false)) {
+      if (visit(PD))
+        return true;
+    }
+    if (visit(AFD->getParameters()))
+      return true;
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
       if (!isa<AccessorDecl>(FD))
@@ -436,7 +450,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
     if (auto *PL = ED->getParameterList()) {
-      visit(PL);
+      if (visit(PL))
+        return true;
     }
 
     if (auto *rawLiteralExpr = ED->getRawValueUnchecked()) {
@@ -848,8 +863,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
-    ClosureExpr *body = expr->getClosureBody();
-    if ((body = cast_or_null<ClosureExpr>(doIt(body))))
+    AbstractClosureExpr *body = expr->getClosureBody();
+    if ((body = cast_or_null<AbstractClosureExpr>(doIt(body))))
       expr->setClosureBody(body);
     else
       return nullptr;
@@ -857,7 +872,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitClosureExpr(ClosureExpr *expr) {
-    visit(expr->getParameters());
+    if (visit(expr->getParameters()))
+      return nullptr;
 
     if (expr->hasExplicitResultType()) {
       if (doIt(expr->getExplicitResultTypeRepr()))
@@ -994,9 +1010,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return E;
   }
-  
-  
-  Expr *visitIfExpr(IfExpr *E) {
+
+  Expr *visitTernaryExpr(TernaryExpr *E) {
     if (Expr *Cond = E->getCondExpr()) {
       Cond = doIt(Cond);
       if (!Cond) return nullptr;
@@ -1249,6 +1264,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   template <typename T>
   using PostWalkResult = ASTWalker::PostWalkResult<T>;
 
+  LLVM_NODISCARD
   bool traverse(PreWalkAction Pre, llvm::function_ref<bool(void)> VisitChildren,
                 llvm::function_ref<PostWalkAction(void)> WalkPost) {
     switch (Pre.Action) {
@@ -1271,6 +1287,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   template <typename T>
+  LLVM_NODISCARD
   T *traverse(PreWalkResult<T *> Pre,
               llvm::function_ref<T *(T *)> VisitChildren,
               llvm::function_ref<PostWalkResult<T *>(T *)> WalkPost) {
@@ -1299,6 +1316,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     llvm_unreachable("Unhandled case in switch!");
   }
 
+  LLVM_NODISCARD
   bool visitParameterList(ParameterList *PL) {
     return traverse(
         Walker.walkToParameterListPre(PL),
@@ -1316,6 +1334,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
+  LLVM_NODISCARD
   Expr *doIt(Expr *E) {
     return traverse<Expr>(
         Walker.walkToExprPre(E),
@@ -1323,6 +1342,7 @@ public:
         [&](Expr *E) { return Walker.walkToExprPost(E); });
   }
 
+  LLVM_NODISCARD
   Stmt *doIt(Stmt *S) {
     return traverse<Stmt>(
         Walker.walkToStmtPre(S),
@@ -1350,6 +1370,7 @@ public:
   }
 
   /// Returns true on failure.
+  LLVM_NODISCARD
   bool doIt(Decl *D) {
     if (shouldSkip(D))
       return false;
@@ -1359,7 +1380,8 @@ public:
         [&]() { return visit(D); },
         [&]() { return Walker.walkToDeclPost(D); });
   }
-  
+
+  LLVM_NODISCARD
   Pattern *doIt(Pattern *P) {
     return traverse<Pattern>(
         Walker.walkToPatternPre(P),
@@ -1367,12 +1389,22 @@ public:
         [&](Pattern *P) { return Walker.walkToPatternPost(P); });
   }
 
+  LLVM_NODISCARD
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
       case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_HasSymbol:
         break;
+      case StmtConditionElement::CK_HasSymbol: {
+        auto E = elt.getHasSymbolInfo()->getSymbolExpr();
+        if (!E)
+          return true;
+        E = doIt(E);
+        if (!E)
+          return true;
+        elt.getHasSymbolInfo()->setSymbolExpr(E);
+        break;
+      }
       case StmtConditionElement::CK_Boolean: {
         auto E = elt.getBoolean();
         // Walk an expression condition normally.
@@ -1398,13 +1430,15 @@ public:
   }
 
   /// Returns true on failure.
+  LLVM_NODISCARD
   bool doIt(TypeRepr *T) {
     return traverse(
         Walker.walkToTypeReprPre(T),
         [&]() { return visit(T); },
         [&]() { return Walker.walkToTypeReprPost(T); });
   }
-  
+
+  LLVM_NODISCARD
   bool doIt(RequirementRepr &Req) {
     switch (Req.getKind()) {
     case RequirementReprKind::SameType:
@@ -1423,6 +1457,7 @@ public:
     return false;
   }
 
+  LLVM_NODISCARD
   bool doIt(GenericParamList *GPL) {
     // Visit generic params
     for (auto &P : GPL->getParams()) {
@@ -1439,6 +1474,7 @@ public:
     return false;
   }
 
+  LLVM_NODISCARD
   ArgumentList *visit(ArgumentList *ArgList) {
     for (auto Idx : indices(*ArgList)) {
       auto *E = doIt(ArgList->getExpr(Idx));
@@ -1448,6 +1484,7 @@ public:
     return ArgList;
   }
 
+  LLVM_NODISCARD
   ArgumentList *doIt(ArgumentList *ArgList) {
     return traverse<ArgumentList>(
         Walker.walkToArgumentListPre(ArgList),
@@ -2001,12 +2038,12 @@ Pattern *Pattern::walk(ASTWalker &walker) {
 }
 
 TypeRepr *TypeRepr::walk(ASTWalker &walker) {
-  Traversal(walker).doIt(this);
+  (void)Traversal(walker).doIt(this);
   return this;
 }
 
 StmtConditionElement *StmtConditionElement::walk(ASTWalker &walker) {
-  Traversal(walker).doIt(*this);
+  (void)Traversal(walker).doIt(*this);
   return this;
 }
 

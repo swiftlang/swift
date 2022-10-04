@@ -85,12 +85,6 @@ __asm__("  .globl __swiftImmortalRefCount\n");
   #error("unsupported pointer width")
 #endif
 
-// Static arrays can only contain trivial elements. Therefore we can reuse
-// the metadata of the empty array buffer. The important thing is that its
-// deinit is a no-op and does not actually destroy any elements.
-__asm__("  .globl __swiftStaticArrayMetadata\n");
-__asm__(".set __swiftStaticArrayMetadata, _$ss19__EmptyArrayStorageCN\n");
-
 #endif
 
 SWIFT_RUNTIME_STDLIB_API

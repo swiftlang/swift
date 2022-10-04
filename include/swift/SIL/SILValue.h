@@ -572,6 +572,10 @@ public:
     return true;
   }
 
+  /// Returns true if this value should be traced for optimization debugging
+  /// (it has a debug_value [trace] user).
+  bool hasDebugTrace() const;
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;

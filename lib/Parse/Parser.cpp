@@ -975,7 +975,7 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
   switch (K) {
@@ -1043,6 +1043,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::TuplePatternElement;
   case SyntaxKind::AvailabilitySpecList:
     return SyntaxKind::AvailabilityArgument;
+  case SyntaxKind::YieldExprList:
+    return SyntaxKind::YieldExprListElement;
   default:
     return SyntaxKind::Unknown;
   }

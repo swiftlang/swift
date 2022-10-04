@@ -413,7 +413,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
                                            std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
-  if (isAnyInitSelf())
+  if (isAnyInitSelf() || getAsTypeWrapperLocalStorageVar())
     Result = "self";
   else if (ValueDecl *VD =
                dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
@@ -534,6 +534,13 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
                             silFn->getDeclContext()->getAsDecl()))
             return ctor;
+
+  return nullptr;
+}
+
+VarDecl *DIMemoryObjectInfo::getAsTypeWrapperLocalStorageVar() const {
+  if (isTypeWrapperLocalStorageVar(getFunction(), MemoryInst))
+    return getLoc().getAsASTNode<VarDecl>();
 
   return nullptr;
 }
@@ -1990,4 +1997,33 @@ void swift::ownership::collectDIElementUsesFrom(
   ElementUseCollector collector(MemoryInfo, UseInfo, VisitedClosures);
   collector.collectFrom(MemoryInfo.getUninitializedValue(),
                         /*collectDestroysOfContainer*/ true);
+}
+
+bool swift::ownership::canHaveTypeWrapperLocalStorageVar(SILFunction &F) {
+  auto *DC = F.getDeclContext();
+  if (!DC)
+    return false;
+
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl());
+  if (!ctor || ctor->isImplicit() || !ctor->isDesignatedInit())
+    return false;
+
+  auto *parentType = ctor->getDeclContext()->getSelfNominalTypeDecl();
+  return parentType && parentType->hasTypeWrapper();
+}
+
+bool swift::ownership::isTypeWrapperLocalStorageVar(
+    SILFunction &F, MarkUninitializedInst *Inst) {
+  if (!Inst->isVar())
+    return false;
+
+  if (!canHaveTypeWrapperLocalStorageVar(F))
+    return false;
+
+  if (auto *var = Inst->getLoc().getAsASTNode<VarDecl>()) {
+    auto &ctx = var->getASTContext();
+    return var->isImplicit() && var->getName() == ctx.Id_localStorageVar;
+  }
+
+  return false;
 }

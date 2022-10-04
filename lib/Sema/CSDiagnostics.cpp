@@ -1371,6 +1371,22 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
           .fixItInsert(sourceRange.End, "!.");
     }
   } else {
+    // Check whether or not the base of this optional unwrap is implicit self
+    // This can only happen with a [weak self] capture, and is not permitted.
+    if (auto dotExpr = getAsExpr<UnresolvedDotExpr>(locator->getAnchor())) {
+      if (auto baseDeclRef = dyn_cast<DeclRefExpr>(dotExpr->getBase())) {
+        ASTContext &Ctx = baseDeclRef->getDecl()->getASTContext();
+        if (baseDeclRef->isImplicit() &&
+            baseDeclRef->getDecl()->getName().isSimpleName(Ctx.Id_self)) {
+          emitDiagnostic(diag::optional_self_not_unwrapped);
+
+          emitDiagnostic(diag::optional_self_chain)
+              .fixItInsertAfter(sourceRange.End, "self?.");
+          return true;
+        }
+      }
+    }
+    
     emitDiagnostic(diag::optional_base_not_unwrapped, baseType, Member,
                    unwrappedBaseType);
 
@@ -1843,7 +1859,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
   if (!callExpr)
     return false;
 
-  // FIXME: We ought to handle multiple trailing closures here (SR-15054)
+  // FIXME(https://github.com/apple/swift/issues/57381): We ought to handle multiple trailing closures here.
   if (callExpr->getArgs()->getNumTrailingClosures() != 1)
     return false;
   if (callExpr->getFn() != anchor)
@@ -2111,7 +2127,7 @@ bool AssignmentFailure::diagnoseAsError() {
     }
   }
 
-  if (auto IE = dyn_cast<IfExpr>(immutableExpr)) {
+  if (auto IE = dyn_cast<TernaryExpr>(immutableExpr)) {
     emitDiagnosticAt(Loc, DeclDiagnostic,
                      "result of conditional operator '? :' is never mutable")
         .highlight(IE->getQuestionLoc())
@@ -2437,10 +2453,10 @@ bool ContextualFailure::diagnoseAsError() {
   }
 
   case ConstraintLocator::TernaryBranch: {
-    auto *ifExpr = castToExpr<IfExpr>(getRawAnchor());
-    fromType = getType(ifExpr->getThenExpr());
-    toType = getType(ifExpr->getElseExpr());
-    diagnostic = diag::if_expr_cases_mismatch;
+    auto *ternaryExpr = castToExpr<TernaryExpr>(getRawAnchor());
+    fromType = getType(ternaryExpr->getThenExpr());
+    toType = getType(ternaryExpr->getElseExpr());
+    diagnostic = diag::ternary_expr_cases_mismatch;
     break;
   }
 
@@ -4535,9 +4551,7 @@ bool PartialApplicationFailure::diagnoseAsError() {
     kind = RefKind::SuperMethod;
   }
 
-  /* TODO(diagnostics): SR-15250, 
-  Add a "did you mean to call it?" note with a fix-it for inserting '()'
-  if function type has no params or all have a default value. */
+  // TODO(https://github.com/apple/swift/issues/57572, diagnosticsQoI): Add a "did you mean to call it?" note with a fix-it for inserting '()' if function type has no params or all have a default value.
   auto diagnostic = CompatibilityWarning
                         ? diag::partial_application_of_function_invalid_swift4
                         : diag::partial_application_of_function_invalid;
@@ -8076,7 +8090,7 @@ CoercibleOptionalCheckedCastFailure::unwrappedTypes() const {
                          fromOptionals.size() - toOptionals.size());
 }
 
-bool CoercibleOptionalCheckedCastFailure::diagnoseIfExpr() const {
+bool CoercibleOptionalCheckedCastFailure::diagnoseTernaryExpr() const {
   auto *expr = getAsExpr<IsExpr>(CastExpr);
   if (!expr)
     return false;
@@ -8258,7 +8272,7 @@ bool NoopExistentialToCFTypeCheckedCast::diagnoseAsError() {
 }
 
 bool CoercibleOptionalCheckedCastFailure::diagnoseAsError() {
-  if (diagnoseIfExpr())
+  if (diagnoseTernaryExpr())
     return true;
 
   if (diagnoseForcedCastExpr())
@@ -8282,9 +8296,7 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
 bool CheckedCastToUnrelatedFailure::diagnoseAsError() {
   const auto toType = getToType();
   auto *sub = CastExpr->getSubExpr()->getSemanticsProvidingExpr();
-  // FIXME: This literal diagnostics needs to be revisited by a proposal
-  // to unify casting semantics for literals.
-  // https://bugs.swift.org/browse/SR-12093
+  // FIXME(https://github.com/apple/swift/issues/54529): This literal diagnostics needs to be revisited by a proposal to unify casting semantics for literals.
   auto &ctx = getASTContext();
   auto *dc = getDC();
   if (isa<LiteralExpr>(sub)) {

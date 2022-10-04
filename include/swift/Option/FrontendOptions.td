@@ -889,6 +889,10 @@ def explicit_interface_module_build :
   Flag<["-"], "explicit-interface-module-build">,
   HelpText<"Use the specified command-line to build the module from interface, instead of flags specified in the interface">;
 
+def direct_clang_cc1_module_build :
+  Flag<["-"], "direct-clang-cc1-module-build">,
+  HelpText<"Use the specified -Xcc options to build a PCM by using Clang frontend directly, bypassing the Clang driver">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
@@ -1077,11 +1081,12 @@ def skip_import_in_public_interface:
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
 
-def clang_header_expose_public_decls:
-  Flag<["-"], "clang-header-expose-public-decls">,
-  HelpText<"Expose all public declarations in the generated clang header">,
-  Flags<[FrontendOption, HelpHidden]>;
-  
+def clang_header_expose_decls:
+  Joined<["-"], "clang-header-expose-decls=">,
+  HelpText<"Which declarations should be exposed in the generated clang header.">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"all-public|has-expose-attr">;
+
 def weak_link_at_target :
   Flag<["-"], "weak-link-at-target">,
   HelpText<"Weakly link symbols for declarations that were introduced at the "

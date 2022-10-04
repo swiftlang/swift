@@ -227,7 +227,7 @@ namespace {
 
     ImportResult VisitType(const Type*) = delete;
 
-    // TODO: Add support for dependent types (SR-13809).
+    // TODO(https://github.com/apple/swift/issues/56206): Add support for dependent types.
 #define DEPENDENT_TYPE(Class, Base)                                            \
   ImportResult Visit##Class##Type(const clang::Class##Type *) { return Impl.SwiftContext.getAnyExistentialType(); }
 #define TYPE(Class, Base)
@@ -697,10 +697,9 @@ namespace {
         if (!swiftParamTy)
           return Type();
 
-        // FIXME: If we were walking TypeLocs, we could actually get parameter
-        // names. The probably doesn't matter outside of a FuncDecl, which
-        // we'll have to special-case, but it's an interesting bit of data loss.
-        // <https://bugs.swift.org/browse/SR-2529>
+        // FIXME(https://github.com/apple/swift/issues/45134): If we were walking TypeLocs, we could actually get parameter names.
+        // The probably doesn't matter outside of a FuncDecl, which we'll have
+        // to special-case, but it's an interesting bit of data loss.
         params.push_back(FunctionType::Param(swiftParamTy));
       }
 
@@ -2446,7 +2445,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
                            bool shouldCheckResultType) -> bool {
     auto paramDecl = genericParam->getClangDecl();
     auto templateTypeParam = cast<clang::TemplateTypeParmDecl>(paramDecl);
-    // TODO(SR-13809): This won't work when we support importing dependent types.
+    // TODO(https://github.com/apple/swift/issues/56206): This won't work when we support importing dependent types.
     // We'll have to change this logic to traverse the type tree of the imported
     // Swift type (basically whatever ends up in the parameters variable).
     // Check if genericParam's corresponding clang template type is used by

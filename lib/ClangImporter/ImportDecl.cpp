@@ -2002,7 +2002,7 @@ namespace {
         return nullptr;
       }
 
-      // TODO(SR-13809): fix this once we support dependent types.
+      // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
       if (decl->getTypeForDecl()->isDependentType()) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
@@ -2221,21 +2221,10 @@ namespace {
               MD->overwriteAccess(AccessLevel::Private);
             } else if (cxxOperatorKind ==
                        clang::OverloadedOperatorKind::OO_PlusPlus) {
-              // Make sure the type is not an immortal foreign reference type.
+              // Make sure the type is not a foreign reference type.
               // We cannot handle `operator++` for those types, since the
               // current implementation creates a new instance of the type.
-              bool isImmortal = false;
-              if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-                auto retainOperation = evaluateOrDefault(
-                    Impl.SwiftContext.evaluator,
-                    CustomRefCountingOperation(
-                        {classDecl, CustomRefCountingOperationKind::retain}),
-                    {});
-                isImmortal = retainOperation.kind ==
-                             CustomRefCountingOperationResult::immortal;
-              }
-
-              if (cxxMethod->param_empty() && !isImmortal) {
+              if (cxxMethod->param_empty() && !isa<ClassDecl>(result)) {
                 // This is a pre-increment operator. We synthesize a
                 // non-mutating function called `successor() -> Self`.
                 FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(MD);
@@ -3006,8 +2995,7 @@ namespace {
 
       auto templateParamTypeUsedInSignature =
           [decl](clang::TemplateTypeParmDecl *type) -> bool {
-        // TODO(SR-13809): we will want to update this to handle dependent
-        // types when those are supported.
+        // TODO(https://github.com/apple/swift/issues/56206): We will want to update this to handle dependent types when those are supported.
         if (hasSameUnderlyingType(decl->getReturnType().getTypePtr(), type))
           return true;
 
@@ -3038,8 +3026,7 @@ namespace {
           //
           // If the defaulted template type parameter is used in the signature,
           // then still add a generic so that it can be overrieded.
-          // TODO(SR-14837): in the future we might want to import two overloads
-          // in this case so that the default type could still be used.
+          // TODO(https://github.com/apple/swift/issues/57184): In the future we might want to import two overloads in this case so that the default type could still be used.
           if (templateTypeParam->hasDefaultArgument() &&
               !templateParamTypeUsedInSignature(templateTypeParam))
             continue;
@@ -3213,8 +3200,12 @@ namespace {
         if (importedName.isSubscriptAccessor()) {
           assert(func->getParameters()->size() == 1);
           auto typeDecl = dc->getSelfNominalTypeDecl();
-          auto parameterType = func->getParameters()->get(0)->getType();
+          auto parameter = func->getParameters()->get(0);
+          auto parameterType = parameter->getType();
           if (!typeDecl || !parameterType)
+            return nullptr;
+          if (parameter->isInOut())
+            // Subscripts with inout parameters are not allowed in Swift.
             return nullptr;
 
           auto &getterAndSetter = Impl.cxxSubscripts[{ typeDecl,

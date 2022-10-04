@@ -1745,11 +1745,12 @@ namespace {
                                     memberLocator);
       } else if (needsCurryThunk) {
         // Another case where we want to build a single closure is when
-        // we have a partial application of a constructor on a statically-
+        // we have a partial application of a static member on a statically-
         // derived metatype value. Again, there are no order of evaluation
         // concerns here, and keeping the call and base together in the AST
         // improves SILGen.
-        if (isa<ConstructorDecl>(member) &&
+        if ((isa<ConstructorDecl>(member)
+             || member->isStatic()) &&
             cs.isStaticallyDerivedMetatype(base)) {
           // Add a useless ".self" to avoid downstream diagnostics.
           base = new (context) DotSelfExpr(base, SourceLoc(), base->getEndLoc(),
@@ -3779,7 +3780,7 @@ namespace {
       return result;
     }
 
-    Expr *visitIfExpr(IfExpr *expr) {
+    Expr *visitTernaryExpr(TernaryExpr *expr) {
       auto resultTy = simplifyType(cs.getType(expr));
       cs.setType(expr, resultTy);
 
@@ -4978,24 +4979,14 @@ namespace {
       //     return "{ [$kp$ = \(E)] in $0[keyPath: $kp$] }"
 
       auto &ctx = cs.getASTContext();
-      auto discriminator = E->getClosureDiscriminator();
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
           FunctionType::get({FunctionType::Param(baseTy)}, leafTy, closureInfo);
-
-      ClosureExpr *closure = new (ctx)
-        ClosureExpr(DeclAttributes(),
-                    SourceRange(),
-                    /*captured self*/ nullptr,
-                    /*params*/ nullptr,
-                    SourceLoc(),
-                    SourceLoc(),
-                    SourceLoc(),
-                    SourceLoc(),
-                    /*explicit result type*/ nullptr,
-                    discriminator,
-                    dc);
+      auto closure = new (ctx)
+          AutoClosureExpr(/*set body later*/nullptr, leafTy,
+                          discriminator, dc);
 
       auto param = new (ctx) ParamDecl(
           SourceLoc(),
@@ -5054,14 +5045,10 @@ namespace {
                                  E->getStartLoc(), outerParamRef, E->getEndLoc(),
                                  leafTy, /*implicit=*/true);
       cs.cacheType(application);
-      
-      auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), application);
-      auto bodyStmt = BraceStmt::create(ctx,
-                                SourceLoc(), ASTNode(returnStmt), SourceLoc());
 
       // Finish up the inner closure.
       closure->setParameterList(ParameterList::create(ctx, {param}));
-      closure->setBody(bodyStmt, /*singleExpr*/ true);
+      closure->setBody(application);
       closure->setType(closureTy);
       cs.cacheType(closure);
       
@@ -6607,7 +6594,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // foo(bar) // This expression should compile in Swift 3 mode
       // ```
       //
-      // See also: https://bugs.swift.org/browse/SR-6796
+      // See also: https://github.com/apple/swift/issues/49345
       if (cs.getASTContext().isSwiftVersionAtLeast(4) &&
           !cs.getASTContext().isSwiftVersionAtLeast(5)) {
         auto obj1 = fromType->getOptionalObjectType();
@@ -8094,18 +8081,18 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(
       return {parent, 0};
     if (BE->getRHS() == expr)
       return {parent, 1};
-  } else if (auto ifExpr = dyn_cast<IfExpr>(parent)) {
+  } else if (auto *ternary = dyn_cast<TernaryExpr>(parent)) {
     unsigned index;
-    if (expr == ifExpr->getCondExpr()) {
+    if (expr == ternary->getCondExpr()) {
       index = 0;
-    } else if (expr == ifExpr->getThenExpr()) {
+    } else if (expr == ternary->getThenExpr()) {
       index = 1;
-    } else if (expr == ifExpr->getElseExpr()) {
+    } else if (expr == ternary->getElseExpr()) {
       index = 2;
     } else {
-      llvm_unreachable("expr not found in parent IfExpr");
+      llvm_unreachable("expr not found in parent TernaryExpr");
     }
-    return { ifExpr, index };
+    return { ternary, index };
   } else if (auto assignExpr = dyn_cast<AssignExpr>(parent)) {
     unsigned index;
     if (expr == assignExpr->getSrc()) {
@@ -8936,8 +8923,24 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     for (auto &condElement : *stmtCondition) {
       switch (condElement.getKind()) {
       case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_HasSymbol:
         continue;
+
+      case StmtConditionElement::CK_HasSymbol: {
+        ConstraintSystem &cs = solution.getConstraintSystem();
+        auto info = condElement.getHasSymbolInfo();
+        auto target = *cs.getSolutionApplicationTarget(&condElement);
+        auto resolvedTarget = rewriteTarget(target);
+        if (!resolvedTarget) {
+          info->setInvalid();
+          return None;
+        }
+
+        auto rewrittenExpr = resolvedTarget->getAsExpr();
+        info->setSymbolExpr(rewrittenExpr);
+        info->setReferencedDecl(
+            TypeChecker::getReferencedDeclForHasSymbolCondition(rewrittenExpr));
+        continue;
+      }
 
       case StmtConditionElement::CK_Boolean: {
         auto condExpr = condElement.getBoolean();

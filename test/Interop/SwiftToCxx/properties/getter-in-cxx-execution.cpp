@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/getter-in-cxx.swift -typecheck -module-name Properties -clang-header-expose-public-decls -emit-clang-header-path %t/properties.h
+// RUN: %target-swift-frontend %S/getter-in-cxx.swift -typecheck -module-name Properties -clang-header-expose-decls=all-public -emit-clang-header-path %t/properties.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-props-execution.o
 // RUN: %target-interop-build-swift %S/getter-in-cxx.swift -o %t/swift-props-execution -Xlinker %t/swift-props-execution.o -module-name Properties -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -59,5 +59,12 @@ int main() {
   assert(propsInClass.getComputedInt() == -1235);
   auto smallStructFromClass = propsInClass.getSmallStruct();
   assert(smallStructFromClass.getX() == 1234);
+
+  {
+    auto x = LargeStruct::getStaticX();
+    assert(x == -402);
+    auto smallStruct = LargeStruct::getStaticSmallStruct();
+    assert(smallStruct.getX() == 789);
+  }
   return 0;
 }

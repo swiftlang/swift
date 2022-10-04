@@ -148,22 +148,7 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_ : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error any Error {
-// CHECK:      [[T0:%.*]] = function_ref @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error any Error
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[T0]](%0)
-// CHECK-NEXT: return [[T1]]
-
-// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error any Error {
-// CHECK:      [[TEMP:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
-// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
-// CHECK:      [[METHOD:%.*]] = objc_method [[SELF]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
-// CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
-// CHECK:      cond_br
-// CHECK:      return
-// CHECK:      [[T0:%.*]] = load [take] [[TEMP]]
-// CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
-// CHECK:      "willThrow"([[T1]] : $any Error)
-// CHECK:      throw [[T1]]
+// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcfu_ : $@convention(thin) () -> @error any Error
 
 func testArgs() throws {
   try ErrorProne.consume(nil)

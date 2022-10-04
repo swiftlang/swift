@@ -735,7 +735,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      diagLevel);
     }
   } else if (Args.getLastArg(OPT_require_explicit_availability,
-                             OPT_require_explicit_availability_target)) {
+                             OPT_require_explicit_availability_target) ||
+             Opts.LibraryLevel == LibraryLevel::API) {
     Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
   }
 
@@ -1273,6 +1274,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
+  Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();

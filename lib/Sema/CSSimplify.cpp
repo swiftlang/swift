@@ -2531,8 +2531,9 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   // FIXME: We ought not to have the is<TypeVariableType>() condition here, but
   // removing it currently regresses the diagnostic for the test case for
   // rdar://60727310. Once we better handle the separation of conformance fixes
-  // from argument mismatches in cases like SR-12438, we should be able to
-  // remove it from the condition.
+  // from argument mismatches in cases like
+  // https://github.com/apple/swift/issues/54877, we should be able to remove
+  // it from the condition.
   if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
       resolvedTy->isAny() || resolvedTy->isAnyObject() ||
       getKnownFoundationEntity(resolvedTy->getString())) {
@@ -3011,9 +3012,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
-  // https://bugs.swift.org/browse/SR-6796
-  // Add a super-narrow hack to allow:
-  //   (()) -> T to be passed in place of () -> T
+  // https://github.com/apple/swift/issues/49345
+  // Add a super-narrow hack to allow '(()) -> T' to be passed in place
+  // of '() -> T'.
   if (getASTContext().isSwiftVersionAtLeast(4) &&
       !getASTContext().isSwiftVersionAtLeast(5)) {
     SmallVector<LocatorPathElt, 4> path;
@@ -7748,7 +7749,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   }
 
   if (castKind == CheckedCastKind::ValueCast) {
-    // SR-1612: Special 'is' case diagnostics for CFTypes.
+    // https://github.com/apple/swift/issues/44221
+    // Special 'is' case diagnostics for CFTypes.
     return AllowNoopExistentialToCFTypeCheckedCast::attempt(
         cs, origFromType, origToType, castKind,
         cs.getConstraintLocator(locator));

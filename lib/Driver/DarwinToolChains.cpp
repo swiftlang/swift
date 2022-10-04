@@ -466,10 +466,11 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     // If the user has explicitly asked for a toolchain stdlib, we should
     // provide one using -rpath. This used to be the default behaviour but it
     // was considered annoying in at least the SwiftPM scenario (see
-    // https://bugs.swift.org/browse/SR-1967) and is obsolete in all scenarios
-    // of deploying for Swift-in-the-OS. We keep it here as an optional
-    // behaviour so that people downloading snapshot toolchains for testing new
-    // stdlibs will be able to link to the stdlib bundled in that toolchain.
+    // https://github.com/apple/swift/issues/44576) and is obsolete in all
+    // scenarios of deploying for Swift-in-the-OS. We keep it here as an
+    // optional behaviour so that people downloading snapshot toolchains for
+    // testing new stdlibs will be able to link to the stdlib bundled in
+    // that toolchain.
     for (auto path : RuntimeLibPaths) {
       Arguments.push_back("-rpath");
       Arguments.push_back(context.Args.MakeArgString(path));

@@ -2001,14 +2001,14 @@ bool RefactoringActionConvertStringsConcatenationToInterpolation::performChange(
   return false;
 }
 
-/// Abstract helper class containing info about an IfExpr
+/// Abstract helper class containing info about a TernaryExpr
 /// that can be expanded into an IfStmt.
 class ExpandableTernaryExprInfo {
 
 public:
   virtual ~ExpandableTernaryExprInfo() {}
 
-  virtual IfExpr *getIf() = 0;
+  virtual TernaryExpr *getTernary() = 0;
 
   virtual SourceRange getNameRange() = 0;
 
@@ -2021,7 +2021,7 @@ public:
   virtual bool isValid() {
 
     //Ensure all public properties are non-nil and valid
-    if (!getIf() || !getNameRange().isValid())
+    if (!getTernary() || !getNameRange().isValid())
       return false;
     if (shouldDeclareNameAndType() && getType().isNull())
       return false;
@@ -2035,16 +2035,16 @@ public:
 };
 
 /// Concrete subclass containing info about an AssignExpr
-/// where the source is the expandable IfExpr.
+/// where the source is the expandable TernaryExpr.
 class ExpandableAssignTernaryExprInfo: public ExpandableTernaryExprInfo {
 
 public:
   ExpandableAssignTernaryExprInfo(AssignExpr *Assign): Assign(Assign) {}
 
-  IfExpr *getIf() override {
+  TernaryExpr *getTernary() override {
     if (!Assign)
       return nullptr;
-    return dyn_cast_or_null<IfExpr>(Assign->getSrc());
+    return dyn_cast_or_null<TernaryExpr>(Assign->getSrc());
   }
 
   SourceRange getNameRange() override {
@@ -2068,17 +2068,17 @@ private:
 };
 
 /// Concrete subclass containing info about a PatternBindingDecl
-/// where the pattern initializer is the expandable IfExpr.
+/// where the pattern initializer is the expandable TernaryExpr.
 class ExpandableBindingTernaryExprInfo: public ExpandableTernaryExprInfo {
 
 public:
   ExpandableBindingTernaryExprInfo(PatternBindingDecl *Binding):
   Binding(Binding) {}
 
-  IfExpr *getIf() override {
+  TernaryExpr *getTernary() override {
     if (Binding && Binding->getNumPatternEntries() == 1) {
       if (auto *Init = Binding->getInit(0)) {
-        return dyn_cast<IfExpr>(Init);
+        return dyn_cast<TernaryExpr>(Init);
       }
     }
 
@@ -2153,16 +2153,16 @@ bool RefactoringActionExpandTernaryExpr::performChange() {
 
   auto NameCharRange = Target->getNameCharRange(SM);
 
-  auto IfRange = Target->getIf()->getSourceRange();
+  auto IfRange = Target->getTernary()->getSourceRange();
   auto IfCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, IfRange);
 
-  auto CondRange = Target->getIf()->getCondExpr()->getSourceRange();
+  auto CondRange = Target->getTernary()->getCondExpr()->getSourceRange();
   auto CondCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, CondRange);
 
-  auto ThenRange = Target->getIf()->getThenExpr()->getSourceRange();
+  auto ThenRange = Target->getTernary()->getThenExpr()->getSourceRange();
   auto ThenCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, ThenRange);
 
-  auto ElseRange = Target->getIf()->getElseExpr()->getSourceRange();
+  auto ElseRange = Target->getTernary()->getElseExpr()->getSourceRange();
   auto ElseCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, ElseRange);
 
   SmallString<64> DeclBuffer;
@@ -2653,7 +2653,8 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
   return false;
 }
 
-/// Struct containing info about an IfStmt that can be converted into an IfExpr.
+/// Struct containing info about an IfStmt that can be converted into a
+/// TernaryExpr.
 struct ConvertToTernaryExprInfo {
   ConvertToTernaryExprInfo() {}
 
@@ -5375,7 +5376,7 @@ private:
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         // Don't walk into ternary conditionals as they may have additional
         // conditions such as err != nil that make a force unwrap now valid.
-        if (isa<IfExpr>(E))
+        if (isa<TernaryExpr>(E))
           return Action::SkipChildren(E);
 
         auto *FVE = dyn_cast<ForceValueExpr>(E);
@@ -7315,7 +7316,7 @@ private:
     if (auto Closure = dyn_cast<ClosureExpr>(E)) {
       return Closure;
     } else if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
-      return CaptureList->getClosureBody();
+      return dyn_cast<ClosureExpr>(CaptureList->getClosureBody());
     } else {
       return nullptr;
     }

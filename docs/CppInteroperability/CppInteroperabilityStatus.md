@@ -163,7 +163,7 @@ This status table describes which of the following Swift language features have 
 | Copy and destroy semantics   | Yes                                                      |
 | Creation                     | Yes                                                      |
 | Enums with associated values | Partially: only support structs and enums                |
-| Enums with raw values        | No                                                       |
+| Enums with raw values        | Yes                                                       |
 | Indirect enums               | No                                                       |
 
 **Class types**
@@ -188,6 +188,7 @@ This status table describes which of the following Swift language features have 
 | Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name                         |
 | Setter accessors               | Yes, via `set<name>`                                     |
 | Mutation accessors             | No                                                       |
+| Static property accessors      | Yes                         |
 
 **Generics**
 

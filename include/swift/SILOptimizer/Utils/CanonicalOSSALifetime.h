@@ -249,9 +249,6 @@ private:
   /// liveness may be pruned during canonicalization.
   bool pruneDebugMode;
 
-  /// If true, then new destroy_value instructions will be poison.
-  bool poisonRefsMode;
-
   /// If true and we are processing a value of move_only type, emit a diagnostic
   /// when-ever we need to insert a copy_value.
   std::function<void(Operand *)> moveOnlyCopyValueNotification;
@@ -348,12 +345,11 @@ public:
   }
 
   CanonicalizeOSSALifetime(
-      bool pruneDebugMode, bool poisonRefsMode,
-      NonLocalAccessBlockAnalysis *accessBlockAnalysis, DominanceInfo *domTree,
-      InstructionDeleter &deleter,
+      bool pruneDebugMode, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+      DominanceInfo *domTree, InstructionDeleter &deleter,
       std::function<void(Operand *)> moveOnlyCopyValueNotification = nullptr,
       std::function<void(Operand *)> moveOnlyFinalConsumingUse = nullptr)
-      : pruneDebugMode(pruneDebugMode), poisonRefsMode(poisonRefsMode),
+      : pruneDebugMode(pruneDebugMode),
         moveOnlyCopyValueNotification(moveOnlyCopyValueNotification),
         moveOnlyFinalConsumingUse(moveOnlyFinalConsumingUse),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
@@ -414,11 +410,9 @@ protected:
   void findOrInsertDestroys();
 
   void findOrInsertDestroyOnCFGEdge(SILBasicBlock *predBB,
-                                    SILBasicBlock *succBB, bool needsPoison);
+                                    SILBasicBlock *succBB);
 
   void rewriteCopies();
-
-  void injectPoison();
 };
 
 } // end namespace swift

@@ -19,6 +19,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 
 #include <string>
@@ -388,9 +389,20 @@ public:
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
   bool UseSharedResourceFolder = true;
 
-  /// Indicates whether to expose all public declarations in the generated clang
+  enum class ClangHeaderExposeBehavior {
+    /// Expose all public declarations in the generated header.
+    AllPublic,
+    /// Expose declarations only when they have expose attribute.
+    HasExposeAttr
+  };
+
+  /// Indicates which declarations should be exposed in the generated clang
   /// header.
-  bool ExposePublicDeclsInClangHeader = false;
+  llvm::Optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
+
+  /// Emit C++ bindings for the exposed Swift declarations in the generated
+  /// clang header.
+  bool EnableExperimentalCxxInteropInClangHeader = false;
 
   /// \return true if the given action only parses without doing other compilation steps.
   static bool shouldActionOnlyParse(ActionType);

@@ -937,7 +937,8 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 ///
 /// We also emit diagnostics and potentially a fix-it to help the user.
 ///
-/// See SR-11160 and SR-11212 for more discussion.
+/// See https://github.com/apple/swift/issues/53557 and
+/// https://github.com/apple/swift/issues/53611 for more discussion.
 //
 // type ~ (T1, ..., Tn) (n >= 2)
 //   1a. pat ~ ((P1, ..., Pm)) (m >= 2) -> untuple the pattern

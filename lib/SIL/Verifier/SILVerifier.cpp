@@ -2510,11 +2510,13 @@ public:
             "assign instruction can only exist in raw SIL");
     require(Dest->getType().isAddress(), "Must store to an address dest");
 
-    SILValue initFn = AI->getInitializer();
-    CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions initConv(initTy, AI->getModule());
-    checkAssignByWrapperArgs(Src->getType(), initConv);
-    switch (initConv.getNumIndirectSILResults()) {
+    if (AI->getOriginator() ==
+        AssignByWrapperInst::Originator::PropertyWrapper) {
+      SILValue initFn = AI->getInitializer();
+      CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
+      SILFunctionConventions initConv(initTy, AI->getModule());
+      checkAssignByWrapperArgs(Src->getType(), initConv);
+      switch (initConv.getNumIndirectSILResults()) {
       case 0:
         require(initConv.getNumDirectSILResults() == 1,
                 "wrong number of init function results");
@@ -2535,6 +2537,13 @@ public:
         break;
       default:
         require(false, "wrong number of indirect init function results");
+      }
+    } else {
+      require(AI->getOriginator() ==
+                  AssignByWrapperInst::Originator::TypeWrapper,
+              "wrong originator");
+      require(isa<SILUndef>(AI->getInitializer()),
+              "assignment via type wrapper does not have initializer");
     }
 
     SILValue setterFn = AI->getSetter();

@@ -2200,6 +2200,35 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B) {
   return false;
 }
 
+static bool
+parseAssignByWrapperOriginator(AssignByWrapperInst::Originator &Result,
+                               SILParser &P) {
+  if (P.parseVerbatim("origin"))
+    return true;
+
+  SourceLoc loc;
+  Identifier origin;
+
+  if (P.parseSILIdentifier(origin, loc, diag::expected_in_attribute_list))
+    return true;
+
+  // Then try to parse one of our other initialization kinds. We do not support
+  // parsing unknown here so we use that as our fail value.
+  auto Tmp =
+      llvm::StringSwitch<Optional<AssignByWrapperInst::Originator>>(
+          origin.str())
+          .Case("type_wrapper", AssignByWrapperInst::Originator::TypeWrapper)
+          .Case("property_wrapper",
+                AssignByWrapperInst::Originator::PropertyWrapper)
+          .Default(None);
+
+  if (!Tmp)
+    return true;
+
+  Result = *Tmp;
+  return false;
+}
+
 static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
                                           SILParser &P) {
   StringRef Str;
@@ -3347,6 +3376,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::DebugValueInst: {
     bool poisonRefs = false;
     bool wasMoved = false;
+    bool hasTrace = false;
     SILDebugVariable VarInfo;
 
     // Allow for poison and moved to be in either order.
@@ -3357,6 +3387,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         poisonRefs = true;
       else if (attributeName == "moved")
         wasMoved = true;
+      else if (attributeName == "trace")
+        hasTrace = true;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "debug_value");
@@ -3369,7 +3401,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     if (Val->getType().isAddress())
       assert(!poisonRefs && "debug_value w/ address value does not support poison");
-    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs, wasMoved);
+    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs, wasMoved,
+                                   hasTrace);
     break;
   }
 
@@ -4170,13 +4203,30 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AssignByWrapperInst: {
     SILValue Src, DestAddr, InitFn, SetFn;
     SourceLoc DestLoc;
+    AssignByWrapperInst::Originator originator;
     AssignByWrapperInst::Mode mode;
+
+    if (parseAssignByWrapperOriginator(originator, *this))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
     if (parseTypedValueRef(Src, B) || parseVerbatim("to") ||
         parseAssignByWrapperMode(mode, *this) ||
-        parseTypedValueRef(DestAddr, DestLoc, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(DestAddr, DestLoc, B))
+      return true;
+
+    if (originator == AssignByWrapperInst::Originator::PropertyWrapper) {
+      if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+          parseVerbatim("init") || parseTypedValueRef(InitFn, B))
+        return true;
+    } else {
+      assert(originator == AssignByWrapperInst::Originator::TypeWrapper);
+      InitFn = SILUndef::get(DestAddr->getType(), B.getModule());
+    }
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("set") || parseTypedValueRef(SetFn, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
@@ -4187,8 +4237,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
-    ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr, InitFn, SetFn,
-                                        mode);
+    ResultVal = B.createAssignByWrapper(InstLoc, originator, Src, DestAddr,
+                                        InitFn, SetFn, mode);
     break;
   }
 

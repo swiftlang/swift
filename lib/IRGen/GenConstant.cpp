@@ -288,9 +288,13 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
       IGM.swiftImmortalRefCount = var;
     }
     if (!IGM.swiftStaticArrayMetadata) {
+
+      // Static arrays can only contain trivial elements. Therefore we can reuse
+      // the metadata of the empty array buffer. The important thing is that its
+      // deinit is a no-op and does not actually destroy any elements.
       auto *var = new llvm::GlobalVariable(IGM.Module, IGM.TypeMetadataStructTy,
                                         /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
-                                        /*initializer*/ nullptr, "_swiftStaticArrayMetadata");
+                                        /*initializer*/ nullptr, "$ss19__EmptyArrayStorageCN");
       IGM.swiftStaticArrayMetadata = var;
     }
     elts[0] = llvm::ConstantStruct::get(ObjectHeaderTy, {

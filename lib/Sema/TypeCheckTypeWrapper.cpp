@@ -25,19 +25,17 @@
 
 using namespace swift;
 
-/// Create a property declaration and inject it into the given type.
-static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
-                               Type type, VarDecl::Introducer introducer,
-                               AccessLevel accessLevel,
-                               Expr *initializer = nullptr) {
-  auto &ctx = parent->getASTContext();
+static PatternBindingDecl *injectVariable(DeclContext *DC, Identifier name,
+                                          Type type,
+                                          VarDecl::Introducer introducer,
+                                          Expr *initializer = nullptr) {
+  auto &ctx = DC->getASTContext();
 
   auto *var = new (ctx) VarDecl(/*isStatic=*/false, introducer,
-                                /*nameLoc=*/SourceLoc(), name, parent);
+                                /*nameLoc=*/SourceLoc(), name, DC);
 
   var->setImplicit();
   var->setSynthesized();
-  var->setAccess(accessLevel);
   var->setInterfaceType(type);
 
   Pattern *pattern = NamedPattern::createImplicit(ctx, var);
@@ -45,8 +43,19 @@ static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
 
   pattern = TypedPattern::createImplicit(ctx, pattern, type);
 
-  auto *PBD = PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
-                                                 pattern, initializer, parent);
+  return PatternBindingDecl::createImplicit(ctx, StaticSpellingKind::None,
+                                            pattern, initializer, DC);
+}
+
+/// Create a property declaration and inject it into the given type.
+static VarDecl *injectProperty(NominalTypeDecl *parent, Identifier name,
+                               Type type, VarDecl::Introducer introducer,
+                               AccessLevel accessLevel,
+                               Expr *initializer = nullptr) {
+  auto *PBD = injectVariable(parent, name, type, introducer, initializer);
+  auto *var = PBD->getSingleVar();
+
+  var->setAccess(accessLevel);
 
   parent->addMember(PBD);
   parent->addMember(var);
@@ -142,11 +151,18 @@ VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
                            GetTypeWrapperProperty{mutableSelf}, nullptr);
 }
 
-ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
+ConstructorDecl *
+NominalTypeDecl::getTypeWrappedTypeMemberwiseInitializer() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      SynthesizeTypeWrappedTypeMemberwiseInitializer{mutableSelf}, nullptr);
+}
+
+NominalTypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           SynthesizeTypeWrapperInitializer{mutableSelf},
-                           nullptr);
+                           GetTypeWrapperStorage{mutableSelf}, nullptr);
 }
 
 NominalTypeDecl *
@@ -181,8 +197,8 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   if (!typeWrapper)
     return nullptr;
 
-  auto *storage =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+  auto *storage = parent->getTypeWrapperStorageDecl();
+  assert(storage);
 
   auto *typeWrapperType =
       evaluateOrDefault(ctx.evaluator, GetTypeWrapperType{parent}, Type())
@@ -208,10 +224,7 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
   if (!property->isAccessedViaTypeWrapper())
     return nullptr;
 
-  auto &ctx = wrappedType->getASTContext();
-
-  auto *storage = evaluateOrDefault(
-      ctx.evaluator, GetTypeWrapperStorage{wrappedType}, nullptr);
+  auto *storage = wrappedType->getTypeWrapperStorageDecl();
   assert(storage);
 
   return injectProperty(storage, property->getName(),
@@ -378,15 +391,13 @@ bool IsPropertyAccessedViaTypeWrapper::evaluate(Evaluator &evaluator,
   return true;
 }
 
-BraceStmt *
-SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
-                                               ConstructorDecl *ctor) const {
+BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
+    Evaluator &evaluator, ConstructorDecl *ctor) const {
   auto &ctx = ctor->getASTContext();
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
   // self.$_storage = .init(memberwise: $Storage(...))
-  auto *storageType =
-      evaluateOrDefault(ctx.evaluator, GetTypeWrapperStorage{parent}, nullptr);
+  auto *storageType = parent->getTypeWrapperStorageDecl();
   assert(storageType);
 
   auto *typeWrapperVar = parent->getTypeWrapperProperty();
@@ -471,4 +482,54 @@ SynthesizeTypeWrapperInitializerBody::evaluate(Evaluator &evaluator,
 
   return BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(), body,
                            /*rbloc=*/ctor->getLoc(), /*implicit=*/true);
+}
+
+VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
+    Evaluator &evaluator, ConstructorDecl *ctor) const {
+  auto &ctx = ctor->getASTContext();
+
+  if (ctor->isImplicit() || !ctor->isDesignatedInit())
+    return nullptr;
+
+  auto *DC = ctor->getDeclContext()->getSelfNominalTypeDecl();
+  if (!(DC && DC->hasTypeWrapper()))
+    return nullptr;
+
+  auto *storageDecl = DC->getTypeWrapperStorageDecl();
+  assert(storageDecl);
+
+  SmallVector<TupleTypeElt, 4> members;
+  for (auto *member : storageDecl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      assert(var->hasStorage() &&
+             "$Storage should have stored properties only");
+      members.push_back({var->getValueInterfaceType(), var->getName()});
+    }
+  }
+
+  auto *PBD =
+      injectVariable(ctor, ctx.Id_localStorageVar, TupleType::get(members, ctx),
+                     VarDecl::Introducer::Var);
+  return PBD->getSingleVar();
+}
+
+ConstructorDecl *NominalTypeDecl::getTypeWrapperInitializer() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetTypeWrapperInitializer{mutableSelf}, nullptr);
+}
+
+ConstructorDecl *
+GetTypeWrapperInitializer::evaluate(Evaluator &evaluator,
+                                    NominalTypeDecl *typeWrapper) const {
+  auto &ctx = typeWrapper->getASTContext();
+  assert(typeWrapper->getAttrs().hasAttribute<TypeWrapperAttr>());
+
+  auto ctors = typeWrapper->lookupDirect(
+      DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_memberwise}));
+
+  if (ctors.size() != 1)
+    return nullptr;
+
+  return cast<ConstructorDecl>(ctors.front());
 }

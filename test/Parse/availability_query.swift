@@ -49,6 +49,15 @@ if #available(iDishwasherOS 10.51, *) { // expected-warning {{unrecognized platf
 if #available(macos 10.51, *) { // expected-warning {{unrecognized platform name 'macos'; did you mean 'macOS'?}} {{15-20=macOS}}
 }
 
+if #available(mscos 10.51, *) { // expected-warning {{unrecognized platform name 'mscos'; did you mean 'macOS'?}} {{15-20=macOS}}
+}
+
+if #available(macoss 10.51, *) { // expected-warning {{unrecognized platform name 'macoss'; did you mean 'macOS'?}} {{15-21=macOS}}
+}
+
+if #available(mac 10.51, *) { // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{15-18=macOS}}
+}
+
 if #available(OSX 10.51, OSX 10.52, *) {  // expected-error {{version for 'macOS' already specified}}
 }
 

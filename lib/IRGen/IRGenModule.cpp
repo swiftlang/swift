@@ -138,6 +138,12 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     CGO.TrapFuncName = Opts.TrapFuncName;
   }
 
+  // We don't need to perform coverage mapping for any Clang decls we've
+  // synthesized, as they have no user-written code. This is also needed to
+  // avoid a Clang crash when attempting to emit coverage for decls without
+  // source locations (rdar://100172217).
+  CGO.CoverageMapping = false;
+
   auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
                   .getHeaderSearchInfo()

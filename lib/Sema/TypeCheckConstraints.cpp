@@ -1736,7 +1736,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     case CheckedCastKind::Unresolved:
       // Even though we know the elements cannot be downcast, we cannot return
       // Unresolved here as it's possible for an empty Array, Set or Dictionary
-      // to be cast to any element type at runtime (SR-6192). The one exception
+      // to be cast to any element type at runtime
+      // (https://github.com/apple/swift/issues/48744). The one exception
       // to this is when we're checking whether we can treat a coercion as a
       // checked cast because we don't want to tell the user to use as!, as it's
       // probably the wrong suggestion.

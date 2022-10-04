@@ -181,8 +181,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
-  // WebAssembly doesn't support atomics yet, see https://bugs.swift.org/browse/SR-12097
-  // for more details.
+  // WebAssembly doesn't support atomics yet, see
+  // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
 

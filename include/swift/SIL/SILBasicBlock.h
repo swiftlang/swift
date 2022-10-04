@@ -659,4 +659,26 @@ template <> struct DenseMapInfo<swift::PhiValue> {
 
 } // end namespace llvm
 
+//===----------------------------------------------------------------------===//
+// Inline SILInstruction implementations
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+inline SILFunction *SILInstruction::getFunction() const {
+  return getParent()->getParent();
+}
+
+inline SILInstruction *SILInstruction::getPreviousInstruction() {
+  auto pos = getIterator();
+  return pos == getParent()->begin() ? nullptr : &*std::prev(pos);
+}
+
+inline SILInstruction *SILInstruction::getNextInstruction() {
+  auto nextPos = std::next(getIterator());
+  return nextPos == getParent()->end() ? nullptr : &*nextPos;
+}
+
+} // end swift namespace
+
 #endif

@@ -95,7 +95,7 @@ public typealias CLongDouble = Double
 #endif
 #elseif os(Android)
 // On Android, long double is Float128 for AAPCS64, which we don't have yet in
-// Swift (SR-9072); and Double for ARMv7.
+// Swift (https://github.com/apple/swift/issues/51573); and Double for ARMv7.
 #if arch(arm)
 public typealias CLongDouble = Double
 #endif

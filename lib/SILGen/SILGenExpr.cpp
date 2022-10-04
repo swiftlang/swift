@@ -507,8 +507,8 @@ namespace {
                                                 SGFContext C);
     RValue visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E,
                                              SGFContext C);
-    RValue visitIfExpr(IfExpr *E, SGFContext C);
-    
+    RValue visitTernaryExpr(TernaryExpr *E, SGFContext C);
+
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
     RValue visitEnumIsCaseExpr(EnumIsCaseExpr *E, SGFContext C);
 
@@ -1819,6 +1819,19 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // TODO: Move this up when we can emit closures directly with C calling
   // convention.
   auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
+  // Look through `as` type ascriptions that don't induce bridging too.
+  while (auto subCoerce = dyn_cast<CoerceExpr>(subExpr)) {
+    // Coercions that introduce bridging aren't simple type ascriptions.
+    // (Maybe we could still peephole through them eventually, though, by
+    // performing the bridging in the closure prolog/epilog and/or emitting
+    // the closure with the correct contextual block/closure/C function pointer
+    // representation.)
+    if (!subCoerce->getSubExpr()->getType()->isEqual(subCoerce->getType())) {
+      break;
+    }
+    subExpr = subCoerce->getSubExpr()->getSemanticsProvidingExpr();
+  }
+  
   if ((isa<AbstractClosureExpr>(subExpr) || isa<CaptureListExpr>(subExpr))
       && canPeepholeLiteralClosureConversion(subExpr->getType(),
                                              e->getType())) {
@@ -4547,7 +4560,7 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
   return RValue(SGF, E, v);
 }
 
-RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
+RValue RValueEmitter::visitTernaryExpr(TernaryExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
 
   auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());
