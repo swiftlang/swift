@@ -1820,6 +1820,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
                     -DLLVM_ENABLE_RUNTIMES="$(join ";" ${llvm_enable_runtimes[@]})"
+                    -ULLVM_TOOL_COMPILER_RT_BUILD
+                    -ULLVM_BUILD_EXTERNAL_COMPILER_RT
                 )
 
                 # NOTE: This is not a dead option! It is relied upon for certain
