@@ -759,6 +759,7 @@ final public class TryApplyInst : TermInst, FullApplySite {
 final public class BranchInst : TermInst {
   public var targetBlock: BasicBlock { BranchInst_getTargetBlock(bridged).block }
 
+  /// Returns the target block argument for the cond_br `operand`.
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
@@ -776,8 +777,15 @@ final public class CondBranchInst : TermInst {
     return ops[(CondBranchInst_getNumTrueArgs(bridged) &+ 1)..<ops.count]
   }
 
-  public func getArgument(for operand: Operand) -> Argument {
-    let argIdx = operand.index - 1
+  /// Returns the true or false block argument for the cond_br `operand`.
+  ///
+  /// Return nil if `operand` is the condition itself.
+  public func getArgument(for operand: Operand) -> Argument? {
+    let opIdx = operand.index
+    if opIdx == 0 {
+      return nil
+    }
+    let argIdx = opIdx - 1
     let numTrueArgs = CondBranchInst_getNumTrueArgs(bridged)
     if (0..<numTrueArgs).contains(argIdx) {
       return trueBlock.arguments[argIdx]
