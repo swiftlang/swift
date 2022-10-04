@@ -4031,6 +4031,15 @@ static ConstraintFix *fixPropertyWrapperFailure(
   if (!baseExpr)
     return nullptr;
 
+  if (cs.hasFixFor(cs.getConstraintLocator(baseExpr), FixKind::RemoveUnwrap)) {
+    baseTy = baseTy->lookThroughAllOptionalTypes();
+  }
+
+  if (auto *OEE = getAsExpr<OptionalEvaluationExpr>(baseExpr)) {
+    if (auto bind = getAsExpr<BindOptionalExpr>(OEE->getSubExpr()))
+      baseExpr = bind->getSubExpr();
+  }
+
   auto resolvedOverload = cs.findSelectedOverloadFor(baseExpr);
   if (!resolvedOverload)
     return nullptr;
@@ -4167,7 +4176,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   bool possibleContextualMismatch = false;
   // If this is a conversion to a non-optional contextual type e.g.
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
-  // we should diagnose it as type mismatch instead of missing unwrap
+  // we should diagnose it as type mismatch instead of missing unwrap.
   //
   // We should also handle argument conversion mismatch e.g.
   // `
@@ -8000,6 +8009,15 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
           return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
+      }
+    }
+
+    // Provides us with Optional Eval
+    if (locator.hasEmptyPath()) {
+      auto anchor = locator.getAnchor();
+      if (auto *bindOptional = getAsExpr<BindOptionalExpr>(anchor)) {
+        auto parentExpr = getParentExpr(bindOptional);
+        locator = getConstraintLocator(parentExpr);
       }
     }
 
