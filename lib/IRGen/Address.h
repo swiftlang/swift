@@ -31,11 +31,22 @@ namespace irgen {
 /// The address of an object in memory.
 class Address {
   llvm::Value *Addr;
+  llvm::Type *ElementType;
   Alignment Align;
 
 public:
   Address() : Addr(nullptr) {}
-  Address(llvm::Value *addr, Alignment align) : Addr(addr), Align(align) {
+
+  Address(llvm::Value *addr, llvm::Type *elementType, Alignment align)
+      : Addr(addr), ElementType(elementType), Align(align) {
+    if (!llvm::cast<llvm::PointerType>(addr->getType())
+             ->isOpaqueOrPointeeTypeMatches(elementType)) {
+      addr->getType()->dump();
+      elementType->dump();
+    }
+    assert(llvm::cast<llvm::PointerType>(addr->getType())
+               ->isOpaqueOrPointeeTypeMatches(elementType) &&
+           "Incorrect pointer element type");
     assert(addr != nullptr && "building an invalid address");
   }
 
@@ -55,6 +66,8 @@ public:
   llvm::PointerType *getType() const {
     return cast<llvm::PointerType>(Addr->getType());
   }
+
+  llvm::Type *getElementType() const { return ElementType; }
 };
 
 /// An address in memory together with the (possibly null) heap

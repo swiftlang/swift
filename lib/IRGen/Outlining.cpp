@@ -190,7 +190,8 @@ void OutliningMetadataCollector::emitCallToOutlinedCopy(
       IGF.IGM.getOrCreateOutlinedAssignWithCopyFunction(T, ti, *this);
   }
 
-  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedFn, args);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      cast<llvm::Function>(outlinedFn)->getFunctionType(), outlinedFn, args);
   call->setCallingConv(IGF.IGM.DefaultCC);
 }
 
@@ -360,7 +361,8 @@ void OutliningMetadataCollector::emitCallToOutlinedDestroy(
   auto outlinedFn =
     IGF.IGM.getOrCreateOutlinedDestroyFunction(T, ti, *this);
 
-  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedFn, args);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      cast<llvm::Function>(outlinedFn)->getFunctionType(), outlinedFn, args);
   call->setCallingConv(IGF.IGM.DefaultCC);
 }
 
@@ -409,7 +411,8 @@ llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &ti,
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
         auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getFixedAlignment());
+        Address addr(&*it++, loadableTI->getStorageType(),
+                     loadableTI->getFixedAlignment());
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         Explosion out;
@@ -436,7 +439,8 @@ IRGenModule::getOrCreateReleaseFunction(const TypeInfo &ti,
       funcName, llvmType, argTys,
       [&](IRGenFunction &IGF) {
         auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getFixedAlignment());
+        Address addr(&*it++, loadableTI->getStorageType(),
+                     loadableTI->getFixedAlignment());
         Explosion loaded;
         loadableTI->loadAsTake(IGF, addr, loaded);
         loadableTI->consume(IGF, loaded, atomicity);

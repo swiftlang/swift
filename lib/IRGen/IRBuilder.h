@@ -159,15 +159,15 @@ public:
   llvm::Value *CreateAlloca(llvm::Type *type, llvm::Value *arraySize,
                             const llvm::Twine &name = "") = delete;
 
-  llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
-                             const llvm::Twine &name = "") {
-    llvm::LoadInst *load = IRBuilderBase::CreateLoad(
-        addr->getType()->getPointerElementType(), addr, name);
+  llvm::LoadInst *CreateLoad(llvm::Value *addr, llvm::Type *elementType,
+                             Alignment align, const llvm::Twine &name = "") {
+    llvm::LoadInst *load = IRBuilderBase::CreateLoad(elementType, addr, name);
     load->setAlignment(llvm::MaybeAlign(align.getValue()).valueOrOne());
     return load;
   }
   llvm::LoadInst *CreateLoad(Address addr, const llvm::Twine &name = "") {
-    return CreateLoad(addr.getAddress(), addr.getAlignment(), name);
+    return CreateLoad(addr.getAddress(), addr.getElementType(),
+                      addr.getAlignment(), name);
   }
 
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
@@ -189,10 +189,21 @@ public:
   using IRBuilderBase::CreateStructGEP;
   Address CreateStructGEP(Address address, unsigned index, Size offset,
                           const llvm::Twine &name = "") {
-    llvm::Value *addr = CreateStructGEP(
-        address.getType()->getPointerElementType(), address.getAddress(),
-        index, name);
-    return Address(addr, address.getAlignment().alignmentAtOffset(offset));
+    assert(isa<llvm::StructType>(address.getElementType()) ||
+           isa<llvm::ArrayType>(address.getElementType()));
+
+    llvm::Value *addr = CreateStructGEP(address.getElementType(),
+                                        address.getAddress(), index, name);
+    llvm::Type *elementType = nullptr;
+    if (auto *structTy = dyn_cast<llvm::StructType>(address.getElementType())) {
+      elementType = structTy->getElementType(index);
+    } else if (auto *arrTy =
+                   dyn_cast<llvm::ArrayType>(address.getElementType())) {
+      elementType = arrTy->getElementType();
+    }
+
+    return Address(addr, elementType,
+                   address.getAlignment().alignmentAtOffset(offset));
   }
   Address CreateStructGEP(Address address, unsigned index,
                           const llvm::StructLayout *layout,
@@ -205,9 +216,9 @@ public:
   /// N elements past it.  The type is not changed.
   Address CreateConstArrayGEP(Address base, unsigned index, Size eltSize,
                               const llvm::Twine &name = "") {
-    auto addr = CreateConstInBoundsGEP1_32(
-        base.getType()->getPointerElementType(), base.getAddress(), index, name);
-    return Address(addr,
+    auto addr = CreateConstInBoundsGEP1_32(base.getElementType(),
+                                           base.getAddress(), index, name);
+    return Address(addr, base.getElementType(),
                    base.getAlignment().alignmentAtOffset(eltSize * index));
   }
 
@@ -215,29 +226,28 @@ public:
   Address CreateConstByteArrayGEP(Address base, Size offset,
                                   const llvm::Twine &name = "") {
     auto addr = CreateConstInBoundsGEP1_32(
-        base.getType()->getPointerElementType(), base.getAddress(), offset.getValue(),
-        name);
-    return Address(addr, base.getAlignment().alignmentAtOffset(offset));
+        base.getElementType(), base.getAddress(), offset.getValue(), name);
+    return Address(addr, base.getElementType(),
+                   base.getAlignment().alignmentAtOffset(offset));
   }
 
   using IRBuilderBase::CreateBitCast;
-  Address CreateBitCast(Address address, llvm::Type *type,
-                        const llvm::Twine &name = "") {
-    llvm::Value *addr = CreateBitCast(address.getAddress(), type, name);
-    return Address(addr, address.getAlignment());
-  }
 
   /// Cast the given address to be a pointer to the given element type,
   /// preserving the original address space.
   Address CreateElementBitCast(Address address, llvm::Type *type,
                                const llvm::Twine &name = "") {
     // Do nothing if the type doesn't change.
-    auto origPtrType = address.getType();
-    if (origPtrType->getPointerElementType() == type) return address;
+    if (address.getElementType() == type) {
+      return address;
+    }
 
     // Otherwise, cast to a pointer to the correct type.
-    auto ptrType = type->getPointerTo(origPtrType->getAddressSpace());
-    return CreateBitCast(address, ptrType, name);
+    auto origPtrType = address.getType();
+    return Address(
+        CreateBitCast(address.getAddress(),
+                      type->getPointerTo(origPtrType->getAddressSpace())),
+        type, address.getAlignment());
   }
 
   /// Insert the given basic block after the IP block and move the
@@ -301,23 +311,28 @@ public:
     setCallingConvUsingCallee(Call);
     return Call;
   }
-
-  llvm::CallInst *CreateCall(llvm::Constant *Callee,
-                             ArrayRef<llvm::Value *> Args,
-                             const Twine &Name = "",
-                             llvm::MDNode *FPMathTag = nullptr) {
+  llvm::CallInst *CreateCallWithoutDbgLoc(llvm::FunctionType *FTy,
+                                          llvm::Constant *Callee,
+                                          ArrayRef<llvm::Value *> Args,
+                                          const Twine &Name = "",
+                                          llvm::MDNode *FPMathTag = nullptr) {
     // assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on
     // call");
     assert(!isTrapIntrinsic(Callee) && "Use CreateNonMergeableTrap");
-    auto Call = IRBuilderBase::CreateCall(
-        cast<llvm::FunctionType>(Callee->getType()->getPointerElementType()),
-        Callee, Args, Name, FPMathTag);
+    auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;
   }
 
   llvm::CallInst *CreateCall(const FunctionPointer &fn,
                              ArrayRef<llvm::Value *> args);
+
+  llvm::CallInst *CreateCall(const FunctionPointer &fn,
+                             ArrayRef<llvm::Value *> args, const Twine &Name) {
+    auto c = CreateCall(fn, args);
+    c->setName(Name);
+    return c;
+  }
 
   llvm::CallInst *CreateAsmCall(llvm::InlineAsm *asmBlock,
                                 ArrayRef<llvm::Value *> args) {
@@ -331,7 +346,9 @@ public:
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
       llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
-    return CreateCall(intrinsicFn, args, name);
+    return CreateCallWithoutDbgLoc(
+        cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
+        args, name);
   }
 
   /// Call an intrinsic with type arguments.
@@ -342,7 +359,9 @@ public:
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
       llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
-    return CreateCall(intrinsicFn, args, name);
+    return CreateCallWithoutDbgLoc(
+        cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
+        args, name);
   }
   
   /// Create an expect intrinsic call.

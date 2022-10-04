@@ -78,7 +78,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
     IsKnownPOD = IsPOD;
     IsKnownBitwiseTakable = IsBitwiseTakable;
     IsKnownAlwaysFixedSize = IsFixedSize;
-    Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getPointerElementType());
+    Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
@@ -152,7 +152,7 @@ Address StructLayout::emitCastTo(IRGenFunction &IGF,
                                  const llvm::Twine &name) const {
   llvm::Value *addr =
     IGF.Builder.CreateBitCast(ptr, getType()->getPointerTo(), name);
-  return Address(addr, getAlignment());
+  return Address(addr, getType(), getAlignment());
 }
 
 Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
@@ -178,9 +178,9 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
   }
 
   case Kind::InitialNonFixedSize:
-    return IGF.Builder.CreateBitCast(baseAddr,
-                                 getType().getStorageType()->getPointerTo(),
-                                 baseAddr.getAddress()->getName() + suffix);
+    return IGF.Builder.CreateElementBitCast(
+        baseAddr, getType().getStorageType(),
+        baseAddr.getAddress()->getName() + suffix);
   }
   llvm_unreachable("bad element layout kind");
 }
