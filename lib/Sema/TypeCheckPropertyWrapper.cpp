@@ -484,12 +484,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
-    // A property wrapper cannot be attached to a 'let'.
-    if (!isa<ParamDecl>(var) && var->isLet()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_let);
-      continue;
-    }
-
     // Check for conflicting attributes.
     if (var->getAttrs().hasAttribute<LazyAttr>() ||
         var->getAttrs().hasAttribute<NSCopyingAttr>() ||

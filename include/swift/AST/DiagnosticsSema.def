@@ -6248,9 +6248,6 @@ ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
 
 ERROR(property_wrapper_top_level,none,
       "property wrappers are not yet supported in top-level code", ())
-ERROR(property_wrapper_let, none,
-      "property wrapper can only be applied to a 'var'",
-      ())
 ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
