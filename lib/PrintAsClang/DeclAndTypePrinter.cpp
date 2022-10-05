@@ -2609,7 +2609,8 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
-              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess)
+              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
+                    cxx_translation::isExposableToCxx(VD)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
          !isAsyncAlternativeOfOtherDecl(VD);

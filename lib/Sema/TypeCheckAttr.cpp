@@ -1905,6 +1905,18 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
              decl->getName());
   }
 
+  // Verify that the declaration is exposable.
+  auto repr = cxx_translation::getDeclRepresentation(VD);
+  if (repr.isUnsupported()) {
+    using namespace cxx_translation;
+    switch (*repr.error) {
+    case UnrepresentableActorClass:
+      diagnose(attr->getLocation(), diag::expose_unsupported_actor_to_cxx,
+               decl->getName());
+      break;
+    }
+  }
+
   // Verify that the name mentioned in the expose
   // attribute matches the supported name pattern.
   if (!attr->Name.empty()) {
