@@ -104,6 +104,10 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return SILInstruction_mayRelease(bridged)
   }
 
+  public final var hasUnspecifiedSideEffects: Bool {
+    return SILInstruction_hasUnspecifiedSideEffects(bridged)
+  }
+
   public func visitReferencedFunctions(_ cl: (Function) -> ()) {
   }
 
@@ -273,6 +277,9 @@ final public class UnconditionalCheckedCastAddrInst : Instruction {
   public override var mayTrap: Bool { true }
 }
 
+final public class EndApplyInst : Instruction, UnaryInstruction {}
+final public class AbortApplyInst : Instruction, UnaryInstruction {}
+
 final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 
 final public class DeallocRefInst : Instruction, UnaryInstruction {}
@@ -312,7 +319,15 @@ final public class UnimplementedRefCountingInst : RefCountingInst {}
 final public class UnimplementedSingleValueInst : SingleValueInstruction {
 }
 
-final public class LoadInst : SingleValueInstruction, UnaryInstruction {}
+final public class LoadInst : SingleValueInstruction, UnaryInstruction {
+  // must match with enum class LoadOwnershipQualifier
+  public enum LoadOwnership: Int {
+    case unqualified = 0, take = 1, copy = 2, trivial = 3
+  }
+  public var ownership: LoadOwnership {
+    LoadOwnership(rawValue: LoadInst_getLoadOwnership(bridged))!
+  }
+}
 
 final public class LoadWeakInst : SingleValueInstruction, UnaryInstruction {}
 final public class LoadUnownedInst : SingleValueInstruction, UnaryInstruction {}
@@ -570,11 +585,20 @@ extension BridgedAccessKind {
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
+
+  public var isStatic: Bool { BeginAccessInst_isStatic(bridged) != 0 }
 }
 
+// An instruction that is always paired with a scope ending instruction
+// such as `begin_access` (ending with `end_access`) and `alloc_stack`
+// (ending with `dealloc_stack`).
 public protocol ScopedInstruction {
+  // The type of the ending instructions (while `IteratorProtocol` would be
+  // ideal, for performance reasons we allow the user to specify any type as return)
   associatedtype EndInstructions
 
+  // The instructions that end the scope of the instruction denoted
+  // by `self`.
   var endInstructions: EndInstructions { get }
 }
 
@@ -646,7 +670,7 @@ class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 //                      single-value allocation instructions
 //===----------------------------------------------------------------------===//
 
-public protocol Allocation : AnyObject { }
+public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation {
 }
@@ -735,6 +759,7 @@ final public class TryApplyInst : TermInst, FullApplySite {
 final public class BranchInst : TermInst {
   public var targetBlock: BasicBlock { BranchInst_getTargetBlock(bridged).block }
 
+  /// Returns the target block argument for the cond_br `operand`.
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
@@ -752,8 +777,15 @@ final public class CondBranchInst : TermInst {
     return ops[(CondBranchInst_getNumTrueArgs(bridged) &+ 1)..<ops.count]
   }
 
-  public func getArgument(for operand: Operand) -> Argument {
-    let argIdx = operand.index - 1
+  /// Returns the true or false block argument for the cond_br `operand`.
+  ///
+  /// Return nil if `operand` is the condition itself.
+  public func getArgument(for operand: Operand) -> Argument? {
+    let opIdx = operand.index
+    if opIdx == 0 {
+      return nil
+    }
+    let argIdx = opIdx - 1
     let numTrueArgs = CondBranchInst_getNumTrueArgs(bridged)
     if (0..<numTrueArgs).contains(argIdx) {
       return trueBlock.arguments[argIdx]

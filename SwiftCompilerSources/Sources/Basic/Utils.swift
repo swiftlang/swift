@@ -40,19 +40,31 @@ public func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt =
   }
 }
 
+//===----------------------------------------------------------------------===//
+//                            Debugging Utilities
+//===----------------------------------------------------------------------===//
+
+/// Let's lldb's `po` command not print any "internal" properties of the conforming type.
+///
+/// This is useful if the `description` already contains all the information of a type instance.
+public protocol NoReflectionChildren : CustomReflectable { }
+
+public extension NoReflectionChildren {
+  var customMirror: Mirror { Mirror(self, children: []) }
+}
+
 
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, CustomReflectable {
+public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   let _bridged: llvm.StringRef
 
   public init(bridged: llvm.StringRef) { self._bridged = bridged }
 
   public var string: String { _bridged.string }
   public var description: String { string }
-  public var customMirror: Mirror { Mirror(self, children: []) }
   
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
     let lhsBuffer = UnsafeBufferPointer<UInt8>(

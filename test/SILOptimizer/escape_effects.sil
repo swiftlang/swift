@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -compute-effects | %FileCheck %s
+// RUN: %target-sil-opt %s -compute-escape-effects | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -132,10 +132,10 @@ bb0(%0 : @guaranteed $Z):
 }
 
 // CHECK-LABEL: sil @not_escaping_argument
-// CHECK-NEXT:  [%0!: noescape **]
+// CHECK-NEXT:  [%0: noescape! **]
 // CHECK-NEXT:  {{^[^[]}}
 sil @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> () {
-[%0!: noescape **]
+[%0: noescape! **]
 bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.y
   %2 = global_addr @globalY : $*Y

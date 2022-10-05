@@ -1,4 +1,4 @@
-//===--- ComputeEffects.swift - Compute function effects ------------------===//
+//===--- ComputeEscapeEffects.swift ----------------------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,31 +12,27 @@
 
 import SIL
 
-/// Computes effects for function arguments.
+/// Computes escape effects for function arguments.
 ///
 /// For example, if an argument does not escape, adds a non-escaping effect,
-/// e.g. "[escapes !%0.**]":
-///
-///   sil [escapes !%0.**] @foo : $@convention(thin) (@guaranteed X) -> () {
+/// ```
+///   sil @foo : $@convention(thin) (@guaranteed X) -> () {
+///   [%0: noecape **]
 ///   bb0(%0 : $X):
 ///     %1 = tuple ()
 ///     return %1 : $()
 ///   }
-///
+/// ```
 /// The pass does not try to change or re-compute _defined_ effects.
-/// Currently, only escaping effects are handled.
-/// In future, this pass may also add other effects, like memory side effects.
-let computeEffects = FunctionPass(name: "compute-effects", {
+///
+let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
   (function: Function, context: PassContext) in
-  var argsWithDefinedEffects = getArgIndicesWithDefinedEffects(of: function)
 
-  struct IgnoreRecursiveCallVisitor : EscapeVisitor {
-    func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      return isOperandOfRecursiveCall(operand) ? .ignore : .continueWalk
-    }
-  }
-  var newEffects = Stack<ArgumentEffect>(context)
+  var newEffects = Stack<EscapeEffects.ArgumentEffect>(context)
+  defer { newEffects.deinitialize() }
+
   let returnInst = function.returnInstruction
+  let argsWithDefinedEffects = getArgIndicesWithDefinedEscapingEffects(of: function)
 
   for arg in function.arguments {
     // We are not interested in arguments with trivial types.
@@ -44,11 +40,19 @@ let computeEffects = FunctionPass(name: "compute-effects", {
     
     // Also, we don't want to override defined effects.
     if argsWithDefinedEffects.contains(arg.index) { continue }
-    
+
+    struct IgnoreRecursiveCallVisitor : EscapeVisitor {
+      func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+        return isOperandOfRecursiveCall(operand) ? .ignore : .continueWalk
+      }
+    }
+
     // First check: is the argument (or a projected value of it) escaping at all?
     if !arg.at(.anything).isEscapingWhenWalkingDown(using: IgnoreRecursiveCallVisitor(),
                                                     context) {
-      newEffects.push(ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: SmallProjectionPath(.anything)))
+      let effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index,
+                                                pathPattern: SmallProjectionPath(.anything))
+      newEffects.push(effect)
       continue
     }
   
@@ -62,17 +66,16 @@ let computeEffects = FunctionPass(name: "compute-effects", {
   }
 
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.removeDerivedEffects()
-    effects.argumentEffects.append(contentsOf: newEffects)
+    effects.escapeEffects.arguments = effects.escapeEffects.arguments.filter { !$0.isDerived }
+    effects.escapeEffects.arguments.append(contentsOf: newEffects)
   }
-  newEffects.removeAll()
 })
 
 
 /// Returns true if an argument effect was added.
 private
 func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
-                   to newEffects: inout Stack<ArgumentEffect>,
+                   to newEffects: inout Stack<EscapeEffects.ArgumentEffect>,
                    _ returnInst: ReturnInst?, _ context: PassContext) -> Bool {
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
@@ -141,39 +144,36 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
     return false
   }
 
-  let effect: ArgumentEffect
+  let effect: EscapeEffects.ArgumentEffect
   switch result {
   case .notSet:
-    effect = ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: argPath)
+    effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index, pathPattern: argPath)
   case .toReturn(let toPath):
     let exclusive = isExclusiveEscapeToReturn(fromArgument: arg, fromPath: argPath,
                                               toPath: toPath, returnInst: returnInst, context)
-    effect = ArgumentEffect(.escapingToReturn(toPath, exclusive),
-                            argumentIndex: arg.index, pathPattern: argPath)
+    effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+                                          argumentIndex: arg.index, pathPattern: argPath)
   case .toArgument(let toArgIdx, let toPath):
     let exclusive = isExclusiveEscapeToArgument(fromArgument: arg, fromPath: argPath,
                                                 toArgumentIndex: toArgIdx, toPath: toPath, context)
-    effect = ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
-                            argumentIndex: arg.index, pathPattern: argPath)
+    effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+                                          argumentIndex: arg.index, pathPattern: argPath)
   }
   newEffects.push(effect)
   return true
 }
 
 /// Returns a set of argument indices for which there are "defined" effects (as opposed to derived effects).
-private func getArgIndicesWithDefinedEffects(of function: Function) -> Set<Int> {
+private func getArgIndicesWithDefinedEscapingEffects(of function: Function) -> Set<Int> {
   var argsWithDefinedEffects = Set<Int>()
 
-  for effect in function.effects.argumentEffects {
+  for effect in function.effects.escapeEffects.arguments {
     if effect.isDerived { continue }
 
     argsWithDefinedEffects.insert(effect.argumentIndex)
-
     switch effect.kind {
-    case .notEscaping, .escapingToReturn:
-      break
-    case .escapingToArgument(let toArgIdx, _, _):
-      argsWithDefinedEffects.insert(toArgIdx)
+      case .notEscaping, .escapingToReturn:         break
+      case .escapingToArgument(let toArgIdx, _, _): argsWithDefinedEffects.insert(toArgIdx)
     }
   }
   return argsWithDefinedEffects

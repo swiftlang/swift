@@ -154,6 +154,11 @@ extension Value {
     return self.at(SmallProjectionPath()).isEscaping(using: visitor, context)
   }
 
+  func isEscapingWhenWalkingDown<V: EscapeVisitor>(using visitor: V = DefaultVisitor(),
+                                                   _ context: PassContext) -> Bool {
+    return self.at(SmallProjectionPath()).isEscapingWhenWalkingDown(using: visitor, context)
+  }
+
   /// The un-projected version of `ProjectedValue.visit()`.
   func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: PassContext) -> V.Result? {
     return self.at(SmallProjectionPath()).visit(using: visitor, context)
@@ -177,14 +182,28 @@ protocol EscapeVisitor {
   
   /// Called during the UseDef walk for each definition
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult
+  
+  /// Returns true if the type of `value` at `path` is relevant and should be tracked.
+  func hasRelevantType(_ value: Value, at path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool
 }
 
 extension EscapeVisitor {
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     return .continueWalk
   }
+
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
     return .continueWalkUp
+  }
+
+  func hasRelevantType(_ value: Value, at path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool {
+    let type = value.type
+    if type.isNonTrivialOrContainsRawPointer(in: value.function) { return true }
+    
+    // For selected addresses we also need to consider trivial types (`value`
+    // is a selected address if the path does not contain any class projections).
+    if analyzeAddresses && type.isAddress && !path.hasClassProjection { return true }
+    return false
   }
 }
 
@@ -360,7 +379,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkDown(value: Operand, path: Path) -> WalkResult {
-    if hasRelevantType(value.value, at: path.projectionPath) {
+    if visitor.hasRelevantType(value.value, at: path.projectionPath, analyzeAddresses: analyzeAddresses) {
       switch visitor.visitUse(operand: value, path: path) {
       case .continueWalk:
         return walkDownDefault(value: value, path: path)
@@ -456,7 +475,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkDown(address: Operand, path: Path) -> WalkResult {
-    if hasRelevantType(address.value, at: path.projectionPath) {
+    if visitor.hasRelevantType(address.value, at: path.projectionPath, analyzeAddresses: analyzeAddresses) {
       switch visitor.visitUse(operand: address, path: path) {
       case .continueWalk:
         return walkDownDefault(address: address, path: path)
@@ -562,7 +581,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       guard let destructor = calleeAnalysis.getDestructor(ofExactType: exactTy) else {
         return isEscaping
       }
-      if destructor.effects.canEscape(argumentIndex: 0, path: p, analyzeAddresses: analyzeAddresses) {
+      if destructor.effects.escapeEffects.canEscape(argumentIndex: 0, path: p, analyzeAddresses: analyzeAddresses) {
         return isEscaping
       }
     } else {
@@ -572,7 +591,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         return isEscaping
       }
       for destructor in destructors {
-        if destructor.effects.canEscape(argumentIndex: 0, path: p, analyzeAddresses: analyzeAddresses) {
+        if destructor.effects.escapeEffects.canEscape(argumentIndex: 0, path: p, analyzeAddresses: analyzeAddresses) {
           return isEscaping
         }
       }
@@ -610,7 +629,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 
     for callee in callees {
       let effects = callee.effects
-      if !effects.canEscape(argumentIndex: calleeArgIdx, path: path.projectionPath, analyzeAddresses: analyzeAddresses) {
+      if !effects.escapeEffects.canEscape(argumentIndex: calleeArgIdx, path: path.projectionPath, analyzeAddresses: analyzeAddresses) {
         continue
       }
       if walkDownArgument(calleeArgIdx: calleeArgIdx, argPath: path,
@@ -626,7 +645,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   func walkDownArgument(calleeArgIdx: Int, argPath: Path,
                         apply: ApplySite, effects: FunctionEffects) -> WalkResult {
     var matched = false
-    for effect in effects.argumentEffects {
+    for effect in effects.escapeEffects.arguments {
       switch effect.kind {
       case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
@@ -670,7 +689,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
           }
           matched = true
         }
-      default:
+      case .notEscaping:
         break
       }
     }
@@ -691,7 +710,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkUp(value: Value, path: Path) -> WalkResult {
-    if hasRelevantType(value, at: path.projectionPath) {
+    if visitor.hasRelevantType(value, at: path.projectionPath, analyzeAddresses: analyzeAddresses) {
       switch visitor.visitDef(def: value, path: path) {
       case .continueWalkUp:
         return walkUpDefault(value: value, path: path)
@@ -736,7 +755,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   }
   
   mutating func walkUp(address: Value, path: Path) -> WalkResult {
-    if hasRelevantType(address, at: path.projectionPath) {
+    if visitor.hasRelevantType(address, at: path.projectionPath, analyzeAddresses: analyzeAddresses) {
       switch visitor.visitDef(def: address, path: path) {
       case .continueWalkUp:
         return walkUpDefault(address: address, path: path)
@@ -787,10 +806,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 
     for callee in callees {
       var matched = false
-      for effect in callee.effects.argumentEffects {
+      for effect in callee.effects.escapeEffects.arguments {
         switch effect.kind {
-        case .notEscaping, .escapingToArgument:
-          break
         case .escapingToReturn(let toPath, let exclusive):
           if exclusive && path.projectionPath.matches(pattern: toPath) {
             let arg = apply.arguments[effect.argumentIndex]
@@ -801,6 +818,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
             }
             matched = true
           }
+        case .notEscaping, .escapingToArgument:
+          break
         }
       }
       if !matched {
@@ -833,17 +852,6 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   //                          private utility functions
   //===--------------------------------------------------------------------===//
 
-  /// Returns true if the type of `value` at `path` is relevant and should be tracked.
-  private func hasRelevantType(_ value: Value, at path: SmallProjectionPath) -> Bool {
-    let type = value.type
-    if type.isNonTrivialOrContainsRawPointer(in: value.function) { return true }
-    
-    // For selected addresses we also need to consider trivial types (`value`
-    // is a selected address if the path does not contain any class projections).
-    if analyzeAddresses && type.isAddress && !path.hasClassProjection { return true }
-    return false
-  }
-
   /// Returns true if the selected address/value at `path` can be ignored for loading from
   /// that address or for passing that address/value to a called function.
   ///
@@ -867,7 +875,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   /// Tries to pop the given projection from path, if the projected `value` has a relevant type.
   private func pop(_ kind: Path.FieldKind, index: Int? = nil, from path: Path, yielding value: Value) -> Path? {
     if let newPath = path.popIfMatches(kind, index: index),
-       hasRelevantType(value, at: newPath.projectionPath) {
+       visitor.hasRelevantType(value, at: newPath.projectionPath, analyzeAddresses: analyzeAddresses) {
       return newPath
     }
     return nil

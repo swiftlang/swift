@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, CustomReflectable {
+public struct Operand : CustomStringConvertible, NoReflectionChildren {
   fileprivate let bridged: BridgedOperand
 
   init(_ bridged: BridgedOperand) {
@@ -39,8 +39,6 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
   public var isTypeDependent: Bool { Operand_isTypeDependent(bridged) != 0 }
   
   public var description: String { "operand #\(index) of \(instruction)" }
-  
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
 public struct OperandArray : RandomAccessCollection, CustomReflectable {

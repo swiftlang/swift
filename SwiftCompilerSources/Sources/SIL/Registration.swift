@@ -51,6 +51,8 @@ public func registerSILClasses() {
   register(DebugValueInst.self)
   register(UnconditionalCheckedCastAddrInst.self)
   register(SetDeallocatingInst.self)
+  register(EndApplyInst.self)
+  register(AbortApplyInst.self)
   register(DeallocRefInst.self)
   register(StrongRetainInst.self)
   register(RetainValueInst.self)

@@ -235,14 +235,18 @@ PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
 PASS(EscapeAnalysisDumper, "escapes-dump",
      "Dump Escape Analysis Results")
+SWIFT_FUNCTION_PASS(DeadEndBlockDumper, "dump-deadendblocks",
+     "Tests the DeadEndBlocks utility")
 SWIFT_FUNCTION_PASS(EscapeInfoDumper, "dump-escape-info",
      "Dumps escape information")
 SWIFT_FUNCTION_PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
      "Dumps address escape information")
 SWIFT_FUNCTION_PASS(AccessDumper, "dump-access",
      "Dump access information")
-SWIFT_FUNCTION_PASS(ComputeEffects, "compute-effects",
-     "Computes function effects")
+SWIFT_FUNCTION_PASS(ComputeEscapeEffects, "compute-escape-effects",
+     "Computes function escape effects")
+SWIFT_FUNCTION_PASS(ComputeSideEffects, "compute-side-effects",
+     "Computes function side effects")
 PASS(FlowIsolation, "flow-isolation",
      "Enforces flow-sensitive actor isolation rules")
 PASS(FunctionOrderPrinter, "function-order-printer",

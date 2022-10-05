@@ -177,6 +177,11 @@ SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function) {
           getNumIndirectFormalResults();
 }
 
+SwiftInt SILFunction_numParameterArguments(BridgedFunction function) {
+  return castToFunction(function)->getLoweredFunctionType()->
+          getNumParameters();
+}
+
 SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function) {
   CanSILFunctionType fTy = castToFunction(function)->getLoweredFunctionType();
   if (!fTy->hasSelfParam())
@@ -195,6 +200,35 @@ BridgedType SILFunction_getSILArgumentType(BridgedFunction function, SwiftInt id
   SILFunctionConventions conv(f->getConventionsInContext());
   SILType argTy = conv.getSILArgumentType(idx, f->getTypeExpansionContext());
   return {argTy.getOpaqueValue()};
+}
+
+BridgedArgumentConvention SILArgumentConvention_getBridged(SILArgumentConvention conv) {
+  switch (conv.Value) {
+    case SILArgumentConvention::Indirect_Inout:
+      return ArgumentConvention_Indirect_Inout;
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return ArgumentConvention_Indirect_InoutAliasable;
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return ArgumentConvention_Indirect_In_Guaranteed;
+    case SILArgumentConvention::Indirect_In:
+      return ArgumentConvention_Indirect_In;
+    case SILArgumentConvention::Indirect_In_Constant:
+      return ArgumentConvention_Indirect_In_Constant;
+    case SILArgumentConvention::Indirect_Out:
+      return ArgumentConvention_Indirect_Out;
+    case SILArgumentConvention::Direct_Unowned:
+      return ArgumentConvention_Direct_Unowned;
+    case SILArgumentConvention::Direct_Owned:
+      return ArgumentConvention_Direct_Owned;
+    case SILArgumentConvention::Direct_Guaranteed:
+      return ArgumentConvention_Direct_Guaranteed;
+  }
+}
+
+BridgedArgumentConvention SILFunction_getSILArgumentConvention(BridgedFunction function, SwiftInt idx) {
+  SILFunction *f = castToFunction(function);
+  SILFunctionConventions conv(f->getConventionsInContext());
+  return SILArgumentConvention_getBridged(SILArgumentConvention(conv.getParamInfoForSILArg(idx).getConvention()));
 }
 
 BridgedType SILFunction_getSILResultType(BridgedFunction function) {
@@ -226,6 +260,19 @@ SwiftInt SILFunction_hasSemanticsAttr(BridgedFunction function,
                                       StringRef attrName) {
   SILFunction *f = castToFunction(function);
   return f->hasSemanticsAttr(attrName) ? 1 : 0;
+}
+
+BridgedEffectAttributeKind SILFunction_getEffectAttribute(BridgedFunction function) {
+  switch (castToFunction(function)->getEffectsKind()) {
+    case EffectsKind::ReadNone: return EffectKind_readNone;
+    case EffectsKind::ReadOnly: return EffectKind_readOnly;
+    case EffectsKind::ReleaseNone: return EffectKind_releaseNone;
+    default: return EffectKind_none;
+  }
+}
+
+bool SILFunction_hasReadOnlyAttribute(BridgedFunction function) {
+  return castToFunction(function)->getEffectsKind() == EffectsKind::ReadOnly;
 }
 
 SwiftInt SILFunction_needsStackProtection(BridgedFunction function) {
@@ -464,6 +511,15 @@ SwiftInt SILType_isTuple(BridgedType type) {
 
 SwiftInt SILType_isEnum(BridgedType type) {
   return castToSILType(type).getEnumOrBoundGenericEnum() ? 1 : 0;
+}
+
+bool SILType_isFunction(BridgedType type) {
+  return castToSILType(type).is<SILFunctionType>();
+}
+
+bool SILType_isCalleeConsumedFunction(BridgedType type) {
+  auto funcTy = castToSILType(type).castTo<SILFunctionType>();
+  return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
 }
 
 SwiftInt SILType_getNumTupleElements(BridgedType type) {
@@ -721,6 +777,10 @@ bool SILInstruction_mayRelease(BridgedInstruction inst) {
   return castToInst(inst)->mayRelease();
 }
 
+bool SILInstruction_hasUnspecifiedSideEffects(BridgedInstruction inst) {
+  return castToInst(inst)->mayHaveSideEffects();
+}
+
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {
   return {static_cast<MultipleValueInstructionResult *>(result.obj)->getParent()};
 }
@@ -749,6 +809,10 @@ BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term) {
 
 llvm::StringRef CondFailInst_getMessage(BridgedInstruction cfi) {
   return castToInst<CondFailInst>(cfi)->getMessage();
+}
+
+SwiftInt LoadInst_getLoadOwnership(BridgedInstruction load) {
+  return (SwiftInt)castToInst<LoadInst>(load)->getOwnershipQualifier();
 }
 
 BridgedBuiltinID BuiltinInst_getID(BridgedInstruction bi) {
@@ -889,6 +953,10 @@ BridgedAccessKind BeginAccessInst_getAccessKind(BridgedInstruction beginAccess) 
     case SILAccessKind::Deinit:
       return BridgedAccessKind::AccessKind_Deinit;
   }
+}
+
+SwiftInt BeginAccessInst_isStatic(BridgedInstruction beginAccess) {
+  return castToInst<BeginAccessInst>(beginAccess)->getEnforcement() == SILAccessEnforcement::Static ? 1 : 0;
 }
 
 SwiftInt CopyAddrInst_isTakeOfSrc(BridgedInstruction copyAddr) {
