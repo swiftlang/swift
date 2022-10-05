@@ -1,4 +1,8 @@
 // REQUIRES: no_asan
+
+// rdar://100805115
+// UNSUPPORTED: CPU=arm64e
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
