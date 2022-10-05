@@ -928,19 +928,3 @@ bb0:
   %99 = tuple ()
   return %99 : $()
 }
-
-// Lexical destroy hoisting cannot handle a PointerEscape.
-//
-// CHECK-LABEL: sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
-// CHECK: bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
-// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
-// CHECK:   [[COPY:%.*]] = copy_value [[CAST]] : $Optional<@callee_guaranteed () -> ()>
-// CHECK:   destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
-// CHECK-LABEL: } // end sil function 'testNoLexicalHoistEscape'
-sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
-bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
-  %cast = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
-  %copy = copy_value %cast : $Optional<@callee_guaranteed () -> ()>
-  destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
-  return %copy : $Optional<@callee_guaranteed () -> ()>
-}

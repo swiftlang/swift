@@ -626,16 +626,22 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
     auto *user = use->getUser();
     if (user == context.introducer)
       continue;
-    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::PointerEscape:
+      return false;
+    case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
-            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-              return false;
-            }
-            recordUse(end);
-            return true;
-          })) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        recordUse(end);
+        return true;
+      })) {
         return false;
       }
+      break;
+    default:
+      break;
     }
     recordUse(use);
   }
