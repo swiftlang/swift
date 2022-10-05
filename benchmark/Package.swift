@@ -169,7 +169,9 @@ targets += cxxSingleSourceLibraries.map { name in
     swiftSettings: [.unsafeFlags(["-Xfrontend",
                                   "-enable-experimental-cxx-interop",
                                   "-I",
-                                  "utils/CxxTests"])])
+                                  "utils/CxxTests",
+                                  // FIXME: https://github.com/apple/swift/issues/61453
+                                  "-Xfrontend", "-validate-tbd-against-ir=none"])])
 }
 
 targets += multiSourceLibraries.map { lib in
