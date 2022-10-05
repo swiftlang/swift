@@ -579,7 +579,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     }
   }
 
-  if (!isValueAddressOrTrivial(value)) {
+  if (value->getOwnershipKind() != OwnershipKind::None) {
     return !errorBuilder.handleMalformedSIL([&] {
       if (value->getOwnershipKind() == OwnershipKind::Owned) {
         llvm::errs() << "Error! Found a leaked owned value that was never "

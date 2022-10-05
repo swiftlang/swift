@@ -63,9 +63,6 @@ class DeadEndBlocks;
 class MultiDefPrunedLiveness;
 struct BorrowedValue;
 
-/// Returns true if v is an address or trivial.
-bool isValueAddressOrTrivial(SILValue v);
-
 //===----------------------------------------------------------------------===//
 //                            Forwarding Utilities
 //
