@@ -1,4 +1,4 @@
-//===--- CanonicalOSSALifetime.cpp - Canonicalize OSSA value lifetimes ----===//
+//===-- CanonicalizeOSSALifetime.cpp - Canonicalize OSSA value lifetimes --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -29,7 +29,7 @@
 /// 4. Rewrite `def`s original copies and destroys, inserting new copies where
 ///    needed. Deletes original copies and destroys and inserts new copies.
 ///
-/// See CanonicalOSSALifetime.h for examples.
+/// See CanonicalizeOSSALifetime.h for examples.
 ///
 /// TODO: Canonicalization currently bails out if any uses of the def has
 /// OperandOwnership::PointerEscape. Once project_box is protected by a borrow
@@ -56,7 +56,7 @@
 
 #define DEBUG_TYPE "copy-propagation"
 
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"

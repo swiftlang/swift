@@ -1,4 +1,4 @@
-//===--- CanonicalOSSALifetime.h - Canonicalize OSSA lifetimes --*- C++ -*-===//
+//===- CanonicalizeOSSALifetime.h - Canonicalize OSSA lifetimes -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
