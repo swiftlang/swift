@@ -33,6 +33,9 @@ struct FailableInit<S> {
 // Okay because there is a valid `init(memberwise:)` overload.
 @typeWrapper
 struct FailableAndValidInit<S> {
+  // expected-error@-1 {{type wrapper type 'FailableAndValidInit' does not contain a required writable subscript}}
+  // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+
   init(memberwise: S) {
   }
 
@@ -80,6 +83,11 @@ struct InaccessibleOrInvalidSubscripts<S> {
     get { fatalError() }
   }
 
+  private subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
+    // expected-error@-1 {{private subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+    get { fatalError() }
+  }
+
   subscript(storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript expects a key path parameter type (got: 'Int')}}
     get { true }
   }
@@ -90,6 +98,10 @@ struct NoopWrapper<S> {
   init(memberwise: S) {}
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    get { fatalError() }
+  }
+
+  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get { fatalError() }
     set { }
   }
@@ -129,6 +141,10 @@ struct Parent {
     init(memberwise: S) {}
 
     subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+      get { fatalError() }
+    }
+
+    subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
       set { }
     }
@@ -351,7 +367,7 @@ func testDeclarationsWithUnmanagedProperties() {
   }
 
   _ = WithDefaultedLet(age: 32) // Ok
-  _ = WithDefaultedLet(name: "", age: 0) // expected-error {{extra argument 'name' in call}}
+  _ = WithDefaultedLet(name: "", age: 0) // Ok
 
   @NoopWrapper
   struct WithLazy {
@@ -436,4 +452,54 @@ func testIgnoredAttr() {
       // expected-warning@-1 {{immutable value 'y' was never used; consider replacing with '_' or removing it}}
     }
   }
+}
+
+func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
+  @typeWrapper
+  struct MissingReadOnly<S> {
+    // expected-error@-1 {{type wrapper type 'MissingReadOnly' does not contain a required ready-only subscript}}
+    // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
+
+    init(memberwise: S) {}
+
+    subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+      get { fatalError() }
+      set { }
+    }
+  }
+
+  @typeWrapper
+  struct MissingWritable<S> {
+    // expected-error@-1 {{type wrapper type 'MissingWritable' does not contain a required writable subscript}}
+    // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+
+    init(memberwise: S) {}
+
+    subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+      get { fatalError() }
+    }
+  }
+}
+
+func testIncorrectUsesOfImmutableProperties() {
+  class X<T> {
+    var storage: [T]
+
+    init(storage: [T]) {
+      self.storage = storage
+    }
+  }
+
+  @NoopWrapper
+  struct Test<T> {
+    let x: T? // expected-note {{change 'let' to 'var' to make it mutable}}
+
+    init(x: T) {
+      self.x = x
+    }
+  }
+
+  let test = Test(x: X(storage: [1, 2, 3]))
+  test.x = X(storage: [0]) // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
+  test.x?.storage.append(0) // Ok
 }
