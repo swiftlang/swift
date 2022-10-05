@@ -5702,9 +5702,16 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
+      // "Splat" the elements of the transformed pack expansion into the tuple.
       if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
-        elements.append(transformedPack->getElementTypes().begin(),
-                        transformedPack->getElementTypes().end());
+        auto transformedEltTypes = transformedPack->getElementTypes();
+        if (!transformedEltTypes.empty()) {
+          // Keep the label on the first element.
+
+          elements.push_back(elt.getWithType(transformedEltTypes.front()));
+          elements.append(transformedEltTypes.begin() + 1,
+                          transformedEltTypes.end());
+        }
       } else {
         // Add the new tuple element, with the transformed type.
         elements.push_back(elt.getWithType(transformedEltTy));
