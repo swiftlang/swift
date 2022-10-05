@@ -956,7 +956,7 @@ Functions
   decl ::= sil-function
   sil-function ::= 'sil' sil-linkage? sil-function-attribute+
                      sil-function-name ':' sil-type
-                     '{' argument-effect* sil-basic-block* '}'
+                     '{' effects* sil-basic-block* '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
 SIL functions are defined with the ``sil`` keyword. SIL function names
@@ -1128,20 +1128,32 @@ of runtime functions are allowed to be called from the function.
 Argument Effects
 ````````````````
 
-The effects for function arguments. For details see the documentation
-in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+The function effects, especially for function arguments. For details see the
+documentation in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
 ::
 
-  argument-effect ::= '[' argument-name defined-effect? ':' effect (',' effect)*]'
+  effects ::= '[' argument-name ':' argument-effect (',' argument-effect)*]'
+  effects ::= '[' 'global' ':' global-effect (',' global-effect)*]'
   argument-name ::= '%' [0-9]+
-  defined-effect ::= '!'    // the effect is defined in the source code and not
-                            // derived by the optimizer
 
-  effect ::= 'noescape' projection-path?
-  effect ::= 'escape' projection-path? '=>' arg-or-return  // exclusive escape
-  effect ::= 'escape' projection-path? '->' arg-or-return  // not-exclusive escape
+  argument-effect ::= 'noescape' defined-effect? projection-path?
+  argument-effect ::= 'escape' defined-effect? projection-path? '=>' arg-or-return  // exclusive escape
+  argument-effect ::= 'escape' defined-effect? projection-path? '->' arg-or-return  // not-exclusive escape
+  argument-effect ::= side-effect
+
+  global-effect ::= 'traps'
+  global-effect ::= 'allocates'
+  global-effect ::= side-effect
+
+  side-effect ::= 'read' projection-path?
+  side-effect ::= 'write' projection-path?
+  side-effect ::= 'copy' projection-path?
+  side-effect ::= 'read' projection-path?
+
   arg-or-return ::= argument-name ('.' projection-path)?
   arg-or-return ::= '%r' ('.' projection-path)?
+  defined-effect ::= '!'    // the effect is defined in the source code and not
+                            // derived by the optimizer
 
   projection-path ::= path-component ('.' path-component)* 
   path-component ::= 's' [0-9]+        // struct field
@@ -3987,21 +3999,21 @@ store_borrow
 
   sil-instruction ::= 'store_borrow' sil-value 'to' sil-operand
 
-  store_borrow %0 to %1 : $*T
+  %2 = store_borrow %0 to %1 : $*T
   // $T must be a loadable type
   // %1 must be an alloc_stack $T
+  // %2 is the return address
 
 Stores the value ``%0`` to a stack location ``%1``, which must be an
 ``alloc_stack $T``.
 The stack location must not be modified by other instructions than
 ``store_borrow``.
-The stored value is alive until the ``dealloc_stack`` or until another
-``store_borrow`` overwrites the value. During the its lifetime, the stored
-value must not be modified or destroyed.
+All uses of the store_borrow destination ```%1`` should be via the store_borrow
+return address ``%2`` except dealloc_stack.
+The stored value is alive until the ``end_borrow``. During the its lifetime,the
+stored value must not be modified or destroyed.
 The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
 must outlive the lifetime of the stored value.
-
-Note: This is the current implementation and the design is not final.
 
 begin_borrow
 ````````````

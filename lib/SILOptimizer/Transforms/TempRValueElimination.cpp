@@ -61,7 +61,7 @@ namespace {
 ///   dealloc_stack %temp : $*T
 ///
 /// This differs from the copy forwarding algorithm because it handles
-/// copy source and dest lifetimes that are unavoidably overlappying. Instead,
+/// copy source and dest lifetimes that are unavoidably overlapping. Instead,
 /// it finds cases in which it is easy to determine that the source is
 /// unmodified during the copy destination's lifetime. Thus, the destination can
 /// be viewed as a short-lived "rvalue".
@@ -169,7 +169,7 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     //
     //   %addr = begin_access [read]
     //      ... // there can be no writes to %addr here
-    //   end_acess %addr   // <- This is where the use actually ends.
+    //   end_access %addr   // <- This is where the use actually ends.
     for (EndAccessInst *endAccess : beginAccess->getEndAccesses()) {
       if (endAccess->getParent() != block)
         return false;

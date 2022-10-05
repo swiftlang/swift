@@ -164,10 +164,10 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
   if (offset.isStatic())
     return Offset(offset.getStaticOffset());
 
-  Address layoutAddr(
-    IGF.IGM.getAddrOfClassMetadataBounds(cast<ClassDecl>(getDecl()),
-                                         NotForDefinition),
-    IGF.IGM.getPointerAlignment());
+  Address layoutAddr(IGF.IGM.getAddrOfClassMetadataBounds(
+                         cast<ClassDecl>(getDecl()), NotForDefinition),
+                     IGF.IGM.ClassMetadataBaseOffsetTy,
+                     IGF.IGM.getPointerAlignment());
 
   auto offsetBaseAddr = IGF.Builder.CreateStructGEP(layoutAddr, 0, Size(0));
 
@@ -515,8 +515,9 @@ Address irgen::emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
   // The superclass field in a class type is the first field past the isa.
   unsigned index = 1;
 
-  Address addr(metadata, IGF.IGM.getPointerAlignment());
-  addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.TypeMetadataPtrTy);
+  Address addr(
+      IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrPtrTy),
+      IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
   return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
 }
 

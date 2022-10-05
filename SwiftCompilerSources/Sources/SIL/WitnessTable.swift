@@ -12,12 +12,12 @@
 
 import SILBridging
 
-public struct WitnessTable : CustomStringConvertible, CustomReflectable {
+public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedWitnessTable
 
   public init(bridged: BridgedWitnessTable) { self.bridged = bridged }
 
-  public struct Entry : CustomStringConvertible, CustomReflectable {
+  public struct Entry : CustomStringConvertible, NoReflectionChildren {
     fileprivate let bridged: BridgedWitnessTableEntry
     
     public enum Kind {
@@ -49,8 +49,6 @@ public struct WitnessTable : CustomStringConvertible, CustomReflectable {
       let stdString = SILWitnessTableEntry_debugDescription(bridged)
       return String(_cxxString: stdString)
     }
-
-    public var customMirror: Mirror { Mirror(self, children: []) }
   }
 
   public struct EntryArray : BridgedRandomAccessCollection {
@@ -73,11 +71,9 @@ public struct WitnessTable : CustomStringConvertible, CustomReflectable {
     let stdString = SILWitnessTable_debugDescription(bridged)
     return String(_cxxString: stdString)
   }
-
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
-public struct DefaultWitnessTable : CustomStringConvertible, CustomReflectable {
+public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedDefaultWitnessTable
 
   public init(bridged: BridgedDefaultWitnessTable) { self.bridged = bridged }
@@ -93,8 +89,6 @@ public struct DefaultWitnessTable : CustomStringConvertible, CustomReflectable {
     let stdString = SILDefaultWitnessTable_debugDescription(bridged)
     return String(_cxxString: stdString)
   }
-
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
 extension OptionalBridgedWitnessTable {

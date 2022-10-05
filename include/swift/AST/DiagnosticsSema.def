@@ -1506,6 +1506,8 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
+ERROR(expose_unsupported_actor_to_cxx,none,
+      "actor %0 can not be exposed to C++", (DeclName))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -6570,6 +6572,17 @@ ERROR(type_wrapper_requires_subscript,none,
       "type wrapper type %0 does not contain a required subscript"
       " - subscript(storedKeyPath:)",
       (DeclName))
+
+ERROR(type_wrapper_requires_readonly_subscript,none,
+      "type wrapper type %0 does not contain a required ready-only subscript",
+      (DeclName))
+
+ERROR(type_wrapper_requires_writable_subscript,none,
+      "type wrapper type %0 does not contain a required writable subscript",
+      (DeclName))
+
+NOTE(add_type_wrapper_subscript_stub_note,none,
+     "do you want to add a stub?", ())
 
 ERROR(type_wrapper_failable_init,none,
       "type wrapper initializer %0 cannot be failable", (DeclName))

@@ -1831,6 +1831,15 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
+                    # In the near future we are aiming to build compiler-rt with
+                    # LLVM_ENABLE_RUNTIMES
+                    # Until that happens, we need to unset this variable from
+                    # LLVM CMakeCache.txt for two reasons
+                    # * prevent PRs testing this variable to affect other runs landing
+                    #   unrelated features
+                    # * avoid fallouts should we land such change and then have to revert
+                    #   it to account for unforeseen regressions
+                    -ULLVM_ENABLE_RUNTIMES
                 )
 
                 # NOTE: This is not a dead option! It is relied upon for certain

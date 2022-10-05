@@ -574,7 +574,7 @@ bb2:
   return %v : $()
 }
 
-// Original Overlapping (unnecessarilly extends pruned liveness):
+// Original Overlapping (unnecessarily extends pruned liveness):
 //
 //     %def
 //     begin_access // access scope unrelated to def
@@ -614,7 +614,7 @@ bb1:
   return %v : $()
 }
 
-// Original Overlapping (unnecessarilly extends pruned liveness):
+// Original Overlapping (unnecessarily extends pruned liveness):
 //
 // TODO: this copy could be avoided but is probably an unusual case,
 // and sinking the destroy outside the access scope might help to
@@ -927,20 +927,4 @@ bb0:
   dealloc_stack %14 : $*Optional<@callee_guaranteed () -> ()>
   %99 = tuple ()
   return %99 : $()
-}
-
-// Lexical destroy hoisting cannot handle a PointerEscape.
-//
-// CHECK-LABEL: sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
-// CHECK: bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
-// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
-// CHECK:   [[COPY:%.*]] = copy_value [[CAST]] : $Optional<@callee_guaranteed () -> ()>
-// CHECK:   destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
-// CHECK-LABEL: } // end sil function 'testNoLexicalHoistEscape'
-sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
-bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
-  %cast = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
-  %copy = copy_value %cast : $Optional<@callee_guaranteed () -> ()>
-  destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
-  return %copy : $Optional<@callee_guaranteed () -> ()>
 }

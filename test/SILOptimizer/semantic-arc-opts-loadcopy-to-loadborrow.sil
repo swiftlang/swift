@@ -1445,11 +1445,11 @@ bbEnd:
 // Just make sure that we do not crash on this code and convert the 2nd load
 // [copy] to a load_borrow.
 //
-// CHECK-LABEL: sil [ossa] @inproper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK-LABEL: sil [ossa] @improper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
 // CHECK: load_borrow
 // CHECK: load_borrow
-// CHECK: } // end sil function 'inproper_dead_end_block_crasher_test'
-sil [ossa] @inproper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
+// CHECK: } // end sil function 'improper_dead_end_block_crasher_test'
+sil [ossa] @improper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Klass
   %2 = load_borrow %1 : $*Klass

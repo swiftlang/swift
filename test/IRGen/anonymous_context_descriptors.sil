@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -enable-anonymous-context-mangled-names %s | %FileCheck %s -check-prefix CHECK-MANGLED
+// RUN: %target-swift-frontend -emit-ir %s > %t.ir
+// %FileCheck --input-file %t.ir %s
+// RUN: %target-swift-frontend -emit-ir -enable-anonymous-context-mangled-names %s > %t.anon.ir
+// RUN: %FileCheck --input-file %t.anon.ir %s -check-prefix CHECK-MANGLED
 
 import Builtin
 import Swift
@@ -12,7 +14,7 @@ class Blah<T: P> {
 
 // Mangled name of the anonymous descriptor
 // CHECK-NOT: private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
-// CHECK-MANGLED: [[INNER_MANGLED:@.str.[0-9]+]] = private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
+// CHECK-MANGLED: @".str.83.$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV" = private constant [84 x i8] c"$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV\00"
 
 // Anonymous descriptor
 // CHECK: @"$s29anonymous_context_descriptors4BlahC5Inner33{{.*}}MXX" =
@@ -36,4 +38,4 @@ class Blah<T: P> {
 // CHECK-MANGLED-SAME: i16 4, i16 0
 
 // # mangled name
-// CHECK-MANGLED-SAME: [[INNER_MANGLED]]
+// CHECK-MANGLED-SAME: @".str.83.$s29anonymous_context_descriptors4BlahC5Inner33_4F495173994818481DD703D65EB08308LLV"

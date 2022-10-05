@@ -546,9 +546,9 @@ bb5:
   return %val1 : $Klass
 }
 
-// CHECK-LABEL: sil [ossa] @rle_needsmuultiplecopies3 : 
-// CHECK-LABEL: } // end sil function 'rle_needsmuultiplecopies3'
-sil [ossa] @rle_needsmuultiplecopies3 : $@convention(thin) (@in NonTrivialStruct) -> () {
+// CHECK-LABEL: sil [ossa] @rle_needsmultiplecopies3 : 
+// CHECK-LABEL: } // end sil function 'rle_needsmultiplecopies3'
+sil [ossa] @rle_needsmultiplecopies3 : $@convention(thin) (@in NonTrivialStruct) -> () {
 bb0(%0 : $*NonTrivialStruct):
   %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
   cond_br undef, bb1, bb2

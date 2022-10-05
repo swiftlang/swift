@@ -753,7 +753,7 @@ bb0(%0 : $*P, %1 : $*PP):
 }
 
 // Check that an unconditional_checked_cast_addr from a non-existential loadable type to a protocol
-// can be replaced by a more efficient code sequence if it is statitcally known that this
+// can be replaced by a more efficient code sequence if it is statistically known that this
 // type conforms to this protocol.
 // CHECK-LABEL: sil @replace_unconditional_check_cast_addr_for_type_to_existential
 // CHECK-NOT: unconditional_checked_cast_addr

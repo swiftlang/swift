@@ -331,10 +331,11 @@ IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
 /// create ObjC protocol_t records for protocols, storing references to the
 /// record into the __objc_protolist and __objc_protorefs sections to be
 /// fixed up by the runtime.
-llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
-                                               ForDefinition_t forDefinition) {
-  return const_cast<llvm::Constant*>
-    (cast<llvm::Constant>(getObjCProtocolGlobalVars(proto).ref));
+Address IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
+                                              ForDefinition_t forDefinition) {
+  return Address(const_cast<llvm::Constant *>(cast<llvm::Constant>(
+                     getObjCProtocolGlobalVars(proto).ref)),
+                 Int8PtrTy, getPointerAlignment());
 }
 
 IRGenModule::ObjCProtocolPair
@@ -681,14 +682,14 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             SILType selfType) {
   // Get an appropriately-cast function pointer.
   auto fn = IGF.IGM.getObjCAllocWithZoneFn();
+  auto fnType = IGF.IGM.getObjCAllocWithZoneFnType();
 
   if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
-    auto fnTy = llvm::FunctionType::get(self->getType(), self->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+    fnType = llvm::FunctionType::get(self->getType(), self->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  
-  auto call = IGF.Builder.CreateCall(fn, self);
+
+  auto call = IGF.Builder.CreateCall(fnType, fn, self);
 
   // Cast the returned pointer to the right type.
   auto &classTI = IGF.getTypeInfo(selfType);
@@ -1500,25 +1501,26 @@ bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
 llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {
   // Get an appropriately-cast function pointer.
   auto fn = IGM.getBlockCopyFn();
+  auto fnType = IGM.getBlockCopyFnType();
+
   if (value->getType() != IGM.ObjCBlockPtrTy) {
-    auto fnTy = llvm::FunctionType::get(value->getType(), value->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+    fnType = llvm::FunctionType::get(value->getType(), value->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  
-  auto call = Builder.CreateCall(fn, value);
+
+  auto call = Builder.CreateCall(fnType, fn, value);
   return call;
 }
 
 void IRGenFunction::emitBlockRelease(llvm::Value *value) {
   // Get an appropriately-cast function pointer.
   auto fn = IGM.getBlockReleaseFn();
+  auto fnType = IGM.getBlockReleaseFnType();
   if (value->getType() != IGM.ObjCBlockPtrTy) {
-    auto fnTy = llvm::FunctionType::get(IGM.VoidTy, value->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+    fnType = llvm::FunctionType::get(IGM.VoidTy, value->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  auto call = Builder.CreateCall(fn, value);
+  auto call = Builder.CreateCall(fnType, fn, value);
   call->setDoesNotThrow();
 }
 
@@ -1527,13 +1529,13 @@ void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
   auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
-  auto llvmFn = IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition);
+  auto llvmFn = cast<llvm::Function>(
+      IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
 
   auto argType =
-      cast<llvm::FunctionType>(llvmFn->getType()->getPointerElementType())
-          ->getParamType(0);
+      cast<llvm::FunctionType>(llvmFn->getFunctionType())->getParamType(0);
   value = Builder.CreateBitCast(value, argType);
 
-  auto call = Builder.CreateCall(llvmFn, value);
+  auto call = Builder.CreateCall(llvmFn->getFunctionType(), llvmFn, value);
   call->setDoesNotThrow();
 }

@@ -1019,7 +1019,7 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
   // SILValues can share storage via projections, but the storage is still
   // singly defined. However, allocatePhi may coalesce multiple values, or even
   // a single value across multiple loop iterations. The burden for checking
-  // inteference is entirely on allocatePhi.
+  // interference is entirely on allocatePhi.
   for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap)) {
     if (auto phi = PhiValue(valueStorageI.value)) {
       allocatePhi(phi);
@@ -1365,7 +1365,7 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
 // the materialized address.
 //
 // If \p intoPhiOperand is false, then the materialized address is guaranteed to
-// domaninate the composing user. Map the user onto this address to avoid
+// dominate the composing user. Map the user onto this address to avoid
 // rematerialization.
 //
 // Note: This only materializes the address for the purpose of projection an
@@ -1556,7 +1556,7 @@ namespace {
 //
 // For blocks with multiple phis, all moves of phi operands semantically occur
 // in parallel on the CFG edge from the predecessor to the phi block. As these
-// moves are inserted into the predecessor's intruction list, maintain the
+// moves are inserted into the predecessor's instruction list, maintain the
 // illusion of parallel moves by resolving any interference between the phi
 // moves. This is done by checking for anti-dependencies to or from other phi
 // moves. If one phi move's source reads from another phi move's dest, then the
@@ -2070,13 +2070,13 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
   auto *allocInst = argBuilder.createAllocStack(callLoc, argTy);
 
   // Instead of using resultBuilder, insert dealloc immediately after the call
-  // for stack discpline across loadable indirect results.
+  // for stack discipline across loadable indirect results.
   apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
     callBuilder.createDeallocStack(callLoc, allocInst);
   });
 
   if (oldResult && !oldResult->use_empty()) {
-    // Insert reloads immediately after the call. Get the reaload insertion
+    // Insert reloads immediately after the call. Get the reload insertion
     // point after emitting dealloc to ensure the reload happens first.
     auto reloadBuilder = pass.getBuilder(getResultInsertionPoint());
 
@@ -2647,7 +2647,7 @@ protected:
   void visitDeinitExistentialValueInst(
       DeinitExistentialValueInst *deinitExistential) {
     // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented DeinitExsitentialValue use.");
+    llvm::report_fatal_error("Unimplemented DeinitExistentialValue use.");
   }
 
   void visitDestroyValueInst(DestroyValueInst *destroy) {
@@ -2857,13 +2857,14 @@ void UseRewriter::emitEndBorrows(SILValue value) {
   findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(&discoveredBlocks);
+  liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding());
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   PrunedLivenessBoundary guaranteedBoundary;
-  guaranteedBoundary.compute(liveness);
+  liveness.computeBoundary(guaranteedBoundary);
   guaranteedBoundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
         pass.getBuilder(insertPt).createEndBorrow(pass.genLoc(), value);
@@ -3223,7 +3224,7 @@ protected:
 //===----------------------------------------------------------------------===//
 
 // Rewrite applies with indirect parameters or results of loadable types which
-// were not visited during opaque value rewritting.
+// were not visited during opaque value rewriting.
 static void rewriteIndirectApply(FullApplySite apply,
                                  AddressLoweringState &pass) {
   // If all indirect args were loadable, then they still need to be rewritten.

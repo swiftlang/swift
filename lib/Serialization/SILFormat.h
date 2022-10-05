@@ -320,6 +320,7 @@ namespace sil_block {
       BCRecordLayout<SIL_ARG_EFFECTS_ATTR,
                      IdentifierIDField, // argument effects string
                      BCVBR<8>,          // argumentIndex
+                     BCFixed<1>,        // argumentIndexValid
                      BCFixed<1>         // isDerived
                      >;
 

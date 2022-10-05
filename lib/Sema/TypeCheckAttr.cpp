@@ -1905,6 +1905,18 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
              decl->getName());
   }
 
+  // Verify that the declaration is exposable.
+  auto repr = cxx_translation::getDeclRepresentation(VD);
+  if (repr.isUnsupported()) {
+    using namespace cxx_translation;
+    switch (*repr.error) {
+    case UnrepresentableActorClass:
+      diagnose(attr->getLocation(), diag::expose_unsupported_actor_to_cxx,
+               decl->getName());
+      break;
+    }
+  }
+
   // Verify that the name mentioned in the expose
   // attribute matches the supported name pattern.
   if (!attr->Name.empty()) {
@@ -3771,6 +3783,9 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
     llvm::SmallDenseMap<SubscriptDecl *, SmallVector<UnviabilityReason, 2>, 2>
         nonViableSubscripts;
 
+    bool hasReadOnly = false;
+    bool hasWritable = false;
+
     for (auto *decl : subscripts) {
       auto *subscript = cast<SubscriptDecl>(decl);
 
@@ -3782,6 +3797,10 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
               BGT->isReferenceWritableKeyPath())) {
           nonViableSubscripts[subscript].push_back(
               UnviabilityReason::InvalidType);
+        } else {
+          hasReadOnly |= BGT->isKeyPath();
+          hasWritable |=
+              BGT->isWritableKeyPath() || BGT->isReferenceWritableKeyPath();
         }
       } else {
         nonViableSubscripts[subscript].push_back(
@@ -3791,6 +3810,41 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
       if (isLessAccessibleThanType(subscript))
         nonViableSubscripts[subscript].push_back(
             UnviabilityReason::Inaccessible);
+    }
+
+    if (!hasReadOnly) {
+      auto &DE = ctx.Diags;
+      DE.diagnoseWithNotes(
+          DE.diagnose(nominal->getLoc(),
+                      diag::type_wrapper_requires_readonly_subscript,
+                      nominal->getName()),
+          [&]() {
+            DE.diagnose(nominal->getLoc(),
+                        diag::add_type_wrapper_subscript_stub_note)
+                .fixItInsertAfter(
+                    nominal->getBraces().Start,
+                    "\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, "
+                    "Value>) -> Value { get { <#code#> } }");
+          });
+      attr->setInvalid();
+    }
+
+    if (!hasWritable) {
+      auto &DE = ctx.Diags;
+      DE.diagnoseWithNotes(
+          DE.diagnose(nominal->getLoc(),
+                      diag::type_wrapper_requires_writable_subscript,
+                      nominal->getName()),
+          [&]() {
+            DE.diagnose(nominal->getLoc(),
+                        diag::add_type_wrapper_subscript_stub_note)
+                .fixItInsertAfter(
+                    nominal->getBraces().Start,
+                    "\nsubscript<Value>(storageKeyPath path: "
+                    "WritableKeyPath<<#Base#>, "
+                    "Value>) -> Value { get { <#code#> } set { <#code#> } }");
+          });
+      attr->setInvalid();
     }
 
     if (subscripts.size() - nonViableSubscripts.size() == 0) {

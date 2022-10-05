@@ -288,7 +288,7 @@ public func useExternalResilient3() {
   useP(e.myValue3())
 }
 
-// Check that we can look throught two layers of inlinable resilient functions.
+// Check that we can look through two layers of inlinable resilient functions.
 // CHECK-LABEL: sil @$s1A21useExternalResilient4yyF
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External3040inlinableExternalResilientCallsInlinablecD0QryF : $@convention(thin) @substituted {{.*}} for <Int64>

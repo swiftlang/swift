@@ -686,14 +686,14 @@ public:
 
   void collectExpressionTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-      SourceKitCancellationToken CancellationToken,
+      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+      bool CanonicalType, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
   void collectVariableTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length,
+      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;

@@ -1168,7 +1168,7 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
       termInst->setOperand(phiIndex, phiCopy);
 
       // Now that we know our base, phi, phiCopy for this specific incoming
-      // value, append it to the phiNodeClenaupState so we can insert
+      // value, append it to the phiNodeCleanupState so we can insert
       // destroy_values late after we visit all insertedPhiNodes.
       cleanupInserter.trackNewCleanup(value, phiCopy);
     }
@@ -1242,7 +1242,7 @@ void AvailableValueAggregator::addMissingDestroysForCopiedValues(
 
   for (auto *inst : insertedInsts) {
     // Otherwise, see if this is a load [copy]. It if it a load [copy], then we
-    // know that the load [copy] must be in the load block meaing we can just
+    // know that the load [copy] must be in the load block meaning we can just
     // put a destroy_value /after/ the load_borrow to ensure that the value
     // lives long enough for us to copy_value it or a derived value for the
     // begin_borrow.
@@ -1971,7 +1971,7 @@ private:
 
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
-  /// aggreaged result to the caller and expects the caller to eventually RAUW
+  /// aggregated result to the caller and expects the caller to eventually RAUW
   /// \p inst with the return value. The reason why we do this is to allow for
   /// the caller to work around invalidation issues by not deleting the load
   /// [take] until after all load [take] have been cleaned up.

@@ -140,12 +140,13 @@ bool swift::computeGuaranteedBoundary(SILValue value,
   bool noEscape = findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(&discoveredBlocks);
+  liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding());
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
-  boundary.compute(liveness);
+  liveness.computeBoundary(boundary);
 
   return noEscape;
 }
@@ -197,7 +198,7 @@ GuaranteedOwnershipExtension::checkBorrowExtension(
     return Valid; // arguments have whole-function ownership
 
   assert(guaranteedLiveness.empty());
-  borrow.computeLiveness(guaranteedLiveness);
+  borrow.computeTransitiveLiveness(guaranteedLiveness);
 
   if (guaranteedLiveness.areUsesWithinBoundary(newUses, &deBlocks))
     return Valid; // reuse the borrow scope as-is
@@ -239,7 +240,7 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
   if (ownershipKind != OwnershipKind::Owned)
     return Invalid;
 
-  ownedLifetime.initializeDefBlock(ownedValue->getParentBlock());
+  ownedLifetime.initializeDef(ownedValue);
   for (Operand *use : ownedValue->getUses()) {
     auto *user = use->getUser();
     if (use->isConsuming()) {
@@ -260,17 +261,17 @@ void GuaranteedOwnershipExtension::transform(Status status) {
     return;
   case ExtendBorrow: {
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedBoundary.compute(guaranteedLiveness, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
   case ExtendLifetime: {
     ownedLifetime.extendAcrossLiveness(guaranteedLiveness);
     PrunedLivenessBoundary ownedBoundary;
-    ownedBoundary.compute(ownedLifetime, ownedConsumeBlocks);
+    ownedLifetime.computeBoundary(ownedBoundary, ownedConsumeBlocks);
     extendOwnedLifetime(beginBorrow->getOperand(), ownedBoundary, deleter);
     PrunedLivenessBoundary guaranteedBoundary;
-    guaranteedBoundary.compute(guaranteedLiveness, ownedConsumeBlocks);
+    guaranteedLiveness.computeBoundary(guaranteedBoundary, ownedConsumeBlocks);
     extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
@@ -437,9 +438,9 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
     return true;
 
   if (auto borrowedValue = BorrowedValue(value)) {
-    PrunedLiveness liveness;
     auto *function = value->getFunction();
-    borrowedValue.computeLiveness(liveness);
+    MultiDefPrunedLiveness liveness(function);
+    borrowedValue.computeTransitiveLiveness(liveness);
     DeadEndBlocks deadEndBlocks(function);
     return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
   }
@@ -473,7 +474,7 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
 ///     %otherCopy = copy_value %borrowedValue
 ///     %newPhi = phi(%ownedValue, %otherCopy)
 ///
-/// The immediate effect is to produce an unnecesssary copy, but it avoids
+/// The immediate effect is to produce an unnecessary copy, but it avoids
 /// extending %ownedValue's liveness to new paths and hopefully simplifies
 /// downstream optimization and debugging. Unnecessary copies could be
 /// avoided with simple dominance check if it becomes desirable to do so.
@@ -591,7 +592,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
 // same type.
 //
 // TODO: consider reusing copies that dominate multiple reborrowed
-// operands. Howeer, this requires copying in an earlier block and inserting
+// operands. However, this requires copying in an earlier block and inserting
 // post-dominating destroys, which may be better handled in an ownership phi
 // canonicalization pass.
 SILValue BorrowedLifetimeExtender::createCopyAtEdge(PhiOperand reborrowOper) {
@@ -971,7 +972,7 @@ static SILBasicBlock::iterator getBorrowPoint(SILValue newValue,
 /// newValue. This may allow newValue's original borrow scope to be removed,
 /// which then allows the copy to be removed. The result would be a single
 /// borrow scope over all newValue's and guaranteedValue's uses, which is
-/// usually preferrable to a new copy and separate borrow scope. When doing
+/// usually preferable to a new copy and separate borrow scope. When doing
 /// this, we can use newValue as the borrow point instead of getBorrowPoint.
 SILValue
 OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
@@ -997,7 +998,7 @@ OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
 // Borrow \p newValue over \p singleGuaranteedUse. Return the new guaranteed
 // value.
 //
-// Precondition: \p newValue dominates dominates \p singleGuaranteedUse.
+// Precondition: \p newValue dominates \p singleGuaranteedUse.
 //
 // Precondition: If \p singleGuaranteedUse ends a borrowed lifetime, the \p
 // newValue also dominates the beginning of the borrow scope.
@@ -1700,7 +1701,7 @@ SILBasicBlock::iterator OwnershipReplaceSingleUseHelper::perform() {
 /// Create end_borrows at all points that cover the inner uses.
 ///
 /// The client must check canCloneTerminator() first to make sure that the
-/// search for transitive uses does not encouter a PointerEscape.
+/// search for transitive uses does not encounter a PointerEscape.
 class GuaranteedPhiBorrowFixup {
   // A phi in mustConvertPhis has already been determined to be part of this
   // new nested borrow scope.

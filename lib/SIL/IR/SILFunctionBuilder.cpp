@@ -140,8 +140,8 @@ void SILFunctionBuilder::addFunctionAttributes(
       }
     }
     for (const EffectsAttr *effectsAttr : llvm::reverse(customEffects)) {
-      auto error = F->parseEffects(effectsAttr->getCustomString(),
-        /*fromSIL*/ false, /*argumentIndex*/ -1, /*isDerived*/ false, paramNames);
+      auto error = F->parseArgumentEffectsFromSource(
+                                effectsAttr->getCustomString(), paramNames);
       if (error.first) {
         SourceLoc loc = effectsAttr->getCustomStringLocation();
         if (loc.isValid())

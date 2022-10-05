@@ -1057,9 +1057,9 @@ static llvm::Value *emitWitnessTableAccessorCall(
   auto conditionalTables =
       emitConditionalConformancesBuffer(IGF, conformance);
 
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetWitnessTableFn(),
-                                     {conformanceDescriptor, *srcMetadataCache,
-                                      conditionalTables});
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetWitnessTableFunctionPointer(),
+      {conformanceDescriptor, *srcMetadataCache, conditionalTables});
 
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
@@ -1091,13 +1091,13 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   auto cacheVariable =
       cast<llvm::GlobalVariable>(IGM.getAddrOfWitnessTableLazyCacheVariable(
           rootConformance, conformingType, ForDefinition));
-  emitCacheAccessFunction(IGM, accessor, cacheVariable, CacheStrategy::Lazy,
-                          [&](IRGenFunction &IGF, Explosion &params) {
-    llvm::Value *conformingMetadataCache = nullptr;
-    return MetadataResponse::forComplete(
-             emitWitnessTableAccessorCall(IGF, conformance,
-                                          &conformingMetadataCache));
-  });
+  emitCacheAccessFunction(
+      IGM, accessor, cacheVariable, IGM.WitnessTablePtrTy, CacheStrategy::Lazy,
+      [&](IRGenFunction &IGF, Explosion &params) {
+        llvm::Value *conformingMetadataCache = nullptr;
+        return MetadataResponse::forComplete(emitWitnessTableAccessorCall(
+            IGF, conformance, &conformingMetadataCache));
+      });
 
   return accessor;
 }
@@ -1178,7 +1178,8 @@ public:
     // Otherwise, call a lazy-cache function.
     auto accessor =
       getWitnessTableLazyAccessFunction(IGF.IGM, Conformance);
-    llvm::CallInst *call = IGF.Builder.CreateCall(accessor, {});
+    llvm::CallInst *call =
+        IGF.Builder.CreateCall(accessor->getFunctionType(), accessor, {});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotAccessMemory();
     call->setDoesNotThrow();
@@ -1511,8 +1512,8 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto witness = llvm::ConstantExpr::getBitCast(typeRef, Int8PtrTy);
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(
-    witness->getType()->getPointerElementType(), witness, bitConstant);
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, witness,
+                                                      bitConstant);
 }
 
 static void buildAssociatedTypeValueName(CanType depAssociatedType,
@@ -1579,7 +1580,8 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
   llvm::Value *self = parameters.claimNext();
   setTypeMetadataName(IGM, self, ConcreteType);
 
-  Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
+  Address destTable(parameters.claimNext(), IGM.WitnessTableTy,
+                    IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               Conformance.getProtocol());
 
@@ -1757,7 +1759,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
 
   // Break out the parameters.
   Explosion params = IGF.collectParameters();
-  Address wtable(params.claimNext(), PointerAlignment);
+  Address wtable(params.claimNext(), IGM.WitnessTableTy, PointerAlignment);
   llvm::Value *metadata = params.claimNext();
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, metadata,
                                         MetadataState::Complete);
@@ -1765,7 +1767,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
   Address conditionalTables(
       IGF.Builder.CreateBitCast(instantiationArgs,
                                 IGF.IGM.WitnessTablePtrPtrTy),
-      PointerAlignment);
+      IGM.WitnessTablePtrTy, PointerAlignment);
 
   // Register local type data for the conditional conformance witness tables.
   for (auto idx : indices(ConditionalRequirementPrivateDataIndices)) {
@@ -2496,13 +2498,10 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
   auto baseDescriptor =
     IGF.IGM.getAddrOfProtocolRequirementsBaseDescriptor(sourceProtocol);
 
-  auto call =
-    IGF.Builder.CreateCall(IGF.IGM.getGetAssociatedConformanceWitnessFn(),
-                           {
-                             wtable, parentMetadata,
-                             associatedTypeMetadata,
-                             baseDescriptor, assocConformanceDescriptor
-                           });
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetAssociatedConformanceWitnessFunctionPointer(),
+      {wtable, parentMetadata, associatedTypeMetadata, baseDescriptor,
+       assocConformanceDescriptor});
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return call;
@@ -3529,9 +3528,7 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
   if (IGF.IGM.getOptions().WitnessMethodElimination) {
     // For LLVM IR WME, emit a @llvm.type.checked.load with the type of the
     // method.
-    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
-    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto slotAsPointer = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int8Ty);
     auto typeId = typeIdForMethod(IGF.IGM, member);
 
     // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
@@ -3544,8 +3541,8 @@ static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad =
-        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::type_checked_load, args);
     return IGF.Builder.CreateExtractValue(checkedLoad, 0);
   }
 
@@ -3579,7 +3576,8 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                      : IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), member);
 
-  return FunctionPointer(fnType, witnessFnPtr, authInfo, signature);
+  return FunctionPointer::createSigned(fnType, witnessFnPtr, authInfo,
+                                       signature);
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(
@@ -3640,12 +3638,10 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
     IGM.getAddrOfAssociatedTypeDescriptor(associatedType.getAssociation());
 
   // Call swift_getAssociatedTypeWitness().
-  auto call = IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessFn(),
-                                     { request.get(IGF),
-                                       wtable,
-                                       parentMetadata,
-                                       reqBaseDescriptor,
-                                       assocTypeDescriptor });
+  auto call =
+      IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessFunctionPointer(),
+                             {request.get(IGF), wtable, parentMetadata,
+                              reqBaseDescriptor, assocTypeDescriptor});
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return MetadataResponse::handle(IGF, request, call);

@@ -224,8 +224,8 @@ sil @doubleWriteTopLevel : $@convention(thin) () -> () {
   return %ret : $()
 }
 
-// There was a bug where the evalutor would not detect a double-write to a
-// tuple element at the top level if one of the writes writes an unknown value.
+// There was a bug where the evaluator would not detect a double-write to a
+// tuple element at the top level if one of the writes an unknown value.
 sil @doubleWriteTupleElement : $@convention(thin) (Int64) -> () {
 bb0(%arg : $Int64):
   // Allocate and initialize the tuple to (1, 2).

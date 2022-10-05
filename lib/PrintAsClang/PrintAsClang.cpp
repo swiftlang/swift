@@ -528,7 +528,12 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       if (defaultDependencyBehavior && deps.dependsOnStandardLibrary) {
         assert(!M->isStdlibModule());
         SwiftToClangInteropContext interopContext(*M->getASTContext().getStdlibModule(), irGenOpts);
+        auto macroGuard =
+            computeMacroGuard(M->getASTContext().getStdlibModule());
+        os << "#ifndef " << macroGuard << "\n";
+        os << "#define " << macroGuard << "\n";
         printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(), interopContext, /*requiresExposedAttribute=*/true);
+        os << "#endif // " << macroGuard << "\n";
       }
 
       os << moduleContents.str();

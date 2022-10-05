@@ -9,6 +9,7 @@ import SwiftShims
 @typeWrapper class MyWrapper<S> {
   @_hasStorage var underlying: S { get set }
   init(memberwise s: S)
+  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V { get }
   subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V { get set }
   deinit
 }

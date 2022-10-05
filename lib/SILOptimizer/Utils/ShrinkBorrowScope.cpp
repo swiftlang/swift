@@ -56,7 +56,7 @@ struct Context final {
 
   /// The copy_value instructions that the utility creates or changes.
   ///
-  /// Clients provide this so that they can update worklists in respons.
+  /// Clients provide this so that they can update worklists in response.
   SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
 
   InstructionDeleter &deleter;

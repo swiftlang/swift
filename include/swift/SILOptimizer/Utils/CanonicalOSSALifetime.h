@@ -19,7 +19,7 @@
 /// The "extended lifetime" of the references defined by 'def' transitively
 /// includes the uses of 'def' itself along with the uses of any copies of
 /// 'def'. Canonicalization provably minimizes the OSSA lifetime and its copies
-/// by rewriting all copies and destroys. Only consusming uses that are not on
+/// by rewriting all copies and destroys. Only consuming uses that are not on
 /// the liveness boundary require a copy.
 ///
 /// Example #1: The last consuming use ends the reference lifetime.
@@ -267,9 +267,6 @@ private:
 
   InstructionDeleter &deleter;
 
-  /// Current copied def for which this state describes the liveness.
-  SILValue currentDef;
-
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed. For guaranteed values it remains empty. A backward walk from
   /// these blocks must discover all uses on paths that lead to a return or
@@ -281,7 +278,7 @@ private:
 
   /// Record all interesting debug_value instructions here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie
-  /// outisde the pruned liveness at the time it is discovered.
+  /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
@@ -293,7 +290,7 @@ private:
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
 
   /// The destroys of the value.  These are not uses, but need to be recorded so
   /// that we know when the last use in a consuming block is (without having to
@@ -355,7 +352,7 @@ public:
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
         deleter(deleter) {}
 
-  SILValue getCurrentDef() const { return currentDef; }
+  SILValue getCurrentDef() const { return liveness.getDef(); }
 
   void initDef(SILValue def) {
     assert(consumingBlocks.empty() && debugValues.empty() && liveness.empty());
@@ -364,8 +361,7 @@ public:
     accessBlocks = nullptr;
     consumes.clear();
 
-    currentDef = def;
-    liveness.initializeDefBlock(def->getParentBlock());
+    liveness.initializeDef(def);
   }
 
   void clearLiveness() {

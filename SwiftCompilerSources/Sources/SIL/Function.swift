@@ -33,6 +33,11 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var hasOwnership: Bool { SILFunction_hasOwnership(bridged) != 0 }
 
+  /// Returns true if the function is a definition and not only an external declaration.
+  ///
+  /// This is the case if the functioun contains a body, i.e. some basic blocks.
+  public var isDefinition: Bool { blocks.first != nil }
+
   public var entryBlock: BasicBlock {
     SILFunction_firstBlock(bridged).block!
   }
@@ -50,9 +55,22 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.lazy.flatMap { $0.instructions }
   }
 
+  /// The number of indirect result arguments.
   public var numIndirectResultArguments: Int {
     SILFunction_numIndirectResultArguments(bridged)
   }
+  
+  /// The number of arguments which correspond to parameters (and not to indirect results).
+  public var numParameterArguments: Int {
+    SILFunction_numParameterArguments(bridged)
+  }
+
+  /// The total number of arguments.
+  ///
+  /// This is the sum of indirect result arguments and parameter arguments.
+  /// If the function is a definition (i.e. it has at least an entry block), this is the
+  /// number of arguments of the function's entry block.
+  public var numArguments: Int { numIndirectResultArguments + numParameterArguments }
 
   public var hasSelfArgument: Bool {
     SILFunction_getSelfArgumentIndex(bridged) >= 0
@@ -66,6 +84,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   
   public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
   public var resultType: Type { SILFunction_getSILResultType(bridged).type }
+
+  public func getArgumentConvention(for argumentIndex: Int) -> ArgumentConvention {
+    if argumentIndex < numIndirectResultArguments {
+      return .indirectOut
+    }
+    return SILFunction_getSILArgumentConvention(bridged, argumentIndex).convention
+  }
 
   public var returnInstruction: ReturnInst? {
     for block in blocks.reversed() {
@@ -93,6 +118,60 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
       SILFunction_hasSemanticsAttr(bridged, llvm.StringRef(buffer.baseAddress!, buffer.count)) != 0
+    }
+  }
+
+  /// Kinds of effect attributes which can be defined for a Swift function.
+  public enum EffectAttribute {
+    /// No effect attribute is specified.
+    case none
+    
+    /// `[readnone]`
+    ///
+    /// A readnone function does not have any observable memory read or write operations.
+    /// This does not mean that the function cannot read or write at all. For example,
+    /// it’s allowed to allocate and write to local objects inside the function.
+    ///
+    /// A function can be marked as readnone if two calls of the same function with the
+    /// same parameters can be simplified to one call (e.g. by the CSE optimization).
+    /// Some conclusions:
+    /// * A readnone function must not return a newly allocated class instance.
+    /// * A readnone function can return a newly allocated copy-on-write object,
+    ///   like an Array, because COW data types conceptually behave like value types.
+    /// * A readnone function must not release any parameter or any object indirectly
+    ///   referenced from a parameter.
+    /// * Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
+    case readNone
+    
+    /// `[readonly]`
+    ///
+    /// A readonly function does not have any observable memory write operations.
+    /// Similar to readnone, a readonly function is allowed to contain writes to e.g. local objects, etc.
+    ///
+    /// A function can be marked as readonly if it’s save to eliminate a call to such
+    /// a function if its return value is not used.
+    /// The same conclusions as for readnone also apply to readonly.
+    case readOnly
+    
+    /// `[releasenone]`
+    ///
+    /// A releasenone function must not perform any observable release-operation on an object.
+    /// This means, it must not do anything which might let the caller observe any decrement of
+    /// a reference count or any deallocations.
+    /// Note that it's allowed to release an object if the release is balancing a retain in the
+    /// same function. Also, it's allowed to release (and deallocate) local objects which were
+    /// allocated in the same function.
+    case releaseNone
+  }
+
+  /// The effect attribute which is specified in the source code (if any).
+  public var effectAttribute: EffectAttribute {
+    switch SILFunction_getEffectAttribute(bridged) {
+      case EffectKind_none: return .none
+      case EffectKind_readNone: return .readNone
+      case EffectKind_readOnly: return .readOnly
+      case EffectKind_releaseNone: return .releaseNone
+      default: fatalError()
     }
   }
 
@@ -134,33 +213,47 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       // writeFn
       { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
         let s: String
+        let effects = f.function.effects
         if idx >= 0 {
-          s = f.function.effects.argumentEffects[idx].bodyDescription
+          if idx < effects.escapeEffects.arguments.count {
+            s = effects.escapeEffects.arguments[idx].bodyDescription
+          } else {
+            let globalIdx = idx - effects.escapeEffects.arguments.count
+            if globalIdx == 0 {
+              s = effects.sideEffects!.global.description
+            } else {
+              let seIdx = globalIdx - 1
+              s = effects.sideEffects!.getArgumentEffects(for: seIdx).bodyDescription
+            }
+          }
         } else {
-          s = f.function.effects.argumentEffectsDescription
+          s = effects.description
         }
         s._withStringRef { OStream_write(os, $0) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: llvm.StringRef, fromSIL: Int, argumentIndex: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
+      { (f: BridgedFunction, str: llvm.StringRef, mode: ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
         do {
           var parser = StringParser(str.string)
+          let function = f.function
 
-          if fromSIL != 0 && argumentIndex < 0 {
-            try parser.parseEffectsFromSIL(to: &f.function.effects)
-          } else {
-            let effect: ArgumentEffect
-            if fromSIL != 0 {
-              effect = try parser.parseEffectFromSIL(argumentIndex: argumentIndex, isDerived: isDerived != 0)
-            } else {
-              let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
-                  (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
-                let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
-                return Dictionary(uniqueKeysWithValues: keyValPairs)
-              }
-              effect = try parser.parseEffectFromSource(for: f.function, params: paramToIdx)
+          switch mode {
+          case ParseArgumentEffectsFromSource:
+            let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
+                (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
+              let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
+              return Dictionary(uniqueKeysWithValues: keyValPairs)
             }
-            f.function.effects.argumentEffects.append(effect)
+            let effect = try parser.parseEffectFromSource(for: function, params: paramToIdx)
+            function.effects.escapeEffects.arguments.append(effect)
+          case ParseArgumentEffectsFromSIL:
+            try parser.parseEffectsFromSIL(argumentIndex: argumentIndex, to: &function.effects)
+          case ParseGlobalEffectsFromSIL:
+            try parser.parseGlobalSideEffectsFromSIL(to: &function.effects)
+          case ParseMultipleEffectsFromSIL:
+            try parser.parseEffectsFromSIL(to: &function.effects)
+          default:
+            fatalError("invalid ParseEffectsMode")
           }
           if !parser.isEmpty() { try parser.throwError("syntax error") }
         } catch let error as ParsingError {
@@ -190,12 +283,24 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       },
       // getEffectInfo
       {  (f: BridgedFunction, idx: Int) -> BridgedEffectInfo in
-        let argEffects = f.function.effects.argumentEffects
-        if idx >= argEffects.count {
-          return BridgedEffectInfo(argumentIndex: -1, isDerived: false)
+        let effects = f.function.effects
+        if idx < effects.escapeEffects.arguments.count {
+          let effect = effects.escapeEffects.arguments[idx]
+          return BridgedEffectInfo(argumentIndex: effect.argumentIndex,
+                                   isDerived: effect.isDerived, isEmpty: false, isValid: true)
         }
-        let effect = argEffects[idx]
-        return BridgedEffectInfo(argumentIndex: effect.argumentIndex, isDerived: effect.isDerived)
+        if let sideEffects = effects.sideEffects {
+          let globalIdx = idx - effects.escapeEffects.arguments.count
+          if globalIdx == 0 {
+            return BridgedEffectInfo(argumentIndex: -1, isDerived: true, isEmpty: false, isValid: true)
+          }
+          let seIdx = globalIdx - 1
+          if seIdx < sideEffects.arguments.count {
+            return BridgedEffectInfo(argumentIndex: seIdx, isDerived: true,
+                                     isEmpty: sideEffects.arguments[seIdx].isEmpty, isValid: true)
+          }
+        }
+        return BridgedEffectInfo(argumentIndex: -1, isDerived: false, isEmpty: true, isValid: false)
       }
     )
   }

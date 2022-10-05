@@ -773,7 +773,10 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {
-    os << "#endif\n";
+    // FIXME: This is a workaround for prologue being emitted outside of
+    // __cplusplus.
+    if (!M.isStdlibModule())
+      os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
     M.ValueDecl::getName().print(os);
@@ -784,7 +787,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
     os << prologueOS.str();
 
-    os << "\n#ifdef __cplusplus\n";
+    if (!M.isStdlibModule())
+      os << "\n#ifdef __cplusplus\n";
     os << "}\n";
     os << "}\n";
     os << "}\n";

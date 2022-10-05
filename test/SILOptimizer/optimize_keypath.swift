@@ -585,7 +585,7 @@ func testGetComplex(_ s: SimpleClass) -> Int {
   return s[keyPath: kp]
 }
 
-// allow exactly one unoptimzedkey path instruction, in this function
+// allow exactly one unoptimized key path instruction, in this function
 // CHECK-ALL: sil {{.*}}makeKeyPathInGenericContext
 // CHECK-ALL: = keypath
 func makeKeyPathInGenericContext<T: P>(of: T.Type) -> WritableKeyPath<GenStruct<T>, T> {

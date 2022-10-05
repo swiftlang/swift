@@ -60,7 +60,7 @@ public func callOuter(_ x: Int) -> Int {
   return x
 }
 
-// internl class
+// internal class
 class Base3 {
   @inline(never) func inner() { action(5)}
   @inline(never) func middle() { inner() }

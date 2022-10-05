@@ -516,7 +516,7 @@ bb0:
 
 // These tests ensure that we insert all gep operations, before the stores and
 // any new load operations at the location where the old load was. It also
-// ensures that we are able to handle values that are provided with multilple
+// ensures that we are able to handle values that are provided with multiple
 // available values from different stores. Today the tests use the exact same
 // value since pred mem opts is so conservative (it will not support having
 // different available values from different blocks due to the predicate it uses

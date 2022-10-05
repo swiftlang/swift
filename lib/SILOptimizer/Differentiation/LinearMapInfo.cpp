@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Linear map struct and branching trace enum information for differentation.
+// Linear map struct and branching trace enum information for differentiation.
 //
 //===----------------------------------------------------------------------===//
 

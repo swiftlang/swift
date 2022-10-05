@@ -9,6 +9,24 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// Note: Unreachable blocks must always be eliminated before simplifying
+/// useless phis. Otherwise self-loops will result in invalid SIL:
+///
+///   bb1(%phi):
+///     apply %use(%phi)
+///     %def = apply %getValue()
+///     br bb1(%def)
+///
+/// When bb1 is unreachable, %phi will be removed as useless:
+///   bb1:
+///     apply %use(%def)
+///     %def = apply %getValue()
+///     br bb1(%def)
+///
+/// This is considered invalid SIL because SIL has a special SSA dominance rule
+/// that does not allow a use above a def in the same block.
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify-cfg"
 
@@ -1976,7 +1994,7 @@ static bool containsOnlyObjMethodCallOnOptional(SILValue optionalValue,
       continue;
     if (inst->isDebugInstruction())
       continue;
-    // An objc_method has no sideffects.
+    // An objc_method has no sideeffects.
     if (isa<ObjCMethodInst>(inst))
       continue;
 
@@ -2081,7 +2099,7 @@ static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
 ///   \             |       v
 ///    \            ... more bbs? (A)
 ///     \           /
-///       ulimateBB
+///       ultimateBB
 ///
 /// This routine does not support diverging control flow in (A). This means that
 /// there must not be any loops or diamonds beginning in that region. We do

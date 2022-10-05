@@ -531,7 +531,7 @@ void Rewriter::fold(Match candidate, ArrayRef<int> rewritableArgumentIndices) {
   //   apply %fn(%move)
   //   end_borrow %lifetime
   //
-  // This isn't valid, though, because the apply consumes the the %move but
+  // This isn't valid, though, because the apply consumes the %move but
   // the borrow scope guarantees it until the subsequent end_borrow.
   //
   // Fix this by hoisting the end_borrow above the apply.
@@ -626,16 +626,22 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
     auto *user = use->getUser();
     if (user == context.introducer)
       continue;
-    if (use->getOperandOwnership() == OperandOwnership::Borrow) {
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::PointerEscape:
+      return false;
+    case OperandOwnership::Borrow:
       if (!BorrowingOperand(use).visitScopeEndingUses([&](Operand *end) {
-            if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-              return false;
-            }
-            recordUse(end);
-            return true;
-          })) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        recordUse(end);
+        return true;
+      })) {
         return false;
       }
+      break;
+    default:
+      break;
     }
     recordUse(use);
   }
@@ -644,8 +650,8 @@ bool findBorroweeUsage(Context const &context, BorroweeUsage &usage) {
 
 bool borroweeHasUsesWithinBorrowScope(Context const &context,
                                       BorroweeUsage const &usage) {
-  PrunedLiveness liveness;
-  context.borrowedValue.computeLiveness(liveness);
+  MultiDefPrunedLiveness liveness(context.function);
+  context.borrowedValue.computeTransitiveLiveness(liveness);
   DeadEndBlocks deadEndBlocks(context.function);
   return !liveness.areUsesOutsideBoundary(usage.uses, &deadEndBlocks);
 }

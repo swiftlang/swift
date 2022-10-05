@@ -129,8 +129,8 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
 
 void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
                                           Explosion &out) {
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetMainExecutorFn(),
-                                     {});
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskGetMainExecutorFunctionPointer(), {});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -167,8 +167,8 @@ void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
 }
 
 void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
-                                      {});
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskGetCurrentExecutorFunctionPointer(), {});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -241,23 +241,15 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   llvm::CallInst *call;
   if (localResultBuffer) {
     // This is @_silgen_name("swift_asyncLet_begin")
-    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFn(),
-                                      {alet,
-                                       taskOptions,
-                                       futureResultTypeMetadata,
-                                       taskFunction,
-                                       localContextInfo,
-                                       localResultBuffer
-                                      });
+    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFunctionPointer(),
+                                  {alet, taskOptions, futureResultTypeMetadata,
+                                   taskFunction, localContextInfo,
+                                   localResultBuffer});
   } else {
     // This is @_silgen_name("swift_asyncLet_start")
-    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
-                                      {alet,
-                                       taskOptions,
-                                       futureResultTypeMetadata,
-                                       taskFunction,
-                                       localContextInfo
-                                      });
+    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFunctionPointer(),
+                                  {alet, taskOptions, futureResultTypeMetadata,
+                                   taskFunction, localContextInfo});
   }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
@@ -266,8 +258,8 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
 }
 
 void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFn(),
-                                      {alet});
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFunctionPointer(), {alet});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -286,8 +278,9 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
   auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFn(),
-                                      {group, resultTypeMetadata});
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
+                             {group, resultTypeMetadata});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -295,8 +288,8 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
 }
 
 void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
-  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupDestroyFn(),
-                                      {group});
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskGroupDestroyFunctionPointer(), {group});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -325,7 +318,8 @@ llvm::Function *IRGenModule::getAwaitAsyncContinuationFn() {
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *context = suspendFn->getArg(0);
-  auto *call = Builder.CreateCall(getContinuationAwaitFn(), { context });
+  auto *call =
+      Builder.CreateCall(getContinuationAwaitFunctionPointer(), {context});
   call->setDoesNotThrow();
   call->setCallingConv(SwiftAsyncCC);
   call->setTailCallKind(AsyncTailCallKind);
@@ -343,7 +337,7 @@ void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
   auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
   auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskRunInlineFn(),
+      IGF.IGM.getTaskRunInlineFunctionPointer(),
       {result, closure, closureContext, resultTypeMetadata});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);

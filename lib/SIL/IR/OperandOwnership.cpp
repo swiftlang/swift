@@ -239,7 +239,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 OPERAND_OWNERSHIP(PointerEscape, ConvertEscapeToNoEscape)
 
 // UncheckedBitwiseCast ownership behaves like RefToUnowned. It produces an
-// Unowned values from a non-trivial value, without consuming or borrowing the
+// Unowned value from a non-trivial value, without consuming or borrowing the
 // non-trivial value. Unlike RefToUnowned, a bitwise cast works on a compound
 // value and may truncate the value. The resulting value is still Unowned and
 // should be immediately copied to produce an owned value. These happen for two

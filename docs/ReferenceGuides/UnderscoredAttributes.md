@@ -478,6 +478,7 @@ Marks an import to be used in SPI and implementation details only.
 The import statement will be printed in the private swiftinterface only and
 skipped in the public swiftinterface. Any use of imported types and decls in API
 will be diagnosed.
+Requires setting the frontend flag `-experimental-spi-only-imports`.
 
 ## `@_implements(ProtocolName, Requirement)`
 

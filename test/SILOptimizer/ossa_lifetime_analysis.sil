@@ -1,0 +1,134 @@
+// RUN: %target-sil-opt %s -ossa-lifetime-analysis -o /dev/null | %FileCheck %s
+//
+// These tests rely on "incomplete" OSSA lifetimes. Incomplete OSSA
+// lifetimes are invalid SIL, but the OSSA liveness utilities still
+// need to handle them! SILGen and textual SIL is allowed to produce
+// incomplete lifetimes. The OSSA liveness utilities need to be able
+// to fixup those incomplete lifetimes. So the utilities need to
+// handle invalid SIL in order to produce valid SIL.
+//
+// For each function, all values used by debug_value [trace] are
+// considered live range defs. Liveness is computed from their direct uses.
+
+sil_stage canonical
+
+import Builtin
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class C {}
+class D {
+  var object: C
+}
+
+// CHECK-LABEL: @testSelfLoop
+// CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
+// CHECK: bb1: LiveOut
+// CHECK: bb2: LiveWithin
+// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
+// CHECK: last user:   br bb1([[V]] : $C)
+// CHECK-NOT: dead def
+sil [ossa] @testSelfLoop : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  br bb3
+
+bb1(%1 : @owned $C):
+  destroy_value %1 : $C
+  %2 = copy_value %0 : $C
+  debug_value [trace] %2 : $C
+  br bb2
+
+bb2:
+  br bb1(%2 : $C)
+
+bb3:
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testSelfKill
+// CHECK:SSA lifetime analysis:   [[V:%.*]] = move_value %1 : $C
+// CHECK: bb1: LiveOut
+// CHECK: bb2: LiveWithin
+// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
+// CHECK: last user:   br bb1([[V]] : $C)
+// CHECK-NOT: dead def
+sil [ossa] @testSelfKill : $@convention(thin) () -> () {
+bb0:
+  br bb3
+
+bb1(%1 : @owned $C):
+  %2 = move_value %1 : $C
+  debug_value [trace] %2 : $C
+  br bb2
+
+bb2:
+  br bb1(%2 : $C)
+
+bb3:
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Test a live range that is extended through reborrows,
+// considering them new defs.
+// (e.g. BorrowedValue::visitTransitiveLifetimeEndingUses)
+//
+// This live range is not dominated by the original borrow.
+//
+// CHECK-LABEL: @testReborrow
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def:   [[B:%.*]] = begin_borrow %0 : $C
+// CHECK:   def:   [[RB:%.*]] = argument of bb3 : $C
+// CHECK-NEXT: bb2: LiveWithin
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: lifetime-ending user:   br bb3([[B]] : $C)
+// CHECK-NEXT: lifetime-ending user:   end_borrow [[RB]] : $C
+// CHECK-NEXT: last user:   br bb3([[B]] : $C)
+// CHECK-NEXT: last user:   end_borrow [[RB]] : $C
+sil [ossa] @testReborrow : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %0 : $C
+  br bb3(%borrow1 : $C)
+
+bb2:
+  %borrow2 = begin_borrow %0 : $C
+  debug_value [trace] %borrow2 : $C
+  br bb3(%borrow2 : $C)
+
+bb3(%reborrow : @guaranteed $C):
+  debug_value [trace] %reborrow : $C
+  end_borrow %reborrow : $C
+  br bb4
+
+bb4:
+  destroy_value %0 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testGuaranteedForwarding
+// CHECK: SSA lifetime analysis:   [[C:%.*]] = unchecked_ref_cast %{{.*}} : $D to $C
+// CHECK: bb0: LiveWithin
+// CHECK: regular user: %{{.*}} = load [copy]
+// CHECK: last user:    %{{.*}} = load [copy]
+sil [ossa] @testGuaranteedForwarding : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %borrow0 = begin_borrow %0 : $D
+  %c = unchecked_ref_cast %borrow0 : $D to $C
+  debug_value [trace] %c : $C
+  %d = unchecked_ref_cast %c : $C to $D
+  %f = ref_element_addr %d : $D, #D.object
+  %o = load [copy] %f : $*C
+  end_borrow %borrow0 : $D
+  destroy_value %o : $C
+  destroy_value %0 : $D
+  %99 = tuple()
+  return %99 : $()
+}

@@ -1,0 +1,1071 @@
+// RUN: %target-sil-opt %s -parse-serialized-sil -module-name test -compute-side-effects | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+enum Never {}
+
+final class X {
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
+
+  init()
+  deinit
+}
+
+class Y {
+}
+
+struct SP {
+  var value: X
+}
+
+struct TwoSPs {
+  var sp1: SP
+  var sp2: SP
+}
+
+enum EP {
+  case none
+  case data(SP, Builtin.Int1)
+}
+
+class List {
+  var x: Int32
+  let next: List
+}
+
+struct S {
+  var l: List
+  var y: Int32
+}
+
+struct Ptr {
+  var p: Int32
+}
+
+
+sil_global public @global_var : $Int32
+
+sil [_semantics "programtermination_point"] @exitfunc : $@convention(thin) () -> Never
+sil [readnone] @pure_func : $@convention(thin) () -> ()
+sil [readnone] @readnone_owned : $@convention(thin) (@owned X) -> @owned X
+sil [releasenone] @releasenone_func : $@convention(thin) () -> ()
+sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
+sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+sil [readonly] @readonly_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X
+sil [readnone] @readnone_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X
+
+sil @unknown_func : $@convention(thin) () -> ()
+sil @unknown_func_with_in_arg : $@convention(thin) (@in X) -> ()
+sil @unknown_func_with_in_guaranteed_arg : $@convention(thin) (@in_guaranteed X) -> ()
+sil @unknown_func_with_inout_arg : $@convention(thin) (@inout SP) -> ()
+sil @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> ()
+
+
+sil @$s4test1XCfD : $@convention(method) (@owned X) -> () {
+[global: copy, write]
+}
+
+// CHECK-LABEL: sil @load_store_to_args
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %l1 = load %0 : $*Int32
+  store %l1 to %1  : $*Int32
+  %a = ref_element_addr %2 : $X, #X.a
+  store %l1 to %a : $*Int32
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_load_store_to_args1
+// CHECK-NEXT:  [%0: write c0.v**]
+// CHECK-NEXT:  [%1: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_load_store_to_args1 : $@convention(thin) (@guaranteed X, @inout Int32, @inout Int32) -> () {
+bb0(%0 : $X, %1 : $*Int32, %2 : $*Int32):
+  %s = alloc_stack $Int32
+
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %f(%1, %s, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+
+  dealloc_stack %s : $*Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_load_store_to_args2
+// CHECK-NEXT:  [%0: read c1.v**, write c0.v**]
+// CHECK-NEXT:  [%1: read v**]
+// CHECK-NEXT:  [global: write]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_load_store_to_args2 : $@convention(thin) (@guaranteed X, @inout Int32) -> () {
+bb0(%0 : $X, %1 : $*Int32):
+  %xa = ref_element_addr %0 : $X, #X.x
+  %x2 = load %xa : $*X
+  %a = ref_element_addr %x2 : $X, #X.a
+
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %f(%1, %a, %0) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @partial_apply_load_store_to_args
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%2: write c0.v**, destroy c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c = partial_apply %f(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  // The apply may call deinit of the callee_owned thick function. Therefore the
+  // function effects are conservative.
+  // %c is implicitly released which may call deinit of the boxed X.
+  %ap = apply %c(%0) : $@callee_owned (@inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @guaranteed_partial_apply_load_store_to_args
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @guaranteed_partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c = partial_apply [callee_guaranteed] %f(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %c(%0) : $@callee_guaranteed (@inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @stack_partial_apply_load_store_to_args
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @stack_partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c = partial_apply [on_stack] %f(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %ap = apply %c(%0) : $@noescape @callee_owned (@inout Int32) -> ()
+  dealloc_stack %c : $@noescape @callee_owned (@inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @load_store_to_unknown
+// CHECK-NEXT:  [%1: read c1.v**]
+// CHECK-NEXT:  [global: read,write]
+// CHECK-NEXT:  {{^[^[]}}
+sil @load_store_to_unknown : $@convention(thin) (Int32, @guaranteed X) -> () {
+bb0(%0 : $Int32, %1 : $X):
+  %xa = ref_element_addr %1 : $X, #X.x
+  %x2 = load %xa : $*X
+  %a = ref_element_addr %x2 : $X, #X.a
+  store %0 to %a  : $*Int32
+  %l = load %a : $*Int32
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @retain_and_store
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: copy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @retain_and_store : $@convention(thin) (@guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $X):
+  strong_retain %1 : $X
+  store %1 to %0  : $*X
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @release_owned
+// CHECK-NEXT:  [%0: destroy c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @release_owned : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  strong_release %0 : $X
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_unknown
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_unknown : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @unknown_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_unknown_func_with_trivial_args
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> () {
+bb0(%0 : $*Int32, %1 : $Int32):
+  %2 = function_ref @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@in Int32, Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @load_store_to_local
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @load_store_to_local : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %x = alloc_ref $X
+  %a = ref_element_addr %x : $X, #X.a
+  store %0 to %a : $*Int32
+  %l1 = load %a : $*Int32
+
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int32>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int32>, 0
+  store %0 to %ba : $*Int32
+  %l2 = load %ba : $*Int32
+
+  %s = alloc_stack $Int32
+  store %0 to %s : $*Int32
+  %l3 = load %s : $*Int32
+  dealloc_stack %s : $*Int32
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @condfail
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @condfail : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_fail %0 : $Builtin.Int1
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @checkedcast
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @checkedcast : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  unconditional_checked_cast %0 : $Builtin.NativeObject to X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @checkedaddr
+sil @checkedaddr : $@convention(thin) (Builtin.NativeObject, X) -> () {
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+bb0(%0 : $Builtin.NativeObject, %1 : $X):
+  unconditional_checked_cast_addr Builtin.NativeObject in %0 : $Builtin.NativeObject to X in %1 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_project_box
+// CHECK-NEXT:  [%0: read c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_project_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+  %a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %l = load %a : $*Builtin.Int32
+  return %l : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @projections
+// CHECK-NEXT:  [%0: read e1.0.s0.c0.s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @projections : $@convention(thin) (@guaranteed EP) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $EP):
+  %1 = unchecked_enum_data %0 : $EP, #EP.data!enumelt
+  %2 = tuple_extract %1 : $(SP, Builtin.Int1), 0
+  %3 = struct_extract %2 : $SP, #SP.value
+  %b = begin_borrow %3 : $X
+  %4 = ref_element_addr %b : $X, #X.a
+  %5 = begin_access [read] [dynamic] %4 : $*Int32
+  %6 = struct_element_addr %5 : $*Int32, #Int32._value
+  %7 = load [trivial] %6 : $*Builtin.Int32
+  end_access %5 : $*Int32
+  end_borrow %b : $X
+  return %7 : $Builtin.Int32
+}
+
+sil @two_addr_args : $@convention(thin) (@inout Int32, @inout SP) -> () {
+[%0: write s1]
+[%1: write s0.v**]
+[global: ]
+}
+
+// CHECK-LABEL: sil [ossa] @path_concatenation
+// CHECK-NEXT:  [%0: write s0.c0.s1]
+// CHECK-NEXT:  [%1: write s1.s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @path_concatenation : $@convention(thin) (@guaranteed SP, @inout TwoSPs) -> () {
+bb0(%0 : @guaranteed $SP, %1 : $*TwoSPs):
+  %2 = struct_extract %0 : $SP, #SP.value
+  %3 = ref_element_addr %2 : $X, #X.a
+  %4 = struct_element_addr %1 : $*TwoSPs, #TwoSPs.sp2
+  %f = function_ref @two_addr_args : $@convention(thin) (@inout Int32, @inout SP) -> ()
+  %ap = apply %f(%3, %4) : $@convention(thin) (@inout Int32, @inout SP) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @two_addr_args2 : $@convention(thin) (@inout Int32, @inout X) -> () {
+[%0: write v**]
+[%1: write v**]
+}
+
+// CHECK-LABEL: sil [ossa] @path_merging
+// CHECK-NEXT:  [%0: write s0.c*.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @path_merging : $@convention(thin) (@guaranteed SP) -> () {
+bb0(%0 : @guaranteed $SP):
+  %1 = struct_extract %0 : $SP, #SP.value
+  %2 = ref_element_addr %1 : $X, #X.a
+  %3 = ref_element_addr %1 : $X, #X.x
+  %f = function_ref @two_addr_args2 : $@convention(thin) (@inout Int32, @inout X) -> ()
+  %ap = apply %f(%2, %3) : $@convention(thin) (@inout Int32, @inout X) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @multiple_arg_roots1
+// CHECK-NEXT:  [%0: read s0.c0.v**]
+// CHECK-NEXT:  [%1: read c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @multiple_arg_roots1 : $@convention(thin) (@guaranteed SP, @guaranteed X) -> Int32 {
+bb0(%0 : $SP, %1 : $X):
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = struct_extract %0 : $SP, #SP.value
+  br bb3(%2 : $X)
+bb2:
+  br bb3(%1 : $X)
+bb3(%5 : $X):
+  %6 = ref_element_addr %5 : $X, #X.a
+  %7 = load %6 : $*Int32
+  return %7 : $Int32
+}
+
+// CHECK-LABEL: sil @multiple_arg_roots_and_load
+// CHECK-NEXT:  [%0: read s0.c0.v**]
+// CHECK-NEXT:  [%1: read c0.v**]
+// CHECK-NEXT:  [%2: read v**]
+// CHECK-NEXT:  [global: read]
+// CHECK-NEXT:  {{^[^[]}}
+sil @multiple_arg_roots_and_load : $@convention(thin) (@guaranteed SP, @guaranteed X, @in_guaranteed X) -> Int32 {
+bb0(%0 : $SP, %1 : $X, %2 : $*X):
+  cond_br undef, bb1, bb2
+bb1:
+  cond_br undef, bb3, bb4
+bb2:
+  %5 = struct_extract %0 : $SP, #SP.value
+  br bb5(%5 : $X)
+bb3:
+  br bb5(%1 : $X)
+bb4:
+  %8 = load %2 : $*X
+  br bb5(%8 : $X)
+bb5(%10 : $X):
+  %11 = ref_element_addr %10 : $X, #X.a
+  %12 = load %11 : $*Int32
+  return %12 : $Int32
+}
+
+// CHECK-LABEL: sil @load_from_global_var
+// CHECK-NEXT:  [global: read]
+// CHECK-NEXT:  {{^[^[]}}
+sil @load_from_global_var : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = global_addr @global_var : $*Int32
+  %1 = load %0 : $*Int32
+  return %1 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @forward_to_return
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @forward_to_return : $@convention(thin) (@owned SP) -> @owned SP {
+bb0(%0 : @owned $SP):
+  return %0 : $SP
+}
+
+// CHECK-LABEL: sil [ossa] @store_destoys
+// CHECK-NEXT:  [%0: write v**, destroy v**]
+// CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @store_destoys : $@convention(thin) (@inout X, @owned X) -> () {
+bb0(%0 : $*X, %1 : @owned $X):
+  store %1 to [assign] %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unknown_destructor_effects
+// CHECK-NEXT:  [%0: write v**, destroy v**]
+// CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @unknown_destructor_effects : $@convention(thin) (@inout Y, @owned Y) -> () {
+bb0(%0 : $*Y, %1 : @owned $Y):
+  store %1 to [assign] %0 : $*Y
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_doesnt_destroy
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @store_doesnt_destroy : $@convention(thin) (@owned X) -> @out X {
+bb0(%0 : $*X, %1 : @owned $X):
+  store %1 to [init] %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_destoys
+// CHECK-NEXT:  [%0: write v**, destroy v**]
+// CHECK-NEXT:  [%1: read v**, copy v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_destoys : $@convention(thin) (@inout X, @in_guaranteed X) -> () {
+bb0(%0 : $*X, %1 : $*X):
+  copy_addr %1 to %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_doesnt_destoy
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: read v**, copy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_doesnt_destoy : $@convention(thin) (@in_guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $*X):
+  copy_addr %1 to [initialization] %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_value_effects1
+// CHECK-NEXT:  [%0: destroy v**.c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @destroy_value_effects1 : $@convention(thin) (@owned SP) -> () {
+bb0(%0 : @owned $SP):
+  destroy_value %0 : $SP
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_value_effects2
+// CHECK-NEXT:  [%0: destroy s0.c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @destroy_value_effects2 : $@convention(thin) (@owned SP) -> () {
+bb0(%0 : @owned $SP):
+  (%1) = destructure_struct %0 : $SP
+  destroy_value %1 : $X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_addr_effects
+// CHECK-NEXT:  [%0: destroy v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @destroy_addr_effects : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  destroy_addr %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @release_value_effects
+// CHECK-NEXT:  [%0: destroy c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @release_value_effects : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  release_value %0 : $X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @strong_release_effects
+// CHECK-NEXT:  [%0: destroy c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @strong_release_effects : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  strong_release %0 : $X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @load_and_release
+// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @load_and_release : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  strong_release %1 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_and_destroy
+// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @load_take_and_destroy : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = load [take] %0 : $*X
+  destroy_value %1 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_copy_and_destroy
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @load_copy_and_destroy : $@convention(thin) (@in_guaranteed X) -> () {
+bb0(%0 : $*X):
+  %1 = load [copy] %0 : $*X
+  destroy_value %1 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_take_and_destroy
+// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_addr_take_and_destroy : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = alloc_stack $X
+  copy_addr [take] %0 to [initialization] %1 : $*X
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_take_and_init
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_addr_take_and_init : $@convention(thin) (@in X) -> @out X {
+bb0(%0 : $*X, %1 : $*X):
+  copy_addr [take] %1 to [initialization] %0 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_and_destroy
+// CHECK-NEXT:  [%0: read v**, copy v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_addr_and_destroy : $@convention(thin) (@in_guaranteed X) -> () {
+bb0(%0 : $*X):
+  %1 = alloc_stack $X
+  copy_addr %0 to [initialization] %1 : $*X
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @pass_arg_to_unknown_function
+// CHECK-NEXT:  [%0: read s1.v**, write s1.v**, copy s1.v**, destroy s1.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @pass_arg_to_unknown_function : $@convention(thin) (@inout TwoSPs) -> () {
+bb0(%0 : $*TwoSPs):
+  %1 = struct_element_addr %0 : $*TwoSPs, #TwoSPs.sp2
+  %f = function_ref @unknown_func_with_inout_arg : $@convention(thin) (@inout SP) -> ()
+  %a = apply %f(%1) : $@convention(thin) (@inout SP) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_and_consume_by_unknown_func
+// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_addr_and_consume_by_unknown_func : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = alloc_stack $X
+  copy_addr [take] %0 to [initialization] %1 : $*X
+  %f = function_ref @unknown_func_with_in_arg : $@convention(thin) (@in X) -> ()
+  %a = apply %f(%1) : $@convention(thin) (@in X) -> ()
+  dealloc_stack %1 : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_noreturn
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_noreturn : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %u = function_ref @exitfunc : $@convention(thin) () -> Never
+  %a = apply %u() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_readnone
+// CHECK-NEXT:  [global: copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_readnone : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @pure_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_releasenone
+// CHECK-NEXT:  [global: read,write,copy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_releasenone : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @releasenone_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// CHECK-LABEL: sil @call_readonly_owned
+// CHECK-NEXT:  [%0: read c*.v**, copy c*.v**]
+// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_readonly_owned : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  %u = function_ref @readonly_owned : $@convention(thin) (@owned X) -> ()
+  %a = apply %u(%0) : $@convention(thin) (@owned X) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @call_readnone_owned
+// CHECK-NEXT:  [%0: copy c*.v**]
+// CHECK-NEXT:  [global: copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @call_readnone_owned : $@convention(thin) (@owned X) -> @owned X {
+bb0(%0 : @owned $X):
+  %u = function_ref @readnone_owned : $@convention(thin) (@owned X) -> @owned X
+  %a = apply %u(%0) : $@convention(thin) (@owned X) -> @owned X
+  return %a : $X
+}
+
+// CHECK-LABEL: sil @call_readonly_guaranteed
+// CHECK-NEXT:  [%0: read c*.v**, copy c*.v**]
+// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_readonly_guaranteed : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  %u = function_ref @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+  %a = apply %u(%0) : $@convention(thin) (@guaranteed X) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_readonly_indirect_params
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: read v**, copy v**]
+// CHECK-NEXT:  [%2: read v**, copy v**]
+// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_readonly_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X {
+bb0(%0 : $*X, %1 : $*X, %2 : $*X):
+  %u = function_ref @readonly_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X
+  %a = apply %u(%0, %1, %2) : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_readnone_indirect_params
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [%1: read v**, copy v**]
+// CHECK-NEXT:  [%2: read v**, copy v**]
+// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_readnone_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X {
+bb0(%0 : $*X, %1 : $*X, %2 : $*X):
+  %u = function_ref @readonly_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X
+  %a = apply %u(%0, %1, %2) : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_unknown_func_with_in_guaranteed_arg
+// CHECK-NEXT:  [%0: read v**, copy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_unknown_func_with_in_guaranteed_arg : $@convention(thin) (@in_guaranteed X) -> () {
+bb0(%0 : $*X):
+  %1 = function_ref @unknown_func_with_in_guaranteed_arg : $@convention(thin) (@in_guaranteed X) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_escaping_in_argument
+// CHECK-NEXT:  [%0: read v**, copy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_escaping_in_argument : $@convention(thin) (@in_guaranteed X) -> () {
+bb0(%0 : $*X):
+  %1 = address_to_pointer %0 : $*X to $Builtin.RawPointer
+  %3 = function_ref @unknown_func : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_argument
+// CHECK-NEXT:  [%0: copy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @copy_argument : $@convention(thin) (@owned SP) -> @owned TwoSPs {
+bb0(%0 : @owned $SP):
+  %1 = copy_value %0 : $SP
+  %2 = struct $TwoSPs(%0 : $SP, %1 : $SP)
+  return %2 : $TwoSPs
+}
+
+// CHECK-LABEL: sil @fix_lifetime_test
+// CHECK-NEXT:  [%0: read c*.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @fix_lifetime_test : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  fix_lifetime %0 : $X
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @not_called_partial_apply
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @not_called_partial_apply : $@convention(thin) (@in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
+bb0(%0 : $*Int32):
+  %2 = function_ref @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+  %3 = partial_apply %2(%0) : $@convention(thin) (Bool, @in Int32) -> Int32
+  return %3 : $@callee_owned (Bool) -> Int32
+}
+
+// CHECK-LABEL: sil @two_nonstack_partial_applies
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @two_nonstack_partial_applies : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c1 = partial_apply [callee_guaranteed] %f(%2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c2 = partial_apply [callee_guaranteed] %c1(%1) : $@callee_guaranteed (@inout Int32, @inout Int32) -> ()
+  %ap = apply %c2(%0) : $@callee_guaranteed (@inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @two_stack_partial_applies
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @two_stack_partial_applies : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
+  %f = function_ref @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c1 = partial_apply [on_stack] %f(%2) : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> ()
+  %c2 = partial_apply [on_stack] %c1(%1) : $@noescape @callee_owned (@inout Int32, @inout Int32) -> ()
+  %ap = apply %c2(%0) : $@noescape @callee_owned (@inout Int32) -> ()
+  dealloc_stack %c2 : $@noescape @callee_owned (@inout Int32) -> ()
+  dealloc_stack %c1 : $@noescape @callee_owned (@inout Int32, @inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @closure : $@convention(thin) (Bool, @in Int32) -> Int32
+
+sil public_external @public_external_func : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_public_external_func
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_public_external_func : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @public_external_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_escaping_allocation
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @non_escaping_allocation : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $X
+  destroy_value %0 :$X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @escaping_allocation
+// CHECK-NEXT:  [global: allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @escaping_allocation : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  return %0 : $X
+}
+
+// CHECK-LABEL: sil [ossa] @readIdentifiedArg
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int32) -> Int32 {
+bb0(%0 : $*Int32):
+  %res = load [trivial] %0 : $*Int32
+  return %res : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @writeIdentifiedArg
+// CHECK-NEXT:  [%0: write v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int32) -> () {
+bb0(%0 : $*Int32):
+  %2 = integer_literal $Builtin.Int32, 42
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  store %3 to [trivial] %0 : $*Int32
+  %5 = tuple ()
+  return %5 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @$writeToHead
+// CHECK-NEXT:  [%0: write s0.c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @$writeToHead : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  debug_value %0 : $S, let, name "s", argno 1
+  %2 = struct_extract %0 : $S, #S.l
+  %3 = integer_literal $Builtin.Int32, 10
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = begin_borrow [lexical] %2 : $List
+  %6 = ref_element_addr %5 : $List, #List.x
+  %7 = begin_access [modify] [dynamic] %6 : $*Int32
+  store %4 to [trivial] %7 : $*Int32
+  end_access %7 : $*Int32
+  end_borrow %5 : $List
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @storeToArgs
+// CHECK-NEXT:  [%0: write c0.v**]
+// CHECK-NEXT:  [%1: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
+bb0(%1 : @guaranteed $List, %2 : @guaranteed $List):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %8 = integer_literal $Builtin.Int32, 10
+  %9 = struct $Int32 (%8 : $Builtin.Int32)
+  %10 = ref_element_addr %1 : $List, #List.x
+  %11 = begin_access [modify] [dynamic] %10 : $*Int32
+  store %9 to [trivial] %11 : $*Int32
+  end_access %11 : $*Int32
+  %14 = tuple ()
+  br bb3
+
+bb2:
+  %16 = integer_literal $Builtin.Int32, 20
+  %17 = struct $Int32 (%16 : $Builtin.Int32)
+  %18 = ref_element_addr %2 : $List, #List.x
+  %19 = begin_access [modify] [dynamic] %18 : $*Int32
+  store %17 to [trivial] %19 : $*Int32
+  end_access %19 : $*Int32
+  %22 = tuple ()
+  br bb3
+
+bb3:
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil @storeMaybeLocalPhi
+// CHECK-NEXT:  [%0: read c*.v**, write c*.v**, copy **, destroy c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @storeMaybeLocalPhi : $@convention(thin) (@guaranteed List) -> () {
+bb0(%1 : $List):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %1 : $List
+  br bb3(%1 : $List)
+
+bb2:
+  %10 = alloc_ref $List
+  br bb3(%10 : $List)
+
+bb3(%12 : $List):
+  %14 = integer_literal $Builtin.Int32, 20
+  %15 = struct $Int32 (%14 : $Builtin.Int32)
+  %16 = ref_element_addr %12 : $List, #List.x
+  %17 = begin_access [modify] [dynamic] %16 : $*Int32
+  store %15 to %17 : $*Int32
+  end_access %17 : $*Int32
+  %20 = tuple ()
+  strong_release %12 : $List
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testStructPhiCommon
+// CHECK-NEXT:  [%0: write s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
+bb0(%0 : $*Ptr):
+  %2 = struct_element_addr %0 : $*Ptr, #Ptr.p
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = address_to_pointer %2 : $*Int32 to $Builtin.RawPointer
+  br bb3(%3 : $Builtin.RawPointer)
+
+bb2:
+  %5 = address_to_pointer %2 : $*Int32 to $Builtin.RawPointer
+  br bb3(%5 : $Builtin.RawPointer)
+
+bb3(%6 : $Builtin.RawPointer) :
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*Int32
+  %8 = integer_literal $Builtin.Int32, 2
+  %9 = struct $Int32 (%8 : $Builtin.Int32)
+  store %9 to [trivial] %7 : $*Int32
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @calleeWriteToHead
+// CHECK-NEXT:  [%0: write s0.c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @calleeWriteToHead : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  debug_value %0 : $S, let, name "s", argno 1
+  %2 = struct_extract %0 : $S, #S.l
+  %3 = integer_literal $Builtin.Int32, 10
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = begin_borrow [lexical] %2 : $List
+  %6 = ref_element_addr %5 : $List, #List.x
+  %7 = begin_access [modify] [dynamic] %6 : $*Int32
+  %writeArg = function_ref @writeIdentifiedArg : $@convention(thin) (@inout Int32) -> ()
+  %app = apply %writeArg(%7) : $@convention(thin) (@inout Int32) -> ()
+  end_access %7 : $*Int32
+  end_borrow %5 : $List
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @has_partial_apply
+// CHECK-NEXT:  [%0: write c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @has_partial_apply : $@convention(thin) (@guaranteed List) -> () {
+bb0(%0 : @guaranteed $List):
+  %f = function_ref @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> ()
+  %clo = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed List, @guaranteed List) -> ()
+  %res = apply %clo(%0) : $@noescape @callee_guaranteed (@guaranteed List) -> ()
+  dealloc_stack %clo : $@noescape @callee_guaranteed (@guaranteed List) -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @readIdentifiedBoxArg
+// CHECK-NEXT:  [%0: read c0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int32 }) -> Int32 {
+bb0(%0 : @guaranteed ${ var Int32 }):
+  %1 = project_box %0 : ${ var Int32 }, 0
+  %5 = begin_access [read] [dynamic] %1 : $*Int32
+  %6 = load [trivial] %5 : $*Int32
+  end_access %5 : $*Int32
+  return %6 : $Int32
+}

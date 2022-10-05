@@ -118,7 +118,7 @@ public:
   Address getCallerErrorResultSlot();
 
   /// Set the error result slot for the current function.
-  void setCallerErrorResultSlot(llvm::Value *address);
+  void setCallerErrorResultSlot(Address address);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -184,9 +184,9 @@ private:
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
-  llvm::Value *CalleeErrorResultSlot = nullptr;
-  llvm::Value *AsyncCalleeErrorResultSlot = nullptr;
-  llvm::Value *CallerErrorResultSlot = nullptr;
+  Address CalleeErrorResultSlot;
+  Address AsyncCalleeErrorResultSlot;
+  Address CallerErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
@@ -259,16 +259,12 @@ public:
                                               Address addr,
                                               bool isFar);
 
-  llvm::Value *
-  emitLoadOfRelativeIndirectablePointer(Address addr, bool isFar,
-                                        llvm::PointerType *expectedType,
-                                        const llvm::Twine &name = "");
   llvm::Value *emitLoadOfRelativePointer(Address addr, bool isFar,
-                                         llvm::PointerType *expectedType,
+                                         llvm::Type *expectedPointedToType,
                                          const llvm::Twine &name = "");
   llvm::Value *
   emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
-                                   llvm::PointerType *expectedType,
+                                   llvm::Type *expectedPointedToType,
                                    const llvm::Twine &name = "");
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,

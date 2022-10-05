@@ -255,7 +255,7 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 /// resigning the identity requires a call into the \p actorSystem.
 /// Since deinitialization consistently happens in-order, according to the
 /// listing returned by \p NominalTypeDecl::getStoredProperties
-/// it is important the the VarDecl for the \p id is synthesized before
+/// it is important the VarDecl for the \p id is synthesized before
 /// the \p actorSystem so that we get the right ordering in DI and deinits.
 ///
 /// \param nomDecl a distributed actor decl
@@ -468,22 +468,35 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
-  // If we aren't representing 'self' in a non-delegating initializer, then we
-  // can't have 'let' properties.
-  if (!isNonDelegatingInit())
-    return IsLet;
+  NullablePtr<NominalTypeDecl> NTD;
 
-  auto &Module = MemoryInst->getModule();
+  // If this is an element of a `_storage` tuple, we need to
+  // check the `$Storage` to determine whether underlying storage
+  // backing element is immutable.
+  if (auto *storageVar = getAsTypeWrapperLocalStorageVar()) {
+    auto *wrappedType = cast<NominalTypeDecl>(
+        storageVar->getDeclContext()->getInnermostTypeContext());
+    assert(wrappedType && "_storage reference without type wrapper");
+    NTD = wrappedType->getTypeWrapperStorageDecl();
+  } else {
+    // If we aren't representing 'self' in a non-delegating initializer, then we
+    // can't have 'let' properties.
+    if (!isNonDelegatingInit())
+      return IsLet;
 
-  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
+    NTD = MemorySILType.getNominalOrBoundGenericNominal();
+  }
+
   if (!NTD) {
     // Otherwise, we miscounted elements?
     assert(Element == 0 && "Element count problem");
     return false;
   }
 
+  auto &Module = MemoryInst->getModule();
+
   auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
-  for (auto *VD : NTD->getStoredProperties()) {
+  for (auto *VD : NTD.get()->getStoredProperties()) {
     auto FieldType = MemorySILType.getFieldType(VD, Module, expansionContext);
     unsigned NumFieldElements =
         getElementCountRec(expansionContext, Module, FieldType, false);

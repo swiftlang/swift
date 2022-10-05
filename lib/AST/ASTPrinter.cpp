@@ -2738,10 +2738,6 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureActors2(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->isSendable())
@@ -2844,17 +2840,6 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
 }
 
 static bool usesFeatureGlobalActors(Decl *decl) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    if (nominal->getAttrs().hasAttribute<GlobalActorAttr>())
-      return true;
-  }
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto nominal = ext->getExtendedNominal())
-      if (usesFeatureGlobalActors(nominal))
-        return true;
-  }
-
   return false;
 }
 

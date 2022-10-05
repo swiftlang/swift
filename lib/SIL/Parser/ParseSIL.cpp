@@ -6670,9 +6670,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         StringRef effectsStr = P.SourceMgr.extractText(
                       CharSourceRange(P.SourceMgr, effectsStart, effectsEnd));
 
-        auto error = FunctionState.F->parseEffects(effectsStr, /*fromSIL*/true,
-                                     /*argumentIndex*/ -1, /*isDerived*/ false,
-                                     {});
+        auto error = FunctionState.F->parseMultipleEffectsFromSIL(effectsStr);
         if (error.first) {
           SourceLoc loc = effectsStart;
           if (loc.isValid())
