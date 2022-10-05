@@ -1506,6 +1506,8 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
+ERROR(expose_unsupported_actor_to_cxx,none,
+      "actor %0 can not be exposed to C++", (DeclName))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
