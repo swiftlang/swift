@@ -160,6 +160,8 @@ public:
   ConformancePath getConformancePath(Type type, ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
+  Type getReducedShape(Type type) const;
+
   llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();
 

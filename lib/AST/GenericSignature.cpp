@@ -534,6 +534,11 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
   return getRequirementMachine()->lookupNestedType(type, name);
 }
 
+Type
+GenericSignatureImpl::getReducedShape(Type type) const {
+  return getRequirementMachine()->getReducedShape(type);
+}
+
 unsigned GenericParamKey::findIndexIn(
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   // For depth 0, we have random access. We perform the extra checking so that

@@ -696,6 +696,27 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   return nullptr;
 }
 
+Type RequirementMachine::getReducedShape(Type type) const {
+  if (!type->isTypeSequenceParameter())
+    return Type();
+
+  auto rootType = type->getRootGenericParam();
+  auto term = Context.getMutableTermForType(rootType->getCanonicalType(),
+                                            /*proto=*/nullptr);
+
+  // Append the 'shape' symbol to the term.
+  term.add(Symbol::forShape(Context));
+
+  System.simplify(term);
+  verify(term);
+
+  // Remove the 'shape' symbol from the term.
+  assert(term.back().getKind() == Symbol::Kind::Shape);
+  MutableTerm reducedTerm(term.begin(), term.end() - 1);
+
+  return Map.getTypeForTerm(reducedTerm, getGenericParams());
+}
+
 void RequirementMachine::verify(const MutableTerm &term) const {
 #ifndef NDEBUG
   // If the term is in the generic parameter domain, ensure we have a valid
