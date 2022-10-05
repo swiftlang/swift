@@ -285,6 +285,7 @@ public:
   /// be hoisted over to avoid churn and infinite looping.
   static bool ignoredByDestroyHoisting(SILInstructionKind kind) {
     switch (kind) {
+    case SILInstructionKind::DebugValueInst:
     case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::CopyValueInst:
     case SILInstructionKind::BeginBorrowInst:
