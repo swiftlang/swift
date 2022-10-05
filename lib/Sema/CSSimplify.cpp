@@ -24,6 +24,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PackExpansionMatcher.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -2160,108 +2161,6 @@ static bool isInPatternMatchingContext(ConstraintLocatorBuilder locator) {
 
 namespace {
 
-struct MatchedPair {
-  Type lhs;
-  Type rhs;
-  unsigned idx;
-
-  MatchedPair(Type lhs, Type rhs, unsigned idx)
-    : lhs(lhs), rhs(rhs), idx(idx) {}
-};
-
-static PackType *gatherTupleElements(ArrayRef<TupleTypeElt> &elts,
-                                     Identifier name,
-                                     ASTContext &ctx) {
-  SmallVector<Type, 2> types;
-
-  if (!elts.empty() && elts.front().getName() == name) {
-    do {
-      types.push_back(elts.front().getType());
-      elts = elts.slice(1);
-    } while (!elts.empty() && !elts.front().hasName());
-  }
-
-  return PackType::get(ctx, types);
-}
-
-class TuplePackMatcher {
-  ASTContext &ctx;
-
-  ArrayRef<TupleTypeElt> lhsElts;
-  ArrayRef<TupleTypeElt> rhsElts;
-
-public:
-  SmallVector<MatchedPair, 4> pairs;
-
-  TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple)
-    : ctx(lhsTuple->getASTContext()),
-      lhsElts(lhsTuple->getElements()),
-      rhsElts(rhsTuple->getElements()) {}
-
-  bool match() {
-    unsigned idx = 0;
-
-    // Iterate over the two tuples in parallel, popping elements from
-    // the start.
-    while (true) {
-      // If both tuples have been exhausted, we're done.
-      if (lhsElts.empty() && rhsElts.empty())
-        return false;
-
-      if (lhsElts.empty()) {
-        assert(!rhsElts.empty());
-        return true;
-      }
-
-      // A pack expansion type on the left hand side absorbs all elements
-      // from the right hand side up to the next mismatched label.
-      auto lhsElt = lhsElts.front();
-      if (lhsElt.getType()->is<PackExpansionType>()) {
-        lhsElts = lhsElts.slice(1);
-
-        assert(lhsElts.empty() || lhsElts.front().hasName() &&
-               "Tuple element with pack expansion type cannot be followed "
-               "by an unlabeled element");
-
-        auto *rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
-        pairs.emplace_back(lhsElt.getType(), rhs, idx++);
-        continue;
-      }
-
-      if (rhsElts.empty()) {
-        assert(!lhsElts.empty());
-        return true;
-      }
-
-      // A pack expansion type on the right hand side absorbs all elements
-      // from the left hand side up to the next mismatched label.
-      auto rhsElt = rhsElts.front();
-      if (rhsElt.getType()->is<PackExpansionType>()) {
-        rhsElts = rhsElts.slice(1);
-
-        assert(rhsElts.empty() || rhsElts.front().hasName() &&
-               "Tuple element with pack expansion type cannot be followed "
-               "by an unlabeled element");
-
-        auto *lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
-        pairs.emplace_back(lhs, rhsElt.getType(), idx++);
-        continue;
-      }
-
-      // Neither side is a pack expansion. We must have an exact match.
-      if (lhsElt.getName() != rhsElt.getName())
-        return true;
-
-      lhsElts = lhsElts.slice(1);
-      rhsElts = rhsElts.slice(1);
-
-      pairs.emplace_back(lhsElt.getType(), rhsElt.getType(), idx++);
-    }
-
-    return false;
-  }
-};
-
 class TupleMatcher {
   TupleType *tuple1;
   TupleType *tuple2;
@@ -2274,6 +2173,8 @@ public:
     : tuple1(tuple1), tuple2(tuple2) {}
 
   bool matchBind() {
+    // FIXME: TuplePackMatcher should completely replace the non-variadic
+    // case too eventually.
     if (tuple1->containsPackExpansionType() ||
         tuple2->containsPackExpansionType()) {
       TuplePackMatcher matcher(tuple1, tuple2);
@@ -2302,6 +2203,8 @@ public:
   }
 
   bool matchInPatternMatchingContext() {
+    // FIXME: TuplePackMatcher should completely replace the non-variadic
+    // case too eventually.
     if (tuple1->containsPackExpansionType() ||
         tuple2->containsPackExpansionType()) {
       TuplePackMatcher matcher(tuple1, tuple2);
@@ -2329,6 +2232,8 @@ public:
   }
 
   bool matchSubtype() {
+    // FIXME: TuplePackMatcher should completely replace the non-variadic
+    // case too eventually.
     if (tuple1->containsPackExpansionType() ||
         tuple2->containsPackExpansionType()) {
       TuplePackMatcher matcher(tuple1, tuple2);
@@ -2365,6 +2270,8 @@ public:
   }
 
   bool matchConversion() {
+    // FIXME: TuplePackMatcher should completely replace the non-variadic
+    // case too eventually.
     if (tuple1->containsPackExpansionType() ||
         tuple2->containsPackExpansionType()) {
       TuplePackMatcher matcher(tuple1, tuple2);
