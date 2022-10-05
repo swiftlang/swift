@@ -874,12 +874,14 @@ void TBDGenVisitor::visitSubscriptDecl(SubscriptDecl *SD) {
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
-  addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
+  if (!NTD->getObjCImplementationDecl()) {
+    addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
 
-  // Generic types do not get metadata directly, only through the function.
-  if (!NTD->isGenericContext()) {
-    addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                          TypeMetadataAddress::AddressPoint));
+    // Generic types do not get metadata directly, only through the function.
+    if (!NTD->isGenericContext()) {
+      addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                            TypeMetadataAddress::AddressPoint));
+    }
   }
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
@@ -1017,6 +1019,12 @@ void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
+  if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+    // Generate symbols for the class instead of the extension.
+    visitClassDecl(CD);
+    return;
+  }
+
   if (!isa<ProtocolDecl>(ED->getExtendedNominal())) {
     addConformances(ED);
   }

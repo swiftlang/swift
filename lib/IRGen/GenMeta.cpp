@@ -3441,6 +3441,8 @@ namespace {
         MetadataLayout(IGM.getClassMetadataLayout(theClass)) {}
 
   public:
+    const ClassLayout &getFieldLayout() const { return FieldLayout; }
+
     SILType getLoweredType() {
       return IGM.getLoweredType(Target->getDeclaredTypeInContext());
     }
@@ -3452,7 +3454,12 @@ namespace {
 
     ClassFlags getClassFlags() { return ::getClassFlags(Target); }
 
-    void addClassFlags() { B.addInt32((uint32_t)asImpl().getClassFlags()); }
+    void addClassFlags() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
+      B.addInt32((uint32_t)asImpl().getClassFlags());
+    }
 
     void noteResilientSuperclass() {}
 
@@ -3486,6 +3493,9 @@ namespace {
     }
 
     void addValueWitnessTable() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       B.add(asImpl().getValueWitnessTable(false).getValue());
     }
 
@@ -3576,6 +3586,9 @@ namespace {
     }
 
     void addDestructorFunction() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (auto ptr = getAddrOfDestructorFunction(IGM, Target)) {
         B.addSignedPointer(*ptr,
                            IGM.getOptions().PointerAuth.HeapDestructors,
@@ -3588,6 +3601,9 @@ namespace {
     }
 
     void addIVarDestroyer() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
@@ -3610,6 +3626,9 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       B.addSignedPointer(asImpl().getNominalTypeDescriptor(),
                          IGM.getOptions().PointerAuth.TypeDescriptors,
                          PointerAuthEntity::Special::TypeDescriptor);
@@ -3624,6 +3643,9 @@ namespace {
     }
 
     void addInstanceAddressPoint() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       // Right now, we never allocate fields before the address point.
       B.addInt32(0);
     }
@@ -3633,6 +3655,9 @@ namespace {
     const ClassLayout &getFieldLayout() { return FieldLayout; }
 
     void addInstanceSize() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (asImpl().hasFixedLayout()) {
         B.addInt32(asImpl().getFieldLayout().getSize().getValue());
       } else {
@@ -3642,6 +3667,9 @@ namespace {
     }
     
     void addInstanceAlignMask() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       if (asImpl().hasFixedLayout()) {
         B.addInt16(asImpl().getFieldLayout().getAlignMask().getValue());
       } else {
@@ -3651,15 +3679,24 @@ namespace {
     }
 
     void addRuntimeReservedBits() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       B.addInt16(0);
     }
 
     void addClassSize() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       auto size = MetadataLayout.getSize();
       B.addInt32(size.FullSize.getValue());
     }
 
     void addClassAddressPoint() {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       // FIXME: Wrong
       auto size = MetadataLayout.getSize();
       B.addInt32(size.AddressPoint.getValue());
@@ -3691,13 +3728,16 @@ namespace {
       // Derive the RO-data.
       llvm::Constant *data = asImpl().getROData();
 
-      // Set a low bit to indicate this class has Swift metadata.
-      auto bit = llvm::ConstantInt::get(
-          IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
+      if (!asImpl().getFieldLayout().hasObjCImplementation()) {
+        // Set a low bit to indicate this class has Swift metadata.
+        auto bit = llvm::ConstantInt::get(
+            IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
 
-      // Emit data + bit.
-      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-      data = llvm::ConstantExpr::getAdd(data, bit);
+        // Emit data + bit.
+        data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
+        data = llvm::ConstantExpr::getAdd(data, bit);
+      }
+
       B.add(data);
     }
 
@@ -3876,6 +3916,8 @@ namespace {
       : IGM(IGM), Target(theClass), B(builder), FieldLayout(fieldLayout) {}
 
     llvm::Constant *emitNominalTypeDescriptor() {
+      if (FieldLayout.hasObjCImplementation())
+        return nullptr;
       return ClassContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
     }
 
@@ -3897,11 +3939,17 @@ namespace {
     }
 
     void addDestructorFunction() {
+      if (FieldLayout.hasObjCImplementation())
+        return;
+
       auto function = getAddrOfDestructorFunction(IGM, Target);
       B.addCompactFunctionReferenceOrNull(function ? *function : nullptr);
     }
 
     void addIVarDestroyer() {
+      if (FieldLayout.hasObjCImplementation())
+        return;
+
       auto function = IGM.getAddrOfIVarInitDestroy(Target,
                                                    /*isDestroyer=*/ true,
                                                    /*isForeign=*/ false,
@@ -3910,6 +3958,9 @@ namespace {
     }
 
     void addClassFlags() {
+      if (FieldLayout.hasObjCImplementation())
+        return;
+
       B.addInt32((uint32_t) getClassFlags(Target));
     }
 
@@ -3968,6 +4019,11 @@ namespace {
     }
 
     void layoutHeader() {
+      // @_objcImplementation on true (non-ObjC) generic classes doesn't make
+      // much sense, and we haven't updated this builder to handle it.
+      assert(!FieldLayout.hasObjCImplementation()
+             && "@_objcImplementation class with generic metadata?");
+
       super::layoutHeader();
 
       // RelativePointer<HeapObjectDestroyer> Destroy;
@@ -4332,6 +4388,10 @@ namespace {
 static void emitObjCClassSymbol(IRGenModule &IGM, ClassDecl *classDecl,
                                 llvm::Constant *metadata,
                                 llvm::Type *metadataTy) {
+  if (classDecl->getObjCImplementationDecl())
+    // Should already have this symbol.
+    return;
+
   auto entity = LinkEntity::forObjCClass(classDecl);
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
 

@@ -165,6 +165,9 @@ namespace {
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
 
+      if (theClass->getObjCImplementationDecl())
+        Options |= ClassMetadataFlags::ClassHasObjCImplementation;
+
       if (theClass->isGenericContext() && !theClass->hasClangNode())
         Options |= ClassMetadataFlags::ClassIsGeneric;
 
@@ -1116,6 +1119,15 @@ namespace {
       return pair.second;
     }
 
+    Optional<StringRef> getObjCImplCategoryName() const {
+      if (!TheExtension || !TheExtension->isObjCImplementation())
+        return None;
+      if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
+        assert(!ident->empty());
+        return ident->str();
+      }
+      return None;
+    }
     bool isBuildingClass() const {
       return TheEntity.isa<ClassUnion>() && !TheExtension;
     }
@@ -1210,11 +1222,11 @@ namespace {
         const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
-      visitConformances(getClass());
+      visitConformances(getClass()->getImplementationContext());
 
       if (getClass()->isRootDefaultActor())
         Ivars.push_back(Field::DefaultActorStorage);
-      visitMembers(getClass());
+      visitImplementationMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
         addIVarInitializer();
@@ -1228,9 +1240,9 @@ namespace {
           FieldLayout(nullptr) {
       buildCategoryName(CategoryName);
 
-      visitConformances(theExtension);
+      visitConformances(theExtension->getImplementationContext());
 
-      for (Decl *member : TheExtension->getMembers())
+      for (Decl *member : TheExtension->getImplementationContext()->getMembers())
         visit(member);
     }
 
@@ -1379,6 +1391,12 @@ namespace {
   private:
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
+
+      if (auto implementationCategoryName = getObjCImplCategoryName()) {
+        os << *implementationCategoryName;
+        return;
+      }
+
       // Find the module the extension is declared in.
       ModuleDecl *TheModule = TheExtension->getParentModule();
 
@@ -1392,7 +1410,10 @@ namespace {
     llvm::Constant *getClassMetadataRef() {
       auto *theClass = getClass();
 
-      if (theClass->hasClangNode())
+      // If this is truly an imported ObjC class, with no @_objcImplementation,
+      // someone else will emit the ObjC metadata symbol and we simply want to
+      // use it.
+      if (theClass->hasClangNode() && !theClass->getObjCImplementationDecl())
         return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
       // Note that getClassMetadataStrategy() will return

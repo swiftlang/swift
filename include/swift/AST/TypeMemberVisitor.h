@@ -59,6 +59,16 @@ public:
       asImpl().visit(member);
     }
   }
+
+  /// A convenience method to visit all the members in the implementation
+  /// context.
+  ///
+  /// \seealso IterableDeclContext::getImplementationContext()
+  void visitImplementationMembers(NominalTypeDecl *D) {
+    for (Decl *member : D->getImplementationContext()->getMembers()) {
+      asImpl().visit(member);
+    }
+  }
 };
 
 template<typename ImplClass, typename RetTy = void>
@@ -69,6 +79,10 @@ public:
 
   void visitMembers(ClassDecl *D) {
     TypeMemberVisitor<ImplClass, RetTy>::visitMembers(D);
+  }
+
+  void visitImplementationMembers(ClassDecl *D) {
+    TypeMemberVisitor<ImplClass, RetTy>::visitImplementationMembers(D);
   }
 };
 
