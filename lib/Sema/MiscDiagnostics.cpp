@@ -400,7 +400,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       auto layout = castType->getExistentialLayout();
       for (auto proto : layout.getProtocols()) {
-        if (proto->isMarkerProtocol()) {
+        // We allow checked cast to Reflectable marker protocol and handle it later.
+        if (proto->isMarkerProtocol() && !proto->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
           Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
                              proto->getName());
         }
