@@ -5,21 +5,55 @@
 import Foundation
 
 @_objcImplementation extension ImplClass {
+  @objc override init() {
+    self.implProperty = 0
+    super.init()
+  }
+
+  @objc var implProperty: Int
+
   @objc class func runTests() {
-    print(ImplClass().someMethod())
-    print(SwiftSubclass().someMethod())
+    let impl = ImplClass()
+    print("someMethod =", impl.someMethod())
+    print("implProperty =", impl.implProperty)
+    impl.implProperty = 42
+    print("implProperty =", impl.implProperty)
+
+    let swiftSub = SwiftSubclass()
+    print("someMethod =", swiftSub.someMethod())
+    print("implProperty =", swiftSub.implProperty)
+    swiftSub.implProperty = 42
+    print("implProperty =", swiftSub.implProperty)
+
+    print("otherProperty =", swiftSub.otherProperty)
+    swiftSub.otherProperty = 13
+    print("otherProperty =", swiftSub.otherProperty)
+    print("implProperty =", swiftSub.implProperty)
   }
 
   @objc func someMethod() -> String { "ImplClass.someMethod()" }
 }
 
 class SwiftSubclass: ImplClass {
+  @objc var otherProperty: Int = 1
+
+  override init() {
+    super.init()
+  }
+
   override func someMethod() -> String { "SwiftSubclass.someMethod()" }
 }
 
 // `#if swift` to ignore the inactive branch's contents
 #if swift(>=5.0) && TOP_LEVEL_CODE
 ImplClass.runTests()
-// CHECK: ImplClass.someMethod()
-// CHECK: SwiftSubclass.someMethod()
+// CHECK: someMethod = ImplClass.someMethod()
+// CHECK: implProperty = 0
+// CHECK: implProperty = 42
+// CHECK: someMethod = SwiftSubclass.someMethod()
+// CHECK: implProperty = 0
+// CHECK: implProperty = 42
+// CHECK: otherProperty = 1
+// CHECK: otherProperty = 13
+// CHECK: implProperty = 42
 #endif

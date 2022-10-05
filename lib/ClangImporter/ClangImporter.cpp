@@ -5229,6 +5229,13 @@ Decl *Decl::getImplementedObjCDecl() const {
              .interfaceDecl;
 }
 
+DeclContext *DeclContext::getImplementedObjCContext() const {
+  if (auto ED = dyn_cast<ExtensionDecl>(this))
+    if (auto impl = dyn_cast_or_null<DeclContext>(ED->getImplementedObjCDecl()))
+      return impl;
+  return const_cast<DeclContext *>(this);
+}
+
 Decl *Decl::getObjCImplementationDecl() const {
   if (!hasClangNode())
     // This *is* the implementation, if it has one.

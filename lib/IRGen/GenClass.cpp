@@ -227,7 +227,8 @@ namespace {
                                bool superclass) {
       if (theClass->hasClangNode() && !theClass->isForeignReferenceType()) {
         Options |= ClassMetadataFlags::ClassHasObjCAncestry;
-        return;
+        if (!theClass->getObjCImplementationDecl())
+          return;
       }
 
       if (theClass->isNativeNSObjectSubclass()) {

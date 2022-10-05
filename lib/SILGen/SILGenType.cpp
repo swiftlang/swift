@@ -1238,6 +1238,10 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
+    // Arguably, we should divert to SILGenType::emitType() here if it's an
+    // @_objcImplementation extension, but we don't actually need to do any of
+    // the stuff that it currently does.
+
     for (Decl *member : e->getABIMembers())
       visit(member);
 
@@ -1313,6 +1317,17 @@ public:
 
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasStorage()) {
+      if (!vd->isStatic()) {
+        // Is this a stored property of an @_objcImplementation extension?
+        auto ed = cast<ExtensionDecl>(vd->getDeclContext());
+        if (auto cd =
+                dyn_cast_or_null<ClassDecl>(ed->getImplementedObjCDecl())) {
+          // Act as though we declared it on the class.
+          SILGenType(SGM, cd).visitVarDecl(vd);
+          return;
+        }
+      }
+
       bool hasDidSetOrWillSetDynamicReplacement =
           vd->hasDidSetOrWillSetDynamicReplacement();
       assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&

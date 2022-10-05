@@ -3837,6 +3837,9 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       addFixedFieldOffset(IGM, B, var, [](DeclContext *dc) {
         return dc->getDeclaredTypeInContext();
       });
@@ -3873,12 +3876,18 @@ namespace {
       : super(IGM, theClass, builder, fieldLayout) {}
 
     void addFieldOffset(VarDecl *var) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       // Field offsets are either copied from the superclass or calculated
       // at runtime.
       B.addInt(IGM.SizeTy, 0);
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       for (unsigned i = 0,
                     e = placeholder->getNumberOfFieldOffsetVectorEntries();
            i < e; ++i) {
@@ -4338,6 +4347,9 @@ namespace {
     }
 
     void addFieldOffset(VarDecl *var) {
+      if (asImpl().getFieldLayout().hasObjCImplementation())
+        return;
+
       addFixedFieldOffset(IGM, B, var, [&](DeclContext *dc) {
         return dc->mapTypeIntoContext(type);
       });

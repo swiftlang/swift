@@ -507,6 +507,11 @@ public:
   LLVM_READONLY
   DeclContext *getModuleScopeContext() const;
 
+  /// If this DeclContext is an \c \@_objcImplementation extension, returns the
+  /// \c DeclContext for the Objective-C declaration it implements. Otherwise
+  /// returns \c this.
+  DeclContext *getImplementedObjCContext() const;
+
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.
   LLVM_READONLY

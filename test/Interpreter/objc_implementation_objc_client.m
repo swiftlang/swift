@@ -25,6 +25,8 @@
 
 @interface ObjCClientSubclass : ImplClass
 
+@property (assign) NSInteger otherProperty;
+
 - (NSString *)someMethod;
 
 @end
@@ -49,23 +51,61 @@ static void print(NSString *str) {
   }
 }
 
+static void printInt(NSString *str, NSUInteger num) {
+  NSString *fullStr =
+    [NSString stringWithFormat:@"%@ %lld", str, (long long)num];
+  print(fullStr);
+}
+
 int main() {
   [ImplClass runTests];
-  // CHECK: ImplClass.someMethod()
-  // CHECK: SwiftSubclass.someMethod()
+  // CHECK: someMethod = ImplClass.someMethod()
+  // CHECK: implProperty = 0
+  // CHECK: implProperty = 42
+  // CHECK: someMethod = SwiftSubclass.someMethod()
+  // CHECK: implProperty = 0
+  // CHECK: implProperty = 42
+  // CHECK: otherProperty = 1
+  // CHECK: otherProperty = 13
+  // CHECK: implProperty = 42
 
   fflush(stdout);
 
-  print([[[ImplClass alloc] init] someMethod]);
+  ImplClass *impl = [[ImplClass alloc] init];
+  print([impl someMethod]);
   // CHECK: ImplClass.someMethod()
+  printInt(@"implProperty", impl.implProperty);
+  // CHECK: implProperty 0
+  impl.implProperty = -2;
+  printInt(@"implProperty", impl.implProperty);
+  // CHECK: implProperty -2
 
-  print([[[ObjCClientSubclass alloc] init] someMethod]);
+  ObjCClientSubclass *objcSub = [[ObjCClientSubclass alloc] init];
+  print([objcSub someMethod]);
   // CHECK: -[ObjCClientSubclass someMethod]
+
+  printInt(@"implProperty", objcSub.implProperty);
+  // CHECK: implProperty 0
+  printInt(@"otherProperty", objcSub.otherProperty);
+  // CHECK: otherProperty 4
+  objcSub.implProperty = 7;
+  objcSub.otherProperty = 9;
+  printInt(@"implProperty", objcSub.implProperty);
+  // CHECK: implProperty 7
+  printInt(@"otherProperty", objcSub.otherProperty);
+  // CHECK: otherProperty 9
 
   return 0;
 }
 
 @implementation ObjCClientSubclass
+
+- (id)init {
+  if (self = [super init]) {
+    _otherProperty = 4;
+  }
+  return self;
+}
 
 - (NSString *)someMethod {
   return @"-[ObjCClientSubclass someMethod]";

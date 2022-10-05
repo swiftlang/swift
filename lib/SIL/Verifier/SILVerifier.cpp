@@ -3304,7 +3304,8 @@ public:
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
 
-    require(EI->getField()->getDeclContext() == cd,
+    require(EI->getField()->getDeclContext() ==
+                cd->getImplementationContext()->getAsGenericContext(),
             "ref_element_addr field must be a member of the class");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {

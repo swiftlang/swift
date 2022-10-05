@@ -33,16 +33,33 @@ import Foundation
 import objc_implementation
 
 ImplClass.runTests()
-// CHECK: ImplClass.someMethod()
-// CHECK: SwiftSubclass.someMethod()
+// CHECK: someMethod = ImplClass.someMethod()
+// CHECK: implProperty = 0
+// CHECK: implProperty = 42
+// CHECK: someMethod = SwiftSubclass.someMethod()
+// CHECK: implProperty = 0
+// CHECK: implProperty = 42
+// CHECK: otherProperty = 1
+// CHECK: otherProperty = 13
+// CHECK: implProperty = 42
 
-print(ImplClass().someMethod())
-// CHECK: ImplClass.someMethod()
+let impl = ImplClass()
+print(impl.someMethod(), impl.implProperty)
+// CHECK: ImplClass.someMethod() 0
 
 class SwiftClientSubclass: ImplClass {
+  override init() {}
+  var otherProperty = 2
   override func someMethod() -> String { "SwiftClientSubclass.someMethod()" }
 }
 
-print(SwiftClientSubclass().someMethod())
+let swiftClientSub = SwiftClientSubclass()
+print(swiftClientSub.someMethod())
 // CHECK: SwiftClientSubclass.someMethod()
+print(swiftClientSub.implProperty, swiftClientSub.otherProperty)
+// CHECK: 0 2
+swiftClientSub.implProperty = 3
+swiftClientSub.otherProperty = 9
+print(swiftClientSub.implProperty, swiftClientSub.otherProperty)
+// CHECK: 3 9
 
