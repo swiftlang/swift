@@ -2323,6 +2323,8 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       ArrayRef<TupleTypeElt> Elements);
   
+  bool containsPackExpansionType() const;
+
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties)

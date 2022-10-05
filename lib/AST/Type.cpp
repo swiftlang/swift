@@ -3459,6 +3459,15 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
+bool TupleType::containsPackExpansionType() const {
+  for (auto elt : getElements()) {
+    if (elt.getType()->is<PackExpansionType>())
+      return true;
+  }
+
+  return false;
+}
+
 ArchetypeType::ArchetypeType(TypeKind Kind,
                              const ASTContext &Ctx,
                              RecursiveTypeProperties properties,
