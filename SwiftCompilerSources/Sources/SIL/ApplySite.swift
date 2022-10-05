@@ -67,17 +67,30 @@ public protocol ApplySite : Instruction {
 extension ApplySite {
   public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
 
-  public var arguments: LazyMapSequence<OperandArray, Value> {
+  /// Returns the subset of operands which are argument operands.
+  ///
+  /// This does not include the callee function operand.
+  public var argumentOperands: OperandArray {
     let numArgs = ApplySite_getNumArguments(bridged)
     let offset = ApplyOperands.firstArgumentIndex
-    let argOps = operands[offset..<(numArgs + offset)]
-    return argOps.lazy.map { $0.value }
+    return operands[offset..<(numArgs + offset)]
+  }
+
+  /// Returns the subset of operand values which are arguments.
+  ///
+  /// This does not include the callee function operand.
+  public var arguments: LazyMapSequence<OperandArray, Value> {
+    argumentOperands.lazy.map { $0.value }
   }
 
   public var substitutionMap: SubstitutionMap {
     SubstitutionMap(ApplySite_getSubstitutionMap(bridged))
   }
 
+  /// Returns the argument index of an operand.
+  ///
+  /// Returns nil if 'operand' is not an argument operand. This is the case if
+  /// it's the callee function operand.
   public func argumentIndex(of operand: Operand) -> Int? {
     let opIdx = operand.index
     if opIdx >= ApplyOperands.firstArgumentIndex &&
@@ -87,6 +100,11 @@ extension ApplySite {
     return nil
   }
 
+  /// Returns true if `operand` is the callee function operand and not am argument operand.
+  public func isCalleeOperand(_ operand: Operand) -> Bool {
+    return operand.index < ApplyOperands.firstArgumentIndex
+  }
+  
   public func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention {
     return ApplySite_getArgumentConvention(bridged, calleeArgIndex).convention
   }

@@ -956,7 +956,7 @@ Functions
   decl ::= sil-function
   sil-function ::= 'sil' sil-linkage? sil-function-attribute+
                      sil-function-name ':' sil-type
-                     '{' argument-effect* sil-basic-block* '}'
+                     '{' effects* sil-basic-block* '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
 SIL functions are defined with the ``sil`` keyword. SIL function names
@@ -1128,20 +1128,32 @@ of runtime functions are allowed to be called from the function.
 Argument Effects
 ````````````````
 
-The effects for function arguments. For details see the documentation
-in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+The function effects, especially for function arguments. For details see the
+documentation in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
 ::
 
-  argument-effect ::= '[' argument-name defined-effect? ':' effect (',' effect)*]'
+  effects ::= '[' argument-name ':' argument-effect (',' argument-effect)*]'
+  effects ::= '[' 'global' ':' global-effect (',' global-effect)*]'
   argument-name ::= '%' [0-9]+
-  defined-effect ::= '!'    // the effect is defined in the source code and not
-                            // derived by the optimizer
 
-  effect ::= 'noescape' projection-path?
-  effect ::= 'escape' projection-path? '=>' arg-or-return  // exclusive escape
-  effect ::= 'escape' projection-path? '->' arg-or-return  // not-exclusive escape
+  argument-effect ::= 'noescape' defined-effect? projection-path?
+  argument-effect ::= 'escape' defined-effect? projection-path? '=>' arg-or-return  // exclusive escape
+  argument-effect ::= 'escape' defined-effect? projection-path? '->' arg-or-return  // not-exclusive escape
+  argument-effect ::= side-effect
+
+  global-effect ::= 'traps'
+  global-effect ::= 'allocates'
+  global-effect ::= side-effect
+
+  side-effect ::= 'read' projection-path?
+  side-effect ::= 'write' projection-path?
+  side-effect ::= 'copy' projection-path?
+  side-effect ::= 'read' projection-path?
+
   arg-or-return ::= argument-name ('.' projection-path)?
   arg-or-return ::= '%r' ('.' projection-path)?
+  defined-effect ::= '!'    // the effect is defined in the source code and not
+                            // derived by the optimizer
 
   projection-path ::= path-component ('.' path-component)* 
   path-component ::= 's' [0-9]+        // struct field

@@ -1,0 +1,81 @@
+// RUN: %target-sil-opt %s -dump-deadendblocks -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: Function simple_test
+// CHECK:       [bb2]
+// CHECK:       end function simple_test
+sil @simple_test : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  unreachable
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @throwing_fun : $@convention(thin) () -> ((), @error any Error)
+
+// CHECK-LABEL: Function test_throw
+// CHECK:       [bb1]
+// CHECK:       end function test_throw
+sil @test_throw : $@convention(thin) () -> ((), @error any Error) {
+bb0:
+  %0 = function_ref @throwing_fun : $@convention(thin) () -> ((), @error any Error)
+  try_apply %0() : $@convention(thin) () -> ((), @error any Error), normal bb1, error bb2
+bb1(%2: $()):
+  unreachable
+bb2(%3 : $Error):
+  throw %3 : $Error
+}
+
+
+// CHECK-LABEL: Function test_unwind
+// CHECK:       [bb1]
+// CHECK:       end function test_unwind
+sil @test_unwind : $@yield_once @convention(thin) () -> @yields () {
+bb0:
+  %t = tuple ()
+  yield %t : $(), resume bb1, unwind bb2
+bb1:
+  unreachable
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: Function complex_cfg
+// CHECK:       [bb7,bb8,bb9]
+// CHECK:       end function complex_cfg
+sil @complex_cfg : $@convention(thin) () -> ((), @error any Error) {
+bb0:
+  cond_br undef, bb1, bb7
+bb1:
+  %0 = function_ref @throwing_fun : $@convention(thin) () -> ((), @error any Error)
+  try_apply %0() : $@convention(thin) () -> ((), @error any Error), normal bb2, error bb3
+bb2(%2: $()):
+  br bb4
+bb3(%3 : $Error):
+  throw %3 : $Error
+bb4:
+  cond_br undef, bb5, bb6
+bb5:
+  br bb4
+bb6:
+  %r = tuple ()
+  return %r : $()
+bb7:
+  br bb8
+bb8:
+  cond_br undef, bb8, bb9
+bb9:
+  unreachable
+}
+

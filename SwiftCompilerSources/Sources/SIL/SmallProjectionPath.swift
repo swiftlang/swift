@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
+
 /// A small and very efficient representation of a projection path.
 ///
 /// A `SmallProjectionPath` can be parsed and printed in SIL syntax and parsed from Swift
@@ -37,7 +39,7 @@
 /// which means: it represents any number of any kind of projections.
 /// Though, it's very unlikely that the limit will be reached in real world scenarios.
 ///
-public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, Hashable {
+public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflectionChildren {
 
   /// The physical representation of the path. The path components are stored in
   /// reverse order: the first path component is stored in the lowest bits (LSB),
@@ -403,8 +405,6 @@ public struct SmallProjectionPath : CustomStringConvertible, CustomReflectable, 
     }
     return false
   }
-
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
 //===----------------------------------------------------------------------===//

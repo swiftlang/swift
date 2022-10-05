@@ -113,18 +113,17 @@ private struct FindAllocationOfRelease : ValueUseDefWalker {
   private let allocInst: AllocRefInstBase
   private var allocFound = false
 
-  var walkUpCache = WalkerCache<SmallProjectionPath>()
+  var walkUpCache = WalkerCache<UnusedWalkingPath>()
 
   init(allocation: AllocRefInstBase) { allocInst = allocation }
 
   /// The top-level entry point: returns true if the root of `value` is the `allocInst`.
   mutating func allocationIsRoot(of value: Value) -> Bool {
-    let path = SmallProjectionPath().push(.anyValueFields)
-    return walkUp(value: value, path: path) != .abortWalk &&
+    return walkUp(value: value, path: UnusedWalkingPath()) != .abortWalk &&
            allocFound
   }
 
-  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+  mutating func rootDef(value: Value, path: UnusedWalkingPath) -> WalkResult {
     if value == allocInst {
       allocFound = true
       return .continueWalk
@@ -134,7 +133,7 @@ private struct FindAllocationOfRelease : ValueUseDefWalker {
 
   // This function is called for `struct` and `tuple` instructions in case the `path` doesn't select
   // a specific operand but all operands.
-  mutating func walkUpAllOperands(of def: Instruction, path: SmallProjectionPath) -> WalkResult {
+  mutating func walkUpAllOperands(of def: Instruction, path: UnusedWalkingPath) -> WalkResult {
   
     // Instead of walking up _all_ operands (which would be the default behavior), require that only a
     // _single_ operand is not trivial and walk up that operand.

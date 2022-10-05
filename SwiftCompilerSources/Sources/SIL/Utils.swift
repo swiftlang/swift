@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Basic
 import SILBridging
 
 // Need to export "Basic" to make `Basic.assert` available in the Optimizer module.
@@ -93,9 +94,8 @@ public protocol HasShortDescription {
   var shortDescription: String { get }
 }
 
-private struct CustomMirrorChild : CustomStringConvertible, CustomReflectable {
+private struct CustomMirrorChild : CustomStringConvertible, NoReflectionChildren {
   public var description: String
-  public var customMirror: Mirror { Mirror(self, children: []) }
   
   public init(description: String) { self.description = description }
 }

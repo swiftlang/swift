@@ -13,7 +13,7 @@
 import Basic
 import SILBridging
 
-public struct Type : CustomStringConvertible, CustomReflectable {
+public struct Type : CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedType
   
   public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
@@ -36,6 +36,7 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var isStruct: Bool { SILType_isStruct(bridged) != 0 }
   public var isTuple: Bool { SILType_isTuple(bridged) != 0 }
   public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
+  public var isFunction: Bool { SILType_isFunction(bridged) }
 
   public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
 
@@ -43,6 +44,8 @@ public struct Type : CustomStringConvertible, CustomReflectable {
     NominalFieldsArray(type: self, function: function)
   }
 
+  public var isCalleeConsumedFunction: Bool { SILType_isCalleeConsumedFunction(bridged) }
+  
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withStringRef {
       SILType_getCaseIdxOfEnumType(bridged, $0)
@@ -53,8 +56,6 @@ public struct Type : CustomStringConvertible, CustomReflectable {
   public var description: String {
     String(_cxxString: SILType_debugDescription(bridged))
   }
-
-  public var customMirror: Mirror { Mirror(self, children: []) }
 }
 
 extension Type: Equatable {
