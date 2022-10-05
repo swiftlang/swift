@@ -6,7 +6,7 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS, obsoleted: 10.15)
+@available(macOS, obsoleted: 11.0)
 public struct S {
   public func foo() {}
 }
@@ -16,13 +16,13 @@ public struct S {
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "domain": "macOS",
 // CHECK-NEXT:     "obsoleted": {
-// CHECK-NEXT:       "major": 10,
-// CHECK-NEXT:       "minor": 15
+// CHECK-NEXT:       "major": 11,
+// CHECK-NEXT:       "minor": 0
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 
-@available(macOS, obsoleted: 10.15)
+@available(macOS, obsoleted: 11.0)
 public struct Outer {
   public struct Inner {
     // TRANSITIVE-LABEL: "precise": "s:16IntroducedFilled5OuterV5InnerV3fooyyF"
@@ -30,8 +30,8 @@ public struct Outer {
     // TRANSITIVE-NEXT:   {
     // TRANSITIVE-NEXT:     "domain": "macOS",
     // TRANSITIVE-NEXT:     "obsoleted": {
-    // TRANSITIVE-NEXT:       "major": 10,
-    // TRANSITIVE-NEXT:       "minor": 15
+    // TRANSITIVE-NEXT:       "major": 11,
+    // TRANSITIVE-NEXT:       "minor": 0
     // TRANSITIVE-NEXT:     }
     // TRANSITIVE-NEXT:   }
     // TRANSITIVE-NEXT: ]

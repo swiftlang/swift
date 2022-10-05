@@ -6,12 +6,13 @@
 
 // RUN: cp %S/Inputs/custom-modules/module.map %t/module.map
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution -target %target-cpu-apple-macosx10.13
 // RUN: %FileCheck %s --check-prefix=NO-STUBS < %t/resilient.h
 // RUN: %check-in-clang %t/resilient.h -I %t
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=iosmac
+// REQUIRES: OS=macosx
 
 // See also resilient-ancestry.swift, for the stable ABI deployment target test.
 

@@ -1,9 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift -enable-library-evolution
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module-path %t/resilient_objc_class.swiftmodule %S/../Inputs/resilient_objc_class.swift -I %t -enable-library-evolution
-// RUN: %target-swift-frontend -typecheck -verify %s -I %t
+// RUN: %target-swift-frontend -typecheck -verify %s -I %t -target %target-cpu-apple-macosx10.13
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 import Foundation
 import resilient_objc_class
@@ -46,19 +47,19 @@ extension AnotherFixedLayoutNSObjectSubclass {
 // If either the class or the extension member has sufficiently narrow
 // availability, we're okay.
 extension AnotherResilientNSObjectSubclass {
-  @available(macOS 10.15, iOS 13.0.0, tvOS 13.0.0, watchOS 6.0.0, *)
+  @available(macOS 11, iOS 14.0.0, tvOS 14.0.0, watchOS 7.0.0, *)
   @objc public func availableCategoryOneMethod() {}
 }
 
 extension AnotherResilientNSObjectSubclass {
-  @available(macOS 10.15, iOS 13.0.0, tvOS 13.0.0, watchOS 6.0.0, *)
+  @available(macOS 11, iOS 14.0.0, tvOS 14.0.0, watchOS 7.0.0, *)
   @objc public func availableCategoryTwoMethod() {}
 }
 
-@available(macOS 10.15, iOS 13.0.0, tvOS 13.0.0, watchOS 6.0.0, *)
+@available(macOS 11, iOS 14.0.0, tvOS 14.0.0, watchOS 7.0.0, *)
 @objc public class AvailableResilientNSObjectSubclass : ResilientNSObjectOutsideParent {}
 
-@available(macOS 10.15, iOS 13.0.0, tvOS 13.0.0, watchOS 6.0.0, *)
+@available(macOS 11, iOS 14.0.0, tvOS 14.0.0, watchOS 7.0.0, *)
 extension AnotherResilientNSObjectSubclass {
   @objc public func categoryThreeMethod() {}
 }
