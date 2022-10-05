@@ -329,7 +329,7 @@ void RequirementBuilder::processConnectedComponents() {
     MutableTerm subjectTerm(pair.first);
     RequirementKind kind;
     if (subjectTerm.back().getKind() == Symbol::Kind::Shape) {
-      kind = RequirementKind::SameCount;
+      kind = RequirementKind::SameShape;
       // Strip off the shape symbol from the subject term.
       subjectTerm = MutableTerm{subjectTerm.begin(), subjectTerm.end() - 1};
     } else {

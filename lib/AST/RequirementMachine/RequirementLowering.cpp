@@ -359,10 +359,10 @@ static void desugarSameShapeRequirement(Type lhs, Type rhs, SourceLoc loc,
   // For now, only allow shape requirements directly between pack types.
   if (!lhs->isTypeSequenceParameter() || !rhs->isTypeSequenceParameter()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(
-        {RequirementKind::SameCount, lhs, rhs}, loc));
+        {RequirementKind::SameShape, lhs, rhs}, loc));
   }
 
-  result.emplace_back(RequirementKind::SameCount,
+  result.emplace_back(RequirementKind::SameShape,
                       lhs->getRootGenericParam(),
                       rhs->getRootGenericParam());
 }
@@ -378,7 +378,7 @@ swift::rewriting::desugarRequirement(Requirement req, SourceLoc loc,
   auto firstType = req.getFirstType();
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
+  case RequirementKind::SameShape:
     desugarSameShapeRequirement(firstType, req.getSecondType(),
                                 loc, result, errors);
     break;
@@ -504,7 +504,7 @@ struct InferRequirementsWalker : public TypeWalker {
         auto first = packReferences.begin();
         auto second = first + 1;
         while (second != packReferences.end()) {
-          Requirement req(RequirementKind::SameCount, *first++, *second++);
+          Requirement req(RequirementKind::SameShape, *first++, *second++);
           desugarRequirement(req, SourceLoc(), reqs, errors);
         }
       }
@@ -613,8 +613,8 @@ void swift::rewriting::realizeRequirement(
   auto *moduleForInference = dc->getParentModule();
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirement not supported here");
 
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {

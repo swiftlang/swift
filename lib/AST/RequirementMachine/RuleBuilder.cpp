@@ -298,8 +298,8 @@ void RuleBuilder::addRequirement(const Requirement &req,
   MutableTerm constraintTerm;
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount: {
-    // A same-shape requirement length(T...) == length(U...)
+  case RequirementKind::SameShape: {
+    // A same-shape requirement T.shape == U.shape
     // becomes a rewrite rule:
     //
     //    T.[shape] => U.[shape]

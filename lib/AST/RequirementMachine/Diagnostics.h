@@ -34,7 +34,7 @@ struct RequirementError {
     /// A type requirement on a trivially invalid subject type,
     /// e.g. Bool: Collection.
     InvalidRequirementSubject,
-    /// An invalid shape requirement, e.g. length(T...) == length(Int)
+    /// An invalid shape requirement, e.g. T.shape == Int.shape
     InvalidShapeRequirement,
     /// A pair of conflicting requirements, T == Int, T == String
     ConflictingRequirement,

@@ -5,42 +5,42 @@ protocol P {
 }
 
 // CHECK-LABEL: inferSameShape(ts:us:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U where T.count == U.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U where T.shape == U.shape>
 func inferSameShape<@_typeSequence T, @_typeSequence U>(ts t: T..., us u: U...) where ((T, U)...): Any {
 }
 
 // CHECK-LABEL: desugarSameShape(ts:us:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U where T : P, T.count == U.count, U : P>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U where T : P, T.shape == U.shape, U : P>
 func desugarSameShape<@_typeSequence T, @_typeSequence U>(ts t: T..., us u: U...) where T: P, U: P, ((T.A, U.A)...): Any {
 }
 
 // CHECK-LABEL: multipleSameShape1(ts:us:vs:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.shape == U.shape, U.shape == V.shape>
 func multipleSameShape1<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((T, U, V)...): Any {
 }
 
 // CHECK-LABEL: multipleSameShape2(ts:us:vs:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.shape == U.shape, U.shape == V.shape>
 func multipleSameShape2<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((V, T, U)...): Any {
 }
 
 // CHECK-LABEL: multipleSameShape3(ts:us:vs:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.shape == U.shape, U.shape == V.shape>
 func multipleSameShape3<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((U, V, T)...): Any {
 }
 
 // CHECK-LABEL: multipleSameShape4(ts:us:vs:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.shape == U.shape, U.shape == V.shape>
 func multipleSameShape4<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((U, T, V)...): Any {
 }
 
 // CHECK-LABEL: multipleSameShape5(ts:us:vs:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.shape == U.shape, U.shape == V.shape>
 func multipleSameShape5<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((T, V, U)...): Any {
 }
 
 // CHECK-LABEL: multipleSameShape6(ts:us:vs:)
-// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
+// CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.shape == U.shape, U.shape == V.shape>
 func multipleSameShape6<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((V, U, T)...): Any {
 }
 
@@ -53,7 +53,7 @@ struct Ts<@_typeSequence T> {
 
     struct Vs<@_typeSequence V> {
       // CHECK-LABEL: Ts.Us.Vs.packEquality()
-      // CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T == U, T.count == V.count>
+      // CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T == U, T.shape == V.shape>
       func packEquality() where T == U, ((U, V)...): Any {
       }
     }

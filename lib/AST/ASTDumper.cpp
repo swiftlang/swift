@@ -4277,8 +4277,8 @@ void Requirement::dump() const {
 }
 void Requirement::dump(raw_ostream &out) const {
   switch (getKind()) {
-  case RequirementKind::SameCount:
-    out << "same_count: ";
+  case RequirementKind::SameShape:
+    out << "same_shape: ";
     break;
   case RequirementKind::Conformance:
     out << "conforms_to: ";

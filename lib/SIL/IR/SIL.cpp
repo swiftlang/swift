@@ -163,7 +163,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
     // a dependent type.
 
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::Layout:
       continue;
 
