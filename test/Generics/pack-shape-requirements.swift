@@ -43,3 +43,19 @@ func multipleSameShape5<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts
 // CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T.count == U.count, U.count == V.count>
 func multipleSameShape6<@_typeSequence T, @_typeSequence U, @_typeSequence V>(ts t: T..., us u: U..., vs v: V...) where ((V, U, T)...): Any {
 }
+
+struct Ts<@_typeSequence T> {
+  struct Us<@_typeSequence U> {
+    // CHECK-LABEL: Ts.Us.packEquality()
+    // CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U where T == U>
+    func packEquality() where T == U, ((T, U)...): Any {
+    }
+
+    struct Vs<@_typeSequence V> {
+      // CHECK-LABEL: Ts.Us.Vs.packEquality()
+      // CHECK-NEXT: Generic signature: <@_typeSequence T, @_typeSequence U, @_typeSequence V where T == U, T.count == V.count>
+      func packEquality() where T == U, ((U, V)...): Any {
+      }
+    }
+  }
+}
