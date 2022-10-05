@@ -3869,8 +3869,21 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   // It has to be checked first because it injects initialization of
   // `self.$storage`.
   if (auto *storageVar = findLocalTypeWrapperStorageVar(Fn)) {
-    // Then process the memory object.
-    processMemoryObject(storageVar, blockStates);
+    {
+      auto &M = Fn.getModule();
+
+      DiagnosticTransaction T(M.getASTContext().Diags);
+
+      // process `_storage` object.
+      processMemoryObject(storageVar, blockStates);
+
+      // Stop if `_storage` initialization checking produced
+      // errors, otherwise DI is going to emit confusing
+      // "return without fully initialized self - self.$storage" error.
+      if (T.hasErrors())
+        return true;
+    }
+
     storageVar->replaceAllUsesWith(storageVar->getOperand());
     storageVar->eraseFromParent();
     Changed = true;

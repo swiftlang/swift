@@ -11,6 +11,10 @@ public struct Wrapper<S> {
     self.underlying = memberwise
   }
 
+  public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    get { underlying[keyPath: path] }
+  }
+
   public subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get { underlying[keyPath: path] }
     set { underlying[keyPath: path] = newValue }
@@ -329,6 +333,84 @@ class ClassWithConvenienceInit<T> {
       // CHECK: [[B_SETTER:%.*]] = class_method [[SELF:%.*]] : $ClassWithConvenienceInit<T>, #ClassWithConvenienceInit.b!setter
       // CHECK-NEXT: {{.*}} = apply [[B_SETTER]]<T>({{.*}})
       self.b = "ultimate question"
+    }
+  }
+}
+
+@Wrapper
+struct TypeWithLetProperties<T> {
+  let a: T
+  let b: Int
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test21TypeWithLetPropertiesV1a1b5onSetACyxGx_SiSgyycSgtcfC
+  // CHECK: [[LOCAL_STORAGE:%.*]] = alloc_stack [lexical] $(a: T, b: Int), var, name "_storage", implicit
+  public init(a: T, b: Int? = nil, onSet: (() -> Void)? = nil) {
+    // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
+    // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
+    // CHECK-NEXT: copy_addr [take] %11 to [initialization] [[A_REF]] : $*T
+    // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
+    // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]]
+    self.a = a
+    if let b {
+      // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
+      // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 1
+      // CHECK-NEXT: assign {{.*}} to [init] [[B_REF]] : $*Int
+      // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
+      // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int)
+
+      // CHECK: [[STORAGE:%.*]] = alloc_stack $TypeWithLetProperties<T>.$Storage
+      // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test21TypeWithLetPropertiesV8$StorageV1a1bAEyx_Gx_SitcfC
+
+      // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
+      // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
+      // CHECK-NEXT: [[T:%.*]] = alloc_stack $T
+      // CHECK-NEXT: copy_addr [[A_REF]] to [initialization] [[T]] : $*T
+      // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 1
+      // CHECK-NEXT: [[B_VAL:%.*]] = load [trivial] [[B_REF]] : $*Int
+      // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int)
+
+      // CHECK-NEXT: [[STORAGE_METATYPE:%.*]] = metatype $@thin TypeWithLetProperties<T>.$Storage.Type
+      // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE]], [[T]], [[B_VAL]], [[STORAGE_METATYPE]])
+
+      // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV10memberwiseACyxGx_tcfC
+      // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$_storage
+      // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TypeWithLetProperties<T>.$Storage>
+      // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
+
+      // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]] : $*Wrapper<TypeWithLetProperties<T>.$Storage>
+      // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]] : $*Wrapper<TypeWithLetProperties<T>.$Storage>
+      // CHECK-NEXT: end_access [[STORAGE_PROP_ACCESS]]
+      self.b = b
+    } else {
+      // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
+      // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 1
+      // CHECK-NEXT: assign {{.*}} to [init] [[B_REF]] : $*Int
+      // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
+      // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int)
+
+      // CHECK: [[STORAGE:%.*]] = alloc_stack $TypeWithLetProperties<T>.$Storage
+      // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test21TypeWithLetPropertiesV8$StorageV1a1bAEyx_Gx_SitcfC
+
+      // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
+      // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
+      // CHECK-NEXT: [[T:%.*]] = alloc_stack $T
+      // CHECK-NEXT: copy_addr [[A_REF]] to [initialization] [[T]] : $*T
+      // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 1
+      // CHECK-NEXT: [[B_VAL:%.*]] = load [trivial] [[B_REF]] : $*Int
+      // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int)
+
+      // CHECK-NEXT: [[STORAGE_METATYPE:%.*]] = metatype $@thin TypeWithLetProperties<T>.$Storage.Type
+      // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE]], [[T]], [[B_VAL]], [[STORAGE_METATYPE]])
+
+      // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV10memberwiseACyxGx_tcfC
+      // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$_storage
+      // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TypeWithLetProperties<T>.$Storage>
+      // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
+
+      // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]] : $*Wrapper<TypeWithLetProperties<T>.$Storage>
+      // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]] : $*Wrapper<TypeWithLetProperties<T>.$Storage>
+      // CHECK-NEXT: end_access [[STORAGE_PROP_ACCESS]]
+      self.b = 0
     }
   }
 }

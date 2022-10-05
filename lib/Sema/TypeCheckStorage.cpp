@@ -3306,7 +3306,8 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     } else if (var->hasAttachedPropertyWrapper()) {
       finishPropertyWrapperImplInfo(var, info);
     } else if (var->isAccessedViaTypeWrapper()) {
-      info = StorageImplInfo::getMutableComputed();
+      info = var->isLet() ? StorageImplInfo::getImmutableComputed()
+                          : StorageImplInfo::getMutableComputed();
     }
   }
 

@@ -7,6 +7,13 @@ public struct Wrapper<S> {
     self.underlying = memberwise
   }
 
+  public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    get {
+      print("in read-only getter")
+      return underlying[keyPath: path]
+    }
+  }
+
   public subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get {
       print("in getter")
@@ -301,5 +308,33 @@ public class ClassWithConvenienceInit<T> {
 
     self.b = "<modified>"
     print(self.b)
+  }
+}
+
+@Wrapper
+public struct TypeWithLetProperties<T> {
+  let a: T
+  let b: Int
+
+  public init(a: T, b: Int? = nil, onSet: (() -> Void)? = nil) {
+    self.a = a
+    if let b {
+      self.b = b
+    } else {
+      self.b = 0
+    }
+
+    print("--Before onSet--")
+
+    print(self.a)
+    print(self.b)
+
+    if let onSet {
+      onSet()
+
+      print("--After onSet--")
+      print(self.a)
+      print(self.b)
+    }
   }
 }
