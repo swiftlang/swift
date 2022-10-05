@@ -9011,7 +9011,6 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         if (!resolvedTarget)
           return None;
 
-        solution.setExprTypes(resolvedTarget->getAsExpr());
         condElement.setInitializer(resolvedTarget->getAsExpr());
         condElement.setPattern(resolvedTarget->getInitializationPattern());
         continue;
