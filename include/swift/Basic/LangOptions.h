@@ -61,6 +61,12 @@ namespace swift {
     Complete,
   };
 
+  enum class ReflectionMetadataLevel {
+    OptIn,
+    None,      ///< Don't emit reflection metadata at all.
+    Full,      ///< Make reflection metadata fully available.
+  };
+
   /// Describes how strict concurrency checking should be.
   enum class StrictConcurrency {
     /// Enforce Sendable constraints where it has been explicitly adopted and
@@ -453,9 +459,10 @@ namespace swift {
     /// TODO: remove this when @_implementationOnly modules are robust enough.
     bool AllowDeserializingImplementationOnly = false;
 
-    /// Allows to diagnose `Reflectable` declarations
+    /// Allows to add implicit conformance to Reflectable 
+    /// and diagnose `Reflectable` declarations
     /// when reflection metadata is disabled.
-    bool ReflectionMetadataIsDisabled = false;
+    ReflectionMetadataLevel ReflectionMetadata = ReflectionMetadataLevel::OptIn;
 
     // Allow errors during module generation. See corresponding option in
     // FrontendOptions.

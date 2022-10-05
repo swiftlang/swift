@@ -37,6 +37,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -48,6 +49,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -1176,6 +1178,104 @@ IsReflectableRequest::evaluate(Evaluator &evaluator,
   return (bool)conformance;
 }
 
+ProtocolConformance *GetImplicitReflectableRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  // Protocols never get implicit Reflectable conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return nullptr;
+
+  ASTContext &ctx = nominal->getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::Reflectable);
+  if (!proto)
+    return nullptr;
+
+  auto module = nominal->getParentModule();
+  auto explicitConformance =
+      module->lookupConformance(nominal->getInterfaceType(), proto);
+  if (!explicitConformance.isInvalid()) {
+    // ok, it was conformed explicitly -- let's not synthesize;
+    return nullptr;
+  }
+
+  // Check whether we can infer conformance at all.
+  if (auto *file = dyn_cast<FileUnit>(nominal->getModuleScopeContext())) {
+    switch (file->getKind()) {
+    case FileUnitKind::Source:
+      // Check what kind of source file we have.
+      if (auto sourceFile = nominal->getParentSourceFile()) {
+        switch (sourceFile->Kind) {
+        case SourceFileKind::Interface:
+          // Interfaces have explicitly called-out Sendable conformances.
+          return nullptr;
+
+        case SourceFileKind::Library:
+        case SourceFileKind::Main:
+        case SourceFileKind::SIL:
+          break;
+        }
+      }
+      break;
+
+    case FileUnitKind::Builtin:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::Synthesized:
+      // Explicitly-handled modules don't infer Sendable conformances.
+      return nullptr;
+
+    case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
+      // Infer conformances for imported modules.
+      break;
+    }
+  } else {
+    return nullptr;
+  }
+
+  // Local function to form the implicit conformance.
+  auto formConformance = [&](const DeclAttribute *attrMakingUnavailable)
+        -> NormalProtocolConformance * {
+    DeclContext *conformanceDC = nominal;
+    auto conformance = ctx.getConformance(
+        nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
+        conformanceDC, ProtocolConformanceState::Complete,
+        /*isUnchecked=*/false);
+    conformance->setSourceKindAndImplyingConformance(
+        ConformanceEntryKind::Synthesized, nullptr);
+    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+    return conformance;
+  };
+
+//   // If this is a class, check the superclass. If it's already Sendable,
+//   // form an inherited conformance.
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (classDecl) {
+    if (Type superclass = classDecl->getSuperclass()) {
+      auto classModule = classDecl->getParentModule();
+      auto inheritedConformance = TypeChecker::conformsToProtocol(
+          classDecl->mapTypeIntoContext(superclass),
+          proto, classModule, /*allowMissing=*/false);
+      if (inheritedConformance.hasUnavailableConformance())
+        inheritedConformance = ProtocolConformanceRef::forInvalid();
+
+      if (inheritedConformance) {
+        inheritedConformance = inheritedConformance
+            .mapConformanceOutOfContext();
+        if (inheritedConformance.isConcrete()) {
+          return ctx.getInheritedConformance(
+              nominal->getDeclaredInterfaceType(),
+              inheritedConformance.getConcrete());
+        }
+      }
+    }
+  }
+
+  // Only structs and enums can get implicit Reflectable.
+  if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal))
+    return nullptr;
+
+  return formConformance(nullptr);
+}
+
 /// Check the requirements in the where clause of the given \c atd
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
@@ -1834,7 +1934,7 @@ public:
 
     if (auto NTD = dyn_cast<NominalTypeDecl>(decl)) {
       bool isDeclReflectable = NTD->isReflectable();
-      bool isReflectableMetadataDisabled = NTD->getASTContext().LangOpts.ReflectionMetadataIsDisabled;
+      bool isReflectableMetadataDisabled = NTD->getASTContext().LangOpts.ReflectionMetadata == ReflectionMetadataLevel::None;
       auto &DE = getASTContext().Diags;
       if (isDeclReflectable && isReflectableMetadataDisabled) {
         DE.diagnose(NTD->getLoc(), diag::reflection_metadata_is_disabled);

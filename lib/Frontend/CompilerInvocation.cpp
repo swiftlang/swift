@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Frontend/Frontend.h"
 
@@ -220,15 +221,18 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 static void
 setLangOptsFromIRGenOptions(LangOptions &LangOpts,
                             const IRGenOptions &IRGenOpts) {
+
   switch (IRGenOpts.ReflectionMetadata) {
     case ReflectionMetadataMode::None:
-      LangOpts.ReflectionMetadataIsDisabled = true;
+      LangOpts.ReflectionMetadata = ReflectionMetadataLevel::None;
       break;
-    case ReflectionMetadataMode::Runtime:
-    case ReflectionMetadataMode::OptIn:
     case ReflectionMetadataMode::DebuggerOnly:
-      LangOpts.ReflectionMetadataIsDisabled = false;
+    case ReflectionMetadataMode::Runtime:
+      LangOpts.ReflectionMetadata = ReflectionMetadataLevel::Full;
       break;
+    case ReflectionMetadataMode::OptIn:
+      LangOpts.ReflectionMetadata = ReflectionMetadataLevel::OptIn;
+      break;    
   }
 }
 

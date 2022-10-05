@@ -205,6 +205,9 @@ SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsReflectableRequest, bool(NominalTypeDecl *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, GetImplicitReflectableRequest,
+              ProtocolConformance *(NominalTypeDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsMoveOnlyRequest, bool(ValueDecl *), SeparatelyCached,
