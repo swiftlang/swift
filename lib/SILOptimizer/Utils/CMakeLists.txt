@@ -2,7 +2,7 @@ target_sources(swiftSILOptimizer PRIVATE
   BasicBlockOptUtils.cpp
   CFGOptUtils.cpp
   CanonicalizeInstruction.cpp
-  CanonicalOSSALifetime.cpp
+  CanonicalizeOSSALifetime.cpp
   CanonicalizeBorrowScope.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp

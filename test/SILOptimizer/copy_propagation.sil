@@ -23,6 +23,7 @@ sil [ossa] @getOwnedB : $@convention(thin) () -> (@owned B)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @borrowB : $@convention(thin) (@guaranteed B) -> ()
 sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
 
 // -O hoists the destroy
@@ -185,6 +186,57 @@ bb3(%arg3 : @owned $C):
 
 bb4(%arg4 : @owned $C):
   return %arg4 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @debugValueAfterDestroy : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         debug_value [[INSTANCE]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'debugValueAfterDestroy'
+sil [ossa] @debugValueAfterDestroy : $@convention(thin) () -> () {
+  %getOwnedB = function_ref @getOwnedB : $@convention(thin) () -> (@owned B)
+  %dummy = function_ref @dummy : $@convention(thin) () -> ()
+  %borrowB = function_ref @borrowB : $@convention(thin) (@guaranteed B) -> ()
+  %b = apply %getOwnedB() : $@convention(thin) () -> (@owned B)
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %borrowB(%b) : $@convention(thin) (@guaranteed B) -> ()
+
+  debug_value %b : $B
+  destroy_value %b : $B
+
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @deadArgDef : {{.*}} {
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] :
+// CHECK-NEXT:    destroy_value [[INSTANCE]]
+// CHECK:         apply {{%[^,]+}}
+// CHECK:         apply {{%[^,]+}}
+// CHECK:         apply {{%[^,]+}}
+// CHECK-LABEL: } // end sil function 'deadArgDef'
+sil [ossa] @deadArgDef : $@convention(thin) () -> () {
+  %getOwnedB = function_ref @getOwnedB : $@convention(thin) () -> (@owned B)
+  %dummy = function_ref @dummy : $@convention(thin) () -> ()
+  %borrowB = function_ref @borrowB : $@convention(thin) (@guaranteed B) -> ()
+  %b = apply %getOwnedB() : $@convention(thin) () -> (@owned B)
+  apply %borrowB(%b) : $@convention(thin) (@guaranteed B) -> ()
+  br exit(%b : $B)
+
+exit(%b2 : @owned $B):
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  destroy_value %b2 : $B
+
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // -----------------------------------------------------------------------------

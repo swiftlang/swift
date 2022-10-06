@@ -46,8 +46,8 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -306,7 +306,7 @@ static void findPreheadersOnControlEquivalentPath(
 /// Sink \p ownedForward to its uses.
 ///
 /// Owned forwarding instructions are identified by
-/// CanonicalOSSALifetime::isRewritableOSSAForward().
+/// CanonicalizeOSSALifetime::isRewritableOSSAForward().
 ///
 /// Assumes that the uses of ownedForward jointly postdominate it (valid OSSA).
 ///
