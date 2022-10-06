@@ -16,6 +16,11 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), size_t(bridged.numElements)};
 }
 
+static SourceLoc getSourceLocFromPointer(void *loc) {
+  auto smLoc = llvm::SMLoc::getFromPointer((const char *)loc);
+  return SourceLoc(smLoc);
+}
+
 BridgedIdentifier
 SwiftASTContext_getIdentifier(void *ctx, const uint8_t *_Nullable str, long len) {
   return const_cast<void *>(
@@ -39,14 +44,15 @@ void *SwiftImportDecl_create(void *ctx, void *dc, void *importLoc, char kind,
     importPath.push_back(ident, loc);
   }
   return ImportDecl::create(
-      Context, static_cast<DeclContext *>(dc), *(SourceLoc *)&importLoc,
-      static_cast<ImportKind>(kind), *(SourceLoc *)&kindLoc,
+      Context, static_cast<DeclContext *>(dc),
+      getSourceLocFromPointer(importLoc),
+      static_cast<ImportKind>(kind), getSourceLocFromPointer(kindLoc),
       std::move(importPath).get());
 }
 
 void *BridgedSourceLoc_advanced(void *loc, long len) {
-  SourceLoc l = ((SourceLoc *)&loc)->getAdvancedLoc(len);
-  return &l; // TODO: what?
+  SourceLoc l = getSourceLocFromPointer(loc).getAdvancedLoc(len);
+  return const_cast<void *>(l.getOpaquePointerValue());
 }
 
 void *SwiftTopLevelCodeDecl_createStmt(void *ctx, void *DC, void *startLoc,
@@ -54,8 +60,8 @@ void *SwiftTopLevelCodeDecl_createStmt(void *ctx, void *DC, void *startLoc,
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *S = static_cast<Stmt *>(element);
   auto Brace =
-      BraceStmt::create(Context, *(SourceLoc *)&startLoc,
-                        {S}, *(SourceLoc *)&endLoc,
+      BraceStmt::create(Context, getSourceLocFromPointer(startLoc),
+                        {S}, getSourceLocFromPointer(endLoc),
                         /*Implicit=*/true);
   auto *TLCD =
       new (Context) TopLevelCodeDecl(static_cast<DeclContext *>(DC), Brace);
@@ -67,8 +73,8 @@ void *SwiftTopLevelCodeDecl_createExpr(void *ctx, void *DC, void *startLoc,
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *E = static_cast<Expr *>(element);
   auto Brace =
-      BraceStmt::create(Context, *(SourceLoc *)&startLoc,
-                        {E}, *(SourceLoc *)&endLoc,
+      BraceStmt::create(Context, getSourceLocFromPointer(startLoc),
+                        {E}, getSourceLocFromPointer(endLoc),
                         /*Implicit=*/true);
   auto *TLCD =
       new (Context) TopLevelCodeDecl(static_cast<DeclContext *>(DC), Brace);
@@ -83,8 +89,8 @@ void *SwiftSequenceExpr_create(void *ctx, BridgedArrayRef exprs) {
 void *SwiftTupleExpr_create(void *ctx, void *lparen, BridgedArrayRef subs,
                             void *rparen) {
   return TupleExpr::create(
-      *static_cast<ASTContext *>(ctx), *(SourceLoc *)&lparen,
-      getArrayRef<Expr *>(subs), {}, {}, *(SourceLoc *)&rparen,
+      *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(lparen),
+      getArrayRef<Expr *>(subs), {}, {}, getSourceLocFromPointer(rparen),
       /*Implicit*/ false);
 }
 
@@ -108,7 +114,7 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
   auto name = DeclNameRef{
       swift::Identifier::getFromOpaquePointer(base)};
   Expr *E = new (Context) UnresolvedDeclRefExpr(
-      name, DeclRefKind::Ordinary, DeclNameLoc{*(SourceLoc *)&loc});
+      name, DeclRefKind::Ordinary, DeclNameLoc{getSourceLocFromPointer(loc)});
   return E;
 }
 
@@ -118,7 +124,7 @@ void *SwiftStringLiteralExpr_create(
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) StringLiteralExpr(
       StringRef{reinterpret_cast<const char *>(string), size_t(len)},
-      *(SourceLoc *)&TokenLoc);
+      getSourceLocFromPointer(TokenLoc));
 }
 
 void *SwiftIntegerLiteralExpr_create(
@@ -126,12 +132,13 @@ void *SwiftIntegerLiteralExpr_create(
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) IntegerLiteralExpr(
       StringRef{reinterpret_cast<const char *>(string), size_t(len)},
-      *(SourceLoc *)&TokenLoc);
+      getSourceLocFromPointer(TokenLoc));
 }
 
 void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) BooleanLiteralExpr(value, *(SourceLoc *)&TokenLoc);
+  return new (Context) BooleanLiteralExpr(
+      value, getSourceLocFromPointer(TokenLoc));
 }
 
 void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
@@ -139,22 +146,24 @@ void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) VarDecl(isStatic,
                                isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-                               *(SourceLoc *)&loc, Identifier::getFromOpaquePointer(nameId),
+                               getSourceLocFromPointer(loc),
+                               Identifier::getFromOpaquePointer(nameId),
                                reinterpret_cast<DeclContext *>(dc));
 }
 
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, void *_Nullable elseLoc,
                     void *_Nullable elseStmt) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) IfStmt(*(SourceLoc *)&ifLoc, (Expr *)cond, (Stmt *)then, *(SourceLoc *)&elseLoc,
-                              (Stmt *)elseStmt, None, Context);
+  return new (Context) IfStmt(
+      getSourceLocFromPointer(ifLoc), (Expr *)cond, (Stmt *)then,
+      getSourceLocFromPointer(elseLoc), (Stmt *)elseStmt, None, Context);
 }
 
 void *BraceStmt_createExpr(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return BraceStmt::create(Context, *(SourceLoc *)&lbloc,
+  return BraceStmt::create(Context, getSourceLocFromPointer(lbloc),
                            getArrayRef<ASTNode>(elements),
-                           *(SourceLoc *)&rbloc);
+                           getSourceLocFromPointer(rbloc));
 }
 
 void *BraceStmt_createStmt(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc) {
@@ -164,9 +173,9 @@ void *BraceStmt_createStmt(void *ctx, void *lbloc, BridgedArrayRef elements, voi
   }
 
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return BraceStmt::create(Context, *(SourceLoc *)&lbloc,
+  return BraceStmt::create(Context, getSourceLocFromPointer(lbloc),
                            Context.AllocateCopy(nodes),
-                           *(SourceLoc *)&rbloc);
+                           getSourceLocFromPointer(rbloc));
 }
 
 void *ParamDecl_create(
@@ -175,9 +184,10 @@ void *ParamDecl_create(
     void *_Nullable paramLoc, BridgedIdentifier _Nullable paramName,
     void *declContext) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) ParamDecl(*(SourceLoc *)&loc, *(SourceLoc *)&argLoc,
+  return new (Context) ParamDecl(getSourceLocFromPointer(loc),
+                                 getSourceLocFromPointer(argLoc),
                                  Identifier::getFromOpaquePointer(argName),
-                                 *(SourceLoc *)&paramLoc,
+                                 getSourceLocFromPointer(paramLoc),
                                  Identifier::getFromOpaquePointer(paramName),
                                  (DeclContext *)declContext);
 }
@@ -190,16 +200,18 @@ void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
                       void *_Nullable body, void *_Nullable returnType,
                       void *declContext) {
   auto *paramList = ParameterList::create(
-      *static_cast<ASTContext *>(ctx), *(SourceLoc *)&paramLLoc,
-      getArrayRef<ParamDecl *>(params), *(SourceLoc *)&paramRLoc);
+      *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(paramLLoc),
+      getArrayRef<ParamDecl *>(params), getSourceLocFromPointer(paramRLoc));
   auto declName =
       DeclName(*static_cast<ASTContext *>(ctx),
                Identifier::getFromOpaquePointer(name), paramList);
   auto *out = FuncDecl::create(
-      *static_cast<ASTContext *>(ctx), *(SourceLoc *)&staticLoc,
+      *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(staticLoc),
       isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
-      *(SourceLoc *)&funcLoc, declName, *(SourceLoc *)&nameLoc, isAsync,
-      *(SourceLoc *)&asyncLoc, throws, *(SourceLoc *)&throwsLoc, nullptr,
+      getSourceLocFromPointer(funcLoc), declName,
+      getSourceLocFromPointer(nameLoc), isAsync,
+      getSourceLocFromPointer(asyncLoc), throws,
+      getSourceLocFromPointer(throwsLoc), nullptr,
       paramList, (TypeRepr *)returnType, (DeclContext *)declContext);
   out->setBody((BraceStmt *)body, FuncDecl::BodyKind::Parsed);
 
@@ -208,17 +220,19 @@ void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
 
 void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) SimpleIdentTypeRepr(DeclNameLoc(*(SourceLoc *)&loc),
-                                           DeclNameRef(Identifier::getFromOpaquePointer(id)));
+  return new (Context) SimpleIdentTypeRepr(
+      DeclNameLoc(getSourceLocFromPointer(loc)),
+      DeclNameRef(Identifier::getFromOpaquePointer(id)));
 }
 
 void *UnresolvedDotExpr_create(
     void *ctx, void *base, void *dotLoc,  BridgedIdentifier name,
     void *nameLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-      return new (Context) UnresolvedDotExpr((Expr *)base, *(SourceLoc *)&dotLoc,
-                                         DeclNameRef(Identifier::getFromOpaquePointer(name)),
-                                         DeclNameLoc(*(SourceLoc *)&nameLoc), false);
+      return new (Context) UnresolvedDotExpr(
+          (Expr *)base, getSourceLocFromPointer(dotLoc),
+          DeclNameRef(Identifier::getFromOpaquePointer(name)),
+          DeclNameLoc(getSourceLocFromPointer(nameLoc)), false);
 }
 
 void *ClosureExpr_create(void *ctx, void *body, void *dc) {
@@ -246,9 +260,9 @@ void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
 DeclContextAndDecl StructDecl_create(
     void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  auto *out = new (Context) StructDecl(SourceLoc(), // *(SourceLoc *)&loc,
+  auto *out = new (Context) StructDecl(getSourceLocFromPointer(loc),
                                        Identifier::getFromOpaquePointer(name),
-                                       SourceLoc(), // *(SourceLoc *)&nameLoc,
+                                       getSourceLocFromPointer(nameLoc),
                                        {}, nullptr,
                                        (DeclContext *)dc);
   out->setImplicit(); // TODO: remove this.
@@ -258,17 +272,17 @@ DeclContextAndDecl StructDecl_create(
 DeclContextAndDecl ClassDecl_create(
     void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  auto *out = new (Context) ClassDecl(SourceLoc(), // *(SourceLoc *)&loc,
+  auto *out = new (Context) ClassDecl(getSourceLocFromPointer(loc),
                                       Identifier::getFromOpaquePointer(name),
-                                      SourceLoc(), // *(SourceLoc *)&nameLoc,
+                                      getSourceLocFromPointer(nameLoc),
                                       {}, nullptr,
                                       (DeclContext *)dc, false);
   out->setImplicit(); // TODO: remove this.
   return {(DeclContext *)out, (NominalTypeDecl *)out, (Decl *)out};
 }
 
-void TopLevelCodeDecl_dump(void *decl) { ((TopLevelCodeDecl *)decl)->dump(); }
+void TopLevelCodeDecl_dump(void *decl) { ((TopLevelCodeDecl *)decl)->dump(llvm::errs()); }
 
-void Expr_dump(void *expr) { ((Expr *)expr)->dump(); }
-void Decl_dump(void *expr) { ((Decl *)expr)->dump(); }
-void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(); }
+void Expr_dump(void *expr) { ((Expr *)expr)->dump(llvm::errs()); }
+void Decl_dump(void *expr) { ((Decl *)expr)->dump(llvm::errs()); }
+void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(llvm::errs()); }
