@@ -4282,6 +4282,15 @@ bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
 }
 
+bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
+  for (auto param : params) {
+    if (param.getPlainType()->is<PackExpansionType>())
+      return true;
+  }
+
+  return false;
+}
+
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
   if (!Bits.SILFunctionType.HasClangTypeInfo)
     return ClangTypeInfo();

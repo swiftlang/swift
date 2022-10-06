@@ -3359,6 +3359,8 @@ public:
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
+  static bool containsPackExpansionType(ArrayRef<Param> params);
+
   static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
                           const PrintOptions &PO = PrintOptions());
   static void printParams(ArrayRef<Param> Params, ASTPrinter &Printer,
