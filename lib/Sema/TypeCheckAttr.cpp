@@ -3751,7 +3751,7 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
   // Check whether type marked as @typeWrapper is valid:
   //
   // - Has a single generic parameter <Storage>
-  // - Has `init(memberwise: <Storage>)`
+  // - Has `init(storage: <Storage>)`
   // - Has at least one `subscript(storedKeyPath: KeyPath<...>)` overload
 
   // Has a single generic parameter.
@@ -3765,10 +3765,10 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
     }
   }
 
-  // `init(memberwise:)`
+  // `init(storage:)`
   {
     DeclName initName(ctx, DeclBaseName::createConstructor(),
-                      ArrayRef<Identifier>(ctx.Id_memberwise));
+                      ArrayRef<Identifier>(ctx.Id_storage));
 
     SmallVector<ValueDecl *, 2> inits;
     if (findMembersOrDiagnose(initName, inits,
@@ -3806,7 +3806,7 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
             break;
 
           case UnviabilityReason::InvalidType:
-            llvm_unreachable("init(memberwise:) type is not checked");
+            llvm_unreachable("init(storage:) type is not checked");
           }
         }
       }

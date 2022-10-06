@@ -2,9 +2,9 @@
 public struct Wrapper<S> {
   var underlying: S
 
-  public init(memberwise: S) {
-    print("Wrapper.init(\(memberwise))")
-    self.underlying = memberwise
+  public init(storage: S) {
+    print("Wrapper.init(\(storage))")
+    self.underlying = storage
   }
 
   public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {

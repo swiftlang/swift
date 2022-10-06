@@ -4,16 +4,16 @@
 
 @typeWrapper
 struct ConcreteTypeWrapper { // expected-error {{type wrapper has to declare a single generic parameter for underlying storage type}}
-  init(memberwise: Int) {}
+  init(storage: Int) {}
 }
 
 @typeWrapper
-struct EmptyTypeWrapper<S> { // expected-error {{type wrapper type 'EmptyTypeWrapper' does not contain a required initializer - init(memberwise:)}}
+struct EmptyTypeWrapper<S> { // expected-error {{type wrapper type 'EmptyTypeWrapper' does not contain a required initializer - init(storage:)}}
 }
 
 @typeWrapper
 struct NoMemberwiseInit<S> {
-  // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(memberwise:)}}
+  // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(storage:)}}
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
@@ -22,7 +22,7 @@ struct NoMemberwiseInit<S> {
 
 @typeWrapper
 struct FailableInit<S> {
-  init?(memberwise: S) { // expected-error {{type wrapper initializer 'init(memberwise:)' cannot be failable}}
+  init?(storage: S) { // expected-error {{type wrapper initializer 'init(storage:)' cannot be failable}}
   }
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
@@ -30,16 +30,16 @@ struct FailableInit<S> {
   }
 }
 
-// Okay because there is a valid `init(memberwise:)` overload.
+// Okay because there is a valid `init(storage:)` overload.
 @typeWrapper
 struct FailableAndValidInit<S> {
   // expected-error@-1 {{type wrapper type 'FailableAndValidInit' does not contain a required writable subscript}}
   // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
-  init(memberwise: S) {
+  init(storage: S) {
   }
 
-  init?(memberwise: S) where S == Int {
+  init?(storage: S) where S == Int {
   }
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
@@ -49,13 +49,13 @@ struct FailableAndValidInit<S> {
 
 @typeWrapper
 public struct InaccessibleInit<S> {
-  fileprivate init(memberwise: S) {
-    // expected-error@-1 {{fileprivate initializer 'init(memberwise:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
+  fileprivate init(storage: S) {
+    // expected-error@-1 {{fileprivate initializer 'init(storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
   }
 
-  private init?(memberwise: S) where S: AnyObject {
-    // expected-error@-1 {{private initializer 'init(memberwise:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
-    // expected-error@-2 {{type wrapper initializer 'init(memberwise:)' cannot be failable}}
+  private init?(storage: S) where S: AnyObject {
+    // expected-error@-1 {{private initializer 'init(storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
+    // expected-error@-2 {{type wrapper initializer 'init(storage:)' cannot be failable}}
   }
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
@@ -66,12 +66,12 @@ public struct InaccessibleInit<S> {
 @typeWrapper
 struct NoSubscripts<S> {
   // expected-error@-1 {{type wrapper type 'NoSubscripts' does not contain a required subscript - subscript(storedKeyPath:)}}
-  init(memberwise: S) {}
+  init(storage: S) {}
 }
 
 @typeWrapper
 struct InaccessibleOrInvalidSubscripts<S> {
-  init(memberwise: S) {}
+  init(storage: S) {}
 
   fileprivate subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     // expected-error@-1 {{fileprivate subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
@@ -95,7 +95,7 @@ struct InaccessibleOrInvalidSubscripts<S> {
 
 @typeWrapper
 struct NoopWrapper<S> {
-  init(memberwise: S) {}
+  init(storage: S) {}
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
@@ -138,7 +138,7 @@ func testWrappedTypeAccessChecking() {
 struct Parent {
   @typeWrapper
   struct Wrapper<S> {
-    init(memberwise: S) {}
+    init(storage: S) {}
 
     subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
@@ -460,7 +460,7 @@ func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
     // expected-error@-1 {{type wrapper type 'MissingReadOnly' does not contain a required ready-only subscript}}
     // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
 
-    init(memberwise: S) {}
+    init(storage: S) {}
 
     subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
@@ -473,7 +473,7 @@ func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
     // expected-error@-1 {{type wrapper type 'MissingWritable' does not contain a required writable subscript}}
     // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
-    init(memberwise: S) {}
+    init(storage: S) {}
 
     subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }

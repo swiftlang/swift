@@ -459,7 +459,7 @@ namespace {
     /// corresponds to `self`.
     void injectActorHops();
 
-    /// Injects `self.$storage = .init(memberwise: $Storage(...))`
+    /// Injects `self.$storage = .init(storage: $Storage(...))`
     /// assignment instructions into the function after each point
     /// where `_storage` becomes fully initialized via `assign_by_wrapper`.
     /// This is only necessary only for user-defined initializers of a
@@ -1117,7 +1117,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
       auto storageType = F.getLoweredType(
           ctor->mapTypeIntoContext(storageDecl->getDeclaredInterfaceType()));
 
-      // Argument value to use in call to <TypeWrapper>.init(memberwise:)
+      // Argument value to use in call to <TypeWrapper>.init(storage:)
       SILValue storageObj = allocStack(storageType);
 
       // let storageObj = $Storage(<destructured _storage tuple>)
@@ -1253,7 +1253,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
                                  StoreOwnershipQualifier::Init);
       }
 
-      // self.$storage = <TypeWrapper>(memberwise: storageObj))
+      // self.$storage = <TypeWrapper>(storage: storageObj))
       {
         bool isClass = isa<ClassDecl>(parentType);
 
@@ -1308,7 +1308,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
         wrapperInitArgs.push_back(storageObj);
         wrapperInitArgs.push_back(typeWrapperType);
 
-        // <wrapper-var> = <TypeWrapper>.init(memberwise: tmpStorage)
+        // <wrapper-var> = <TypeWrapper>.init(storage: tmpStorage)
         auto wrapperInitResult = b.createApply(
             loc, typeWrapperInitRef,
             SubstitutionMap::get(typeWrapperInit->getGenericSignature(),

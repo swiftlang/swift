@@ -6,7 +6,7 @@
 struct Wrapper<S> {
   var underlying: S
 
-  init(memberwise: S) { self.underlying = memberwise }
+  init(storage: S) { self.underlying = storage }
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     get { underlying[keyPath: path] }

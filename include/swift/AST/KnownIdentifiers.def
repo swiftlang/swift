@@ -313,7 +313,6 @@ IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
 IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$_storage")
 IDENTIFIER(storageKeyPath)
-IDENTIFIER(memberwise)
 IDENTIFIER_WITH_NAME(localStorageVar, "_storage")
 
 // Attribute options

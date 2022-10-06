@@ -403,7 +403,7 @@ BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
   auto &ctx = ctor->getASTContext();
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
-  // self.$_storage = .init(memberwise: $Storage(...))
+  // self.$_storage = .init(storage: $Storage(...))
   auto *storageType = parent->getTypeWrapperStorageDecl();
   assert(storageType);
 
@@ -481,7 +481,7 @@ BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
   // .init($Storage(...))
   Expr *typeWrapperInit = CallExpr::createImplicit(
       ctx, initRef,
-      ArgumentList::forImplicitSingle(ctx, ctx.Id_memberwise, storageInit));
+      ArgumentList::forImplicitSingle(ctx, ctx.Id_storage, storageInit));
 
   body.push_back(new (ctx) AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(),
                                       typeWrapperInit,
@@ -533,7 +533,7 @@ GetTypeWrapperInitializer::evaluate(Evaluator &evaluator,
   assert(typeWrapper->getAttrs().hasAttribute<TypeWrapperAttr>());
 
   auto ctors = typeWrapper->lookupDirect(
-      DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_memberwise}));
+      DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_storage}));
 
   if (ctors.size() != 1)
     return nullptr;

@@ -6,9 +6,8 @@
 public struct Wrapper<S> {
   var underlying: S
 
-  public init(memberwise: S) {
-    print("Wrapper.init(\(memberwise))")
-    self.underlying = memberwise
+  public init(storage: S) {
+    self.underlying = storage
   }
 
   public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
@@ -33,7 +32,7 @@ struct TrivialStruct {
   // CHECK: [[STORAGE_METATYPE:%.*]] = metatype $@thin TrivialStruct.$Storage.Type
   // CHECK: [[STORAGE_INIT_RES:%.*]] = apply [[STORAGE_INIT_REF]]([[STORAGE_METATYPE]]) : $@convention(method) (@thin TrivialStruct.$Storage.Type) -> TrivialStruct.$Storage
   // CHECK: store [[STORAGE_INIT_RES]] to [trivial] [[STORAGE_INST]] : $*TrivialStruct.$Storage
-  // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV10memberwiseACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+  // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[SELF_ACCESS:%.*]] = begin_access [modify] [static] %1 : $*TrivialStruct
   // CHECK: [[STORAGE_VAR_REF:%.*]] = struct_element_addr [[SELF_ACCESS]] : $*TrivialStruct, #TrivialStruct.$_storage
   // CHECK: [[WRAPPER_METATYPE:%.*]] = metatype $@thin Wrapper<TrivialStruct.$Storage>.Type
@@ -67,7 +66,7 @@ struct GenericStruct<T: Collection> {
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(test: T)
   // CHECK: [[STORAGE_METATYPE:%.*]] = metatype $@thin GenericStruct<T>.$Storage.Type
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST]], [[T_VAL]], [[STORAGE_METATYPE]]) : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0, @thin GenericStruct<τ_0_0>.$Storage.Type) -> @out GenericStruct<τ_0_0>.$Storage
-  // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV10memberwiseACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+  // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*GenericStruct<T>
   // CHECK: [[STORAGE_VAR:%.*]] = struct_element_addr [[SELF_ACCESS]] : $*GenericStruct<T>, #GenericStruct.$_storage
   // CHECK: [[WRAPPER_METATYPE:%.*]] = metatype $@thin Wrapper<GenericStruct<T>.$Storage>.Type
@@ -372,7 +371,7 @@ struct TypeWithLetProperties<T> {
       // CHECK-NEXT: [[STORAGE_METATYPE:%.*]] = metatype $@thin TypeWithLetProperties<T>.$Storage.Type
       // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE]], [[T]], [[B_VAL]], [[STORAGE_METATYPE]])
 
-      // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV10memberwiseACyxGx_tcfC
+      // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC
       // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$_storage
       // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TypeWithLetProperties<T>.$Storage>
       // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
@@ -402,7 +401,7 @@ struct TypeWithLetProperties<T> {
       // CHECK-NEXT: [[STORAGE_METATYPE:%.*]] = metatype $@thin TypeWithLetProperties<T>.$Storage.Type
       // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE]], [[T]], [[B_VAL]], [[STORAGE_METATYPE]])
 
-      // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV10memberwiseACyxGx_tcfC
+      // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC
       // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$_storage
       // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TypeWithLetProperties<T>.$Storage>
       // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])

@@ -6600,7 +6600,7 @@ ERROR(cannot_use_multiple_type_wrappers,none,
 
 ERROR(type_wrapper_requires_memberwise_init,none,
       "type wrapper type %0 does not contain a required initializer"
-      " - init(memberwise:)",
+      " - init(storage:)",
       (DeclName))
 
 ERROR(type_wrapper_requires_subscript,none,
