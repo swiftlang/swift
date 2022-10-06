@@ -187,6 +187,9 @@ public:
   // Print the #include sequence for the specified C++ interop shim header.
   void printIncludeForShimHeader(StringRef headerName);
 
+  // Print the #define for the given macro.
+  void printDefine(StringRef macroName);
+
 protected:
   raw_ostream &os;
 };

@@ -354,3 +354,7 @@ void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
   os << "#include <swiftToCxx/" << headerName << ">\n";
   os << "#endif\n";
 }
+
+void ClangSyntaxPrinter::printDefine(StringRef macroName) {
+  os << "#define " << macroName << "\n";
+}
