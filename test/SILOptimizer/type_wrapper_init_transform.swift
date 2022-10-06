@@ -34,7 +34,7 @@ struct TrivialStruct {
   // CHECK: store [[STORAGE_INIT_RES]] to [trivial] [[STORAGE_INST]] : $*TrivialStruct.$Storage
   // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[SELF_ACCESS:%.*]] = begin_access [modify] [static] %1 : $*TrivialStruct
-  // CHECK: [[STORAGE_VAR_REF:%.*]] = struct_element_addr [[SELF_ACCESS]] : $*TrivialStruct, #TrivialStruct.$_storage
+  // CHECK: [[STORAGE_VAR_REF:%.*]] = struct_element_addr [[SELF_ACCESS]] : $*TrivialStruct, #TrivialStruct.$storage
   // CHECK: [[WRAPPER_METATYPE:%.*]] = metatype $@thin Wrapper<TrivialStruct.$Storage>.Type
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TrivialStruct.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF]]<TrivialStruct.$Storage>([[WRAPPER_INST]], [[STORAGE_INST]], [[WRAPPER_METATYPE]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
@@ -68,7 +68,7 @@ struct GenericStruct<T: Collection> {
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST]], [[T_VAL]], [[STORAGE_METATYPE]]) : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0, @thin GenericStruct<τ_0_0>.$Storage.Type) -> @out GenericStruct<τ_0_0>.$Storage
   // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*GenericStruct<T>
-  // CHECK: [[STORAGE_VAR:%.*]] = struct_element_addr [[SELF_ACCESS]] : $*GenericStruct<T>, #GenericStruct.$_storage
+  // CHECK: [[STORAGE_VAR:%.*]] = struct_element_addr [[SELF_ACCESS]] : $*GenericStruct<T>, #GenericStruct.$storage
   // CHECK: [[WRAPPER_METATYPE:%.*]] = metatype $@thin Wrapper<GenericStruct<T>.$Storage>.Type
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<GenericStruct<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF]]<GenericStruct<T>.$Storage>([[WRAPPER_INST]], [[STORAGE_INST]], [[WRAPPER_METATYPE]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
@@ -90,7 +90,7 @@ class GenericClass<T: Collection> {
   // CHECK: [[TEST_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(test: T), 0
   // CHECK: assign_by_wrapper origin type_wrapper, [[TEST_VAL:%.*]] : $*T to [initialization] [[TEST_PROP]] : $*T, set {{.*}}
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $GenericClass<T>
-  // CHECK-NEXT: [[STORAGE_VAR_REF:%.*]] = ref_element_addr [[SELF_ACCESS]] : $GenericClass<T>, #GenericClass.$_storage
+  // CHECK-NEXT: [[STORAGE_VAR_REF:%.*]] = ref_element_addr [[SELF_ACCESS]] : $GenericClass<T>, #GenericClass.$storage
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<GenericClass<T>.$Storage>([[WRAPPER_INST:%.*]], [[STORAGE_INST:%.*]], {{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[STORAGE_VAR_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_VAR_REF]] : $*Wrapper<GenericClass<T>.$Storage>
   // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_VAR_ACCESS]] : $*Wrapper<GenericClass<T>.$Storage>
@@ -192,7 +192,7 @@ class TestConditionalInjection<T> {
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
-  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$_storage
+  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$storage
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[STORAGE_INST]], {{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]] : $*Wrapper<TestConditionalInjection<T>.$Storage>
@@ -213,7 +213,7 @@ class TestConditionalInjection<T> {
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
-  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$_storage
+  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$storage
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[STORAGE_INST]], {{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]] : $*Wrapper<TestConditionalInjection<T>.$Storage>
@@ -251,7 +251,7 @@ class TestConditionalInjection<T> {
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
-  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$_storage
+  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$storage
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[STORAGE_INST]], {{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]] : $*Wrapper<TestConditionalInjection<T>.$Storage>
@@ -272,7 +272,7 @@ class TestConditionalInjection<T> {
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
-  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$_storage
+  // CHECK: [[STORAGE_PROP:%.*]] = ref_element_addr [[SELF_ACCESS]] : $TestConditionalInjection<T>, #TestConditionalInjection.$storage
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[STORAGE_INST]], {{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]] : $*Wrapper<TestConditionalInjection<T>.$Storage>
@@ -372,7 +372,7 @@ struct TypeWithLetProperties<T> {
       // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE]], [[T]], [[B_VAL]], [[STORAGE_METATYPE]])
 
       // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC
-      // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$_storage
+      // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$storage
       // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TypeWithLetProperties<T>.$Storage>
       // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
 
@@ -402,7 +402,7 @@ struct TypeWithLetProperties<T> {
       // CHECK-NEXT: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE]], [[T]], [[B_VAL]], [[STORAGE_METATYPE]])
 
       // CHECK: [[WRAPPER_INIT_REF:%.*]] = function_ref @$s4test7WrapperV7storageACyxGx_tcfC
-      // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$_storage
+      // CHECK: [[STORAGE_PROP:%.*]] = struct_element_addr [[SELF_ACCESS:%.*]] : $*TypeWithLetProperties<T>, #TypeWithLetProperties.$storage
       // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TypeWithLetProperties<T>.$Storage>
       // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
 

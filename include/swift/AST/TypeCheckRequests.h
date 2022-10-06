@@ -3588,7 +3588,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Inject or get `$_storage` property which is used to route accesses through
+/// Inject or get `$storage` property which is used to route accesses through
 /// to all stored properties of a type that has a type wrapper.
 class GetTypeWrapperProperty
     : public SimpleRequest<GetTypeWrapperProperty, VarDecl *(NominalTypeDecl *),

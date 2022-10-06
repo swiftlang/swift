@@ -205,7 +205,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
           ->castTo<AnyGenericType>();
   assert(typeWrapperType);
 
-  // $_storage: Wrapper<$Storage>
+  // $storage: Wrapper<$Storage>
   auto propertyTy = BoundGenericType::get(
       typeWrapper, /*Parent=*/typeWrapperType->getParent(),
       /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
@@ -240,7 +240,7 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
 }
 
 /// Given the property create a subscript to reach its type wrapper storage:
-/// `$_storage[storageKeyPath: \$Storage.<property>]`.
+/// `$storage[storageKeyPath: \$Storage.<property>]`.
 static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
                                                    AccessorDecl *useDC) {
   auto &ctx = useDC->getASTContext();
@@ -270,7 +270,7 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
                             /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
       typeWrapperVar->getName());
 
-  // $_storage[storageKeyPath: \$Storage.<property-name>]
+  // $storage[storageKeyPath: \$Storage.<property-name>]
   return SubscriptExpr::create(
       ctx, subscriptBaseExpr,
       ArgumentList::forImplicitSingle(ctx, ctx.Id_storageKeyPath, argExpr),
@@ -403,7 +403,7 @@ BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
   auto &ctx = ctor->getASTContext();
   auto *parent = ctor->getDeclContext()->getSelfNominalTypeDecl();
 
-  // self.$_storage = .init(storage: $Storage(...))
+  // self.$storage = .init(storage: $Storage(...))
   auto *storageType = parent->getTypeWrapperStorageDecl();
   assert(storageType);
 

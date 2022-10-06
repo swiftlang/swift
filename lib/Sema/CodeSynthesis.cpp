@@ -1249,7 +1249,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       auto &ctx = decl->getASTContext();
       // If declaration is type wrapped and there are no
       // designated initializers, synthesize a special
-      // memberwise initializer that would instantiate `$_storage`.
+      // memberwise initializer that would instantiate `$storage`.
       if (!hasUserDefinedDesignatedInit(ctx.evaluator, decl))
         (void)decl->getTypeWrappedTypeMemberwiseInitializer();
     }

@@ -43,7 +43,7 @@ do {
     }
   }
 
-  // FIXME: Diagnostics should mention `self.b` or `self.a` and not `self.$_storage`
+  // FIXME: Diagnostics should mention `self.b` or `self.a` and not `self.$storage`
 
   @Wrapper
   struct ImmutableTest3 {
@@ -57,7 +57,7 @@ do {
 
     init(a: Int = 42) {
       self.a = a
-      print(self.a) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$_storage' not initialized}}
+      print(self.a) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$storage' not initialized}}
       self.b = ""
     }
 
@@ -74,15 +74,15 @@ do {
       if let b = otherB {
         self.b = b
       }
-    } // expected-error {{return from initializer without initializing all stored properties}} expected-note {{'self.$_storage' not initialized}}
+    } // expected-error {{return from initializer without initializing all stored properties}} expected-note {{'self.$storage' not initialized}}
 
     init(optB: String? = nil) {
       if let optB {
         self.b = optB
-        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$_storage' not initialized}}
+        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$storage' not initialized}}
       } else {
         self.b = ""
-        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$_storage' not initialized}}
+        print(self.b) // expected-error {{'self' used before all stored properties are initialized}} expected-note {{'self.$storage' not initialized}}
       }
 
       self.a = 0
