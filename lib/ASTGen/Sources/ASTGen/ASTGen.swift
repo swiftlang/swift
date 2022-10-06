@@ -17,15 +17,21 @@ extension UnsafePointer {
   }
 }
 
-// TODO: :(
-var declContext: UnsafeMutableRawPointer! = nil
+/// Little utility wrapper that lets us
+@propertyWrapper
+class Boxed<Value> {
+  var wrappedValue: Value
+
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+}
 
 struct ASTGenVisitor: SyntaxTransformVisitor {
   let ctx: UnsafeMutableRawPointer
   let base: UnsafePointer<CChar>
 
-  // TOOD: we need to be up updating this.
-//  var declContext: UnsafeMutableRawPointer
+  @Boxed var declContext: UnsafeMutableRawPointer
   
   // TODO: this some how messes up the witness table when I uncomment it locally :/
 //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
@@ -70,8 +76,7 @@ public func parseTopLevelSwift(
     callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
   let syntax = try! Parser.parse(source: String(cString: buffer))
-  declContext = dc
-  ASTGenVisitor(ctx: ctx, base: buffer)
+  ASTGenVisitor(ctx: ctx, base: buffer, declContext: dc)
     .visit(syntax)
     .forEach { callback($0, outputContext) }
 }
