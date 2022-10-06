@@ -17,10 +17,12 @@ inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
 }
 
 BridgedIdentifier
-SwiftASTContext_getIdentifier(void *ctx, const char *_Nullable str, long len) {
-  return static_cast<ASTContext *>(ctx)
-      ->getIdentifier(StringRef{str, size_t(len)})
-      .get();
+SwiftASTContext_getIdentifier(void *ctx, const uint8_t *_Nullable str, long len) {
+  return const_cast<void *>(
+      static_cast<ASTContext *>(ctx)
+        ->getIdentifier(
+          StringRef{reinterpret_cast<const char *>(str), size_t(len)})
+        .getAsOpaquePointer());
 }
 
 void *SwiftImportDecl_create(void *ctx, void *dc, void *importLoc, char kind,
@@ -101,27 +103,30 @@ void *SwiftFunctionCallExpr_create(void *ctx, void *fn, void *args) {
                           /*implicit*/ false);
 }
 
-void *SwiftIdentifierExpr_create(void *ctx, const char *base, void *loc) {
+void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto name = DeclNameRef{
-      swift::Identifier::getFromOpaquePointer(const_cast<char *>(base))};
+      swift::Identifier::getFromOpaquePointer(base)};
   Expr *E = new (Context) UnresolvedDeclRefExpr(
       name, DeclRefKind::Ordinary, DeclNameLoc{*(SourceLoc *)&loc});
   return E;
 }
 
-void *SwiftStringLiteralExpr_create(void *ctx, const char *_Nullable string,
-                                    long len, void *TokenLoc) {
+void *SwiftStringLiteralExpr_create(
+    void *ctx, const uint8_t *_Nullable string,
+    long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) StringLiteralExpr(StringRef{string, size_t(len)},
-                                         *(SourceLoc *)&TokenLoc);
+  return new (Context) StringLiteralExpr(
+      StringRef{reinterpret_cast<const char *>(string), size_t(len)},
+      *(SourceLoc *)&TokenLoc);
 }
 
-void *SwiftIntegerLiteralExpr_create(void *ctx, const char *_Nullable string,
-                                long len, void *TokenLoc) {
+void *SwiftIntegerLiteralExpr_create(
+    void *ctx, const uint8_t *_Nullable string, long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) IntegerLiteralExpr(StringRef{string, size_t(len)},
-                                         *(SourceLoc *)&TokenLoc);
+  return new (Context) IntegerLiteralExpr(
+      StringRef{reinterpret_cast<const char *>(string), size_t(len)},
+      *(SourceLoc *)&TokenLoc);
 }
 
 void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
@@ -129,12 +134,12 @@ void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
   return new (Context) BooleanLiteralExpr(value, *(SourceLoc *)&TokenLoc);
 }
 
-void *SwiftVarDecl_create(void *ctx, const char *_Nullable nameId,
+void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
                           void *loc, bool isStatic, bool isLet, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) VarDecl(isStatic,
                                isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-                               *(SourceLoc *)&loc, Identifier::getFromOpaquePointer((void *)nameId),
+                               *(SourceLoc *)&loc, Identifier::getFromOpaquePointer(nameId),
                                reinterpret_cast<DeclContext *>(dc));
 }
 
@@ -164,10 +169,11 @@ void *BraceStmt_createStmt(void *ctx, void *lbloc, BridgedArrayRef elements, voi
                            *(SourceLoc *)&rbloc);
 }
 
-void *ParamDecl_create(void *ctx, void *loc,
-                       void *_Nullable argLoc, void *_Nullable argName,
-                       void *_Nullable paramLoc, void *_Nullable paramName,
-                       void *declContext) {
+void *ParamDecl_create(
+    void *ctx, void *loc,
+    void *_Nullable argLoc, BridgedIdentifier _Nullable argName,
+    void *_Nullable paramLoc, BridgedIdentifier _Nullable paramName,
+    void *declContext) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) ParamDecl(*(SourceLoc *)&loc, *(SourceLoc *)&argLoc,
                                  Identifier::getFromOpaquePointer(argName),
@@ -177,7 +183,7 @@ void *ParamDecl_create(void *ctx, void *loc,
 }
 
 void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
-                      const char *name, void *nameLoc,
+                      BridgedIdentifier name, void *nameLoc,
                       bool isAsync, void *_Nullable asyncLoc,
                       bool throws, void *_Nullable throwsLoc,
                       void *paramLLoc, BridgedArrayRef params, void *paramRLoc,
@@ -188,7 +194,7 @@ void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
       getArrayRef<ParamDecl *>(params), *(SourceLoc *)&paramRLoc);
   auto declName =
       DeclName(*static_cast<ASTContext *>(ctx),
-               Identifier::getFromOpaquePointer((void *)name), paramList);
+               Identifier::getFromOpaquePointer(name), paramList);
   auto *out = FuncDecl::create(
       *static_cast<ASTContext *>(ctx), *(SourceLoc *)&staticLoc,
       isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
@@ -200,16 +206,18 @@ void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
   return static_cast<Decl *>(out);
 }
 
-void *SimpleIdentTypeRepr_create(void *ctx, void *loc, const char *id) {
+void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) SimpleIdentTypeRepr(DeclNameLoc(*(SourceLoc *)&loc),
-                                           DeclNameRef(Identifier::getFromOpaquePointer((void *)id)));
+                                           DeclNameRef(Identifier::getFromOpaquePointer(id)));
 }
 
-void *UnresolvedDotExpr_create(void *ctx, void *base, void *dotLoc, const char *name, void *nameLoc) {
+void *UnresolvedDotExpr_create(
+    void *ctx, void *base, void *dotLoc,  BridgedIdentifier name,
+    void *nameLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
       return new (Context) UnresolvedDotExpr((Expr *)base, *(SourceLoc *)&dotLoc,
-                                         DeclNameRef(Identifier::getFromOpaquePointer((void *)name)),
+                                         DeclNameRef(Identifier::getFromOpaquePointer(name)),
                                          DeclNameLoc(*(SourceLoc *)&nameLoc), false);
 }
 
@@ -235,11 +243,11 @@ void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
     ((NominalTypeDecl *)decl)->addMember(m);
 }
 
-DeclContextAndDecl StructDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
-                        void *dc) {
+DeclContextAndDecl StructDecl_create(
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *out = new (Context) StructDecl(SourceLoc(), // *(SourceLoc *)&loc,
-                                       Identifier::getFromOpaquePointer((void *)name),
+                                       Identifier::getFromOpaquePointer(name),
                                        SourceLoc(), // *(SourceLoc *)&nameLoc,
                                        {}, nullptr,
                                        (DeclContext *)dc);
@@ -247,11 +255,11 @@ DeclContextAndDecl StructDecl_create(void *ctx, void *loc, const char *name, voi
   return {(DeclContext *)out, (NominalTypeDecl *)out, (Decl *)out};
 }
 
-DeclContextAndDecl ClassDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
-                       void *dc) {
+DeclContextAndDecl ClassDecl_create(
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *out = new (Context) ClassDecl(SourceLoc(), // *(SourceLoc *)&loc,
-                                      Identifier::getFromOpaquePointer((void *)name),
+                                      Identifier::getFromOpaquePointer(name),
                                       SourceLoc(), // *(SourceLoc *)&nameLoc,
                                       {}, nullptr,
                                       (DeclContext *)dc, false);

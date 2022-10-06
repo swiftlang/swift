@@ -13,6 +13,8 @@
 #ifndef SWIFT_C_AST_ASTBRIDGING_H
 #define SWIFT_C_AST_ASTBRIDGING_H
 
+#include <inttypes.h>
+
 #if __clang__
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -26,6 +28,7 @@
 #else
 #define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 #define SWIFT_END_NULLABILITY_ANNOTATIONS
+#define _Nullable
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -73,7 +76,7 @@ void DiagnosticEngine_diagnose(void *, void *loc, BridgedDiagID diagID,
 
 int DiagnosticEngine_hadAnyError(void *);
 
-typedef const char *BridgedIdentifier;
+typedef void *BridgedIdentifier;
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,7 +86,8 @@ extern "C" {
 #endif
 
 BridgedIdentifier
-SwiftASTContext_getIdentifier(void *ctx, const char *_Nullable str, long len);
+SwiftASTContext_getIdentifier(
+    void *ctx, const uint8_t * _Nullable str, long len);
 
 void *SwiftImportDecl_create(void *, void *, void *, char, void *,
                              BridgedArrayRef, BridgedArrayRef);
@@ -100,17 +104,17 @@ void *SwiftTupleExpr_create(void *ctx, void *lparen, BridgedArrayRef subs,
 
 void *SwiftFunctionCallExpr_create(void *ctx, void *fn, void *args);
 
-void *SwiftIdentifierExpr_create(void *ctx, const char *base, void *loc);
+void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc);
 
-void *SwiftStringLiteralExpr_create(void *ctx, const char *_Nullable string,
+void *SwiftStringLiteralExpr_create(void *ctx, const uint8_t * _Nullable string,
                                     long len, void *TokenLoc);
 
-void *SwiftIntegerLiteralExpr_create(void *ctx, const char *_Nullable string,
+void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t * _Nullable string,
                                     long len, void *TokenLoc);
 
 void *SwiftBooleanLiteralExpr_create(void *ctx, _Bool value, void *TokenLoc);
 
-void *SwiftVarDecl_create(void *ctx, const char *_Nullable name,
+void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable name,
                           void *loc, _Bool isStatic, _Bool isLet, void *dc);
 
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, void *_Nullable elseLoc,
@@ -127,16 +131,16 @@ void *ParamDecl_create(void *ctx, void *loc,
                        void *declContext);
 
 void *FuncDecl_create(void *ctx, void *staticLoc, _Bool isStatic, void *funcLoc,
-                      const char *name, void *nameLoc,
+                      BridgedIdentifier name, void *nameLoc,
                       _Bool isAsync, void *_Nullable asyncLoc,
                       _Bool throws, void *_Nullable throwsLoc,
                       void *paramLLoc, BridgedArrayRef params, void *paramRLoc,
                       void *_Nullable body, void *_Nullable returnType,
                       void *declContext);
 
-void *SimpleIdentTypeRepr_create(void *ctx, void *loc, const char *id);
+void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id);
 
-void *UnresolvedDotExpr_create(void *ctx, void *base, void *dotLoc, const char *name, void *nameLoc);
+void *UnresolvedDotExpr_create(void *ctx, void *base, void *dotLoc, BridgedIdentifier name, void *nameLoc);
 
 void *ClosureExpr_create(void *ctx, void *body, void *dc);
 
@@ -148,10 +152,10 @@ struct DeclContextAndDecl {
   void *decl;
 };
 
-struct DeclContextAndDecl StructDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
-                        void *dc);
-struct DeclContextAndDecl ClassDecl_create(void *ctx, void *loc, const char *name, void *nameLoc,
-                       void *dc);
+struct DeclContextAndDecl StructDecl_create(
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
+struct DeclContextAndDecl ClassDecl_create(
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
 
 void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);

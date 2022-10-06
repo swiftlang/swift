@@ -72,7 +72,7 @@ extension ASTGenVisitor {
     if let nodeFirstName = node.firstName {
       var text = nodeFirstName.text
       firstName = text.withUTF8 { buf in
-        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count).raw
+        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
       }
     } else {
       firstName = nil
@@ -81,7 +81,7 @@ extension ASTGenVisitor {
     if let nodeSecondName = node.secondName {
       var text = nodeSecondName.text
       secondName = text.withUTF8 { buf in
-        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count).raw
+        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
       }
     } else {
       secondName = nil
