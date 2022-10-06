@@ -240,9 +240,6 @@ private:
   /// Visited set for general def-use traversal that prevents revisiting values.
   GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
-  /// Visited set general CFG traversal that prevents revisiting blocks.
-  GraphNodeWorklist<SILBasicBlock *, 8> blockWorklist;
-
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
