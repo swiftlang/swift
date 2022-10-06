@@ -286,7 +286,7 @@ bool SILValueOwnershipChecker::gatherUsers(
   // this value forwards guaranteed ownership. In such a case, we are going to
   // validate it as part of the borrow introducer from which the forwarding
   // value originates. So we can just return true and continue.
-  if (isForwardingBorrow(value))
+  if (isGuaranteedForwarding(value))
     return true;
 
   // Ok, we have some sort of borrow introducer. We need to recursively validate
@@ -322,7 +322,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     // Example: A guaranteed parameter of a co-routine.
 
     // Now check if we have a non guaranteed forwarding inst...
-    if (op->getOperandOwnership() != OperandOwnership::ForwardingBorrow) {
+    if (op->getOperandOwnership() != OperandOwnership::GuaranteedForwarding) {
       // First check if we are visiting an operand that is a consuming use...
       if (op->isLifetimeEnding()) {
         // If its underlying value is our original value, then this is a true
@@ -563,7 +563,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
   // have lifetime ending uses, since our lifetime is guaranteed by our
   // operand, so there is nothing further to do. So just return true.
   if (value->getOwnershipKind() == OwnershipKind::Guaranteed &&
-      isForwardingBorrow(value))
+      isGuaranteedForwarding(value))
     return true;
 
   // If we have an unowned value, then again there is nothing left to do.
@@ -682,7 +682,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
   if (value->getOwnershipKind() == OwnershipKind::Guaranteed &&
-      isForwardingBorrow(value)) {
+      isGuaranteedForwarding(value)) {
     if (!isSubobjectProjectionWithLifetimeEndingUses(value,
                                                      lifetimeEndingUsers)) {
       return false;

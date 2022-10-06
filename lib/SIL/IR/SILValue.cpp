@@ -430,8 +430,8 @@ StringRef OperandOwnership::asString() const {
     return "forwarding-consume";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
-  case OperandOwnership::ForwardingBorrow:
-    return "forwarding-borrow";
+  case OperandOwnership::GuaranteedForwarding:
+    return "guaranteed-forwarding";
   case OperandOwnership::EndBorrow:
     return "end-borrow";
   case OperandOwnership::Reborrow:

@@ -214,7 +214,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         if (updateLivenessAndWeakStores)
           liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
         // TermInst includes ReturnInst, which is generally an escape.
         // If this is called as part of getArgumentState, then it is not really

@@ -297,14 +297,14 @@ OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
 OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
 // Instructions that propagate a value within a borrow scope.
-OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
-OPERAND_OWNERSHIP(ForwardingBorrow, StructExtract)
-OPERAND_OWNERSHIP(ForwardingBorrow, DifferentiableFunctionExtract)
-OPERAND_OWNERSHIP(ForwardingBorrow, LinearFunctionExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, TupleExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, StructExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, DifferentiableFunctionExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 // FIXME: OpenExistential[Box]Value should be able to take owned values too by
 // using getForwardingOperandOwnership.
-OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialValue)
-OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialBoxValue)
+OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
+OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
@@ -335,7 +335,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 #undef OPERAND_OWNERSHIP
 
 // Forwarding operations are conditionally either ForwardingConsumes or
-// ForwardingBorrows, depending on the instruction's constant ownership
+// GuaranteedForwarding, depending on the instruction's constant ownership
 // attribute.
 #define FORWARDING_OWNERSHIP(INST)                                             \
   OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
@@ -376,7 +376,7 @@ FORWARDING_ANY_OWNERSHIP(CheckedCastBranch)
 // the meet of its operands' ownership. A destructured member has the same
 // ownership as its aggregate unless its type gives it None ownership.
 //
-// TODO: Aggregate operations should be Reborrows, not ForwardingBorrows,
+// TODO: Aggregate operations should be Reborrows, not GuaranteedForwarding,
 // because the borrowed value is different on either side of the operation and
 // the lifetimes of borrowed members could differ.
 #define AGGREGATE_OWNERSHIP(INST)                                              \
@@ -422,7 +422,7 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
 OperandOwnership
 OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
   if (getValue() == i->getDefaultResult())
-    return OperandOwnership::ForwardingBorrow;
+    return OperandOwnership::GuaranteedForwarding;
 
   for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
     SILValue casevalue;
@@ -430,7 +430,7 @@ OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
     std::tie(casevalue, result) = i->getCase(idx);
 
     if (getValue() == casevalue) {
-      return OperandOwnership::ForwardingBorrow;
+      return OperandOwnership::GuaranteedForwarding;
     }
   }
   return OperandOwnership::TrivialUse;

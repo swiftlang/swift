@@ -297,7 +297,7 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
     case OperandOwnership::InteriorPointer:
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
-    case OperandOwnership::ForwardingBorrow: {
+    case OperandOwnership::GuaranteedForwarding: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() != OwnershipKind::None) {

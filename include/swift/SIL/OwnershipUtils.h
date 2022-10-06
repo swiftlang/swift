@@ -73,19 +73,19 @@ struct BorrowedValue;
 /// values?
 ///
 /// This may be true even if the current instance of the instruction is not a
-/// ForwardingBorrow. If true, then the operation may be trivially rewritten
+/// GuaranteedForwarding. If true, then the operation may be trivially rewritten
 /// with Guaranteed ownership.
 bool canOpcodeForwardGuaranteedValues(SILValue value);
 
 /// Is the opcode that consumes \p use capable of forwarding guaranteed values?
 ///
-/// This may be true even if \p use is not a ForwardingBorrow. If true, then the
-/// operation may be trivially rewritten with Guaranteed ownership.
+/// This may be true even if \p use is not a GuaranteedForwarding. If true, then
+/// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardGuaranteedValues(Operand *use);
 
 // This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::ForwardingBorrow.
-inline bool isForwardingBorrow(SILValue value) {
+// OperandOwnership::GuaranteedForwarding.
+inline bool isGuaranteedForwarding(SILValue value) {
   assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
   return canOpcodeForwardGuaranteedValues(value);
 }

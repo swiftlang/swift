@@ -185,7 +185,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         }
         break;
       case OperandOwnership::InteriorPointer:
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::EndBorrow:
         // Guaranteed values are considered uses of the value when the value is
         // an owned phi and the guaranteed values are adjacent reborrow phis or
