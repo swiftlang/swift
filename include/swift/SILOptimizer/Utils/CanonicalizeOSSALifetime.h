@@ -304,6 +304,7 @@ public:
     // analysis, freeing its memory.
     accessBlocks = nullptr;
     consumes.clear();
+    destroys.clear();
 
     liveness.initializeDef(def);
   }
