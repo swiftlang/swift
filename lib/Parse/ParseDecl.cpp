@@ -190,6 +190,11 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
       !SourceMgr.hasCodeCompletionBuffer() &&
       SF.Kind != SourceFileKind::SIL) {
     parseTopLevelSwift(contents.data(), CurDeclContext, &Context, &decls, appendToVector);
+
+    // Spin the C++ parser to the end; we won't be using it.
+    while (!Tok.is(tok::eof)) {
+      consumeToken();
+    }
     return;
   }
 #endif

@@ -70,7 +70,6 @@ public func parseTopLevelSwift(
     callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
   let syntax = try! Parser.parse(source: String(cString: buffer))
-  dump(syntax)
   declContext = dc
   ASTGenVisitor(ctx: ctx, base: buffer)
     .visit(syntax)
