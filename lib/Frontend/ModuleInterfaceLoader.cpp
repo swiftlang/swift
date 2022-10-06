@@ -1489,6 +1489,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
       GenericArgs.push_back(ArgSaver.save(pair));
   });
+
+  if (LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    genericSubInvocation.getLangOptions().Features.insert(
+      Feature::LayoutPrespecialization);
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
