@@ -3158,149 +3158,168 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
-  int diff = func1Params.size() - func2Params.size();
-  if (diff != 0) {
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(argumentLocator);
+  // FIXME: ParamPackMatcher should completely replace the non-variadic
+  // case too eventually.
+  if (AnyFunctionType::containsPackExpansionType(func1Params) ||
+      AnyFunctionType::containsPackExpansionType(func2Params)) {
+    ParamPackMatcher matcher(func1Params, func2Params, getASTContext());
+    if (matcher.match())
+      return getTypeMatchFailure(locator);
 
-    auto *loc = getConstraintLocator(locator);
-
-    // If this is conversion between optional (or IUO) parameter
-    // and argument, let's drop the last path element so locator
-    // could be simplified down to an argument expression.
-    //
-    // func foo(_: ((Int, Int) -> Void)?) {}
-    // _ = foo { _ in } <- missing second closure parameter.
-    if (loc->isLastElement<LocatorPathElt::OptionalPayload>()) {
-      auto path = loc->getPath();
-      loc = getConstraintLocator(loc->getAnchor(), path.drop_back());
+    for (auto pair : matcher.pairs) {
+      auto result = matchTypes(pair.lhs, pair.rhs, subKind, subflags,
+                               (func1Params.size() == 1
+                                ? argumentLocator
+                                : argumentLocator.withPathElement(
+                                      LocatorPathElt::TupleElement(pair.idx))));
+      if (result.isFailure())
+        return result;
     }
-
-    auto anchor = simplifyLocatorToAnchor(loc);
-    if (!anchor)
-      return getTypeMatchFailure(argumentLocator);
-
-    // If there are missing arguments, let's add them
-    // using parameter as a template.
-    if (diff < 0) {
-      if (fixMissingArguments(*this, anchor, func1Params, func2Params,
-                              abs(diff), loc))
-        return getTypeMatchFailure(argumentLocator);
-    } else {
-      // If there are extraneous arguments, let's remove
-      // them from the list.
-      if (fixExtraneousArguments(*this, func2, func1Params, diff, loc))
-        return getTypeMatchFailure(argumentLocator);
-
-      // Drop all of the extraneous arguments.
-      auto numParams = func2Params.size();
-      func1Params.erase(func1Params.begin() + numParams, func1Params.end());
-    }
-  }
-
-  bool hasLabelingFailures = false;
-  for (unsigned i : indices(func1Params)) {
-    auto func1Param = func1Params[i];
-    auto func2Param = func2Params[i];
-
-    // Increase the score if matching an autoclosure parameter to an function
-    // type, so we enforce that non-autoclosure overloads are preferred.
-    //
-    //   func autoclosure(f: () -> Int) { }
-    //   func autoclosure(f: @autoclosure () -> Int) { }
-    //
-    //   let _ = autoclosure as (() -> (Int)) -> () // non-autoclosure preferred
-    //
-    auto isAutoClosureFunctionMatch = [](AnyFunctionType::Param &param1,
-                                         AnyFunctionType::Param &param2) {
-      return param1.isAutoClosure() &&
-             (!param2.isAutoClosure() &&
-              param2.getPlainType()->is<FunctionType>());
-    };
-
-    if (isAutoClosureFunctionMatch(func1Param, func2Param) ||
-        isAutoClosureFunctionMatch(func2Param, func1Param)) {
-      increaseScore(SK_FunctionToAutoClosureConversion);
-    }
-
-    // Variadic bit must match.
-    if (func1Param.isVariadic() != func2Param.isVariadic()) {
-      if (!(shouldAttemptFixes() && func2Param.isVariadic()))
-        return getTypeMatchFailure(argumentLocator);
-
-      auto argType =
-          getFixedTypeRecursive(func1Param.getPlainType(), /*wantRValue=*/true);
-      auto varargsType = func2Param.getPlainType();
-
-      // Delay solving this constraint until argument is resolved.
-      if (argType->is<TypeVariableType>()) {
-        addUnsolvedConstraint(Constraint::create(
-            *this, kind, func1, func2, getConstraintLocator(locator)));
-        return getTypeMatchSuccess();
-      }
-
-      auto *fix = ExpandArrayIntoVarargs::attempt(
-          *this, argType, varargsType,
-          argumentLocator.withPathElement(LocatorPathElt::ApplyArgToParam(
-              i, i, func2Param.getParameterFlags())));
-
-      if (!fix || recordFix(fix))
-        return getTypeMatchFailure(argumentLocator);
-
-      continue;
-    }
-
-    // Labels must match.
-    //
-    // FIXME: We should not end up with labels here at all, but we do
-    // from invalid code in diagnostics, and as a result of code completion
-    // directly building constraint systems.
-    if (func1Param.getLabel() != func2Param.getLabel()) {
+  } else {
+    int diff = func1Params.size() - func2Params.size();
+    if (diff != 0) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(argumentLocator);
 
-      // If we are allowed to attempt fixes, let's ignore labeling
-      // failures, and create a fix to re-label arguments if types
-      // line up correctly.
-      hasLabelingFailures = true;
+      auto *loc = getConstraintLocator(locator);
+
+      // If this is conversion between optional (or IUO) parameter
+      // and argument, let's drop the last path element so locator
+      // could be simplified down to an argument expression.
+      //
+      // func foo(_: ((Int, Int) -> Void)?) {}
+      // _ = foo { _ in } <- missing second closure parameter.
+      if (loc->isLastElement<LocatorPathElt::OptionalPayload>()) {
+        auto path = loc->getPath();
+        loc = getConstraintLocator(loc->getAnchor(), path.drop_back());
+      }
+
+      auto anchor = simplifyLocatorToAnchor(loc);
+      if (!anchor)
+        return getTypeMatchFailure(argumentLocator);
+
+      // If there are missing arguments, let's add them
+      // using parameter as a template.
+      if (diff < 0) {
+        if (fixMissingArguments(*this, anchor, func1Params, func2Params,
+                                abs(diff), loc))
+          return getTypeMatchFailure(argumentLocator);
+      } else {
+        // If there are extraneous arguments, let's remove
+        // them from the list.
+        if (fixExtraneousArguments(*this, func2, func1Params, diff, loc))
+          return getTypeMatchFailure(argumentLocator);
+
+        // Drop all of the extraneous arguments.
+        auto numParams = func2Params.size();
+        func1Params.erase(func1Params.begin() + numParams, func1Params.end());
+      }
     }
 
-    // "isolated" can be added as a subtype relation, but otherwise must match.
-    if (func1Param.isIsolated() != func2Param.isIsolated() &&
-        !(func2Param.isIsolated() && subKind >= ConstraintKind::Subtype)) {
-      return getTypeMatchFailure(argumentLocator);
+    bool hasLabelingFailures = false;
+    for (unsigned i : indices(func1Params)) {
+      auto func1Param = func1Params[i];
+      auto func2Param = func2Params[i];
+
+      // Increase the score if matching an autoclosure parameter to an function
+      // type, so we enforce that non-autoclosure overloads are preferred.
+      //
+      //   func autoclosure(f: () -> Int) { }
+      //   func autoclosure(f: @autoclosure () -> Int) { }
+      //
+      //   let _ = autoclosure as (() -> (Int)) -> () // non-autoclosure preferred
+      //
+      auto isAutoClosureFunctionMatch = [](AnyFunctionType::Param &param1,
+                                           AnyFunctionType::Param &param2) {
+        return param1.isAutoClosure() &&
+               (!param2.isAutoClosure() &&
+                param2.getPlainType()->is<FunctionType>());
+      };
+
+      if (isAutoClosureFunctionMatch(func1Param, func2Param) ||
+          isAutoClosureFunctionMatch(func2Param, func1Param)) {
+        increaseScore(SK_FunctionToAutoClosureConversion);
+      }
+
+      // Variadic bit must match.
+      if (func1Param.isVariadic() != func2Param.isVariadic()) {
+        if (!(shouldAttemptFixes() && func2Param.isVariadic()))
+          return getTypeMatchFailure(argumentLocator);
+
+        auto argType =
+            getFixedTypeRecursive(func1Param.getPlainType(), /*wantRValue=*/true);
+        auto varargsType = func2Param.getPlainType();
+
+        // Delay solving this constraint until argument is resolved.
+        if (argType->is<TypeVariableType>()) {
+          addUnsolvedConstraint(Constraint::create(
+              *this, kind, func1, func2, getConstraintLocator(locator)));
+          return getTypeMatchSuccess();
+        }
+
+        auto *fix = ExpandArrayIntoVarargs::attempt(
+            *this, argType, varargsType,
+            argumentLocator.withPathElement(LocatorPathElt::ApplyArgToParam(
+                i, i, func2Param.getParameterFlags())));
+
+        if (!fix || recordFix(fix))
+          return getTypeMatchFailure(argumentLocator);
+
+        continue;
+      }
+
+      // Labels must match.
+      //
+      // FIXME: We should not end up with labels here at all, but we do
+      // from invalid code in diagnostics, and as a result of code completion
+      // directly building constraint systems.
+      if (func1Param.getLabel() != func2Param.getLabel()) {
+        if (!shouldAttemptFixes())
+          return getTypeMatchFailure(argumentLocator);
+
+        // If we are allowed to attempt fixes, let's ignore labeling
+        // failures, and create a fix to re-label arguments if types
+        // line up correctly.
+        hasLabelingFailures = true;
+      }
+
+      // "isolated" can be added as a subtype relation, but otherwise must match.
+      if (func1Param.isIsolated() != func2Param.isIsolated() &&
+          !(func2Param.isIsolated() && subKind >= ConstraintKind::Subtype)) {
+        return getTypeMatchFailure(argumentLocator);
+      }
+
+      // FIXME: We should check value ownership too, but it's not completely
+      // trivial because of inout-to-pointer conversions.
+
+      // For equality contravariance doesn't matter, but let's make sure
+      // that types are matched in original order because that is important
+      // when function types are equated as part of pattern matching.
+      auto paramType1 = kind == ConstraintKind::Equal ? func1Param.getOldType()
+                                                      : func2Param.getOldType();
+
+      auto paramType2 = kind == ConstraintKind::Equal ? func2Param.getOldType()
+                                                      : func1Param.getOldType();
+
+      // Compare the parameter types.
+      auto result = matchTypes(paramType1, paramType2, subKind, subflags,
+                               (func1Params.size() == 1
+                                ? argumentLocator
+                                : argumentLocator.withPathElement(
+                                      LocatorPathElt::TupleElement(i))));
+      if (result.isFailure())
+        return result;
     }
 
-    // FIXME: We should check value ownership too, but it's not completely
-    // trivial because of inout-to-pointer conversions.
+    if (hasLabelingFailures && !hasFixFor(loc)) {
+      ConstraintFix *fix =
+          loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
+              ? AllowArgumentMismatch::create(*this, func1, func2, loc)
+              : ContextualMismatch::create(*this, func1, func2, loc);
 
-    // For equality contravariance doesn't matter, but let's make sure
-    // that types are matched in original order because that is important
-    // when function types are equated as part of pattern matching.
-    auto paramType1 = kind == ConstraintKind::Equal ? func1Param.getOldType()
-                                                    : func2Param.getOldType();
-
-    auto paramType2 = kind == ConstraintKind::Equal ? func2Param.getOldType()
-                                                    : func1Param.getOldType();
-
-    // Compare the parameter types.
-    auto result = matchTypes(paramType1, paramType2, subKind, subflags,
-                             (func1Params.size() == 1
-                                  ? argumentLocator
-                                  : argumentLocator.withPathElement(
-                                        LocatorPathElt::TupleElement(i))));
-    if (result.isFailure())
-      return result;
-  }
-
-  if (hasLabelingFailures && !hasFixFor(loc)) {
-    ConstraintFix *fix =
-        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
-            ? AllowArgumentMismatch::create(*this, func1, func2, loc)
-            : ContextualMismatch::create(*this, func1, func2, loc);
-
-    if (recordFix(fix))
-      return getTypeMatchFailure(argumentLocator);
+      if (recordFix(fix))
+        return getTypeMatchFailure(argumentLocator);
+    }
   }
 
   // Result type can be covariant (or equal).
