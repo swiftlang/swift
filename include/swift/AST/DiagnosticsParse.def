@@ -1963,6 +1963,12 @@ ERROR(attr_requires_concurrency, none,
       (StringRef, bool))
 
 //------------------------------------------------------------------------------
+// MARK: Consistency diagnostics
+//------------------------------------------------------------------------------
+ERROR(new_parser_failure, none,
+      "new parser has failed consistency checking; please see errors above", ())
+
+//------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,

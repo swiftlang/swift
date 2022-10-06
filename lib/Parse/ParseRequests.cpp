@@ -219,9 +219,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
           bufferRange.str().data(), bufferRange.getByteLength(),
           SF->getFilename().str().c_str(), flags);
 
-      // FIXME: Produce an error on round-trip failure.
       if (roundTripResult)
-        abort();
+        ctx.Diags.diagnose(SourceLoc(), diag::new_parser_failure);
     }
   }
 #endif
