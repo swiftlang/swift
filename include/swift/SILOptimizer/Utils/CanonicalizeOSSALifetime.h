@@ -1,4 +1,4 @@
-//===--- CanonicalOSSALifetime.h - Canonicalize OSSA lifetimes --*- C++ -*-===//
+//===- CanonicalizeOSSALifetime.h - Canonicalize OSSA lifetimes -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -134,39 +134,10 @@ class CanonicalOSSAConsumeInfo {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 4> finalBlockConsumes;
 
-  /// Record any debug_value instructions found after a final consume.
-  SmallVector<DebugValueInst *, 8> debugAfterConsume;
-
-  /// The set of non-destroy consumes that need to be poisoned. This is
-  /// determined in two steps. First findOrInsertDestroyInBlock() checks if the
-  /// lifetime shrank within the block. Second rewriteCopies() checks if the
-  /// consume is in remnantLiveOutBlock(). Finally injectPoison() inserts new
-  /// copies and poison destroys for everything in this set.
-  SmallPtrSetVector<SILInstruction *, 4> needsPoisonConsumes;
-
 public:
-  void clear() {
-    finalBlockConsumes.clear();
-    debugAfterConsume.clear();
-    needsPoisonConsumes.clear();
-  }
+  void clear() { finalBlockConsumes.clear(); }
 
-  bool empty() {
-    return finalBlockConsumes.empty() && debugAfterConsume.empty()
-           && needsPoisonConsumes.empty();
-  }
-
-  void recordNeedsPoison(SILInstruction *consume) {
-    needsPoisonConsumes.insert(consume);
-  }
-
-  bool needsPoison(SILInstruction *consume) const {
-    return needsPoisonConsumes.count(consume);
-  }
-
-  ArrayRef<SILInstruction *> getNeedsPoisonConsumes() const {
-    return needsPoisonConsumes.getArrayRef();
-  }
+  bool empty() { return finalBlockConsumes.empty(); }
 
   bool hasUnclaimedConsumes() const { return !finalBlockConsumes.empty(); }
 
@@ -186,21 +157,6 @@ public:
       return true;
     }
     return false;
-  }
-
-  /// Record a debug_value that is known to be outside pruned liveness. Assumes
-  /// that instructions are only visited once.
-  void recordDebugAfterConsume(DebugValueInst *dvi) {
-    debugAfterConsume.push_back(dvi);
-  }
-
-  void popDebugAfterConsume(DebugValueInst *dvi) {
-    if (!debugAfterConsume.empty() && debugAfterConsume.back() == dvi)
-      debugAfterConsume.pop_back();
-  }
-
-  ArrayRef<DebugValueInst *> getDebugInstsAfterConsume() const {
-    return debugAfterConsume;
   }
 
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
@@ -297,16 +253,6 @@ private:
   /// repeatedly do use-def walks from destroys).
   SmallPtrSet<SILInstruction *, 8> destroys;
 
-  /// remnantLiveOutBlocks are part of the original extended lifetime that are
-  /// not in canonical pruned liveness. There is a path from a PrunedLiveness
-  /// boundary to an original destroy that passes through a remnant block.
-  ///
-  /// These blocks would be equivalent to PrunedLiveness::LiveOut if
-  /// PrunedLiveness were recomputed using all original destroys as interesting
-  /// uses, minus blocks already marked PrunedLiveness::LiveOut. (Remnant blocks
-  /// may be in PrunedLiveness::LiveWithin).
-  SmallSetVector<SILBasicBlock *, 8> remnantLiveOutBlocks;
-
   /// Information about consuming instructions discovered in this canonical OSSA
   /// lifetime.
   CanonicalOSSAConsumeInfo consumes;
@@ -316,6 +262,7 @@ public:
   /// be hoisted over to avoid churn and infinite looping.
   static bool ignoredByDestroyHoisting(SILInstructionKind kind) {
     switch (kind) {
+    case SILInstructionKind::DebugValueInst:
     case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::CopyValueInst:
     case SILInstructionKind::BeginBorrowInst:
@@ -368,7 +315,6 @@ public:
     consumingBlocks.clear();
     debugValues.clear();
     liveness.clear();
-    remnantLiveOutBlocks.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
@@ -388,9 +334,7 @@ public:
   InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
 
 protected:
-  void recordDebugValue(DebugValueInst *dvi) {
-    debugValues.insert(dvi);
-  }
+  void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
   void recordConsumingUse(Operand *use) {
     consumingBlocks.insert(use->getUser()->getParent());
@@ -401,12 +345,9 @@ protected:
 
   void extendLivenessThroughOverlappingAccess();
 
-  void findOrInsertDestroyInBlock(SILBasicBlock *bb);
+  void findExtendedBoundary(PrunedLivenessBoundary &boundary);
 
-  void findOrInsertDestroys();
-
-  void findOrInsertDestroyOnCFGEdge(SILBasicBlock *predBB,
-                                    SILBasicBlock *succBB);
+  void insertDestroysOnBoundary(PrunedLivenessBoundary &boundary);
 
   void rewriteCopies();
 };

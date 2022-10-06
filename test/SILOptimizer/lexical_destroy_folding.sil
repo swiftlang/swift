@@ -574,8 +574,8 @@ exit:
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
-// CHECK:         destroy_value [[COPY]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
+// CHECK:         destroy_value [[COPY]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         apply [[CALLEE_OWNED]]([[MOVE]])
 // CHECK:         br [[EXIT:bb[0-9]+]]
