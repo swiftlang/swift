@@ -14,9 +14,14 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   )
   target_link_libraries(swift-frontend-bootstrapping0
                         PRIVATE
-                          swiftCore
                           swiftDriverTool
                           swiftCompilerStub)
+
+  if(SWIFT_SWIFT_PARSER)
+    target_link_libraries(swift-frontend-bootstrapping0
+                          PRIVATE
+                            swiftCore)
+  endif()
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping0
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
@@ -34,9 +39,14 @@ if(${BOOTSTRAPPING_MODE} MATCHES "BOOTSTRAPPING.*")
   )
   target_link_libraries(swift-frontend-bootstrapping1
                         PRIVATE
-                          swiftCore
                           swiftDriverTool
                           swiftCompilerModules-bootstrapping1)
+
+  if(SWIFT_SWIFT_PARSER)
+    target_link_libraries(swift-frontend-bootstrapping1
+                          PRIVATE
+                            swiftCore)
+  endif()
 
   swift_create_post_build_symlink(swift-frontend-bootstrapping1
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
@@ -51,9 +61,14 @@ add_swift_host_tool(swift-frontend
 )
 target_link_libraries(swift-frontend
                       PUBLIC
-                        swiftCore
                         swiftDriverTool
                         swiftCompilerModules)
+
+if(SWIFT_SWIFT_PARSER)
+  target_link_libraries(swift-frontend
+                        PRIVATE
+                          swiftCore)
+endif()
 
 _add_swift_runtime_link_flags(swift-frontend "../../lib" "")
 
