@@ -103,10 +103,11 @@ static uint64_t uint64ToStringImpl(char *Buffer, uint64_t Value,
   return size_t(P - Buffer);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 uint64_t swift_int64ToString(char *Buffer, size_t BufferLength,
-                             int64_t Value, int64_t Radix,
-                             bool Uppercase) {
+                             int64_t Value, int64_t Radix, bool Uppercase) {
   if ((Radix >= 10 && BufferLength < 32) || (Radix < 10 && BufferLength < 65))
     swift::crash("swift_int64ToString: insufficient buffer size");
 
@@ -127,10 +128,9 @@ uint64_t swift_int64ToString(char *Buffer, size_t BufferLength,
                             Negative);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
-                              uint64_t Value, int64_t Radix,
-                              bool Uppercase) {
+                              uint64_t Value, int64_t Radix, bool Uppercase) {
   if ((Radix >= 10 && BufferLength < 32) || (Radix < 10 && BufferLength < 64))
     swift::crash("swift_int64ToString: insufficient buffer size");
 
@@ -140,6 +140,8 @@ uint64_t swift_uint64ToString(char *Buffer, intptr_t BufferLength,
   return uint64ToStringImpl(Buffer, Value, Radix, Uppercase,
                             /*Negative=*/false);
 }
+
+SWIFT_END_DECLS
 
 #if SWIFT_STDLIB_HAS_LOCALE
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__ANDROID__)
@@ -175,39 +177,49 @@ static locale_t getCLocale() {
 #endif
 #endif // SWIFT_STDLIB_HAS_LOCALE
 
+SWIFT_BEGIN_DECLS
+
 // TODO: replace this with a float16 implementation instead of calling _float.
 // Argument type will have to stay float, though; only the formatting changes.
 // Note, return type is __swift_ssize_t, not uint64_t as with the other
 // formatters. We'd use this type there if we could, but it's ABI so we can't
 // go back and change it.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 __swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
                                       float Value, bool Debug) {
   __fp16 v = Value;
   return swift_dtoa_optimal_binary16_p(&v, Buffer, BufferLength);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
                                float Value, bool Debug) {
   return swift_dtoa_optimal_float(Value, Buffer, BufferLength);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
                                double Value, bool Debug) {
   return swift_dtoa_optimal_double(Value, Buffer, BufferLength);
 }
 
+SWIFT_END_DECLS
+
 // We only support float80 on platforms that use that exact format for 'long double'
 // This should match the conditionals in Runtime.swift
 #if !defined(_WIN32) && !defined(__ANDROID__) && (defined(__i386__) || defined(__i686__) || defined(__x86_64__))
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
                                long double Value, bool Debug) {
   // SwiftDtoa.cpp automatically enables float80 on platforms that use it for 'long double'
   return swift_dtoa_optimal_float80_p(&Value, Buffer, BufferLength);
 }
+
+SWIFT_END_DECLS
+
 #endif
 
 #if SWIFT_STDLIB_HAS_STDIN

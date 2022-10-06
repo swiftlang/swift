@@ -101,12 +101,16 @@ struct YieldOnceCoroutine<ResultTy(ArgTys...)> {
 
 #endif
 
+SWIFT_BEGIN_DECLS
+
 /// A standard routine, suitable for placement in the value witness
 /// table, for copying an opaque POD object.
 SWIFT_RUNTIME_EXPORT
 OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            OpaqueValue *src,
                            const Metadata *self);
+
+SWIFT_END_DECLS
 
 template <>
 inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
@@ -131,40 +135,41 @@ template <> inline bool ValueWitnessTable::checkIsComplete() const {
 
 // Standard value-witness tables.
 
-#define BUILTIN_TYPE(Symbol, _) \
-  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
-#define BUILTIN_POINTER_TYPE(Symbol, _) \
-  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+SWIFT_BEGIN_DECLS
+
+#define BUILTIN_TYPE(Symbol, _)                                                 \
+  SWIFT_RUNTIME_EXPORT extern const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#define BUILTIN_POINTER_TYPE(Symbol, _)                                         \
+  SWIFT_RUNTIME_EXPORT extern const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
 #include "swift/Runtime/BuiltinTypes.def"
 
 // The () -> () table can be used for arbitrary function types.
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable
+extern const ValueWitnessTable
   VALUE_WITNESS_SYM(FUNCTION_MANGLING);     // () -> ()
 
 // The @differentiable(reverse) () -> () table can be used for differentiable
 // function types.
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable
-  VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING); // @differentiable(reverse) () -> ()
+extern const ValueWitnessTable VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING);
 
 // The @noescape () -> () table can be used for arbitrary noescaping function types.
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable
-  VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);     // @noescape () -> ()
+extern const ValueWitnessTable VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);
 
 // The @convention(thin) () -> () table can be used for arbitrary thin function types.
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable
-  VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING);    // @convention(thin) () -> ()
+extern const ValueWitnessTable VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING);
 
 // The () table can be used for arbitrary empty types.
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING);        // ()
+extern const ValueWitnessTable VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING);
 
-// The table for aligned-pointer-to-pointer types.
+// The Builtin.NativeObject.Type table for aligned-pointer-to-pointer types.
 SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject.Type
+extern const ValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo);
+
+SWIFT_END_DECLS
 
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
@@ -184,35 +189,38 @@ getUnmanagedPointerPointerValueWitnesses() {
 
 using OpaqueMetadata = TargetOpaqueMetadata<InProcess>;
 
+SWIFT_BEGIN_DECLS
+
 // Standard POD opaque metadata.
 // The "Int" metadata are used for arbitrary POD data with the
 // matching characteristics.
 using FullOpaqueMetadata = FullMetadata<OpaqueMetadata>;
-#define BUILTIN_TYPE(Symbol, Name) \
-    SWIFT_RUNTIME_EXPORT \
-    const FullOpaqueMetadata METADATA_SYM(Symbol);
+#define BUILTIN_TYPE(Symbol, Name)                                              \
+    SWIFT_RUNTIME_EXPORT extern const FullOpaqueMetadata METADATA_SYM(Symbol);
 #include "swift/Runtime/BuiltinTypes.def"
 
 /// The standard metadata for the empty tuple type.
 SWIFT_RUNTIME_EXPORT
-const
-  FullMetadata<TupleTypeMetadata> METADATA_SYM(EMPTY_TUPLE_MANGLING);
+extern const FullMetadata<TupleTypeMetadata> METADATA_SYM(EMPTY_TUPLE_MANGLING);
 
 /// The standard metadata for the empty protocol composition type, Any.
 SWIFT_RUNTIME_EXPORT
-const
-  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANY_MANGLING);
+extern const FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANY_MANGLING);
 
 /// The standard metadata for the empty class-constrained protocol composition
 /// type, AnyObject.
 SWIFT_RUNTIME_EXPORT
-const
-  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANYOBJECT_MANGLING);
+extern const FullMetadata<ExistentialTypeMetadata>
+METADATA_SYM(ANYOBJECT_MANGLING);
+
+SWIFT_END_DECLS
 
 
 /// True if two context descriptors in the currently running program describe
 /// the same context.
 bool equalContexts(const ContextDescriptor *a, const ContextDescriptor *b);
+
+SWIFT_BEGIN_DECLS
 
 /// Determines whether two type context descriptors describe the same type
 /// context.
@@ -228,10 +236,14 @@ SWIFT_CC(swift)
 bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
                                          const TypeContextDescriptor *rhs);
 
+SWIFT_END_DECLS
+
 /// Compute the bounds of class metadata with a resilient superclass.
 ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
+
+SWIFT_BEGIN_DECLS
 
 /// Fetch a uniqued metadata object for a nominal type which requires
 /// singleton metadata initialization.
@@ -313,7 +325,7 @@ swift_getGenericMetadata(MetadataRequest request,
 ///   - installing new v-table entries and overrides; and
 ///   - registering the class with the runtime under ObjC interop.
 /// Most of this work can be achieved by calling swift_initClassMetadata.
-SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 ClassMetadata *
 swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                    const void *arguments,
@@ -322,7 +334,7 @@ swift_allocateGenericClassMetadata(const ClassDescriptor *description,
 /// Allocate a generic value metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic struct or
 /// enum.
-SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 ValueMetadata *
 swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const void *arguments,
@@ -555,7 +567,11 @@ size_t swift_getTupleTypeLayout2(TypeLayout *tupleLayout,
                                  const TypeLayout *elt0,
                                  const TypeLayout *elt1);
 
+SWIFT_END_DECLS
+
 struct OffsetPair { size_t First; size_t Second; };
+
+SWIFT_BEGIN_DECLS
 
 /// Perform layout as if for a three-element tuple whose elements have
 /// the given layouts.
@@ -723,6 +739,8 @@ OpaqueValue *swift_assignExistentialWithCopy(OpaqueValue *dest,
                                              const OpaqueValue *src,
                                              const Metadata *type);
 
+SWIFT_END_DECLS
+
 /// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with no
 /// witness tables.
@@ -828,6 +846,8 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
 
+SWIFT_BEGIN_DECLS
+
 /// Register a block of protocol records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT
 void swift_registerProtocols(const ProtocolRecord *begin,
@@ -842,6 +862,8 @@ void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
 SWIFT_RUNTIME_EXPORT
 void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                        const TypeMetadataRecord *end);
+
+SWIFT_END_DECLS
 
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
@@ -861,6 +883,8 @@ void verifyMangledNameRoundtrip(const Metadata *metadata);
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type);
+
+SWIFT_BEGIN_DECLS
 
 // Defined in KeyPath.swift in the standard library.
 SWIFT_RUNTIME_EXPORT
@@ -899,6 +923,8 @@ void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
 
 SWIFT_RUNTIME_EXPORT
 void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+SWIFT_END_DECLS
 
 #pragma clang diagnostic pop
 

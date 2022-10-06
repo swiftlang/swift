@@ -52,27 +52,32 @@ struct AsyncTaskAndContext {
   AsyncContext *InitialContext;
 };
 
+SWIFT_BEGIN_DECLS
+
 /// Create a task object.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create(
-    size_t taskCreateFlags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    void *closureEntry, HeapObject *closureContext);
+AsyncTaskAndContext swift_task_create(size_t taskCreateFlags,
+                                      TaskOptionRecord *options,
+                                      const Metadata *futureResultType,
+                                      void *closureEntry,
+                                      HeapObject *closureContext);
+
+SWIFT_END_DECLS
 
 /// Caution: not all future-initializing functions actually throw, so
 /// this signature may be incorrect.
 using FutureAsyncSignature =
   AsyncSignature<void(void*), /*throws*/ true>;
 
+SWIFT_BEGIN_DECLS
+
 /// Create a task object.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_common(
-    size_t taskCreateFlags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, void *closureContext,
-    size_t initialContextSize);
+AsyncTaskAndContext
+swift_task_create_common(size_t taskCreateFlags, TaskOptionRecord *options,
+                         const Metadata *futureResultType,
+                         FutureAsyncSignature::FunctionType *function,
+                         void *closureContext, size_t initialContextSize);
 
 /// Allocate memory in a task.
 ///
@@ -290,11 +295,15 @@ void swift_asyncLet_begin(AsyncLet *alet,
                           void *closureEntryPoint, HeapObject *closureContext,
                           void *resultBuffer);
 
+SWIFT_END_DECLS
+
 /// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
 using AsyncLetWaitSignature =
     SWIFT_CC(swiftasync)
     void(OpaqueValue *,
          SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
+
+SWIFT_BEGIN_DECLS
 
 /// DEPRECATED. swift_asyncLet_get is used instead.
 /// Wait for a non-throwing async-let to complete.
@@ -609,6 +618,8 @@ void swift_task_localValuePop();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
 
+SWIFT_END_DECLS
+
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {
 ///      case none
@@ -626,6 +637,8 @@ struct NearestTaskDeadline {
   TaskDeadline Value;
   Kind ValueKind;
 };
+
+SWIFT_BEGIN_DECLS
 
 /// Returns the nearest deadline that's been registered with this task.
 ///
@@ -670,8 +683,12 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+SWIFT_END_DECLS
+
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
+
+SWIFT_BEGIN_DECLS
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job);
@@ -680,34 +697,57 @@ void swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
+SWIFT_END_DECLS
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+
+SWIFT_BEGIN_DECLS
 
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
 
+SWIFT_END_DECLS
+
 #endif
 
 /// A hook to take over global enqueuing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueGlobal_hook)(
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+extern void (*swift_task_enqueueGlobal_hook)(
     Job *job, swift_task_enqueueGlobal_original original);
+
+SWIFT_END_DECLS
 
 /// A hook to take over global enqueuing with delay.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_original)(
     unsigned long long delay, Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+extern void (*swift_task_enqueueGlobalWithDelay_hook)(
     unsigned long long delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original);
+
+SWIFT_END_DECLS
 
 /// A hook to take over main executor enqueueing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(
     Job *job);
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_hook)(
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+extern void (*swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original);
+
+SWIFT_END_DECLS
+
+SWIFT_BEGIN_DECLS
 
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -788,7 +828,7 @@ void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
                                                 /* +1 */ SwiftError *error);
 
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
-extern "C" SWIFT_CC(swift)
+SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);
 
 /// Drain the queue
@@ -825,7 +865,11 @@ void swift_task_reportUnexpectedExecutor(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
 
+SWIFT_END_DECLS
+
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+
+SWIFT_BEGIN_DECLS
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative
@@ -834,9 +878,14 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                                   void *context);
 
+SWIFT_END_DECLS
+
 #endif
 
 #ifdef __APPLE__
+
+SWIFT_BEIGN_DECLS
+
 /// A magic symbol whose address is the mask to apply to a frame pointer to
 /// signal that it is an async frame. Do not try to read the actual value of
 /// this global, it will crash.
@@ -846,6 +895,9 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 /// the bit is not used and the address is always 0.
 SWIFT_EXPORT_FROM(swift_Concurrency)
 struct { char c; } swift_async_extendedFramePointerFlags;
+
+SWIFT_END_DECLS
+
 #endif
 
 }

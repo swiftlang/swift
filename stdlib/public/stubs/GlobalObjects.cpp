@@ -24,18 +24,24 @@
 #include <stdlib.h>
 
 namespace swift {
+
+SWIFT_BEGIN_DECLS
+
 // FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_API?
 // _direct type metadata for Swift.__EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s19__EmptyArrayStorage);
+extern ClassMetadata CLASS_METADATA_SYM(s19__EmptyArrayStorage);
 
 // _direct type metadata for Swift.__EmptyDictionarySingleton
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s26__EmptyDictionarySingleton);
+extern ClassMetadata CLASS_METADATA_SYM(s26__EmptyDictionarySingleton);
 
 // _direct type metadata for Swift.__EmptySetSingleton
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s19__EmptySetSingleton);
+extern ClassMetadata CLASS_METADATA_SYM(s19__EmptySetSingleton);
+
+SWIFT_END_DECLS
+
 } // namespace swift
 
 SWIFT_RUNTIME_STDLIB_API

@@ -1509,9 +1509,10 @@ struct ClassExtents {
   size_t positive; 
 };
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
-ClassExtents
-_swift_getSwiftClassInstanceExtents(const Metadata *c) {
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift)
+ClassExtents _swift_getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
   return ClassExtents{
@@ -1520,11 +1521,14 @@ _swift_getSwiftClassInstanceExtents(const Metadata *c) {
   };
 }
 
+SWIFT_END_DECLS
+
 #if SWIFT_OBJC_INTEROP
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
-ClassExtents
-_swift_getObjCClassInstanceExtents(const ClassMetadata* c) {
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift)
+ClassExtents _swift_getObjCClassInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())
     return ClassExtents{0, class_getInstanceSize(class_const_cast(c))};
@@ -1532,8 +1536,7 @@ _swift_getObjCClassInstanceExtents(const ClassMetadata* c) {
   return _swift_getSwiftClassInstanceExtents(c);
 }
 
-SWIFT_CC(swift)
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
                                              const char *filename,
                                              size_t filenameLength,
@@ -1612,6 +1615,8 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   free(message);
   free(nullTerminatedFilename);
 }
+
+SWIFT_END_DECLS
 
 const Metadata *swift::getNSObjectMetadata() {
   return SWIFT_LAZY_CONSTANT(

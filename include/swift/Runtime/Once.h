@@ -23,6 +23,8 @@ namespace swift {
 
 typedef swift::once_t swift_once_t;
 
+SWIFT_BEGIN_DECLS
+
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
@@ -31,6 +33,8 @@ typedef swift::once_t swift_once_t;
 /// this is exposed so that the compiler can generate calls to it.
 SWIFT_RUNTIME_EXPORT
 void swift_once(swift_once_t *predicate, void (*fn)(void *), void *context);
+
+SWIFT_END_DECLS
 
 }
 

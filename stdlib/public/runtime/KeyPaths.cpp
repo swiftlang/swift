@@ -18,10 +18,14 @@
 
 using namespace swift;
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 void swift_copyKeyPathTrivialIndices(const void *src, void *dest, size_t bytes) {
   memcpy(dest, src, bytes);
 }
+
+SWIFT_END_DECLS
 
 SWIFT_CC(swift)
 static bool equateGenericArguments(const void *a, const void *b, size_t bytes) {
@@ -47,6 +51,8 @@ struct KeyPathGenericWitnessTable {
   SWIFT_CC(swift) intptr_t (* __ptrauth_swift_runtime_function_entry_with_key(swift::SpecialPointerAuthDiscriminators::KeyPathHash) hash)(const void *src, size_t bytes);
 };
 
+SWIFT_BEGIN_DECLS
+
 /// A prefab witness table for computed key path components that only include
 /// captured generic arguments.
 SWIFT_RUNTIME_EXPORT
@@ -56,6 +62,8 @@ KeyPathGenericWitnessTable swift_keyPathGenericWitnessTable = {
   equateGenericArguments,
   hashGenericArguments,
 };
+
+SWIFT_END_DECLS
 
 /****************************************************************************/
 /** Projection functions ****************************************************/

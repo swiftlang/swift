@@ -28,6 +28,8 @@ template <typename Runtime> struct TargetValueBuffer;
 struct InProcess;
 using ValueBuffer = TargetValueBuffer<InProcess>;
 
+SWIFT_BEGIN_DECLS
+
 /// Begin dynamically tracking an access.
 ///
 /// The buffer is opaque scratch space that the runtime may use for
@@ -57,9 +59,13 @@ void swift_endAccess(ValueBuffer *buffer);
 /// state.  (We also need to not leave references to scratch
 /// buffers on the stack sitting around in the runtime.)
 SWIFT_RUNTIME_EXPORT
-bool _swift_disableExclusivityChecking;
+extern bool _swift_disableExclusivityChecking;
+
+SWIFT_END_DECLS
 
 #ifndef NDEBUG
+
+SWIFT_BEGIN_DECLS
 
 /// Dump all accesses currently tracked by the runtime.
 ///
@@ -69,6 +75,8 @@ bool _swift_disableExclusivityChecking;
 /// happen. This eases debugging.
 SWIFT_RUNTIME_EXPORT
 void swift_dumpTrackedAccesses();
+
+SWIFT_END_DECLS
 
 #endif
 
@@ -90,6 +98,8 @@ void swift_task_exitThreadLocalContextBackdeploy56(char *state);
 #  define swift_task_enterThreadLocalContext swift_task_enterThreadLocalContextBackDeploy
 #  define swift_task_exitThreadLocalContext swift_task_exitThreadLocalContextBackDeploy
 #endif
+
+SWIFT_BEGIN_DECLS
 
 /// Called when a task inits, resumes and returns control to caller synchronous
 /// code to update any exclusivity specific state associated with the task.
@@ -114,6 +124,8 @@ void swift_task_enterThreadLocalContext(char *state);
 /// Exclusivity.cpp.
 SWIFT_RUNTIME_EXPORT
 void swift_task_exitThreadLocalContext(char *state);
+
+SWIFT_END_DECLS
 
 #endif
 

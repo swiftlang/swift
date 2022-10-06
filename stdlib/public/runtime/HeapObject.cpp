@@ -140,10 +140,14 @@ HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
   CALL_IMPL(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_allocObject)(
     HeapMetadata const *metadata, size_t requiredSize,
     size_t requiredAlignmentMask) = _swift_allocObject_;
+
+SWIFT_END_DECLS
 
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
@@ -200,15 +204,19 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
                       "Fatal error: Weak reference to stack object\n");
 }
 
+SWIFT_BEGIN_DECLS
+
 /// Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
-HeapObject* swift_bufferAllocate(
-  HeapMetadata const* bufferType, size_t size, size_t alignMask)
+SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift)
+HeapObject* swift_bufferAllocate(HeapMetadata const* bufferType, size_t size,
+                                 size_t alignMask)
 {
   return swift::swift_allocObject(bufferType, size, alignMask);
 }
+
+SWIFT_END_DECLS
 
 namespace {
 /// Heap object destructor for a generic box allocated with swift_allocBox.
@@ -359,9 +367,13 @@ HeapObject *swift::swift_retain(HeapObject *object) {
 #endif
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain)(HeapObject *object) =
     _swift_retain_;
+
+SWIFT_END_DECLS
 
 HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
@@ -386,9 +398,13 @@ HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
 #endif
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_retain_n)(
     HeapObject *object, uint32_t n) = _swift_retain_n_;
+
+SWIFT_END_DECLS
 
 HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain_n);
@@ -412,9 +428,13 @@ void swift::swift_release(HeapObject *object) {
 #endif
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object) =
     _swift_release_;
+
+SWIFT_END_DECLS
 
 void swift::swift_nonatomic_release(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release);
@@ -437,9 +457,13 @@ void swift::swift_release_n(HeapObject *object, uint32_t n) {
 #endif
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release_n)(HeapObject *object,
                                                 uint32_t n) = _swift_release_n_;
+
+SWIFT_END_DECLS
 
 void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release_n);
@@ -598,9 +622,13 @@ HeapObject *swift::swift_tryRetain(HeapObject *object) {
   CALL_IMPL(swift_tryRetain, (object));
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_tryRetain)(HeapObject *object) =
     _swift_tryRetain_;
+
+SWIFT_END_DECLS
 
 bool swift::swift_isDeallocating(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
@@ -950,6 +978,8 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
 
 #ifndef NDEBUG
 
+SWIFT_BEGIN_DECLS
+
 /// Returns true if the "immutable" flag is set on \p object.
 ///
 /// Used for runtime consistency checking of COW buffers.
@@ -966,6 +996,8 @@ SWIFT_RUNTIME_EXPORT
 bool _swift_setImmutableCOWBuffer(HeapObject *object, bool immutable) {
   return object->refCounts.setIsImmutableCOWBuffer(immutable);
 }
+
+SWIFT_END_DECLS
 
 void HeapObject::dump() const {
   auto *Self = const_cast<HeapObject *>(this);

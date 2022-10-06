@@ -34,6 +34,8 @@ template <typename Runtime> struct TargetEnumMetadata;
 using EnumMetadata = TargetEnumMetadata<InProcess>;
 struct TypeLayout;
 
+SWIFT_BEGIN_DECLS
+
 /// Initialize the type metadata for a single-case enum type.
 ///
 /// \param enumType - pointer to the instantiated but uninitialized metadata
@@ -58,10 +60,14 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
                                          const TypeLayout *payload,
                                          unsigned emptyCases);
 
+SWIFT_END_DECLS
+
 using getExtraInhabitantTag_t =
   SWIFT_CC(swift) unsigned (const OpaqueValue *value,
                             unsigned numExtraInhabitants,
                             const Metadata *payloadType);
+
+SWIFT_BEGIN_DECLS
 
 /// Implement getEnumTagSinglePayload generically in terms of a
 /// payload type with a getExtraInhabitantIndex function.
@@ -79,11 +85,15 @@ unsigned swift_getEnumTagSinglePayloadGeneric(const OpaqueValue *value,
                                               const Metadata *payloadType,
                                               getExtraInhabitantTag_t *getTag);
 
+SWIFT_END_DECLS
+
 using storeExtraInhabitantTag_t =
   SWIFT_CC(swift) void (OpaqueValue *value,
                         unsigned whichCase,
                         unsigned numExtraInhabitants,
                         const Metadata *payloadType);
+
+SWIFT_BEGIN_DECLS
 
 /// Implement storeEnumTagSinglePayload generically in terms of a
 /// payload type with a storeExtraInhabitant function.
@@ -147,6 +157,9 @@ void swift_storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
                                                  uint32_t index,
                                                  uint32_t numExtraCases,
                                                  const Metadata *enumType);
+
+SWIFT_END_DECLS
+
 }
 
 #endif

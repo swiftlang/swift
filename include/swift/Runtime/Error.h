@@ -30,6 +30,8 @@ namespace swift {
 
 struct SwiftError;
 
+SWIFT_BEGIN_DECLS
+
 /// Allocate a catchable error object.
 ///
 /// If value is nonnull, it should point to a value of \c type, which will be
@@ -46,11 +48,15 @@ BoxPair swift_allocError(const Metadata *type,
 SWIFT_RUNTIME_STDLIB_API
 void swift_deallocError(SwiftError *error, const Metadata *type);
 
+SWIFT_END_DECLS
+
 struct ErrorValueResult {
   const OpaqueValue *value;
   const Metadata *type;
   const WitnessTable *errorConformance;
 };
+
+SWIFT_BEGIN_DECLS
 
 /// Extract a pointer to the value, the type metadata, and the Error
 /// protocol witness from an error object.
@@ -66,19 +72,17 @@ void swift_getErrorValue(const SwiftError *errorObject,
 
 /// Called when throwing an error.  Serves as a breakpoint hook
 /// for debuggers.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API void
-swift_willThrow(SWIFT_CONTEXT void *unused,
-                SWIFT_ERROR_RESULT SwiftError **object);
+SWIFT_RUNTIME_STDLIB_API
+SWIFT_CC(swift) void swift_willThrow(SWIFT_CONTEXT void *unused,
+                                     SWIFT_ERROR_RESULT SwiftError **object);
 
 /// Called when an error is thrown out of the top level of a script.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN void
-swift_errorInMain(SwiftError *object);
+SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN
+SWIFT_CC(swift) void swift_errorInMain(SwiftError *object);
 
 /// Called when the try! operator fails.
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN void
+SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN
+SWIFT_CC(swift) void
 swift_unexpectedError(SwiftError *object, OpaqueValue *filenameStart,
                       long filenameLength, bool isAscii, unsigned long line);
 
@@ -89,6 +93,8 @@ SwiftError *swift_errorRetain(SwiftError *object);
 /// Release an error box.
 SWIFT_RUNTIME_STDLIB_API
 void swift_errorRelease(SwiftError *object);
+
+SWIFT_END_DECLS
 
 } // end namespace swift
 

@@ -42,6 +42,8 @@ using HeapMetadata = TargetHeapMetadata<InProcess>;
 
 struct OpaqueValue;
 
+SWIFT_BEGIN_DECLS
+
 /// Allocates a new heap object.  The returned memory is
 /// uninitialized outside of the heap-object header.  The object
 /// has an initial retain count of 1, and its metadata is set to
@@ -61,7 +63,7 @@ struct OpaqueValue;
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
@@ -92,10 +94,14 @@ HeapObject *swift_initStaticObject(HeapMetadata const *metadata,
 SWIFT_RUNTIME_EXPORT
 void swift_verifyEndOfLifetime(HeapObject *object);
 
+SWIFT_END_DECLS
+
 struct BoxPair {
   HeapObject *object;
   OpaqueValue *buffer;
 };
+
+SWIFT_BEGIN_DECLS
 
 /// Allocates a heap object that can contain a value of the given type.
 /// Returns a Box structure containing a HeapObject* pointer to the
@@ -117,7 +123,7 @@ BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
 /// Returns the address of a heap object representing all empty box types.
-SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
 HeapObject* swift_allocEmptyBox();
 
 /// Atomically increments the retain count of an object.
@@ -344,6 +350,8 @@ void swift_deallocBox(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 OpaqueValue *swift_projectBox(HeapObject *object);
 
+SWIFT_END_DECLS
+
 /// RAII object that wraps a Swift heap object and releases it upon
 /// destruction.
 class SwiftRAII {
@@ -394,6 +402,8 @@ public:
 struct UnownedReference {
   HeapObject *Value;
 };
+
+SWIFT_BEGIN_DECLS
 
 /// Increment the unowned retain count.
 SWIFT_RUNTIME_EXPORT
@@ -452,6 +462,8 @@ void swift_nonatomic_unownedRetainStrongAndRelease(HeapObject *value);
 /// Aborts if the object has been deallocated.
 SWIFT_RUNTIME_EXPORT
 void swift_unownedCheck(HeapObject *value);
+
+SWIFT_END_DECLS
 
 static inline void swift_unownedInit(UnownedReference *ref, HeapObject *value) {
   ref->Value = value;
@@ -528,6 +540,8 @@ static inline bool swift_unownedIsEqual(UnownedReference *ref,
 
 // Defined in Runtime/WeakReference.h
 class WeakReference;
+
+SWIFT_BEGIN_DECLS
 
 /// Initialize a weak reference.
 ///
@@ -1073,33 +1087,37 @@ static inline bool swift_unknownObjectUnownedIsEqual(UnownedReference *ref,
 
 #endif // SWIFT_OBJC_INTEROP
 
+SWIFT_END_DECLS
+
 struct TypeNamePair {
   const char *data;
   uintptr_t length;
 };
 
+SWIFT_BEGIN_DECLS
+
 /// Return the name of a Swift type represented by a metadata object.
 /// func _getTypeName(_ type: Any.Type, qualified: Bool)
 ///   -> (UnsafePointer<UInt8>, Int)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-TypeNamePair
-swift_getTypeName(const Metadata *type, bool qualified);
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
+TypeNamePair swift_getTypeName(const Metadata *type, bool qualified);
 
 /// Return the mangled name of a Swift type represented by a metadata object.
 /// func _getMangledTypeName(_ type: Any.Type)
 ///   -> (UnsafePointer<UInt8>, Int)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 TypeNamePair
-swift_getFunctionFullNameFromMangledName(
-        const char *mangledNameStart, uintptr_t mangledNameLength);
+swift_getFunctionFullNameFromMangledName(const char *mangledNameStart,
+                                         uintptr_t mangledNameLength);
 
 /// Return the human-readable full name of the mangled function name passed in.
 /// func _getMangledTypeName(_ mangledName: UnsafePointer<UInt8>,
 ///                          mangledNameLength: UInt)
 ///   -> (UnsafePointer<UInt8>, Int)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-TypeNamePair
-swift_getMangledTypeName(const Metadata *type);
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
+TypeNamePair swift_getMangledTypeName(const Metadata *type);
+
+SWIFT_END_DECLS
 
 } // end namespace swift
 

@@ -243,25 +243,25 @@ void _swift_reportToDebugger(uintptr_t flags, const char *message,
                              RuntimeErrorDetails *details = nullptr);
 
 SWIFT_RUNTIME_STDLIB_SPI
-bool _swift_reportFatalErrorsToDebugger;
+extern bool _swift_reportFatalErrorsToDebugger;
 
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_shouldReportFatalErrorsToDebugger();
 
 SWIFT_RUNTIME_STDLIB_SPI
-bool _swift_debug_metadataAllocationIterationEnabled;
+extern bool _swift_debug_metadataAllocationIterationEnabled;
 
 SWIFT_RUNTIME_STDLIB_SPI
-const void * const _swift_debug_allocationPoolPointer;
+extern const void * const _swift_debug_allocationPoolPointer;
 
 SWIFT_RUNTIME_STDLIB_SPI
-std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
+extern std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 
 SWIFT_RUNTIME_STDLIB_SPI
-const void * const _swift_debug_protocolConformanceStatePointer;
+extern const void * const _swift_debug_protocolConformanceStatePointer;
 
 SWIFT_RUNTIME_STDLIB_SPI
-const uint64_t _swift_debug_multiPayloadEnumPointerSpareBitsMask;
+extern const uint64_t _swift_debug_multiPayloadEnumPointerSpareBitsMask;
 
 // namespace swift
 }

@@ -19,9 +19,11 @@
 #include "swift/Runtime/Metadata.h"
 using namespace swift;
 
+SWIFT_BEGIN_DECLS
+
 // @_silgen_name("_swift_stdlib_getDefaultErrorCode")
 // func _getDefaultErrorCode<T : Error>(_ x: T) -> Int
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift)
 intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
                                            const Metadata *T,
                                            const WitnessTable *Error) {
@@ -39,3 +41,5 @@ intptr_t _swift_stdlib_getDefaultErrorCode(OpaqueValue *error,
 
   return result;
 }
+
+SWIFT_END_DECLS

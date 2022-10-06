@@ -155,13 +155,24 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
 #define _bridgeAnythingToObjectiveC                                 \
   MANGLE_SYM(s27_bridgeAnythingToObjectiveCyyXlxlF)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 HeapObject *_bridgeAnythingToObjectiveC(
   OpaqueValue *src, const Metadata *srcType);
 
+SWIFT_END_DECLS
+
 #if SWIFT_OBJC_INTEROP
+
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
-id swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype);
+extern id swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype);
+
+SWIFT_END_DECLS
+
 #endif
 
 // protocol _ObjectiveCBridgeable {

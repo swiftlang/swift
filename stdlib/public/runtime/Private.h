@@ -102,8 +102,13 @@ public:
 };
 
 #if SWIFT_HAS_ISA_MASKING
-  SWIFT_RUNTIME_EXPORT
-  uintptr_t swift_isaMask;
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_EXPORT
+uintptr_t swift_isaMask;
+
+SWIFT_END_DECLS
 
 // Hardcode the mask. We have our own copy of the value, as it's hard to work
 // out the proper includes from libobjc. The values MUST match the ones from
@@ -133,6 +138,7 @@ public:
 #  else
 #    error Unknown architecture for masked isa.
 #  endif
+
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -276,9 +282,13 @@ public:
   const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
+  SWIFT_BEGIN_DECLS
+
   SWIFT_RUNTIME_EXPORT
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                           Demangle::Demangler &Dem);
+
+  SWIFT_END_DECLS
 
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
@@ -393,6 +403,9 @@ public:
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage" 
+
+  SWIFT_BEGIN_DECLS
+
   /// Retrieve the type metadata described by the given demangled type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
@@ -421,6 +434,9 @@ public:
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
+
+  SWIFT_END_DECLS
+
 #pragma clang diagnostic pop
 
   /// Function object that produces substitutions for the generic parameters

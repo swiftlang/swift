@@ -134,6 +134,8 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
   } while (i != 0);
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 void swift_arrayInitWithCopy(OpaqueValue *dest, OpaqueValue *src, size_t count,
                              const Metadata *self) {
@@ -208,3 +210,5 @@ void swift_arrayDestroy(OpaqueValue *begin, size_t count, const Metadata *self) 
     wtable->destroy(obj, self);
   }
 }
+
+SWIFT_END_DECLS

@@ -60,11 +60,15 @@ public:
   size_t getBitWidth() const { return Flags.getBitWidth(); }
 };
 
-SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) 
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 float swift_intToFloat32(IntegerLiteral value);
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 double swift_intToFloat64(IntegerLiteral value);
+
+SWIFT_END_DECLS
 
 // TODO: Float16 instead of just truncating from float?
 // TODO: Float80 on x86?

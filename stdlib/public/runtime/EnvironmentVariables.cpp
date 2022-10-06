@@ -237,10 +237,18 @@ void swift::runtime::environment::initialize(void *context) {
 }
 #endif
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
 bool swift_COWChecksEnabled() {
   return runtime::environment::SWIFT_DEBUG_ENABLE_COW_CHECKS();
 }
+
+SWIFT_END_DECLS
+
+namespace swift {
+namespace runtime {
+namespace environment {
 
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues() {
   return runtime::environment::
@@ -255,4 +263,8 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration() {
 
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
   return runtime::environment::SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS();
+}
+
+}
+}
 }

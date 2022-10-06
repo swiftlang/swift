@@ -21,6 +21,8 @@
 
 namespace swift {
 
+SWIFT_BEGIN_DECLS
+
 /// Perform a checked dynamic cast of a value to a target type.
 ///
 /// \param dest A buffer into which to write the destination value.
@@ -243,6 +245,8 @@ const Metadata *swift_getObjectType(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol);
+
+SWIFT_END_DECLS
 
 } // end namespace swift
 

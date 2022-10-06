@@ -56,6 +56,8 @@ static float fromEncoding(unsigned int e) {
 // but who knows what could go wrong, and they're tiny functions.
 # include <immintrin.h>
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT float __gnu_h2f_ieee(short h) {
   return _mm_cvtss_f32(_mm_cvtph_ps(_mm_set_epi64x(0,h)));
 }
@@ -66,7 +68,11 @@ SWIFT_RUNTIME_EXPORT short __gnu_f2h_ieee(float f) {
   );
 }
 
+SWIFT_END_DECLS
+
 #else
+
+SWIFT_BEGIN_DECLS
 
 // Input in di, result in xmm0. We can get that calling convention in C++
 // by taking a int16 arg instead of Float16, which we don't have (or else
@@ -117,7 +123,11 @@ SWIFT_RUNTIME_EXPORT unsigned short __gnu_f2h_ieee(float f) {
   return (int)signbit >> 16 | magnitude;
 }
 
+SWIFT_END_DECLS
+
 #endif
+
+SWIFT_BEGIN_DECLS
 
 // Input in xmm0, result in di. We can get that calling convention in C++
 // by returning uint16 instead of Float16, which we don't have (or else
@@ -150,10 +160,18 @@ SWIFT_RUNTIME_EXPORT unsigned short __truncdfhf2(double d) {
   return __gnu_f2h_ieee(f);
 }
 
+SWIFT_END_DECLS
+
 #if defined(__ARM_EABI__)
+
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT unsigned short __aeabi_d2h(double d) {
   return __truncdfhf2(d);
 }
+
+SWIFT_END_DECLS
+
 #endif
 
 #endif // defined(__x86_64__) && !defined(__APPLE__)

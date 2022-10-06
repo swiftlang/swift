@@ -323,6 +323,8 @@ reportNow(uint32_t flags, const char *message)
 #endif
 }
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_NOINLINE SWIFT_RUNTIME_EXPORT void
 _swift_runtime_on_report(uintptr_t flags, const char *message,
                          RuntimeErrorDetails *details) {
@@ -335,6 +337,8 @@ _swift_runtime_on_report(uintptr_t flags, const char *message,
                : // Clobber list, empty.
                );
 }
+
+SWIFT_END_DECLS
 
 void swift::_swift_reportToDebugger(uintptr_t flags, const char *message,
                                     RuntimeErrorDetails *details) {
@@ -404,11 +408,16 @@ swift::warning(uint32_t flags, const char *format, ...)
   warningv(flags, format, args);
 }
 
+SWIFT_BEGIN_DECLS
+
 // Crash when a deleted method is called by accident.
-SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {
+SWIFT_RUNTIME_EXPORT SWIFT_NORETURN
+void swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "Fatal error: Call of deleted method\n");
 }
+
+SWIFT_END_DECLS
 
 // Crash due to a retain count overflow.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks

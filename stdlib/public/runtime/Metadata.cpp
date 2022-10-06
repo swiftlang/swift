@@ -6493,9 +6493,13 @@ const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadat
 // implementation of these functions is in the standard library in
 // KeyPath.swift.
 
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_STDLIB_SPI
-const HeapObject *swift_getKeyPathImpl(const void *pattern,
-                                       const void *arguments);
+extern const HeapObject *swift_getKeyPathImpl(const void *pattern,
+                                              const void *arguments);
+
+SWIFT_END_DECLS
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE

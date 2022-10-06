@@ -64,11 +64,13 @@ static const FullMetadata<HeapMetadata> ErrorMetadata{
   HeapMetadata(MetadataKind::ErrorObject),
 };
 
-BoxPair
-swift::swift_allocError(const swift::Metadata *type,
-                        const swift::WitnessTable *errorConformance,
-                        OpaqueValue *initialValue,
-                        bool isTake) {
+namespace swift {
+
+SWIFT_BEGIN_DECLS
+
+BoxPair swift_allocError(const swift::Metadata *type,
+                         const swift::WitnessTable *errorConformance,
+                         OpaqueValue *initialValue, bool isTake) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
   
   auto allocated = swift_allocObject(&ErrorMetadata,
@@ -91,27 +93,28 @@ swift::swift_allocError(const swift::Metadata *type,
   return BoxPair{allocated, valuePtr};
 }
 
-void
-swift::swift_deallocError(SwiftError *error, const Metadata *type) {
+void swift_deallocError(SwiftError *error, const Metadata *type) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
   swift_deallocUninitializedObject(error, sizeAndAlign.first, sizeAndAlign.second);
 }
 
-void
-swift::swift_getErrorValue(const SwiftError *errorObject,
-                           void **scratch,
-                           ErrorValueResult *out) {
+void swift_getErrorValue(const SwiftError *errorObject, void **scratch,
+                         ErrorValueResult *out) {
   out->value = errorObject->getValue();
   out->type = errorObject->type;
   out->errorConformance = errorObject->errorConformance;
 }
 
-SwiftError *swift::swift_errorRetain(SwiftError *error) {
+SwiftError *swift_errorRetain(SwiftError *error) {
   return static_cast<SwiftError*>(swift_retain(error));
 }
 
-void swift::swift_errorRelease(SwiftError *error) {
+void swift_errorRelease(SwiftError *error) {
   swift_release(error);
+}
+
+SWIFT_END_DECLS
+
 }
 
 #endif

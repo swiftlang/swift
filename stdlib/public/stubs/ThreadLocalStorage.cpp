@@ -16,15 +16,18 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-void _stdlib_destroyTLS(void *);
+SWIFT_BEGIN_DECLS
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-void *_stdlib_createTLS(void);
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
+extern void _stdlib_destroyTLS(void *);
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
+extern void *_stdlib_createTLS(void);
+
+SWIFT_END_DECLS
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-void *
-_swift_stdlib_threadLocalStorageGet(void) {
+void * _swift_stdlib_threadLocalStorageGet(void) {
 
 #if SWIFT_THREADING_NONE
 

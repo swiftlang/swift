@@ -27,8 +27,9 @@
 #ifndef __swift__
 namespace swift {
 #endif
-extern "C" {
 #endif
+
+SWIFT_BEGIN_DECLS
 
 struct _SwiftArrayBodyStorage {
   __swift_intptr_t count;
@@ -41,7 +42,7 @@ struct _SwiftEmptyArrayStorage {
 };
 
 SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
+extern struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
 struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
@@ -79,19 +80,19 @@ struct _SwiftEmptySetSingleton {
 };
 
 SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptyDictionarySingleton _swiftEmptyDictionarySingleton;
+extern struct _SwiftEmptyDictionarySingleton _swiftEmptyDictionarySingleton;
 
 SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptySetSingleton _swiftEmptySetSingleton;
+extern struct _SwiftEmptySetSingleton _swiftEmptySetSingleton;
 
 struct _SwiftHashingParameters {
   __swift_uint64_t seed0;
   __swift_uint64_t seed1;
   __swift_bool deterministic;
 };
-  
+
 SWIFT_RUNTIME_STDLIB_API
-struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
+extern struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 
 #ifdef __cplusplus
 
@@ -105,7 +106,8 @@ static_assert(
     4 * sizeof(__swift_intptr_t) + sizeof(__swift_int64_t),
   "_SwiftSetBodyStorage has unexpected size");
 
-} // extern "C"
+SWIFT_END_DECLS
+
 #ifndef __swift__
 } // namespace swift
 #endif

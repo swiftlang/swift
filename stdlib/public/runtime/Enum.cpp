@@ -26,7 +26,7 @@ using namespace swift;
 
 // So remote inspection/debugging tools can obtain
 // information about this process.
-SWIFT_RUNTIME_STDLIB_SPI
+extern "C" SWIFT_RUNTIME_STDLIB_SPI
 const uint64_t _swift_debug_multiPayloadEnumPointerSpareBitsMask
   = _swift_abi_SwiftSpareBitsMask;
 
@@ -332,9 +332,13 @@ swift::swift_storeEnumTagMultiPayload(OpaqueValue *value,
   }
 }
 
+namespace swift {
+
+SWIFT_BEGIN_DECLS
+
 unsigned
-swift::swift_getEnumCaseMultiPayload(const OpaqueValue *value,
-                                     const EnumMetadata *enumType) {
+swift_getEnumCaseMultiPayload(const OpaqueValue *value,
+                              const EnumMetadata *enumType) {
   auto layout = getMultiPayloadLayout(enumType);
   unsigned numPayloads = enumType->getDescription()->getNumPayloadCases();
 
@@ -354,4 +358,8 @@ swift::swift_getEnumCaseMultiPayload(const OpaqueValue *value,
              + numPayloads;
     }
   }
+}
+
+SWIFT_END_DECLS
+
 }

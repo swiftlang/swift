@@ -24,8 +24,9 @@
 
 using namespace swift;
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
+SWIFT_BEGIN_DECLS
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_get_time(
   long long *seconds,
   long long *nanoseconds,
@@ -108,8 +109,7 @@ void swift_get_time(
   abort(); // Invalid clock_id
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_get_clock_res(
   long long *seconds,
   long long *nanoseconds,
@@ -168,3 +168,5 @@ switch (clock_id) {
   }
   abort(); // Invalid clock_id
 }
+
+SWIFT_END_DECLS

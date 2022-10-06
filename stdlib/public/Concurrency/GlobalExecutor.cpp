@@ -61,17 +61,20 @@
 
 using namespace swift;
 
-SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobal_hook)(
-    Job *job, swift_task_enqueueGlobal_original original) = nullptr;
+namespace swift {
+
+SWIFT_BEGIN_DECLS
 
 SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
-    JobDelay delay, Job *job,
-    swift_task_enqueueGlobalWithDelay_original original) = nullptr;
+void (*swift_task_enqueueGlobal_hook)(Job *job,
+                                      swift_task_enqueueGlobal_original original) = nullptr;
 
 SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
+void (*swift_task_enqueueGlobalWithDelay_hook)(JobDelay delay, Job *job,
+                                               swift_task_enqueueGlobalWithDelay_original original) = nullptr;
+
+SWIFT_CC(swift)
+void (*swift_task_enqueueGlobalWithDeadline_hook)(
     long long sec,
     long long nsec,
     long long tsec,
@@ -80,8 +83,12 @@ void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
     swift_task_enqueueGlobalWithDeadline_original original) = nullptr;
 
 SWIFT_CC(swift)
-void (*swift::swift_task_enqueueMainExecutor_hook)(
+void (*swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original) = nullptr;
+
+SWIFT_END_DECLS
+
+}
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include "CooperativeGlobalExecutor.inc"

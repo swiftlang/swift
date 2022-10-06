@@ -131,6 +131,8 @@ const Metadata *swift::hashable_support::findHashableBaseType(
   return findHashableBaseTypeImpl</*KnownToConformToHashable=*/ false>(type);
 }
 
+SWIFT_BEGIN_DECLS
+
 // internal func _makeAnyHashableUsingDefaultRepresentation<H : Hashable>(
 //   of value: H,
 //   storingResultInto result: UnsafeMutablePointer<AnyHashable>)
@@ -192,3 +194,4 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
   }
 }
 
+SWIFT_END_DECLS

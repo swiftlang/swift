@@ -65,11 +65,15 @@ static const char *class_getName(const ClassMetadata* type) {
     reinterpret_cast<Class>(const_cast<ClassMetadata*>(type)));
 }
 
+SWIFT_BEGIN_DECLS
+
 // Aliases for Swift runtime entry points for Objective-C types.
-extern "C" const void *swift_dynamicCastObjCProtocolConditional(
-                         const void *object,
-                         size_t numProtocols,
-                         Protocol * const *protocols);
+const void *
+swift_dynamicCastObjCProtocolConditional(const void *object,
+                                         size_t numProtocols,
+                                         Protocol * const *protocols);
+
+SWIFT_END_DECLS
 #endif
 
 #if SWIFT_STDLIB_HAS_TYPE_PRINTING
@@ -152,8 +156,12 @@ static Lazy<llvm::DenseMap<llvm::StringRef, std::pair<const char *, size_t>>>
 /// Access MUST be protected using `MangledToPrettyFunctionNameCache`.
   MangledToPrettyFunctionNameCache;
 
+namespace swift {
+
+SWIFT_BEGIN_DECLS
+
 TypeNamePair
-swift::swift_getTypeName(const Metadata *type, bool qualified) {
+swift_getTypeName(const Metadata *type, bool qualified) {
   TypeNameCacheKey key = TypeNameCacheKey(type, qualified ? TypeNameKind::Qualified: TypeNameKind::NotQualified);
   auto &cache = TypeNameCache.get();
 
@@ -191,6 +199,10 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
     cache.insert({key, {result, size}});
     return TypeNamePair{result, size};
   }
+}
+
+SWIFT_END_DECLS
+
 }
 
 /// Return mangled name for the given type.
@@ -425,12 +437,19 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 }
 
 #if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class
+
+SWIFT_BEGIN_DECLS
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
                                        OpaqueValue *result,
                                        const Metadata *destinationType);
+
 /// Nominal type descriptor for Swift.__SwiftValue
-extern "C" const ClassDescriptor NOMINAL_TYPE_DESCR_SYM(s12__SwiftValueC);
+extern const ClassDescriptor NOMINAL_TYPE_DESCR_SYM(s12__SwiftValueC);
+
+SWIFT_END_DECLS
+
 #endif
 
 /// Dynamically cast a class instance to a Swift class type.
@@ -683,9 +702,13 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   }
 }
 
-extern "C" const Metadata *
-swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self,
-                            bool existentialMetatype) {
+namespace swift {
+
+SWIFT_BEGIN_DECLS
+
+const Metadata *
+swift_getDynamicType(OpaqueValue *value, const Metadata *self,
+                     bool existentialMetatype) {
   OpaqueValue *outValue;
   const Metadata *outType;
   bool canTake = false;
@@ -695,10 +718,16 @@ swift::swift_getDynamicType(OpaqueValue *value, const Metadata *self,
   return outType;
 }
 
+SWIFT_END_DECLS
+
+}
+
 #if SWIFT_OBJC_INTEROP
+
+SWIFT_BEGIN_DECLS
+
 SWIFT_RUNTIME_EXPORT
-id
-swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
+id swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
@@ -713,9 +742,10 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
 }
 
 SWIFT_RUNTIME_EXPORT
-id
-swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
-                                               const char *file, unsigned line, unsigned column) {
+id swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
+                                                  const char *file,
+                                                  unsigned line,
+                                                  unsigned column) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
@@ -732,6 +762,8 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
   }
   }
 }
+
+SWIFT_END_DECLS
 
 #endif
 
@@ -1202,7 +1234,11 @@ MetadataResponse _getBridgedObjectiveCType(
   
 } // unnamed namespace
 
-extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
+SWIFT_BEGIN_DECLS
+
+extern const ProtocolDescriptor PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
+
+SWIFT_END_DECLS
 
 #if SWIFT_OBJC_INTEROP
 static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
@@ -1317,11 +1353,20 @@ id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 #define BRIDGING_CONFORMANCE_SYM \
   MANGLE_SYM(s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
 
-extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
+SWIFT_BEGIN_DECLS
+
+const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
+
+SWIFT_END_DECLS
+
 #endif
 
 /// Nominal type descriptor for Swift.String.
-extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
+SWIFT_BEGIN_DECLS
+
+extern const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
+
+SWIFT_END_DECLS
 
 static const _ObjectiveCBridgeableWitnessTable *
 swift_conformsToObjectiveCBridgeable(const Metadata *T) {
@@ -1378,7 +1423,10 @@ findBridgeWitness(const Metadata *T) {
 // Called by inlined stdlib code.
 #define _getBridgedNonVerbatimObjectiveCType \
   MANGLE_SYM(s36_getBridgedNonVerbatimObjectiveCTypeyypXpSgxmlF)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 const Metadata *_getBridgedNonVerbatimObjectiveCType(
   const Metadata *value, const Metadata *T
 ) {
@@ -1395,28 +1443,30 @@ const Metadata *_getBridgedNonVerbatimObjectiveCType(
   return nullptr;
 }
 
+SWIFT_END_DECLS
+
 #if SWIFT_OBJC_INTEROP
+
+SWIFT_BEGIN_DECLS
 
 // @_silgen_name("_bridgeNonVerbatimFromObjectiveCToAny")
 // func _bridgeNonVerbatimFromObjectiveCToAny(
 //     x: AnyObject,
 //     inout result: Any?
 // )
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void
-_bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
-                                      OpaqueValue *destValue);
+SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_CC(swift)
+extern void _bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
+                                                  OpaqueValue *destValue);
 
 // @_silgen_name("_bridgeNonVerbatimBoxedValue")
 // func _bridgeNonVerbatimBoxedValue<NativeType>(
 //     x: UnsafePointer<NativeType>,
 //     inout result: NativeType?
 // )
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void
-_bridgeNonVerbatimBoxedValue(const OpaqueValue *sourceValue,
-                             OpaqueValue *destValue,
-                             const Metadata *nativeType);
+SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_CC(swift)
+extern void _bridgeNonVerbatimBoxedValue(const OpaqueValue *sourceValue,
+                                         OpaqueValue *destValue,
+                                         const Metadata *nativeType);
 
 // Try bridging by conversion to Any or boxing if applicable.
 static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
@@ -1462,15 +1512,12 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
 // Called by inlined stdlib code.
 #define _bridgeNonVerbatimFromObjectiveC \
   MANGLE_SYM(s32_bridgeNonVerbatimFromObjectiveCyyyXl_xmxSgztlF)
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-void
-_bridgeNonVerbatimFromObjectiveC(
-  HeapObject *sourceValue,
-  const Metadata *nativeType,
-  OpaqueValue *destValue,
-  const Metadata *nativeType_
-) {
-  
+void _bridgeNonVerbatimFromObjectiveC(HeapObject *sourceValue,
+                                      const Metadata *nativeType,
+                                      OpaqueValue *destValue,
+                                      const Metadata *nativeType_) {
   if (tryBridgeNonVerbatimFromObjectiveCUniversal(sourceValue, nativeType,
                                                   destValue))
     return;
@@ -1509,14 +1556,12 @@ _bridgeNonVerbatimFromObjectiveC(
 /// Called by inlined stdlib code.
 #define _bridgeNonVerbatimFromObjectiveCConditional \
   MANGLE_SYM(s43_bridgeNonVerbatimFromObjectiveCConditionalySbyXl_xmxSgztlF)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-bool
-_bridgeNonVerbatimFromObjectiveCConditional(
-  HeapObject *sourceValue,
-  const Metadata *nativeType,
-  OpaqueValue *destValue,
-  const Metadata *nativeType_
-) {
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
+bool _bridgeNonVerbatimFromObjectiveCConditional(HeapObject *sourceValue,
+                                                 const Metadata *nativeType,
+                                                 OpaqueValue *destValue,
+                                                 const Metadata *nativeType_) {
   if (tryBridgeNonVerbatimFromObjectiveCUniversal(sourceValue, nativeType,
                                                   destValue))
     return true;
@@ -1552,13 +1597,18 @@ _bridgeNonVerbatimFromObjectiveCConditional(
     destValue, nativeType, nativeType, bridgeWitness);
 }
 
+SWIFT_END_DECLS
+
 #endif // SWIFT_OBJC_INTEROP
 
 // func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 // Called by inlined stdlib code.
 #define _isBridgedNonVerbatimToObjectiveC \
   MANGLE_SYM(s33_isBridgedNonVerbatimToObjectiveCySbxmlF)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 bool _isBridgedNonVerbatimToObjectiveC(const Metadata *value,
                                        const Metadata *T) {
   assert(!swift_isClassOrObjCExistentialTypeImpl(T));
@@ -1568,22 +1618,22 @@ bool _isBridgedNonVerbatimToObjectiveC(const Metadata *value,
 }
 
 // func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 bool _swift_isClassOrObjCExistentialType(const Metadata *value,
-                                                    const Metadata *T) {
+                                         const Metadata *T) {
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift)
 void _swift_setClassMetadata(const HeapMetadata *newClassMetadata,
-                             HeapObject* onObject,
-                             const Metadata *T) {
+                             HeapObject* onObject, const Metadata *T) {
   assert(T == newClassMetadata);
   onObject->metadata = newClassMetadata;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
+namespace swift {
+SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_CC(swift)
+const Metadata *_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject()) {
     if (classHasSuperclass(classType))
       return getMetadataForClass(classType->Superclass);
@@ -1596,6 +1646,7 @@ const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   }
 
   return nullptr;
+}
 }
 
 // Called by compiler-generated cast code.
@@ -1610,13 +1661,18 @@ bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
 
+SWIFT_END_DECLS
+
 #if !SWIFT_OBJC_INTEROP
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_CC(swift)
 bool _swift_isOptional(OpaqueValue *src, const Metadata *type) {
   return swift_isOptionalType(type);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_RUNTIME_STDLIB_SPI SWIFT_CC(swift)
 HeapObject *_swift_extractDynamicValue(OpaqueValue *value, const Metadata *self) {
   OpaqueValue *outValue;
   const Metadata *outType;
@@ -1635,7 +1691,7 @@ HeapObject *_swift_extractDynamicValue(OpaqueValue *value, const Metadata *self)
   return nullptr;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_CC(swift)
 HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
   OpaqueValue *src, const Metadata *srcType) {
   assert(!swift_isClassOrObjCExistentialTypeImpl(srcType));
@@ -1657,6 +1713,9 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
     return nullptr;
   }
 }
+
+SWIFT_END_DECLS
+
 #endif
 
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE

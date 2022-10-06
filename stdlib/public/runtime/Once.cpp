@@ -42,7 +42,14 @@ static_assert(sizeof(swift_once_t) <= sizeof(void*),
 /// Runs the given function with the given context argument exactly once.
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
-void swift::swift_once(swift_once_t *predicate, void (*fn)(void *),
-                       void *context) {
+namespace swift {
+
+SWIFT_BEGIN_DECLS
+
+void swift_once(swift_once_t *predicate, void (*fn)(void *), void *context) {
   swift::once(*predicate, fn, context);
+}
+
+SWIFT_END_DECLS
+
 }

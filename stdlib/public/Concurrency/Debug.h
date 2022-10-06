@@ -21,33 +21,42 @@
 
 namespace swift {
 
+SWIFT_BEGIN_DECLS
+
 // Dispatch knows about these symbol names. Don't change them without consulting
 // dispatch.
 
 /// The metadata pointer used for job objects.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_jobMetadata;
+extern const void *const _swift_concurrency_debug_jobMetadata;
 
 /// The metadata pointer used for async task objects.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_asyncTaskMetadata;
+extern const void *const _swift_concurrency_debug_asyncTaskMetadata;
 
 /// A fake metadata pointer placed at the start of async task slab allocations.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_asyncTaskSlabMetadata;
+extern const void *const _swift_concurrency_debug_asyncTaskSlabMetadata;
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_non_future_adapter;
+extern const void *const _swift_concurrency_debug_non_future_adapter;
+
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_future_adapter;
+extern const void *const _swift_concurrency_debug_future_adapter;
+
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_task_wait_throwing_resume_adapter;
+extern const void *const
+_swift_concurrency_debug_task_wait_throwing_resume_adapter;
+
 SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_task_future_wait_resume_adapter;
+extern const void *const
+_swift_concurrency_debug_task_future_wait_resume_adapter;
 
 /// Whether the runtime we are inspecting supports priority escalation
 SWIFT_EXPORT_FROM(swift_Concurrency)
-bool _swift_concurrency_debug_supportsPriorityEscalation;
+extern bool _swift_concurrency_debug_supportsPriorityEscalation;
+
+SWIFT_END_DECLS
 
 } // namespace swift
 

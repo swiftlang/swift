@@ -19,7 +19,12 @@
 
 namespace swift {
 
-SWIFT_RUNTIME_EXPORT void (*_swift_willThrow)(SwiftError *error);
+SWIFT_BEGIN_DECLS
+
+SWIFT_RUNTIME_EXPORT
+extern void (*_swift_willThrow)(SwiftError *error);
+
+SWIFT_END_DECLS
 
 }
 

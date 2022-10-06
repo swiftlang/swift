@@ -32,13 +32,16 @@ findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
   return nullptr;
 }
 
-SWIFT_CC(swift)
-SWIFT_EXPORT_FROM(swiftDistributed)
+SWIFT_BEGIN_DECLS
+
+SWIFT_EXPORT_FROM(swiftDistributed) SWIFT_CC(swift)
 void *swift_distributed_getGenericEnvironment(const char *targetNameStart,
                                               size_t targetNameLength) {
   auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
   return accessor ? accessor->GenericEnvironment.get() : nullptr;
 }
+
+SWIFT_END_DECLS
 
 /// func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
 ///    on: AnyObject,
@@ -64,9 +67,12 @@ using TargetExecutorSignature =
                         /*decoderWitnessTable=*/void **),
                    /*throws=*/true>;
 
-SWIFT_CC(swiftasync)
-SWIFT_EXPORT_FROM(swiftDistributed)
-TargetExecutorSignature::FunctionType swift_distributed_execute_target;
+SWIFT_BEGIN_DECLS
+
+SWIFT_CC(swiftasync) SWIFT_EXPORT_FROM(swiftDistributed)
+extern TargetExecutorSignature::FunctionType swift_distributed_execute_target;
+
+SWIFT_END_DECLS
 
 /// Accessor takes:
 ///   - an async context

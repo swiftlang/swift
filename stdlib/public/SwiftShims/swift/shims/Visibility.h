@@ -204,26 +204,22 @@
 #define SWIFT_IMAGE_EXPORTS_swift_Differentiation 0
 #endif
 
-#define SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)                          \
-  SWIFT_MACRO_IF(SWIFT_IMAGE_EXPORTS_##LIBRARY,                       \
-                 SWIFT_ATTRIBUTE_FOR_EXPORTS,                         \
-                 SWIFT_ATTRIBUTE_FOR_IMPORTS)
+#define SWIFT_EXPORT_FROM(LIBRARY)                                              \
+  SWIFT_MACRO_IF(SWIFT_IMAGE_EXPORTS_##LIBRARY,                                 \
+                 SWIFT_ATTRIBUTE_FOR_EXPORTS, SWIFT_ATTRIBUTE_FOR_IMPORTS)
 
-// SWIFT_EXPORT_FROM(LIBRARY) declares something to be a C-linkage
-// entity exported by the given library.
-//
+#if defined(__cplusplus)
+#define SWIFT_BEGIN_DECLS extern "C" {
+#define SWIFT_END_DECLS }
+#else
+#define SWIFT_BEGIN_DECLS
+#define SWIFT_END_DECLS
+#endif
+
 // SWIFT_RUNTIME_EXPORT is just SWIFT_EXPORT_FROM(swiftCore).
 //
 // TODO: use this in shims headers in overlays.
-#if defined(__cplusplus)
-#define SWIFT_EXPORT_FROM(LIBRARY) extern "C" SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)
-#define SWIFT_EXTERN_C extern "C" 
-#else
-#define SWIFT_EXPORT_FROM(LIBRARY) SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)
-#define SWIFT_EXTERN_C
-#endif
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_FROM(swiftCore)
-#define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
 #if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
 #define SWIFT_FALLTHROUGH [[fallthrough]]
