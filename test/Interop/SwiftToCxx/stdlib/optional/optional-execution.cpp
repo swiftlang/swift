@@ -84,9 +84,12 @@ int main() {
   {
     auto val = createCIntOpt(2);
     takeCIntOpt(val);
+    assert((bool)val);
     assert(val.isSome());
     assert(val.getUnsafelyUnwrapped() == 2);
+    assert(val.get() == 2);
     resetOpt(val);
+    assert(!(bool)val);
     assert(val.isNone());
     takeCIntOpt(val);
   }
@@ -95,9 +98,12 @@ int main() {
   {
     auto val = createSmallStructOpt(0xFA);
     takeSmallStructOpt(val);
+    assert((bool)val);
     assert(val.isSome());
     assert(val.getUnsafelyUnwrapped().getX() == 0xFA);
+    assert(val.get().getX() == 0xFA);
     resetOpt(val);
+    assert(!(bool)val);
     assert(val.isNone());
     takeSmallStructOpt(val);
   }
