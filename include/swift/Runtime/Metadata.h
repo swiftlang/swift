@@ -313,21 +313,19 @@ swift_getGenericMetadata(MetadataRequest request,
 ///   - installing new v-table entries and overrides; and
 ///   - registering the class with the runtime under ObjC interop.
 /// Most of this work can be achieved by calling swift_initClassMetadata.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
-ClassMetadata *
-swift_allocateGenericClassMetadata(const ClassDescriptor *description,
-                                   const void *arguments,
-                                   const GenericClassMetadataPattern *pattern);
+SWIFT_RUNTIME_EXPORT
+ClassMetadata *swift_allocateGenericClassMetadata SWIFT_RETURNS_NONNULL
+SWIFT_NODISCARD(const ClassDescriptor *description, const void *arguments,
+                const GenericClassMetadataPattern *pattern);
 
 /// Allocate a generic value metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic struct or
 /// enum.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
-ValueMetadata *
-swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
-                                   const void *arguments,
-                                   const GenericValueMetadataPattern *pattern,
-                                   size_t extraDataSize);
+SWIFT_RUNTIME_EXPORT
+ValueMetadata *swift_allocateGenericValueMetadata SWIFT_RETURNS_NONNULL
+SWIFT_NODISCARD(const ValueTypeDescriptor *description, const void *arguments,
+                const GenericValueMetadataPattern *pattern,
+                size_t extraDataSize);
 
 /// Check that the given metadata has the right state.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
