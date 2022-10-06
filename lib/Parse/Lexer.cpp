@@ -1922,12 +1922,6 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
     wasErroneous |= CharValue == ~1U;
   }
 
-  if (QuoteChar == '\'') {
-    assert(!IsMultilineString && CustomDelimiterLen == 0 &&
-           "Single quoted string cannot have custom delimiter, nor multiline");
-    diagnoseSingleQuoteStringLiteral(TokStart, CurPtr);
-  }
-
   if (wasErroneous)
     return formToken(tok::unknown, TokStart);
 

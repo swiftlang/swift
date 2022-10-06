@@ -139,6 +139,10 @@ ERROR(lex_invalid_escape_delimiter,none,
       "too many '#' characters in delimited escape", ())
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
+ERROR(single_quoted_invalid,none,
+      "single quoted literal is not a single character", ())
+ERROR(single_quoted_segmented,none,
+      "single quoted literal cannot contain interpolations", ())
 
 ERROR(lex_regex_literal_invalid_starting_char,none,
       "regex literal may not start with %0; add backslash to escape",

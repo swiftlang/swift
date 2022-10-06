@@ -191,6 +191,13 @@
           },
           {
             "kind": "Conformance",
+            "name": "ExpressibleByASCIILiteral",
+            "printedName": "ExpressibleByASCIILiteral",
+            "usr": "s:s25ExpressibleByASCIILiteralP",
+            "mangledName": "$ss25ExpressibleByASCIILiteralP"
+          },
+          {
+            "kind": "Conformance",
             "name": "Sendable",
             "printedName": "Sendable",
             "usr": "s:s8SendableP",

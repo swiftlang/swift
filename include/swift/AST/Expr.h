@@ -175,10 +175,11 @@ protected:
     IsExplicitConversion : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StringLiteralExpr, LiteralExpr, 3+1+1,
+  SWIFT_INLINE_BITFIELD(StringLiteralExpr, LiteralExpr, 3+1+1+1,
     Encoding : 3,
     IsSingleUnicodeScalar : 1,
-    IsSingleExtendedGraphemeCluster : 1
+    IsSingleExtendedGraphemeCluster : 1,
+    IsSingleQuoted : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(InterpolatedStringLiteralExpr, LiteralExpr, 32+20,
@@ -817,7 +818,7 @@ public:
     OneUnicodeScalar
   };
 
-  StringLiteralExpr(StringRef Val, SourceRange Range, bool Implicit = false);
+  StringLiteralExpr(StringRef Val, SourceRange Range, bool Implicit = false, bool SingleQuoted = false);
 
   StringRef getValue() const { return Val; }
   SourceRange getSourceRange() const { return Range; }
@@ -838,6 +839,10 @@ public:
 
   bool isSingleExtendedGraphemeCluster() const {
     return Bits.StringLiteralExpr.IsSingleExtendedGraphemeCluster;
+  }
+
+  bool isSingleQuoted() const {
+    return Bits.StringLiteralExpr.IsSingleQuoted;
   }
 
   static bool classof(const Expr *E) {

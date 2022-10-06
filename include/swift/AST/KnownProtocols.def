@@ -123,6 +123,8 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringInterpolation, "StringLiteral
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByStringLiteral, "StringLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByNilLiteral, nullptr, false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScalarType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleBySingleQuotedLiteral, "SingleQuotedType", true)
+EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByASCIILiteral, "SingleQuotedType", true)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)

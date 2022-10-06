@@ -415,7 +415,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol ExpressibleByUnicodeScalarLiteral {
+public protocol ExpressibleByUnicodeScalarLiteral: ExpressibleBySingleQuotedLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
@@ -426,6 +426,12 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   ///
   /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
+}
+
+@_marker public protocol ExpressibleBySingleQuotedLiteral: ExpressibleByASCIILiteral {
+}
+
+@_marker public protocol ExpressibleByASCIILiteral {
 }
 
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral

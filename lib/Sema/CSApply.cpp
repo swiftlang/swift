@@ -2715,6 +2715,10 @@ namespace {
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
       } else {
+        if (stringLiteral && !stringLiteral->isSingleUnicodeScalar())
+          ctx.Diags.diagnose(stringLiteral->getStartLoc(),
+                             diag::single_quoted_invalid_cast, type);
+
         // Otherwise, we should have just one Unicode scalar.
         literalType = ctx.Id_UnicodeScalarLiteralType;
 

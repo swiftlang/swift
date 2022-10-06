@@ -1914,7 +1914,8 @@ static StringLiteralExpr *
 createStringLiteralExprFromSegment(ASTContext &Ctx,
                                    const Lexer *L,
                                    Lexer::StringSegment &Segment,
-                                   SourceLoc TokenLoc) {
+                                   SourceLoc TokenLoc,
+                                   bool SingleQuoted = false) {
   assert(Segment.Kind == Lexer::StringSegment::Literal);
   // FIXME: Consider lazily encoding the string when needed.
   llvm::SmallString<256> Buf;
@@ -1924,7 +1925,8 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
            "Returned string is not from buffer?");
     EncodedStr = Ctx.AllocateCopy(EncodedStr);
   }
-  return new (Ctx) StringLiteralExpr(EncodedStr, TokenLoc);
+  return new (Ctx) StringLiteralExpr(EncodedStr, TokenLoc,
+                                     false, SingleQuoted);
 }
 
 ParserStatus Parser::
@@ -2112,6 +2114,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   OpenQuoteStr = Tok.getRawText().substr(DelimiterLength, QuoteLength);
   CloseQuoteStr = Tok.getRawText().substr(CloseQuoteBegin, QuoteLength);
   CloseDelimiterStr = Tok.getRawText().take_back(DelimiterLength);
+  bool SingleQuoted = OpenQuoteStr == "'";
 
   // Make unknown tokens to represent the open and close quote.
   Token OpenQuote(QuoteKind, OpenQuoteStr);
@@ -2162,9 +2165,18 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       SyntaxContext->addToken(CloseQuote, StringRef(), EntireTrailingTrivia);
     }
 
-    return makeParserResult(
-        createStringLiteralExprFromSegment(Context, L, Segments.front(), Loc));
+    auto expr = createStringLiteralExprFromSegment(Context, L, Segments.front(),
+                                                   Loc, SingleQuoted);
+
+    if (SingleQuoted && !(expr->isSingleUnicodeScalar() ||
+                          expr->isSingleExtendedGraphemeCluster()))
+      diagnose(EntireTok, diag::single_quoted_invalid);
+
+    return makeParserResult(expr);
   }
+
+  if (SingleQuoted)
+    diagnose(EntireTok, diag::single_quoted_segmented);
 
   // We don't expose the entire interpolated string as one token. Instead, we
   // should expose the tokens in each segment.
