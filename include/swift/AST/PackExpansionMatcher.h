@@ -62,6 +62,29 @@ public:
   bool match();
 };
 
+/// Performs a structural match of two lists of (unlabeled) function
+/// parameters.
+///
+/// The invariant is that each list must only contain at most one pack
+/// expansion type. After collecting a common prefix and suffix, the
+/// pack expansion on either side asborbs the remaining elements on the
+/// other side.
+class ParamPackMatcher {
+  ArrayRef<AnyFunctionType::Param> lhsParams;
+  ArrayRef<AnyFunctionType::Param> rhsParams;
+
+  ASTContext &ctx;
+
+public:
+  SmallVector<MatchedPair, 4> pairs;
+
+  ParamPackMatcher(ArrayRef<AnyFunctionType::Param> lhsParams,
+                   ArrayRef<AnyFunctionType::Param> rhsParams,
+                   ASTContext &ctx);
+
+  bool match();
+};
+
 } // end namespace swift
 
 #endif // SWIFT_AST_TYPE_MATCHER_H
