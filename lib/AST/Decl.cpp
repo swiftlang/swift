@@ -6504,6 +6504,14 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
+bool VarDecl::isTypeWrapperLocalStorageForInitializer() const {
+  if (auto *ctor =
+          dyn_cast_or_null<ConstructorDecl>(getDeclContext()->getAsDecl())) {
+    return this == ctor->getLocalTypeWrapperStorageVar();
+  }
+  return false;
+}
+
 bool VarDecl::isLet() const {
   // An awful hack that stabilizes the value of 'isLet' for ParamDecl instances.
   //

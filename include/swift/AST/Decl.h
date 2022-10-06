@@ -5714,6 +5714,11 @@ public:
   /// backing property will be treated as the member-initialized property.
   bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
 
+  /// Check whether this variable presents a local storage synthesized
+  /// by the compiler in a user-defined designated initializer to
+  /// support initialization of type wrapper managed properties.
+  bool isTypeWrapperLocalStorageForInitializer() const;
+
   /// Return the range of semantics attributes attached to this VarDecl.
   auto getSemanticsAttrs() const
       -> decltype(getAttrs().getAttributes<SemanticsAttr>()) {
