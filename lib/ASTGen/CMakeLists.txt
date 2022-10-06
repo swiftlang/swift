@@ -1,5 +1,5 @@
 if (SWIFT_SWIFT_PARSER)
-  add_library(swiftASTGen
+  add_library(swiftASTGen STATIC
     Sources/ASTGen/ASTGen.swift
     Sources/ASTGen/Decls.swift
     Sources/ASTGen/Exprs.swift
@@ -25,6 +25,8 @@ if (SWIFT_SWIFT_PARSER)
     $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
+
+    swiftAST
   )
 
   target_include_directories(swiftASTGen PUBLIC
