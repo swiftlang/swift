@@ -8,8 +8,7 @@ extension ASTGenVisitor {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var segment = node.segments.first!.as(StringSegmentSyntax.self)!.content.text
     return segment.withUTF8 { buf in
-      let id = SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
-      return SwiftStringLiteralExpr_create(ctx, id, buf.count, loc)
+      return SwiftStringLiteralExpr_create(ctx, buf.baseAddress, buf.count, loc)
     }
   }
 
@@ -17,8 +16,7 @@ extension ASTGenVisitor {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var segment = node.digits.text
     return segment.withUTF8 { buf in
-      let id = SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
-      return SwiftIntegerLiteralExpr_create(ctx, id, buf.count, loc)
+      return SwiftIntegerLiteralExpr_create(ctx, buf.baseAddress, buf.count, loc)
     }
   }
 
