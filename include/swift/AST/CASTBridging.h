@@ -31,28 +31,6 @@
 #define _Nullable
 #endif
 
-//===----------------------------------------------------------------------===//
-// Diagnostic Engine
-//===----------------------------------------------------------------------===//
-
-#ifndef __has_attribute         // Optional of course.
-  #define __has_attribute(x) 0  // Compatibility with non-clang compilers.
-#endif
-
-// TODO: Move this to somewhere common header.
-#if __has_attribute(enum_extensibility)
-#define ENUM_EXTENSIBILITY_ATTR(arg) __attribute__((enum_extensibility(arg)))
-#else
-#define ENUM_EXTENSIBILITY_ATTR(arg)
-#endif
-
-// NOTE: This must be the same underlying value as C++ 'swift::DiagID' defined
-// in 'DiagnosticList.cpp'.
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : unsigned {
-#define DIAG(KIND, ID, Options, Text, Signature) BridgedDiagID_##ID,
-#include "swift/AST/DiagnosticsAll.def"
-} BridgedDiagID;
-
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 typedef long SwiftInt;
@@ -67,14 +45,6 @@ typedef struct {
   void *start;
   SwiftInt byteLength;
 } BridgedCharSourceRange;
-
-// FIXME: Can we bridge InFlightDiagnostic?
-void DiagnosticEngine_diagnose(void *, void *loc, BridgedDiagID diagID,
-                               BridgedArrayRef arguments,
-                               BridgedCharSourceRange highlight,
-                               BridgedArrayRef fixIts);
-
-int DiagnosticEngine_hadAnyError(void *);
 
 typedef void *BridgedIdentifier;
 
