@@ -409,6 +409,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     void checkMoveExpr(MoveExpr *moveExpr) {
       // Make sure the MoveOnly feature is set. If not, error.
+      // This should not currently be reached because the parse should ignore
+      // the _move keyword unless the feature flag is set.
       if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
         auto error =
           diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
