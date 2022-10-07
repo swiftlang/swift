@@ -706,8 +706,7 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
 }
 
 void BorrowingOperand::getImplicitUses(
-    SmallVectorImpl<Operand *> &foundUses,
-    std::function<void(Operand *)> *errorFunction) const {
+    SmallVectorImpl<Operand *> &foundUses) const {
   // FIXME: this visitScopeEndingUses should never return false once dead
   // borrows are disallowed.
   if (!visitScopeEndingUses([&](Operand *endOp) {

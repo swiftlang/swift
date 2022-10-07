@@ -240,9 +240,8 @@ bool SILPhiArgument::visitTransitiveIncomingPhiOperands(
     argument->getIncomingPhiOperands(operands);
 
     for (auto *operand : operands) {
-      SILPhiArgument *forwarded;
-      if ((forwarded = dyn_cast<SILPhiArgument>(operand->get())) &&
-          forwarded->isPhi()) {
+      SILPhiArgument *forwarded = dyn_cast<SILPhiArgument>(operand->get());
+      if (forwarded && forwarded->isPhi()) {
         worklist.insert(forwarded);
       }
       if (!visitor(argument, operand))

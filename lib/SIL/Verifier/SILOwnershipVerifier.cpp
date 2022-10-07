@@ -254,14 +254,7 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     // initial end scope instructions without any further work.
     //
     // Maybe: Is borrow scope non-local?
-    std::function<void(Operand *)> error = [&](Operand *op) {
-      errorBuilder.handleMalformedSIL([&] {
-        llvm::errs() << "Implicit Regular User Guaranteed Phi Cycle!\n"
-                     << "User: " << *op->getUser()
-                     << "Initial: " << *initialScopedOperand << "\n";
-      });
-    };
-    initialScopedOperand.getImplicitUses(nonLifetimeEndingUsers, &error);
+    initialScopedOperand.getImplicitUses(nonLifetimeEndingUsers);
     if (initialScopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
       guaranteedPhiVerifier.verifyReborrows(
           cast<BeginBorrowInst>(op->getUser()));
@@ -361,15 +354,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       if (auto scopedOperand = BorrowingOperand(op)) {
         assert(!scopedOperand.isReborrow());
 
-        std::function<void(Operand *)> onError = [&](Operand *op) {
-          errorBuilder.handleMalformedSIL([&] {
-            llvm::errs() << "Implicit Regular User Guaranteed Phi Cycle!\n"
-                         << "User: " << *op->getUser()
-                         << "Initial: " << *scopedOperand << "\n";
-          });
-        };
-
-        scopedOperand.getImplicitUses(nonLifetimeEndingUsers, &onError);
+        scopedOperand.getImplicitUses(nonLifetimeEndingUsers);
         if (scopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
           guaranteedPhiVerifier.verifyReborrows(
               cast<BeginBorrowInst>(op->getUser()));

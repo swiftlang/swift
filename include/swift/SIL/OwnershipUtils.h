@@ -478,13 +478,7 @@ struct BorrowingOperand {
   /// set of its operands uses.
   ///
   /// E.x.: end_apply uses.
-  ///
-  /// \p errorFunction a callback that if non-null is passed an operand that
-  /// triggers a mal-formed SIL error. This is just needed for the ownership
-  /// verifier to emit good output.
-  void getImplicitUses(
-      SmallVectorImpl<Operand *> &foundUses,
-      std::function<void(Operand *)> *errorFunction = nullptr) const;
+  void getImplicitUses(SmallVectorImpl<Operand *> &foundUses) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
