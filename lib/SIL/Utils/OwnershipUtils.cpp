@@ -54,6 +54,7 @@ bool swift::hasPointerEscape(BorrowedValue value) {
     case OperandOwnership::BitwiseEscape:
       break;
 
+    case OperandOwnership::GuaranteedForwardingPhi:
     case OperandOwnership::Reborrow: {
       SILArgument *phi = cast<BranchInst>(op->getUser())
                              ->getDestBB()
@@ -239,6 +240,11 @@ bool swift::findInnerTransitiveGuaranteedUses(
       }
       break;
     }
+    case OperandOwnership::GuaranteedForwardingPhi: {
+      leafUse(use);
+      foundPointerEscape = true;
+      break;
+    }
     case OperandOwnership::Borrow:
       // FIXME: Use visitExtendedScopeEndingUses and audit all clients to handle
       // reborrows.
@@ -310,14 +316,12 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
 
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
+    case OperandOwnership::Reborrow:
       return false;
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
     case OperandOwnership::BitwiseEscape:
-    // Reborrow only happens when this is called on a value that creates a
-    // borrow scope.
-    case OperandOwnership::Reborrow:
     // EndBorrow either happens when this is called on a value that creates a
     // borrow scope, or when it is pushed as a use when processing a nested
     // borrow.
@@ -338,7 +342,17 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       }
       recordUse(use);
       break;
-
+    // \p borrowedValue will dominate this GuaranteedForwardingPhi, because we
+    // return false in the case of Reborrow.
+    case OperandOwnership::GuaranteedForwardingPhi: {
+      SILArgument *phi = PhiOperand(use).getValue();
+      for (auto *use : phi->getUses()) {
+        if (use->getOperandOwnership() != OperandOwnership::NonUse)
+          worklist.insert(use);
+      }
+      recordUse(use);
+      break;
+    }
     case OperandOwnership::GuaranteedForwarding: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
@@ -394,6 +408,53 @@ bool swift::findUsesOfSimpleValue(SILValue value,
       break;
     }
     usePoints->push_back(use);
+  }
+  return true;
+}
+
+bool swift::visitGuaranteedForwardingPhisForSSAValue(
+    SILValue value, function_ref<bool(Operand *)> visitor) {
+  assert(isa<BeginBorrowInst>(value) || isa<LoadBorrowInst>(value) ||
+         (isa<SILPhiArgument>(value) &&
+          value->getOwnershipKind() == OwnershipKind::Guaranteed));
+  // guaranteedForwardingOps is a collection of all transitive
+  // GuaranteedForwarding uses of \p value. It is a set, to avoid repeated
+  // processing of structs and tuples which are GuaranteedForwarding.
+  SmallSetVector<Operand *, 4> guaranteedForwardingOps;
+  // Collect first-level GuaranteedForwarding uses, and call the visitor on any
+  // GuaranteedForwardingPhi uses.
+  for (auto *use : value->getUses()) {
+    if (use->getOperandOwnership() == OperandOwnership::GuaranteedForwarding) {
+      guaranteedForwardingOps.insert(use);
+      continue;
+    }
+    if (use->getOperandOwnership() ==
+        OperandOwnership::GuaranteedForwardingPhi) {
+      if (!visitor(use)) {
+        return false;
+      }
+      continue;
+    }
+  }
+
+  // Transitively, collect GuaranteedForwarding uses.
+  for (unsigned i = 0; i < guaranteedForwardingOps.size(); i++) {
+    for (auto val : guaranteedForwardingOps[i]->getUser()->getResults()) {
+      for (auto *valUse : val->getUses()) {
+        if (valUse->getOperandOwnership() ==
+            OperandOwnership::GuaranteedForwarding) {
+          guaranteedForwardingOps.insert(valUse);
+          continue;
+        }
+        if (valUse->getOperandOwnership() ==
+            OperandOwnership::GuaranteedForwardingPhi) {
+          if (!visitor(valUse)) {
+            return false;
+          }
+          continue;
+        }
+      }
+    }
   }
   return true;
 }
@@ -1388,6 +1449,7 @@ ForwardingOperand::ForwardingOperand(Operand *use) {
   case OperandOwnership::Borrow:
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::InteriorPointer:
+  case OperandOwnership::GuaranteedForwardingPhi:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
     llvm_unreachable("this isn't the operand being forwarding!");
@@ -1610,55 +1672,116 @@ bool ForwardingOperand::visitForwardedValues(
   });
 }
 
-void swift::findTransitiveReborrowBaseValuePairs(
-    BorrowingOperand initialScopedOperand, SILValue origBaseValue,
-    function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair) {
-  // We need a SetVector to make sure we don't revisit the same reborrow operand
-  // again.
-  SmallSetVector<std::tuple<Operand *, SILValue>, 4> worklist;
+void swift::visitExtendedReborrowPhiBaseValuePairs(
+    BeginBorrowInst *borrowInst, function_ref<void(SILPhiArgument *, SILValue)>
+                                     visitReborrowPhiBaseValuePair) {
+  // A Reborrow can have different base values on different control flow
+  // paths.
+  // For that reason, worklist stores (reborrow, base value) pairs.
+  // We need a SetVector to make sure we don't revisit the same pair again.
+  SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
 
-  // Populate the worklist with reborrow and the base value
-  initialScopedOperand.visitScopeEndingUses([&](Operand *op) {
-    if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
-      worklist.insert(std::make_tuple(op, origBaseValue));
-    }
-    return true;
-  });
-
-  // Size of worklist changes in this loop
-  for (unsigned idx = 0; idx < worklist.size(); idx++) {
-    Operand *reborrowOp;
-    SILValue baseValue;
-    std::tie(reborrowOp, baseValue) = worklist[idx];
-
-    BorrowingOperand borrowingOperand(reborrowOp);
-    assert(borrowingOperand.isReborrow());
-
-    auto *branchInst = cast<BranchInst>(reborrowOp->getUser());
-    auto *succBlock = branchInst->getDestBB();
-    auto *phiArg = cast<SILPhiArgument>(
-        succBlock->getArgument(reborrowOp->getOperandNumber()));
-
-    SILValue newBaseVal = baseValue;
-    // If the previous base value was also passed as a phi arg, that will be
-    // the new base value.
-    for (auto *arg : succBlock->getArguments()) {
-      if (arg->getIncomingPhiValue(branchInst->getParent()) == baseValue) {
-        newBaseVal = arg;
-        break;
-      }
-    }
-
-    // Call the visitor function
-    visitReborrowBaseValuePair(phiArg, newBaseVal);
-
-    BorrowedValue scopedValue(phiArg);
-    scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
+  // Find all reborrows of value and insert the (reborrow, base value) pair into
+  // the worklist.
+  auto collectReborrows = [&](SILValue value, SILValue baseValue) {
+    BorrowedValue(value).visitLocalScopeEndingUses([&](Operand *op) {
       if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
-        worklist.insert(std::make_tuple(op, newBaseVal));
+        worklist.insert(std::make_tuple(PhiOperand(op), baseValue));
       }
       return true;
     });
+  };
+
+  // Initialize the worklist.
+  collectReborrows(borrowInst, borrowInst->getOperand());
+
+  // For every (reborrow, base value) pair in the worklist:
+  // - Find phi value and new base value
+  // - Call the visitor on the phi value and new base value pair
+  // - Populate the worklist with pairs of reborrows of phi value and the new
+  // base.
+  for (unsigned idx = 0; idx < worklist.size(); idx++) {
+    PhiOperand phiOp;
+    SILValue currentBaseValue;
+    std::tie(phiOp, currentBaseValue) = worklist[idx];
+
+    auto *phiValue = phiOp.getValue();
+    SILValue newBaseValue = currentBaseValue;
+
+    // If the previous base value was also passed as a phi operand along with
+    // the reborrow, its phi value will be the new base value.
+    for (auto &op : phiOp.getBranch()->getAllOperands()) {
+      PhiOperand otherPhiOp(&op);
+      if (otherPhiOp.getSource() != currentBaseValue) {
+        continue;
+      }
+      newBaseValue = otherPhiOp.getValue();
+    }
+
+    // Call the visitor function
+    visitReborrowPhiBaseValuePair(phiValue, newBaseValue);
+
+    collectReborrows(phiValue, newBaseValue);
+  }
+}
+
+void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
+    BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
+                              visitGuaranteedForwardingPhiBaseValuePair) {
+  assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
+         borrow.kind == BorrowedValueKind::LoadBorrow);
+  // A GuaranteedForwardingPhi can have different base values on different
+  // control flow paths.
+  // For that reason, worklist stores (GuaranteedForwardingPhi operand, base
+  // value) pairs. We need a SetVector to make sure we don't revisit the same
+  // pair again.
+  SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
+
+  auto collectGuaranteedForwardingPhis = [&](SILValue value,
+                                             SILValue baseValue) {
+    visitGuaranteedForwardingPhisForSSAValue(value, [&](Operand *op) {
+      worklist.insert(std::make_tuple(PhiOperand(op), baseValue));
+      return true;
+    });
+  };
+
+  // Collect all GuaranteedForwardingPhis
+  collectGuaranteedForwardingPhis(borrow.value, borrow.value);
+  borrow.visitTransitiveLifetimeEndingUses([&](Operand *endUse) {
+    if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+      auto *phiValue = PhiOperand(endUse).getValue();
+      collectGuaranteedForwardingPhis(phiValue, phiValue);
+    }
+    return true;
+  });
+  // For every (GuaranteedForwardingPhi operand, base value) pair in the
+  // worklist:
+  // - Find phi value and new base value
+  // - Call the visitor on the phi value and new base value pair
+  // - Populate the worklist with pairs of GuaranteedForwardingPhi ops of phi
+  // value and the new base.
+  for (unsigned idx = 0; idx < worklist.size(); idx++) {
+    PhiOperand phiOp;
+    SILValue currentBaseValue;
+    std::tie(phiOp, currentBaseValue) = worklist[idx];
+
+    auto *phiValue = phiOp.getValue();
+    SILValue newBaseValue = currentBaseValue;
+
+    // If an adjacent reborrow is found in the same block as the guaranteed phi,
+    // then set newBaseValue to the reborrow.
+    for (auto &op : phiOp.getBranch()->getAllOperands()) {
+      PhiOperand otherPhiOp(&op);
+      if (otherPhiOp.getSource() != currentBaseValue) {
+        continue;
+      }
+      newBaseValue = otherPhiOp.getValue();
+    }
+
+    // Call the visitor function
+    visitGuaranteedForwardingPhiBaseValuePair(phiValue, newBaseValue);
+
+    collectGuaranteedForwardingPhis(phiValue, newBaseValue);
   }
 }
 

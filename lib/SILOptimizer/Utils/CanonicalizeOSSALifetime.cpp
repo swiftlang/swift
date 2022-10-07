@@ -192,6 +192,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         // reborrow of such.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::Reborrow:
         BranchInst *branch;
         if (!(branch = dyn_cast<BranchInst>(user))) {

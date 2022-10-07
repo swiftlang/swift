@@ -27,6 +27,9 @@ bool swift::checkOperandOwnershipInvariants(const Operand *operand,
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
   }
+  if (opOwnership == OperandOwnership::GuaranteedForwarding) {
+    return canOpcodeForwardGuaranteedValues(const_cast<Operand *>(operand));
+  }
   return true;
 }
 
@@ -440,10 +443,10 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
   ValueOwnershipKind destBlockArgOwnershipKind =
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
-  // FIXME: remove this special case once all aggregate operations behave just
-  // like phis.
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
-    return OperandOwnership::Reborrow;
+    return isGuaranteedForwardingPhi(getValue())
+               ? OperandOwnership::GuaranteedForwardingPhi
+               : OperandOwnership::Reborrow;
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
     /*allowUnowned*/true);

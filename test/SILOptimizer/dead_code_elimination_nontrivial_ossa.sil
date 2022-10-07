@@ -827,16 +827,19 @@ sil [ossa] @reborrow_guaranteed_phi2 : $@convention(thin) (@owned EitherNoneOrAn
 entry(%0 : @owned $EitherNoneOrAnyObject):
   %borrow_either = begin_borrow %0 : $EitherNoneOrAnyObject
   switch_enum %borrow_either : $EitherNoneOrAnyObject, case #EitherNoneOrAnyObject.none!enumelt: none_block, case #EitherNoneOrAnyObject.any!enumelt: any_block
+
 any_block(%borrow : @guaranteed $AnyObject):
   %2 = begin_borrow %borrow : $AnyObject
   end_borrow %2 : $AnyObject
   end_borrow %borrow_either : $EitherNoneOrAnyObject
   destroy_value %0 : $EitherNoneOrAnyObject
   br exit
+
 none_block:
   end_borrow %borrow_either : $EitherNoneOrAnyObject
   destroy_value %0 : $EitherNoneOrAnyObject
   br exit
+
 exit:
   %retval = tuple ()
   return %retval : $()

@@ -432,6 +432,8 @@ StringRef OperandOwnership::asString() const {
     return "interior-pointer";
   case OperandOwnership::GuaranteedForwarding:
     return "guaranteed-forwarding";
+  case OperandOwnership::GuaranteedForwardingPhi:
+    return "guaranteed-forwarding-phi";
   case OperandOwnership::EndBorrow:
     return "end-borrow";
   case OperandOwnership::Reborrow:
