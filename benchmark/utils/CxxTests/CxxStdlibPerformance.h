@@ -14,10 +14,13 @@ inline VectorOfU32 makeVector32(size_t size) {
     return result;
 }
 
-inline uint32_t testVector32Sum(VectorOfU32 &vector) {
+inline uint32_t testVector32Sum(size_t vectorSize, size_t iters) {
+    auto vector = makeVector32(vectorSize);
     auto sum = uint32_t(0);
-    for (auto i : vector) {
-        sum += i;
+    for (size_t i = 0; i < iters; ++i) {
+        for (auto x : vector) {
+            sum += x;
+        }
     }
     return sum;
 }
