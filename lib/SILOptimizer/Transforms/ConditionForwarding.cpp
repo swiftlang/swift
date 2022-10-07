@@ -202,6 +202,14 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     if (!EI)
       return false;
 
+    if (getFunction()->hasOwnership() && EI->hasOperand()) {
+      auto some = EI->getOperand();
+      if (some->getOwnershipKind() == OwnershipKind::Guaranteed &&
+          isa<SILFunctionArgument>(some)) {
+        return false;
+      }
+    }
+
     if (CommonBranchBlock && PredPred != CommonBranchBlock)
       return false;
     CommonBranchBlock = PredPred;
