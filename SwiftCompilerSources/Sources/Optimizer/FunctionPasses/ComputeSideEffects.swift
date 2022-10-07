@@ -376,7 +376,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
   mutating func hasUnknownUses(argument: FunctionArgument) -> Bool {
     if argument.type.isAddress {
       return walkDownUses(ofAddress: argument, path: UnusedWalkingPath()) == .abortWalk
-    } else if argument.type.isTrivial(in: argument.function) {
+    } else if argument.hasTrivialType {
       return false
     } else {
       return walkDownUses(ofValue: argument, path: UnusedWalkingPath()) == .abortWalk
@@ -415,14 +415,14 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     switch inst {
     case let copy as CopyAddrInst:
       if address == copy.sourceOperand &&
-          !address.value.type.isTrivial(in: inst.function) &&
+          !address.value.hasTrivialType &&
           (!function.hasOwnership || copy.isTakeOfSrc) {
         foundTakingLoad = true
       }
       return .continueWalk
  
     case let load as LoadInst:
-      if !address.value.type.isTrivial(in: function) &&
+      if !address.value.hasTrivialType &&
           // In non-ossa SIL we don't know if a load is taking.
           (!function.hasOwnership || load.ownership == .take) {
         foundTakingLoad = true
@@ -430,7 +430,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     case is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
-      if !function.hasOwnership && !address.value.type.isTrivial(in: function) {
+      if !function.hasOwnership && !address.value.hasTrivialType {
         foundTakingLoad = true
       }
       return .continueWalk

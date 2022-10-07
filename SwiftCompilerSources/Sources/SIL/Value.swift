@@ -27,6 +27,12 @@ public protocol Value : AnyObject, CustomStringConvertible {
   ///
   /// It's not legal to get the definingBlock of an `Undef` value.
   var definingBlock: BasicBlock { get }
+
+  /// True if the value has a trivial type.
+  var hasTrivialType: Bool { get }
+
+  /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
+  var hasTrivialNonPointerType: Bool { get }
 }
 
 public enum Ownership {
@@ -92,6 +98,12 @@ extension Value {
   public var function: Function { definingBlock.function }
 
   public var type: Type { SILValue_getType(bridged).type }
+
+  /// True if the value has a trivial type.
+  public var hasTrivialType: Bool { type.isTrivial(in: function) }
+
+  /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
+  public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: function) }
 
   public var ownership: Ownership { SILValue_getOwnership(bridged).ownership }
 
@@ -165,9 +177,18 @@ extension BridgedValue {
 
 final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
+
   public var definingBlock: BasicBlock {
     fatalError("undef has no defining block")
   }
+
+  /// Undef has not parent function, therefore the default `hasTrivialType` does not work.
+  /// Return the conservative default in this case.
+  public var hasTrivialType: Bool { false }
+
+  /// Undef has not parent function, therefore the default `hasTrivialNonPointerType` does not work.
+  /// Return the conservative default in this case.
+  public var hasTrivialNonPointerType: Bool { false }
 }
 
 final class PlaceholderValue : Value {

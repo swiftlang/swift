@@ -35,8 +35,8 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
 
   for arg in function.arguments {
     // We are not interested in arguments with trivial types.
-    if !arg.type.isNonTrivialOrContainsRawPointer(in: function) { continue }
-
+    if arg.hasTrivialNonPointerType { continue }
+    
     // Also, we don't want to override defined effects.
     if argsWithDefinedEffects.contains(arg.index) { continue }
 

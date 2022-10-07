@@ -149,7 +149,7 @@ private struct FindAllocationOfRelease : ValueUseDefWalker {
     //
     var nonTrivialOperandFound = false
     for operand in def.operands {
-      if !operand.value.type.isTrivial(in: def.function) {
+      if !operand.value.hasTrivialType {
         if nonTrivialOperandFound {
           return .abortWalk
         }

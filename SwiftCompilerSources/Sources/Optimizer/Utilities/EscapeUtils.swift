@@ -197,12 +197,11 @@ extension EscapeVisitor {
   }
 
   func hasRelevantType(_ value: Value, at path: SmallProjectionPath, analyzeAddresses: Bool) -> Bool {
-    let type = value.type
-    if type.isNonTrivialOrContainsRawPointer(in: value.function) { return true }
+    if !value.hasTrivialNonPointerType { return true }
     
     // For selected addresses we also need to consider trivial types (`value`
     // is a selected address if the path does not contain any class projections).
-    if analyzeAddresses && type.isAddress && !path.hasClassProjection { return true }
+    if analyzeAddresses && value.type.isAddress && !path.hasClassProjection { return true }
     return false
   }
 }
@@ -542,7 +541,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       let svi = instruction as! SingleValueInstruction
       
       // Even when analyzing addresses, a loaded trivial value can be ignored.
-      if !svi.type.isNonTrivialOrContainsRawPointer(in: svi.function) { return .continueWalk }
+      if svi.hasTrivialNonPointerType { return .continueWalk }
       return walkDownUses(ofValue: svi, path: path.with(knownType: nil))
     case let atp as AddressToPointerInst:
       return walkDownUses(ofValue: atp, path: path.with(knownType: nil))

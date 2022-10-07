@@ -23,12 +23,13 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return SILType_isTrivial(bridged, function.bridged) != 0
   }
 
-  public func isReferenceCounted(in function: Function) -> Bool {
-    return SILType_isReferenceCounted(bridged, function.bridged) != 0
+  /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
+  public func isTrivialNonPointer(in function: Function) -> Bool {
+    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) == 0
   }
 
-  public func isNonTrivialOrContainsRawPointer(in function: Function) -> Bool {
-    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) != 0
+  public func isReferenceCounted(in function: Function) -> Bool {
+    return SILType_isReferenceCounted(bridged, function.bridged) != 0
   }
 
   public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
