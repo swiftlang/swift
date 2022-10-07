@@ -549,7 +549,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case let ia as IndexAddrInst:
       assert(operand.index == 0)
       return walkDownUses(ofAddress: ia, path: path.with(knownType: nil))
-    case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst:
+    case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
+         is DebugValueInst:
       return .continueWalk
     default:
       return isEscaping
