@@ -1751,10 +1751,6 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
-  RValue emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
-                         ArgumentSource &&self, PreparedArguments &&args,
-                         SGFContext C);
-
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,

@@ -684,8 +684,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
-  if (Args.hasArg(OPT_enable_experimental_layout_prespecialization))
-    Opts.Features.insert(Feature::LayoutPrespecialization);
   
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);

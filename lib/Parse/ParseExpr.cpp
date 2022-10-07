@@ -432,7 +432,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
    return sub;
   }
 
-  if (Tok.isContextualKeyword("_move")) {
+  if (Context.LangOpts.hasFeature(Feature::MoveOnly)
+      && Tok.isContextualKeyword("_move")) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -1713,11 +1714,13 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
                 /*UnexpectedNodes=*/None,
-                /*Identifier=*/SyntaxContext->popToken(), *SyntaxContext);
+                /*Identifier=*/SyntaxContext->popToken(),
+                /*UnexpectedNodes=*/None, *SyntaxContext);
         ParsedExprSyntax ExprNode =
             ParsedSyntaxRecorder::makeUnresolvedPatternExpr(
                 /*UnexpectedNodes=*/None,
-                /*Pattern=*/std::move(PatternNode), *SyntaxContext);
+                /*Pattern=*/std::move(PatternNode),
+                /*UnexpectedNodes=*/None, *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));

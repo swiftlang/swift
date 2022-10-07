@@ -25,6 +25,9 @@
 #include <malloc.h>
 #endif
 
+// FIXME: Use always_inline, artificial.
+#define SWIFT_INLINE_THUNK inline
+
 namespace swift {
 namespace _impl {
 

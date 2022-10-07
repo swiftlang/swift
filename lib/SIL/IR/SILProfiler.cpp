@@ -40,14 +40,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
                << "Skipping ASTNode: invalid start/end locations\n");
     return false;
   }
-  if (!Constant) {
-    // We should only ever have a null SILDeclRef for top-level code, which is
-    // always user-written, and should always be profiled.
-    // FIXME: Once top-level code is unified under a single SILProfiler, this
-    // case can be eliminated.
-    assert(isa<TopLevelCodeDecl>(N.get<Decl *>()));
-    return true;
-  }
 
   // Do not profile AST nodes in unavailable contexts.
   auto *DC = Constant.getInnermostDeclContext();
@@ -282,13 +274,15 @@ struct MapRegionCounters : public ASTWalker {
   }
 };
 
+struct CounterExprStorage;
+using CounterAllocator = llvm::SpecificBumpPtrAllocator<CounterExprStorage>;
+
 /// A node in an expression tree of counters.
 class CounterExpr {
-  enum class Kind { Node, Add, Sub, Zero, Ref };
+  enum class Kind { Node, Add, Sub, Zero };
   Kind K;
   ASTNode Node;
-  const CounterExpr *LHS;
-  const CounterExpr *RHS;
+  const CounterExprStorage *Storage = nullptr;
 
   CounterExpr(Kind K) : K(K) {
     assert((K == Kind::Zero) && "only valid for Zero");
@@ -298,43 +292,32 @@ class CounterExpr {
     assert(K == Kind::Node && "only valid for Node");
   }
 
-  CounterExpr(Kind K, const CounterExpr &LHS) : K(K), LHS(&LHS) {
-    assert((K == Kind::Ref) && "only valid for Ref");
-  }
-
-  CounterExpr(Kind K, const CounterExpr &LHS, const CounterExpr &RHS)
-      : K(K), LHS(&LHS), RHS(&RHS) {
+  CounterExpr(Kind K, const CounterExprStorage *Storage)
+      : K(K), Storage(Storage) {
     assert((K == Kind::Add || K == Kind::Sub) && "only valid for operators");
   }
 
 public:
-  // Move only.
-  CounterExpr(const CounterExpr &) = delete;
-  void operator=(const CounterExpr &) = delete;
-  CounterExpr(CounterExpr &&Other) = default;
-  CounterExpr &operator=(CounterExpr &&RHS) = default;
-
   static CounterExpr Leaf(ASTNode Node) {
     return CounterExpr(Kind::Node, Node);
   }
-  static CounterExpr Add(const CounterExpr &LHS, const CounterExpr &RHS) {
-    return CounterExpr(Kind::Add, LHS, RHS);
-  }
-  static CounterExpr Sub(const CounterExpr &LHS, const CounterExpr &RHS) {
-    return CounterExpr(Kind::Sub, LHS, RHS);
-  }
-  static CounterExpr Zero() { return CounterExpr(Kind::Zero); }
-  static CounterExpr Ref(const CounterExpr &LHS) {
-    return CounterExpr(Kind::Ref, LHS);
+  static CounterExpr Zero() {
+    return CounterExpr(Kind::Zero);
   }
 
-  /// Return the referenced node, or null if this is not a Ref type.
-  const CounterExpr *getReferencedNode() const {
-    return K == Kind::Ref ? LHS : nullptr;
-  }
+  static CounterExpr Add(CounterExpr LHS, CounterExpr RHS,
+                         CounterAllocator &Alloc);
+  static CounterExpr Sub(CounterExpr LHS, CounterExpr RHS,
+                         CounterAllocator &Alloc);
 
   /// Returns true if this is a Zero node.
   bool isZero() const { return K == Kind::Zero; }
+
+  /// For an addition or subtraction counter, retrieves the LHS counter.
+  const CounterExpr &getLHS() const;
+
+  /// For an addition or subtraction counter, retrieves the RHS counter.
+  const CounterExpr &getRHS() const;
 
   /// Returns true if the counter is semantically a Zero node. This considers
   /// the simplified version of the counter that has eliminated redundant
@@ -370,13 +353,11 @@ public:
     case Kind::Node:
       return llvm::coverage::Counter::getCounter(GetCounterIdx(Node));
     case Kind::Add:
-      return Builder.add(LHS->expand(Builder, GetCounterIdx),
-                         RHS->expand(Builder, GetCounterIdx));
+      return Builder.add(getLHS().expand(Builder, GetCounterIdx),
+                         getRHS().expand(Builder, GetCounterIdx));
     case Kind::Sub:
-      return Builder.subtract(LHS->expand(Builder, GetCounterIdx),
-                              RHS->expand(Builder, GetCounterIdx));
-    case Kind::Ref:
-      return LHS->expand(Builder, GetCounterIdx);
+      return Builder.subtract(getLHS().expand(Builder, GetCounterIdx),
+                              getRHS().expand(Builder, GetCounterIdx));
     }
 
     llvm_unreachable("Unhandled Kind in switch.");
@@ -406,14 +387,9 @@ public:
       return;
     case Kind::Add:
     case Kind::Sub:
-      LHS->print(OS);
+      getLHS().print(OS);
       OS << ' ' << ((K == Kind::Add) ? '+' : '-') << ' ';
-      RHS->print(OS);
-      return;
-    case Kind::Ref:
-      OS << "ref(";
-      LHS->print(OS);
-      OS << ")";
+      getRHS().print(OS);
       return;
     }
     llvm_unreachable("Unhandled Kind in switch.");
@@ -424,11 +400,43 @@ public:
 #endif
 };
 
+struct CounterExprStorage {
+  CounterExpr LHS;
+  CounterExpr RHS;
+};
+
+inline CounterExpr CounterExpr::Add(CounterExpr LHS, CounterExpr RHS,
+                                    CounterAllocator &Alloc) {
+  auto *Storage = Alloc.Allocate();
+  Storage->LHS = LHS;
+  Storage->RHS = RHS;
+  return CounterExpr(Kind::Add, Storage);
+}
+inline CounterExpr CounterExpr::Sub(CounterExpr LHS, CounterExpr RHS,
+                                    CounterAllocator &Alloc) {
+  auto *Storage = Alloc.Allocate();
+  Storage->LHS = LHS;
+  Storage->RHS = RHS;
+  return CounterExpr(Kind::Sub, Storage);
+}
+
+inline const CounterExpr &CounterExpr::getLHS() const {
+  assert(Storage && "Counter does not have an LHS");
+  return Storage->LHS;
+}
+
+inline const CounterExpr &CounterExpr::getRHS() const {
+  assert(Storage && "Counter does not have an RHS");
+  return Storage->RHS;
+}
+
 /// A region of source code that can be mapped to a counter.
 class SourceMappingRegion {
   ASTNode Node;
 
-  CounterExpr *Count;
+  /// The counter for an incomplete region. Note we do not store counters
+  /// for nodes, as we need to be able to fix them up after popping the regions.
+  Optional<CounterExpr> Counter;
 
   /// The region's starting location.
   Optional<SourceLoc> StartLoc;
@@ -437,9 +445,10 @@ class SourceMappingRegion {
   Optional<SourceLoc> EndLoc;
 
 public:
-  SourceMappingRegion(ASTNode Node, CounterExpr &Count,
+  SourceMappingRegion(ASTNode Node, Optional<CounterExpr> Counter,
                       Optional<SourceLoc> StartLoc, Optional<SourceLoc> EndLoc)
-      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {
+      : Node(Node), Counter(std::move(Counter)), StartLoc(StartLoc),
+        EndLoc(EndLoc) {
     assert((!StartLoc || StartLoc->isValid()) &&
            "Expected start location to be valid");
     assert((!EndLoc || EndLoc->isValid()) &&
@@ -451,7 +460,15 @@ public:
 
   ASTNode getNode() const { return Node; }
 
-  CounterExpr &getCounter() const { return *Count; }
+  CounterExpr
+  getCounter(const llvm::DenseMap<ASTNode, CounterExpr> &NodeCounters) const {
+    if (Counter)
+      return *Counter;
+
+    auto Iter = NodeCounters.find(Node);
+    assert(Iter != NodeCounters.end() && "Must have counter for node");
+    return Iter->second;
+  }
 
   bool hasStartLoc() const { return StartLoc.hasValue(); }
 
@@ -696,11 +713,11 @@ private:
   /// The SIL function being profiled.
   SILDeclRef Constant;
 
-  /// Storage for counter expressions.
-  std::forward_list<CounterExpr> Exprs;
+  /// Allocator for counter expressions.
+  CounterAllocator CounterAlloc;
 
   /// The map of statements to counter expressions.
-  llvm::DenseMap<ASTNode, CounterExpr *> CounterMap;
+  llvm::DenseMap<ASTNode, CounterExpr> CounterMap;
 
   /// The source mapping regions for this function.
   std::vector<SourceMappingRegion> SourceRegions;
@@ -714,7 +731,7 @@ private:
   /// A stack of active do-catch statements.
   std::vector<DoCatchStmt *> DoCatchStack;
 
-  CounterExpr *ExitCounter = nullptr;
+  Optional<CounterExpr> ExitCounter;
 
   Stmt *ImplicitTopLevelBody = nullptr;
 
@@ -724,56 +741,53 @@ private:
   /// Return the region counter for \c Node.
   ///
   /// This should only be called on statements that have a dedicated counter.
-  CounterExpr &getCounter(ASTNode Node) {
-    assert(CounterMap.count(Node) && "No counter found");
-    return *CounterMap[Node];
-  }
-
-  /// Create a counter expression.
-  CounterExpr &createCounter(CounterExpr &&Expr) {
-    Exprs.push_front(std::move(Expr));
-    return Exprs.front();
+  CounterExpr getCounter(ASTNode Node) {
+    auto Iter = CounterMap.find(Node);
+    assert(Iter != CounterMap.end() && "No counter found");
+    return Iter->second;
   }
 
   /// Create a counter expression for \c Node and add it to the map.
-  CounterExpr &assignCounter(ASTNode Node, CounterExpr &&Expr) {
+  void assignCounter(ASTNode Node, CounterExpr Expr) {
     assert(Node && "Assigning counter expression to non-existent AST node");
-    CounterExpr &Result = createCounter(std::move(Expr));
-    CounterMap[Node] = &Result;
-    return Result;
+    auto Res = CounterMap.insert({Node, Expr});
+
+    // Overwrite an existing assignment.
+    if (!Res.second)
+      Res.first->second = std::move(Expr);
   }
 
   /// Create a counter expression referencing \c Node's own counter.
-  CounterExpr &assignCounter(ASTNode Node) {
-    return assignCounter(Node, CounterExpr::Leaf(Node));
+  CounterExpr assignCounter(ASTNode Node) {
+    auto Counter = CounterExpr::Leaf(Node);
+    assignCounter(Node, Counter);
+    return Counter;
   }
 
   /// Add \c Expr to \c Node's counter.
-  void addToCounter(ASTNode Node, CounterExpr &Expr) {
-    CounterExpr &Counter = getCounter(Node);
-    if (const CounterExpr *ReferencedCounter = Counter.getReferencedNode())
-      Counter = CounterExpr::Add(*ReferencedCounter, Expr);
-    else if (Counter.isZero())
-      Counter = CounterExpr::Ref(Expr);
-    else
-      Counter = CounterExpr::Add(createCounter(std::move(Counter)), Expr);
+  void addToCounter(ASTNode Node, CounterExpr Expr) {
+    auto Counter = getCounter(Node);
+    if (Counter.isZero()) {
+      Counter = std::move(Expr);
+    } else {
+      Counter = CounterExpr::Add(Counter, std::move(Expr), CounterAlloc);
+    }
+    assignCounter(Node, Counter);
   }
 
   /// Subtract \c Expr from \c Node's counter.
-  void subtractFromCounter(ASTNode Node, CounterExpr &Expr) {
-    CounterExpr &Counter = getCounter(Node);
+  void subtractFromCounter(ASTNode Node, CounterExpr Expr) {
+    auto Counter = getCounter(Node);
     assert(!Counter.isZero() && "Cannot create a negative counter");
-    if (const CounterExpr *ReferencedCounter = Counter.getReferencedNode())
-      Counter = CounterExpr::Sub(*ReferencedCounter, Expr);
-    else
-      Counter = CounterExpr::Sub(createCounter(std::move(Counter)), Expr);
+    assignCounter(Node,
+                  CounterExpr::Sub(Counter, std::move(Expr), CounterAlloc));
   }
 
   /// Return the current region's counter.
-  CounterExpr &getCurrentCounter() { return getRegion().getCounter(); }
+  CounterExpr getCurrentCounter() { return getRegion().getCounter(CounterMap); }
 
   /// Get the counter from the end of the most recent scope.
-  CounterExpr &getExitCounter() {
+  CounterExpr getExitCounter() {
     assert(ExitCounter && "no exit counter available");
     return *ExitCounter;
   }
@@ -782,19 +796,19 @@ private:
   ///
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
-  CounterExpr *setExitCount(ASTNode Node) {
-    ExitCounter = &getCurrentCounter();
-    if (hasCounter(Node) && ExitCounter != &getCounter(Node))
-      return &createCounter(CounterExpr::Sub(getCounter(Node), *ExitCounter));
-    return nullptr;
+  Optional<CounterExpr> setExitCount(ASTNode Node) {
+    ExitCounter = getCurrentCounter();
+    if (hasCounter(Node) && getRegion().getNode() != Node)
+      return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterAlloc);
+    return None;
   }
 
   /// Adjust the count for control flow when exiting a scope.
-  void adjustForNonLocalExits(ASTNode Scope, CounterExpr *ControlFlowAdjust) {
+  void adjustForNonLocalExits(ASTNode Scope, Optional<CounterExpr> ControlFlowAdjust) {
     if (Parent.getAsDecl())
       return;
 
-    CounterExpr *JumpsToLabel = nullptr;
+    Optional<CounterExpr> JumpsToLabel;
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
       if (isa<DoCatchStmt>(ParentStmt))
@@ -803,26 +817,28 @@ private:
       if (caseStmt && caseStmt->getParentKind() == CaseParentKind::DoCatch)
         return;
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
-        JumpsToLabel = &getCounter(LS);
+        JumpsToLabel = getCounter(LS);
     }
 
     if (!ControlFlowAdjust && !JumpsToLabel)
       return;
 
-    CounterExpr *Count = &getCurrentCounter();
+    auto Count = getCurrentCounter();
     // Add the counts from jumps directly to the label (such as breaks)
     if (JumpsToLabel)
-      Count = &createCounter(CounterExpr::Add(*Count, *JumpsToLabel));
+      Count = CounterExpr::Add(Count, *JumpsToLabel, CounterAlloc);
     // Now apply any adjustments for control flow.
     if (ControlFlowAdjust)
-      Count = &createCounter(CounterExpr::Sub(*Count, *ControlFlowAdjust));
+      Count = CounterExpr::Sub(Count, *ControlFlowAdjust, CounterAlloc);
 
     replaceCount(Count, getEndLoc(Scope));
   }
 
   /// Push a region covering \c Node onto the stack.
   void pushRegion(ASTNode Node) {
-    RegionStack.emplace_back(Node, getCounter(Node), Node.getStartLoc(),
+    // Note we don't store counters for nodes, as we need to be able to fix
+    // them up later.
+    RegionStack.emplace_back(Node, /*Counter*/ None, Node.getStartLoc(),
                              getEndLoc(Node));
     LLVM_DEBUG({
       llvm::dbgs() << "Pushed region: ";
@@ -834,21 +850,14 @@ private:
   /// Replace the current region at \p Start with a new counter. If \p Start is
   /// \c None, or the counter is semantically zero, an 'incomplete' region is
   /// formed, which is not recorded unless followed by additional AST nodes.
-  void replaceCount(CounterExpr *Counter, Optional<SourceLoc> Start) {
+  void replaceCount(CounterExpr Counter, Optional<SourceLoc> Start) {
     // If the counter is semantically zero, form an 'incomplete' region with
     // no starting location. This prevents forming unreachable regions unless
     // there is a following statement or expression to extend the region.
-    if (Start && Counter->isSemanticallyZero())
+    if (Start && Counter.isSemanticallyZero())
       Start = None;
 
-    RegionStack.emplace_back(ASTNode(), *Counter, Start, None);
-  }
-
-  /// Replace the current region at \p Start with a new counter. If \p Start is
-  /// \c None, or the counter is semantically zero, an 'incomplete' region is
-  /// formed, which is not recorded unless followed by additional AST nodes.
-  void replaceCount(CounterExpr &&Expr, Optional<SourceLoc> Start) {
-    replaceCount(&createCounter(std::move(Expr)), Start);
+    RegionStack.emplace_back(ASTNode(), Counter, Start, None);
   }
 
   /// Get the location for the end of the last token in \c Node.
@@ -946,8 +955,9 @@ public:
       auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
       assert(Start.first <= End.first && "region start and end out of order");
 
+      auto Counter = Region.getCounter(CounterMap);
       Regions.emplace_back(Start.first, Start.second, End.first, End.second,
-                           Region.getCounter().expand(Builder, CounterIndices));
+                           Counter.expand(Builder, CounterIndices));
     }
     return SILCoverageMap::create(M, Filename, Name, PGOFuncName, Hash, Regions,
                                   Builder.getExpressions());
@@ -987,7 +997,7 @@ public:
 
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
       if (auto *Cond = getConditionNode(IS->getCond()))
-        assignCounter(Cond, CounterExpr::Ref(getCurrentCounter()));
+        assignCounter(Cond, getCurrentCounter());
 
       // The counter for the if statement itself tracks the number of jumps to
       // it by break statements.
@@ -995,10 +1005,12 @@ public:
 
       // We emit a counter for the then block, and define the else block in
       // terms of it.
-      CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
-      if (IS->getElseStmt())
-        assignCounter(IS->getElseStmt(),
-                      CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      auto ThenCounter = assignCounter(IS->getThenStmt());
+      if (IS->getElseStmt()) {
+        auto ElseCounter =
+            CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterAlloc);
+        assignCounter(IS->getElseStmt(), ElseCounter);
+      }
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
       assignCounter(GS->getBody());
@@ -1009,7 +1021,7 @@ public:
       assignCounter(WS, CounterExpr::Zero());
 
       if (auto *E = getConditionNode(WS->getCond()))
-        assignCounter(E, CounterExpr::Ref(getCurrentCounter()));
+        assignCounter(E, getCurrentCounter());
       assignCounter(WS->getBody());
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
@@ -1017,8 +1029,8 @@ public:
       // to it by break and continue statements.
       assignCounter(RWS, CounterExpr::Zero());
 
-      CounterExpr &BodyCounter = assignCounter(RWS->getBody());
-      assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
+      auto BodyCounter = assignCounter(RWS->getBody());
+      assignCounter(RWS->getCond(), BodyCounter);
       RepeatWhileStack.push_back(RWS);
 
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
@@ -1033,8 +1045,7 @@ public:
       // cases.
       assignCounter(SS, CounterExpr::Zero());
 
-      assignCounter(SS->getSubjectExpr(),
-                    CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(SS->getSubjectExpr(), getCurrentCounter());
 
       // Assign counters for cases so they're available for fallthrough.
       for (CaseStmt *Case : SS->getCases())
@@ -1048,18 +1059,18 @@ public:
       // to it by break statements.
       assignCounter(DS, CounterExpr::Zero());
 
-      assignCounter(DS->getBody(), CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(DS->getBody(), getCurrentCounter());
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       // The do-catch body is visited the same number of times as its parent.
-      assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(DCS->getBody(), getCurrentCounter());
 
       for (CaseStmt *Catch : DCS->getCatches())
         assignCounter(Catch->getBody());
 
       // Initialize the exit count of the do-catch to the entry count, then
       // subtract off non-local exits as they are visited.
-      assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
+      assignCounter(DCS, getCurrentCounter());
       DoCatchStack.push_back(DCS);
     }
     return Action::Continue(S);
@@ -1071,7 +1082,7 @@ public:
 
     if (isa<BraceStmt>(S)) {
       if (hasCounter(S)) {
-        CounterExpr *Adjust = setExitCount(S);
+        auto Adjust = setExitCount(S);
         popRegions(S);
         adjustForNonLocalExits(S, Adjust);
       }
@@ -1117,7 +1128,7 @@ public:
       terminateRegion(S);
 
     } else if (isa<SwitchStmt>(S)) {
-      replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
+      replaceCount(getCounter(S), getEndLoc(S));
 
     } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
       if (caseStmt->getParentKind() == CaseParentKind::Switch) {
@@ -1129,7 +1140,7 @@ public:
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
       DoCatchStack.pop_back();
-      replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
+      replaceCount(getCounter(S), getEndLoc(S));
 
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
       // When we return, adjust loop condition counts and do-catch exit counts
@@ -1184,9 +1195,10 @@ public:
     assert(!RegionStack.empty() && "Must be within a region");
 
     if (auto *IE = dyn_cast<TernaryExpr>(E)) {
-      CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
-      assignCounter(IE->getElseExpr(),
-                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      auto ThenCounter = assignCounter(IE->getThenExpr());
+      auto ElseCounter =
+          CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterAlloc);
+      assignCounter(IE->getElseExpr(), ElseCounter);
     }
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
     if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {

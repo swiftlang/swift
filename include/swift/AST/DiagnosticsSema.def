@@ -6628,7 +6628,7 @@ ERROR(no_metadata_on_non_generic_param, none,
 ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental layout based"
       " pre-specializations are disabled! Pass the frontend flag"
-      " -enable-experimental-layout-prespecialization to swift to enable "
+      " -enable-experimental-feature LayoutPrespecialization to swift to enable "
       " the usage of this language feature", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

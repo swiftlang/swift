@@ -4043,10 +4043,10 @@ generateForEachStmtConstraints(
   // `.next()`. `next()` is called on each iteration of the loop.
   {
     auto *nextRef = UnresolvedDotExpr::createImplicit(
-      ctx,
-      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(),
-                            /*Implicit=*/true),
-      ctx.Id_next, /*labels=*/ArrayRef<Identifier>());
+        ctx,
+        new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
+                              /*Implicit=*/true),
+        ctx.Id_next, /*labels=*/ArrayRef<Identifier>());
     nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     Expr *nextCall = CallExpr::createImplicitEmpty(ctx, nextRef);
@@ -4382,17 +4382,13 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
-      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
+      auto target = SolutionApplicationTarget(condExpr, dc, CTP_Condition,
+                                              boolTy, /*isDiscarded=*/false);
 
-      condExpr = generateConstraints(condExpr, dc);
-      if (!condExpr) {
+      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
-      }
 
-      addConstraint(
-          ConstraintKind::Conversion, getType(condExpr), boolTy,
-          getConstraintLocator(condExpr,
-                               LocatorPathElt::ContextualType(CTP_Condition)));
+      setSolutionApplicationTarget(&condElement, target);
       continue;
     }
 

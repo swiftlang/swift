@@ -83,11 +83,6 @@ bool swift::hasPointerEscape(BorrowedValue value) {
   return false;
 }
 
-bool swift::isValueAddressOrTrivial(SILValue v) {
-  return v->getType().isAddress() ||
-         v->getOwnershipKind() == OwnershipKind::None;
-}
-
 bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.

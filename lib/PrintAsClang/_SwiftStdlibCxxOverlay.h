@@ -14,6 +14,26 @@
 #error "no C++"
 #endif
 
+#ifdef SWIFT_CXX_INTEROP_OPTIONAL_MIXIN
+
+/// True when the Optional has a value.
+SWIFT_INLINE_THUNK operator bool() const noexcept { return *this != none; }
+
+/// Returns the value stored in the Optional.
+///
+/// The returned value is copied using the appropriate Swift / C++ copy
+/// semantics.
+SWIFT_INLINE_THUNK T_0_0 get() const
+    noexcept(noexcept(getUnsafelyUnwrapped())) {
+  // FIXME: Fail with source location.
+  return getUnsafelyUnwrapped();
+}
+
+#undef SWIFT_CXX_INTEROP_OPTIONAL_MIXIN
+
+#else
+// out-of-class overlay for Swift standard library.
+
 static_assert(sizeof(_impl::_impl_String) >= 0,
               "included outside of stdlib bindings");
 
@@ -70,3 +90,5 @@ template <class T>
 inline cxxOverlay::IterationEndSentinel end(const Array<T> &) {
   return {};
 }
+
+#endif
