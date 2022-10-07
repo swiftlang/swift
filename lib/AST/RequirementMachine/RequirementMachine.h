@@ -160,7 +160,13 @@ public:
   ConformancePath getConformancePath(Type type, ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
+private:
+  MutableTerm getReducedShapeTerm(Type type) const;
+
+public:
   Type getReducedShape(Type type) const;
+
+  bool haveSameShape(Type type1, Type type2) const;
 
   llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
   computeMinimalProtocolRequirements();

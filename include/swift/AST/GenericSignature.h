@@ -426,6 +426,10 @@ public:
   /// whose root generic parameter is a pack.
   Type getReducedShape(Type type) const;
 
+  /// Returns \c true if the given type parameter packs are in
+  /// the same shape equivalence class.
+  bool haveSameShape(Type type1, Type type2) const;
+
   /// Get the ordinal of a generic parameter in this generic signature.
   ///
   /// For example, if you have a generic signature for a nested context like:

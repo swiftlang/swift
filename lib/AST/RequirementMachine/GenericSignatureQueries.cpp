@@ -696,9 +696,9 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   return nullptr;
 }
 
-Type RequirementMachine::getReducedShape(Type type) const {
-  if (!type->isTypeSequenceParameter())
-    return Type();
+MutableTerm
+RequirementMachine::getReducedShapeTerm(Type type) const {
+  assert(type->isTypeSequenceParameter());
 
   auto rootType = type->getRootGenericParam();
   auto term = Context.getMutableTermForType(rootType->getCanonicalType(),
@@ -714,7 +714,22 @@ Type RequirementMachine::getReducedShape(Type type) const {
   assert(term.back().getKind() == Symbol::Kind::Shape);
   MutableTerm reducedTerm(term.begin(), term.end() - 1);
 
-  return Map.getTypeForTerm(reducedTerm, getGenericParams());
+  return reducedTerm;
+}
+
+Type RequirementMachine::getReducedShape(Type type) const {
+  if (!type->isTypeSequenceParameter())
+    return Type();
+
+  return Map.getTypeForTerm(getReducedShapeTerm(type),
+                            getGenericParams());
+}
+
+bool RequirementMachine::haveSameShape(Type type1, Type type2) const {
+  auto term1 = getReducedShapeTerm(type1);
+  auto term2 = getReducedShapeTerm(type2);
+
+  return term1 == term2;
 }
 
 void RequirementMachine::verify(const MutableTerm &term) const {

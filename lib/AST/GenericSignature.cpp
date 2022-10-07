@@ -539,6 +539,11 @@ GenericSignatureImpl::getReducedShape(Type type) const {
   return getRequirementMachine()->getReducedShape(type);
 }
 
+bool
+GenericSignatureImpl::haveSameShape(Type type1, Type type2) const {
+  return getRequirementMachine()->haveSameShape(type1, type2);
+}
+
 unsigned GenericParamKey::findIndexIn(
                       TypeArrayView<GenericTypeParamType> genericParams) const {
   // For depth 0, we have random access. We perform the extra checking so that
