@@ -23,6 +23,10 @@ check('a'+1,
 // CHECK: >11< String
        "1"+'€',
 // CHECK: >1€< String
+       '1'+'1' as String,
+// CHECK: >11< String
+       '1'+'1' as Int,
+// CHECK: >98< Int
        Int("0123") as Any,
 // CHECK: >Optional(123)< Optional<Int>
        Int('3'),

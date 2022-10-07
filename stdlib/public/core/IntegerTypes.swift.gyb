@@ -1696,12 +1696,15 @@ extension ${Self}: _HasCustomAnyHashableRepresentation {
   }
 }
 
+/// Expressibility of all integer types using
+/// a single quoted string literal that has a
+/// single 7 bit ASCII codepoint.
 extension ${Self} :
      _ExpressibleByBuiltinUnicodeScalarLiteral,
      ExpressibleByASCIILiteral {
    @_transparent
    public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-     self = ${Self}(truncatingIfNeeded: UInt32(value))
+     self = ${Self}(UInt32(value))
    }
    @_transparent
    public init(unicodeScalarLiteral value: ${Self}) {

@@ -394,6 +394,20 @@ public protocol ExpressibleByBooleanLiteral {
   init(booleanLiteral value: BooleanLiteralType)
 }
 
+/// Two new marker protocols used in the implementation of single
+/// quoted "Character" literal syntax. They are used to be able to
+/// have a distinct default type and conformances specific to certain
+/// character literal sub-types (e.g ASCii to integer expressability).
+///
+/// These have @_marker attribute in the hope that adding them
+/// will not alter the witness table layout and hence the ABI of the
+/// pre-existing "ExpressableBy" protocols for double quoted literals.
+@_marker public protocol ExpressibleByASCIILiteral {
+}
+
+@_marker public protocol ExpressibleBySingleQuotedLiteral: ExpressibleByASCIILiteral {
+}
+
 public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
@@ -426,12 +440,6 @@ public protocol ExpressibleByUnicodeScalarLiteral: ExpressibleBySingleQuotedLite
   ///
   /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
-}
-
-@_marker public protocol ExpressibleBySingleQuotedLiteral: ExpressibleByASCIILiteral {
-}
-
-@_marker public protocol ExpressibleByASCIILiteral {
 }
 
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
