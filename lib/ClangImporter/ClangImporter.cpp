@@ -4775,9 +4775,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
       StaticSpellingKind::None, // TODO: we should handle static vars.
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, bodyParams, computedType,
-      declContext);
+      /*ThrowsLoc=*/SourceLoc(), bodyParams, computedType, declContext);
   getterDecl->setIsTransparent(true);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeBaseClassFieldGetterBody,
@@ -4809,9 +4807,8 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
       StaticSpellingKind::None, // TODO: we should handle static vars.
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, setterBodyParams,
-      TupleType::getEmpty(ctx), declContext);
+      /*ThrowsLoc=*/SourceLoc(), setterBodyParams, TupleType::getEmpty(ctx),
+      declContext);
   setterDecl->setIsTransparent(true);
   setterDecl->setAccess(AccessLevel::Public);
   setterDecl->setBodySynthesizer(synthesizeBaseClassFieldSetterBody,

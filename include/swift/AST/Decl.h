@@ -7133,32 +7133,24 @@ class AccessorDecl final : public FuncDecl {
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
-               bool hasImplicitSelfDecl, GenericParamList *genericParams,
-               DeclContext *parent)
-    : FuncDecl(DeclKind::Accessor,
-               staticLoc, staticSpelling, /*func loc*/ declLoc,
-               /*name*/ Identifier(), /*name loc*/ declLoc,
-               async, asyncLoc, throws, throwsLoc,
-               hasImplicitSelfDecl, genericParams, parent),
-      AccessorKeywordLoc(accessorKeywordLoc),
-      Storage(storage) {
+               bool hasImplicitSelfDecl, DeclContext *parent)
+      : FuncDecl(DeclKind::Accessor, staticLoc, staticSpelling,
+                 /*func loc*/ declLoc,
+                 /*name*/ Identifier(), /*name loc*/ declLoc, async, asyncLoc,
+                 throws, throwsLoc, hasImplicitSelfDecl,
+                 /*genericParams*/ nullptr, parent),
+        AccessorKeywordLoc(accessorKeywordLoc), Storage(storage) {
     assert(!async || accessorKind == AccessorKind::Get
            && "only get accessors can be async");
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
 
-  static AccessorDecl *createImpl(ASTContext &ctx,
-                                  SourceLoc declLoc,
-                                  SourceLoc accessorKeywordLoc,
-                                  AccessorKind accessorKind,
-                                  AbstractStorageDecl *storage,
-                                  SourceLoc staticLoc,
-                                  StaticSpellingKind staticSpelling,
-                                  bool async, SourceLoc asyncLoc,
-                                  bool throws, SourceLoc throwsLoc,
-                                  GenericParamList *genericParams,
-                                  DeclContext *parent,
-                                  ClangNode clangNode);
+  static AccessorDecl *
+  createImpl(ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
+             AccessorKind accessorKind, AbstractStorageDecl *storage,
+             SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
+             SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+             DeclContext *parent, ClangNode clangNode);
 
   Optional<bool> getCachedIsTransparent() const {
     if (Bits.AccessorDecl.IsTransparentComputed)
@@ -7174,21 +7166,15 @@ public:
                                           AbstractStorageDecl *storage,
                                           StaticSpellingKind staticSpelling,
                                           bool async, bool throws,
-                                          GenericParamList *genericParams,
                                           Type fnRetType, DeclContext *parent);
 
-  static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
-                              SourceLoc accessorKeywordLoc,
-                              AccessorKind accessorKind,
-                              AbstractStorageDecl *storage,
-                              SourceLoc staticLoc,
-                              StaticSpellingKind staticSpelling,
-                              bool async, SourceLoc asyncLoc,
-                              bool throws, SourceLoc throwsLoc,
-                              GenericParamList *genericParams,
-                              ParameterList *parameterList,
-                              Type fnRetType, DeclContext *parent,
-                              ClangNode clangNode = ClangNode());
+  static AccessorDecl *
+  create(ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
+         AccessorKind accessorKind, AbstractStorageDecl *storage,
+         SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
+         SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+         ParameterList *parameterList, Type fnRetType, DeclContext *parent,
+         ClangNode clangNode = ClangNode());
 
   SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }
 

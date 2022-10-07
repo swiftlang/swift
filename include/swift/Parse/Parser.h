@@ -1242,10 +1242,8 @@ public:
                bool HasLetOrVarKeyword = true);
 
   struct ParsedAccessors;
-  ParserStatus parseGetSet(ParseDeclOptions Flags,
-                           GenericParamList *GenericParams,
-                           ParameterList *Indices, TypeRepr *ResultType,
-                           ParsedAccessors &accessors,
+  ParserStatus parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
+                           TypeRepr *ResultType, ParsedAccessors &accessors,
                            AbstractStorageDecl *storage, SourceLoc StaticLoc);
   ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,

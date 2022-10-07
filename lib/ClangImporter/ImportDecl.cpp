@@ -106,15 +106,13 @@ static FuncDecl *createFuncOrAccessor(ClangImporter::Implementation &impl,
                                       ClangNode clangNode) {
   FuncDecl *decl;
   if (accessorInfo) {
-    decl = AccessorDecl::create(impl.SwiftContext, funcLoc,
-                                /*accessorKeywordLoc*/ SourceLoc(),
-                                accessorInfo->Kind, accessorInfo->Storage,
-                                /*StaticLoc*/ SourceLoc(),
-                                StaticSpellingKind::None,
-                                async, /*AsyncLoc=*/SourceLoc(),
-                                throws, /*ThrowsLoc=*/SourceLoc(),
-                                genericParams, bodyParams,
-                                resultTy, dc, clangNode);
+    decl = AccessorDecl::create(
+        impl.SwiftContext, funcLoc,
+        /*accessorKeywordLoc*/ SourceLoc(), accessorInfo->Kind,
+        accessorInfo->Storage,
+        /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None, async,
+        /*AsyncLoc=*/SourceLoc(), throws, /*ThrowsLoc=*/SourceLoc(), bodyParams,
+        resultTy, dc, clangNode);
   } else {
     decl = FuncDecl::createImported(impl.SwiftContext, funcLoc, name, nameLoc,
                                     async, throws, bodyParams, resultTy,
@@ -599,19 +597,15 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   auto *params = ParameterList::createEmpty(C);
 
-  auto getterDecl = AccessorDecl::create(C,
-                     /*FuncLoc=*/SourceLoc(),
-                     /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::Get,
-                     errorDomainPropertyDecl,
-                     /*StaticLoc=*/SourceLoc(),
-                     StaticSpellingKind::None,
-                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                     /*Throws=*/false,
-                     /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr,
-                     params,
-                     stringTy, swiftDecl);
+  auto getterDecl = AccessorDecl::create(
+      C,
+      /*FuncLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), AccessorKind::Get,
+      errorDomainPropertyDecl,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false,
+      /*ThrowsLoc=*/SourceLoc(), params, stringTy, swiftDecl);
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(false);

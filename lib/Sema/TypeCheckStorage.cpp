@@ -617,20 +617,6 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
-/// Create the generic parameters needed for the given accessor, if any.
-static GenericParamList *createAccessorGenericParams(
-                                              AbstractStorageDecl *storage) {
-  // Accessors of generic subscripts get a copy of the subscript's
-  // generic parameter list, because they're not nested inside the
-  // subscript.
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
-    if (auto genericParams = subscript->getGenericParams())
-      return genericParams->clone(subscript->getDeclContext());
-  }
-
-  return nullptr;
-}
-
 static bool doesAccessorHaveBody(AccessorDecl *accessor) {
   // Protocol requirements don't have bodies.
   //
@@ -2044,8 +2030,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
     }
   }
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   // Add an index-forwarding clause.
   auto *getterParams = buildIndexForwardingParamList(storage, {}, ctx);
 
@@ -2054,14 +2038,10 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
     staticLoc = storage->getLoc();
 
   auto getter = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::Get, storage,
+      ctx, loc, /*AccessorKeywordLoc*/ loc, AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams,
-      getterParams,
-      Type(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), getterParams, Type(),
       storage->getDeclContext());
   getter->setSynthesized();
 
@@ -2144,8 +2124,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   bool isMutating = storage->isSetterMutating();
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   // Add a "(value : T, indices...)" argument list.
   auto *param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), loc,
@@ -2157,13 +2135,10 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   auto *params = buildIndexForwardingParamList(storage, param, ctx);
 
   auto setter = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::Set, storage,
+      ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(), AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params,
-      Type(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, Type(),
       storage->getDeclContext());
   setter->setSynthesized();
 
@@ -2238,15 +2213,11 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // Coroutine accessors always return ().
   const Type retTy = TupleType::getEmpty(ctx);
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   auto *accessor = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      kind, storage,
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params, retTy, dc);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, retTy, dc);
   accessor->setSynthesized();
 
   if (isMutating)
