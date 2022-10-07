@@ -1020,6 +1020,12 @@ SwiftInt ApplySite_getNumArguments(BridgedInstruction inst) {
   return as.getNumArguments();
 }
 
+SwiftInt FullApplySite_numIndirectResultArguments(BridgedInstruction inst) {
+  auto fas = FullApplySite(castToInst(inst));
+  return fas.getNumIndirectSILResults();
+
+}
+
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
 //===----------------------------------------------------------------------===//
