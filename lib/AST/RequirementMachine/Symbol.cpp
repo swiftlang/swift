@@ -307,27 +307,13 @@ Symbol Symbol::forGenericParam(GenericTypeParamType *param,
 }
 
 Symbol Symbol::forShape(RewriteContext &ctx) {
-  llvm::FoldingSetNodeID id;
-  id.AddInteger(unsigned(Kind::Shape));
-
-  void *insertPos = nullptr;
-  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+  if (auto *symbol = ctx.TheShapeSymbol)
     return symbol;
 
   unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *symbol = new (mem) Storage(Storage::ForShape());
-
-#ifndef NDEBUG
-  llvm::FoldingSetNodeID newID;
-  symbol->Profile(newID);
-  assert(id == newID);
-#endif
-
-  ctx.Symbols.InsertNode(symbol, insertPos);
-  ctx.SymbolHistogram.add(unsigned(Kind::Shape));
-
-  return symbol;
+  return (ctx.TheShapeSymbol = symbol);
 }
 
 /// Creates a layout symbol, representing a layout constraint.
