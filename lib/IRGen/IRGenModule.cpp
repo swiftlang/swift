@@ -103,6 +103,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getClangCodeGenOpts();
+  if (CGO.OpaquePointers)
+    LLVMContext.setOpaquePointers(true);
+
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
   CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
