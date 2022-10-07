@@ -699,7 +699,7 @@ you replace a native Objective-C `@implementation Foo (Bar)` with a Swift
 
 You create a class with this feature very differently from normal ObjC interop:
 
-1. Hand-write headers that declare the classes' Objective-C interface, just as
+1. Hand-write headers that declare the class's Objective-C interface, just as
    you would for a native Objective-C class. Since you're handwriting these
    headers, you can write them just as you would for an Objective-C class:
    splitting them across multiple files, grouping related declarations together,
@@ -721,28 +721,35 @@ You create a class with this feature very differently from normal ObjC interop:
    * To implement a category in Swift, use
      `@_objcImplementation(CategoryName) extension ClassName`.
      
-   * We should think about Objective-C generics.
-
-4. Every member of an `@_objcImplementation` extension should be either `@objc`
-   or `final`. The `final` members can be made `public` if you want to expose
-   them to Swift clients. The `@objc` members are implicitly `dynamic`.
+The members of an `@_objcImplementation` extension should fall into one of
+three categories:
    
-   * Eventually, we'd like to allow members which are not explicitly marked
-     `@objc`. The compiler will check that they match something declared in the
-     header, and if they do, it will automatically apply appropriate attributes.
-     If not, it will reject them. Members with an explicit `@objc` will not be
-     checked, so you can define helpers that are callable by selector but not in
-     any header.
+* **Swift-only members** include any member marked `final`. These are not
+  `@objc` or `dynamic` and are only callable from Swift. Use these for
+  Swift-only APIs, random helper methods, etc. 
+    
+* **ObjC helper members** include any non-`final` member marked `fileprivate`
+  or `private`. These are implicitly `@objc dynamic`. Use these for action
+  methods, selector-based callbacks, and other situations where you need a
+  helper method to be accessible from an Objective-C message.
   
-   * Eventually, we want the main `@_objcImplementation` extension to be able to
-     declare stored properties that aren't in the interface. We also want
-     `final` stored properties to be allowed to be resilent Swift types, but
-     it's not clear how to achieve that without boxing them in `__SwiftValue`
-     (which we might do as a stopgap).
+* **Member implementations** include any other non-`final` member. These are
+  implicitly `@objc dynamic` and must match a member declared in the
+  Objective-C header. Use these to implement the APIs declared in your
+  headers. Swift will emit an error if these don't match your headers.
+
+Notes:
+
+* We don't currently plan to support ObjC generics.
+
+* Eventually, we want the main `@_objcImplementation` extension to be able to
+  declare stored properties that aren't in the interface. We also want
+  `final` stored properties to be allowed to be resilent Swift types, but
+  it's not clear how to achieve that without boxing them in `__SwiftValue`
+  (which we might do as a stopgap).
      
-   * We should think about ObjC `direct` members.
-      
-   * Access control design for ObjC methods TBD.
+* We should think about ObjC "direct" members, but that would probably
+  require a way to spell this in Swift. 
 
 ## `@_objc_non_lazy_realization`
 

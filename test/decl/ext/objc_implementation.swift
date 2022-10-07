@@ -15,7 +15,7 @@
     // FIXME: Should complain about the wrong category
   }
 
-  @objc func methodNot(fromHeader1: CInt) {
+  @objc fileprivate func methodNot(fromHeader1: CInt) {
     // OK, declares a new @objc dynamic method.
   }
 
@@ -39,7 +39,7 @@
     // OK, provides an implementation for the header's method.
   }
 
-  @objc func categoryMethodNot(fromHeader1: CInt) {
+  @objc fileprivate func categoryMethodNot(fromHeader1: CInt) {
     // OK, declares a new @objc dynamic method.
   }
 

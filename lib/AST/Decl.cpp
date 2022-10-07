@@ -3742,6 +3742,21 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
          VD->getDeclContext()->getParentModule() == useDC->getParentModule();
 }
 
+/// Checks if \p VD is an ObjC member implementation:
+///
+/// \li It's in an \c \@_objcImplementation extension
+/// \li It's \c \@objc
+/// \li Its access level is not \c private or \c fileprivate
+static bool
+isObjCMemberImplementation(const ValueDecl *VD,
+                           llvm::function_ref<AccessLevel()> getAccessLevel) {
+  if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    if (ED->isObjCImplementation())
+      return VD->isObjC() && getAccessLevel() >= AccessLevel::Internal;
+
+  return false;
+}
+
 /// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi
 /// imports into account.
 ///
@@ -3756,6 +3771,12 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
                         bool forConformance,
                         bool includeInlineable,
                         llvm::function_ref<AccessLevel()> getAccessLevel) {
+  // If this is an @_objcImplementation member implementation, unconditionally
+  // forbid access. Name lookups will instead find and use the matching
+  // interface decl.
+  if (isObjCMemberImplementation(VD, getAccessLevel))
+    return false;
+
   if (VD->getASTContext().isAccessControlDisabled())
     return true;
 
