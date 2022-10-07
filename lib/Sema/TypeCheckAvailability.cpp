@@ -3611,8 +3611,8 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
 
   if (const AbstractFunctionDecl *afd = dyn_cast<AbstractFunctionDecl>(D)) {
     if (const AbstractFunctionDecl *asyncAlt = afd->getAsyncAlternative()) {
-      assert(call && "No call calling async alternative function");
-      ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+      SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+      ctx.Diags.diagnose(diagLoc, diag::warn_use_async_alternative);
 
       if (auto *accessor = dyn_cast<AccessorDecl>(asyncAlt)) {
         SmallString<32> name;
