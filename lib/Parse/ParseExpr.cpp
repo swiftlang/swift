@@ -432,7 +432,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
    return sub;
   }
 
-  if (Tok.isContextualKeyword("_move")) {
+  if (Context.LangOpts.hasFeature(Feature::MoveOnly)
+      && Tok.isContextualKeyword("_move")) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc awaitLoc = consumeToken();
     ParserResult<Expr> sub =
