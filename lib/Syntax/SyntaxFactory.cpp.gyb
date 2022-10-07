@@ -249,7 +249,8 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
     /*UnexpectedNodes=*/None,
     /*Elements=*/makeBlankTupleTypeElementList(),
     /*UnexpectedNodes=*/None,
-    /*RightParen=*/makeRightParenToken({}, {})
+    /*RightParen=*/makeRightParenToken({}, {}),
+    /*UnexpectedNodes=*/None
   );
 }
 
@@ -274,7 +275,8 @@ SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
     /*UnexpectedNodes=*/None,
     /*Intitializer=*/None,
     /*UnexpectedNodes=*/None,
-    /*TrailingComma=*/TrailingComma
+    /*TrailingComma=*/TrailingComma,
+    /*UnexpectedNodes=*/None
   );
 }
 
@@ -297,7 +299,8 @@ SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
     /*UnexpectedNodes=*/None,
     /*Initializer=*/None,
     /*UnexpectedNodes=*/None,
-    /*TrailingComma=*/TrailingComma
+    /*TrailingComma=*/TrailingComma,
+    /*UnexpectedNodes=*/None
   );
 }
 
@@ -314,7 +317,8 @@ SyntaxFactory::makeGenericParameter(TokenSyntax Name,
     /*UnexpectedNodes=*/None,
     /*InheritedType=*/None,
     /*UnexpectedNodes=*/None,
-    /*TrailingComma=*/TrailingComma
+    /*TrailingComma=*/TrailingComma,
+    /*UnexpectedNodes=*/None
   );
 }
 
@@ -330,7 +334,8 @@ TypeSyntax SyntaxFactory::makeTypeIdentifier(StringRef TypeName,
     /*UnexpectedNodes=*/None,
     /*Name=*/identifier,
     /*UnexpectedNodes=*/None,
-    /*GenerigArgumentClause=*/None
+    /*GenerigArgumentClause=*/None,
+    /*UnexpectedNodes=*/None
   );
 }
 
