@@ -66,6 +66,14 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
     collectedEffects.addEffectsForEcapingArgument(argument: argument)
   }
 
+  // Don't modify the effects if they didn't change. This avoids sending a change notification
+  // which can trigger unnecessary other invalidations.
+  if let existingEffects = function.effects.sideEffects,
+     existingEffects.arguments == collectedEffects.argumentEffects,
+     existingEffects.global == collectedEffects.globalEffects {
+    return
+  }
+
   // Finally replace the function's side effects.
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
     effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)

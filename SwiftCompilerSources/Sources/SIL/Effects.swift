@@ -134,9 +134,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// An escape effect on a function argument.
-  public struct ArgumentEffect : CustomStringConvertible, NoReflectionChildren {
+  public struct ArgumentEffect : Equatable, CustomStringConvertible, NoReflectionChildren {
 
-    public enum Kind {
+    public enum Kind : Equatable {
       /// The argument value does not escape.
       ///
       /// Syntax examples:
