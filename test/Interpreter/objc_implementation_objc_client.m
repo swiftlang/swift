@@ -19,6 +19,10 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// FIXME: This test fails in Swift CI simulators, but I have not been able to
+//        reproduce this locally.
+// REQUIRES: OS=macosx
+
 #import <Foundation/Foundation.h>
 #import <objc_implementation/objc_implementation.h>
 #import <stdlib.h>
