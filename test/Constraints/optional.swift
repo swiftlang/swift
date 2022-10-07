@@ -577,4 +577,14 @@ do {
     // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
     // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
+  func passLayersOfOptional(value: (any P)??) {
+    takesP(value)
+    // expected-error@-1 {{value of optional type '(any P)??' must be unwrapped to a value of type '(any P)?}}
+    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+  func passNonConformingValue(value: (any BinaryInteger)?){
+    takesP(value)
+    // expected-error@-1 {{argument type '(any BinaryInteger)?' does not conform to expected type 'P'}}
+  }
 }
