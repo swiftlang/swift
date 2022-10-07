@@ -3750,25 +3750,25 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
 
   // Check whether type marked as @typeWrapper is valid:
   //
-  // - Has a single generic parameter <Storage>
-  // - Has `init(storage: <Storage>)`
+  // - Has two generic parameters - `Wrapped` and `Storage`
+  // - Has `init(for: <Wrapped>.Type, storage: <Storage>)`
   // - Has at least one `subscript(storedKeyPath: KeyPath<...>)` overload
 
   // Has a single generic parameter.
+  auto *genericParams = nominal->getGenericParams();
   {
-    auto *genericParams = nominal->getGenericParams();
-    if (!genericParams || genericParams->size() != 1) {
+    if (!genericParams || genericParams->size() != 2) {
       diagnose(nominal->getLoc(),
-               diag::type_wrapper_requires_a_single_generic_param);
+               diag::type_wrapper_requires_two_generic_params);
       attr->setInvalid();
       return;
     }
   }
 
-  // `init(storage:)`
+  // `init(for:storage:)`
   {
     DeclName initName(ctx, DeclBaseName::createConstructor(),
-                      ArrayRef<Identifier>(ctx.Id_storage));
+                      {ctx.Id_for, ctx.Id_storage});
 
     SmallVector<ValueDecl *, 2> inits;
     if (findMembersOrDiagnose(initName, inits,
@@ -3787,8 +3787,11 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
         nonViableInits[init].push_back(UnviabilityReason::Inaccessible);
     }
 
-    // If there are no viable initializers, let's complain.
-    if (inits.size() - nonViableInits.size() == 0) {
+    unsigned numViable = inits.size() - nonViableInits.size();
+
+    switch (numViable) {
+    case 0: {
+      // If there are no viable initializers, let's complain.
       for (const auto &entry : nonViableInits) {
         auto *init = entry.first;
 
@@ -3812,6 +3815,61 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
       }
 
       attr->setInvalid();
+      return;
+    }
+
+    case 1: {
+      // If there is only one choice let's check whether it's correct.
+      for (auto *decl : inits) {
+        auto *ctor = cast<ConstructorDecl>(decl);
+
+        if (nonViableInits.count(ctor))
+          continue;
+
+        auto wrappedType = ctor->getParameters()->get(0)->getInterfaceType();
+        auto storageType = ctor->getParameters()->get(1)->getInterfaceType();
+
+        auto typeWrapperGenericParams = genericParams->getParams();
+
+        // Let's check wrapped type - it should be a metatype of the first
+        // generic parameter - <Wrapped>.
+        {
+          auto wrappedTypeParamTy =
+              typeWrapperGenericParams[0]->getInterfaceType();
+          if (!wrappedType->isEqual(wrappedTypeParamTy)) {
+            diagnose(
+                ctor,
+                diag::cannot_declare_type_wrapper_init_with_invalid_first_param,
+                wrappedTypeParamTy);
+            ctor->setInvalid();
+          }
+        }
+
+        // Second parameter should be <Storage> generic parameter type.
+        {
+          auto storageTypeParamTy = typeWrapperGenericParams[1]
+                                        ->getInterfaceType()
+                                        ->getMetatypeInstanceType();
+          if (!storageType->isEqual(storageTypeParamTy)) {
+            diagnose(
+                ctor,
+                diag::
+                    cannot_declare_type_wrapper_init_with_invalid_second_param,
+                storageTypeParamTy);
+            ctor->setInvalid();
+          }
+        }
+
+        if (ctor->isInvalid()) {
+          attr->setInvalid();
+          return;
+        }
+      }
+      break;
+    }
+
+    default:
+      diagnose(inits.front(), diag::cannot_overload_type_wrapper_initializer);
       return;
     }
   }

@@ -3,17 +3,17 @@
 // REQUIRES: asserts
 
 @typeWrapper
-struct ConcreteTypeWrapper { // expected-error {{type wrapper has to declare a single generic parameter for underlying storage type}}
+struct ConcreteTypeWrapper { // expected-error {{type wrapper has to declare two generic parameters: wrapped and storage types}}
   init(storage: Int) {}
 }
 
 @typeWrapper
-struct EmptyTypeWrapper<S> { // expected-error {{type wrapper type 'EmptyTypeWrapper' does not contain a required initializer - init(storage:)}}
+struct EmptyTypeWrapper<W, S> { // expected-error {{type wrapper type 'EmptyTypeWrapper' does not contain a required initializer - init(for:storage:)}}
 }
 
 @typeWrapper
-struct NoMemberwiseInit<S> {
-  // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(storage:)}}
+struct NoMemberwiseInit<W, S> {
+  // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(for:storage:)}}
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
@@ -21,8 +21,8 @@ struct NoMemberwiseInit<S> {
 }
 
 @typeWrapper
-struct FailableInit<S> {
-  init?(storage: S) { // expected-error {{type wrapper initializer 'init(storage:)' cannot be failable}}
+struct FailableInit<W, S> {
+  init?(for: W.Type, storage: S) { // expected-error {{type wrapper initializer 'init(for:storage:)' cannot be failable}}
   }
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
@@ -30,32 +30,16 @@ struct FailableInit<S> {
   }
 }
 
-// Okay because there is a valid `init(storage:)` overload.
+// Okay because there is a valid `init(for:storage:)` overload.
 @typeWrapper
-struct FailableAndValidInit<S> {
+struct FailableAndValidInit<W, S> {
   // expected-error@-1 {{type wrapper type 'FailableAndValidInit' does not contain a required writable subscript}}
-  // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+  // expected-note@-2 {{do you want to add a stub?}} {{36-36=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
-  init(storage: S) {
+  init(for: W.Type, storage: S) {
   }
 
-  init?(storage: S) where S == Int {
-  }
-
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
-    get { fatalError() }
-  }
-}
-
-@typeWrapper
-public struct InaccessibleInit<S> {
-  fileprivate init(storage: S) {
-    // expected-error@-1 {{fileprivate initializer 'init(storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
-  }
-
-  private init?(storage: S) where S: AnyObject {
-    // expected-error@-1 {{private initializer 'init(storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
-    // expected-error@-2 {{type wrapper initializer 'init(storage:)' cannot be failable}}
+  init?(for: W.Type, storage: S) where S == Int {
   }
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
@@ -64,14 +48,30 @@ public struct InaccessibleInit<S> {
 }
 
 @typeWrapper
-struct NoSubscripts<S> {
+public struct InaccessibleInit<W, S> {
+  fileprivate init(for: W.Type, storage: S) {
+    // expected-error@-1 {{fileprivate initializer 'init(for:storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
+  }
+
+  private init?(for: W.Type, storage: S) where S: AnyObject {
+    // expected-error@-1 {{private initializer 'init(for:storage:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleInit' (which is public)}}
+    // expected-error@-2 {{type wrapper initializer 'init(for:storage:)' cannot be failable}}
+  }
+
+  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    get { fatalError() }
+  }
+}
+
+@typeWrapper
+struct NoSubscripts<W, S> {
   // expected-error@-1 {{type wrapper type 'NoSubscripts' does not contain a required subscript - subscript(storedKeyPath:)}}
-  init(storage: S) {}
+  init(for: W.Type, storage: S) {}
 }
 
 @typeWrapper
-struct InaccessibleOrInvalidSubscripts<S> {
-  init(storage: S) {}
+struct InaccessibleOrInvalidSubscripts<W, S> {
+  init(for: W.Type, storage: S) {}
 
   fileprivate subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     // expected-error@-1 {{fileprivate subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
@@ -94,8 +94,54 @@ struct InaccessibleOrInvalidSubscripts<S> {
 }
 
 @typeWrapper
-struct NoopWrapper<S> {
-  init(storage: S) {}
+struct OverloadedCtorWrapper<W, S> {
+  init(for: W.Type, storage: S) {} // expected-error {{cannot overload type wrapper initializer 'init(for:storage:)'}}
+  init(for: W.Type, storage: Int) {}
+
+  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> [V] { get { fatalError() } }
+  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
+    get { fatalError() }
+    set { }
+  }
+}
+
+do {
+  @typeWrapper
+  struct InvalidInit1<W, S> {
+    init(for: Int, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit2<W, S> {
+    init(for: W, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit3<W, S> {
+    init(for: Int.Type, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit4<W, S> {
+    init(for: W.Type, storage: Int) {} // expected-error {{second parameter of type wrapper initializer should be storage type - 'S'}}
+  }
+
+  @typeWrapper
+  struct InvalidInit5<W, S> {
+    init(for: W.Type, storage: UnknownType) {} // expected-error {{second parameter of type wrapper initializer should be storage type - 'S'}}
+    // expected-error@-1 {{cannot find type 'UnknownType' in scope}}
+  }
+
+  @typeWrapper
+  struct InvalidInit6<W, S> {
+    init(for: UnknownType.Type, storage: S) {} // expected-error {{first parameter of type wrapper initializer should be wrapped type - 'W.Type'}}
+    // expected-error@-1 {{cannot find type 'UnknownType' in scope}}
+  }
+}
+
+@typeWrapper
+struct NoopWrapper<W, S> {
+  init(for: W.Type, storage: S) {}
 
   subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
@@ -137,8 +183,8 @@ func testWrappedTypeAccessChecking() {
 
 struct Parent {
   @typeWrapper
-  struct Wrapper<S> {
-    init(storage: S) {}
+  struct Wrapper<W, S> {
+    init(for: W.Type, storage: S) {}
 
     subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
@@ -456,11 +502,11 @@ func testIgnoredAttr() {
 
 func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
   @typeWrapper
-  struct MissingReadOnly<S> {
+  struct MissingReadOnly<W, S> {
     // expected-error@-1 {{type wrapper type 'MissingReadOnly' does not contain a required ready-only subscript}}
-    // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
+    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
 
-    init(storage: S) {}
+    init(for: W.Type, storage: S) {}
 
     subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
@@ -469,11 +515,11 @@ func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
   }
 
   @typeWrapper
-  struct MissingWritable<S> {
+  struct MissingWritable<W, S> {
     // expected-error@-1 {{type wrapper type 'MissingWritable' does not contain a required writable subscript}}
-    // expected-note@-2 {{do you want to add a stub?}} {{30-30=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
-    init(storage: S) {}
+    init(for: W.Type, storage: S) {}
 
     subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
