@@ -500,13 +500,10 @@ struct InferRequirementsWalker : public TypeWalker {
       SmallVector<Type, 2> packReferences;
       packExpansion->getPatternType()->getTypeSequenceParameters(packReferences);
 
-      if (packReferences.size() > 1) {
-        auto first = packReferences.begin();
-        auto second = first + 1;
-        while (second != packReferences.end()) {
-          Requirement req(RequirementKind::SameShape, *first++, *second++);
-          desugarRequirement(req, SourceLoc(), reqs, errors);
-        }
+      auto countType = packExpansion->getCountType();
+      for (auto pack : packReferences) {
+        Requirement req(RequirementKind::SameShape, countType, pack);
+        desugarRequirement(req, SourceLoc(), reqs, errors);
       }
     }
 
