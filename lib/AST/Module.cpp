@@ -1918,6 +1918,11 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
+Identifier ModuleDecl::getPackageName() const {
+  // This will return the real name for an alias (if used) or getName()
+  return getASTContext().getPackageName(getName());
+}
+
 Identifier ModuleDecl::getRealName() const {
   // This will return the real name for an alias (if used) or getName()
   return getASTContext().getRealModuleName(getName());
@@ -2725,6 +2730,7 @@ bool SourceFile::hasTestableOrPrivateImport(
   auto *module = ofDecl->getModuleContext();
   switch (accessLevel) {
   case AccessLevel::Internal:
+  case AccessLevel::Package:
   case AccessLevel::Public:
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
@@ -2891,6 +2897,17 @@ void SourceFile::lookupImportedSPIGroups(
   }
 }
 
+bool SourceFile::isImportedAsPackage(const ValueDecl *targetDecl) const {
+  auto targetModule = targetDecl->getModuleContext();
+    for (auto &import : *Imports) {
+      if (import.options.contains(ImportFlags::PackageAccessControl) &&
+          targetModule == import.module.importedModule) {
+          return true;
+      }
+    }
+    return false;
+}
+
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
@@ -2923,11 +2940,32 @@ bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
     // Also check whether the target module is actually the underlyingClang
     // module for this @_weakLinked import.
     const ModuleDecl *clangModule =
-        importedModule->getUnderlyingModuleIfOverlay();
+      importedModule->getUnderlyingModuleIfOverlay();
     if (module == clangModule)
       return true;
   }
   return false;
+}
+
+//PackageDecl *ModuleDecl::getPackageDecl() const {
+//  const DeclContext *DC = this;
+//  while (!DC->isModuleContext())
+//    DC = DC->getParent();
+//  auto mdecl = const_cast<ModuleDecl *>(cast<ModuleDecl>(DC));
+//  auto pkg = mdecl->getPackageDecl();
+//  return pkg;
+//}
+
+bool ModuleDecl::isImportedAsPackage(const ValueDecl *targetDecl) const {
+  //  FIXME
+  //  auto targetModule = targetDecl->getModuleContext();
+  //  for (auto &import : *Imports) {
+  //    if (import.options.contains(ImportFlags::PackageAccessControl) &&
+  //        targetModule == import.module.importedModule) {
+  //        return true;
+  //    }
+  //  }
+    return false;
 }
 
 bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,

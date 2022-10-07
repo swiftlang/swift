@@ -380,6 +380,8 @@ private:
   /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
   /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
+  /// Map module names to package name they belong to
+  mutable llvm::DenseMap<Identifier, Identifier> PackageNameMap;
 
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -533,6 +535,8 @@ public:
   ///         Else return a real name or an alias mapped to the \p key.
   Identifier getRealModuleName(Identifier key,
                                ModuleAliasLookupOption option = ModuleAliasLookupOption::alwaysRealName) const;
+  Identifier getPackageName(Identifier key) const;
+  void setPackageNameMap(const llvm::StringMap<StringRef> &pkgMap);
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

@@ -93,7 +93,10 @@ enum class ImportFlags {
 
   /// The imported module can only be referenced from SPI decls, or
   /// implementation details.
-  SPIOnly = 0x100
+  SPIOnly = 0x100,
+
+  /// The module is imported to have access to decls with @package attributes
+  PackageAccessControl = 0x200
 };
 
 /// \see ImportFlags

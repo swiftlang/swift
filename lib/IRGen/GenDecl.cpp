@@ -1519,6 +1519,7 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
       switch (type->getEffectiveAccess()) {
       case AccessLevel::Open:
       case AccessLevel::Public:
+      case AccessLevel::Package:
         // We can't remove metadata for externally visible types.
         return false;
       case AccessLevel::Internal:

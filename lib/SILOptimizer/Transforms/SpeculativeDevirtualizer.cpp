@@ -305,6 +305,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   case AccessLevel::Open:
     return false;
   case AccessLevel::Public:
+  case AccessLevel::Package:
   case AccessLevel::Internal:
     if (!AI.getModule().isWholeModule())
       return false;

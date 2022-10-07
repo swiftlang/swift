@@ -1019,6 +1019,11 @@ def migrator_update_swift: Flag<["-"], "migrator-update-swift">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Does nothing. Temporary compatibility flag for Xcode.">;
 
+def package_modules: Separate<["-"], "package-modules">,
+  Flags<[FrontendOption]>,
+  HelpText<"A list of in-package modules to import">,
+  MetaVarName<"<module_name>">;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,

@@ -1506,6 +1506,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   IsOverriding = VD->getOverriddenDecl();
   IsProtocolReq = isProtocolRequirement(VD);
   IsOpen = Ctx.getAccessLevel(VD) == AccessLevel::Open;
+  // TODO: do we need IsPackage for SDK node?
   IsInternal = Ctx.getAccessLevel(VD) < AccessLevel::Public;
   SelfIndex = getSelfIndex(VD);
   FixedBinaryOrder = Ctx.getFixedBinaryOrder(VD);
@@ -1733,6 +1734,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
       return true;
+    case AccessLevel::Package:
     case AccessLevel::Public:
     case AccessLevel::Open:
       break;

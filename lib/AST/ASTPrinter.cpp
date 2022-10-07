@@ -723,6 +723,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
         return;
       Printer << tok::kw_internal;
       break;
+    case AccessLevel::Package:
+      Printer.printKeyword("package", Options);
+      break;
     case AccessLevel::Public:
       Printer << tok::kw_public;
       break;

@@ -38,6 +38,7 @@ private:
   bool computeFallbackModuleName();
   bool computeModuleName();
   bool computeModuleAliases();
+  void computePackageNameMap();
   bool computeMainAndSupplementaryOutputFilenames();
   void computeDumpScopeMapLocations();
   void computeHelpOptions();

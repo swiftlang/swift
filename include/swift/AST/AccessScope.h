@@ -34,7 +34,7 @@ public:
   AccessScope(const DeclContext *DC, bool isPrivate = false);
 
   static AccessScope getPublic() { return AccessScope(nullptr, false); }
-
+ 
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
   /// also allow access.
@@ -53,6 +53,7 @@ public:
   bool isPrivate() const { return Value.getPointer() && Value.getInt(); }
   bool isFileScope() const;
   bool isInternal() const;
+  bool isPackage() const;
 
   /// Returns true if this is a child scope of the specified other access scope.
   ///

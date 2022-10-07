@@ -542,7 +542,6 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 
   if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     import.options |= ImportFlags::ImplementationOnly;
-
   if (ID->getAttrs().hasAttribute<SPIOnlyAttr>())
     import.options |= ImportFlags::SPIOnly;
 
@@ -569,6 +568,15 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     import.options |= ImportFlags::WeakLinked;
 
   import.docVisibility = swift::symbolgraphgen::documentationVisibilityForDecl(ID);
+
+  // Handle if `-package-name <package_name>` was passed
+//  auto pkgModules = ID->getASTContext().getPackageModules();
+//  for (auto pkgModule: pkgModules) {
+//    if (pkgModule == ID->getImportPath().front().Item.str()) {
+//      import.options |= ImportFlags::PackageAccessControl;
+//      break;
+//    }
+//  }
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {

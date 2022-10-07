@@ -1852,6 +1852,28 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   }
 }
 
+void ASTContext::setPackageNameMap(const llvm::StringMap<StringRef> &pkgNameMap) {
+  // This setter should be called only once after ASTContext has been initialized
+  assert(PackageNameMap.empty());
+
+  for (auto k: pkgNameMap.keys()) {
+    auto v = pkgNameMap.lookup(k);
+    if (!v.empty()) {
+      auto moduleName = getIdentifier(k);
+      auto pkgName = getIdentifier(v);
+      PackageNameMap[moduleName] = pkgName;
+    }
+  }
+}
+
+Identifier ASTContext::getPackageName(Identifier key) const {
+  auto found = PackageNameMap.find(key);
+  if (found == PackageNameMap.end()) // not found
+    return Identifier();
+
+  return found->second;
+}
+
 Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption option) const {
   auto found = ModuleAliasMap.find(key);
   if (found == ModuleAliasMap.end())

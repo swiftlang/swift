@@ -521,6 +521,7 @@ enum class AccessLevel : uint8_t {
   Private = 0,
   FilePrivate,
   Internal,
+  Package,
   Public,
   Open,
 };

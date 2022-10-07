@@ -235,6 +235,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (computeModuleName())
     return true;
 
+  computePackageNameMap();
+
   if (HaveNewInputsAndOutputs &&
       computeMainAndSupplementaryOutputFilenames())
     return true;
@@ -548,6 +550,11 @@ bool ArgsToFrontendOptionsConverter::setUpImmediateArgs() {
   return false;
 }
 
+void ArgsToFrontendOptionsConverter::computePackageNameMap() {
+//  auto list = Args.getAllArgValues(options::OPT_package_name);
+  Opts.PackageNameMap.insert({"File", "fooPkg"});
+}
+
 bool ArgsToFrontendOptionsConverter::computeModuleAliases() {
   auto list = Args.getAllArgValues(options::OPT_module_alias);
   return ModuleAliasesConverter::computeModuleAliases(list, Opts, Diags);
@@ -747,6 +754,14 @@ void ArgsToFrontendOptionsConverter::computeLLVMArgs() {
     Opts.LLVMArgs.push_back(A->getValue());
   }
 }
+
+//void ArgsToFrontendOptionsConverter::computePackageModules() {
+//    auto list = Args.getAllArgValues(options::OPT_package_modules);
+//    Opts.PackageModules.clear();
+//    for (auto el: list) {
+//        Opts.PackageModules.push_back(el);
+//    }
+//}
 
 bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
                                                   FrontendOptions &options,

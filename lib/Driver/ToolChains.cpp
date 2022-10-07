@@ -288,6 +288,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_emit_fine_grained_dependency_sourcefile_dot_files);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
+  inputArgs.AddLastArg(arguments, options::OPT_package_modules);
   inputArgs.AddLastArg(arguments, options::OPT_locale);
   inputArgs.AddLastArg(arguments, options::OPT_localization_path);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);

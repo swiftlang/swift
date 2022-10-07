@@ -3548,7 +3548,8 @@ static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
 }
 
 /// Adjust \p access based on whether \p VD is \@usableFromInline, has been
-/// testably imported from \p useDC or \p VD is an imported SPI.
+/// testably imported from \p useDC, \p VD is an imported SPI, or \p VD is an
+/// imported package decl.
 ///
 /// \p access isn't always just `VD->getFormalAccess()` because this adjustment
 /// may be for a write, in which case the setter's access might be used instead.
@@ -3598,6 +3599,7 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   case AccessLevel::Open:
     break;
   case AccessLevel::Public:
+  case AccessLevel::Package:
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
         getModuleContext()->arePrivateImportsEnabled())
@@ -3714,6 +3716,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     assert(resultDC->isModuleScopeContext());
     return AccessScope(resultDC, access == AccessLevel::Private);
   case AccessLevel::Internal:
+  case AccessLevel::Package:
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
   case AccessLevel::Open:
@@ -3750,11 +3753,18 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   if (accessScope.getDeclContext() == useDC) return true;
   if (!AccessScope(useDC).isChildOf(accessScope)) return false;
 
-  // Check SPI access
-  if (!useDC || !VD->isSPI()) return true;
+  if (!useDC) return true;
   auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-  return !useSF || useSF->isImportedAsSPI(VD) ||
-         VD->getDeclContext()->getParentModule() == useDC->getParentModule();
+  auto parentModuleMatched = VD->getDeclContext()->getParentModule() == useDC->getParentModule();
+  // Check SPI access
+  if (VD->isSPI()) {
+      return !useSF || useSF->isImportedAsSPI(VD) || parentModuleMatched;
+  }
+  // Check @package access
+//  if (VD->isPackage()) {
+//      return !useSF || useSF->isImportedAsPackage(VD) || parentModuleMatched;
+//  }
+  return true;
 }
 
 /// Checks if \p VD is an ObjC member implementation:
@@ -3864,6 +3874,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     auto *useSF = dyn_cast<SourceFile>(useFile);
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     return true;

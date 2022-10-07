@@ -2182,6 +2182,7 @@ static uint8_t getRawStableAccessLevel(swift::AccessLevel access) {
   CASE(Private)
   CASE(FilePrivate)
   CASE(Internal)
+  CASE(Package)
   CASE(Public)
   CASE(Open)
 #undef CASE

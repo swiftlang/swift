@@ -43,10 +43,12 @@ using namespace swift;
 ExportContext::ExportContext(DeclContext *DC,
                              AvailabilityContext runningOSVersion,
                              FragileFunctionKind kind,
-                             bool spi, bool exported, bool implicit, bool deprecated,
+                             bool spi, bool package,
+                             bool exported, bool implicit, bool deprecated,
                              Optional<PlatformKind> unavailablePlatformKind)
     : DC(DC), RunningOSVersion(runningOSVersion), FragileKind(kind) {
   SPI = spi;
+  Package = package;
   Exported = exported;
   Implicit = implicit;
   Deprecated = deprecated;
@@ -179,11 +181,15 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
 }
 
 static void computeExportContextBits(ASTContext &Ctx, Decl *D,
-                                     bool *spi, bool *implicit, bool *deprecated,
+                                     bool *spi, bool *package,
+                                     bool *implicit, bool *deprecated,
                                      Optional<PlatformKind> *unavailablePlatformKind) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
+//  const auto isPackageDecl = isa<ValueDecl>(D) && cast<ValueDecl>(D)->isPackage();
+//  if (isPackageDecl)
+//    *package = true;
 
   // Defer bodies are desugared to an implicit closure expression. We need to
   // dilute the meaning of "implicit" to make sure we're still checking
@@ -202,7 +208,8 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D,
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
       if (auto *VD = PBD->getAnchoringVarDecl(i))
-        computeExportContextBits(Ctx, VD, spi, implicit, deprecated,
+        computeExportContextBits(Ctx, VD, spi, package,
+                                 implicit, deprecated,
                                  unavailablePlatformKind);
     }
   }
@@ -218,22 +225,26 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(D->getLoc(), DC));
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
+  bool package = false;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
-  computeExportContextBits(Ctx, D, &spi, &implicit, &deprecated,
+  computeExportContextBits(Ctx, D, &spi, &package,
+                           &implicit, &deprecated,
                            &unavailablePlatformKind);
   forEachOuterDecl(D->getDeclContext(),
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated,
+                                              &spi, &package,
+                                              &implicit, &deprecated,
                                               &unavailablePlatformKind);
                    });
 
   bool exported = ::isExported(D);
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated,
+                       spi, package,
+                       exported, implicit, deprecated,
                        unavailablePlatformKind);
 }
 
@@ -247,20 +258,23 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
        : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
+    bool package = false;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
   forEachOuterDecl(DC,
                    [&](Decl *D) {
                      computeExportContextBits(Ctx, D,
-                                              &spi, &implicit, &deprecated,
+                                              &spi, &package,
+                                              &implicit, &deprecated,
                                               &unavailablePlatformKind);
                    });
 
   bool exported = false;
 
   return ExportContext(DC, runningOSVersion, fragileKind,
-                       spi, exported, implicit, deprecated,
+                       spi, package,
+                       exported, implicit, deprecated,
                        unavailablePlatformKind);
 }
 

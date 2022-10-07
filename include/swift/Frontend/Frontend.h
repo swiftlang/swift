@@ -308,6 +308,8 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  bool setPackageNameMap(std::vector<std::string> args, DiagnosticEngine &diags);
+
   /// Sets the module alias map with string args passed in via `-module-alias`.
   /// \param args The arguments to `-module-alias`. If input has `-module-alias Foo=Bar
   ///             -module-alias Baz=Qux`, the args are ['Foo=Bar', 'Baz=Qux'].  The name

@@ -2481,6 +2481,7 @@ static Optional<swift::AccessLevel> getActualAccessLevel(uint8_t raw) {
   CASE(Private)
   CASE(FilePrivate)
   CASE(Internal)
+  CASE(Package)
   CASE(Public)
   CASE(Open)
 #undef CASE

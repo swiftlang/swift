@@ -159,6 +159,10 @@ class OverlayFile;
 /// location.
 class ModuleSourceFileLocationMap;
 
+//class PackageDecl
+//: public DeclContext, public TypeDecl, public ASTAllocated<PackageDecl> {
+//};
+
 /// The minimum unit of compilation.
 ///
 /// A module is made up of several file-units, which are all part of the same
@@ -399,6 +403,9 @@ public:
   void setABIName(Identifier name) {
     ModuleABIName = name;
   }
+
+  /// Get the package name of the module
+  Identifier getPackageName() const;
 
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
@@ -720,6 +727,7 @@ public:
   // Is \p attr accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(const SpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
+  bool isImportedAsPackage(const ValueDecl *targetDecl) const;
 
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(Identifier spiGroup, const ModuleDecl *fromModule) const;

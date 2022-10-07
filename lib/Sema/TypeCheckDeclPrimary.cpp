@@ -3421,6 +3421,7 @@ public:
           requiredAccess = AccessLevel::Public;
           break;
         case AccessLevel::Public:
+        case AccessLevel::Package:
         case AccessLevel::Internal:
           requiredAccess = AccessLevel::Internal;
           break;

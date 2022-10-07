@@ -1142,8 +1142,16 @@ AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
     DC = getPrivateDeclContext(DC, DC->getParentSourceFile());
     Value.setPointer(DC);
   }
-  if (!DC || isa<ModuleDecl>(DC))
-    assert(!isPrivate && "public or internal scope can't be private");
+      auto shouldAssert = false;
+      if (!DC) {
+        shouldAssert = true;
+      } else if (isa<ModuleDecl>(DC)) {
+        auto mdecl = cast<ModuleDecl>(DC);
+        // if package name is empty, it's internal, else package
+        shouldAssert |= mdecl->getPackageName().empty();
+      }
+  if (shouldAssert)
+    assert(!isPrivate && "public, package, or internal scope can't be private");
 }
 
 bool AccessScope::isFileScope() const {
@@ -1156,9 +1164,23 @@ bool AccessScope::isInternal() const {
   return DC && isa<ModuleDecl>(DC);
 }
 
+bool AccessScope::isPackage() const {
+  auto DC = getDeclContext();
+  if (isa<ModuleDecl>(DC)) {
+    auto mdecl = cast<ModuleDecl>(DC);
+    // if package name is empty, it's internal, else package
+    auto hasPkg = !mdecl->getPackageName().empty();
+    return DC && hasPkg;
+  }
+
+  return false;
+}
+
 AccessLevel AccessScope::accessLevelForDiagnostics() const {
   if (isPublic())
     return AccessLevel::Public;
+  if (isPackage())
+    return AccessLevel::Package;
   if (isa<ModuleDecl>(getDeclContext()))
     return AccessLevel::Internal;
   if (getDeclContext()->isModuleScopeContext()) {

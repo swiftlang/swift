@@ -25,7 +25,7 @@ import Foundation
 
 
 %{
-names = ["Open", "Public", "Internal", "Private"]
+names = ["Open", "Public", "Package", "Internal", "Private"]
 
 METHODS = "{access} {override} func method{name}() {{}}"
 OBJC_METHOD = "@objc {access} {override} func method{name}ObjC() {{}}"

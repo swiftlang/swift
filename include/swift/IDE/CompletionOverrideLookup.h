@@ -54,6 +54,7 @@ public:
                         isKeywordSpecified("fileprivate") ||
                         isKeywordSpecified("internal") ||
                         isKeywordSpecified("public") ||
+                        isKeywordSpecified("package") ||
                         isKeywordSpecified("open");
     hasOverride = isKeywordSpecified("override");
     hasOverridabilityModifier =

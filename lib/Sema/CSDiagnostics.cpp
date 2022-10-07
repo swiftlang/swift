@@ -5610,6 +5610,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
+
   if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
     emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
                      CD->getResultInterfaceType(), accessLevel)

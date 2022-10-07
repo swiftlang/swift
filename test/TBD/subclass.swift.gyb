@@ -55,7 +55,7 @@ import subclass_super
 // Create a variety of variations like `open class ... { open override
 // func function() }` and `public class ... { public final override
 // func function() }`.
-% for access in ["open", "public", "internal", "fileprivate"]:
+% for access in ["open", "public", "package", "internal", "fileprivate"]:
 % for class_final in [""] if access == "open" else ["", "final"]:
 % for member_final in [""] if access == "open" else ["", "final"]:
 % class_mod = "%s %s" % (access, class_final)

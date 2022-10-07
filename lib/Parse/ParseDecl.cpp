@@ -1999,6 +1999,7 @@ bool Parser::parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
         .Case("open", AccessLevel::Open)
         .Case("public", AccessLevel::Public)
         .Case("internal", AccessLevel::Internal)
+        .Case("package", AccessLevel::Package)
         .Case("private", AccessLevel::Private)
         .Case("fileprivate", AccessLevel::FilePrivate)
         .Default(None);
@@ -2413,6 +2414,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("private", AccessLevel::Private)
       .Case("fileprivate", AccessLevel::FilePrivate)
       .Case("internal", AccessLevel::Internal)
+      .Case("package", AccessLevel::Package)
       .Case("public", AccessLevel::Public)
       .Case("open", AccessLevel::Open);
 
@@ -3935,6 +3937,7 @@ ParserStatus Parser::parseDeclAttributeList(
 //      'fileprivate' '(' 'set' )'
 //      'internal'
 //      'internal' '(' 'set' ')'
+//      'package'
 //      'public'
 //      'open'
 //      'weak'
@@ -3967,6 +3970,7 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
     case tok::kw_private:
     case tok::kw_fileprivate:
     case tok::kw_internal:
+    case tok::kw_package:
     case tok::kw_public: {
       // We still model these specifiers as attributes.
       isError |=
@@ -4023,7 +4027,6 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         diagnose(actorLoc, diag::keyword_cant_be_identifier, Tok.getText());
         continue;
       }
-
       isError |= parseNewDeclAttribute(
           Attributes, /*AtLoc=*/{}, Kind, isFromClangAttribute);
       continue;
@@ -4297,6 +4300,7 @@ bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_internal:
   case tok::kw_let:
   case tok::kw_operator:
+  case tok::kw_package:
   case tok::kw_precedencegroup:
   case tok::kw_private:
   case tok::kw_protocol:

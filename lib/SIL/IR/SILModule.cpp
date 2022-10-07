@@ -931,6 +931,7 @@ SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
   case AccessLevel::Internal:
     linkage = SILLinkage::Hidden;
     break;
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     linkage = SILLinkage::Public;

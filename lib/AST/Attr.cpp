@@ -74,6 +74,7 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   case AccessLevel::Private: return "private";
   case AccessLevel::FilePrivate: return "fileprivate";
   case AccessLevel::Internal: return "internal";
+  case AccessLevel::Package: return "package";
   case AccessLevel::Public: return "public";
   case AccessLevel::Open: return "open";
   }

@@ -286,6 +286,30 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
+bool CompilerInvocation::setPackageNameMap(std::vector<std::string> args,
+                                           DiagnosticEngine &diags) {
+  if (!args.empty()) {
+    // ModuleAliasMap should initially be empty as setting
+    // it should be called only once
+    FrontendOpts.PackageNameMap.clear();
+
+    for (auto item: args) {
+      auto str = StringRef(item);
+
+      if (str.empty()) {
+        // no package name given
+        return false;
+      }
+      // Insert source file ptr or name as key and package name as value
+      if (!FrontendOpts.PackageNameMap.insert({"File", "fooPkg"}).second) {
+        // already exists
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
                                            DiagnosticEngine &diags) {
   return ModuleAliasesConverter::computeModuleAliases(args, FrontendOpts, diags);
@@ -1331,6 +1355,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
         llvm::StringSwitch<AccessLevel>(A->getValue())
             .Case("open", AccessLevel::Open)
             .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
             .Case("internal", AccessLevel::Internal)
             .Case("fileprivate", AccessLevel::FilePrivate)
             .Case("private", AccessLevel::Private)

@@ -82,6 +82,7 @@ enum class ExportabilityReason : unsigned {
 ///
 /// - the declaration is `public` or `@usableFromInline`
 /// - the declaration is not `@_spi`
+/// - the declaration is not `@package`
 /// - the declaration was not imported from an `@_implementationOnly` import
 ///
 /// The "signature" of a declaration is the set of all types written in the
@@ -93,7 +94,7 @@ enum class ExportabilityReason : unsigned {
 ///
 /// The body of an inlinable function can only reference other `public` and
 /// `@usableFromInline` declarations; furthermore, if the inlinable
-/// function is not `@_spi`, its body can only reference other exported
+/// function is not `@_spi` or `@package`, its body can only reference other exported
 /// declarations.
 ///
 /// The ExportContext also stores if the location in the program is inside
@@ -105,6 +106,7 @@ class ExportContext {
   AvailabilityContext RunningOSVersion;
   FragileFunctionKind FragileKind;
   unsigned SPI : 1;
+  unsigned Package : 1;
   unsigned Exported : 1;
   unsigned Deprecated : 1;
   unsigned Implicit : 1;
@@ -115,7 +117,8 @@ class ExportContext {
   ExportContext(DeclContext *DC,
                 AvailabilityContext runningOSVersion,
                 FragileFunctionKind kind,
-                bool spi, bool exported, bool implicit, bool deprecated,
+                bool spi, bool package,
+                bool exported, bool implicit, bool deprecated,
                 Optional<PlatformKind> unavailablePlatformKind);
 
 public:

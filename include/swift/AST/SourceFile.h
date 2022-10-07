@@ -385,6 +385,7 @@ public:
 
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
+  bool isImportedAsPackage(const ValueDecl *targetDecl) const;
 
   bool shouldCrossImport() const;
 

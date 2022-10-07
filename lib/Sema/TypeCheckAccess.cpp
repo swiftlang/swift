@@ -1691,6 +1691,12 @@ swift::getDisallowedOriginKind(const Decl *decl,
       DisallowedOriginKind::SPIImported;
   }
 
+//  else if (isa<ValueDecl>(decl) && cast<ValueDecl>(decl)->isPackage() && !where.isPackage()) {
+//      // package can only be exported in package.
+//      return where.getDeclContext()->getParentModule() == M ?
+//        DisallowedOriginKind::PackageLocal :
+//        DisallowedOriginKind::PackageImported;
+//  }
   return DisallowedOriginKind::None;
 }
 
@@ -2101,6 +2107,7 @@ static void checkExtensionGenericParamAccess(const ExtensionDecl *ED) {
   case AccessLevel::Internal:
     desiredAccessScope = AccessScope(ED->getModuleContext());
     break;
+  case AccessLevel::Package:
   case AccessLevel::Public:
   case AccessLevel::Open:
     break;
