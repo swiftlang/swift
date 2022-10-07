@@ -33,4 +33,6 @@ if (SWIFT_SWIFT_PARSER)
     "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
 
   add_dependencies(swiftASTGen swiftAST)
+
+  set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()
