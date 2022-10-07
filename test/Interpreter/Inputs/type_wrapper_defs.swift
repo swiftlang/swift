@@ -1,9 +1,9 @@
 @typeWrapper
-public struct Wrapper<S> {
+public struct Wrapper<W, S> {
   var underlying: S
 
-  public init(storage: S) {
-    print("Wrapper.init(\(storage))")
+  public init(for wrappedType: W.Type, storage: S) {
+    print("Wrapper.init(for: \(wrappedType), storage: \(storage))")
     self.underlying = storage
   }
 

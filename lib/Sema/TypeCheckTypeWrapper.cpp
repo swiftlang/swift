@@ -205,10 +205,12 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
           ->castTo<AnyGenericType>();
   assert(typeWrapperType);
 
-  // $storage: Wrapper<$Storage>
+  // $storage: Wrapper<<ParentType>, <ParentType>.$Storage>
   auto propertyTy = BoundGenericType::get(
       typeWrapper, /*Parent=*/typeWrapperType->getParent(),
-      /*genericArgs=*/{storage->getInterfaceType()->getMetatypeInstanceType()});
+      /*genericArgs=*/
+      {parent->getDeclaredInterfaceType(),
+       storage->getDeclaredInterfaceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
                         VarDecl::Introducer::Var, AccessLevel::Internal);
@@ -478,10 +480,21 @@ BraceStmt *SynthesizeTypeWrappedTypeMemberwiseInitializerBody::evaluate(
       DeclNameRef::createConstructor(), /*implicit=*/true);
   { initRef->setFunctionRefKind(FunctionRefKind::DoubleApply); }
 
-  // .init($Storage(...))
+  auto *selfTypeRef = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), parent, parent->getDeclContext(),
+      ctor->mapTypeIntoContext(parent->getInterfaceType()));
+
+  auto *selfRef = new (ctx)
+      DotSelfExpr(selfTypeRef, /*dot=*/SourceLoc(), /*self=*/SourceLoc());
+  selfRef->setImplicit();
+
+  // .init($Storage(for:storage:))
   Expr *typeWrapperInit = CallExpr::createImplicit(
       ctx, initRef,
-      ArgumentList::forImplicitSingle(ctx, ctx.Id_storage, storageInit));
+      ArgumentList::createImplicit(
+          ctx,
+          {Argument(/*labelLoc=*/SourceLoc(), ctx.Id_for, selfRef),
+           Argument(/*labelLoc=*/SourceLoc(), ctx.Id_storage, storageInit)}));
 
   body.push_back(new (ctx) AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(),
                                       typeWrapperInit,
@@ -532,8 +545,8 @@ GetTypeWrapperInitializer::evaluate(Evaluator &evaluator,
   auto &ctx = typeWrapper->getASTContext();
   assert(typeWrapper->getAttrs().hasAttribute<TypeWrapperAttr>());
 
-  auto ctors = typeWrapper->lookupDirect(
-      DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_storage}));
+  auto ctors = typeWrapper->lookupDirect(DeclName(
+      ctx, DeclBaseName::createConstructor(), {ctx.Id_for, ctx.Id_storage}));
 
   if (ctors.size() != 1)
     return nullptr;

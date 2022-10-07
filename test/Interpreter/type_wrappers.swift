@@ -15,7 +15,7 @@
 import type_wrapper_defs
 
 var p: Person<String> = .init(name: "P", projects: ["A", "B"])
-// CHECK: Wrapper.init($Storage(name: "P", projects: ["A", "B"]))
+// CHECK: Wrapper.init(for: Person<String>, storage: $Storage(name: "P", projects: ["A", "B"]))
 
 print(p.name)
 // CHECK: in getter
@@ -48,7 +48,7 @@ print(p.projects)
 // CHECK-NEXT: ["A", "B", "C", "D"]
 
 var pDefaults = PersonWithDefaults()
-// CHECK: Wrapper.init($Storage(name: "<no name>", age: 99))
+// CHECK: Wrapper.init(for: PersonWithDefaults, storage: $Storage(name: "<no name>", age: 99))
 
 print(pDefaults.name)
 // CHECK: in getter
@@ -94,7 +94,7 @@ print(pDefaultsName.age)
 
 func testPropertyWrappers() {
   var wrapped1 = PropWrapperTest(test: 42)
-  // CHECK: Wrapper.init($Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 42)))
+  // CHECK: Wrapper.init(for: PropWrapperTest, storage: $Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 42)))
   do {
     print(wrapped1.test)
     // CHECK: in getter
@@ -110,7 +110,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped2 = DefaultedPropWrapperTest()
-  // CHECK: Wrapper.init($Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 0)))
+  // CHECK: Wrapper.init(for: DefaultedPropWrapperTest, storage: $Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 0)))
   do {
     print(wrapped2.test)
     // CHECK: in getter
@@ -126,7 +126,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped3 = DefaultedPropWrapperTest(test: 1)
-  // CHECK: Wrapper.init($Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 1)))
+  // CHECK: Wrapper.init(for: DefaultedPropWrapperTest, storage: $Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 1)))
   do {
     print(wrapped3.test)
     // CHECK: in getter
@@ -142,7 +142,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped4 = DefaultedPropWrapperWithArgTest()
-  // CHECK: Wrapper.init($Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 3)))
+  // CHECK: Wrapper.init(for: DefaultedPropWrapperWithArgTest, storage: $Storage(_test: type_wrapper_defs.PropWrapper<Swift.Int>(value: 3)))
   do {
     print(wrapped4.test)
     // CHECK: in getter
@@ -158,7 +158,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped5 = PropWrapperNoInitTest(a: PropWrapperWithoutInit(value: 1))
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapperWithoutInit<Swift.Int>(value: 1), _b: type_wrapper_defs.PropWrapperWithoutInit<Swift.String>(value: "b")))
+  // CHECK: Wrapper.init(for: PropWrapperNoInitTest, storage: $Storage(_a: type_wrapper_defs.PropWrapperWithoutInit<Swift.Int>(value: 1), _b: type_wrapper_defs.PropWrapperWithoutInit<Swift.String>(value: "b")))
   do {
     print(wrapped5.a)
     // CHECK: in getter
@@ -186,7 +186,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped6 = PropWrapperNoInitTest(a: PropWrapperWithoutInit(value: 1), b: PropWrapperWithoutInit(value: "hello"))
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapperWithoutInit<Swift.Int>(value: 1), _b: type_wrapper_defs.PropWrapperWithoutInit<Swift.String>(value: "hello")))
+  // CHECK: Wrapper.init(for: PropWrapperNoInitTest, storage: $Storage(_a: type_wrapper_defs.PropWrapperWithoutInit<Swift.Int>(value: 1), _b: type_wrapper_defs.PropWrapperWithoutInit<Swift.String>(value: "hello")))
   do {
     print(wrapped6.a)
     // CHECK: in getter
@@ -214,7 +214,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped7 = ComplexPropWrapperTest()
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: ["a"]), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [1, 2, 3]))))
+  // CHECK: Wrapper.init(for: ComplexPropWrapperTest, storage: $Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: ["a"]), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [1, 2, 3]))))
   do {
     print(wrapped7.a)
     // CHECK: in getter
@@ -242,7 +242,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped8 = ComplexPropWrapperTest(a: ["a", "b"])
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: ["a", "b"]), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [1, 2, 3]))))
+  // CHECK: Wrapper.init(for: ComplexPropWrapperTest, storage: $Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: ["a", "b"]), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [1, 2, 3]))))
   do {
     print(wrapped8.a)
     // CHECK: in getter
@@ -270,7 +270,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped9 = ComplexPropWrapperTest(b: PropWrapperWithoutInit(value: PropWrapper(wrappedValue: [0])))
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: ["a"]), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [0]))))
+  // CHECK: Wrapper.init(for: ComplexPropWrapperTest, storage: $Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: ["a"]), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [0]))))
   do {
     print(wrapped9.a)
     // CHECK: in getter
@@ -298,7 +298,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped10 = ComplexPropWrapperTest(a: [], b: PropWrapperWithoutInit(value: PropWrapper(wrappedValue: [0])))
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: []), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [0]))))
+  // CHECK: Wrapper.init(for: ComplexPropWrapperTest, storage: $Storage(_a: type_wrapper_defs.PropWrapper<Swift.Array<Swift.String>>(value: []), _b: type_wrapper_defs.PropWrapperWithoutInit<type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>>(value: type_wrapper_defs.PropWrapper<Swift.Array<Swift.Int>>(value: [0]))))
   do {
     print(wrapped10.a)
     // CHECK: in getter
@@ -326,7 +326,7 @@ func testPropertyWrappers() {
   }
 
   var wrapped11 = PropWrapperNoProjectionTest()
-  // CHECK: Wrapper.init($Storage(_a: type_wrapper_defs.PropWrapperWithoutProjection<Swift.Int>(value: 0), _b: type_wrapper_defs.PropWrapperWithoutProjection<type_wrapper_defs.PropWrapper<Swift.String>>(value: type_wrapper_defs.PropWrapper<Swift.String>(value: "b"))))
+  // CHECK: Wrapper.init(for: PropWrapperNoProjectionTest, storage: $Storage(_a: type_wrapper_defs.PropWrapperWithoutProjection<Swift.Int>(value: 0), _b: type_wrapper_defs.PropWrapperWithoutProjection<type_wrapper_defs.PropWrapper<Swift.String>>(value: type_wrapper_defs.PropWrapper<Swift.String>(value: "b"))))
   do {
     print(wrapped11.a)
     // CHECK: in getter
@@ -358,7 +358,7 @@ testPropertyWrappers()
 
 do {
   var person = PersonWithUnmanagedTest(name: "Arthur Dent")
-  // CHECK: Wrapper.init($Storage(name: "Arthur Dent", _favoredColor: type_wrapper_defs.PropWrapper<Swift.String>(value: "red")))
+  // CHECK: Wrapper.init(for: PersonWithUnmanagedTest, storage: $Storage(name: "Arthur Dent", _favoredColor: type_wrapper_defs.PropWrapper<Swift.String>(value: "red")))
 
   print(person.name)
   // CHECK: in read-only getter
@@ -412,7 +412,7 @@ do {
 
 do {
   var arthur = PersonWithIgnoredAge(name: "Arthur Dent", age: 30)
-  // CHECK: Wrapper.init($Storage(name: "Arthur Dent"))
+  // CHECK: Wrapper.init(for: PersonWithIgnoredAge, storage: $Storage(name: "Arthur Dent"))
 
   print(arthur.name)
   // CHECK: in getter
@@ -430,7 +430,7 @@ do {
   // CHECK-NOT: in setter
 
   var marvin = PersonWithIgnoredAge(name: "Marvin The Paranoid Android", manufacturer: "Sirius Cybernetics Corporation")
-  // CHECK: Wrapper.init($Storage(name: "Marvin The Paranoid Android"))
+  // CHECK: Wrapper.init(for: PersonWithIgnoredAge, storage: $Storage(name: "Marvin The Paranoid Android"))
 
   print(marvin.name)
   // CHECK: in getter
@@ -454,15 +454,15 @@ do {
 // user-defined init tests
 do {
   _ = EmptyUserDefinedInitClassTest()
-  // CHECK: Wrapper.init($Storage())
+  // CHECK: Wrapper.init(for: EmptyUserDefinedInitClassTest, storage: $Storage())
   _ = EmptyUserDefinedInitStructTest()
-  // CHECK: Wrapper.init($Storage())
+  // CHECK: Wrapper.init(for: EmptyUserDefinedInitStructTest, storage: $Storage())
 
   _ = TrivialUserDefinedInitClassTest(a: 42)
-  // CHECK: Wrapper.init($Storage(a: 42))
+  // CHECK: Wrapper.init(for: TrivialUserDefinedInitClassTest, storage: $Storage(a: 42))
 
   _ = TrivialUserDefinedInitClassTest(withReassign: 42)
-  // CHECK: Wrapper.init($Storage(a: 0))
+  // CHECK: Wrapper.init(for: TrivialUserDefinedInitClassTest, storage: $Storage(a: 0))
   // CHECK-NEXT: in getter
   // CHECK-NEXT: 0
   // CHECK-NEXT: in setter => 42
@@ -470,7 +470,7 @@ do {
   // CHECK-NEXT: 42
 
   _ = TrivialUserDefinedInitStructTest(withReassign: 42)
-  // CHECK: Wrapper.init($Storage(a: 0))
+  // CHECK: Wrapper.init(for: TrivialUserDefinedInitStructTest, storage: $Storage(a: 0))
   // CHECK-NEXT: in getter
   // CHECK-NEXT: 0
   // CHECK-NEXT: in setter => 42
@@ -478,7 +478,7 @@ do {
   // CHECK-NEXT: 42
 
   let complex1 = ContextUserDefinedInitClassTest(c: ["hello": 42], placeholder: ("<placeholder>", -1))
-  // CHECK: Wrapper.init($Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1, 2, 3]))), c: ["hello": 42]))
+  // CHECK: Wrapper.init(for: ContextUserDefinedInitClassTest<String, Int>, storage: $Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1, 2, 3]))), c: ["hello": 42]))
   // CHECK-NEXT: in getter
   // CHECK-NEXT: ["hello": 42]
   // CHECK-NEXT: in getter
@@ -503,7 +503,7 @@ do {
   }
 
   let complex2 = ContextUserDefinedInitStructTest(b: ("", (0, [1])), c: ["hello": 42], placeholder: ("<placeholder>", -1))
-  // CHECK: Wrapper.init($Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1]))), c: ["hello": 42]))
+  // CHECK: Wrapper.init(for: ContextUserDefinedInitStructTest<String, Int>, storage: $Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1]))), c: ["hello": 42]))
     // CHECK-NEXT: in getter
   // CHECK-NEXT: ["hello": 42]
   // CHECK-NEXT: in getter
@@ -528,13 +528,13 @@ do {
 
   // cond: true, initialValue: nil
   _ = UserDefinedInitWithConditionalTest<Int>()
-  // CHECK: Wrapper.init($Storage(val: nil))
+  // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<Int>, storage: $Storage(val: nil))
   // CHECK-NEXT: in getter
   // CHECK-NEXT nil
 
   // initalValue: nil
   _ = UserDefinedInitWithConditionalTest<[String: any BinaryInteger]>(cond: true)
-  // CHECK: Wrapper.init($Storage(val: nil))
+  // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<Dictionary<String, BinaryInteger>>, storage: $Storage(val: nil))
   // CHECK-NEXT: in getter
   // CHECK-NEXT: nil
 
@@ -542,12 +542,12 @@ do {
     let initialValue = (("a", 42), ("b", 0))
 
     _ = UserDefinedInitWithConditionalTest(cond: true, initialValue: initialValue)
-    // CHECK: Wrapper.init($Storage(val: Optional((("a", 42), ("b", 0)))))
+    // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>, storage: $Storage(val: Optional((("a", 42), ("b", 0)))))
     // CHECK-NEXT: in getter
     // CHECK-NEXT: Optional((("a", 42), ("b", 0)))
 
     _ = UserDefinedInitWithConditionalTest(cond: false, initialValue: initialValue)
-    // CHECK: Wrapper.init($Storage(val: nil))
+    // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>, storage: $Storage(val: nil))
     // CHECK-NEXT: in getter
     // CHECK-NEXT: nil
   }
@@ -555,6 +555,7 @@ do {
 
 do {
   let test1 = ClassWithConvenienceInit(a: [1, 2, 3])
+  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<Array<Int>>, storage: $Storage(a: Optional([1, 2, 3]), b: "<placeholder>"))
   // CHECK: in getter
   // CHECK-NEXT: [1, 2, 3]
   // CHECK-NEXT: in getter
@@ -573,6 +574,7 @@ do {
   }
 
   test((a: 1, b: 2.0, c: 3))
+  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>, storage: $Storage(a: nil, b: "<placeholder>"))
   // -> from init(a: T?)
   // CHECK: in getter
   // CHECK-NEXT: nil
@@ -606,7 +608,7 @@ do {
   let test1 = TypeWithLetProperties(a: arg, b: 42) {
     arg.x.append(1)
   }
-  // CHECK: Wrapper.init($Storage(a: X(x: []), b: 42))
+  // CHECK: Wrapper.init(for: TypeWithLetProperties<X>, storage: $Storage(a: X(x: []), b: 42))
   // CHECK-NEXT: --Before onSet--
   // CHECK-NEXT: in read-only getter
   // CHECK-NEXT: X(x: [])
@@ -619,7 +621,7 @@ do {
   // CHECK-nEXT: 42
 
   let test2 = TypeWithLetProperties(a: Optional.some([1, 2, 3]))
-  // CHECK: Wrapper.init($Storage(a: Optional([1, 2, 3]), b: 0))
+  // CHECK: Wrapper.init(for: TypeWithLetProperties<Optional<Array<Int>>>, storage: $Storage(a: Optional([1, 2, 3]), b: 0))
   // CHECK-NEXT: --Before onSet--
   // CHECK-NEXT: in read-only getter
   // CHECK-NEXT: Optional([1, 2, 3])
