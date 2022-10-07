@@ -362,6 +362,11 @@ macro(add_sourcekit_framework name)
   set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
   set(framework_location "${lib_dir}/${name}.framework")
 
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_SWIFT_PARSER)
+    set(SOURCEKITFW_HAS_SWIFT_MODULES ON)
+  endif()
+
   if (NOT SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     set(FLAT_FRAMEWORK_NAME "${name}")
     set(FLAT_FRAMEWORK_IDENTIFIER "com.apple.${name}")
