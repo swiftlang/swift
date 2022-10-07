@@ -2,11 +2,6 @@
 
 set -ex
 
-if [ -x "$(command -v pip)" ]; then
-  pip install six
-fi
-pip3 install six
-
 brew install cmake ninja llvm sccache
 
 # Install latest wasmer
