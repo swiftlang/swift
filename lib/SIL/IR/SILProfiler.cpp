@@ -40,14 +40,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
                << "Skipping ASTNode: invalid start/end locations\n");
     return false;
   }
-  if (!Constant) {
-    // We should only ever have a null SILDeclRef for top-level code, which is
-    // always user-written, and should always be profiled.
-    // FIXME: Once top-level code is unified under a single SILProfiler, this
-    // case can be eliminated.
-    assert(isa<TopLevelCodeDecl>(N.get<Decl *>()));
-    return true;
-  }
 
   // Do not profile AST nodes in unavailable contexts.
   auto *DC = Constant.getInnermostDeclContext();

@@ -1946,10 +1946,20 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
 
+  // Retrieve the entry point constant we're emitting for.
+  // FIXME: This won't be necessary once we unify emission of the entry point
+  // such that we walk all of the TopLevelCodeDecls in one shot. This will be
+  // needed in order to requestify entry point emission.
+  auto *SF = td->getParentSourceFile();
+  assert(SF && "TopLevelDecl outside of a SourceFile?");
+  auto entryPoint = TopLevelSGF->F.isAsync()
+                      ? SILDeclRef::getAsyncMainFileEntryPoint(SF)
+                      : SILDeclRef::getMainFileEntryPoint(SF);
+
   // A single SILFunction may be used to lower multiple top-level decls. When
   // this happens, fresh profile counters must be assigned to the new decl.
   TopLevelSGF->F.discardProfiler();
-  TopLevelSGF->F.createProfiler(td, SILDeclRef());
+  TopLevelSGF->F.createProfiler(td, entryPoint);
 
   TopLevelSGF->emitProfilerIncrement(td->getBody());
  
