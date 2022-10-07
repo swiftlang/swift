@@ -1368,6 +1368,7 @@ emitIsUniqueCall(llvm::Value *value, ReferenceCounting style, SourceLoc loc, boo
       fn = IGM.getIsUniquelyReferenced_nonNull_bridgeObjectFunctionPointer();
   }
   break;
+  case ReferenceCounting::ObjC:
   case ReferenceCounting::Unknown: {
     if (nonObjC) {
       if (isNonNull)
@@ -1383,7 +1384,6 @@ emitIsUniqueCall(llvm::Value *value, ReferenceCounting style, SourceLoc loc, boo
   }
   break;
   case ReferenceCounting::Error:
-  case ReferenceCounting::ObjC:
   case ReferenceCounting::Block:
   case ReferenceCounting::Custom:
   case ReferenceCounting::None:
