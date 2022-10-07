@@ -325,6 +325,14 @@ func asyncContext(t: HandlerTest) async {
   t.asyncImportSame(1, replyTo: { _ in })
 }
 
+@MainActor
+@available(SwiftStdlib 5.5, *)
+func mainActorAsyncContext(t: HandlerTest) async {
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  t.simpleOnMainActor(completionHandler: { _ in })
+  await t.simpleOnMainActor()
+}
+
 @available(SwiftStdlib 5.5, *)
 func syncContext(t: HandlerTest) {
   goodFunc1(value: "Hello") { _ in }
