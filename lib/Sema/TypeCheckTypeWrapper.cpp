@@ -258,12 +258,19 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
   assert(storageVar);
 
   // \$Storage.<property-name>
-  auto *argExpr = KeyPathExpr::createImplicit(
+  auto *storageKeyPath = KeyPathExpr::createImplicit(
       ctx, /*backslashLoc=*/SourceLoc(),
       {KeyPathExpr::Component::forProperty(
           {storageVar},
           useDC->mapTypeIntoContext(storageVar->getInterfaceType()),
           /*Loc=*/SourceLoc())},
+      /*endLoc=*/SourceLoc());
+
+  // WrappedType.<property-name>
+  auto *propertyKeyPath = KeyPathExpr::createImplicit(
+      ctx, /*backslashLoc=*/SourceLoc(),
+      {KeyPathExpr::Component::forUnresolvedProperty(
+          DeclNameRef(var->getName()), /*Loc=*/SourceLoc())},
       /*endLoc=*/SourceLoc());
 
   auto *subscriptBaseExpr = UnresolvedDotExpr::createImplicit(
@@ -275,7 +282,11 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
   // $storage[storageKeyPath: \$Storage.<property-name>]
   return SubscriptExpr::create(
       ctx, subscriptBaseExpr,
-      ArgumentList::forImplicitSingle(ctx, ctx.Id_storageKeyPath, argExpr),
+      ArgumentList::createImplicit(
+          ctx, {Argument(/*loc=*/SourceLoc(), ctx.Id_propertyKeyPath,
+                         propertyKeyPath),
+                Argument(/*loc=*/SourceLoc(), ctx.Id_storageKeyPath,
+                         storageKeyPath)}),
       ConcreteDeclRef(), /*implicit=*/true);
 }
 

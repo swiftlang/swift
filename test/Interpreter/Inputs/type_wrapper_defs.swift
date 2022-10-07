@@ -7,21 +7,23 @@ public struct Wrapper<W, S> {
     self.underlying = storage
   }
 
-  public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: KeyPath<S, V>) -> V {
     get {
-      print("in read-only getter")
-      return underlying[keyPath: path]
+      print("in read-only getter storage: \(storagePath), property: \(propertyPath)")
+      return underlying[keyPath: storagePath]
     }
   }
 
-  public subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
     get {
-      print("in getter")
-      return underlying[keyPath: path]
+      print("in getter storage: \(storagePath), property: \(propertyPath)")
+      return underlying[keyPath: storagePath]
     }
     set {
       print("in setter => \(newValue)")
-      underlying[keyPath: path] = newValue
+      underlying[keyPath: storagePath] = newValue
     }
   }
 }

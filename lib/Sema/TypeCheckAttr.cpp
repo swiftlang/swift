@@ -3732,7 +3732,12 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
            std::min(nominal->getFormalAccess(), AccessLevel::Public);
   };
 
-  enum class UnviabilityReason { Failable, InvalidType, Inaccessible };
+  enum class UnviabilityReason {
+    Failable,
+    InvalidPropertyType,
+    InvalidStorageType,
+    Inaccessible
+  };
 
   auto findMembersOrDiagnose = [&](DeclName memberName,
                                    SmallVectorImpl<ValueDecl *> &results,
@@ -3808,7 +3813,8 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
                      nominal->getFormalAccess());
             break;
 
-          case UnviabilityReason::InvalidType:
+          case UnviabilityReason::InvalidStorageType:
+          case UnviabilityReason::InvalidPropertyType:
             llvm_unreachable("init(storage:) type is not checked");
           }
         }
@@ -3874,11 +3880,10 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
     }
   }
 
-  // subscript(storedKeypath: KeyPath<...>)
+  // subscript(propertyKeyPath: KeyPath, storedKeypath: {Writable}KeyPath)
   {
-    DeclName subscriptName(
-        ctx, DeclBaseName::createSubscript(),
-        ArrayRef<Identifier>(ctx.getIdentifier("storageKeyPath")));
+    DeclName subscriptName(ctx, DeclBaseName::createSubscript(),
+                           {ctx.Id_propertyKeyPath, ctx.Id_storageKeyPath});
 
     SmallVector<ValueDecl *, 2> subscripts;
     if (findMembersOrDiagnose(subscriptName, subscripts,
@@ -3891,25 +3896,33 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
     bool hasReadOnly = false;
     bool hasWritable = false;
 
+    auto hasKeyPathType = [](ParamDecl *PD) {
+      if (auto *BGT = PD->getInterfaceType()->getAs<BoundGenericType>()) {
+        return BGT->isKeyPath() || BGT->isWritableKeyPath() ||
+               BGT->isReferenceWritableKeyPath();
+      }
+      return false;
+    };
+
     for (auto *decl : subscripts) {
       auto *subscript = cast<SubscriptDecl>(decl);
 
-      auto *keyPathParam = subscript->getIndices()->get(0);
+      auto *propertyKeyPathParam = subscript->getIndices()->get(0);
 
-      if (auto *BGT =
-              keyPathParam->getInterfaceType()->getAs<BoundGenericType>()) {
-        if (!(BGT->isKeyPath() || BGT->isWritableKeyPath() ||
-              BGT->isReferenceWritableKeyPath())) {
-          nonViableSubscripts[subscript].push_back(
-              UnviabilityReason::InvalidType);
-        } else {
-          hasReadOnly |= BGT->isKeyPath();
-          hasWritable |=
-              BGT->isWritableKeyPath() || BGT->isReferenceWritableKeyPath();
-        }
+      if (!hasKeyPathType(propertyKeyPathParam)) {
+        nonViableSubscripts[subscript].push_back(
+            UnviabilityReason::InvalidPropertyType);
+      }
+
+      auto *storageKeyPathParam = subscript->getIndices()->get(1);
+      if (hasKeyPathType(storageKeyPathParam)) {
+        auto type = storageKeyPathParam->getInterfaceType();
+        hasReadOnly |= type->isKeyPath();
+        hasWritable |=
+            type->isWritableKeyPath() || type->isReferenceWritableKeyPath();
       } else {
         nonViableSubscripts[subscript].push_back(
-            UnviabilityReason::InvalidType);
+            UnviabilityReason::InvalidStorageType);
       }
 
       if (isLessAccessibleThanType(subscript))
@@ -3928,7 +3941,9 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
                         diag::add_type_wrapper_subscript_stub_note)
                 .fixItInsertAfter(
                     nominal->getBraces().Start,
-                    "\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, "
+                    "\nsubscript<Value>(propertyKeyPath propPath: "
+                    "KeyPath<<#WrappedType#>, Value>, storageKeyPath "
+                    "storagePath: KeyPath<<#Base#>, "
                     "Value>) -> Value { get { <#code#> } }");
           });
       attr->setInvalid();
@@ -3945,7 +3960,9 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
                         diag::add_type_wrapper_subscript_stub_note)
                 .fixItInsertAfter(
                     nominal->getBraces().Start,
-                    "\nsubscript<Value>(storageKeyPath path: "
+                    "\nsubscript<Value>(propertyKeyPath propPath: "
+                    "KeyPath<<#WrappedType#>, Value>, storageKeyPath "
+                    "storagePath: "
                     "WritableKeyPath<<#Base#>, "
                     "Value>) -> Value { get { <#code#> } set { <#code#> } }");
           });
@@ -3958,10 +3975,17 @@ void AttributeChecker::visitTypeWrapperAttr(TypeWrapperAttr *attr) {
 
         for (auto reason : entry.second) {
           switch (reason) {
-          case UnviabilityReason::InvalidType: {
+          case UnviabilityReason::InvalidPropertyType: {
             auto paramTy = subscript->getIndices()->get(0)->getInterfaceType();
-            diagnose(subscript, diag::type_wrapper_invalid_subscript_param_type,
-                     paramTy);
+            diagnose(subscript, diag::type_wrapper_subscript_invalid_parameter,
+                     ctx.Id_propertyKeyPath, paramTy);
+            break;
+          }
+
+          case UnviabilityReason::InvalidStorageType: {
+            auto paramTy = subscript->getIndices()->get(1)->getInterfaceType();
+            diagnose(subscript, diag::type_wrapper_subscript_invalid_parameter,
+                     ctx.Id_storageKeyPath, paramTy);
             break;
           }
 

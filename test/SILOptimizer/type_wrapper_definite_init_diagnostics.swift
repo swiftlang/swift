@@ -8,11 +8,13 @@ struct Wrapper<W, S> {
 
   init(for: W.Type, storage: S) { self.underlying = storage }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>,
+               storageKeyPath path: KeyPath<S, V>) -> V {
     get { underlying[keyPath: path] }
   }
 
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>,
+               storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get { underlying[keyPath: path] }
     set { underlying[keyPath: path] = newValue }
   }

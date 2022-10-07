@@ -19,6 +19,9 @@
 // (rdar://99051588)
 // UNSUPPORTED: remote_run || device_run
 
+// FIXME: There is no way to form a key path to an actor isolated property (rdar://84445219)
+// REQUIRES: rdar84445219
+
 import type_wrapper_defs
 
 @Wrapper

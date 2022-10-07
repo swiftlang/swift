@@ -15,7 +15,7 @@ struct EmptyTypeWrapper<W, S> { // expected-error {{type wrapper type 'EmptyType
 struct NoMemberwiseInit<W, S> {
   // expected-error@-1 {{type wrapper type 'NoMemberwiseInit' does not contain a required initializer - init(for:storage:)}}
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
@@ -25,7 +25,7 @@ struct FailableInit<W, S> {
   init?(for: W.Type, storage: S) { // expected-error {{type wrapper initializer 'init(for:storage:)' cannot be failable}}
   }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
@@ -34,7 +34,7 @@ struct FailableInit<W, S> {
 @typeWrapper
 struct FailableAndValidInit<W, S> {
   // expected-error@-1 {{type wrapper type 'FailableAndValidInit' does not contain a required writable subscript}}
-  // expected-note@-2 {{do you want to add a stub?}} {{36-36=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+  // expected-note@-2 {{do you want to add a stub?}} {{36-36=\nsubscript<Value>(propertyKeyPath propPath: KeyPath<<#WrappedType#>, Value>, storageKeyPath storagePath: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
   init(for: W.Type, storage: S) {
   }
@@ -42,7 +42,7 @@ struct FailableAndValidInit<W, S> {
   init?(for: W.Type, storage: S) where S == Int {
   }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
@@ -58,14 +58,14 @@ public struct InaccessibleInit<W, S> {
     // expected-error@-2 {{type wrapper initializer 'init(for:storage:)' cannot be failable}}
   }
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 }
 
 @typeWrapper
 struct NoSubscripts<W, S> {
-  // expected-error@-1 {{type wrapper type 'NoSubscripts' does not contain a required subscript - subscript(storedKeyPath:)}}
+  // expected-error@-1 {{type wrapper type 'NoSubscripts' does not contain a required subscript - subscript(propertyKeyPath:storageKeyPath:)}}
   init(for: W.Type, storage: S) {}
 }
 
@@ -73,22 +73,27 @@ struct NoSubscripts<W, S> {
 struct InaccessibleOrInvalidSubscripts<W, S> {
   init(for: W.Type, storage: S) {}
 
-  fileprivate subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
-    // expected-error@-1 {{fileprivate subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+  fileprivate subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
+    // expected-error@-1 {{fileprivate subscript 'subscript(propertyKeyPath:storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
     get { fatalError() }
   }
 
-  private subscript<V>(storageKeyPath path: KeyPath<S, V>) -> [V] {
-    // expected-error@-1 {{private subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+  private subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> [V] {
+    // expected-error@-1 {{private subscript 'subscript(propertyKeyPath:storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
     get { fatalError() }
   }
 
-  private subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
-    // expected-error@-1 {{private subscript 'subscript(storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
+  private subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
+    // expected-error@-1 {{private subscript 'subscript(propertyKeyPath:storageKeyPath:)' cannot have more restrictive access than its enclosing type wrapper type 'InaccessibleOrInvalidSubscripts' (which is internal)}}
     get { fatalError() }
   }
 
-  subscript(storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript expects a key path parameter type (got: 'Int')}}
+  subscript(propertyKeyPath _: KeyPath<W, Bool>, storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript 'storageKeyPath' parameter expects a key path (got: 'Int')}}
+    get { true }
+  }
+
+  subscript(propertyKeyPath _: Int.Type, storageKeyPath path: KeyPath<S, Bool>) -> Bool {
+    // expected-error@-1 {{type wrapper subscript 'propertyKeyPath' parameter expects a key path (got: 'Int.Type')}}
     get { true }
   }
 }
@@ -98,8 +103,8 @@ struct OverloadedCtorWrapper<W, S> {
   init(for: W.Type, storage: S) {} // expected-error {{cannot overload type wrapper initializer 'init(for:storage:)'}}
   init(for: W.Type, storage: Int) {}
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> [V] { get { fatalError() } }
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> [V] { get { fatalError() } }
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> [V] {
     get { fatalError() }
     set { }
   }
@@ -143,11 +148,11 @@ do {
 struct NoopWrapper<W, S> {
   init(for: W.Type, storage: S) {}
 
-  subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
     get { fatalError() }
   }
 
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
     get { fatalError() }
     set { }
   }
@@ -186,11 +191,11 @@ struct Parent {
   struct Wrapper<W, S> {
     init(for: W.Type, storage: S) {}
 
-    subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
     }
 
-    subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
       set { }
     }
@@ -443,13 +448,15 @@ func testDeclarationsWithUnmanagedProperties() {
   _ = OnlyLazyLetAndComputed(name: "Arthur Dent") // Ok
 }
 
+/* (!) FIXME: It's not possible to form a key path to an actor isolated property (rdar://84445219)
+ *
 func testActors() async {
   @NoopWrapper
   actor Person {
     var name: String
-    // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+    note@-1 {{mutation of this property is only permitted within the actor}}
     var age: Int
-    // expected-note@-1 {{mutation of this property is only permitted within the actor}}
+    ote@-1 {{mutation of this property is only permitted within the actor}}
   }
 
   let person = Person(name: "Arthur Dent", age: 30)
@@ -457,9 +464,12 @@ func testActors() async {
   _ = await person.name
   _ = await person.age
 
-  person.name = "NoName" // expected-error {{actor-isolated property 'name' can not be mutated from a non-isolated context}}
-  person.age = 0 // expected-error {{actor-isolated property 'age' can not be mutated from a non-isolated context}}
+  person.name = "NoName"
+  error@-1 {{actor-isolated property 'name' can not be mutated from a non-isolated context}}
+  person.age = 0
+  error@-1 {{actor-isolated property 'age' can not be mutated from a non-isolated context}}
 }
+*/
 
 func testIgnoredAttr() {
   @NoopWrapper
@@ -504,11 +514,11 @@ func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
   @typeWrapper
   struct MissingReadOnly<W, S> {
     // expected-error@-1 {{type wrapper type 'MissingReadOnly' does not contain a required ready-only subscript}}
-    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
+    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(propertyKeyPath propPath: KeyPath<<#WrappedType#>, Value>, storageKeyPath storagePath: KeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} \}}}
 
     init(for: W.Type, storage: S) {}
 
-    subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
       get { fatalError() }
       set { }
     }
@@ -517,11 +527,11 @@ func testMissingReadOnlyAndWritableSubscriptsAreDiagnosed() {
   @typeWrapper
   struct MissingWritable<W, S> {
     // expected-error@-1 {{type wrapper type 'MissingWritable' does not contain a required writable subscript}}
-    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(storageKeyPath path: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
+    // expected-note@-2 {{do you want to add a stub?}} {{33-33=\nsubscript<Value>(propertyKeyPath propPath: KeyPath<<#WrappedType#>, Value>, storageKeyPath storagePath: WritableKeyPath<<#Base#>, Value>) -> Value { get { <#code#> \} set { <#code#> \} \}}}
 
     init(for: W.Type, storage: S) {}
 
-    subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
       get { fatalError() }
     }
   }
