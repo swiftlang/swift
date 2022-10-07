@@ -1,10 +1,12 @@
-# Swift and C++ Interoperability Roadmap
+# Using C++ from Swift 
 
 ## Introduction
 
-This document is a roadmap for the development of the "forward" half of C++ and Swift interoperability: using C++ APIs from Swift. It lays out overarching goals that drive the project’s design decisions, outlines some hihg-level topics related to C++ interoperability, and finally, investigates a collection of specific API patterns and proposes potential ways for the compiler to import them. This roadmap is a sketch, rather than a final design for C++ and Swift interoperability. Towards the end, this document suggests a proeccess for evolving C++ interoperability over time, and the path for finalizing the designs discussed here.
+This document lays out a vision for the development of the "forward" half of C++ and Swift interoperability: using C++ APIs from Swift. It sets overarching goals that drive the project’s design decisions, outlines some high-level topics related to C++ interoperability, and, finally, investigates a collection of specific API patterns and proposes potential ways for the compiler to import them. This vision is a sketch, rather than a final design for C++ and Swift interoperability. Towards the end, this document suggests a proeccess for evolving C++ interoperability over time, and the path for finalizing the designs discussed here.
 
-“Reverse” interoperability (using Swift APIs from C++) is another extremely important part of the interoperability story; however, reverse interoperability has largely different goals and constraints, which necessarily mean a different design and roadmap. [The Reverse interop roadmap is being developed here.](https://github.com/apple/swift/pull/61256)
+“Reverse” interoperability (using Swift APIs from C++) is another extremely important part of the interoperability story; however, reverse interoperability has largely different goals and constraints, which necessarily mean a different design and therefore a different vision document. [The vision for reverse interoperability is being developed here.](https://github.com/apple/swift/pull/61256)
+
+This document is a prospective feature vision document, as described in the [draft review management guidelines](https://github.com/rjmccall/swift-evolution/blob/057b2383102f34c3d0f5b257f82bba0f5b94683d/review_management.md#future-directions-and-roadmaps) of the Swift evolution process.  It has not yet been approved by the Language Workgroup.
 
 ## Goals
 
@@ -54,11 +56,11 @@ Value types have value semantics, that is, they can be copied and destroyed. Eac
 
 #### Simple data types
 
-This roadmap will refer to C++'s trivially-copyable value types that do not hold pointers as “simple data types.” These types include primitive types such as integers and types which are composed of other simple data types. Simple data types are “owned” types that provide trivial lifetime operations: a copy is a copy of their bits and a destroy is a no-op. Simple data types have roughly the same mapping throughout Swift, C, Objective-C, and C++ making them trivial to import. Simple data types, their instances, methods on simple data types, and other APIs that use simple data types are generally considered to be safe and usable.
+This document will refer to C++'s trivially-copyable value types that do not hold pointers as “simple data types.” These types include primitive types such as integers and types which are composed of other simple data types. Simple data types are “owned” types that provide trivial lifetime operations: a copy is a copy of their bits and a destroy is a no-op. Simple data types have roughly the same mapping throughout Swift, C, Objective-C, and C++ making them trivial to import. Simple data types, their instances, methods on simple data types, and other APIs that use simple data types are generally considered to be safe and usable.
 
 **View types**
 
-This roadmap will refer to trivially-copyable value types that hold pointers as “view types.” These types include pointers themselves and types which are composed of any other view types (potentially including other types as well). The pointers held by view types refer to memory that is *not owned* by the pointer type (making view types a “view” or “projection” into memory). While view types are very similar to simple data types with respect to their trivial lifetime operations and the fact that they map similarly in these four language, they differ in the fact that while they themselves are not inherently unsafe, they may be used in unsafe APIs (discussed later).
+This document will refer to trivially-copyable value types that hold pointers as “view types.” These types include pointers themselves and types which are composed of any other view types (potentially including other types as well). The pointers held by view types refer to memory that is *not owned* by the pointer type (making view types a “view” or “projection” into memory). While view types are very similar to simple data types with respect to their trivial lifetime operations and the fact that they map similarly in these four language, they differ in the fact that while they themselves are not inherently unsafe, they may be used in unsafe APIs (discussed later).
 
 #### Self-contained types
 
@@ -103,13 +105,13 @@ It may be convient for Swift to assume that all projects follow one, unique patt
 
 ### Generic APIs
 
-C++ provides a couple of tools for writing generic APIs: templates, concepts, virtual classes (inheritance), and various combinations and permutations of these. Templates are likely the most common tool for creating generic APIs. Unfortunately, as outlined in [this forum post](https://forums.swift.org/t/bridging-c-templates-with-interop/55003) (Bridging C++ Templates with Interop), C++ templates do not map cleanly to Swift generics, making interoperability between these generic APIs extremely difficult. Despite this, the linked forum post proposes various strategies for importing C++ templates derived from goals similar to the ones outlines in this roadmap. These proposals should probably be factored into this section of the roadmap at some point in the future.
+C++ provides a couple of tools for writing generic APIs: templates, concepts, virtual classes (inheritance), and various combinations and permutations of these. Templates are likely the most common tool for creating generic APIs. Unfortunately, as outlined in [this forum post](https://forums.swift.org/t/bridging-c-templates-with-interop/55003) (Bridging C++ Templates with Interop), C++ templates do not map cleanly to Swift generics, making interoperability between these generic APIs extremely difficult. Despite this, the linked forum post proposes various strategies for importing C++ templates derived from goals similar to the ones outlines in this document. These proposals should probably be factored into this section at some point in the future.
 
 ## Evolution process
 
-Several specific API patterns are outlined above. These specific API patterns will each need a detailed, self-contained, evolution proposal which can take context from and be framed by this roadmap. Once each of these specific API patterns is accepted by the Swift community (through the evolution process) the design will be ratified.
+Several specific API patterns are outlined above. These specific API patterns will each need a detailed, self-contained, evolution proposal which can take context from and be framed by this document. Once each of these specific API patterns is accepted by the Swift community (through the evolution process) the design will be ratified.
 
-This roadmap allows specific, focused, and self contained evolution proposals to be created for individual pieces of the language and specific programming patterns by providing goals that lend themself to this kind of incremental design and evolution (by not importing everything and requiring specific mappings for specific API patterns) and by framing interop in a larger context that these individual evolution proposals can fit into.
+This document allows specific, focused, and self contained evolution proposals to be created for individual pieces of the language and specific programming patterns by providing goals that lend themself to this kind of incremental design and evolution (by not importing everything and requiring specific mappings for specific API patterns) and by framing interop in a larger context that these individual evolution proposals can fit into.
 
 ## The Swift ecosystem
 
@@ -117,7 +119,7 @@ This roadmap allows specific, focused, and self contained evolution proposals to
 
 It goes without saying (yet will be said anyway) that as a supported language feature, C++ and Swift interoperability must work well on every platform supported by Swift. In a similar vein, tools in the Swift ecosystem should be updated to support interoperability features. For example, SourceKit should provide autocompletion, jump-to-definition, etc. for C++ functions, methods, and types and lldb should be able to print C++ types (even in Swift frames). Finally, the Swift package manager should be updated with the necessary features to support building C++ dependencies.
 
-This roadmap outlines a strategy for importing APIs that relies on semantic information from the user. In order to make this painless for users across a variety of projects, Swift will need to provide both inline annotation support for C++ APIs and side-file support for APIs that cannot be updated. For Objective-C, this side-file is an APINotes file. As part of Swift and C++ interoperability, APINotes will either need to be updated to support C++ APIs, or another kind side-file will need to be created. 
+This document outlines a strategy for importing APIs that relies on semantic information from the user. In order to make this painless for users across a variety of projects, Swift will need to provide both inline annotation support for C++ APIs and side-file support for APIs that cannot be updated. For Objective-C, this side-file is an APINotes file. As part of Swift and C++ interoperability, APINotes will either need to be updated to support C++ APIs, or another kind side-file will need to be created. 
 
 ### The standard library
 
