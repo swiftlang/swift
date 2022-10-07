@@ -1713,11 +1713,13 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
                 /*UnexpectedNodes=*/None,
-                /*Identifier=*/SyntaxContext->popToken(), *SyntaxContext);
+                /*Identifier=*/SyntaxContext->popToken(),
+                /*UnexpectedNodes=*/None, *SyntaxContext);
         ParsedExprSyntax ExprNode =
             ParsedSyntaxRecorder::makeUnresolvedPatternExpr(
                 /*UnexpectedNodes=*/None,
-                /*Pattern=*/std::move(PatternNode), *SyntaxContext);
+                /*Pattern=*/std::move(PatternNode),
+                /*UnexpectedNodes=*/None, *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));

@@ -946,7 +946,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
           /*UnexpectedNodes=*/None,
           /*Type=*/std::move(*synType),
           /*UnexpectedNodes=*/None,
-          /*Ampersand=*/None, *SyntaxContext);
+          /*Ampersand=*/None, /*UnexpectedNodes=*/None, *SyntaxContext);
       SyntaxContext->addSyntax(std::move(LastNode));
     }
   }

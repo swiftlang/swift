@@ -68,13 +68,16 @@
                       "leadingTrivia": "\n",
                       "trailingTrivia": "",
                       "presence": "Present"
-                    }
+                    },
+                    null
                   ],
                   "presence": "Present"
-                }
+                },
+                null
               ],
               "presence": "Present"
             },
+            null,
             null,
             null,
             null,
@@ -145,13 +148,16 @@
                       "leadingTrivia": "\n",
                       "trailingTrivia": "",
                       "presence": "Present"
-                    }
+                    },
+                    null
                   ],
                   "presence": "Present"
-                }
+                },
+                null
               ],
               "presence": "Present"
             },
+            null,
             null,
             null,
             null,
@@ -171,7 +177,8 @@
       "leadingTrivia": "\n",
       "trailingTrivia": "",
       "presence": "Present"
-    }
+    },
+    null
   ],
   "presence": "Present"
 }
