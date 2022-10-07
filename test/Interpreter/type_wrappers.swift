@@ -18,17 +18,17 @@ var p: Person<String> = .init(name: "P", projects: ["A", "B"])
 // CHECK: Wrapper.init(for: Person<String>, storage: $Storage(name: "P", projects: ["A", "B"]))
 
 print(p.name)
-// CHECK: in getter storage: \$Storage.name, property: \Person<String>.name
+// CHECK: in (reference type) getter storage: \$Storage.name, property: \Person<String>.{{.*}}
 // CHECK-NEXT: P
 print(p.projects)
-// CHECK: in getter storage: \$Storage.projects, property: \Person<String>.projects
+// CHECK: in (reference type) getter storage: \$Storage.projects, property: \Person<String>.{{.*}}
 // CHECK-NEXT: ["A", "B"]
 
 p.name = "OtherP"
-// CHECK: in setter => OtherP
+// CHECK: in (reference type) setter => OtherP
 p.projects.append("C")
-// CHECK: in getter storage: \$Storage.projects, property: \Person<String>.projects
-// CHECK-NEXT: in setter => ["A", "B", "C"]
+// CHECK: in (reference type) getter storage: \$Storage.projects, property: \Person<String>.{{.*}}
+// CHECK-NEXT: in (reference type) setter => ["A", "B", "C"]
 
 
 func addProjects<T>(p: inout Person<T>, _ newProjects: [T]) {
@@ -36,15 +36,15 @@ func addProjects<T>(p: inout Person<T>, _ newProjects: [T]) {
 }
 
 addProjects(p: &p, ["D"])
-// CHECK: in getter storage: \$Storage.projects, property: \Person<String>.projects
-// CHECK: in setter => ["A", "B", "C", "D"]
+// CHECK: in (reference type) getter storage: \$Storage.projects, property: \Person<String>.{{.*}}
+// CHECK: in (reference type) setter => ["A", "B", "C", "D"]
 
 print(p.name)
-// CHECK: in getter storage: \$Storage.name, property: \Person<String>.name
+// CHECK: in (reference type) getter storage: \$Storage.name, property: \Person<String>.{{.*}}
 // CHECK-NEXT: OtherP
 
 print(p.projects)
-// CHECK: in getter storage: \$Storage.projects, property: \Person<String>.projects
+// CHECK: in (reference type) getter storage: \$Storage.projects, property: \Person<String>.{{.*}}
 // CHECK-NEXT: ["A", "B", "C", "D"]
 
 var pDefaults = PersonWithDefaults()
@@ -387,26 +387,26 @@ do {
   var test = ClassWithDesignatedInit(a: 42)
 
   print(test.a)
-  // CHECK: in getter storage: \$Storage.a, property: \ClassWithDesignatedInit.a
+  // CHECK: in (reference type) getter storage: \$Storage.a, property: \ClassWithDesignatedInit.{{.*}}
   // CHECK-NEXT: 42
 
   print(test.b)
-  // CHECK: in getter storage: \$Storage._b, property: \ClassWithDesignatedInit._b
+  // CHECK: in (reference type) getter storage: \$Storage._b, property: \ClassWithDesignatedInit.{{.*}}
   // CHECK-NEXT: [1, 2, 3]
 
   test.a = 0
-  // CHECK: in setter => 0
+  // CHECK: in (reference type) setter => 0
 
   test.b = [42]
-  // CHECK: in getter storage: \$Storage._b, property: \ClassWithDesignatedInit._b
-  // CHECK-NEXT: in setter => PropWrapperWithoutInit<Array<Int>>(value: [42])
+  // CHECK: in (reference type) getter storage: \$Storage._b, property: \ClassWithDesignatedInit.{{.*}}
+  // CHECK-NEXT: in (reference type) setter => PropWrapperWithoutInit<Array<Int>>(value: [42])
 
   print(test.a)
-  // CHECK: in getter storage: \$Storage.a, property: \ClassWithDesignatedInit.a
+  // CHECK: in (reference type) getter storage: \$Storage.a, property: \ClassWithDesignatedInit.{{.*}}
   // CHECK-NEXT: 0
 
   print(test.b)
-  // CHECK: in getter storage: \$Storage._b, property: \ClassWithDesignatedInit._b
+  // CHECK: in (reference type) getter storage: \$Storage._b, property: \ClassWithDesignatedInit.{{.*}}
   // CHECK-NEXT: [42]
 }
 
@@ -415,7 +415,7 @@ do {
   // CHECK: Wrapper.init(for: PersonWithIgnoredAge, storage: $Storage(name: "Arthur Dent"))
 
   print(arthur.name)
-  // CHECK: in getter storage: \$Storage.name, property: \PersonWithIgnoredAge.name
+  // CHECK: in (reference type) getter storage: \$Storage.name, property: \PersonWithIgnoredAge.{{.*}}
   // CHECK-NEXT: Arthur Dent
 
   print(arthur.age)
@@ -433,7 +433,7 @@ do {
   // CHECK: Wrapper.init(for: PersonWithIgnoredAge, storage: $Storage(name: "Marvin The Paranoid Android"))
 
   print(marvin.name)
-  // CHECK: in getter storage: \$Storage.name, property: \PersonWithIgnoredAge.name
+  // CHECK: in (reference type) getter storage: \$Storage.name, property: \PersonWithIgnoredAge.{{.*}}
   // CHECK-NEXT: Marvin The Paranoid Android
 
   print(marvin.age)
@@ -463,10 +463,10 @@ do {
 
   _ = TrivialUserDefinedInitClassTest(withReassign: 42)
   // CHECK: Wrapper.init(for: TrivialUserDefinedInitClassTest, storage: $Storage(a: 0))
-  // CHECK-NEXT: in getter storage: \$Storage.a, property: \TrivialUserDefinedInitClassTest.a
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.a, property: \TrivialUserDefinedInitClassTest.{{.*}}
   // CHECK-NEXT: 0
-  // CHECK-NEXT: in setter => 42
-  // CHECK-NEXT: in getter storage: \$Storage.a, property: \TrivialUserDefinedInitClassTest.a
+  // CHECK-NEXT: in (reference type) setter => 42
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.a, property: \TrivialUserDefinedInitClassTest.{{.*}}
   // CHECK-NEXT: 42
 
   _ = TrivialUserDefinedInitStructTest(withReassign: 42)
@@ -479,63 +479,63 @@ do {
 
   let complex1 = ContextUserDefinedInitClassTest(c: ["hello": 42], placeholder: ("<placeholder>", -1))
   // CHECK: Wrapper.init(for: ContextUserDefinedInitClassTest<String, Int>, storage: $Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1, 2, 3]))), c: ["hello": 42]))
-  // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.c
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.{{.*}}
   // CHECK-NEXT: ["hello": 42]
-  // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.c
-  // CHECK-NEXT: in setter => [{{.*}}, {{.*}}]
-  // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.c
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.{{.*}}
+  // CHECK-NEXT: in (reference type) setter => [{{.*}}, {{.*}}]
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.{{.*}}
   // CHECK-NEXT: [{{.*}}, {{.*}}]
   print(complex1.a)
-  // CHECK-NEXT: in getter storage: \$Storage.a, property: \ContextUserDefinedInitClassTest<String, Int>.a
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.a, property: \ContextUserDefinedInitClassTest<String, Int>.{{.*}}
   // CHECK-NEXT: 0
   print(complex1.b)
-  // CHECK-NEXT: in getter storage: \$Storage._b, property: \ContextUserDefinedInitClassTest<String, Int>.<{{.*}} (PropWrapper<(String, (Int, Array<Int>))>)>
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage._b, property: \ContextUserDefinedInitClassTest<String, Int>.<{{.*}} (PropWrapper<(String, (Int, Array<Int>))>)>
   // CHECK-NEXT: ("", (0, [1, 2, 3]))
 
   if complex1.c == ["hello": 42] { // use of Hashable, Equatable conformances
-    // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.c
+    // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.{{.*}}
     fatalError("== failed between complex1 dictionaries")
   }
 
   if complex1.c != ["hello": 42, "<placeholder>": -1] {
-    // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.c
+    // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitClassTest<String, Int>.{{.*}}
     fatalError("!= failed between complex1 dictionaries")
   }
 
   let complex2 = ContextUserDefinedInitStructTest(b: ("", (0, [1])), c: ["hello": 42], placeholder: ("<placeholder>", -1))
   // CHECK: Wrapper.init(for: ContextUserDefinedInitStructTest<String, Int>, storage: $Storage(a: 0, _b: type_wrapper_defs.PropWrapper<(Swift.String, (Swift.Int, Swift.Array<Swift.Int>))>(value: ("", (0, [1]))), c: ["hello": 42]))
-  // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.c
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.{{.*}}
   // CHECK-NEXT: ["hello": 42]
-  // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.c
-  // CHECK-NEXT: in setter => [{{.*}}, {{.*}}]
-  // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.c
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.{{.*}}
+  // CHECK-NEXT: in (reference type) setter => [{{.*}}, {{.*}}]
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.{{.*}}
   // CHECK-NEXT: [{{.*}}, {{.*}}]
   print(complex2.a)
-  // CHECK-NEXT: in getter storage: \$Storage.a, property: \ContextUserDefinedInitStructTest<String, Int>.a
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.a, property: \ContextUserDefinedInitStructTest<String, Int>.{{.*}}
   // CHECK-NEXT: 0
   print(complex2.b)
-  // CHECK-NEXT: in getter storage: \$Storage._b, property: \ContextUserDefinedInitStructTest<String, Int>.<{{.*}} (PropWrapper<(String, (Int, Array<Int>))>)>
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage._b, property: \ContextUserDefinedInitStructTest<String, Int>.<{{.*}} (PropWrapper<(String, (Int, Array<Int>))>)>
   // CHECK-NEXT: ("", (0, [1]))
   if complex2.c == ["hello": 42] { // use of Hashable, Equatable conformances
-    // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.c
+    // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.{{.*}}
     fatalError("== failed between complex2 dictionaries")
   }
 
   if complex2.c != ["hello": 42, "<placeholder>": -1] {
-    // CHECK-NEXT: in getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.c
+    // CHECK-NEXT: in (reference type) getter storage: \$Storage.c, property: \ContextUserDefinedInitStructTest<String, Int>.{{.*}}
     fatalError("!= failed between complex2 dictionaries")
   }
 
   // cond: true, initialValue: nil
   _ = UserDefinedInitWithConditionalTest<Int>()
   // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<Int>, storage: $Storage(val: nil))
-  // CHECK-NEXT: in getter
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<Int>.{{.*}}
   // CHECK-NEXT nil
 
   // initalValue: nil
   _ = UserDefinedInitWithConditionalTest<[String: any BinaryInteger]>(cond: true)
   // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<Dictionary<String, BinaryInteger>>, storage: $Storage(val: nil))
-  // CHECK-NEXT: in getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<Dictionary<String, BinaryInteger>>.va
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<Dictionary<String, BinaryInteger>>.{{.*}}
   // CHECK-NEXT: nil
 
   do {
@@ -543,29 +543,29 @@ do {
 
     _ = UserDefinedInitWithConditionalTest(cond: true, initialValue: initialValue)
     // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>, storage: $Storage(val: Optional((("a", 42), ("b", 0)))))
-    // CHECK-NEXT: in getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>.val
+    // CHECK-NEXT: in (reference type) getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>.{{.*}}
     // CHECK-NEXT: Optional((("a", 42), ("b", 0)))
 
     _ = UserDefinedInitWithConditionalTest(cond: false, initialValue: initialValue)
     // CHECK: Wrapper.init(for: UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>, storage: $Storage(val: nil))
-    // CHECK-NEXT: in getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>.val
+    // CHECK-NEXT: in (reference type) getter storage: \$Storage.val, property: \UserDefinedInitWithConditionalTest<((String, Int), (String, Int))>.val
     // CHECK-NEXT: nil
   }
 }
 
 do {
-  let test1 = ClassWithConvenienceInit(a: [1, 2, 3])
-  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<Array<Int>>, storage: $Storage(a: Optional([1, 2, 3]), b: "<placeholder>"))
-  // CHECK: in getter storage: \$Storage.a, property: \ClassWithConvenienceInit<Array<Int>>.a
+  let test1 = ClassWithConvenienceInit(val: [1, 2, 3])
+  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<Array<Int>>, storage: $Storage(a: Optional([1, 2, 3]), b: "<default-placeholder>"))
+  // CHECK: in (reference type) getter storage: \$Storage.a, property: \ClassWithConvenienceInit<Array<Int>>.{{.*}}
   // CHECK-NEXT: [1, 2, 3]
-  // CHECK-NEXT: in getter storage: \$Storage.b, property: \ClassWithConvenienceInit<Array<Int>>.b
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.b, property: \ClassWithConvenienceInit<Array<Int>>.{{.*}}
   // CHECK-NEXT: <placeholder>
-  // CHECK-NEXT: in setter => <modified>
-  // CHECK-NEXT: in getter storage: \$Storage.b, property: \ClassWithConvenienceInit<Array<Int>>.b
+  // CHECK-NEXT: in (reference type) setter => <modified>
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.b, property: \ClassWithConvenienceInit<Array<Int>>.{{.*}}
   // CHECK-NEXT: <modified>
 
   let test2 = ClassWithConvenienceInit(aWithoutB: [1, ""])
-  // CHECK: Wrapper.init($Storage(a: Optional([1, ""]), b: ""))
+  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<Array<Any>>, storage: $Storage(a: Optional([1, ""]), b: "<default-placeholder>"))
 
   func test<T>(_ v: T) {
     let test1 = ClassWithConvenienceInit<(Int, String, T)>()
@@ -574,23 +574,23 @@ do {
   }
 
   test((a: 1, b: 2.0, c: 3))
-  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>, storage: $Storage(a: nil, b: "<placeholder>"))
+  // CHECK: Wrapper.init(for: ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>, storage: $Storage(a: nil, b: "<default-placeholder>"))
   // -> from init(a: T?)
-  // CHECK: in getter storage: \$Storage.a, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.a
+  // CHECK: in (reference type) getter storage: \$Storage.a, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.{{.*}}
   // CHECK-NEXT: nil
-  // CHECK-NEXT: in getter storage: \$Storage.b, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.b
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.b, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.{{.*}}
   // CHECK-NEXT: <placeholder>
-  // CHECK-NEXT: in setter => <modified>
-  // CHECK-NEXT: in getter storage: \$Storage.b, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.b
+  // CHECK-NEXT: in (reference type) setter => <modified>
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.b, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.{{.*}}
   // CHECK-NEXT: <modified>
   // -> from init()
-  // CHECK-NEXT: in getter storage: \$Storage.a, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.a
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.a, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.{{.*}}
   // CHECK-NEXT: nil
-  // CHECK-NEXT: in getter storage: \$Storage.b, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.b
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.b, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.{{.*}}
   // CHECK-NEXT: <modified>
   // -> from test<T>(_: T)
-  // CHECK-NEXT: in setter => Optional((-1, "ultimate question", (a: 1, b: 2.0, c: 3)))
-  // CHECK-NEXT: in getter storage: \$Storage.a, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.a
+  // CHECK-NEXT: in (reference type) setter => Optional((-1, "ultimate question", (a: 1, b: 2.0, c: 3)))
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage.a, property: \ClassWithConvenienceInit<(Int, String, (a: Int, b: Double, c: Int))>.{{.*}}
   // CHECK-NEXT: Optional((-1, "ultimate question", (a: 1, b: 2.0, c: 3)))
 }
 
@@ -629,20 +629,20 @@ do {
   // CHECK-NEXT: 0
 
   let test3 = TypeWithDefaultedLetProperties<[String]>()
-  // CHECK: Wrapper.init($Storage(a: nil, b: 0))
-  // CHECK-NEXT: in read-only getter
+  // CHECK: Wrapper.init(for: TypeWithDefaultedLetProperties<Array<String>>, storage: $Storage(a: nil, b: 0))
+  // CHECK-NEXT: in (reference type) let getter storage: \$Storage.a, property: \TypeWithDefaultedLetProperties<Array<String>>.{{.*}}
   // CHECK-NEXT: nil
-  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: in (reference type) let getter storage: \$Storage.b, property: \TypeWithDefaultedLetProperties<Array<String>>.{{.*}}
   // CHECK-NEXT: 0
 
   let test4 = TypeWithSomeDefaultedLetProperties(a: ["", 1.0])
-  // CHECK: Wrapper.init($Storage(a: ["", 1.0], b: Optional(0), _c: type_wrapper_defs.PropWrapper<Swift.String>(value: "<default>"), _d: type_wrapper_defs.PropWrapperWithoutInit<Swift.Array<Any>>(value: [1, ""])))
-  // CHECK-NEXT: in getter
-  // CHECK-NEXT: in setter => PropWrapper<String>(value: "a")
-  // CHECK-NEXT: in read-only getter
+  // CHECK: Wrapper.init(for: TypeWithSomeDefaultedLetProperties<Array<Any>>, storage: $Storage(a: ["", 1.0], b: Optional(0), _c: type_wrapper_defs.PropWrapper<Swift.String>(value: "<default>"), _d: type_wrapper_defs.PropWrapperWithoutInit<Swift.Array<Any>>(value: [1, ""])))
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage._c, property: \TypeWithSomeDefaultedLetProperties<Array<Any>>.<{{.*}} (PropWrapper<String>)>
+  // CHECK-NEXT: in (reference type) setter => PropWrapper<String>(value: "a")
+  // CHECK-NEXT: in (reference type) let getter storage: \$Storage.a, property: \TypeWithSomeDefaultedLetProperties<Array<Any>>.{{.*}}
   // CHECK-NEXT: ["", 1.0]
-  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: in (reference type) let getter storage: \$Storage.b, property: \TypeWithSomeDefaultedLetProperties<Array<Any>>.{{.*}}
   // CHECK-NEXT: Optional(0)
-  // CHECK-NEXT: in getter
+  // CHECK-NEXT: in (reference type) getter storage: \$Storage._c, property: \TypeWithSomeDefaultedLetProperties<Array<Any>>.<{{.*}} (PropWrapper<String>)>
   // CHECK-NEXT: a
 }

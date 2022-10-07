@@ -26,6 +26,28 @@ public struct Wrapper<W, S> {
       underlying[keyPath: storagePath] = newValue
     }
   }
+
+  public subscript<V>(wrappedSelf w: W,
+                      propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: KeyPath<S, V>) -> V {
+    get {
+      print("in (reference type) let getter storage: \(storagePath), property: \(propertyPath)")
+      return underlying[keyPath: storagePath]
+    }
+  }
+
+  public subscript<V>(wrappedSelf w: W,
+                      propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
+    get {
+      print("in (reference type) getter storage: \(storagePath), property: \(propertyPath)")
+      return underlying[keyPath: storagePath]
+    }
+    set {
+      print("in (reference type) setter => \(newValue)")
+      underlying[keyPath: storagePath] = newValue
+    }
+  }
 }
 
 @propertyWrapper
@@ -284,7 +306,7 @@ public class UserDefinedInitWithConditionalTest<T> {
 @Wrapper
 public class ClassWithConvenienceInit<T> {
   public var a: T?
-  public var b: String = ""
+  public var b: String = "<default-placeholder>"
 
   public init(aWithoutB: T?) {
     self.a = aWithoutB
@@ -302,13 +324,13 @@ public class ClassWithConvenienceInit<T> {
   }
 
   public convenience init() {
-    self.init(a: nil)
+    self.init(val: nil)
     print(self.a)
     print(self.b)
   }
 
-  public convenience init(a: T?) {
-    self.init(a: a, b: "<placeholder>")
+  public convenience init(val: T?) {
+    self.init(a: val, b: "<placeholder>")
     print(self.a)
     print(self.b)
 

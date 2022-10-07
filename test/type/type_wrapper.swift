@@ -88,12 +88,12 @@ struct InaccessibleOrInvalidSubscripts<W, S> {
     get { fatalError() }
   }
 
-  subscript(propertyKeyPath _: KeyPath<W, Bool>, storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript 'storageKeyPath' parameter expects a key path (got: 'Int')}}
+  subscript(propertyKeyPath _: KeyPath<W, Bool>, storageKeyPath path: Int) -> Bool { // expected-error {{type wrapper subscript parameter 'storageKeyPath' expects a key path (got: 'Int')}}
     get { true }
   }
 
   subscript(propertyKeyPath _: Int.Type, storageKeyPath path: KeyPath<S, Bool>) -> Bool {
-    // expected-error@-1 {{type wrapper subscript 'propertyKeyPath' parameter expects a key path (got: 'Int.Type')}}
+    // expected-error@-1 {{type wrapper subscript parameter 'propertyKeyPath' expects a key path (got: 'Int.Type')}}
     get { true }
   }
 }
@@ -558,4 +558,42 @@ func testIncorrectUsesOfImmutableProperties() {
   let test = Test(x: X(storage: [1, 2, 3]))
   test.x = X(storage: [0]) // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
   test.x?.storage.append(0) // Ok
+}
+
+func testWrappedSelfInReferenceOnlySubscript() {
+  @typeWrapper
+  struct WrappedSelfTests<W, S> {
+    init(for: W.Type, storage: S) {}
+
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
+      get { fatalError() }
+      set { }
+    }
+
+    subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V {
+      get { fatalError() }
+      set { }
+    }
+
+    subscript<V>(wrappedSelf w: W, propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V { // Ok
+      get { fatalError() }
+      set { }
+    }
+
+    subscript<V>(wrappedSelf w: W, propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V { // Ok
+      get { fatalError() }
+    }
+
+    subscript<V>(wrappedSelf w: Int, propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V { // expected-error {{type wrapper subscript parameter 'wrappedSelf' expects type 'W' (got: 'Int')}}
+      get { fatalError() }
+    }
+
+    subscript<V>(wrappedSelf w: Int, propertyKeyPath _: String, storageKeyPath path: [Int]) -> V {
+      // expected-error@-1 {{type wrapper subscript parameter 'wrappedSelf' expects type 'W' (got: 'Int')}}
+      // expected-error@-2 {{subscript parameter 'propertyKeyPath' expects a key path (got: 'String')}}
+      // expected-error@-3 {{type wrapper subscript parameter 'storageKeyPath' expects a key path (got: '[Int]'}}
+      get { fatalError() }
+    }
+  }
+
 }

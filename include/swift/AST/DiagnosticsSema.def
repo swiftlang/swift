@@ -6631,8 +6631,12 @@ NOTE(add_type_wrapper_subscript_stub_note,none,
 ERROR(type_wrapper_failable_init,none,
       "type wrapper initializer %0 cannot be failable", (DeclName))
 
-ERROR(type_wrapper_subscript_invalid_parameter,none,
-      "type wrapper subscript %0 parameter expects a key path (got: %1)",
+ERROR(type_wrapper_subscript_invalid_parameter_type,none,
+      "type wrapper subscript parameter %0 expects type %1 (got: %2)",
+      (Identifier, Type, Type))
+
+ERROR(type_wrapper_subscript_invalid_keypath_parameter,none,
+      "type wrapper subscript parameter %0 expects a key path (got: %1)",
       (Identifier, Type))
 
 ERROR(type_wrapper_type_requirement_not_accessible,none,

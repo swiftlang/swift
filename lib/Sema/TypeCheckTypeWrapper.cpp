@@ -257,6 +257,11 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
   assert(typeWrapperVar);
   assert(storageVar);
 
+  auto createRefToSelf = [&]() {
+    return new (ctx) DeclRefExpr({useDC->getImplicitSelfDecl()},
+                                 /*Loc=*/DeclNameLoc(), /*Implicit=*/true);
+  };
+
   // \$Storage.<property-name>
   auto *storageKeyPath = KeyPathExpr::createImplicit(
       ctx, /*backslashLoc=*/SourceLoc(),
@@ -274,20 +279,35 @@ static SubscriptExpr *subscriptTypeWrappedProperty(VarDecl *var,
       /*endLoc=*/SourceLoc());
 
   auto *subscriptBaseExpr = UnresolvedDotExpr::createImplicit(
-      ctx,
-      new (ctx) DeclRefExpr({useDC->getImplicitSelfDecl()},
-                            /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
-      typeWrapperVar->getName());
+      ctx, createRefToSelf(), typeWrapperVar->getName());
+
+  SmallVector<Argument, 4> subscriptArgs;
+
+  // If this is a reference type, let's see whether type wrapper supports
+  // `wrappedSelf:propertyKeyPath:storageKeyPath:` overload.
+  if (isa<ClassDecl>(parent)) {
+    DeclName subscriptName(
+        ctx, DeclBaseName::createSubscript(),
+        {ctx.Id_wrappedSelf, ctx.Id_propertyKeyPath, ctx.Id_storageKeyPath});
+
+    auto *typeWrapper = parent->getTypeWrapper();
+    auto candidates = typeWrapper->lookupDirect(subscriptName);
+
+    if (!candidates.empty()) {
+      subscriptArgs.push_back(
+          Argument(/*loc=*/SourceLoc(), ctx.Id_wrappedSelf, createRefToSelf()));
+    }
+  }
+
+  subscriptArgs.push_back(
+      Argument(/*loc=*/SourceLoc(), ctx.Id_propertyKeyPath, propertyKeyPath));
+  subscriptArgs.push_back(
+      Argument(/*loc=*/SourceLoc(), ctx.Id_storageKeyPath, storageKeyPath));
 
   // $storage[storageKeyPath: \$Storage.<property-name>]
-  return SubscriptExpr::create(
-      ctx, subscriptBaseExpr,
-      ArgumentList::createImplicit(
-          ctx, {Argument(/*loc=*/SourceLoc(), ctx.Id_propertyKeyPath,
-                         propertyKeyPath),
-                Argument(/*loc=*/SourceLoc(), ctx.Id_storageKeyPath,
-                         storageKeyPath)}),
-      ConcreteDeclRef(), /*implicit=*/true);
+  return SubscriptExpr::create(ctx, subscriptBaseExpr,
+                               ArgumentList::createImplicit(ctx, subscriptArgs),
+                               ConcreteDeclRef(), /*implicit=*/true);
 }
 
 BraceStmt *
