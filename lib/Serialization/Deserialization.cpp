@@ -3516,8 +3516,8 @@ public:
                                         resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
-          ctx, accessorKind, storage, staticSpelling.getValue(),
-          async, throws, genericParams, resultType, DC);
+          ctx, accessorKind, storage, staticSpelling.getValue(), async, throws,
+          resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;

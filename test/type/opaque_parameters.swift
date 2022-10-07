@@ -115,3 +115,19 @@ typealias FnType<T> = (T) -> Void
 
 func consumingA(fn: (some P) -> Void) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
 func consumingB(fn: FnType<some P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(some P) -> Void'}}
+
+// https://github.com/apple/swift/issues/61387
+struct I61387 {
+  subscript(s: some StringProtocol) -> String {
+    fatalError()
+  }
+}
+
+struct I61387_1 {
+  subscript(s: some StringProtocol) -> String {
+    get { fatalError() }
+    set {
+      fatalError()
+    }
+  }
+}

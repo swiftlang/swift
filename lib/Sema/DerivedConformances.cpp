@@ -506,15 +506,15 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
-  
-  auto getterDecl = AccessorDecl::create(C,
-    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, property,
-    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-    /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, params,
-    property->getInterfaceType(), parentDC);
+
+  auto getterDecl = AccessorDecl::create(
+      C,
+      /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+      AccessorKind::Get, property,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params,
+      property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();
   getterDecl->setIsTransparent(false);
   getterDecl->copyFormalAccessFrom(property);
