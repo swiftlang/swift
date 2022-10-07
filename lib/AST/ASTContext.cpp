@@ -5584,8 +5584,8 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
 
   for (auto requirement : baseGenericSig.getRequirements()) {
     switch (requirement.getKind()) {
-    case RequirementKind::SameCount:
-      // Drop same-length requirements from the element signature.
+    case RequirementKind::SameShape:
+      // Drop same-shape requirements from the element signature.
       break;
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:

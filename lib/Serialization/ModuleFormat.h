@@ -435,7 +435,7 @@ static inline OperatorFixity getASTOperatorFixity(OperatorKind fixity) {
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum GenericRequirementKind : uint8_t {
-  SameCount = 0,
+  SameShape = 0,
   Conformance = 1,
   SameType    = 2,
   Superclass  = 3,

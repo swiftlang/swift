@@ -5907,8 +5907,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
     switch (auto kind = requirement.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     case RequirementKind::Layout:
       ++metadata.NumRequirements;

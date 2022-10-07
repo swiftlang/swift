@@ -1337,7 +1337,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
     return GenericRequirementKind::KIND;
 
   switch (kind) {
-  CASE(SameCount)
+  CASE(SameShape)
   CASE(Conformance)
   CASE(Superclass)
   CASE(SameType)

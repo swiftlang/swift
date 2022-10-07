@@ -1119,7 +1119,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // FIXME: Second type of a superclass requirement may contain
       // generic parameters.
       continue;
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1171,7 +1171,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
           CurrentGP)
         CollectedReqs.push_back(Req);
       continue;
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and

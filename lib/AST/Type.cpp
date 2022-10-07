@@ -4203,8 +4203,8 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     }
 
     switch (Req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Superclass:
     case RequirementKind::Conformance:
       MinimalMembers.push_back(Req.getSecondType());

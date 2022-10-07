@@ -240,7 +240,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (!isPublicOrUsableFromInline(req.getSecondType()))
               return false;
             break;
-          case RequirementKind::SameCount:
+          case RequirementKind::SameShape:
           case RequirementKind::Layout:
             break;
           }
@@ -1415,8 +1415,8 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
   bool inWhereClause;
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirements not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirements not supported here");
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
   case RequirementKind::Superclass: {
@@ -1510,7 +1510,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
 
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
-  case RequirementKind::SameCount: {
+  case RequirementKind::SameShape: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());
     unsigned secondDepth = getDepthOfType(req.getSecondType());
@@ -1757,8 +1757,8 @@ void PrintAST::printSingleDepthOfGenericSignature(
         // We only print the second part of a requirement in the "inherited"
         // clause.
         switch (req.getKind()) {
-        case RequirementKind::SameCount:
-          llvm_unreachable("Same-count requirement not supported here");
+        case RequirementKind::SameShape:
+          llvm_unreachable("Same-shape requirement not supported here");
 
         case RequirementKind::Layout:
           req.getLayoutConstraint()->print(Printer, Options);
@@ -1788,10 +1788,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
 void PrintAST::printRequirement(const Requirement &req) {
   printTransformedType(req.getFirstType());
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    Printer << ".count == ";
+  case RequirementKind::SameShape:
+    Printer << ".shape == ";
     printTransformedType(req.getSecondType());
-    Printer << ".count";
+    Printer << ".shape";
     return;
   case RequirementKind::Layout:
     Printer << " : ";
