@@ -2961,6 +2961,20 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     return result;
   }
 
+  // AccessorDecl generic parameter list is the same of its storage
+  // context.
+  if (auto *AD = dyn_cast<AccessorDecl>(value)) {
+    auto *GC = AD->getStorage()->getAsGenericContext();
+    if (!GC)
+      return nullptr;
+
+    auto *GP = GC->getGenericParams();
+    if (!GP)
+      return nullptr;
+
+    return GP->clone(AD->getDeclContext());
+  }
+
   auto parsedGenericParams = value->getParsedGenericParams();
 
   // Create implicit generic parameters due to opaque parameters, if we need

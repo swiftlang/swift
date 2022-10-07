@@ -895,14 +895,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   ParameterList *params = ParameterList::createEmpty(C);
 
-  AccessorDecl *getterDecl = AccessorDecl::create(C,
+  AccessorDecl *getterDecl = AccessorDecl::create(
+      C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params,
-      intType, parentDC);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, intType, parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setSynthesized();
