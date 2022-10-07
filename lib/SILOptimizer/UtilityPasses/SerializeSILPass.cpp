@@ -424,7 +424,7 @@ class SerializeSILPass : public SILModuleTransform {
       // underlying type. Update the function's opaque archetypes.
       if (wasSerialized && F.isDefinition()) {
         updateOpaqueArchetypes(F);
-        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::FunctionBody);
       }
 
       // After serialization we don't need to keep @alwaysEmitIntoClient

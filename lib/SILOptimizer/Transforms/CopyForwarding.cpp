@@ -589,9 +589,9 @@ public:
     if (HasChangedCFG) {
       // We are only invalidating the analysis that we use internally.
       // We'll invalidate the analysis that are used by other passes at the end.
-      DomAnalysis->invalidate(F, SILAnalysis::InvalidationKind::Everything);
-      PostOrder->invalidate(F, SILAnalysis::InvalidationKind::Everything);
-      RCIAnalysis->invalidate(F, SILAnalysis::InvalidationKind::Everything);
+      DomAnalysis->invalidate(F, SILAnalysis::InvalidationKind::FunctionBody);
+      PostOrder->invalidate(F, SILAnalysis::InvalidationKind::FunctionBody);
+      RCIAnalysis->invalidate(F, SILAnalysis::InvalidationKind::FunctionBody);
     }
     CurrentDef = SILValue();
     IsSrcLoadedFrom = false;

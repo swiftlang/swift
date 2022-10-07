@@ -3387,7 +3387,7 @@ bool SimplifyCFG::run() {
     // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
     // but avoids excess dangling pointers in deBlocks.
     deBlocksAnalysis->invalidate(&Fn,
-                                 SILAnalysis::InvalidationKind::Everything);
+                                 SILAnalysis::InvalidationKind::FunctionBody);
   }
   deBlocks = deBlocksAnalysis->get(&Fn);
 
@@ -3410,11 +3410,11 @@ bool SimplifyCFG::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
   if (Changed) {
     // Force dominator recomputation since we modified the cfg.
-    DA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
+    DA->invalidate(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
     // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
     // but avoids excess dangling pointers in deBlocks.
     deBlocksAnalysis->invalidate(&Fn,
-                                 SILAnalysis::InvalidationKind::Everything);
+                                 SILAnalysis::InvalidationKind::FunctionBody);
   }
   deBlocks = deBlocksAnalysis->get(&Fn);
 

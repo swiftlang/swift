@@ -881,7 +881,7 @@ public:
     // The old function must be a thunk now.
     assert(F->isThunk() && "Old function should have been turned into a thunk");
 
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.
