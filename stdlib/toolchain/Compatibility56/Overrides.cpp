@@ -22,6 +22,8 @@
 
 using namespace swift;
 
+__asm__ (".linker_option \"-lc++\"");
+
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 
