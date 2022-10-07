@@ -210,8 +210,8 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       }
     }
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     // Check layout requirements.
     case RequirementKind::Layout: {

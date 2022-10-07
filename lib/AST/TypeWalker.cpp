@@ -114,7 +114,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
 
       switch (req.getKind()) {
-      case RequirementKind::SameCount:
+      case RequirementKind::SameShape:
       case RequirementKind::SameType:
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:

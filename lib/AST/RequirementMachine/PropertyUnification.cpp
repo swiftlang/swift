@@ -647,6 +647,7 @@ void PropertyMap::addProperty(
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:
   case Symbol::Kind::AssociatedType:
+  case Symbol::Kind::Shape:
     break;
   }
 

@@ -172,13 +172,13 @@ This status table describes which of the following Swift language features have 
 |--------------------------------|----------------------------------------------------------|
 | Class reference values         | Yes                                                      |
 | ARC semantics                  | Yes (C++ copy constructor,assignment operator, destructor perform ARC operations)  |
-| Initializers                   | No |
+| Initializers                   | Yes |
 
 **Methods**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Instance methods               | Yes                                                      |
+| Instance methods               | Yes on structs and enums. Only 'final' method calls on class types are correctly supported though (virtual calls won't be virtual due to a bug right now) |
 | Static methods                 | No                                                       |
 
 **Properties**

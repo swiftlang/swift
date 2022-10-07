@@ -267,6 +267,7 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
     case Symbol::Kind::ConcreteConformance:
+    case Symbol::Kind::Shape:
       llvm::errs() <<"Invalid symbol in a type term: " << term << "\n";
       abort();
     }
@@ -695,6 +696,42 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   return nullptr;
 }
 
+MutableTerm
+RequirementMachine::getReducedShapeTerm(Type type) const {
+  assert(type->isTypeSequenceParameter());
+
+  auto rootType = type->getRootGenericParam();
+  auto term = Context.getMutableTermForType(rootType->getCanonicalType(),
+                                            /*proto=*/nullptr);
+
+  // Append the 'shape' symbol to the term.
+  term.add(Symbol::forShape(Context));
+
+  System.simplify(term);
+  verify(term);
+
+  // Remove the 'shape' symbol from the term.
+  assert(term.back().getKind() == Symbol::Kind::Shape);
+  MutableTerm reducedTerm(term.begin(), term.end() - 1);
+
+  return reducedTerm;
+}
+
+Type RequirementMachine::getReducedShape(Type type) const {
+  if (!type->isTypeSequenceParameter())
+    return Type();
+
+  return Map.getTypeForTerm(getReducedShapeTerm(type),
+                            getGenericParams());
+}
+
+bool RequirementMachine::haveSameShape(Type type1, Type type2) const {
+  auto term1 = getReducedShapeTerm(type1);
+  auto term2 = getReducedShapeTerm(type2);
+
+  return term1 == term2;
+}
+
 void RequirementMachine::verify(const MutableTerm &term) const {
 #ifndef NDEBUG
   // If the term is in the generic parameter domain, ensure we have a valid
@@ -735,6 +772,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
+      case Symbol::Kind::Shape:
         llvm::errs() << "Bad initial symbol in " << term << "\n";
         abort();
         break;
@@ -757,6 +795,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
     case Symbol::Kind::ConcreteConformance:
+    case Symbol::Kind::Shape:
       llvm::errs() << "Bad interior symbol " << symbol << " in " << term << "\n";
       abort();
       break;
