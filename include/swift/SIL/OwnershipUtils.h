@@ -63,8 +63,11 @@ class DeadEndBlocks;
 class MultiDefPrunedLiveness;
 struct BorrowedValue;
 
-/// Returns true if v is an address or trivial.
-bool isValueAddressOrTrivial(SILValue v);
+//===----------------------------------------------------------------------===//
+//                            Forwarding Utilities
+//
+// TODO: encapsulate in a ForwardingInstruction abstraction
+//===----------------------------------------------------------------------===//
 
 /// Is the opcode that produces \p value capable of forwarding guaranteed
 /// values?
@@ -107,6 +110,10 @@ inline bool isForwardingConsume(SILValue value) {
   assert(value->getOwnershipKind() == OwnershipKind::Owned);
   return canOpcodeForwardOwnedValues(value);
 }
+
+//===----------------------------------------------------------------------===//
+//                        Ownership Def-Use Utilities
+//===----------------------------------------------------------------------===//
 
 bool hasPointerEscape(BorrowedValue value);
 
