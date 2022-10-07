@@ -158,10 +158,22 @@ Double-check that running `pwd` prints a path ending with `swift`.
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
-2. To install sccache (optional):
+2. To install `sccache` (optional):
+  * If you're not building within a Docker container:
    ```
    sudo snap install sccache --candidate --classic
    ```
+   * If you're building within a Docker container, you'll have to install `sccache` manually, since [`snap`
+   is not available in environments without `systemd`](https://unix.stackexchange.com/questions/541230/do-snaps-require-systemd):
+
+   ```
+   SCCACHE_VERSION=v0.3.0
+   curl -L "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-$(uname -m)-unknown-linux-musl.tar.gz" -o sccache.tar.gz
+   tar xzpvf sccache.tar.gz
+   sudo cp "sccache-${SCCACHE_VERSION}-$(uname -m)-unknown-linux-musl/sccache" /usr/local/bin
+   sudo chmod +x /usr/local/bin/sccache
+   ```
+
    **Note:** LLDB currently requires at least `swig-1.3.40` but will
    successfully build with version 2 shipped with Ubuntu.
 
