@@ -2534,6 +2534,15 @@ class VarDeclUsageChecker : public ASTWalker {
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
 
+  /// The stack of closure exprs for the current position in the AST.
+  /// The top item on the stack, if present, is the current closure scope.
+  SmallVector<AbstractClosureExpr *, 4> ClosureStack;
+
+  /// A mapping from if/while/guard stmts to the closure they're contained in,
+  /// if applicable.
+  llvm::SmallDenseMap<LabeledConditionalStmt *, AbstractClosureExpr *>
+      ClosureForCndStmt;
+
 #ifndef NDEBUG
   llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
 #endif
@@ -2698,6 +2707,7 @@ public:
 
   /// The heavy lifting happens when visiting expressions.
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
   /// handle #if directives.
   void handleIfConfig(IfConfigDecl *ICD);
@@ -2707,12 +2717,19 @@ public:
     // Keep track of an association between vardecls and the StmtCondition that
     // they are bound in for IfStmt, GuardStmt, WhileStmt, etc.
     if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
-      for (auto &cond : LCS->getCond())
+      for (auto &cond : LCS->getCond()) {
         if (auto pat = cond.getPatternOrNull()) {
           pat->forEachVariable([&](VarDecl *VD) {
             StmtConditionForVD[VD] = LCS;
           });
         }
+      }
+
+      // Track the closure that this stmt condition is part of
+      if (ClosureStack.size() != 0) {
+        auto closure = ClosureStack[ClosureStack.size() - 1];
+        ClosureForCndStmt[LCS] = closure;
+      }
     }
     
     // A fallthrough dest case's bound variable means the source case's
@@ -3318,6 +3335,42 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                     }
                   }
 
+                  // If this is a `self` unwrap condition in a non-escaping
+                  // closure that captures self weakly, then we provide a custom
+                  // diagnostic. Implicit self in these closures behaves
+                  // incorrectly in Swift 5 mode, and unexpectedly _doesn't_
+                  // actually refer to this decl. So we explain that this decl
+                  // is unused, and offer a fix-it to add explicit self for any
+                  // decl using implicit self for the remainder of the scope.
+                  auto inNonEscapingWeakSelfClosure = false;
+                  if (auto closure = ClosureForCndStmt[SC]) {
+                    auto hasWeakSelfCapture = false;
+                    if (auto closureExpr = dyn_cast<ClosureExpr>(closure)) {
+                      if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+                        hasWeakSelfCapture =
+                            selfDecl->getType()->is<WeakStorageType>();
+                      }
+                    }
+
+                    auto isNonEscaping =
+                        AnyFunctionRef(
+                            const_cast<AbstractClosureExpr *>(closure))
+                            .isKnownNoEscape();
+
+                    inNonEscapingWeakSelfClosure =
+                        hasWeakSelfCapture && isNonEscaping;
+                  }
+
+                  auto &Ctx = var->getASTContext();
+                  if (var->getName() == Ctx.Id_self &&
+                      inNonEscapingWeakSelfClosure &&
+                      !Ctx.isSwiftVersionAtLeast(6)) {
+                    // TODO: Do a custom diagnostic where we walk the rest of
+                    // the closure, and emit a fix-it for each usage of implicit
+                    // self.
+                    continue;
+                  }
+
                   auto diagIF = Diags.diagnose(var->getLoc(),
                                                diag::pbd_never_used_stmtcond,
                                             var->getName());
@@ -3651,7 +3704,21 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))
     sawError = true;
-  
+
+  // Track the current closure in `ClosureStack`
+  if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
+    ClosureStack.push_back(closure);
+  }
+
+  return Action::Continue(E);
+}
+
+ASTWalker::PostWalkResult<Expr *> VarDeclUsageChecker::walkToExprPost(Expr *E) {
+  if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
+    assert(ClosureStack.size() > 0);
+    ClosureStack.pop_back();
+  }
+
   return Action::Continue(E);
 }
 
