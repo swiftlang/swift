@@ -251,6 +251,10 @@ macro(add_sourcekit_library name)
     add_llvm_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_SWIFT_PARSER AND SOURCEKITLIB_SHARED)
+    set(SOURCEKITLIB_HAS_SWIFT_MODULES ON)
+  endif()
 
   if(SOURCEKITLIB_SHARED)
     set(RPATH_LIST)
@@ -329,6 +333,16 @@ macro(add_sourcekit_executable name)
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
   add_sourcekit_default_compiler_flags("${name}")
+
+  if(SWIFT_SWIFT_PARSER)
+    set(SKEXEC_HAS_SWIFT_MODULES TRUE)
+  else()
+    set(SKEXEC_HAS_SWIFT_MODULES FALSE)
+  endif()
+
+  set(RPATH_LIST)
+  add_sourcekit_swift_runtime_link_flags(${name} "../../../.." ${SKEXEC_HAS_SWIFT_MODULES})
+
 endmacro()
 
 # Add a new SourceKit framework.
@@ -347,6 +361,11 @@ macro(add_sourcekit_framework name)
 
   set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
   set(framework_location "${lib_dir}/${name}.framework")
+
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_SWIFT_PARSER)
+    set(SOURCEKITFW_HAS_SWIFT_MODULES ON)
+  endif()
 
   if (NOT SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     set(FLAT_FRAMEWORK_NAME "${name}")
