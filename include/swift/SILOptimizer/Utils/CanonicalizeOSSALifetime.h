@@ -209,6 +209,10 @@ private:
   /// liveness may be pruned during canonicalization.
   bool pruneDebugMode;
 
+  /// If true, lifetimes will not be shortened except when necessary to avoid
+  /// copies.
+  bool maximizeLifetime;
+
   /// If true and we are processing a value of move_only type, emit a diagnostic
   /// when-ever we need to insert a copy_value.
   std::function<void(Operand *)> moveOnlyCopyValueNotification;
@@ -244,6 +248,9 @@ private:
   /// Visited set for general def-use traversal that prevents revisiting values.
   GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
+  /// The blocks that were discovered by PrunedLiveness.
+  SmallVector<SILBasicBlock *, 32> discoveredBlocks;
+
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
@@ -252,7 +259,7 @@ private:
   /// The destroys of the value.  These are not uses, but need to be recorded so
   /// that we know when the last use in a consuming block is (without having to
   /// repeatedly do use-def walks from destroys).
-  SmallPtrSet<SILInstruction *, 8> destroys;
+  SmallPtrSetVector<SILInstruction *, 8> destroys;
 
   /// Information about consuming instructions discovered in this canonical OSSA
   /// lifetime.
@@ -290,15 +297,17 @@ public:
   }
 
   CanonicalizeOSSALifetime(
-      bool pruneDebugMode, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-      DominanceInfo *domTree, InstructionDeleter &deleter,
+      bool pruneDebugMode, bool maximizeLifetime,
+      NonLocalAccessBlockAnalysis *accessBlockAnalysis, DominanceInfo *domTree,
+      InstructionDeleter &deleter,
       std::function<void(Operand *)> moveOnlyCopyValueNotification = nullptr,
       std::function<void(Operand *)> moveOnlyFinalConsumingUse = nullptr)
-      : pruneDebugMode(pruneDebugMode),
+      : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
         moveOnlyCopyValueNotification(moveOnlyCopyValueNotification),
         moveOnlyFinalConsumingUse(moveOnlyFinalConsumingUse),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
-        deleter(deleter) {}
+        deleter(deleter),
+        liveness(maximizeLifetime ? &discoveredBlocks : nullptr) {}
 
   SILValue getCurrentDef() const { return liveness.getDef(); }
 
@@ -317,6 +326,7 @@ public:
     consumingBlocks.clear();
     debugValues.clear();
     liveness.clear();
+    discoveredBlocks.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
@@ -351,6 +361,8 @@ private:
 
   void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
                             PrunedLivenessBoundary &boundary);
+
+  void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
 
   void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
 
