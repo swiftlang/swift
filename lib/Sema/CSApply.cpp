@@ -2675,6 +2675,26 @@ namespace {
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
 
+      auto migrateQuotes = [&]() {
+        if (!stringLiteral || stringLiteral->isSingleQuoted())
+          return;
+
+        SourceManager &SM = ctx.SourceMgr;
+        SourceRange range = stringLiteral->getSourceRange();
+        range.End = Lexer::getLocForEndOfToken(SM, range.Start);
+        std::string body = SM
+          .extractText(CharSourceRange(SM, range.Start, range.End))
+          .drop_front().drop_back().str();
+
+         if (body == "'")
+           body = "\\'";
+         else if (body == "\\\"")
+           body = "\"";
+
+        ctx.Diags.diagnose(expr->getLoc(), diag::single_quoted_migration, type)
+          .fixItReplaceChars(range.Start, range.End, "'" + body + "'");
+      };
+
       if (isStringLiteral) {
         literalType = ctx.Id_StringLiteralType;
 
@@ -2714,11 +2734,9 @@ namespace {
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
-      } else {
-        if (stringLiteral && !stringLiteral->isSingleUnicodeScalar())
-          ctx.Diags.diagnose(stringLiteral->getStartLoc(),
-                             diag::single_quoted_invalid_cast, type);
 
+        migrateQuotes();
+      } else {
         // Otherwise, we should have just one Unicode scalar.
         literalType = ctx.Id_UnicodeScalarLiteralType;
 
@@ -2737,6 +2755,12 @@ namespace {
             diag::builtin_unicode_scalar_literal_broken_proto;
 
         stringLiteral->setEncoding(StringLiteralExpr::OneUnicodeScalar);
+
+        if (stringLiteral && !stringLiteral->isSingleUnicodeScalar())
+          ctx.Diags.diagnose(stringLiteral->getStartLoc(),
+                             diag::single_quoted_invalid_cast, type);
+
+        migrateQuotes();
       }
 
       return convertLiteralInPlace(expr,

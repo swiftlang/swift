@@ -3821,6 +3821,9 @@ ERROR(unicode_scalar_literal_broken_proto,none,
       "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 ERROR(single_quoted_invalid_cast,none,
       "invalid cast of joined Character to %0", (Type))
+WARNING(single_quoted_migration,none,
+       "double quotes deprecated in favour of single quotes to express %0",
+       (Type))
 
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinExtendedGraphemeClusterLiteral' is broken", ())

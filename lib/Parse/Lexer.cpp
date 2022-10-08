@@ -1807,52 +1807,6 @@ static void validateMultilineIndents(const Token &Str,
                                   commonIndentation);
 }
 
-/// Emit diagnostics for single-quote string and suggest replacement
-/// with double-quoted equivalent.
-void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
-                                             const char *TokEnd) {
-  assert(*TokStart == '\'' && TokEnd[-1] == '\'');
-  if (!getTokenDiags()) // or assert?
-    return;
-
-  auto startLoc = Lexer::getSourceLoc(TokStart);
-  auto endLoc = Lexer::getSourceLoc(TokEnd);
-
-  SmallString<32> replacement;
-  replacement.push_back('"');
-  const char *Ptr = TokStart + 1;
-  const char *OutputPtr = Ptr;
-
-  while (*Ptr++ != '\'' && Ptr < TokEnd) {
-    if (Ptr[-1] == '\\') {
-      if (*Ptr == '\'') {
-        replacement.append(OutputPtr, Ptr - 1);
-        OutputPtr = Ptr + 1;
-        // Un-escape single quotes.
-        replacement.push_back('\'');
-      } else if (*Ptr == '(') {
-        // Preserve the contents of interpolation.
-        Ptr = skipToEndOfInterpolatedExpression(Ptr + 1, replacement.end(),
-                                                /*IsMultiline=*/false);
-        assert(*Ptr == ')');
-      }
-      // Skip over escaped characters.
-      ++Ptr;
-    } else if (Ptr[-1] == '"') {
-      replacement.append(OutputPtr, Ptr - 1);
-      OutputPtr = Ptr;
-      // Escape double quotes.
-      replacement.append("\\\"");
-    }
-  }
-  assert(Ptr == TokEnd && Ptr[-1] == '\'');
-  replacement.append(OutputPtr, Ptr - 1);
-  replacement.push_back('"');
-
-  getTokenDiags()->diagnose(startLoc, diag::lex_single_quote_string)
-      .fixItReplaceChars(startLoc, endLoc, replacement);
-}
-
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
