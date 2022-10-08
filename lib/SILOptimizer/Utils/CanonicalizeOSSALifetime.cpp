@@ -110,7 +110,7 @@ static DestroyValueInst *dynCastToDestroyOf(SILInstruction *instruction,
 }
 
 //===----------------------------------------------------------------------===//
-//                    MARK: Step 1. Compute pruned liveness
+// MARK: Step 1. Compute pruned liveness
 //===----------------------------------------------------------------------===//
 
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
