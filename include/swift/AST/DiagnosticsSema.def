@@ -6619,6 +6619,8 @@ WARNING(has_symbol_decl_must_be_weak,none,
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
       "'#_hasSymbol' condition must refer to a declaration", ())
+ERROR(has_symbol_unsupported,none,
+      "'#_hasSymbol' is unsupported on target '%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type erasure
