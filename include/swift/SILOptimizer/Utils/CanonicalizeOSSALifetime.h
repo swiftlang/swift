@@ -347,7 +347,10 @@ private:
 
   void extendLivenessThroughOverlappingAccess();
 
-  void findExtendedBoundary(PrunedLivenessBoundary &boundary);
+  void findOriginalBoundary(PrunedLivenessBoundary &boundary);
+
+  void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
+                            PrunedLivenessBoundary &boundary);
 
   void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
 

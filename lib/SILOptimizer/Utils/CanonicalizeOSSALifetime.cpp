@@ -20,13 +20,16 @@
 /// 1. Compute "pruned" liveness of def and its copies, ignoring original
 ///    destroys. Initializes `liveness`.
 ///
-/// 2. Find the "extended" boundary of liveness by walking out from the boundary
+/// 2. Find the "original" boundary of liveness using
+///    PrunedLiveness::computeBoundary.
+///
+/// 3. Find the "extended" boundary of liveness by walking out from the boundary
 ///    computed by PrunedLiveness out to destroys which aren't separated from
 ///    the original destory by "interesting" instructions.
 ///
-/// 3. Initializes `consumes` and inserts new destroy_value instructions.
+/// 4. Initializes `consumes` and inserts new destroy_value instructions.
 ///
-/// 4. Rewrite `def`s original copies and destroys, inserting new copies where
+/// 5. Rewrite `def`s original copies and destroys, inserting new copies where
 ///    needed. Deletes original copies and destroys and inserts new copies.
 ///
 /// See CanonicalizeOSSALifetime.h for examples.
@@ -410,8 +413,20 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Step 2. Find the destroy points of the current def based on the pruned
-// liveness computed in Step 1.
+// MARK: Step 2. Find the "original" (unextended) boundary determined by the
+//               liveness built up in step 1.
+//===----------------------------------------------------------------------===//
+
+void CanonicalizeOSSALifetime::findOriginalBoundary(
+    PrunedLivenessBoundary &boundary) {
+  assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
+         boundary.deadDefs.size() == 0);
+  liveness.computeBoundary(boundary, consumingBlocks.getArrayRef());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Step 3. Extend the "original" boundary from step 2 up to destroys that
+//               aren't separated from it by "interesting" instructions.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -614,17 +629,17 @@ private:
 } // anonymous namespace
 
 void CanonicalizeOSSALifetime::findExtendedBoundary(
+    PrunedLivenessBoundary const &originalBoundary,
     PrunedLivenessBoundary &boundary) {
-  PrunedLivenessBoundary originalBoundary;
-  liveness.computeBoundary(originalBoundary, consumingBlocks.getArrayRef());
-
+  assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
+         boundary.deadDefs.size() == 0);
   ExtendBoundaryToDestroys extender(liveness, originalBoundary,
                                     getCurrentDef());
   extender.extend(boundary);
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Step 3. Insert destroys onto the boundary found in step 2 where needed.
+// MARK: Step 4. Insert destroys onto the boundary found in step 3 where needed.
 //===----------------------------------------------------------------------===//
 
 /// Create a new destroy_value instruction before the specified instruction and
@@ -714,7 +729,7 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Step 4. Rewrite copies and destroys
+// MARK: Step 5. Rewrite copies and destroys
 //===----------------------------------------------------------------------===//
 
 /// The lifetime extends beyond given consuming use. Copy the value.
@@ -880,12 +895,15 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
     return false;
   }
   extendLivenessThroughOverlappingAccess();
-  // Step 2: compute boundary
+  // Step 2: compute original boundary
+  PrunedLivenessBoundary originalBoundary;
+  findOriginalBoundary(originalBoundary);
+  // Step 3: extend boundary to destroys
   PrunedLivenessBoundary boundary;
-  findExtendedBoundary(boundary);
-  // Step 3: insert destroys and record consumes
+  findExtendedBoundary(originalBoundary, boundary);
+  // Step 4: insert destroys and record consumes
   insertDestroysOnBoundary(boundary);
-  // Step 4: rewrite copies and delete extra destroys
+  // Step 5: rewrite copies and delete extra destroys
   rewriteCopies();
 
   clearLiveness();
