@@ -6618,9 +6618,7 @@ WARNING(has_symbol_decl_must_be_weak,none,
         "%0 %1 is not a weakly linked declaration",
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
-      "#_hasSymbol condition must refer to a declaration", ())
-ERROR(has_symbol_unsupported_in_closures,none,
-      "#_hasSymbol is not supported in closures", ())
+      "'#_hasSymbol' condition must refer to a declaration", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type erasure
