@@ -349,7 +349,7 @@ private:
 
   void findExtendedBoundary(PrunedLivenessBoundary &boundary);
 
-  void insertDestroysOnBoundary(PrunedLivenessBoundary &boundary);
+  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
 
   void rewriteCopies();
 };
