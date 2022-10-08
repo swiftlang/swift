@@ -373,9 +373,9 @@ static bool sinkOwnedForward(SILInstruction *ownedForward,
 namespace {
 
 class CopyPropagation : public SILFunctionTransform {
-  /// True if debug_value instructions should be pruned.
+  /// If true, debug_value instructions should be pruned.
   bool pruneDebug;
-  /// True if all values should be canonicalized.
+  /// If true, all values will be canonicalized.
   bool canonicalizeAll;
   /// If true, then borrow scopes will be canonicalized, allowing copies of
   /// guaranteed values to be optimized. Does *not* shrink the borrow scope.
