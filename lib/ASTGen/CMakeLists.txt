@@ -8,6 +8,21 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/Stmts.swift
   )
 
+  # Set the appropriate target triple.
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+  endif()
+
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
+    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+  endif()
+
+  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+    MACCATALYST_BUILD_FLAVOR ""
+    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+
+    target_compile_options(swiftASTGen PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+
   # Link against the SwiftSyntax parser and libraries it depends on. The actual
   # formulation of this is a hack to work around a CMake bug in Ninja file
   # generation that results in multiple Ninja targets producing the same file in
