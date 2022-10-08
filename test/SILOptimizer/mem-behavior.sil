@@ -881,3 +881,47 @@ bb0 (%0 : $*C):
   return %3 : $()
 }
 
+sil @use_C : $@convention(thin) (Int, @in_guaranteed C) -> ()
+ 
+// CHECK-LABEL: @test_let_alloc_stack
+// CHECK: PAIR #0.
+// CHECK:     store %0 to [init] %1 : $*C
+// CHECK:     %1 = alloc_stack $C, let, name "v"
+// CHECK:   r=0,w=1
+// CHECK: PAIR #1.
+// CHECK:     store %0 to [init] %1 : $*C
+// CHECK:     %3 = alloc_stack $C
+// CHECK:   r=0,w=0
+// CHECK: PAIR #2.
+// CHECK:     copy_addr %1 to [initialization] %3 : $*C
+// CHECK:     %1 = alloc_stack $C, let, name "v"
+// CHECK:   r=1,w=0
+// CHECK: PAIR #3.
+// CHECK:     copy_addr %1 to [initialization] %3 : $*C
+// CHECK:     %3 = alloc_stack $C
+// CHECK:   r=0,w=1
+// CHECK: PAIR #4.
+// CHECK:     %8 = apply %7(%6, %3) : $@convention(thin) (Int, @in_guaranteed C) -> ()
+// CHECK:     %1 = alloc_stack $C, let, name "v"
+// CHECK:   r=1,w=0
+// CHECK: PAIR #5.
+// CHECK:     %8 = apply %7(%6, %3) : $@convention(thin) (Int, @in_guaranteed C) -> ()
+// CHECK:     %3 = alloc_stack $C
+// CHECK:   r=1,w=0
+sil [ossa] @test_let_alloc_stack : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $C, let, name "v"
+  store %0 to [init] %1 : $*C
+  %3 = alloc_stack $C
+  copy_addr %1 to [initialization] %3 : $*C
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  %7 = function_ref @use_C : $@convention(thin) (Int, @in_guaranteed C) -> ()
+  %8 = apply %7(%6, %3) : $@convention(thin) (Int, @in_guaranteed C) -> ()
+  destroy_addr %3 : $*C
+  dealloc_stack %3 : $*C
+  destroy_addr %1 : $*C
+  dealloc_stack %1 : $*C
+  %13 = tuple ()
+  return %13 : $()
+}

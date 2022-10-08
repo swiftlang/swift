@@ -385,6 +385,11 @@ static bool isLetForBase(SILValue base) {
     auto *globalDecl = gai->getReferencedGlobal()->getDecl();
     return globalDecl && globalDecl->isLet();
   }
+
+  if (auto *asi = dyn_cast<AllocStackInst>(base)) {
+    return asi->isLet();
+  }
+
   return false;
 }
 
