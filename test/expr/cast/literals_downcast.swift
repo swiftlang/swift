@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-let ok = "A" as Character // OK // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+let ok = "A" as Character // OK
 let succeed = "A" as? String // expected-warning {{always succeeds}}
 let bad = "A" as? Character // expected-warning {{conditional downcast from literal to 'Character' always fails; consider using 'as' coercion}} {{none}}
 let bad2 = "Aa" as? Character // expected-warning {{cast from 'String' to unrelated type 'Character' always fails}}

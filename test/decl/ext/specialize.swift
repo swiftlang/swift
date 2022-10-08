@@ -10,7 +10,7 @@ extension [Character] {
   func makeString() -> String { fatalError() }
 }
 
-let _ = ["a", "b", "c"].makeString() // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+let _ = ["a", "b", "c"].makeString()
 let _ = [1, 2, 3].makeString() // expected-error 3 {{cannot convert value of type 'Int' to expected element type 'Character'}}
 
 extension Set<_> {} // expected-error {{cannot extend a type that contains placeholders}}

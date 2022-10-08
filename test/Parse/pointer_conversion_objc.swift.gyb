@@ -29,7 +29,7 @@ class D {}
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>${suffix}) {}
 func takesMutableVoidPointer(_ x: UnsafeMutableRawPointer${suffix}) {}
 @discardableResult
-func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" } // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" }
 func takesConstVoidPointer(_ x: UnsafeRawPointer${suffix}) {}
 
 func takesAutoreleasingPointer(_ x: AutoreleasingUnsafeMutablePointer<C>${suffix}) {}

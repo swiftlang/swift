@@ -37,5 +37,5 @@ class X {
 }
 
 var x0 = X()
-var x1 = X(x: 1, y: "2") // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
+var x1 = X(x: 1, y: "2")
 

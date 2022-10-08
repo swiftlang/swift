@@ -534,7 +534,7 @@ func testSingleQuoteStringLiterals() {
 
 // <rdar://problem/17128913>
 var s = "" // expected-note {{did you mean 's'?}}
-s.append(contentsOf: ["x"]) // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+s.append(contentsOf: ["x"])
 
 //===----------------------------------------------------------------------===//
 // InOut arguments

@@ -573,13 +573,13 @@ func test_settable_of_nonsettable(_ a: Aleph) {
 
 struct MonoStruct {
   static var foo: Int = 0
-  static var (bar, bas): (String, UnicodeScalar) = ("zero", "0") // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
+  static var (bar, bas): (String, UnicodeScalar) = ("zero", "0")
 
   static var zim: UInt8 {
     return 0
   }
 
-  static var zang = UnicodeScalar("\0") // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
+  static var zang = UnicodeScalar("\0")
 
   static var zung: UInt16 {
     get {

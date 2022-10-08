@@ -19,7 +19,7 @@ let char = Parser<Character> { str in
 }
 
 let northSouth = char.map {
-  $0 == "N" // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+  $0 == "N"
       ? 1.0
-      : $0 == "S" ? -1 : nil // Ok // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+      : $0 == "S" ? -1 : nil // Ok
 }
