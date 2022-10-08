@@ -435,6 +435,7 @@ llvm::Value *irgen::emitIntLiteralWordAtIndex(
   (void)flags; // [[maybe_unused]]
   return IGF.Builder.CreateLoad(
     IGF.Builder.CreateInBoundsGEP(IGF.IGM.SizeTy, data, index),
+    IGF.IGM.SizeTy,
     IGF.IGM.getPointerAlignment()
   );
 }
