@@ -23,7 +23,7 @@ _ = b1 != b2
 
 extension UnicodeScalar {
   func isAlpha2() -> Bool {
-    return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
+    return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z") // expected-warning {{double quotes deprecated in favour of single quotes to express 'Unicode.Scalar'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Unicode.Scalar'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Unicode.Scalar'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Unicode.Scalar'}}
   }
 }
 
@@ -442,7 +442,7 @@ extension Array where Element: Hashable {
 }
 
 func rdar29633747(characters: String) {
-  let _ = Array(characters).trimmed(["("])
+  let _ = Array(characters).trimmed(["("]) // expected-warning {{double quotes deprecated in favour of single quotes to express 'String.Element' (aka 'Character')}}
 }
 
 // Null pointer dereference in noteArchetypeSource()

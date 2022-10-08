@@ -1106,7 +1106,7 @@ func rdar74711236() {
 
 extension String {
   var filterOut : (Self) throws -> Bool {
-    { $0.contains("a") }
+    { $0.contains("a") } // expected-warning {{double quotes deprecated in favour of single quotes to express 'String.Element' (aka 'Character')}}
   }
 }
 

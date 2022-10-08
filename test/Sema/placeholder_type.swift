@@ -6,7 +6,7 @@ var x3: _ { // expected-error {{type placeholder not allowed here}}
   get { 42 }
 }
 let dict1: [_: Int] = ["hi": 0]
-let dict2: [Character: _] = ["h": 0]
+let dict2: [Character: _] = ["h": 0] // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
 
 let arr = [_](repeating: "hi", count: 3)
 
@@ -45,8 +45,8 @@ struct MyType2<T> {
     init(t: T) {}
 }
 
-let _: MyType2<_> = .init(t: "c" as Character)
-let _: MyType1<_, MyType2<_>> = .init(t: "s" as Character, mt2: .init(t: "c" as Character))
+let _: MyType2<_> = .init(t: "c" as Character) // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
+let _: MyType1<_, MyType2<_>> = .init(t: "s" as Character, mt2: .init(t: "c" as Character)) // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
 
 func dictionary<K, V>(ofType: [K: V].Type) -> [K: V] { [:] }
 

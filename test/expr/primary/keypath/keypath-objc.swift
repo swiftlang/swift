@@ -61,7 +61,7 @@ func testKeyPath(a: A, b: B) {
 
   // String property with a suffix
   let _: String = #keyPath(A.propString).description
-  let _ = #keyPath(A.propString).split(separator: ".")
+  let _ = #keyPath(A.propString).split(separator: ".") // expected-warning {{double quotes deprecated in favour of single quotes to express 'String.Element' (aka 'Character')}}
   func keyPathSwitch(keyPath: String?) {
     switch keyPath {
     case (#keyPath(A.propString))?: break

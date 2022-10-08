@@ -140,11 +140,11 @@ func typeInference_commonTypes() {
     expectType(PartialRangeUpTo<String>.self, &range)
   }
   do {
-    var range = Character("a")..<"z"
+    var range = Character("a")..<"z" // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
     expectType(Range<Character>.self, &range)
   }
   do {
-    var range = UnicodeScalar("a")..<"z"
+    var range = UnicodeScalar("a")..<"z" // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
     expectType(Range<UnicodeScalar>.self, &range)
   }
   do {
@@ -221,11 +221,11 @@ func typeInference_commonTypes() {
     expectType(PartialRangeFrom<String>.self, &range)
   }
   do {
-    var range = Character("a")..."z"
+    var range = Character("a")..."z" // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}// expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
     expectType(ClosedRange<Character>.self, &range)
   }
   do {
-    var range = UnicodeScalar("a")..."z"
+    var range = UnicodeScalar("a")..."z" // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
     expectType(ClosedRange<UnicodeScalar>.self, &range)
   }
   do {

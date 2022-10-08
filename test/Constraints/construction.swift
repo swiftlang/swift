@@ -49,11 +49,11 @@ X(i: 1, j: 2) // expected-warning{{unused}}
 Y(1, 2, "hello") // expected-warning{{unused}}
 
 // Unions
-Z(UnicodeScalar("a")) // expected-warning{{unused}}
+Z(UnicodeScalar("a")) // expected-warning{{unused}} // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
 Z(1, 2) // expected-warning{{unused}}
 
 acceptZ(.none)
-acceptZ(.char("a"))
+acceptZ(.char("a")) // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
 acceptString("\(hello), \(world) #\(i)!")
 
 Optional<Int>(1) // expected-warning{{unused}}

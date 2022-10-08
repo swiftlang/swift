@@ -288,7 +288,7 @@ func asyncContext(t: HandlerTest) async {
   ambiguousFunc(value: 1) { }
   fewerParamsFunc(value: 1) { }
   moreParamsFunc() { }
-  noMatchingParamsFunc(value: "c") { }
+  noMatchingParamsFunc(value: "c") { } // expected-warning {{double quotes deprecated in favour of single quotes to express 'Character'}}
   noMatchingAsyncFunc(value: 1) { }
   sameLabelsDifferentOrder(arg: 1, arg2: "") { }
   handlerNotRemoved(arg: 1) { }

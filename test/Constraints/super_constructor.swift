@@ -16,7 +16,7 @@ class D : B {
   }
 
   init(f:Int) {
-    super.init(a: "x")
+    super.init(a: "x") // expected-warning {{double quotes deprecated in favour of single quotes to express 'UnicodeScalar' (aka 'Unicode.Scalar')}}
   }
 
   init(g:Int) {
