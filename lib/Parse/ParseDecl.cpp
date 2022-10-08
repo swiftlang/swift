@@ -160,6 +160,19 @@ namespace {
   };
 } // end anonymous namespace
 
+extern "C" void parseTopLevelSwift(const char *buffer,
+                                   void *declContext,
+                                   void *astContext,
+                                   void *outputContext,
+                                   void (*)(void *, void *));
+
+static void appendToVector(void *declPtr, void *vecPtr) {
+  auto vec = static_cast<SmallVectorImpl<Decl *> *>(vecPtr);
+  auto decl = static_cast<Decl *>(declPtr);
+
+  vec->push_back(decl);
+}
+
 /// Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -169,6 +182,23 @@ namespace {
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
 void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
+  StringRef contents =
+      SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
+
+#ifdef SWIFT_SWIFT_PARSER
+  if (Context.LangOpts.hasFeature(Feature::ParserASTGen) &&
+      !SourceMgr.hasCodeCompletionBuffer() &&
+      SF.Kind != SourceFileKind::SIL) {
+    parseTopLevelSwift(contents.data(), CurDeclContext, &Context, &decls, appendToVector);
+
+    // Spin the C++ parser to the end; we won't be using it.
+    while (!Tok.is(tok::eof)) {
+      consumeToken();
+    }
+    return;
+  }
+#endif
+  
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
     consumeTokenWithoutFeedingReceiver();

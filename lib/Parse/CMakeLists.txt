@@ -45,6 +45,7 @@ if (SWIFT_SWIFT_PARSER)
   #   target_link_libraries(swiftParse
   #     PRIVATE
   #     SwiftSyntax::SwiftCompilerSupport
+  #     ...
   #   )
   target_link_libraries(swiftParse
     PRIVATE
@@ -54,6 +55,7 @@ if (SWIFT_SWIFT_PARSER)
     $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
+    $<TARGET_OBJECTS:swiftASTGen>
   )
 
   target_include_directories(swiftParse
