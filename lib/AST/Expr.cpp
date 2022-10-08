@@ -389,6 +389,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(InOut, getSubExpr);
 
   NO_REFERENCE(VarargExpansion);
+  NO_REFERENCE(PackExpansion);
   NO_REFERENCE(DynamicType);
 
   PASS_THROUGH_REFERENCE(RebindSelfInConstructor, getSubExpr);
@@ -745,6 +746,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::OpenExistential:
   case ExprKind::MakeTemporarilyEscapable:
   case ExprKind::VarargExpansion:
+  case ExprKind::PackExpansion:
     return false;
 
   case ExprKind::Call:
@@ -918,6 +920,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::AutoClosure:
   case ExprKind::InOut:
   case ExprKind::VarargExpansion:
+  case ExprKind::PackExpansion:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
@@ -1233,6 +1236,14 @@ VarargExpansionExpr *VarargExpansionExpr::createParamExpansion(ASTContext &ctx, 
 VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, ArrayExpr *AE) {
   assert(AE->getType() && "Expansion must have fully-resolved type!");
   return new (ctx) VarargExpansionExpr(AE, /*implicit*/ true, AE->getType());
+}
+
+PackExpansionExpr *
+PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
+                          SourceLoc dotsLoc, bool implicit,
+                          Type type) {
+  return new (ctx) PackExpansionExpr(patternExpr, dotsLoc,
+                                     implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {

@@ -3527,6 +3527,51 @@ public:
   }
 };
 
+/// A pack expansion expression is a pattern expression followed by
+/// the expansion operator '...'. The pattern expression contains
+/// references to parameter packs of length N, and the expansion
+/// operator will repeat the pattern N times.
+///
+/// Pack expansion expressions are permitted in expression contexts
+/// that naturally accept a comma-separated list of values, including
+/// call argument lists, the elements of a tuple value, and the source
+/// of a for-in loop.
+class PackExpansionExpr: public Expr {
+  Expr *PatternExpr;
+  SourceLoc DotsLoc;
+
+  PackExpansionExpr(Expr *patternExpr,
+                    SourceLoc dotsLoc,
+                    bool implicit, Type type)
+    : Expr(ExprKind::PackExpansion, implicit, type),
+      PatternExpr(patternExpr), DotsLoc(dotsLoc) {}
+
+public:
+  static PackExpansionExpr *create(ASTContext &ctx,
+                                   Expr *patternExpr,
+                                   SourceLoc dotsLoc,
+                                   bool implicit = false,
+                                   Type type = Type());
+
+  Expr *getPatternExpr() const { return PatternExpr; }
+
+  void setPatternExpr(Expr *patternExpr) {
+    PatternExpr = patternExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return PatternExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return DotsLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PackExpansion;
+  }
+};
+
 /// SequenceExpr - A list of binary operations which has not yet been
 /// folded into a tree.  The operands all have even indices, while the
 /// subexpressions with odd indices are all (potentially overloaded)

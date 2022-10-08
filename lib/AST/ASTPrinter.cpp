@@ -4750,6 +4750,10 @@ void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
+  visit(expr->getPatternExpr());
+}
+
 void PrintAST::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *expr) {
 }
 
