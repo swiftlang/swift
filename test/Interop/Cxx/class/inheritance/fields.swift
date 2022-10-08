@@ -5,6 +5,7 @@
 // Windows doesn't support -lc++ or -lstdc++.
 // UNSUPPORTED: OS=windows-msvc
 
+import CxxShim
 import StdlibUnittest
 import Fields
 
