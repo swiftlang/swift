@@ -2676,7 +2676,7 @@ namespace {
       Diag<> brokenBuiltinProtocolDiag;
 
       auto migrateQuotes = [&]() {
-        if (!stringLiteral || stringLiteral->isSingleQuoted())
+        if (1 || !stringLiteral || stringLiteral->isSingleQuoted())
           return;
 
         SourceManager &SM = ctx.SourceMgr;
