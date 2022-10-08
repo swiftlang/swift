@@ -357,8 +357,16 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
     if (numLoadsFound == useInsts.size()) {
       // Function calls are an exception: in a called function a potential
       // modification of copySrc could occur _before_ the read of the temporary.
+      auto isLetObject = [](SILValue copySrc) {
+        SILValue object = getUnderlyingObject(copySrc);
+        if (auto *ASI = dyn_cast<AllocStackInst>(object)) {
+          if (ASI->isLet())
+            return true;
+        }
+        return false;
+      };
       if ((FullApplySite::isa(inst) || isa<YieldInst>(inst)) &&
-          aa->mayWriteToMemory(inst, copySrc)) {
+          !isLetObject(copySrc) && aa->mayWriteToMemory(inst, copySrc)) {
         return nullptr;
       }
 
