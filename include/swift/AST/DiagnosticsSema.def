@@ -3949,6 +3949,20 @@ ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
 
+ERROR(incorrect_implicit_self_behavior,none,
+      "use of implicit 'self' is not allowed before 'self' has been unwrapped",
+      ())
+NOTE(note_unwrap_self,none,
+      "unwrap 'self' before using implicit self", ())
+
+WARNING(incorrect_unwrapped_implicit_self_behavior,none,
+      "'self' unwrap condition does not affect uses of implicit self in "
+      "non-escaping closure, because implicit self is always non-optional "
+      "in Swift 5 mode; this is supported in Swift 6 without a warning",
+      ())
+NOTE(note_reference_self_explicitly_to_silence_warning,none,
+      "reference 'self.' explicitly to silence this warning", ())
+
 WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
         "%select{getter|setter}1", (Identifier, bool))
