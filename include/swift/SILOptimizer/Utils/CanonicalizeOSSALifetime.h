@@ -130,7 +130,7 @@ void diagnoseRequiredCopyOfMoveOnly(Operand *use,
 ///
 /// This result remains valid during copy rewriting. The only instructions
 /// referenced it contains are consumes that cannot be deleted.
-class CanonicalOSSAConsumeInfo {
+class CanonicalOSSAConsumeInfo final {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 4> finalBlockConsumes;
 
@@ -159,6 +159,10 @@ public:
     return false;
   }
 
+  CanonicalOSSAConsumeInfo() {}
+  CanonicalOSSAConsumeInfo(CanonicalOSSAConsumeInfo const &) = delete;
+  CanonicalOSSAConsumeInfo &
+  operator=(CanonicalOSSAConsumeInfo const &) = delete;
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
 };
 
@@ -169,7 +173,7 @@ public:
 ///
 /// TODO: Move all the private per-definition members into an implementation
 /// class in the .cpp file.
-class CanonicalizeOSSALifetime {
+class CanonicalizeOSSALifetime final {
 public:
   /// Find the original definition of a potentially copied value. \p copiedValue
   /// must be an owned value. It is usually a copy but may also be a destroy.
@@ -331,7 +335,7 @@ public:
 
   InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
 
-protected:
+private:
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
   void recordConsumingUse(Operand *use) {
