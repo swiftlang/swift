@@ -657,8 +657,8 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
   ++NumDestroysGenerated;
 }
 
-/// Populate `consumes` with the final destroy points once copies are
-/// eliminated. This only applies to owned values.
+/// Inserts destroys along the boundary where needed and records all final
+/// consuming uses.
 ///
 /// Observations:
 /// - currentDef must be postdominated by some subset of its
