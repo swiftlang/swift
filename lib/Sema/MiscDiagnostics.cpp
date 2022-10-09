@@ -4390,6 +4390,51 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
+/// Diagnoses a `if #_hasSymbol(...)` condition. Returns true if a diagnostic
+/// was emitted.
+static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
+                                       DeclContext *DC) {
+  // If we have an invalid info, null expression, or expression without a type
+  // then type checking failed already for this condition.
+  if (info->isInvalid())
+    return false;
+
+  auto symbolExpr = info->getSymbolExpr();
+  if (!symbolExpr)
+    return false;
+
+  if (!symbolExpr->getType())
+    return false;
+
+  auto &ctx = DC->getASTContext();
+  if (!ctx.LangOpts.Target.isOSDarwin()) {
+    // SILGen for #_hasSymbol is currently implemented assuming the target OS
+    // is a Darwin platform.
+    ctx.Diags.diagnose(info->getStartLoc(), diag::has_symbol_unsupported,
+                       ctx.LangOpts.Target.str());
+    return true;
+  }
+
+  auto decl = info->getReferencedDecl().getDecl();
+  if (!decl) {
+    // Diagnose because we weren't able to interpret the expression as one
+    // that uniquely identifies a single declaration.
+    ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+    return true;
+  }
+
+  if (!decl->isWeakImported(DC->getParentModule())) {
+    // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
+    // and may indicate the developer has mis-identified the declaration
+    // they want to check (or forgot to import the module weakly).
+    ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_decl_must_be_weak,
+                       decl->getDescriptiveKind(), decl->getName());
+    return true;
+  }
+
+  return false;
+}
+
 /// Perform MiscDiagnostics for the conditions belonging to a \c
 /// LabeledConditionalStmt.
 static void checkLabeledStmtConditions(ASTContext &ctx,
@@ -4407,32 +4452,9 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
 
     case StmtConditionElement::CK_HasSymbol: {
       auto info = elt.getHasSymbolInfo();
-      if (info->isInvalid())
-        break;
-
-      auto symbolExpr = info->getSymbolExpr();
-      if (!symbolExpr)
-        break;
-
-      if (!symbolExpr->getType())
-        break;
-
-      if (auto decl = info->getReferencedDecl().getDecl()) {
-        // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
-        // and may indicate the developer has mis-identified the declaration
-        // they want to check (or forgot to import the module weakly).
-        if (!decl->isWeakImported(DC->getParentModule())) {
-          ctx.Diags.diagnose(symbolExpr->getLoc(),
-                             diag::has_symbol_decl_must_be_weak,
-                             decl->getDescriptiveKind(), decl->getName());
-          info->setInvalid();
-        }
-      } else {
-        // Diagnose because we weren't able to interpret the expression as one
-        // that uniquely identifies a single declaration.
-        ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+      if (diagnoseHasSymbolCondition(info, DC))
         info->setInvalid();
-      }
+
       break;
     }
     }
