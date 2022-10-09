@@ -130,7 +130,7 @@ void diagnoseRequiredCopyOfMoveOnly(Operand *use,
 ///
 /// This result remains valid during copy rewriting. The only instructions
 /// referenced it contains are consumes that cannot be deleted.
-class CanonicalOSSAConsumeInfo {
+class CanonicalOSSAConsumeInfo final {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 4> finalBlockConsumes;
 
@@ -159,6 +159,10 @@ public:
     return false;
   }
 
+  CanonicalOSSAConsumeInfo() {}
+  CanonicalOSSAConsumeInfo(CanonicalOSSAConsumeInfo const &) = delete;
+  CanonicalOSSAConsumeInfo &
+  operator=(CanonicalOSSAConsumeInfo const &) = delete;
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
 };
 
@@ -169,7 +173,7 @@ public:
 ///
 /// TODO: Move all the private per-definition members into an implementation
 /// class in the .cpp file.
-class CanonicalizeOSSALifetime {
+class CanonicalizeOSSALifetime final {
 public:
   /// Find the original definition of a potentially copied value. \p copiedValue
   /// must be an owned value. It is usually a copy but may also be a destroy.
@@ -204,6 +208,10 @@ private:
   /// If true, then debug_value instructions outside of non-debug
   /// liveness may be pruned during canonicalization.
   bool pruneDebugMode;
+
+  /// If true, lifetimes will not be shortened except when necessary to avoid
+  /// copies.
+  bool maximizeLifetime;
 
   /// If true and we are processing a value of move_only type, emit a diagnostic
   /// when-ever we need to insert a copy_value.
@@ -240,8 +248,8 @@ private:
   /// Visited set for general def-use traversal that prevents revisiting values.
   GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
-  /// Visited set general CFG traversal that prevents revisiting blocks.
-  GraphNodeWorklist<SILBasicBlock *, 8> blockWorklist;
+  /// The blocks that were discovered by PrunedLiveness.
+  SmallVector<SILBasicBlock *, 32> discoveredBlocks;
 
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
@@ -251,7 +259,7 @@ private:
   /// The destroys of the value.  These are not uses, but need to be recorded so
   /// that we know when the last use in a consuming block is (without having to
   /// repeatedly do use-def walks from destroys).
-  SmallPtrSet<SILInstruction *, 8> destroys;
+  SmallPtrSetVector<SILInstruction *, 8> destroys;
 
   /// Information about consuming instructions discovered in this canonical OSSA
   /// lifetime.
@@ -289,15 +297,17 @@ public:
   }
 
   CanonicalizeOSSALifetime(
-      bool pruneDebugMode, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-      DominanceInfo *domTree, InstructionDeleter &deleter,
+      bool pruneDebugMode, bool maximizeLifetime,
+      NonLocalAccessBlockAnalysis *accessBlockAnalysis, DominanceInfo *domTree,
+      InstructionDeleter &deleter,
       std::function<void(Operand *)> moveOnlyCopyValueNotification = nullptr,
       std::function<void(Operand *)> moveOnlyFinalConsumingUse = nullptr)
-      : pruneDebugMode(pruneDebugMode),
+      : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
         moveOnlyCopyValueNotification(moveOnlyCopyValueNotification),
         moveOnlyFinalConsumingUse(moveOnlyFinalConsumingUse),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
-        deleter(deleter) {}
+        deleter(deleter),
+        liveness(maximizeLifetime ? &discoveredBlocks : nullptr) {}
 
   SILValue getCurrentDef() const { return liveness.getDef(); }
 
@@ -307,6 +317,7 @@ public:
     // analysis, freeing its memory.
     accessBlocks = nullptr;
     consumes.clear();
+    destroys.clear();
 
     liveness.initializeDef(def);
   }
@@ -315,6 +326,7 @@ public:
     consumingBlocks.clear();
     debugValues.clear();
     liveness.clear();
+    discoveredBlocks.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
@@ -333,7 +345,7 @@ public:
 
   InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
 
-protected:
+private:
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
   void recordConsumingUse(Operand *use) {
@@ -345,9 +357,14 @@ protected:
 
   void extendLivenessThroughOverlappingAccess();
 
-  void findExtendedBoundary(PrunedLivenessBoundary &boundary);
+  void findOriginalBoundary(PrunedLivenessBoundary &boundary);
 
-  void insertDestroysOnBoundary(PrunedLivenessBoundary &boundary);
+  void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
+                            PrunedLivenessBoundary &boundary);
+
+  void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
+
+  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
 
   void rewriteCopies();
 };
