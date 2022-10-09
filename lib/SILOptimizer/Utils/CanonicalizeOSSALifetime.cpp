@@ -20,13 +20,19 @@
 /// 1. Compute "pruned" liveness of def and its copies, ignoring original
 ///    destroys. Initializes `liveness`.
 ///
-/// 2. Find the "extended" boundary of liveness by walking out from the boundary
+/// 2. Find the "original" boundary of liveness using
+///    PrunedLiveness::computeBoundary.
+///
+/// 3. (Optional) At Onone, extend liveness up to original extent when possible
+///    without incurring extra copies.
+///
+/// 4. Find the "extended" boundary of liveness by walking out from the boundary
 ///    computed by PrunedLiveness out to destroys which aren't separated from
 ///    the original destory by "interesting" instructions.
 ///
-/// 3. Initializes `consumes` and inserts new destroy_value instructions.
+/// 5. Initializes `consumes` and inserts new destroy_value instructions.
 ///
-/// 4. Rewrite `def`s original copies and destroys, inserting new copies where
+/// 6. Rewrite `def`s original copies and destroys, inserting new copies where
 ///    needed. Deletes original copies and destroys and inserts new copies.
 ///
 /// See CanonicalizeOSSALifetime.h for examples.
@@ -51,6 +57,9 @@
 /// barriers, but that may significantly limit optimization.
 ///
 /// 2. Liveness is extended out to original destroys to avoid spurious changes.
+///
+/// 3. In the Onone mode, liveness is preserved to its previous extent whenever
+/// doing so doesn't incur extra copies compared to what is done in the O mode.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -107,7 +116,7 @@ static DestroyValueInst *dynCastToDestroyOf(SILInstruction *instruction,
 }
 
 //===----------------------------------------------------------------------===//
-//                    MARK: Step 1. Compute pruned liveness
+// MARK: Step 1. Compute pruned liveness
 //===----------------------------------------------------------------------===//
 
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
@@ -410,11 +419,150 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Step 2. Find the destroy points of the current def based on the pruned
-// liveness computed in Step 1.
+// MARK: Step 2. Find the "original" (unextended) boundary determined by the
+//               liveness built up in step 1.
 //===----------------------------------------------------------------------===//
 
-namespace swift {
+void CanonicalizeOSSALifetime::findOriginalBoundary(
+    PrunedLivenessBoundary &boundary) {
+  assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
+         boundary.deadDefs.size() == 0);
+  liveness.computeBoundary(boundary, consumingBlocks.getArrayRef());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Step 3. (Optional) Maximize lifetimes.
+//===----------------------------------------------------------------------===//
+
+/// At -Onone, there are some conflicting goals:
+/// On the one hand: good debugging experience.
+/// (1) do not shorten value's lifetime
+/// On the other: demonstrate semantics.
+/// (2) consume value at same places it will be consumed at -O
+/// (3) ensure there are no more copies than there would be at -O
+///
+/// (2) and (3) are equivalent--extra (compared to -O) copies arise from failing
+/// to end lifetimes at consuming uses (which then need their own copies).
+///
+/// We achieve (2) and (3) always.  We achieve (1) where possible.
+///
+/// Conceptually, the strategy is the following:
+/// - Collect the blocks in which the value was live before canonicalization.
+///   These are the "original" live blocks (originalLiveBlocks).
+///   [Color these blocks green.]
+/// - From within that collection, collect the blocks which contain a _final_
+///   consuming, non-destroy use, and their successors.
+///   These are the "consumed" blocks (consumedAtExitBlocks).
+///   [Color these blocks red.]
+/// - Extend liveness down to the boundary between originalLiveBlocks and
+///   consumedAtExitBlocks blocks.
+///   [Extend liveness down to the boundary between green blocks and red.]
+/// - In particular, in regions of originalLiveBlocks which have no boundary
+///   with consumedAtExitBlocks, liveness should be extended to its original
+///   extent.
+///   [Extend liveness down to the boundary between green blocks and uncolored.]
+void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
+    PrunedLivenessBoundary const &boundary) {
+  auto currentDef = getCurrentDef();
+
+  // First, collect the blocks that were _originally_ live.  We can't use
+  // liveness here because it doesn't include blocks that occur before a
+  // destroy_value.
+  BasicBlockSet originalLiveBlocks(currentDef->getFunction());
+  {
+    // Some of the work here was already done by computeCanonicalLiveness.
+    // Specifically, it already discovered all blocks containing (transitive)
+    // uses and blocks that appear between them and the def.
+    //
+    // Seed the set with what it already discovered.
+    for (auto *discoveredBlock : liveness.getDiscoveredBlocks())
+      originalLiveBlocks.insert(discoveredBlock);
+
+    // Start the walk from the consuming blocks (which includes destroys as well
+    // as the other consuming uses).
+    BasicBlockWorklist worklist(currentDef->getFunction());
+    for (auto *consumingBlock : consumingBlocks) {
+      worklist.push(consumingBlock);
+    }
+
+    // Walk backwards from consuming blocks.
+    while (auto *block = worklist.pop()) {
+      originalLiveBlocks.insert(block);
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        // If the block was discovered by liveness, we already added it to the
+        // set.
+        if (originalLiveBlocks.contains(predecessor))
+          continue;
+        worklist.pushIfNotVisited(predecessor);
+      }
+    }
+  }
+
+  // Second, collect the blocks which occur after a _final_ consuming use.
+  BasicBlockSet consumedAtExitBlocks(currentDef->getFunction());
+  StackList<SILBasicBlock *> consumedAtEntryBlocks(currentDef->getFunction());
+  {
+    // Start the forward walk from blocks which contain _final_ non-destroy
+    // consumes. These are just the instructions on the boundary which aren't
+    // destroys.
+    BasicBlockWorklist worklist(currentDef->getFunction());
+    for (auto *instruction : boundary.lastUsers) {
+      if (dynCastToDestroyOf(instruction, getCurrentDef()))
+        continue;
+      if (liveness.isInterestingUser(instruction) !=
+          PrunedLiveness::IsInterestingUser::LifetimeEndingUse)
+        continue;
+      worklist.push(instruction->getParent());
+    }
+    while (auto *block = worklist.pop()) {
+      consumedAtExitBlocks.insert(block);
+      for (auto *successor : block->getSuccessorBlocks()) {
+        if (!originalLiveBlocks.contains(successor))
+          continue;
+        worklist.pushIfNotVisited(successor);
+        consumedAtEntryBlocks.push_back(successor);
+      }
+    }
+  }
+
+  // Third, find the blocks on the boundary between the originally-live blocks
+  // and the originally-live-but-consumed blocks.  Extend liveness "to the end"
+  // of these blocks.
+  for (auto *block : consumedAtEntryBlocks) {
+    for (auto *predecessor : block->getPredecessorBlocks()) {
+      if (consumedAtExitBlocks.contains(predecessor))
+        continue;
+      // Add "the instruction(s) before the terminator" of the predecessor to
+      // liveness.
+      if (auto *inst = predecessor->getTerminator()->getPreviousInstruction()) {
+        liveness.updateForUse(inst, /*lifetimeEnding*/ false);
+      } else {
+        for (auto *grandPredecessor : predecessor->getPredecessorBlocks()) {
+          liveness.updateForUse(grandPredecessor->getTerminator(),
+                                /*lifetimeEnding*/ false);
+        }
+      }
+    }
+  }
+
+  // Finally, preserve the destroys which weren't in the consumed region in
+  // place: hoisting such destroys would not avoid copies.
+  for (auto *destroy : destroys) {
+    auto *block = destroy->getParent();
+    // If the destroy is in a consumed block or a final consuming block,
+    // hoisting it would avoid a copy.
+    if (consumedAtExitBlocks.contains(block))
+      continue;
+    liveness.updateForUse(destroy, /*lifetimeEnding*/ true);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Step 4. Extend the "original" boundary from step 2 up to destroys that
+//               aren't separated from it by "interesting" instructions.
+//===----------------------------------------------------------------------===//
+
+namespace {
 /// Extends the boundary from PrunedLiveness down to preexisting destroys of the
 /// def which aren't separated from the original boundary by "interesting"
 /// instructions.
@@ -423,17 +571,21 @@ namespace swift {
 /// iterating to a fixed point by canonicalizing the lifetimes of several
 /// values with overlapping live ranges and failing to find a fixed point
 /// because their destroys are repeatedly hoisted over one another.
-class CanonicalizeOSSALifetimeBoundaryExtender {
+class ExtendBoundaryToDestroys final {
   SSAPrunedLiveness &liveness;
-  PrunedLivenessBoundary &originalBoundary;
+  PrunedLivenessBoundary const &originalBoundary;
   SILValue currentDef;
+  BasicBlockSet seenMergePoints;
 
 public:
-  CanonicalizeOSSALifetimeBoundaryExtender(
-      SSAPrunedLiveness &liveness, PrunedLivenessBoundary &originalBoundary,
-      SILValue currentDef)
+  ExtendBoundaryToDestroys(SSAPrunedLiveness &liveness,
+                           PrunedLivenessBoundary const &originalBoundary,
+                           SILValue currentDef)
       : liveness(liveness), originalBoundary(originalBoundary),
-        currentDef(currentDef){};
+        currentDef(currentDef), seenMergePoints(currentDef->getFunction()){};
+  ExtendBoundaryToDestroys(ExtendBoundaryToDestroys const &) = delete;
+  ExtendBoundaryToDestroys &
+  operator=(ExtendBoundaryToDestroys const &) = delete;
 
   /// Compute the extended boundary by walking out from the original boundary
   /// (from PrunedLiveness::computeBoundary) down to any destroys that appear
@@ -441,21 +593,16 @@ public:
   /// "interesting" users.
   void extend(PrunedLivenessBoundary &boundary) {
     for (auto *def : originalBoundary.deadDefs) {
-      if (auto *argument = dyn_cast<SILArgument>(def)) {
-        extendBoundaryFromCFGEdge(argument->getParent(), boundary);
-      } else {
-        extendBoundaryFromInstruction(cast<SILInstruction>(def), boundary);
-      }
+      extendBoundaryFromDef(def, boundary);
     }
     for (auto *destination : originalBoundary.boundaryEdges) {
-      extendBoundaryFromCFGEdge(destination, boundary);
+      extendBoundaryFromBoundaryEdge(destination, boundary);
     }
     for (auto *user : originalBoundary.lastUsers) {
-      extendBoundaryFromInstruction(user, boundary);
+      extendBoundaryFromUser(user, boundary);
     }
   }
 
-private:
   /// Look past ignoreable instructions to find the _last_ destroy after the
   /// specified instruction that destroys \p def.
   static DestroyValueInst *findDestroyAfter(SILInstruction *previous,
@@ -481,21 +628,48 @@ private:
     return findDestroyAfter(start, def);
   }
 
-  /// Look past ignoreable instructions to find the _last_ destroy "on" the edge
-  /// that ends at \p destination (i.e. looking from the beginning of \p
-  /// destination) that destroys \p def.
-  static DestroyValueInst *findDestroyOnCFGEdge(SILBasicBlock *destination,
-                                                SILValue def) {
+  /// Look past ignoreable instructions to find the _first_ destroy in \p
+  /// destination that destroys \p def and isn't separated from the beginning
+  /// by "interesting" instructions.
+  static DestroyValueInst *findDestroyFromBlockBegin(SILBasicBlock *destination,
+                                                     SILValue def) {
     return findDestroyAtOrAfter(&*destination->begin(), def);
+  }
+
+private:
+  /// Compute the points on the extended boundary found by walking forward from
+  /// the dead def (starting either with the top of the block in the case of a
+  /// dead arg or the next instruction in the case of an instruction) down to
+  /// any destroys that appear later but which aren't separated from the
+  /// original boundary by "interesting" users.
+  ///
+  /// If a destroy is found, it becomes a last user.  Otherwise, the boundary
+  /// stays in place and \p def remains a dead def.
+  void extendBoundaryFromDef(SILNode *def, PrunedLivenessBoundary &boundary) {
+    if (auto *arg = dyn_cast<SILArgument>(def)) {
+      if (auto *dvi = findDestroyFromBlockBegin(arg->getParent(), currentDef)) {
+        boundary.lastUsers.push_back(dvi);
+        return;
+      }
+    } else {
+      if (auto *dvi = findDestroyAfter(cast<SILInstruction>(def), currentDef)) {
+        boundary.lastUsers.push_back(dvi);
+        return;
+      }
+    }
+    boundary.deadDefs.push_back(def);
   }
 
   /// Compute the points on the extended boundary found by walking down from the
   /// boundary edge in the original boundary (uniquely determined by the
   /// specified destination edge) down to any destroys that appear later but
   /// which aren't separated from the original boundary by "interesting" users.
-  void extendBoundaryFromCFGEdge(SILBasicBlock *destination,
-                                 PrunedLivenessBoundary &boundary) {
-    if (auto *dvi = findDestroyOnCFGEdge(destination, currentDef)) {
+  ///
+  /// If a destroy is found, it becomes a last user.  Otherwise, the boundary
+  /// stays in place and \p destination remains a boundary edge.
+  void extendBoundaryFromBoundaryEdge(SILBasicBlock *destination,
+                                      PrunedLivenessBoundary &boundary) {
+    if (auto *dvi = findDestroyFromBlockBegin(destination, currentDef)) {
       boundary.lastUsers.push_back(dvi);
     } else {
       boundary.boundaryEdges.push_back(destination);
@@ -506,8 +680,16 @@ private:
   /// specified instruction in the original boundary down to any destroys that
   /// appear later but which aren't separated from the original boundary by
   /// "interesting" users.
-  void extendBoundaryFromInstruction(SILInstruction *user,
-                                     PrunedLivenessBoundary &boundary) {
+  ///
+  /// If the user is consuming, the boundary remains in place.
+  ///
+  /// If the user is a terminator, see extendBoundaryFromTerminator.
+  ///
+  /// If a destroy is found after the (non-consuming, non-terminator) \p user,
+  /// it becomes a last user.  Otherwise, the boundary stays in place and \p
+  /// user remains a last user.
+  void extendBoundaryFromUser(SILInstruction *user,
+                              PrunedLivenessBoundary &boundary) {
     if (auto *dvi = dynCastToDestroyOf(user, currentDef)) {
       auto *existingDestroy = findDestroyAtOrAfter(dvi, currentDef);
       assert(existingDestroy && "couldn't find a destroy at or after one!?");
@@ -523,11 +705,8 @@ private:
       return;
     case PrunedLiveness::IsInterestingUser::NonLifetimeEndingUse:
     case PrunedLiveness::IsInterestingUser::NonUser:
-      if (isa<TermInst>(user)) {
-        auto *block = user->getParent();
-        for (auto *successor : block->getSuccessorBlocks()) {
-          extendBoundaryFromCFGEdge(successor, boundary);
-        }
+      if (auto *terminator = dyn_cast<TermInst>(user)) {
+        extendBoundaryFromTerminator(terminator, boundary);
         return;
       }
       if (auto *existingDestroy = findDestroyAfter(user, currentDef)) {
@@ -537,22 +716,63 @@ private:
       boundary.lastUsers.push_back(user);
     }
   }
+
+  /// Compute the points on the extended boundary by walking into \p user's
+  /// parent's successors and looking for destroys.
+  ///
+  /// If any destroys are found, they become last users and all other successors
+  /// (which lack destroys) become boundary edges.  If no destroys are found,
+  /// the boundary stays in place and \p user remains a last user.
+  void extendBoundaryFromTerminator(TermInst *user,
+                                    PrunedLivenessBoundary &boundary) {
+    auto *block = user->getParent();
+    // Record the successors at the beginning of which we didn't find destroys.
+    // If we found a destroy at the beginning of any other successor, then all
+    // the other edges become boundary edges.
+    SmallVector<SILBasicBlock *, 4> successorsWithoutDestroys;
+    bool foundDestroy = false;
+    for (auto *successor : block->getSuccessorBlocks()) {
+      // If multiple terminators were live and had the same successor, only
+      // record the boundary corresponding to that destination block once.
+      if (!seenMergePoints.insert(successor)) {
+        // Thanks to the lack of critical edges, having seen this successor
+        // before means it has multiple predecessors, so this must be \p block's
+        // unique successor.
+        assert(block->getSingleSuccessorBlock() == successor);
+        continue;
+      }
+      if (auto *dvi = findDestroyFromBlockBegin(successor, currentDef)) {
+        boundary.lastUsers.push_back(dvi);
+        foundDestroy = true;
+      } else {
+        successorsWithoutDestroys.push_back(successor);
+      }
+    }
+    if (foundDestroy) {
+      // If we found a destroy in any successor, then every block at the
+      // beginning of which we didn't find a destroy becomes a boundary edge.
+      for (auto *successor : successorsWithoutDestroys) {
+        boundary.boundaryEdges.push_back(successor);
+      }
+    } else {
+      boundary.lastUsers.push_back(user);
+    }
+  }
 };
-} // namespace swift
+} // anonymous namespace
 
 void CanonicalizeOSSALifetime::findExtendedBoundary(
+    PrunedLivenessBoundary const &originalBoundary,
     PrunedLivenessBoundary &boundary) {
-  PrunedLivenessBoundary originalBoundary;
-  liveness.computeBoundary(originalBoundary, consumingBlocks.getArrayRef());
-
-  CanonicalizeOSSALifetimeBoundaryExtender extender(liveness, originalBoundary,
-                                                    getCurrentDef());
+  assert(boundary.lastUsers.size() == 0 && boundary.boundaryEdges.size() == 0 &&
+         boundary.deadDefs.size() == 0);
+  ExtendBoundaryToDestroys extender(liveness, originalBoundary,
+                                    getCurrentDef());
   extender.extend(boundary);
-  assert(boundary.deadDefs.empty() && "dead defs in extended boundary!?");
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Step 3. Insert destroys onto the boundary found in step 2 where needed.
+// MARK: Step 5. Insert destroys onto the boundary found in step 3 where needed.
 //===----------------------------------------------------------------------===//
 
 /// Create a new destroy_value instruction before the specified instruction and
@@ -570,8 +790,8 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
   ++NumDestroysGenerated;
 }
 
-/// Populate `consumes` with the final destroy points once copies are
-/// eliminated. This only applies to owned values.
+/// Inserts destroys along the boundary where needed and records all final
+/// consuming uses.
 ///
 /// Observations:
 /// - currentDef must be postdominated by some subset of its
@@ -579,7 +799,8 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
 /// - The postdominating consumes cannot be within nested loops.
 /// - Any blocks in nested loops are now marked LiveOut.
 void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
-    PrunedLivenessBoundary &boundary) {
+    PrunedLivenessBoundary const &boundary) {
+  BasicBlockSet seenMergePoints(getCurrentDef()->getFunction());
   for (auto *instruction : boundary.lastUsers) {
     if (auto *dvi = dynCastToDestroyOf(instruction, getCurrentDef())) {
       consumes.recordFinalConsume(dvi);
@@ -591,11 +812,23 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
       continue;
     case PrunedLiveness::IsInterestingUser::NonLifetimeEndingUse:
     case PrunedLiveness::IsInterestingUser::NonUser:
+      if (isa<TermInst>(instruction)) {
+        auto *block = instruction->getParent();
+        for (auto *successor : block->getSuccessorBlocks()) {
+          if (!seenMergePoints.insert(successor)) {
+            assert(block->getSingleSuccessorBlock() == successor);
+            continue;
+          }
+          auto *insertionPoint = &*successor->begin();
+          insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(),
+                                         consumes, getCallbacks());
+          LLVM_DEBUG(llvm::dbgs()
+                     << "  Destroy after terminator " << instruction
+                     << " at beginning of " << successor << "\n");
+        }
+        continue;
+      }
       auto *insertionPoint = instruction->getNextInstruction();
-      // If there were no next instruction, it would be a TermInst and we would
-      // have added the successors as boundary edge destinations (or found
-      // destroys in their bodies).
-      assert(insertionPoint);
       insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
                                      getCallbacks());
       LLVM_DEBUG(llvm::dbgs()
@@ -609,10 +842,27 @@ void CanonicalizeOSSALifetime::insertDestroysOnBoundary(
                                    getCallbacks());
     LLVM_DEBUG(llvm::dbgs() << "  Destroy on edge " << edgeDestination << "\n");
   }
+  for (auto *def : boundary.deadDefs) {
+    if (auto *arg = dyn_cast<SILArgument>(def)) {
+      auto *insertionPoint = &*arg->getParent()->begin();
+      insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
+                                     getCallbacks());
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  Destroy after dead def arg " << arg << "\n");
+    } else {
+      auto *instruction = cast<SILInstruction>(def);
+      auto *insertionPoint = instruction->getNextInstruction();
+      assert(insertionPoint && "def instruction was a terminator?!");
+      insertDestroyBeforeInstruction(insertionPoint, getCurrentDef(), consumes,
+                                     getCallbacks());
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  Destroy after dead def inst " << instruction << "\n");
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Step 4. Rewrite copies and destroys
+// MARK: Step 6. Rewrite copies and destroys
 //===----------------------------------------------------------------------===//
 
 /// The lifetime extends beyond given consuming use. Copy the value.
@@ -778,12 +1028,27 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
     return false;
   }
   extendLivenessThroughOverlappingAccess();
-  // Step 2: compute boundary
+  // Step 2: compute original boundary
+  PrunedLivenessBoundary originalBoundary;
+  findOriginalBoundary(originalBoundary);
   PrunedLivenessBoundary boundary;
-  findExtendedBoundary(boundary);
-  // Step 3: insert destroys and record consumes
+  if (maximizeLifetime) {
+    // Step 3. (optional) maximize lifetimes
+    extendUnconsumedLiveness(originalBoundary);
+    originalBoundary.clear();
+    // Step 2: (again) recompute the original boundary since we've extended
+    //         liveness
+    findOriginalBoundary(originalBoundary);
+    // Step 4: extend boundary to destroys
+    findExtendedBoundary(originalBoundary, boundary);
+  } else {
+    // Step 3: (skipped)
+    // Step 4: extend boundary to destroys
+    findExtendedBoundary(originalBoundary, boundary);
+  }
+  // Step 5: insert destroys and record consumes
   insertDestroysOnBoundary(boundary);
-  // Step 4: rewrite copies and delete extra destroys
+  // Step 6: rewrite copies and delete extra destroys
   rewriteCopies();
 
   clearLiveness();

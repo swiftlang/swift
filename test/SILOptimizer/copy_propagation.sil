@@ -668,27 +668,13 @@ bb1:
 
 // Original Overlapping (unnecessarily extends pruned liveness):
 //
-// TODO: this copy could be avoided but is probably an unusual case,
-// and sinking the destroy outside the access scope might help to
-// optimize the access itself.
-//
-//     %def
-//     begin_access // access scope unrelated to def
-//     use %def     // pruned liveness ends here
-//     br bb1
-// bb1:
-//     destroy %def
-//     end_access
-//
 // CHECK-LABEL: sil [ossa] @testOriginalOverlapInDeadBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
 // CHECK:   begin_access
-// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
-// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   end_access
-// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK-LABEL: } // end sil function 'testOriginalOverlapInDeadBlock'
 sil [ossa] @testOriginalOverlapInDeadBlock : $@convention(thin) () -> () {
 bb0:
