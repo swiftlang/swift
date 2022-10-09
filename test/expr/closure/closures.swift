@@ -151,6 +151,7 @@ func anonymousClosureArgsInClosureWithArgs() {
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
 func doVoidStuffNonEscaping(_ fn: () -> ()) {}
+func doStuffNonEscaping(_ fn: () -> Int) {}
 
 // <rdar://problem/16193162> Require specifying self for locations in code where strong reference cycles are likely
 class ExplicitSelfRequiredTest {
@@ -259,10 +260,10 @@ class ExplicitSelfRequiredTest {
   
   func weakSelfError() {
     doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
-    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{variable 'self' was written to, but never read}} expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
     doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
     doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
-    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{variable 'self' was written to, but never read}}  expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
     doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
   }
 }
@@ -741,6 +742,7 @@ public class TestImplicitCaptureOfExplicitCaptureOfSelfInEscapingClosure {
 public class TestImplicitSelfForWeakSelfCapture {
   static var staticOptional: TestImplicitSelfForWeakSelfCapture? = .init()
   func method() { }
+  var value: Int { 42 }
   
   private init() {
     doVoidStuff { [weak self] in
@@ -770,18 +772,33 @@ public class TestImplicitSelfForWeakSelfCapture {
       self.method()
     }
     
+    doVoidStuffNonEscaping { [weak self] in // {{44-44=\nguard let self else { return }}}
+      method() // expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
+      print(value) // expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
+    }
+
+    doStuffNonEscaping { [weak self] in // {{44-44=\nguard let self else { return <#value#> }}}
+      method() // expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
+      return value // expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
+    }
+
     doVoidStuffNonEscaping { [weak self] in
-      method()
-      guard let self = self else { return }
-      method()
-      self.method()
+      guard let self = self else { return } // expected-warning {{'self' unwrap condition does not affect uses of implicit self in non-escaping closure, because implicit self is always non-optional in Swift 5 mode; this is supported in Swift 6 without a warning}}
+      method() // expected-note {{reference 'self.' explicitly to silence this warning}} {{7-7=self.}}
+      print(value) // expected-note {{reference 'self.' explicitly to silence this warning}} {{13-13=self.}}
     }
     
     doVoidStuffNonEscaping { [weak self] in
       if let self = self {
-        method()
-        self.method()
+        method() // expected-note {{reference 'self.' explicitly to silence this warning}} {{9-9=self.}}
+        print(self.value)
       }
+
+      if let self = self {
+        print(value) // expected-note {{reference 'self.' explicitly to silence this warning}} {{15-15=self.}}
+      }
+
+      method() // expected-warning {{use of implicit 'self' is not allowed before 'self' has been unwrapped; this is an error in Swift 6}} expected-note {{unwrap 'self' before using implicit self}}
     }
     
     doVoidStuff { [weak self] in
@@ -792,14 +809,14 @@ public class TestImplicitSelfForWeakSelfCapture {
     
     doVoidStuffNonEscaping { [weak self] in
       let `self`: TestImplicitSelfForWeakSelfCapture? = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional
-      guard let self = self else { return }
-      method()
+      guard let self = self else { return } // expected-warning {{'self' unwrap condition does not affect uses of implicit self in non-escaping closure, because implicit self is always non-optional in Swift 5 mode; this is supported in Swift 6 without a warning}}
+      method() // expected-note {{reference 'self.' explicitly to silence this warning}} {{7-7=self.}}
       self.method()
     }
     
     doVoidStuffNonEscaping { [weak self] in
-      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return }
-      method()
+      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{'self' unwrap condition does not affect uses of implicit self in non-escaping closure, because implicit self is always non-optional in Swift 5 mode; this is supported in Swift 6 without a warning}}
+      method() // expected-note {{reference 'self.' explicitly to silence this warning}} {{7-7=self.}}
       self.method()
     }
   }
