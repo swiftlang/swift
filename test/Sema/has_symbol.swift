@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t -enable-experimental-feature ResultBuilderASTTransform
 
-// UNSUPPORTED: OS=windows-msvc
+// REQUIRES: VENDOR=apple
 
 @_weakLinked import has_symbol_helper
 
@@ -95,11 +95,11 @@ func testNotWeakDeclDiagnostics(_ s: LocalStruct) {
 
 func testInvalidExpressionsDiagnostics() {
   if #_hasSymbol(unknownDecl) {} // expected-error {{cannot find 'unknownDecl' in scope}}
-  if #_hasSymbol(noArgFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(global - 1) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(S.staticFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(C.classFunc()) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  if #_hasSymbol(1 as Int) {} // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  if #_hasSymbol(noArgFunc()) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(global - 1) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(S.staticFunc()) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(C.classFunc()) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  if #_hasSymbol(1 as Int) {} // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
   if #_hasSymbol(1 as S) {} // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
 }
 
@@ -127,11 +127,11 @@ func testClosure() {
   doIt { if #_hasSymbol(ambiguousFunc) {} } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
   doIt { if #_hasSymbol(localFunc) {} } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
   doIt { if #_hasSymbol(unknownDecl) {} } // expected-error {{cannot find 'unknownDecl' in scope}}
-  doIt { if #_hasSymbol(noArgFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(global - 1) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(S.staticFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(C.classFunc()) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
-  doIt { if #_hasSymbol(1 as Int) {} } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+  doIt { if #_hasSymbol(noArgFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(global - 1) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(S.staticFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(C.classFunc()) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
+  doIt { if #_hasSymbol(1 as Int) {} } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
   doIt { if #_hasSymbol(1 as S) {} } // expected-error {{cannot convert value of type 'Int' to type 'S' in coercion}}
 }
 
@@ -164,7 +164,7 @@ struct MyView {
   }
 
   @ViewBuilder var noArgFuncView: some View {
-    if #_hasSymbol(noArgFunc()) { image } // expected-error {{#_hasSymbol condition must refer to a declaration}}
+    if #_hasSymbol(noArgFunc()) { image } // expected-error {{'#_hasSymbol' condition must refer to a declaration}}
     else { image }
   }
 }
