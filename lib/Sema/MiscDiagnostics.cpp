@@ -1676,7 +1676,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         }
       }
 
-      if (conditionalStmt == nullptr) {
+      if (!conditionalStmt) {
         return false;
       }
 
