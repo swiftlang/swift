@@ -1557,6 +1557,17 @@ closureHasIncorrectImplicitSelfBehavior(const AbstractClosureExpr *ACE,
       .isKnownNoEscape();
 }
 
+// Returns true if this is an implicit self expr
+static bool isImplicitSelf(Expr *E) {
+  auto *DRE = dyn_cast<DeclRefExpr>(E);
+
+  if (!DRE || !DRE->isImplicit())
+    return false;
+
+  ASTContext &Ctx = DRE->getDecl()->getASTContext();
+  return DRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
+}
+
 /// Look for any property references in closures that lack a 'self.' qualifier.
 /// Within a closure, we require that the source code contain 'self.' explicitly
 /// (or that the closure explicitly capture 'self' in the capture list) because
@@ -1564,28 +1575,14 @@ closureHasIncorrectImplicitSelfBehavior(const AbstractClosureExpr *ACE,
 /// confusion, so we force an explicit self.
 static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public BaseDiagnosticWalker {
+  class ImplicitSelfDiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
-    const DeclContext *DC;
-
-    /// The stack of closure exprs for the current position in the AST.
-    /// The top item on the stack, if present, is the current closure scope.
     SmallVector<AbstractClosureExpr *, 4> Closures;
 
-    /// A mapping from closure exprs to the optional unwrap patterns that
-    /// unwrap `self`, if applicable
-    llvm::SmallDenseMap<AbstractClosureExpr *,
-                        SmallVector<OptionalSomePattern *, 4>>
-        SelfUnwrapConditions;
-
-    /// A mapping from `self` unwrapping patterns to a list of
-    /// implicit self exprs that reference the conditional stmt's self decl
-    llvm::SmallDenseMap<OptionalSomePattern *, SmallVector<Expr *, 4>>
-        ImplicitSelfReferences;
-
   public:
-    explicit DiagnoseWalker(const DeclContext *DC, AbstractClosureExpr *ACE)
-        : Ctx(DC->getASTContext()), DC(DC), Closures() {
+    explicit ImplicitSelfDiagnoseWalker(ASTContext &Ctx,
+                                        AbstractClosureExpr *ACE)
+        : Ctx(Ctx), Closures() {
       if (ACE)
         Closures.push_back(ACE);
     }
@@ -1601,17 +1598,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return true;
 
       return false;
-    }
-
-    // Returns true if this is an implicit self expr
-    static bool isImplicitSelf(Expr *E) {
-      auto *DRE = dyn_cast<DeclRefExpr>(E);
-
-      if (!DRE || !DRE->isImplicit())
-        return false;
-
-      ASTContext &Ctx = DRE->getDecl()->getASTContext();
-      return DRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
     }
 
     /// Return true if this is an implicit reference to self which is required
@@ -1755,7 +1741,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        Closures.push_back(CE);
+        if (isClosureRequiringSelfQualification(CE, Ctx)) {
+          Closures.push_back(CE);
+        }
       }
 
       // If we aren't in a closure, no diagnostics will be produced.
@@ -1766,20 +1754,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       auto *ACE = Closures[Closures.size() - 1];
       assert(ACE);
 
-      if (isClosureRequiringSelfQualification(ACE, Ctx)) {
-        return walkToExprInClosureRequiringSelfQualification(E, ACE);
-      }
-
-      if (closureHasIncorrectImplicitSelfBehavior(ACE, Ctx)) {
-        return walkToExprInClosureWithIncorrectImplicitSelfBehavior(E, ACE);
-      }
-
-      return Action::Continue(E);
-    }
-
-    PreWalkResult<Expr *>
-    walkToExprInClosureRequiringSelfQualification(Expr *E,
-                                                  AbstractClosureExpr *ACE) {
       auto &Diags = Ctx.Diags;
 
       // Until Swift 6, only emit a warning when we get this with an
@@ -1826,148 +1800,15 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return Action::Continue(E);
     }
 
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (Closures.size() == 0)
-        return Action::Continue(S);
-
-      auto *ACE = Closures[Closures.size() - 1];
-      assert(ACE);
-
-      // We only need to track self unwrap conditions in closures
-      // with incorrect implicit self behavior
-      if (!closureHasIncorrectImplicitSelfBehavior(ACE, Ctx)) {
-        return Action::Continue(S);
-      }
-
-      // If this conditional stmt unwraps self in a closure with incorrect
-      // implicit self behavior, then this stmt is actually unused. We'll
-      // emit a diagnostic later after we've collected all of the implicit
-      // self decls that would refer to this condition in Swift 6 mode.
-      if (auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S)) {
-        for (auto cond : conditionalStmt->getCond()) {
-          if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-            if (OSP->getSubPattern()->getBoundName() == Ctx.Id_self) {
-              SelfUnwrapConditions[ACE].push_back(OSP);
-            }
-          }
-        }
-      }
-
-      return Action::Continue(S);
-    }
-
-    /// The self unwrap pattern defining self (in Swift 6+)
-    /// for the given implicit self expr.
-    OptionalSomePattern *patternDefiningSelf(Expr *implicitSelfExpr) {
-      // The AST for this implicit self decl is incorrect in Swift 5,
-      // so we need to look up the decl that would be used at this
-      // location in Swift 6+.
-      auto selfDecl = ASTScope::lookupSingleLocalDecl(
-          DC->getParentSourceFile(), DeclName(Ctx.Id_self),
-          implicitSelfExpr->getLoc());
-
-      if (!selfDecl) {
-        return nullptr;
-      }
-
-      LabeledConditionalStmt *conditionalStmt = nullptr;
-      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
-        if (auto parentStmt = var->getParentPatternStmt()) {
-          conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
-        }
-      }
-
-      if (conditionalStmt) {
-        for (auto cond : conditionalStmt->getCond()) {
-          if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-            if (OSP->getSubPattern()->getBoundName() == Ctx.Id_self) {
-              return OSP;
-            }
-          }
-        }
-      }
-
-      return nullptr;
-    }
-
-    PreWalkResult<Expr *> walkToExprInClosureWithIncorrectImplicitSelfBehavior(
-        Expr *E, AbstractClosureExpr *ACE) {
-      Expr *implicitSelfExpr = nullptr;
-      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-        if (isImplicitSelf(MRE->getBase())) {
-          implicitSelfExpr = MRE->getBase();
-        }
-      }
-
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
-        if (isImplicitSelf(DSCE->getBase())) {
-          implicitSelfExpr = DSCE->getBase();
-        }
-      }
-
-      if (!implicitSelfExpr) {
-        return Action::Continue(E);
-      }
-
-      // If there's an optional unwrap condition like `guard let self`
-      // earlier in the scope, associate this implicit self decl with it.
-      if (auto selfUnwrapPattern = patternDefiningSelf(E)) {
-        ImplicitSelfReferences[selfUnwrapPattern].push_back(implicitSelfExpr);
-        return Action::Continue(E);
-      }
-
-      // Otherwise this implicit self expr is incorrectly non-optional,
-      // despite not being explicitly unwrapped.
-      auto &Diags = Ctx.Diags;
-      Diags
-          .diagnose(implicitSelfExpr->getLoc(),
-                    diag::incorrect_implicit_self_behavior)
-          .warnUntilSwiftVersion(6);
-
-      if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-        StringRef unwrapSelfFixIt = "\nguard let self else { return }";
-        if (auto functionType = CE->getType()->getAs<FunctionType>()) {
-          if (!functionType->getResult()->isVoid()) {
-            unwrapSelfFixIt = "\nguard let self else { return <#value#> }";
-          }
-        }
-
-        Diags.diagnose(implicitSelfExpr->getLoc(), diag::note_unwrap_self)
-            .fixItInsertAfter(CE->getInLoc(), unwrapSelfFixIt);
-      }
-
-      return Action::Continue(E);
-    }
-
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       auto *ACE = dyn_cast<AbstractClosureExpr>(E);
       if (!ACE) {
         return Action::Continue(E);
       }
 
-      assert(Closures.size() > 0);
-      Closures.pop_back();
-
-      if (closureHasIncorrectImplicitSelfBehavior(ACE, Ctx)) {
-        // If we saw any conditions that unwrapped self (like
-        // `guard let self`), and there were implicit self calls
-        // that would refer to that self decl in Swift 6 (but not Swift 5),
-        // emit a warning indicating that the behavior will change in Swift 6.
-        for (auto cnd : SelfUnwrapConditions[ACE]) {
-          if (ImplicitSelfReferences[cnd].size() != 0) {
-            auto &Diags = Ctx.Diags;
-            Diags.diagnose(cnd->getQuestionLoc(),
-                           diag::incorrect_unwrapped_implicit_self_behavior);
-
-            for (auto implicitSelfExpr : ImplicitSelfReferences[cnd]) {
-              Diags
-                  .diagnose(
-                      implicitSelfExpr->getLoc(),
-                      diag::note_reference_self_explicitly_to_silence_warning)
-                  .fixItInsert(implicitSelfExpr->getLoc(), "self.");
-            }
-          }
-        }
+      if (isClosureRequiringSelfQualification(ACE, Ctx)) {
+        assert(Closures.size() > 0);
+        Closures.pop_back();
       }
 
       return Action::Continue(E);
@@ -2087,17 +1928,215 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
   };
 
+  class IncorrectImplicitSelfDiagnoseWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+    const DeclContext *DC;
+
+    /// The stack of closure exprs for the current position in the AST.
+    /// The top item on the stack, if present, is the current closure scope.
+    SmallVector<AbstractClosureExpr *, 4> Closures;
+
+    /// A mapping from closure exprs to the optional unwrap patterns that
+    /// unwrap `self`, if applicable
+    llvm::SmallDenseMap<AbstractClosureExpr *,
+                        SmallVector<OptionalSomePattern *, 4>>
+        SelfUnwrapConditions;
+
+    /// A mapping from `self` unwrapping patterns to a list of
+    /// implicit self exprs that reference the conditional stmt's self decl
+    llvm::SmallDenseMap<OptionalSomePattern *, SmallVector<Expr *, 4>>
+        ImplicitSelfReferences;
+
+  public:
+    explicit IncorrectImplicitSelfDiagnoseWalker(const DeclContext *DC,
+                                                 AbstractClosureExpr *ACE)
+        : Ctx(DC->getASTContext()), DC(DC), Closures() {
+      if (ACE)
+        Closures.push_back(ACE);
+    }
+
+    bool shouldWalkCaptureInitializerExpressions() override { return true; }
+
+    bool shouldWalkIntoTapExpression() override { return false; }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+        Closures.push_back(CE);
+      }
+
+      // If we aren't in a closure, no diagnostics will be produced.
+      if (Closures.size() == 0)
+        return Action::Continue(E);
+
+      auto *ACE = Closures[Closures.size() - 1];
+      assert(ACE);
+
+      // Only run this diagnostic on closures with incorrect implicit self
+      // behavior (non-escaping closures that capture self weakly, in Swift 5
+      // mode)
+      if (!closureHasIncorrectImplicitSelfBehavior(ACE, Ctx)) {
+        return Action::Continue(E);
+      }
+
+      Expr *implicitSelfExpr = nullptr;
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        if (isImplicitSelf(MRE->getBase())) {
+          implicitSelfExpr = MRE->getBase();
+        }
+      }
+
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
+        if (isImplicitSelf(DSCE->getBase())) {
+          implicitSelfExpr = DSCE->getBase();
+        }
+      }
+
+      if (!implicitSelfExpr) {
+        return Action::Continue(E);
+      }
+
+      // If there's an optional unwrap condition like `guard let self`
+      // earlier in the scope, associate this implicit self decl with it.
+      if (auto selfUnwrapPattern = patternDefiningSelf(E)) {
+        ImplicitSelfReferences[selfUnwrapPattern].push_back(implicitSelfExpr);
+        return Action::Continue(E);
+      }
+
+      // Otherwise this implicit self expr is incorrectly non-optional,
+      // despite not being explicitly unwrapped.
+      auto &Diags = Ctx.Diags;
+      Diags
+          .diagnose(implicitSelfExpr->getLoc(),
+                    diag::incorrect_implicit_self_behavior)
+          .warnUntilSwiftVersion(6);
+
+      if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
+        StringRef unwrapSelfFixIt = "\nguard let self else { return }";
+        if (auto functionType = CE->getType()->getAs<FunctionType>()) {
+          if (!functionType->getResult()->isVoid()) {
+            unwrapSelfFixIt = "\nguard let self else { return <#value#> }";
+          }
+        }
+
+        Diags.diagnose(implicitSelfExpr->getLoc(), diag::note_unwrap_self)
+            .fixItInsertAfter(CE->getInLoc(), unwrapSelfFixIt);
+      }
+
+      return Action::Continue(E);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+      if (!ACE) {
+        return Action::Continue(E);
+      }
+
+      assert(Closures.size() > 0);
+      Closures.pop_back();
+
+      if (closureHasIncorrectImplicitSelfBehavior(ACE, Ctx)) {
+        // If we saw any conditions that unwrapped self (like
+        // `guard let self`), and there were implicit self calls
+        // that would refer to that self decl in Swift 6 (but not Swift 5),
+        // emit a warning indicating that the behavior will change in Swift 6.
+        for (auto cnd : SelfUnwrapConditions[ACE]) {
+          if (ImplicitSelfReferences[cnd].size() != 0) {
+            auto &Diags = Ctx.Diags;
+            Diags.diagnose(cnd->getQuestionLoc(),
+                           diag::incorrect_unwrapped_implicit_self_behavior);
+
+            for (auto implicitSelfExpr : ImplicitSelfReferences[cnd]) {
+              Diags
+                  .diagnose(
+                      implicitSelfExpr->getLoc(),
+                      diag::note_reference_self_explicitly_to_silence_warning)
+                  .fixItInsert(implicitSelfExpr->getLoc(), "self.");
+            }
+          }
+        }
+      }
+
+      return Action::Continue(E);
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      if (Closures.size() == 0)
+        return Action::Continue(S);
+
+      auto *ACE = Closures[Closures.size() - 1];
+      assert(ACE);
+
+      // We only need to track self unwrap conditions in closures
+      // with incorrect implicit self behavior
+      if (!closureHasIncorrectImplicitSelfBehavior(ACE, Ctx)) {
+        return Action::Continue(S);
+      }
+
+      // If this conditional stmt unwraps self in a closure with incorrect
+      // implicit self behavior, then this stmt is actually unused. We'll
+      // emit a diagnostic later after we've collected all of the implicit
+      // self decls that would refer to this condition in Swift 6 mode.
+      if (auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S)) {
+        for (auto cond : conditionalStmt->getCond()) {
+          if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+            if (OSP->getSubPattern()->getBoundName() == Ctx.Id_self) {
+              SelfUnwrapConditions[ACE].push_back(OSP);
+            }
+          }
+        }
+      }
+
+      return Action::Continue(S);
+    }
+
+    /// The self unwrap pattern defining self (in Swift 6+)
+    /// for the given implicit self expr.
+    OptionalSomePattern *patternDefiningSelf(Expr *implicitSelfExpr) {
+      // The AST for this implicit self decl is incorrect in Swift 5,
+      // so we need to look up the decl that would be used at this
+      // location in Swift 6+.
+      auto selfDecl = ASTScope::lookupSingleLocalDecl(
+          DC->getParentSourceFile(), DeclName(Ctx.Id_self),
+          implicitSelfExpr->getLoc());
+
+      if (!selfDecl) {
+        return nullptr;
+      }
+
+      LabeledConditionalStmt *conditionalStmt = nullptr;
+      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
+        if (auto parentStmt = var->getParentPatternStmt()) {
+          conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
+        }
+      }
+
+      if (conditionalStmt) {
+        for (auto cond : conditionalStmt->getCond()) {
+          if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+            if (OSP->getSubPattern()->getBoundName() == Ctx.Id_self) {
+              return OSP;
+            }
+          }
+        }
+      }
+
+      return nullptr;
+    }
+  };
+
   auto &ctx = DC->getASTContext();
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
-        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
+        if (ImplicitSelfDiagnoseWalker::isClosureRequiringSelfQualification(
+                closure, ctx))
           ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
-  const_cast<Expr *>(E)->walk(DiagnoseWalker(DC, ACE));
+  const_cast<Expr *>(E)->walk(ImplicitSelfDiagnoseWalker(ctx, ACE));
+  const_cast<Expr *>(E)->walk(IncorrectImplicitSelfDiagnoseWalker(DC, ACE));
 }
 
 bool TypeChecker::getDefaultGenericArgumentsString(
