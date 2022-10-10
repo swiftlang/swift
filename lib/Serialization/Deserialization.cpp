@@ -5877,13 +5877,13 @@ Expected<Type> DESERIALIZE_TYPE(OPAQUE_ARCHETYPE_TYPE)(
                                       subsOrError.get());
 }
 
-Expected<Type> DESERIALIZE_TYPE(SEQUENCE_ARCHETYPE_TYPE)(
+Expected<Type> DESERIALIZE_TYPE(PACK_ARCHETYPE_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   GenericSignatureID sigID;
   TypeID interfaceTypeID;
 
-  decls_block::SequenceArchetypeTypeLayout::readRecord(scratch, sigID,
-                                                       interfaceTypeID);
+  decls_block::PackArchetypeTypeLayout::readRecord(scratch, sigID,
+                                                   interfaceTypeID);
 
   auto sig = MF.getGenericSignature(sigID);
   if (!sig)

@@ -255,7 +255,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
       return Type();
 
     if (!isa<PrimaryArchetypeType>(archetype) &&
-        !isa<SequenceArchetypeType>(archetype))
+        !isa<PackArchetypeType>(archetype))
       return Type();
 
     type = cast<GenericTypeParamType>(

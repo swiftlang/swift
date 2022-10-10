@@ -6487,7 +6487,7 @@ public:
     }
   }
 
-  void visitSequenceArchetypeType(SequenceArchetypeType *T) {
+  void visitPackArchetypeType(PackArchetypeType *T) {
     printArchetypeCommon(T);
   }
 

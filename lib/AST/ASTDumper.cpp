@@ -3886,8 +3886,8 @@ namespace {
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
-    void visitSequenceArchetypeType(SequenceArchetypeType *T, StringRef label) {
-      printArchetypeCommon(T, "sequence_archetype_type", label);
+    void visitPackArchetypeType(PackArchetypeType *T, StringRef label) {
+      printArchetypeCommon(T, "pack_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';

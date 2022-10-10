@@ -3174,7 +3174,7 @@ PackExpansionType::PackExpansionType(Type patternType, Type countType,
   : TypeBase(TypeKind::PackExpansion, canCtx, properties),
     patternType(patternType), countType(countType) {
   assert(countType->is<TypeVariableType>() ||
-         countType->is<SequenceArchetypeType>() ||
+         countType->is<PackArchetypeType>() ||
          countType->castTo<GenericTypeParamType>()->isTypeSequence());
 }
 
@@ -3223,7 +3223,7 @@ PackType *PackType::get(const ASTContext &C, ArrayRef<Type> elements) {
     assert(!eltTy->isTypeParameter() ||
            !eltTy->getRootGenericParam()->isTypeSequence() &&
            "Pack type parameter outside of a pack expansion");
-    assert(!eltTy->is<SequenceArchetypeType>() &&
+    assert(!eltTy->is<PackArchetypeType>() &&
            "Pack type archetype outside of a pack expansion");
     assert(!eltTy->is<PackType>() &&
            "Cannot have pack directly inside another pack");

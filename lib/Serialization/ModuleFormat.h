@@ -1137,8 +1137,8 @@ namespace decls_block {
     SubstitutionMapIDField // the arguments
   );
 
-  TYPE_LAYOUT(SequenceArchetypeTypeLayout,
-    SEQUENCE_ARCHETYPE_TYPE,
+  TYPE_LAYOUT(PackArchetypeTypeLayout,
+    PACK_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
     TypeIDField              // interface type
   );

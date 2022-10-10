@@ -1270,8 +1270,8 @@ shouldBePartiallySpecialized(Type Replacement,
         UsedArchetypes.insert(Primary);
       }
 
-      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
-        UsedArchetypes.insert(Seq);
+      if (auto Pack = dyn_cast<PackArchetypeType>(Archetype)) {
+        UsedArchetypes.insert(Pack);
       }
     }
   });
@@ -1500,8 +1500,8 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
           UsedCallerArchetypes.insert(Primary);
         }
 
-        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
-          UsedCallerArchetypes.insert(Seq);
+        if (auto Pack = dyn_cast<PackArchetypeType>(Archetype)) {
+          UsedCallerArchetypes.insert(Pack);
         }
       }
     });

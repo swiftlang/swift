@@ -186,7 +186,7 @@ static bool arePackShapesEqual(PackType *lhs, PackType *rhs) {
 static bool isRootTypeSequenceParameter(Type t) {
   if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
     return paramTy->isTypeSequence();
-  } else if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+  } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
     return archetypeTy->isRoot();
   }
 
@@ -194,7 +194,7 @@ static bool isRootTypeSequenceParameter(Type t) {
 }
 
 static bool isRootedInTypeSequenceParameter(Type t) {
-  if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+  if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
     return true;
   }
 

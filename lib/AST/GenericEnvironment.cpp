@@ -342,9 +342,9 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   auto rootGP = requirements.anchor->getRootGenericParam();
   if (rootGP->isTypeSequence()) {
     assert(getKind() == Kind::Primary);
-    result = SequenceArchetypeType::get(ctx, this, requirements.anchor,
-                                        requirements.protos, superclass,
-                                        requirements.layout);
+    result = PackArchetypeType::get(ctx, this, requirements.anchor,
+                                    requirements.protos, superclass,
+                                    requirements.layout);
   } else {
     switch (getKind()) {
     case Kind::Primary:

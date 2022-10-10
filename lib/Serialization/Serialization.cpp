@@ -4679,16 +4679,16 @@ public:
                                           declID, interfaceTypeID, substMapID);
   }
 
-  void visitSequenceArchetypeType(const SequenceArchetypeType *archetypeTy) {
+  void visitPackArchetypeType(const PackArchetypeType *archetypeTy) {
     using namespace decls_block;
     auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
 
     GenericSignatureID sigID = S.addGenericSignatureRef(sig);
     TypeID interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
 
-    unsigned abbrCode = S.DeclTypeAbbrCodes[SequenceArchetypeTypeLayout::Code];
-    SequenceArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                            sigID, interfaceTypeID);
+    unsigned abbrCode = S.DeclTypeAbbrCodes[PackArchetypeTypeLayout::Code];
+    PackArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        sigID, interfaceTypeID);
   }
 
   void visitGenericTypeParamType(const GenericTypeParamType *genericParam) {
@@ -5102,7 +5102,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
-  registerDeclTypeAbbr<SequenceArchetypeTypeLayout>();
+  registerDeclTypeAbbr<PackArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<ParameterizedProtocolTypeLayout>();
   registerDeclTypeAbbr<ExistentialTypeLayout>();
