@@ -2432,6 +2432,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPackExpansionExpr(PackExpansionExpr *E) {
+    printCommon(E, "pack_expansion_expr") << "\n";
+    printRec(E->getPatternExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
     OS << '\n';

@@ -2885,6 +2885,10 @@ namespace {
       return variadicSeq;
     }
 
+    Type visitPackExpansionExpr(PackExpansionExpr *expr) {
+      llvm_unreachable("not implemented for PackExpansionExpr");
+    }
+
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToNoEscape);
