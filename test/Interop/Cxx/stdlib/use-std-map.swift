@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
 //
@@ -7,6 +7,8 @@
 
 import StdlibUnittest
 import StdMap
+import std
+import Cxx
 
 var StdMapTestSuite = TestSuite("StdMap")
 
