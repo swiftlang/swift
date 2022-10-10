@@ -107,7 +107,8 @@ WARNING(import_multiple_mainactor_attr,none,
       (StringRef, StringRef))
 
 WARNING(contradicting_mutation_attrs,none,
-        "attribute 'nonmutating' is ignored when combined with attribute 'mutating'", ())
+        "attribute '%0' is ignored when combined with attribute '%1'",
+        (StringRef, StringRef))
 
 WARNING(nonmutating_without_const,none,
         "attribute 'nonmutating' has no effect on non-const method", ())
