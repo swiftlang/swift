@@ -410,12 +410,14 @@ ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
 
 struct SyntacticElementContext
     : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
-                                SingleValueStmtExpr *, ExprPattern *> {
+                                SingleValueStmtExpr *, ExprPattern *, TapExpr *> {
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
   /// A join that should be applied to the elements of a SingleValueStmtExpr.
   NullablePtr<TypeJoinExpr> ElementJoin;
+
+  static SyntacticElementContext forTapExpr(TapExpr *tap) { return {tap}; }
 
   static SyntacticElementContext forFunctionRef(AnyFunctionRef ref) {
     if (auto *decl = ref.getAbstractFunctionDecl()) {
@@ -454,6 +456,8 @@ struct SyntacticElementContext
       return SVE->getDeclContext();
     } else if (auto *EP = dyn_cast<ExprPattern *>()) {
       return EP->getDeclContext();
+    } else if (auto *tap = this->dyn_cast<TapExpr *>()) {
+      return tap->getVar()->getDeclContext();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -489,6 +493,8 @@ struct SyntacticElementContext
       return closure->getBody();
     } else if (auto *SVE = dyn_cast<SingleValueStmtExpr *>()) {
       return SVE->getStmt();
+    } else if (auto *tap = this->dyn_cast<TapExpr *>()) {
+      return tap->getBody();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -1542,6 +1548,8 @@ ConstraintSystem::simplifySyntacticElementConstraint(
     context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
   } else if (auto *EP = getAsPattern<ExprPattern>(anchor)) {
     context = SyntacticElementContext::forExprPattern(EP);
+  } else if (auto *tap = getAsExpr<TapExpr>(anchor)) {
+    context = SyntacticElementContext::forTapExpr(tap);
   } else {
     return SolutionKind::Error;
   }
