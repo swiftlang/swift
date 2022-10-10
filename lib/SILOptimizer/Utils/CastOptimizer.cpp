@@ -1464,6 +1464,11 @@ static bool optimizeStaticallyKnownProtocolConformance(
     if (!Proto)
       return false;
 
+    // Do not optimize casts to `Reflectable`, since the compiler can't know
+    // statically if reflection metadata is present at runtime.
+    if (Proto->isSpecificProtocol(KnownProtocolKind::Reflectable))
+      return false;
+
     // SourceType is a non-existential type with a non-conditional
     // conformance to a protocol represented by the TargetType.
     //

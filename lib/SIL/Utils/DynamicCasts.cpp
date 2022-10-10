@@ -111,6 +111,11 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (isa<ParameterizedProtocolType>(unwrapExistential(target)))
     return DynamicCastFeasibility::MaySucceed;
 
+  // The compiler can't know statically
+  // if reflection metadata is present at runtime.
+  if (TargetProtocol->isSpecificProtocol(KnownProtocolKind::Reflectable))
+    return DynamicCastFeasibility::MaySucceed;
+
   // If conformsToProtocol returns a valid conformance, then all requirements
   // were proven by the type checker.
   if (M->conformsToProtocol(source, TargetProtocol))
