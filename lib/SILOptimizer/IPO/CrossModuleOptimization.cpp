@@ -264,6 +264,11 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
       return false;
     }
 
+    // In some project configurations imported C functions are not necessarily
+    // public in their modules.
+    if (conservative && callee->hasClangNode())
+      return false;
+
     // Recursively walk down the call graph.
     if (canSerializeFunction(callee, canSerializeFlags, maxDepth - 1))
       return true;
@@ -284,6 +289,12 @@ bool CrossModuleOptimization::canSerializeInstruction(SILInstruction *inst,
         !hasPublicVisibility(global->getLinkage())) {
       return false;
     }
+
+    // In some project configurations imported C variables are not necessarily
+    // public in their modules.
+    if (conservative && global->hasClangNode())
+      return false;
+
     return true;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
