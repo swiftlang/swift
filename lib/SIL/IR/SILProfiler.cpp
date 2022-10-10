@@ -59,17 +59,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   return true;
 }
 
-/// Get the DeclContext for the decl referenced by \p forDecl.
-DeclContext *getProfilerContextForDecl(ASTNode N, SILDeclRef forDecl) {
-  if (auto *D = N.dyn_cast<Decl *>())
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return TLCD;
-  assert(!forDecl.isNull() && "Expected a nonnull SILDeclRef");
-  if (auto *ACE = forDecl.getAbstractClosureExpr())
-    return ACE;
-  return forDecl.getDecl()->getDeclContext();
-}
-
 static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
   switch (caseStmt->getParentKind()) {
   case CaseParentKind::Switch:
@@ -82,15 +71,14 @@ static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
 
 /// Check that the input AST has at least been type-checked.
 LLVM_ATTRIBUTE_UNUSED
-static bool hasASTBeenTypeChecked(ASTNode N, SILDeclRef forDecl) {
-  DeclContext *DC = getProfilerContextForDecl(N, forDecl);
-  SourceFile *SF = DC->getParentSourceFile();
-  return !SF || SF->ASTStage >= SourceFile::TypeChecked;
+static bool hasFileBeenTypeChecked(SILDeclRef forDecl) {
+  auto *SF = forDecl.getInnermostDeclContext()->getParentSourceFile();
+  return SF && SF->ASTStage >= SourceFile::TypeChecked;
 }
 
 /// Check whether a mapped AST node is valid for profiling.
 static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
-  assert(hasASTBeenTypeChecked(N, forDecl) &&
+  assert(hasFileBeenTypeChecked(forDecl) &&
          "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
@@ -1240,9 +1228,9 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
   llvm_unreachable("Unhandled FormalLinkage in switch.");
 }
 
-static StringRef getCurrentFileName(ASTNode N, SILDeclRef forDecl) {
-  DeclContext *Ctx = getProfilerContextForDecl(N, forDecl);
-  if (auto *ParentFile = Ctx->getParentSourceFile())
+static StringRef getCurrentFileName(SILDeclRef forDecl) {
+  auto *DC = forDecl.getInnermostDeclContext();
+  if (auto *ParentFile = DC->getParentSourceFile())
     return ParentFile->getFilename();
   return {};
 }
@@ -1250,7 +1238,7 @@ static StringRef getCurrentFileName(ASTNode N, SILDeclRef forDecl) {
 void SILProfiler::assignRegionCounters() {
   const auto &SM = M.getASTContext().SourceMgr;
 
-  CurrentFileName = getCurrentFileName(Root, forDecl);
+  CurrentFileName = getCurrentFileName(forDecl);
 
   MapRegionCounters Mapper(forDecl, RegionCounterMap);
 
