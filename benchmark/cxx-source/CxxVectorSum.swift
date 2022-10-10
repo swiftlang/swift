@@ -48,8 +48,8 @@ public let benchmarks = [
 // establish an expected threshold of performance, which when exceeded should
 // fail the benchmark.
 
-let vectorSize = 100_000
-let iterRepeatFactor = 10
+let vectorSize = 25_000
+let iterRepeatFactor = 5
 
 @inline(never)
 public func run_CxxVectorOfU32_Sum_Cxx_RangedForLoop(_ n: Int) {
