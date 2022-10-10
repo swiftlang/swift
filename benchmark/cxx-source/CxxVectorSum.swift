@@ -82,8 +82,10 @@ public func run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop(_ n: Int) {
   blackHole(sum)
 }
 
+// Need to wait for https://github.com/apple/swift/issues/61499
 @inline(never)
 public func run_CxxVectorOfU32_Sum_Swift_IndexAndSubscriptLoop(_ n: Int) {
+#if FIXED_61499
   let vectorOfU32 = makeVector32(vectorSize)
   var sum: UInt32 = 0
   for _ in 0..<(n * iterRepeatFactor) {
@@ -92,6 +94,9 @@ public func run_CxxVectorOfU32_Sum_Swift_IndexAndSubscriptLoop(_ n: Int) {
     }
   }
   blackHole(sum)
+#else
+  run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop(n)
+#endif
 }
 
 @inline(never)
