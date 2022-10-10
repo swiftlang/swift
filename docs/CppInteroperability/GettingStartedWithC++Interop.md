@@ -4,55 +4,46 @@ This document is designed to get you started with bidirectional API-level intero
 
 ## Table of Contents
 
+- [Installing Toolchain](#installing-toolchain)
 - [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code)
 - [Adding C++ to an Xcode project](#adding-c-to-an-xcode-project)
 - [Creating a Swift Package](#Creating-a-Swift-Package)
 - [Building with CMake](#building-with-cmake)
+- [Common Errors](#common-errors)
+
+## Installing Toolchain 
+
+For ensuring the availability of the features we used in this demo. Please install the latest version of the toolchain from "Development Snapshots" on [swift.org](https://www.swift.org/download/#snapshots).
+
+After finishing installing, go to the Xcode menu, select Xcode | Toolchains, and pick the latest toolchain.
 
 ## Creating a Module to contain your C++ source code
 
+- Create a new Xcode project.
 - Create a new target in Xcode via _File_ | _New_ | _Target_, select _Library_.
-- Within the directory of the newly created target, create a new C++ implementation and header file
-- For this example we will call the files CxxTest, so we should have a CxxTest.cpp and CxxTest.hpp.
-- Next create an empty file and call it `module.modulemap`, in this file create the module for your source code, and define your C++ header (`requires cplusplus` isn't required but it's convention for C++ modules, especially if they use C++ features).
+- Inside the project folder, create a new C++ implementation and header file. 
+- For this example we will call the files CxxTest, so we should have a CxxTest.cpp and CxxTest.hpp. Source code listed at the end of this section.
+- Change the "Terget Membership" setting, hpp file should set the target to the library target, and cpp file should be set to both the project and library target. 
+- Next create an empty file and call it `module.modulemap`, in this file create the module for your source code, and define your C++ header (`requires cplusplus` isn't required but it's convention for C++ modules, especially if they use C++ features). Source code listed at the end of this section.
 
+The file structure of the demo Xcode project:
+```
+├ PROJECT_NAME
+├── CxxTest
+│   ├── CxxTest.cpp
+│   ├── CxxTest.hpp
+│   └── module.modulemap
+├── PROJECT_NAME
+│   └── main.swift
+```
+
+Source code:
 ```
 // In module.modulemap
+
 module CxxTest {
-    header "CxxTest.hpp"
-    requires cplusplus
-}
-```
-
-<img width="127" alt="cxx-interop-ctest" src="https://user-images.githubusercontent.com/3801618/192995602-f37137f3-ec15-4fdd-bf2c-591728945a68.png">
-
-## Adding C++ to an Xcode project
-- In your xcode project, follow the steps [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code) in your project directory
-
-Add the C++ module to the include path and enable C++ interop:
-- Navigate to your project directory
-- In `Project` navigate to `Build Settings` -> `Swift Compiler`
-- Under `Custom Flags` -> `Other Swift Flags` add`-enable-experimental-cxx-interop`
-- Under `Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `./ProjectName/CxxTest`). Repeat this step in `Other Swift Flags`
-
-```
-//Add to Other Swift Flags and Import Paths respectively
--enable-experimental-cxx-interop
--I./ProjectName/CxxTest
-```
-
-- This should now allow your to import your C++ Module into any `.swift` file.
-
-```
-//In ContentView.swift
-import SwiftUI
-import CxxTest
-
-struct ContentView: View {
-    var body: some View {
-        Text("CxxTest function result: \(cxxFunction(7))")
-            .padding()
-    }
+    header "CxxTest.hpp"
+    requires cplusplus
 }
 ```
 
@@ -75,9 +66,28 @@ int cxxFunction(int n);
 int cxxFunction(int n) {
     return n;
 }
+```
+
+```
+// In main.swift
+
+import Foundation
+import CxxTest
+
+print("Hello, World! \(cxxFunction(7))")
 
 ```
 
+## Adding C++ to an Xcode project
+In your xcode project, follow the steps [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code) in your project directory
+
+Add the C++ module to the include path and enable C++ interop:
+- Navigate to your project directory
+- In `Project` navigate to `Build Settings` -> `Swift Compiler`
+- Under `Custom Flags` -> `Other Swift Flags` add`-Xfrontend -enable-experimental-cxx-interop`. If you cannot find `Other Swift Flags`, please ensure all build settings have been shown.
+- Under `Swift Compiler - Search Paths` -> `Import Paths` add your search path to the C++ module (i.e, `$(SRCROOT)/CxxTest`). 
+
+This should now allow you to import your C++ Module into any `.swift` file.
 
 ## Creating a Swift Package
 After creating your Swift package project, follow the steps [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code) in your `Source` directory
@@ -86,7 +96,7 @@ After creating your Swift package project, follow the steps [Creating a Module t
 - In this example the name of the package is `CxxInterop`
 - Swift code will be in `Sources/CxxInterop` called `main.swift`
 - C++ source code follows the example shown in [Creating a Module to contain your C++ source code](#creating-a-module-to-contain-your-c-source-code)
-- Under targets, add the name of your C++ module and the directory containing the Swift code as a target.
+- In `Package.swift` file inside the project, under targets, add the name of your C++ module and the directory containing the Swift code as a target.
 - In the target defining your Swift target, add a`dependencies` to the C++ Module, the `path`, `source`, and `swiftSettings` with `unsafeFlags` with the source to the C++ Module, and enable `-enable-experimental-cxx-interop`
 
 ```
@@ -201,4 +211,10 @@ CxxInterop.main()
 
 - For more information on `cmake` see the  'GettingStarted' documentation: (https://github.com/apple/swift/blob/main/docs/HowToGuides/GettingStarted.md)
 
+## Common Errors
+- No such module 'CxxTest'.
+It is probably because Xcode cannot find the C++ module via the "Import Paths" you set in [Adding C++ to an Xcode project](#adding-c-to-an-xcode-project).
 
+- Undefined symbol: xccFunction(int)
+1. Check the Target Membership setting, hpp file should set the target to the library target, and cpp file should be set to both the project and library target. 
+2. If you drag the CxxTest folder into the Xcode project manually and set it as a `folder reference`. Please re-import it as a `group` instead. And then change hpp & cpp files' target settings respectively.
