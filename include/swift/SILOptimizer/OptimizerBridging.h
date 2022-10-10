@@ -41,8 +41,11 @@ typedef struct {
 } BridgedCalleeAnalysis;
 
 typedef bool (* _Nonnull InstructionIsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
+typedef BridgedMemoryBehavior(* _Nonnull CalleeAnalysisGetMemBehvaiorFn)(
+      BridgedPassContext context, BridgedInstruction apply, bool observeRetains);
 
-void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn);
+void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn,
+                             CalleeAnalysisGetMemBehvaiorFn getEffectsFn);
 
 typedef struct {
   void * _Nullable dea;
