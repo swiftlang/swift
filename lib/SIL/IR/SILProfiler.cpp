@@ -59,17 +59,6 @@ static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
   return true;
 }
 
-/// Get the DeclContext for the decl referenced by \p forDecl.
-DeclContext *getProfilerContextForDecl(ASTNode N, SILDeclRef forDecl) {
-  if (auto *D = N.dyn_cast<Decl *>())
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return TLCD;
-  assert(!forDecl.isNull() && "Expected a nonnull SILDeclRef");
-  if (auto *ACE = forDecl.getAbstractClosureExpr())
-    return ACE;
-  return forDecl.getDecl()->getDeclContext();
-}
-
 static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
   switch (caseStmt->getParentKind()) {
   case CaseParentKind::Switch:
@@ -82,15 +71,14 @@ static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
 
 /// Check that the input AST has at least been type-checked.
 LLVM_ATTRIBUTE_UNUSED
-static bool hasASTBeenTypeChecked(ASTNode N, SILDeclRef forDecl) {
-  DeclContext *DC = getProfilerContextForDecl(N, forDecl);
-  SourceFile *SF = DC->getParentSourceFile();
-  return !SF || SF->ASTStage >= SourceFile::TypeChecked;
+static bool hasFileBeenTypeChecked(SILDeclRef forDecl) {
+  auto *SF = forDecl.getInnermostDeclContext()->getParentSourceFile();
+  return SF && SF->ASTStage >= SourceFile::TypeChecked;
 }
 
 /// Check whether a mapped AST node is valid for profiling.
 static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
-  assert(hasASTBeenTypeChecked(N, forDecl) &&
+  assert(hasFileBeenTypeChecked(forDecl) &&
          "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
@@ -757,8 +745,9 @@ private:
       Res.first->second = std::move(Expr);
   }
 
-  /// Create a counter expression referencing \c Node's own counter.
-  CounterExpr assignCounter(ASTNode Node) {
+  /// Create a counter expression referencing \c Node's own counter. This must
+  /// have been previously mapped by MapRegionCounters.
+  CounterExpr assignKnownCounter(ASTNode Node) {
     auto Counter = CounterExpr::Leaf(Node);
     assignCounter(Node, Counter);
     return Counter;
@@ -966,10 +955,10 @@ public:
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       return visitFunctionDecl(*this, AFD, [&] {
-        assignCounter(AFD->getBody());
+        assignKnownCounter(AFD->getBody());
       });
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      assignCounter(TLCD->getBody());
+      assignKnownCounter(TLCD->getBody());
       ImplicitTopLevelBody = TLCD->getBody();
       return Action::Continue();
     }
@@ -1005,7 +994,7 @@ public:
 
       // We emit a counter for the then block, and define the else block in
       // terms of it.
-      auto ThenCounter = assignCounter(IS->getThenStmt());
+      auto ThenCounter = assignKnownCounter(IS->getThenStmt());
       if (IS->getElseStmt()) {
         auto ElseCounter =
             CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterAlloc);
@@ -1013,7 +1002,7 @@ public:
       }
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
-      assignCounter(GS->getBody());
+      assignKnownCounter(GS->getBody());
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       // The counter for the while statement itself tracks the number of jumps
@@ -1022,14 +1011,14 @@ public:
 
       if (auto *E = getConditionNode(WS->getCond()))
         assignCounter(E, getCurrentCounter());
-      assignCounter(WS->getBody());
+      assignKnownCounter(WS->getBody());
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       // The counter for the while statement itself tracks the number of jumps
       // to it by break and continue statements.
       assignCounter(RWS, CounterExpr::Zero());
 
-      auto BodyCounter = assignCounter(RWS->getBody());
+      auto BodyCounter = assignKnownCounter(RWS->getBody());
       assignCounter(RWS->getCond(), BodyCounter);
       RepeatWhileStack.push_back(RWS);
 
@@ -1037,7 +1026,7 @@ public:
       // The counter for the for statement itself tracks the number of jumps
       // to it by break and continue statements.
       assignCounter(FES, CounterExpr::Zero());
-      assignCounter(FES->getBody());
+      assignKnownCounter(FES->getBody());
 
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       // The counter for the switch statement itself tracks the number of jumps
@@ -1049,7 +1038,7 @@ public:
 
       // Assign counters for cases so they're available for fallthrough.
       for (CaseStmt *Case : SS->getCases())
-        assignCounter(Case);
+        assignKnownCounter(Case);
 
     } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
       if (caseStmt->getParentKind() == CaseParentKind::Switch)
@@ -1066,7 +1055,7 @@ public:
       assignCounter(DCS->getBody(), getCurrentCounter());
 
       for (CaseStmt *Catch : DCS->getCatches())
-        assignCounter(Catch->getBody());
+        assignKnownCounter(Catch->getBody());
 
       // Initialize the exit count of the do-catch to the entry count, then
       // subtract off non-local exits as they are visited.
@@ -1183,11 +1172,11 @@ public:
     if (Parent.isNull()) {
       assert(RegionStack.empty() &&
              "Mapped a region before visiting the root?");
-      assignCounter(E);
+      assignKnownCounter(E);
     }
 
     if (isa<LazyInitializerExpr>(E))
-      assignCounter(E);
+      assignKnownCounter(E);
 
     if (hasCounter(E))
       pushRegion(E);
@@ -1195,7 +1184,7 @@ public:
     assert(!RegionStack.empty() && "Must be within a region");
 
     if (auto *IE = dyn_cast<TernaryExpr>(E)) {
-      auto ThenCounter = assignCounter(IE->getThenExpr());
+      auto ThenCounter = assignKnownCounter(IE->getThenExpr());
       auto ElseCounter =
           CounterExpr::Sub(getCurrentCounter(), ThenCounter, CounterAlloc);
       assignCounter(IE->getElseExpr(), ElseCounter);
@@ -1239,9 +1228,9 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
   llvm_unreachable("Unhandled FormalLinkage in switch.");
 }
 
-static StringRef getCurrentFileName(ASTNode N, SILDeclRef forDecl) {
-  DeclContext *Ctx = getProfilerContextForDecl(N, forDecl);
-  if (auto *ParentFile = Ctx->getParentSourceFile())
+static StringRef getCurrentFileName(SILDeclRef forDecl) {
+  auto *DC = forDecl.getInnermostDeclContext();
+  if (auto *ParentFile = DC->getParentSourceFile())
     return ParentFile->getFilename();
   return {};
 }
@@ -1249,7 +1238,7 @@ static StringRef getCurrentFileName(ASTNode N, SILDeclRef forDecl) {
 void SILProfiler::assignRegionCounters() {
   const auto &SM = M.getASTContext().SourceMgr;
 
-  CurrentFileName = getCurrentFileName(Root, forDecl);
+  CurrentFileName = getCurrentFileName(forDecl);
 
   MapRegionCounters Mapper(forDecl, RegionCounterMap);
 
