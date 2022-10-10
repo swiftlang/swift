@@ -227,6 +227,14 @@ void PrunedLivenessBoundary::dump() const {
   print(llvm::dbgs());
 }
 
+// TODO: with guaranteed phis, it will be possible to hit this assert:
+//   assert(succ->getSinglePredecessorBlock() == predBB);
+//
+// Once it's possible to test dead guaranteed phis, replace the assert with a
+// set to avoid multiple insertions at a merge point:
+//   // Control flow merge blocks used as insertion points.
+//   BasicBlockSet mergeBlocks;
+//
 void PrunedLivenessBoundary::visitInsertionPoints(
     llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
     DeadEndBlocks *deBlocks) {
