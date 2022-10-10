@@ -53,7 +53,21 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
-       "indexstore-db": {
+        "libxml2": {
+            "remote": { "id": "gnome/libxml2" },
+            "platforms": [ "Linux" ]
+        },
+        "curl": {
+            "remote": { "id": "curl/curl" },
+            "platforms": [ "Linux" ]
+        },
+        "zlib": {
+            "remote": { "id": "madler/zlib" },
+            "platforms": [ "Linux" ]
+        },
+        "swift-cmark-gfm": {
+             "remote": { "id": "apple/swift-cmark" } },
+        "indexstore-db": {
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
             "remote": { "id": "apple/sourcekit-lsp" } },
@@ -111,6 +125,9 @@
                 "icu": "release-65-1",
                 "yams": "5.0.0",
                 "cmake": "v3.19.6",
+                "libxml2": "v2.9.12",
+                "curl": "curl-7_77_0",
+                "zlib": "v1.2.12",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
