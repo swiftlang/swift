@@ -7242,7 +7242,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       ClangDecl = cast<clang::NamedDecl>(maybeDefinition.getValue());
 
   Optional<const clang::SwiftAttrAttr *> seenMainActorAttr;
-  Optional<const clang::SwiftAttrAttr *> seenMutabilityAttr;
+  const clang::SwiftAttrAttr *seenMutabilityAttr = nullptr;
   PatternBindingInitializer *initContext = nullptr;
 
   auto importAttrsFromDecl = [&](const clang::NamedDecl *ClangDecl) {
@@ -7274,14 +7274,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
 
       if (isMutabilityAttr(swiftAttr)) {
+        StringRef attr = swiftAttr->getAttribute();
 
         // Check if 'nonmutating' attr is applicable
-        if (swiftAttr->getAttribute() == "nonmutating") {
+        if (attr == "nonmutating") {
           if (auto *method = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
             if (!method->isConst()) {
               diagnose(HeaderLoc(swiftAttr->getLocation()),
                        diag::nonmutating_without_const);
             }
+
             if (!method->getParent()->hasMutableFields()) {
               diagnose(HeaderLoc(swiftAttr->getLocation()),
                        diag::nonmutating_without_mutable_fields);
@@ -7291,18 +7293,11 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
         // Check for contradicting mutability attr
         if (seenMutabilityAttr) {
-          StringRef seenAttribute =
-              seenMutabilityAttr.getValue()->getAttribute();
-          if ((seenAttribute == "nonmutating" &&
-               swiftAttr->getAttribute() == "mutating") ||
-              (seenAttribute == "mutating" &&
-               swiftAttr->getAttribute() == "nonmutating")) {
-            const clang::SwiftAttrAttr *nonmutatingAttr =
-                seenAttribute == "nonmutating" ? seenMutabilityAttr.getValue()
-                                               : swiftAttr;
+          StringRef previous = seenMutabilityAttr->getAttribute();
 
-            diagnose(HeaderLoc(nonmutatingAttr->getLocation()),
-                     diag::contradicting_mutation_attrs);
+          if (previous != attr) {
+            diagnose(HeaderLoc(swiftAttr->getLocation()),
+                     diag::contradicting_mutation_attrs, attr, previous);
             continue;
           }
         }
