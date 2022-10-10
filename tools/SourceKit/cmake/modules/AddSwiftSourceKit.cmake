@@ -341,7 +341,7 @@ macro(add_sourcekit_executable name)
   endif()
 
   set(RPATH_LIST)
-  add_sourcekit_swift_runtime_link_flags(${name} "../../../.." ${SKEXEC_HAS_SWIFT_MODULES})
+  add_sourcekit_swift_runtime_link_flags(${name} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR} ${SKEXEC_HAS_SWIFT_MODULES})
 
 endmacro()
 
