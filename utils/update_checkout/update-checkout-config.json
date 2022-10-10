@@ -57,6 +57,18 @@
             "remote": { "id": "KitWare/CMake" },
             "platforms": [ "Linux" ]
         },
+        "libxml2": {
+            "remote": { "id": "gnome/libxml2" },
+            "platforms": [ "Windows" ]
+        },
+        "curl": {
+            "remote": { "id": "curl/curl" },
+            "platforms": [ "Windows" ]
+        },
+        "zlib": {
+            "remote": { "id": "madler/zlib" },
+            "platforms": [ "Windows" ]
+        },
         "swift-cmark-gfm": {
              "remote": { "id": "apple/swift-cmark" } },
         "indexstore-db": {
@@ -120,6 +132,9 @@
                 "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.19.6",
+                "libxml2": "v2.9.14",
+                "curl": "curl-7_77_0",
+                "zlib": "v1.2.13",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
