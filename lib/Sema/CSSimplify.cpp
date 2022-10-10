@@ -3627,18 +3627,29 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
           if (last.is<LocatorPathElt::ApplyArgToParam>()) {
             auto proto = protoDecl->getDeclaredInterfaceType();
-            auto *fix = AllowArgumentMismatch::create(
-                *this, type1, proto, getConstraintLocator(anchor, path));
-
             // Impact is 2 here because there are two failures
             // 1 - missing conformance and 2 - incorrect argument type.
             //
             // This would make sure that arguments with incorrect
             // conformances are not prioritized over general argument
             // mismatches.
+            if (type1->isOptional()) {
+              auto unwrappedType = type1->lookThroughAllOptionalTypes();
+              auto result = simplifyConformsToConstraint(
+                  unwrappedType, protoDecl, kind, locator,
+                  subflags | TMF_ApplyingFix);
+              if (result == SolutionKind::Solved) {
+                auto fix = ForceOptional::create(*this, type1, proto,
+                                                 getConstraintLocator(locator));
+                if (recordFix(fix))
+                  return getTypeMatchFailure(locator);
+                break;
+              }
+            }
+            auto fix = AllowArgumentMismatch::create(
+                  *this, type1, proto, getConstraintLocator(anchor, path));
             if (recordFix(fix, /*impact=*/2))
               return getTypeMatchFailure(locator);
-
             break;
           }
 
