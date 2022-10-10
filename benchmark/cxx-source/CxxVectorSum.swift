@@ -19,27 +19,23 @@ import Cxx
 
 public let benchmarks = [
   BenchmarkInfo(
-      name: "CxxVectorOfU32.Sum.Cxx.RangedForLoop",
+      name: "CxxVecU32.Sum.Cxx.RangedForLoop",
       runFunction: run_CxxVectorOfU32_Sum_Cxx_RangedForLoop,
       tags: [.validation, .bridging, .cxxInterop]),
   BenchmarkInfo(
-    name: "CxxVectorOfU32.Sum.Swift.ForInLoop",
+    name: "CxxVecU32.Sum.Swift.ForInLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_ForInLoop,
     tags: [.validation, .bridging, .cxxInterop]),
   BenchmarkInfo(
-    name: "CxxVectorOfU32.Sum.Swift.RawIteratorLoop",
+    name: "CxxVecU32.Sum.Swift.IteratorLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop,
     tags: [.validation, .bridging, .cxxInterop]),
   BenchmarkInfo(
-    name: "CxxVectorOfU32.Sum.Swift.RawIteratorLoop.WithCxxInlineHelpers",
-    runFunction: run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop_WithCxxInlineHelpers,
-    tags: [.validation, .bridging, .cxxInterop]),
-  BenchmarkInfo(
-    name: "CxxVectorOfU32.Sum.Swift.IndexAndSubscriptLoop",
+    name: "CxxVecU32.Sum.Swift.SubscriptLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_IndexAndSubscriptLoop,
     tags: [.validation, .bridging, .cxxInterop]),
   BenchmarkInfo(
-    name: "CxxVectorOfU32.Sum.Swift.Reduce",
+    name: "CxxVecU32.Sum.Swift.Reduce",
     runFunction: run_CxxVectorOfU32_Sum_Swift_Reduce,
     tags: [.validation, .bridging, .cxxInterop])
 ]
@@ -72,23 +68,6 @@ public func run_CxxVectorOfU32_Sum_Swift_ForInLoop(_ n: Int) {
 // This function should have comparable performance to
 // `run_CxxVectorOfU32_Sum_Cxx_RangedForLoop`.
 @inline(never)
-public func run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop_WithCxxInlineHelpers(_ n: Int) {
-  let vectorOfU32 = makeVector32(vectorSize)
-  var sum: UInt32 = 0
-  for _ in 0..<(n * iterRepeatFactor) {
-    var b = vectorOfU32.__beginUnsafe()
-    let e = vectorOfU32.__endUnsafe()
-    while !cmp(b, e) {
-        sum = sum &+ b.pointee
-        b = next(b)
-    }
-  }
-  blackHole(sum)
-}
-
-// This function should have comparable performance to
-// `run_CxxVectorOfU32_Sum_Cxx_RangedForLoop`.
-@inline(never)
 public func run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop(_ n: Int) {
   let vectorOfU32 = makeVector32(vectorSize)
   var sum: UInt32 = 0
@@ -108,11 +87,8 @@ public func run_CxxVectorOfU32_Sum_Swift_IndexAndSubscriptLoop(_ n: Int) {
   let vectorOfU32 = makeVector32(vectorSize)
   var sum: UInt32 = 0
   for _ in 0..<(n * iterRepeatFactor) {
-    var i = 0
-    let e = vectorOfU32.size()
-    while i != e {
-        sum = sum &+ vectorOfU32[i]
-        i = i &+ 1
+    for i in 0..<vectorOfU32.size() {
+      sum = sum &+ vectorOfU32[i]
     }
   }
   blackHole(sum)
@@ -126,14 +102,6 @@ public func run_CxxVectorOfU32_Sum_Swift_Reduce(_ n: Int) {
       sum = vectorOfU32.reduce(sum, &+)
     }
     blackHole(sum)
-}
-
-public func !=(_ y: VectorOfU32.const_iterator, _ x: VectorOfU32.const_iterator) -> Bool {
-    return y.__baseUnsafe() != x.__baseUnsafe()
-}
-
-public func ==(_ y: VectorOfU32.const_iterator, _ x: VectorOfU32.const_iterator) -> Bool {
-    return y.__baseUnsafe() == x.__baseUnsafe()
 }
 
 extension VectorOfU32.const_iterator : Equatable, UnsafeCxxInputIterator { }
