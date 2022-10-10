@@ -984,6 +984,12 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 } // end anonymous namespace
 
 
+SWIFT_RUNTIME_EXPORT
+bool swift_isReflectable(OpaqueValue *value,
+                    const Metadata *type) {
+  return call(value, type, nullptr, [](ReflectionMirrorImpl *impl) { return impl->isReflectable(); });
+}
+
 // func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const Metadata *swift_reflectionMirror_normalizedType(OpaqueValue *value,

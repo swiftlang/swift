@@ -1424,6 +1424,14 @@ FUNCTION(DynamicCast, swift_dynamicCast, C_CC, AlwaysAvailable,
          ATTRS(ZExt, NoUnwind),
          EFFECT(Casting))
 
+// bool swift_reflectableCast(opaque*, opaque*, type*, type*, size_t);
+FUNCTION(ReflectableCast, swift_reflectableCast, C_CC, AlwaysAvailable,
+         RETURNS(Int1Ty),
+         ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              SizeTy),
+         ATTRS(ZExt, NoUnwind),
+         EFFECT(Casting))
+
 // type* swift_dynamicCastTypeToObjCProtocolUnconditional(type* object,
 //                                               size_t numProtocols,
 //                                               Protocol * const *protocols);
