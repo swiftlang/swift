@@ -54,7 +54,7 @@ func makeVectorOnce() {
 // fail the benchmark.
 
 let vectorSize = 25_000
-let iterRepeatFactor = 5
+let iterRepeatFactor = 7
 
 @inline(never)
 public func run_CxxVectorOfU32_Sum_Cxx_RangedForLoop(_ n: Int) {
