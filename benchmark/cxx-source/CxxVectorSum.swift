@@ -21,24 +21,33 @@ public let benchmarks = [
   BenchmarkInfo(
       name: "CxxVecU32.Sum.Cxx.RangedForLoop",
       runFunction: run_CxxVectorOfU32_Sum_Cxx_RangedForLoop,
-      tags: [.validation, .bridging, .cxxInterop]),
+      tags: [.validation, .bridging, .cxxInterop],
+      setUpFunction: makeVectorOnce),
   BenchmarkInfo(
     name: "CxxVecU32.Sum.Swift.ForInLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_ForInLoop,
-    tags: [.validation, .bridging, .cxxInterop]),
+    tags: [.validation, .bridging, .cxxInterop],
+    setUpFunction: makeVectorOnce),
   BenchmarkInfo(
     name: "CxxVecU32.Sum.Swift.IteratorLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop,
-    tags: [.validation, .bridging, .cxxInterop]),
+    tags: [.validation, .bridging, .cxxInterop],
+    setUpFunction: makeVectorOnce),
   BenchmarkInfo(
     name: "CxxVecU32.Sum.Swift.SubscriptLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_IndexAndSubscriptLoop,
-    tags: [.validation, .bridging, .cxxInterop]),
+    tags: [.validation, .bridging, .cxxInterop],
+    setUpFunction: makeVectorOnce),
   BenchmarkInfo(
     name: "CxxVecU32.Sum.Swift.Reduce",
     runFunction: run_CxxVectorOfU32_Sum_Swift_Reduce,
-    tags: [.validation, .bridging, .cxxInterop])
+    tags: [.validation, .bridging, .cxxInterop],
+    setUpFunction: makeVectorOnce)
 ]
+
+func makeVectorOnce() {
+    initVector(vectorSize)
+}
 
 // FIXME: compare CxxVectorOfU32SumInCxx to CxxVectorOfU32SumInSwift and
 // establish an expected threshold of performance, which when exceeded should
