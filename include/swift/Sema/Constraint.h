@@ -307,10 +307,6 @@ enum class ConversionRestrictionKind {
   ///    - Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int>
   ///    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> <-> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
   PointerToCPointer,
-  // Convert a pack into a type with an equivalent arity.
-  // - If the arity of the pack is 1, drops the pack structure <T> => T
-  // - If the arity of the pack is n >= 1, converts the pack structure into a tuple <T, U, V> => (T, U, V)
-  ReifyPackToType,
 };
 
 /// Specifies whether a given conversion requires the creation of a temporary

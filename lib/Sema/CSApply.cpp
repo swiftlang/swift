@@ -7011,11 +7011,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       finishApply(implicitInit, toType, callLocator, callLocator);
       return implicitInit;
     }
-    case ConversionRestrictionKind::ReifyPackToType: {
-      auto reifyPack =
-          cs.cacheType(new (ctx) ReifyPackExpr(expr, toType));
-      return coerceToType(reifyPack, toType, locator);
-    }
     }
   }
 

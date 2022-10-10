@@ -2295,11 +2295,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitReifyPackExpr(ReifyPackExpr *E) {
-    printCommon(E, "reify_pack") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());

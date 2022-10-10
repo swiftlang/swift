@@ -446,7 +446,6 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
-    RValue visitReifyPackExpr(ReifyPackExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
@@ -1511,11 +1510,6 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
   auto result = SGF.emitNativeToBridgedValue(E, mv, origType, resultType,
                                              loweredResultTy, C);
   return RValue(SGF, E, result);
-}
-
-RValue
-RValueEmitter::visitReifyPackExpr(ReifyPackExpr *E, SGFContext C) {
-  llvm_unreachable("Unimplemented!");
 }
 
 RValue

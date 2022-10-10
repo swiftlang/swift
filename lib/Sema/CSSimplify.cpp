@@ -6834,15 +6834,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
     }
-
-    // A Pack of (Ts...) is convertible to a tuple (X, Y, Z) as long as there
-    // is an element-wise match.
-    if (auto *expansionTy = type1->getAs<PackType>()) {
-      if (!type2->isTypeVariableOrMember()) {
-        conversionsOrFixes.push_back(
-            ConversionRestrictionKind::ReifyPackToType);
-      }
-    }
   }
 
   if (kind >= ConstraintKind::OperatorArgumentConversion) {
@@ -12678,22 +12669,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     ImplicitValueConversions.insert(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
-  }
-  case ConversionRestrictionKind::ReifyPackToType: {
-    type1 = simplifyType(type1);
-    auto *PET = type1->castTo<PackType>();
-    if (auto *TT = type2->getAs<TupleType>()) {
-      llvm::SmallVector<TupleTypeElt, 8> elts;
-      for (Type elt : PET->getElementTypes()) {
-        elts.push_back(elt);
-      }
-      Type tupleType1 = TupleType::get(elts, getASTContext());
-      return matchTypes(tupleType1, TT, ConstraintKind::Bind, subflags,
-                        locator);
-    } else {
-      return matchTypes(PET->getElementType(0), type2, ConstraintKind::Bind,
-                        subflags, locator);
-    }
   }
   }
   
