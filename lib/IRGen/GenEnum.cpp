@@ -133,6 +133,7 @@
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 #include "SwitchBuilder.h"
+#include "ClassTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -2467,9 +2468,17 @@ namespace {
     void retainRefcountedPayload(IRGenFunction &IGF,
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case NullableRefcounted:
+      case NullableRefcounted: {
+        if (Refcounting == ReferenceCounting::Custom) {
+          Explosion e;
+          e.add(ptr);
+          getPayloadTypeInfo().as<ClassTypeInfo>().strongRetain(IGF, e, IGF.getDefaultAtomicity());
+          return;
+        }
+
         IGF.emitStrongRetain(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
+      }
       case ForwardToPayload:
       case POD:
       case Normal:
@@ -2495,9 +2504,17 @@ namespace {
     void releaseRefcountedPayload(IRGenFunction &IGF,
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
-      case NullableRefcounted:
+      case NullableRefcounted: {
+        if (Refcounting == ReferenceCounting::Custom) {
+          Explosion e;
+          e.add(ptr);
+          getPayloadTypeInfo().as<ClassTypeInfo>().strongRelease(IGF, e, IGF.getDefaultAtomicity());
+          return;
+        }
+
         IGF.emitStrongRelease(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
+      }
       case ForwardToPayload:
       case POD:
       case Normal:
