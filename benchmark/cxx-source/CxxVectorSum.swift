@@ -19,27 +19,27 @@ import Cxx
 
 public let benchmarks = [
   BenchmarkInfo(
-      name: "CxxVecU32.Sum.Cxx.RangedForLoop",
+      name: "CxxVecU32.sum.Cxx.rangedForLoop",
       runFunction: run_CxxVectorOfU32_Sum_Cxx_RangedForLoop,
       tags: [.validation, .bridging, .cxxInterop],
       setUpFunction: makeVectorOnce),
   BenchmarkInfo(
-    name: "CxxVecU32.Sum.Swift.ForInLoop",
+    name: "CxxVecU32.sum.Swift.forInLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_ForInLoop,
     tags: [.validation, .bridging, .cxxInterop],
     setUpFunction: makeVectorOnce),
   BenchmarkInfo(
-    name: "CxxVecU32.Sum.Swift.IteratorLoop",
+    name: "CxxVecU32.sum.Swift.iteratorLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop,
     tags: [.validation, .bridging, .cxxInterop],
     setUpFunction: makeVectorOnce),
   BenchmarkInfo(
-    name: "CxxVecU32.Sum.Swift.SubscriptLoop",
+    name: "CxxVecU32.sum.Swift.subscriptLoop",
     runFunction: run_CxxVectorOfU32_Sum_Swift_IndexAndSubscriptLoop,
     tags: [.validation, .bridging, .cxxInterop],
     setUpFunction: makeVectorOnce),
   BenchmarkInfo(
-    name: "CxxVecU32.Sum.Swift.Reduce",
+    name: "CxxVecU32.sum.Swift.reduce",
     runFunction: run_CxxVectorOfU32_Sum_Swift_Reduce,
     tags: [.validation, .bridging, .cxxInterop],
     setUpFunction: makeVectorOnce)
