@@ -7668,6 +7668,13 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   if (!castExpr)
     return nullptr;
 
+  // Do not emit diagnostics if casting to Reflectable,
+  // since it will be resolved through runtime in all cases.
+  if (auto NTD = toType->getAnyNominal())
+    if (auto protocol = dyn_cast<ProtocolDecl>(NTD))
+      if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable))
+        return nullptr;
+
   // "from" could be less optional than "to" e.g. `0 as Any?`, so
   // we need to store the difference as a signed integer.
   int extraOptionals = fromOptionals.size() - toOptionals.size();
