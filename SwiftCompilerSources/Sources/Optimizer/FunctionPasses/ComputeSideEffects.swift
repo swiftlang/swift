@@ -203,7 +203,8 @@ private struct CollectedEffects {
 
     if escapeWalker.hasUnknownUses(argument: argument) {
       // Worst case: we don't know anything about how the argument escapes.
-      addEffects(globalEffects.restrictedTo(argument: argument, withConvention: argument.convention), to: argument)
+      addEffects(globalEffects.restrictedTo(argument: argument.at(SmallProjectionPath(.anything)),
+                                            withConvention: argument.convention), to: argument)
 
     } else if escapeWalker.foundTakingLoad {
       // In most cases we can just ignore loads. But if the load is actually "taking" the
@@ -211,7 +212,8 @@ private struct CollectedEffects {
       // know what's happening with the loaded value. If there is any destroying instruction in the
       // function, it might be the destroy of the loaded value.
       let effects = SideEffects.GlobalEffects(ownership: globalEffects.ownership)
-      addEffects(effects.restrictedTo(argument: argument, withConvention: argument.convention), to: argument)
+      addEffects(effects.restrictedTo(argument: argument.at(SmallProjectionPath(.anything)),
+                                      withConvention: argument.convention), to: argument)
 
     } else if escapeWalker.foundConsumingPartialApply && globalEffects.ownership.destroy {
       // Similar situation with apply instructions which consume the callee closure.
@@ -236,7 +238,7 @@ private struct CollectedEffects {
       } else {
         // The callee doesn't have any computed effects. At least we can do better
         // if it has any defined effect attribute (like e.g. `[readnone]`).
-        globalEffects.merge(with: callee.definedSideEffects)
+        globalEffects.merge(with: callee.definedGlobalEffects)
       }
     }
 
@@ -252,15 +254,12 @@ private struct CollectedEffects {
           if let calleePath = calleeEffect.copy    { addEffects(.copy,    to: argument, fromInitialPath: calleePath) }
           if let calleePath = calleeEffect.destroy { addEffects(.destroy, to: argument, fromInitialPath: calleePath) }
         } else {
-          var calleeEffects = callee.definedSideEffects
-
           let convention = callee.getArgumentConvention(for: calleeArgIdx)
-          if convention.isIndirectIn {
-            calleeEffects.memory.read = true
-          } else if convention == .indirectOut {
-            calleeEffects.memory.write = true
-          }
-          addEffects(calleeEffects.restrictedTo(argument: argument, withConvention: convention), to: argument)
+          let wholeArgument = argument.at(SmallProjectionPath(.anything))
+          let calleeEffects = callee.getSideEffects(forArgument: wholeArgument,
+                                                    atIndex: calleeArgIdx,
+                                                    withConvention: convention)
+          addEffects(calleeEffects.restrictedTo(argument: wholeArgument, withConvention: convention), to: argument)
         }
       }
     }
@@ -274,7 +273,7 @@ private struct CollectedEffects {
     // deallocates an object.
     if let destructors = calleeAnalysis.getDestructors(of: addressOrValue.type) {
       for destructor in destructors {
-        globalEffects.merge(with: destructor.effects.accumulatedSideEffects)
+        globalEffects.merge(with: destructor.getSideEffects())
       }
     } else {
       globalEffects = .worstEffects
