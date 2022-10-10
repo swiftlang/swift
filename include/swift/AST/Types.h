@@ -161,8 +161,8 @@ public:
     HasPlaceholder       = 0x800,
 
     /// This type contains a generic type parameter that is declared as a
-    /// type sequence
-    HasTypeSequence = 0x1000,
+    /// parameter pack.
+    HasParameterPack = 0x1000,
 
     /// This type contains a parameterized existential type \c any P<T>.
     HasParameterizedExistential = 0x2000,
@@ -225,7 +225,7 @@ public:
   /// Does a type with these properties structurally contain a placeholder?
   bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
-  bool hasTypeSequence() const { return Bits & HasTypeSequence; }
+  bool hasParameterPack() const { return Bits & HasParameterPack; }
 
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
@@ -624,8 +624,8 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
-  bool hasTypeSequence() const {
-    return getRecursiveProperties().hasTypeSequence();
+  bool hasParameterPack() const {
+    return getRecursiveProperties().hasParameterPack();
   }
 
   /// Determine whether the type involves a parameterized existential type.
@@ -655,10 +655,9 @@ public:
   void getRootOpenedExistentials(
       SmallVectorImpl<OpenedArchetypeType *> &rootOpenedArchetypes) const;
 
-  /// Retrieve the set of type sequence generic parameters that occur
-  /// within this type.
-  void getTypeSequenceParameters(
-      SmallVectorImpl<Type> &rootTypeSequenceParams) const;
+  /// Retrieve the set of type parameter packs that occur within this type.
+  void getTypeParameterPacks(
+      SmallVectorImpl<Type> &rootParameterPacks) const;
 
   /// Replace opened archetypes with the given root with their most
   /// specific non-dependent upper bounds throughout this type.
@@ -689,12 +688,12 @@ public:
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
 
-  /// Determine whether this type is a type sequence parameter, which is
+  /// Determine whether this type is a type parameter pack, which is
   /// either a GenericTypeParamType or a DependentMemberType.
   ///
   /// Like \c isTypeParameter, this routine will return \c false for types that
   /// include type parameters in nested positions e.g. \c X<T...>.
-  bool isTypeSequenceParameter();
+  bool isParameterPack();
 
   /// Determine whether this type can dynamically be an optional type.
   ///
@@ -6063,7 +6062,7 @@ class GenericTypeParamType : public SubstitutableType {
 
 public:
   /// Retrieve a generic type parameter at the given depth and index.
-  static GenericTypeParamType *get(bool isTypeSequence, unsigned depth,
+  static GenericTypeParamType *get(bool isParameterPack, unsigned depth,
                                    unsigned index, const ASTContext &ctx);
 
   /// Retrieve the declaration of the generic type parameter, or null if
@@ -6099,14 +6098,13 @@ public:
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
   unsigned getIndex() const;
 
-  /// Returns \c true if this generic type parameter is declared as a type
-  /// sequence.
+  /// Returns \c true if this type parameter is declared as a pack.
   ///
   /// \code
-  /// func foo<@_typeSequence T>(_ : T...) { }
-  /// struct Foo<@_typeSequence T> { }
-  /// \encode
-  bool isTypeSequence() const;
+  /// func foo<T...>() { }
+  /// struct Foo<T...> { }
+  /// \endcode
+  bool isParameterPack() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -6121,18 +6119,18 @@ private:
     : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
       ParamOrDepthIndex(param) { }
 
-  explicit GenericTypeParamType(bool isTypeSequence, unsigned depth,
+  explicit GenericTypeParamType(bool isParameterPack, unsigned depth,
                                 unsigned index, RecursiveTypeProperties props,
                                 const ASTContext &ctx)
       : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
         ParamOrDepthIndex(depth << 16 | index |
-                          ((isTypeSequence ? 1 : 0) << 30)) {}
+                          ((isParameterPack ? 1 : 0) << 30)) {}
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-static CanGenericTypeParamType get(bool isTypeSequence, unsigned depth,
+static CanGenericTypeParamType get(bool isParameterPack, unsigned depth,
                                    unsigned index, const ASTContext &C) {
   return CanGenericTypeParamType(
-      GenericTypeParamType::get(isTypeSequence, depth, index, C));
+      GenericTypeParamType::get(isParameterPack, depth, index, C));
 }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
@@ -6471,8 +6469,8 @@ public:
   /// a variadic generic parameter, but any variadic generic parameters
   /// appearing in the pattern type must have the same count as \p countType.
   ///
-  /// As for \p countType itself, it must be a type sequence generic parameter
-  /// type, or a sequence archetype type.
+  /// As for \p countType itself, it must be a type parameter pack
+  /// type, or a pack archetype type.
   static PackExpansionType *get(Type pattern, Type countType);
 
 public:
@@ -6544,14 +6542,14 @@ inline bool TypeBase::isTypeParameter() {
   return t->is<GenericTypeParamType>();
 }
 
-inline bool TypeBase::isTypeSequenceParameter() {
+inline bool TypeBase::isParameterPack() {
   Type t(this);
 
   while (auto *memberTy = t->getAs<DependentMemberType>())
     t = memberTy->getBase();
 
   return t->is<GenericTypeParamType>() &&
-         t->castTo<GenericTypeParamType>()->isTypeSequence();
+         t->castTo<GenericTypeParamType>()->isParameterPack();
 }
 
 // TODO: This will become redundant once InOutType is removed.
@@ -6838,7 +6836,7 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
 #include "swift/AST/TypeNodes.def"
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
-    : TypeSequence(p->isTypeSequence()), Depth(p->getDepth()),
+    : ParameterPack(p->isParameterPack()), Depth(p->getDepth()),
       Index(p->getIndex()) {}
 
 inline TypeBase *TypeBase::getDesugaredType() {

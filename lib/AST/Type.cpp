@@ -582,18 +582,18 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
   return transformFn(type);
 }
 
-void TypeBase::getTypeSequenceParameters(
-    SmallVectorImpl<Type> &rootTypeSequenceParams) const {
+void TypeBase::getTypeParameterPacks(
+    SmallVectorImpl<Type> &rootParameterPacks) const {
   llvm::SmallDenseSet<CanType, 2> visited;
 
   auto recordType = [&](Type t) {
     if (visited.insert(t->getCanonicalType()).second)
-      rootTypeSequenceParams.push_back(t);
+      rootParameterPacks.push_back(t);
   };
 
   Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
     if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-      if (paramTy->isTypeSequence()) {
+      if (paramTy->isParameterPack()) {
         recordType(paramTy);
       }
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
@@ -1655,7 +1655,7 @@ CanType TypeBase::computeCanonicalType() {
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
     Result =
-        GenericTypeParamType::get(gpDecl->isTypeSequence(), gpDecl->getDepth(),
+        GenericTypeParamType::get(gpDecl->isParameterPack(), gpDecl->getDepth(),
                                   gpDecl->getIndex(), gpDecl->getASTContext());
     break;
   }
@@ -1966,9 +1966,9 @@ unsigned GenericTypeParamType::getIndex() const {
   return fixedNum & 0xFFFF;
 }
 
-bool GenericTypeParamType::isTypeSequence() const {
+bool GenericTypeParamType::isParameterPack() const {
   if (auto param = getDecl()) {
-    return param->isTypeSequence();
+    return param->isParameterPack();
   }
 
   auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
@@ -3589,7 +3589,7 @@ PackArchetypeType::PackArchetypeType(
     : ArchetypeType(TypeKind::PackArchetype, Ctx,
                     RecursiveTypeProperties::HasArchetype, InterfaceType,
                     ConformsTo, Superclass, Layout, GenericEnv) {
-  assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isTypeSequence());
+  assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isParameterPack());
 }
 
 CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
@@ -5594,7 +5594,7 @@ case TypeKind::Id:
         }
 
         if (input->is<TypeVariableType>() ||
-            input->isTypeSequenceParameter() ||
+            input->isParameterPack() ||
             input->is<PackArchetypeType>()) {
           if (auto *PT = (*remap)->getAs<PackType>()) {
             maxArity = std::max(maxArity, PT->getNumElements());

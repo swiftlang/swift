@@ -698,7 +698,7 @@ RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
 
 MutableTerm
 RequirementMachine::getReducedShapeTerm(Type type) const {
-  assert(type->isTypeSequenceParameter());
+  assert(type->isParameterPack());
 
   auto rootType = type->getRootGenericParam();
   auto term = Context.getMutableTermForType(rootType->getCanonicalType(),
@@ -718,7 +718,7 @@ RequirementMachine::getReducedShapeTerm(Type type) const {
 }
 
 Type RequirementMachine::getReducedShape(Type type) const {
-  if (!type->isTypeSequenceParameter())
+  if (!type->isParameterPack())
     return Type();
 
   return Map.getTypeForTerm(getReducedShapeTerm(type),

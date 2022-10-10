@@ -3028,7 +3028,7 @@ namespace {
           auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
               param, AccessLevel::Public, dc,
               Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(),
-              /*type sequence*/ false, /*depth*/ 0, /*index*/ i);
+              /*isParameterPack*/ false, /*depth*/ 0, /*index*/ i);
           templateParams.push_back(typeParam);
           (void)++i;
         }
@@ -3477,7 +3477,7 @@ namespace {
                 param, AccessLevel::Public, dc,
                 Impl.SwiftContext.getIdentifier(param->getName()),
                 Impl.importSourceLoc(param->getLocation()),
-                /*type sequence*/ false, /*depth*/ 0,
+                /*isParameterPack*/ false, /*depth*/ 0,
                 /*index*/ genericParams.size());
         genericParams.push_back(genericParamDecl);
       }
@@ -6590,7 +6590,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         objcGenericParam, AccessLevel::Public, dc,
         Impl.SwiftContext.getIdentifier(objcGenericParam->getName()),
         Impl.importSourceLoc(objcGenericParam->getLocation()),
-        /*type sequence*/ false, /*depth*/ 0, /*index*/ genericParams.size());
+        /*isParameterPack*/ false, /*depth*/ 0, /*index*/ genericParams.size());
     // NOTE: depth is always 0 for ObjC generic type arguments, since only
     // classes may have generic types in ObjC, and ObjC classes cannot be
     // nested.

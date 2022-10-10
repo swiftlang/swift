@@ -492,7 +492,7 @@ static CanType getAutoDiffTangentTypeForLinearMap(
   // Otherwise, the tangent type is a new generic parameter substituted for the
   // tangent type.
   auto gpIndex = substGenericParams.size();
-  auto gpType = CanGenericTypeParamType::get(/*type sequence*/ false,
+  auto gpType = CanGenericTypeParamType::get(/*isParameterPack*/ false,
                                              0, gpIndex, context);
   substGenericParams.push_back(gpType);
   substReplacements.push_back(tanType);
@@ -2478,7 +2478,7 @@ buildThunkSignature(SILFunction *fn,
 
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam =
-      GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
+      GenericTypeParamType::get(/*isParameterPack*/ false, depth, 0, ctx);
 
   assert(openedExistential->isRoot());
   auto constraint = openedExistential->getExistentialType();

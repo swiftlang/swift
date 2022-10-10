@@ -585,7 +585,7 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
   SmallVector<GenericTypeParamDecl *, 4> newParams;
   for (auto *param : genericParams->getParams()) {
     auto *newParam = GenericTypeParamDecl::create(
-        classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
+        classDecl, param->getName(), SourceLoc(), param->isParameterPack(),
         depth, param->getIndex(), param->isOpaqueType(),
         /*opaqueTypeRepr=*/nullptr);
     newParams.push_back(newParam);

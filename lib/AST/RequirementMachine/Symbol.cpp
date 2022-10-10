@@ -675,7 +675,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
       os << substitution;
 
       auto key = CanType(GenericTypeParamType::get(
-          /*isTypeSequence=*/false, 0, index, ctx));
+          /*isParameterPack=*/false, 0, index, ctx));
       substitutionNames[key] = ctx.getIdentifier(s);
     }
   }
@@ -701,7 +701,7 @@ void Symbol::dump(llvm::raw_ostream &out) const {
 
   case Kind::GenericParam: {
     auto *gp = getGenericParam();
-    if (gp->isTypeSequence()) {
+    if (gp->isParameterPack()) {
       out << "(" << Type(gp) << "…)";
     } else {
       out << Type(gp);

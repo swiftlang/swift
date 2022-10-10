@@ -357,7 +357,7 @@ static void desugarSameShapeRequirement(Type lhs, Type rhs, SourceLoc loc,
                                         SmallVectorImpl<Requirement> &result,
                                         SmallVectorImpl<RequirementError> &errors) {
   // For now, only allow shape requirements directly between pack types.
-  if (!lhs->isTypeSequenceParameter() || !rhs->isTypeSequenceParameter()) {
+  if (!lhs->isParameterPack() || !rhs->isParameterPack()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(
         {RequirementKind::SameShape, lhs, rhs}, loc));
   }
@@ -498,7 +498,7 @@ struct InferRequirementsWalker : public TypeWalker {
     if (auto packExpansion = ty->getAs<PackExpansionType>()) {
       // Get all pack parameters referenced from the pattern.
       SmallVector<Type, 2> packReferences;
-      packExpansion->getPatternType()->getTypeSequenceParameters(packReferences);
+      packExpansion->getPatternType()->getTypeParameterPacks(packReferences);
 
       auto countType = packExpansion->getCountType();
       for (auto pack : packReferences) {

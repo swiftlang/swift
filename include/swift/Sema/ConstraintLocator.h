@@ -792,9 +792,9 @@ public:
   GenericTypeParamType *getType() const {
     return getStoredPointer();
   }
-    
-  bool isTypeSequence() const {
-    return getType()->isTypeSequence();
+
+  bool isParameterPack() const {
+    return getType()->isParameterPack();
   }
 
   static bool classof(const LocatorPathElt *elt) {

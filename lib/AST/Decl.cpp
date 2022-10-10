@@ -4596,14 +4596,14 @@ AbstractTypeParamDecl::getConformingProtocols() const {
 
 GenericTypeParamDecl::GenericTypeParamDecl(
     DeclContext *dc, Identifier name, SourceLoc nameLoc,
-    bool isTypeSequence, unsigned depth, unsigned index,
+    bool isParameterPack, unsigned depth, unsigned index,
     bool isOpaqueType, TypeRepr *typeRepr
   ) : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
-  Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
+  Bits.GenericTypeParamDecl.ParameterPack = isParameterPack;
   Bits.GenericTypeParamDecl.IsOpaqueType = isOpaqueType;
   assert(isOpaqueType || !typeRepr);
   if (isOpaqueType)
@@ -4611,8 +4611,8 @@ GenericTypeParamDecl::GenericTypeParamDecl(
 
   auto &ctx = dc->getASTContext();
   RecursiveTypeProperties props = RecursiveTypeProperties::HasTypeParameter;
-  if (this->isTypeSequence())
-    props |= RecursiveTypeProperties::HasTypeSequence;
+  if (this->isParameterPack())
+    props |= RecursiveTypeProperties::HasParameterPack;
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this, props);
   setInterfaceType(MetatypeType::get(type, ctx));
 }
@@ -4620,14 +4620,14 @@ GenericTypeParamDecl::GenericTypeParamDecl(
 GenericTypeParamDecl *
 GenericTypeParamDecl::create(
     DeclContext *dc, Identifier name, SourceLoc nameLoc,
-    bool isTypeSequence, unsigned depth, unsigned index,
+    bool isParameterPack, unsigned depth, unsigned index,
     bool isOpaqueType, TypeRepr *typeRepr) {
   ASTContext &ctx = dc->getASTContext();
   auto mem = ctx.Allocate(
       totalSizeToAlloc<TypeRepr *>(isOpaqueType ? 1 : 0),
       alignof(GenericTypeParamDecl));
   return new (mem) GenericTypeParamDecl(
-      dc, name, nameLoc, isTypeSequence, depth, index, isOpaqueType,
+      dc, name, nameLoc, isParameterPack, depth, index, isOpaqueType,
       typeRepr);
 }
 

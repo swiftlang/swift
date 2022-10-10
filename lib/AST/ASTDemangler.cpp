@@ -676,7 +676,7 @@ Type ASTBuilder::createMetatypeType(Type instance,
 
 Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
                                                 unsigned index) {
-  return GenericTypeParamType::get(/*type sequence*/ false, depth, index, Ctx);
+  return GenericTypeParamType::get(/*isParameterPack*/ false, depth, index, Ctx);
 }
 
 Type ASTBuilder::createDependentMemberType(StringRef member,

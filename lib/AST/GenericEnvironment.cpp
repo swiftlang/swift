@@ -340,7 +340,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   Type result;
 
   auto rootGP = requirements.anchor->getRootGenericParam();
-  if (rootGP->isTypeSequence()) {
+  if (rootGP->isParameterPack()) {
     assert(getKind() == Kind::Primary);
     result = PackArchetypeType::get(ctx, this, requirements.anchor,
                                     requirements.protos, superclass,

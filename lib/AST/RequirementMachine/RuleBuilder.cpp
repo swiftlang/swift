@@ -304,7 +304,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     //
     //    T.[shape] => U.[shape]
     auto otherType = CanType(req.getSecondType());
-    assert(otherType->isTypeSequenceParameter());
+    assert(otherType->isParameterPack());
 
     constraintTerm = (substitutions
                       ? Context.getRelativeTermForType(

@@ -1402,16 +1402,16 @@ public:
 };
 
 namespace {
-class OpenTypeSequenceElements {
+class OpenParameterPackElements {
   ConstraintSystem &CS;
   int64_t argIdx;
   Type patternTy;
-  // A map that relates a type variable opened for a reference to a type
-  // sequence to an array of parallel type variables, one for each argument.
-  llvm::MapVector<TypeVariableType *, SmallVector<TypeVariableType *, 2>> SequenceElementCache;
+  // A map that relates a type variable opened for a reference to a parameter
+  // pack to an array of parallel type variables, one for each argument.
+  llvm::MapVector<TypeVariableType *, SmallVector<TypeVariableType *, 2>> PackElementCache;
 
 public:
-  OpenTypeSequenceElements(ConstraintSystem &CS, PackExpansionType *PET)
+  OpenParameterPackElements(ConstraintSystem &CS, PackExpansionType *PET)
       : CS(CS), argIdx(-1), patternTy(PET->getPatternType()) {}
 
 public:
@@ -1423,12 +1423,12 @@ public:
   void intoPackTypes(llvm::function_ref<void(TypeVariableType *, Type)> fn) && {
     if (argIdx == -1) {
       (void)patternTy.transform(*this);
-      for (auto &entry : SequenceElementCache) {
+      for (auto &entry : PackElementCache) {
         entry.second.clear();
       }
     }
 
-    for (const auto &entry : SequenceElementCache) {
+    for (const auto &entry : PackElementCache) {
       SmallVector<Type, 8> elements;
       llvm::transform(entry.second, std::back_inserter(elements), [](Type t) {
         return t;
@@ -1447,29 +1447,29 @@ public:
       return Ty;
 
     // Leave plain opened type variables alone.
-    if (!TV->getImpl().getGenericParameter()->isTypeSequence())
+    if (!TV->getImpl().getGenericParameter()->isParameterPack())
       return TV;
 
-    // Create a clone of the type sequence type variable.
+    // Create a clone of the parameter pack type variable.
     auto *clonedTV = CS.createTypeVariable(TV->getImpl().getLocator(),
                                            TV->getImpl().getRawOptions());
 
-    // Is there an entry for this type sequence?
-    const auto &entries = SequenceElementCache.find(TV);
-    if (entries == SequenceElementCache.end()) {
-      // We're just seeing this type sequence fresh, so enter a new type
+    // Is there an entry for this parameter pack?
+    const auto &entries = PackElementCache.find(TV);
+    if (entries == PackElementCache.end()) {
+      // We're just seeing this parameter pack fresh, so enter a new type
       // variable in its place and cache down the fact we just saw it.
-      SequenceElementCache[TV] = {clonedTV};
+      PackElementCache[TV] = {clonedTV};
     } else if ((int64_t)entries->second.size() <= argIdx) {
-      // We've seen this type sequence before, but we have a brand new element.
+      // We've seen this pack before, but we have a brand new element.
       // Expand the cache entry.
-      SequenceElementCache[TV].push_back(clonedTV);
+      PackElementCache[TV].push_back(clonedTV);
     } else {
-      // Not only have we seen this type sequence before, we've seen this
+      // Not only have we seen this pack before, we've seen this
       // argument index before. Extract the old cache entry, emplace the new
       // one, and bind them together.
-      auto *oldEntry = SequenceElementCache[TV][argIdx];
-      SequenceElementCache[TV][argIdx] = clonedTV;
+      auto *oldEntry = PackElementCache[TV][argIdx];
+      PackElementCache[TV][argIdx] = clonedTV;
 
       CS.addConstraint(ConstraintKind::Bind, oldEntry, clonedTV,
                        TV->getImpl().getLocator());
@@ -1814,8 +1814,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     const auto &param = params[paramIdx];
     auto paramTy = param.getOldType();
 
-    // Type sequences ingest the entire set of argument bindings as
-    // a pack type bound to the sequence archetype for the parameter.
+    // Type parameter packs ingest the entire set of argument bindings
+    // as a pack type.
     //
     // We pull these out special because variadic parameters ban lots of
     // the more interesting typing constructs called out below like
@@ -1823,23 +1823,23 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
       auto *PET = paramTy->castTo<PackExpansionType>();
-      OpenTypeSequenceElements openTypeSequence{cs, PET};
+      OpenParameterPackElements openParameterPack{cs, PET};
       for (auto argIdx : parameterBindings[paramIdx]) {
         const auto &argument = argsWithLabels[argIdx];
         auto argTy = argument.getPlainType();
 
         // First, re-open the parameter type so we bind the elements of the type
         // sequence into their proper positions.
-        auto substParamTy = openTypeSequence.expandParameter();
+        auto substParamTy = openParameterPack.expandParameter();
 
         cs.addConstraint(
             subKind, argTy, substParamTy, loc, /*isFavored=*/false);
       }
 
-      // Now that we have the pack mappings, bind the raw type sequence to the
-      // whole parameter pack. This ensures references to the type sequence in
+      // Now that we have the pack mappings, bind the raw list to the
+      // whole parameter pack. This ensures references to the pack in
       // return position refer to the whole pack of elements we just gathered.
-      std::move(openTypeSequence)
+      std::move(openParameterPack)
           .intoPackTypes([&](TypeVariableType *tsParam, Type pack) {
             cs.addConstraint(ConstraintKind::Bind, pack, tsParam, loc,
                              /*isFavored=*/false);
