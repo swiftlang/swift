@@ -53,6 +53,7 @@ func makeVectorOnce() {
 // establish an expected threshold of performance, which when exceeded should
 // fail the benchmark.
 
+// FIXME: Bump up to 50k and 10 once the sequence is faster.
 let vectorSize = 25_000
 let iterRepeatFactor = 7
 
