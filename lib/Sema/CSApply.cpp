@@ -3775,6 +3775,10 @@ namespace {
       return expr;
     }
 
+    Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
+      llvm_unreachable("not implemented for PackExpansionExpr");
+    }
+
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       Expr *base = expr->getBase();
       base = cs.coerceToRValue(base);
