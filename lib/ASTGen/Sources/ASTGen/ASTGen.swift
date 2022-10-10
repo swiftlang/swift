@@ -32,13 +32,13 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
   let base: UnsafePointer<CChar>
 
   @Boxed var declContext: UnsafeMutableRawPointer
-  
+
   // TODO: this some how messes up the witness table when I uncomment it locally :/
 //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
 //    if let node = node { return visit(node) }
 //    return nil
 //  }
-  
+
   @_disfavoredOverload
   public func visit(_ node: SourceFileSyntax) -> UnsafeMutableRawPointer {
     fatalError("Use other overload.")
@@ -47,7 +47,7 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
   public func visitAny(_ node: Syntax) -> UnsafeMutableRawPointer {
     fatalError("Not implemented.")
   }
-  
+
   public func visit(_ node: SourceFileSyntax) -> [UnsafeMutableRawPointer] {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var out = [UnsafeMutableRawPointer]()
@@ -63,7 +63,7 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
         out.append(swiftASTNodes)
       }
     }
-    
+
     return out
   }
 }
