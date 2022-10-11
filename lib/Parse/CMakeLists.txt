@@ -58,6 +58,16 @@ if (SWIFT_SWIFT_PARSER)
     $<TARGET_OBJECTS:swiftASTGen>
   )
 
+  add_dependencies(swiftParse
+    SwiftSyntax::SwiftBasicFormat
+    SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftCompilerSupport
+    swiftASTGen
+  )
+
   target_include_directories(swiftParse
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../swift-syntax/Sources/SwiftCompilerSupport
