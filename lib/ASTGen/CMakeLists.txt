@@ -47,7 +47,15 @@ if (SWIFT_SWIFT_PARSER)
   target_include_directories(swiftASTGen PUBLIC
     "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/swift")
 
-  add_dependencies(swiftASTGen swiftAST)
+  add_dependencies(swiftASTGen
+    SwiftSyntax::SwiftBasicFormat
+    SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftDiagnostics
+    SwiftSyntax::SwiftSyntax
+    SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftCompilerSupport
+    swiftAST
+  )
 
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS swiftASTGen)
 endif()
