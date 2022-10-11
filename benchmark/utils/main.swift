@@ -167,6 +167,7 @@ import SetTests
 import SevenBoom
 import Sim2DArray
 //import SimpleArraySpecialization
+import SharedPtr
 import SortArrayInClass
 import SortIntPyramids
 import SortLargeExistentials
@@ -351,6 +352,7 @@ register(SequenceAlgos.benchmarks)
 register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)
+register(SharedPtr.benchmarks)
 //register(SimpleArraySpecialization.benchmarks)
 register(SortArrayInClass.benchmarks)
 register(SortIntPyramids.benchmarks)

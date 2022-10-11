@@ -201,6 +201,7 @@ set(SWIFT_BENCH_MODULES
     cxx-source/CreateObjects
     cxx-source/CxxVectorSum
     cxx-source/ReadAccessor
+    cxx-source/SharedPtr
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES
