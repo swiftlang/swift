@@ -1559,6 +1559,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     genericSubInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
   }
+  // If building an application extension, make sure API use
+  // is restricted accordingly in downstream dependnecies.
+  if (langOpts.EnableAppExtensionRestrictions) {
+    GenericArgs.push_back("-application-extension");
+  }
   // Save the parent invocation's Target Triple
   ParentInvocationTarget = langOpts.Target;
 
