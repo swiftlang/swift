@@ -849,6 +849,27 @@ public struct RemoteCallArgument<Value> {
 /// /// performs the actual distributed (local) instance method invocation.
 /// mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 /// ```
+///
+/// ### Decoding DistributedActor arguments using Codable
+/// When using the actor system's ``ActorID`` is ``Codable``, every distributed actor using that system
+/// is also implicitly ``Codable`` (see ``DistributedActorSystem``). Such distributed actors are encoded
+/// as their ``ActorID`` stored in a ``Encoder/singleValueContainer``. Since ``Codable`` is being used
+/// by this such system, it means that the ``decodeNextArgument`` method will be using ``Decoder`` to
+/// decode the incoming values, some of which may be distributed actors.
+///
+/// In order for a distributed actor's ``Decodable/init(from:)`` to be able to return an existing instance,
+/// i.e. when the being-decoded ``ActorID`` actually references a locally hosted distributed actor, that the
+/// current actor system can return from `resolve(id:as:)`, an actor system must be provided to the ``Decoder``.
+/// This is done by setting the actor system the decoding is performed for, on the decoder's `userInfo`, as follows:
+///
+/// ```
+/// mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
+///   let argumentData: Data = /// ...
+///   // ...
+///   decoder.userInfo[.actorSystemKey] = self.actorSystem
+///   return try Argument.decode(
+/// }
+// ```
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
   /// The serialization requirement that the types passed to `decodeNextArgument` are required to conform to.
