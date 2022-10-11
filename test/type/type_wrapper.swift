@@ -595,5 +595,16 @@ func testWrappedSelfInReferenceOnlySubscript() {
       get { fatalError() }
     }
   }
+}
 
+// rdar://99884355 - Missing argument for parameter 'name'
+do {
+  struct Use {
+    var product = Product(name: "<no name>")
+  }
+
+  @NoopWrapper
+  struct Product {
+    var name: String
+  }
 }

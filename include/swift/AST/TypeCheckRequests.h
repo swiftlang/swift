@@ -3689,22 +3689,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class SynthesizeTypeWrappedTypeMemberwiseInitializerBody
-    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
-                           BraceStmt *(ConstructorDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  BraceStmt *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 class SynthesizeLocalVariableForTypeWrapperStorage
     : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
                            VarDecl *(ConstructorDecl *), RequestFlags::Cached> {
