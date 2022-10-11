@@ -456,6 +456,21 @@ IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
   return Inst;
 }
 
+TestSpecificationInst *
+TestSpecificationInst::create(SILDebugLocation Loc,
+                              StringRef ArgumentsSpecification, SILModule &M) {
+  auto ArgumentsSpecificationLength = ArgumentsSpecification.size();
+  auto Size = totalSizeToAlloc<char>(ArgumentsSpecificationLength);
+  auto Buffer = M.allocateInst(Size, alignof(TestSpecificationInst));
+
+  auto *Inst =
+      ::new (Buffer) TestSpecificationInst(Loc, ArgumentsSpecificationLength);
+  std::uninitialized_copy(ArgumentsSpecification.begin(),
+                          ArgumentsSpecification.end(),
+                          Inst->getTrailingObjects<char>());
+  return Inst;
+}
+
 InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,

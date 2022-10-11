@@ -1384,6 +1384,9 @@ public:
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   void visitDifferentiabilityWitnessFunctionInst(
       DifferentiabilityWitnessFunctionInst *i);
+  void visitTestSpecificationInst(TestSpecificationInst *i) {
+    llvm_unreachable("test-only instruction in Lowered SIL?!");
+  }
 
 #define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
   void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \

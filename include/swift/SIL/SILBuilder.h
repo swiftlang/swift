@@ -988,6 +988,13 @@ public:
     return createDebugValue(Loc, src, Var);
   }
 
+  TestSpecificationInst *
+  createTestSpecificationInst(SILLocation Loc,
+                              StringRef ArgumentsSpecification) {
+    return insert(TestSpecificationInst::create(
+        getSILDebugLocation(Loc), ArgumentsSpecification, getModule()));
+  }
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   Load##Name##Inst *createLoad##Name(SILLocation Loc, \
                                      SILValue src, \

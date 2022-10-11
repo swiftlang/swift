@@ -914,6 +914,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // sense to write the instruction at all.
     // TODO: decide if we want to serialize those instructions.
     return;
+  case SILInstructionKind::TestSpecificationInst:
+    // Instruction exists only for tests.  Ignore it.
+    return;
 
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UnreachableInst: {
