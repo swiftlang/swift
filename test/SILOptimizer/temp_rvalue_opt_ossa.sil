@@ -1580,3 +1580,30 @@ entry(%instance : $*NonTrivialStruct):
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @init_klass : $@convention(thin) () -> @out Klass
+
+sil @use_Klass : $@convention(thin) (Int, @in_guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_let_alloc_stack : {{.*}} {
+// CHECK-NOT:   copy_addr
+// CHECK-LABEL: } // end sil function 'test_let_alloc_stack'
+sil [ossa] @test_let_alloc_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Klass, let, name "v"
+  %1 = function_ref @init_klass : $@convention(thin) () -> @out Klass
+  %2 = apply %1(%0) : $@convention(thin) () -> @out Klass
+  %3 = alloc_stack $Klass
+  copy_addr %0 to [initialization] %3 : $*Klass
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = struct $Int (%5 : $Builtin.Int64)
+  %7 = function_ref @use_Klass : $@convention(thin) (Int, @in_guaranteed Klass) -> ()
+  %8 = apply %7(%6, %3) : $@convention(thin) (Int, @in_guaranteed Klass) -> ()
+  destroy_addr %3 : $*Klass
+  dealloc_stack %3 : $*Klass
+  destroy_addr %0 : $*Klass
+  dealloc_stack %0 : $*Klass
+  %13 = tuple ()
+  return %13 : $()
+}
+
