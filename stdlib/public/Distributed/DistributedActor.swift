@@ -188,7 +188,7 @@ import _Concurrency
 /// decoder.userInfo[.actorSystemKey] as? ActorSystem
 // ```
 ///
-/// The such obtained actor system is then used to ``resolve(id:using:)`` the decoded ``ID``.
+/// The such obtained actor system is then used to ``resolve(id:as:)`` the decoded ``ID``.
 ///
 /// Use the ``CodingUserInfoKey/actorSystemKey`` to provide the necessary
 /// actor system for the decoding initializer when decoding a distributed actor.

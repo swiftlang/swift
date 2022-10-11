@@ -256,7 +256,7 @@ public protocol DistributedActorSystem: Sendable {
   /// If this type is ``Codable``, then any `distributed actor` using this `ActorID` as its ``DistributedActor/ID``
   /// will gain a synthesized ``Codable`` conformance which is implemented by encoding the `ID`.
   /// The decoding counter part of the ``Codable`` conformance is implemented by decoding the `ID` and passing it to
-  // the ``DistributedActor/resolve(id:using:)`` method.
+  /// the ``DistributedActor/resolve(id:using:)`` method.
   associatedtype ActorID: Sendable & Hashable
 
   /// Type of ``DistributedTargetInvocationEncoder`` that should be used when the Swift runtime needs to encode
@@ -849,6 +849,28 @@ public struct RemoteCallArgument<Value> {
 /// /// performs the actual distributed (local) instance method invocation.
 /// mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument
 /// ```
+///
+/// ### Decoding DistributedActor arguments using Codable
+/// When an actor system's ``ActorID`` is ``Codable``, every distributed actor using that system
+/// is also implicitly ``Codable`` (see ``DistributedActorSystem``). Such distributed actors are encoded
+/// as their ``ActorID`` stored in a ``Encoder/singleValueContainer``. This also means, that this decoder
+/// is likely to be using a ``Decoder`` to implement its ``decodeNextArgument`` method.
+///
+/// Since some arguments may be distributed actor types (e.g. a "`Greeter`" type), decoding such argument
+/// will call into the distributed actor's ``DistributedActor/init(from:)`` which implements the decoding logic,
+/// defined as part of the ``Decodable`` protocol. That implementation relies on a `decoder.userInfo` value being
+/// set, containing the actor system against which a ``resolve(id:as:)`` will be called after successfully decoding
+/// the target actor's ``ActorID``. In other words, in order to successfully decode distributed actors, encoded using the
+/// default ``Codable`` implementation the following `decoder.userInfo[.actorSystemKey]` must be set, like this:
+///
+/// ```
+/// mutating func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
+///   let argumentData: Data = /// ...
+///   // ...
+///   decoder.userInfo[.actorSystemKey] = self.actorSystem
+///   return try decoder.decode(Argument.self, from: argumentData)
+/// }
+// ```
 @available(SwiftStdlib 5.7, *)
 public protocol DistributedTargetInvocationDecoder {
   /// The serialization requirement that the types passed to `decodeNextArgument` are required to conform to.
