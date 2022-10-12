@@ -75,6 +75,15 @@ public:
     return true;
   }
 
+  // Do not traverse unevaluated expressions. Doing to might result in compile
+  // errors if we try to instantiate an un-instantiatable template.
+
+  bool VisitCXXNoexceptExpr(clang::CXXNoexceptExpr *NEE) { return false; }
+
+  bool VisitCXXTypeidExpr(clang::CXXTypeidExpr *TIE) {
+    return TIE->isPotentiallyEvaluated();
+  }
+
   bool shouldVisitTemplateInstantiations() const { return true; }
   bool shouldVisitImplicitCode() const { return true; }
 };
