@@ -344,7 +344,9 @@ NODE(UniqueExtendedExistentialTypeShapeSymbolicReference)
 NODE(NonUniqueExtendedExistentialTypeShapeSymbolicReference)
 NODE(SymbolicExtendedExistentialType)
 
+// Added in Swift 5.8
 NODE(MetatypeParamsRemoved)
+NODE(HasSymbolQuery)
 
 #undef CONTEXT_NODE
 #undef NODE

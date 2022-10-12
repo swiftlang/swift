@@ -157,6 +157,7 @@ public:
     AccessibleFunctionRecord,
     BackDeploymentThunk,
     BackDeploymentFallback,
+    HasSymbolQuery,
   };
 
   /// lldb overrides the defaulted argument to 'true'.
@@ -356,6 +357,8 @@ public:
   std::string mangleOpaqueTypeDecl(const ValueDecl *decl);
 
   std::string mangleGenericSignature(const GenericSignature sig);
+
+  std::string mangleHasSymbolQuery(const ValueDecl *decl);
 
   enum SpecialContext {
     ObjCContext,
