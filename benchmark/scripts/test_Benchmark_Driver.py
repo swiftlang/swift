@@ -222,7 +222,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
 
     def test_gets_list_of_precommit_benchmarks(self):
         self.subprocess_mock.expect(
-            "/benchmarks/Benchmark_O --list --delim=\t".split(" "),
+            "/benchmarks/Benchmark_O --list".split(" "),
             "#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n2\tBenchmark2\t[t3]\n",
         )
         driver = BenchmarkDriver(self.args, _subprocess=self.subprocess_mock)
@@ -233,7 +233,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.assertEqual(driver.test_number["Benchmark2"], "2")
 
     list_all_tests = (
-        "/benchmarks/Benchmark_O --list --delim=\t --skip-tags=".split(" "),
+        "/benchmarks/Benchmark_O --list --skip-tags=".split(" "),
         """#	Test	[Tags]
 1	Benchmark1	[t1, t2]
 2	Benchmark2	[t3]
@@ -310,7 +310,7 @@ class LogParserStub(object):
     @staticmethod
     def results_from_string(log_contents):
         LogParserStub.results_from_string_called = True
-        r = PerformanceTestResult("3,b1,1,123,123,123,0,123".split(","))
+        r = PerformanceTestResult("""{"number":3,"name":"b1","samples":[123]}""")
         return {"b1": r}
 
 
@@ -320,7 +320,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.parser_stub = LogParserStub()
         self.subprocess_mock = SubprocessMock()
         self.subprocess_mock.expect(
-            "/benchmarks/Benchmark_O --list --delim=\t".split(" "),
+            "/benchmarks/Benchmark_O --list".split(" "),
             "#\tTest\t[Tags]\n1\tb1\t[tag]\n",
         )
         self.driver = BenchmarkDriver(
@@ -382,13 +382,6 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             ("/benchmarks/Benchmark_O", "b", "--memory")
         )
 
-    def test_report_quantiles(self):
-        """Use delta compression for quantile reports."""
-        self.driver.run("b", quantile=4)
-        self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O", "b", "--quantile=4", "--delta")
-        )
-
     def test_run_benchmark_independent_samples(self):
         """Extract up to 20 measurements from an independent run."""
         self.driver.args.independent_samples = 3
@@ -400,8 +393,6 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
                     "b1",
                     "--num-iters=1",
                     "--memory",
-                    "--quantile=20",
-                    "--delta",
                 )
             ),
             3,
@@ -412,38 +403,36 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         def mock_run(test):
             self.assertEqual(test, "b1")
             return PerformanceTestResult(
-                "3,b1,5,101,1,1,1,1,888".split(","),
-                quantiles=True,
-                delta=True,
-                memory=True,
+                """{"number":3,"""
+                + """"name":"b1","""
+                + """"samples":[101,102,103,104,105],"""
+                + """"max_rss":888}"""
             )
 
         driver = BenchmarkDriver(tests=["b1"], args=Stub(output_dir=None))
         driver.run_independent_samples = mock_run  # patching
 
         with captured_output() as (out, _):
-            log = driver.run_and_log()
+            driver.run_and_log()
 
         header = (
             "#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs)," + "MAX_RSS(B)\n"
         )
-        csv_log = "3,b1,5,101,102,103,104,105,888\n"
-        self.assertEqual(log, None)
+        csv_log = "3,b1,5,101,101.5,103,104.5,105,888\n"
         self.assertEqual(
             out.getvalue(),
             header + csv_log + "\n" + "Total performance tests executed: 1\n",
         )
 
         with captured_output() as (out, _):
-            log = driver.run_and_log(csv_console=False)
+            driver.run_and_log(csv_console=False)
 
-        self.assertEqual(log, header + csv_log)
         self.assertEqual(
             out.getvalue(),
             "  # TEST                                     SAMPLES MIN(μs)"
             + " Q1(μs) MEDIAN(μs) Q3(μs) MAX(μs) MAX_RSS(B)\n"
             + "  3 b1                                             5     101"
-            + "    102        103    104     105        888\n"
+            + "  101.5        103  104.5     105        888\n"
             + "\n"
             + "Total performance tests executed: 1\n",
         )
@@ -459,7 +448,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
                 openmode = "r"  # 'U' mode is deprecated in Python 3
             with open(log_file, openmode) as f:
                 text = f.read()
-            self.assertEqual(text, "formatted output")
+            self.assertEqual(text, "formatted output\n")
 
         try:
             import tempfile  # setUp
@@ -469,7 +458,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             driver = BenchmarkDriver(Stub(), tests=[""])
 
             self.assertFalse(os.path.exists(log_dir))
-            content = "formatted output"
+            content = ["formatted output"]
             log_file = os.path.join(log_dir, "1.log")
             with captured_output() as (out, _):
                 driver.log_results(content, log_file=log_file)
