@@ -75,12 +75,12 @@ void swift_dumpTrackedAccesses();
 #ifdef SWIFT_COMPATIBILITY56
 /// Backdeploy56 shim calls swift_task_enterThreadLocalContext if it is
 /// available in the underlying runtime, otherwise does nothing
-SWIFT_RUNTIME_EXPORT
+__attribute__((visibility("hidden"), weak))
 void swift_task_enterThreadLocalContextBackdeploy56(char *state);
 
 /// Backdeploy56 shim calls swift_task_exitThreadLocalContext if it is available
 /// in the underlying runtime, otherwise does nothing
-SWIFT_RUNTIME_EXPORT
+__attribute__((visibility("hidden"), weak))
 void swift_task_exitThreadLocalContextBackdeploy56(char *state);
 #else
 

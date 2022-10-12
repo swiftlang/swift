@@ -159,7 +159,7 @@ public:
 };
 
 /// Return the current thread's active task reference.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+SWIFT_CC(swift)
 AsyncTask *swift_task_getCurrent(void);
 } // namespace swift
 
