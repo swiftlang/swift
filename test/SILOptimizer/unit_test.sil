@@ -106,3 +106,36 @@ entry:
     return %retval : $()
 }
 
+// CHECK-LABEL: begin running test 1 of 1 on pay_the_phi: visit-adjacent-reborrows-of-phi with: @trace[2]
+// CHECK: sil [ossa] @pay_the_phi : {{.*}} {
+// CHECK:   [[C:%[^,]+]] = apply
+// CHECK:   [[BORROW1:%[^,]+]] = begin_borrow %1
+// CHECK:   [[BORROW2:%[^,]+]] = begin_borrow %1
+// CHECK:   br [[EXIT:bb[0-9]+]]([[C]] : $C, [[BORROW1]] : $C, [[BORROW2]] :
+// CHECK: [[EXIT]]({{%[^,]+}} : @owned $C, [[GUARANTEED1:%[^,]+]] : @guaranteed $C, [[GUARANTEED2:%[^,]+]] :
+// CHECK: } // end sil function 'pay_the_phi'
+
+// CHECK:[[GUARANTEED1]] = argument of [[EXIT]]
+// CHECK:[[GUARANTEED2]] = argument of [[EXIT]]
+// CHECK-LABEL: end running test 1 of 1 on pay_the_phi: visit-adjacent-reborrows-of-phi with: @trace[2]
+sil [ossa] @pay_the_phi : $@convention(thin) () -> () {
+entry:
+  test_specification "visit-adjacent-reborrows-of-phi @trace[2]"
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %c = apply %getC() : $@convention(thin) () -> @owned C
+  debug_value [trace] %c : $C
+  %borrow1 = begin_borrow %c : $C
+  %borrow2 = begin_borrow %c : $C
+  debug_value [trace] %borrow2 : $C
+  %borrow3 = begin_borrow %borrow2 : $C
+  br exit(%c : $C, %borrow1 : $C, %borrow2 : $C, %borrow3 : $C)
+
+exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaranteed $C, %guaranteed_3 : @guaranteed $C):
+  debug_value [trace] %owned : $C
+  end_borrow %guaranteed_3 : $C
+  end_borrow %guaranteed_2 : $C
+  end_borrow %guaranteed_1 : $C
+  destroy_value %owned : $C
+  %retval = tuple ()
+  return %retval : $()
+}

@@ -199,7 +199,23 @@ struct CanonicalizeOSSALifetimeTest : UnitTest {
   }
 };
 
-/// [new_tests] Add the new UnitTest subclass below this line.
+// Arguments:
+// - SILValue: phi
+// Dumps:
+// - function
+// - the adjacent phis
+struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
+  VisitAdjacentReborrowsOfPhiTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    getFunction()->dump();
+    visitAdjacentReborrowsOfPhi(cast<SILPhiArgument>(arguments.takeValue()),
+                                [](auto *argument) -> bool {
+                                  argument->dump();
+                                  return true;
+                                });
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line.
 
 class UnitTestRunner : public SILFunctionTransform {
@@ -232,6 +248,8 @@ class UnitTestRunner : public SILFunctionTransform {
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime",
                            CanonicalizeOSSALifetimeTest)
+    ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi",
+                           VisitAdjacentReborrowsOfPhiTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
 #undef ADD_UNIT_TEST_SUBCLASS
