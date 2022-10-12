@@ -72,6 +72,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ParseTestSpecification.h"
 #include "llvm/ADT/StringRef.h"
@@ -175,6 +176,30 @@ struct TestSpecificationTest : UnitTest {
   }
 };
 
+// Arguments:
+// - bool: pruneDebug
+// - bool: maximizeLifetimes
+// - SILValue: value to canonicalize
+// Dumps:
+// - function after value canonicalization
+struct CanonicalizeOSSALifetimeTest : UnitTest {
+  CanonicalizeOSSALifetimeTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    auto pruneDebug = arguments.takeBool();
+    auto maximizeLifetimes = arguments.takeBool();
+    InstructionDeleter deleter;
+    CanonicalizeOSSALifetime canonicalizer(pruneDebug, maximizeLifetimes, accessBlockAnalysis,
+                                           domTree, deleter);
+    auto value = arguments.takeValue();
+    canonicalizer.canonicalizeValueLifetime(value);
+    getFunction()->dump();
+  }
+};
+
+/// [new_tests] Add the new UnitTest subclass below this line.
 /// [new_tests] Add the new UnitTest subclass above this line.
 
 class UnitTestRunner : public SILFunctionTransform {
@@ -205,6 +230,8 @@ class UnitTestRunner : public SILFunctionTransform {
   }
 
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
+    ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime",
+                           CanonicalizeOSSALifetimeTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
 #undef ADD_UNIT_TEST_SUBCLASS

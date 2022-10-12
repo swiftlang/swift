@@ -83,3 +83,26 @@ bb1:
   debug_value [trace] %three : $(_ : (), (_ : ()), ((), (_ : ())))
   return %zero : $()
 }
+
+class C {}
+
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+sil [ossa] @borrowC : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @takeC : $@convention(thin) (@owned C) -> ()
+
+// CHECK-LABEL: begin running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, @trace
+// CHECK-LABEL: end running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, @trace
+sil [ossa] @fn : $@convention(thin) () -> () {
+entry:
+    test_specification "canonicalize-ossa-lifetime true true @trace"
+    %getC = function_ref @getC : $@convention(thin) () -> @owned C
+    %c = apply %getC() : $@convention(thin) () -> @owned C
+    debug_value [trace] %c : $C
+    %borrowC = function_ref @borrowC : $@convention(thin) (@guaranteed C) -> ()
+    apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> ()
+    debug_value %c : $C
+    destroy_value %c : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
