@@ -74,6 +74,15 @@ struct ScopedAddressValue {
     return kind != ScopedAddressValueKind::Invalid && value;
   }
 
+  // Both the store_borrow source and address operands are effectively used for
+  // the duration of the address scope.
+  static ScopedAddressValue forUse(Operand *use) {
+    if (auto svi = dyn_cast<SingleValueInstruction>(use->getUser()))
+      return ScopedAddressValue(svi);
+
+    return ScopedAddressValue();
+  }
+
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
