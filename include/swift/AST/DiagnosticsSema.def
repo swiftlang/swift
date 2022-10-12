@@ -5953,6 +5953,9 @@ ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
 
+ERROR(has_symbol_condition_in_inlinable, none,
+      "'#_hasSymbol' cannot be used in " FRAGILE_FUNC_KIND "0", (unsigned))
+
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
@@ -6619,7 +6622,7 @@ WARNING(has_symbol_decl_must_be_weak,none,
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
       "'#_hasSymbol' condition must refer to a declaration", ())
-ERROR(has_symbol_unsupported,none,
+ERROR(has_symbol_unsupported_on_target,none,
       "'#_hasSymbol' is unsupported on target '%0'", (StringRef))
 
 //------------------------------------------------------------------------------
