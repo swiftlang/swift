@@ -70,7 +70,7 @@ static llvm::cl::opt<ActionType> Action(
     llvm::cl::init(ActionType::DumpReflectionSections));
 
 static llvm::cl::list<std::string>
-    BinaryFilename("binary-filename",
+BinaryFilename(llvm::cl::Positional,
                    llvm::cl::desc("Filenames of the binary files"),
                    llvm::cl::OneOrMore);
 
