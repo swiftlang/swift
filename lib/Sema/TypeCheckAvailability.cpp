@@ -20,6 +20,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -3271,6 +3272,24 @@ public:
                                               : E->getLoc();
         diagnoseParameterizedProtocolAvailability(loc, Where.getDeclContext());
       }
+    }
+    if (auto *CC = dyn_cast<CheckedCastExpr>(E)) {
+      auto toType = CC->getCastType();
+      auto &ctx = DC->getASTContext();
+      if (auto *protocol = dyn_cast_or_null<ProtocolDecl>(toType->getAnyNominal()))
+        if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+          auto availability = ctx.getReflectableCastRuntimeAvailability();
+          const bool hasReflectableCastSupport = 
+          AvailabilityContext::forDeploymentTarget(ctx).isContainedIn(availability);
+
+          if (!hasReflectableCastSupport) {
+            auto ev = UnavailabilityReason::requiresVersionRange(availability.getOSVersion());
+            ctx.Diags.diagnose(CC->getLoc(),
+                           diag::reflectable_cast_only_version_newer,
+                           prettyPlatformString(targetPlatform(Context.LangOpts)),
+                           ev.getRequiredOSVersionRange().getLowerEndpoint());
+          }
+        }
     }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);

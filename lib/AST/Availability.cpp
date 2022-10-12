@@ -436,6 +436,11 @@ ASTContext::getParameterizedExistentialRuntimeAvailability() {
 }
 
 AvailabilityContext
+ASTContext::getReflectableCastRuntimeAvailability() {
+  return getSwift57Availability();
+}
+
+AvailabilityContext
 ASTContext::getImmortalRefCountSymbolsAvailability() {
   // TODO: replace this with a concrete swift version once we have it.
   // rdar://94185998

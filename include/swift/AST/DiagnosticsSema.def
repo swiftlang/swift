@@ -6646,5 +6646,10 @@ ERROR(reflection_metadata_is_disabled,none,
       "with `Reflectable` declarations",
       ())
 
+ERROR(reflectable_cast_only_version_newer, none,
+      "runtime support for casts to Reflectable protocol is only available in "
+      "%0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
