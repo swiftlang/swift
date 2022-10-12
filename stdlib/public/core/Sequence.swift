@@ -378,8 +378,8 @@ public protocol Sequence<Element> {
   ///    or not the item is an element of this sequence.
   ///
   /// - Complexity: If this function returns `nil`, it must do so in constant
-  ///    time. If this returns non-`nil`, then it must have better than linear
-  ///    complexity.
+  ///    (O(1)) time. If this returns non-`nil`, then it must have better than linear
+  ///    (O(*n*)) complexity.
   func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool?
