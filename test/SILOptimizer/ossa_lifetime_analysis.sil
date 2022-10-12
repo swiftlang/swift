@@ -22,6 +22,7 @@ case some(T)
 class C {}
 class D {
   var object: C
+  @_borrowed @_hasStorage var borrowed: C { get set }
 }
 
 // CHECK-LABEL: @testSelfLoop
@@ -129,6 +130,48 @@ bb0(%0 : @owned $D):
   end_borrow %borrow0 : $D
   destroy_value %o : $C
   destroy_value %0 : $D
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testGuaranteedResult
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
+// CHECK: bb0: LiveWithin
+// CHECK: last user:   end_apply
+sil [ossa] @testGuaranteedResult : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  debug_value [trace] %0 : $D
+  %2 = class_method %0 : $D, #D.borrowed!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
+  end_apply %4
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testScopedAddress
+// CHECK: SSA lifetime analysis: %{{.*}} = ref_element_addr %0
+// CHECK: bb0: LiveWithin
+// CHECK: last user: end_access
+sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  %f = ref_element_addr %0 : $D, #D.object
+  debug_value [trace] %f : $*C
+  %access = begin_access [read] [static] %f : $*C
+  %o = load [copy] %access : $*C
+  end_access %access : $*C
+  destroy_value %o : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testDeadAddress
+// CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
+// CHECK: bb0: LiveWithin
+// CHECK: last user: %{{.*}} = ref_element_addr
+sil [ossa] @testDeadAddress : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  debug_value [trace] %0 : $D
+  %f = ref_element_addr %0 : $D, #D.object
   %99 = tuple()
   return %99 : $()
 }
