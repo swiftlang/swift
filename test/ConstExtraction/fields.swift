@@ -3,9 +3,9 @@
 // RUN: echo "[MyProto]" > %t/inputs/protocols.json
 
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/fields.swiftconstvalues -const-gather-protocols-file %t/inputs/protocols.json -primary-file %s
+// RUN: cat %t/fields.swiftconstvalues 2>&1 | %FileCheck %s
 
 // CHECK: [
-// CHECK-NEXT:
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "fields.Foo",
 // CHECK-NEXT:    "kind": "struct",
@@ -15,7 +15,7 @@
 // CHECK-NEXT:        "type": "Swift.String",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
-// CHECK-NEXT:        "value": "Hello, World"
+// CHECK-NEXT:        "value": "\"Hello, World\""
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "p5",
