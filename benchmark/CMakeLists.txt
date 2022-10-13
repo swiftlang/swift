@@ -199,6 +199,7 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
+    cxx-source/CxxVectorSum
     cxx-source/ReadAccessor
 )
 

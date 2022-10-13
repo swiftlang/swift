@@ -49,7 +49,7 @@ class GatherWritesVisitor : public AccessUseVisitor {
 
 public:
   GatherWritesVisitor(SmallVectorImpl<Operand *> &writes)
-      : AccessUseVisitor(AccessUseType::Overlapping,
+      : AccessUseVisitor(AccessUseType::Exact,
                          NestedAccessType::StopAtAccessBegin),
         writeAccumulator(writes) {}
 
@@ -338,12 +338,6 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     // First see if the write is a dead end block. In such a case, just skip it.
     if (deadEndBlocks.isDeadEnd(write->getParent())) {
       continue;
-    }
-    // A destroy_value will be a definite write only when the destroy is on the
-    // ownershipRoot
-    if (isa<DestroyValueInst>(write)) {
-      if (op->get() != ownershipRoot)
-        continue;
     }
 
     if (borrowLiveness.isWithinBoundary(write)) {
