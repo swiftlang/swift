@@ -1522,7 +1522,22 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     }
 
     case StmtConditionElement::CK_HasSymbol: {
-      llvm::report_fatal_error("Can't SILGen #_hasSymbol yet!");
+      auto info = elt.getHasSymbolInfo();
+      assert(!info->isInvalid());
+      auto expr = info->getSymbolExpr();
+      auto declRef = info->getReferencedDecl();
+      assert(declRef);
+
+      auto queryFunc = declRef.getDecl()->getHasSymbolQueryDecl();
+      SILFunction *silFn = SGM.getFunction(
+          SILDeclRef(queryFunc, SILDeclRef::Kind::Func), NotForDefinition);
+      SILValue fnRef = B.createFunctionRefFor(loc, silFn);
+      booleanTestValue = B.createApply(loc, fnRef, {}, {});
+      booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
+      booleanTestLoc = expr;
+
+      // FIXME: Add decl to list of decls that need a has symbol query
+      //        function to be emitted during IRGen.
       break;
     }
     }

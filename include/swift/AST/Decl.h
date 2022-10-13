@@ -2733,6 +2733,11 @@ public:
   /// 'func foo(Int) -> () -> Self?'.
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
+
+  /// Returns a synthesized declaration for a query function that provides
+  /// the boolean value for a `if #_hasSymbol(...)` condition. The interface
+  /// type of the function is `() -> Builtin.Int1`.
+  FuncDecl *getHasSymbolQueryDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
