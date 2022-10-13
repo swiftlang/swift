@@ -305,7 +305,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
         requestedByteCount: Int,
         allocation: UnsafeMutableRawPointer
       ) -> Int? {
-        if _fastPath(requestedByteCount <= 128) {
+        if _fastPath(requestedByteCount <= 256) {
           return requestedByteCount &+ 15 & ~15
         } else {
           _mallocSize(ofAllocation: allocation)
