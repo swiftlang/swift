@@ -20,6 +20,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
@@ -244,7 +245,7 @@ Dataflow::classifyInstruction(SILInstruction *instruction) {
                ? Classification::Barrier
                : Classification::Other;
   }
-  if (isDeinitBarrier(instruction)) {
+  if (isDeinitBarrier(instruction, nullptr)) {
     return Classification::Barrier;
   }
   return Classification::Other;

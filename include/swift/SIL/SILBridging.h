@@ -364,6 +364,7 @@ swift::SILDebugLocation SILInstruction_getLocation(BridgedInstruction inst);
 BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
 bool SILInstruction_mayRelease(BridgedInstruction inst);
 bool SILInstruction_hasUnspecifiedSideEffects(BridgedInstruction inst);
+bool swift_mayAccessPointer(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
 SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result);

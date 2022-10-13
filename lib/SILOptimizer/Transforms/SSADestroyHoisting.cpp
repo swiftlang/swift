@@ -97,9 +97,11 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
 using namespace swift;
@@ -339,7 +341,7 @@ DeinitBarriers::classifyInstruction(SILInstruction *inst) const {
   if (knownUses.storageUsers.contains(inst)) {
     return Classification::Barrier;
   }
-  if (!ignoreDeinitBarriers && isDeinitBarrier(inst)) {
+  if (!ignoreDeinitBarriers && isDeinitBarrier(inst, nullptr)) {
     return Classification::Barrier;
   }
   if (auto *eai = dyn_cast<EndAccessInst>(inst)) {

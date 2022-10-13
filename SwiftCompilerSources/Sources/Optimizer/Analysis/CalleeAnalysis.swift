@@ -16,6 +16,15 @@ import SIL
 public struct CalleeAnalysis {
   let bridged: BridgedCalleeAnalysis
 
+  static func register() {
+    CalleeAnalysis_register(
+      // isDeinitBarrierFn:
+      { (inst : BridgedInstruction, bca: BridgedCalleeAnalysis) -> Bool in
+        return inst.instruction.isDeinitBarrier(bca.analysis)
+      }
+    )
+  }
+
   public func getCallees(callee: Value) -> FunctionArray? {
     let bridgedFuncs = CalleeAnalysis_getCallees(bridged, callee.bridged)
     if bridgedFuncs.incomplete != 0 {
@@ -45,6 +54,24 @@ public struct CalleeAnalysis {
   }
 }
 
+extension Instruction {
+  public final func maySynchronize(_ analysis: CalleeAnalysis) -> Bool {
+    if let site = self as? FullApplySite {
+      return true
+    }
+    return maySynchronizeNotConsideringSideEffects
+  }
+
+  /// Whether lifetime ends of lexical values may safely be hoisted over this
+  /// instruction.
+  ///
+  /// Deinitialization barriers constrain variable lifetimes. Lexical
+  /// end_borrow, destroy_value, and destroy_addr cannot be hoisted above them.
+  public final func isDeinitBarrier(_ analysis: CalleeAnalysis) -> Bool {
+    return mayAccessPointer || mayLoadWeakOrUnowned || maySynchronize(analysis)
+  }
+}
+
 public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let bridged: BridgedCalleeList
 
@@ -55,3 +82,9 @@ public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
     return BridgedFunctionArray_get(bridged, index).function
   }
 }
+// Bridging utilities
+
+extension BridgedCalleeAnalysis {
+  public var analysis: CalleeAnalysis { .init(bridged: self) }
+}
+

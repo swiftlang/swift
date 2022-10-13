@@ -649,12 +649,6 @@ public:
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;
 
-  /// Involves a synchronization point like a memory barrier, lock or syscall.
-  ///
-  /// TODO: We need side-effect analysis and library annotation for this to be
-  ///       a reasonable API.  For now, this is just a placeholder.
-  bool maySynchronize() const;
-
   /// Returns true if the given instruction is completely identical to RHS.
   bool isIdenticalTo(const SILInstruction *RHS) const {
     return isIdenticalTo(RHS,
