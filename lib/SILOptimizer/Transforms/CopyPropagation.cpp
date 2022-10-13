@@ -43,6 +43,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -440,6 +441,7 @@ void CopyPropagation::run() {
   CanonicalizeOSSALifetime canonicalizer(
       pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
       accessBlockAnalysis, domTree, deleter);
+  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
 
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
@@ -453,7 +455,8 @@ void CopyPropagation::run() {
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
-      auto shrunk = shrinkBorrowScope(*bbi, deleter, modifiedCopyValueInsts);
+      auto shrunk = shrinkBorrowScope(*bbi, deleter, calleeAnalysis,
+                                      modifiedCopyValueInsts);
       for (auto *cvi : modifiedCopyValueInsts)
         defWorklist.updateForCopy(cvi);
       changed |= shrunk;

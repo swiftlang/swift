@@ -62,13 +62,16 @@ struct Context final {
 
   InstructionDeleter &deleter;
 
+  BasicCalleeAnalysis *calleeAnalysis;
+
   Context(BeginBorrowInst const &introducer,
           SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts,
-          InstructionDeleter &deleter)
+          InstructionDeleter &deleter, BasicCalleeAnalysis *calleeAnalysis)
       : introducer(introducer), borrowedValue(BorrowedValue(&introducer)),
         borrowee(introducer.getOperand()), defBlock(introducer.getParent()),
         function(*introducer.getFunction()),
-        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter) {}
+        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter),
+        calleeAnalysis(calleeAnalysis) {}
   Context(Context const &) = delete;
   Context &operator=(Context const &) = delete;
 };
@@ -245,7 +248,7 @@ Dataflow::classifyInstruction(SILInstruction *instruction) {
                ? Classification::Barrier
                : Classification::Other;
   }
-  if (isDeinitBarrier(instruction, nullptr)) {
+  if (isDeinitBarrier(instruction, context.calleeAnalysis)) {
     return Classification::Barrier;
   }
   return Classification::Other;
@@ -450,7 +453,9 @@ bool run(Context &context) {
 
 bool swift::shrinkBorrowScope(
     BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    BasicCalleeAnalysis *calleeAnalysis,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts) {
-  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter);
+  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter,
+                                     calleeAnalysis);
   return ShrinkBorrowScope::run(context);
 }
