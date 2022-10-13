@@ -81,14 +81,9 @@ using FutureAsyncSignature =
 ///
 /// This has no effect if the task already has at least the given priority.
 /// Returns the priority of the task.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-JobPriority
-swift_task_escalateBackdeploy56(AsyncTask *task, JobPriority newPriority);
-
-/// Return the current thread's active task reference.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTask *swift_task_getCurrent(void);
-
+SWIFT_CC(swift)
+JobPriority swift_task_escalateBackdeploy56(AsyncTask *task,
+                                            JobPriority newPriority);
 } // namespace swift
 
 #pragma clang diagnostic pop
