@@ -6,6 +6,7 @@ var lhs = LoadableIntWrapper(value: 42)
 let rhs = LoadableIntWrapper(value: 23)
 
 let resultPlus = lhs - rhs
+lhs += rhs
 let resultCall0 = lhs()
 let resultCall1 = lhs(1)
 let resultCall2 = lhs(1, 2)
