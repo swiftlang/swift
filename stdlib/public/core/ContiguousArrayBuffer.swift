@@ -308,7 +308,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
         if _fastPath(requestedByteCount <= 256) {
           return requestedByteCount &+ 15 & ~15
         } else {
-          _mallocSize(ofAllocation: allocation)
+          return _mallocSize(ofAllocation: allocation)
         }
       }
       
