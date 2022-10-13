@@ -54,10 +54,19 @@ public struct CalleeAnalysis {
   }
 }
 
+extension FullApplySite {
+  fileprivate func isBarrier(_ analysis: CalleeAnalysis) -> Bool {
+    guard let callees = analysis.getCallees(callee: callee) else {
+      return true
+    }
+    return callees.contains { $0.isDeinitBarrier }
+  }
+}
+
 extension Instruction {
   public final func maySynchronize(_ analysis: CalleeAnalysis) -> Bool {
     if let site = self as? FullApplySite {
-      return true
+      return site.isBarrier(analysis)
     }
     return maySynchronizeNotConsideringSideEffects
   }
