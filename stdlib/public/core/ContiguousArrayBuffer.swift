@@ -300,7 +300,22 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
          realMinimumCapacity._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      if let allocSize = _mallocSize(ofAllocation: storageAddr) {
+      
+      func _mallocSizeShim(
+        requestedByteCount: Int,
+        allocation: UnsafeMutableRawPointer
+      ) -> Int? {
+        if _fastPath(requestedByteCount <= 128) {
+          return requestedByteCount &+ 15 & ~15
+        } else {
+          _mallocSize(ofAllocation: allocation)
+        }
+      }
+      
+      if let allocSize = _mallocSizeShim(
+        requestedByteCount: realMinimumCapacity,
+        allocation: storageAddr
+      ) {
         let endAddr = storageAddr + allocSize
         let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
         _initStorageHeader(
