@@ -160,7 +160,8 @@ MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
 
 bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
                                       SILFunction &function,
-                                      InstructionDeleter &deleter);
+                                      InstructionDeleter &deleter,
+                                      BasicCalleeAnalysis *calleeAnalysis);
 
 } // namespace swift
 

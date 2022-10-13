@@ -476,7 +476,8 @@ void CopyPropagation::run() {
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
-      auto hoisted = hoistDestroysOfOwnedLexicalValue(folded, *f, deleter);
+      auto hoisted =
+          hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
       firstRun = false;
@@ -484,7 +485,7 @@ void CopyPropagation::run() {
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
-      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter);
+      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter, calleeAnalysis);
     }
   }
   deleter.cleanupDeadInstructions();

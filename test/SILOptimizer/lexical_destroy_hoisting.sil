@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift
@@ -7,6 +9,7 @@ import Swift
 // = DECLARATIONS                                                             {{
 // =============================================================================
 
+class X {}
 class C {
     weak var d: D?
 }
@@ -36,6 +39,11 @@ sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Option
 sil [ossa] @synchronization_point : $@convention(thin) () -> ()
 sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
 sil [ossa] @barrier : $@convention(thin) () -> ()
+// This function is not a synchronization point.
+sil [ossa] @empty : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
 
 
 // =============================================================================
@@ -469,6 +477,20 @@ bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
   %copy = copy_value %cast : $Optional<@callee_guaranteed () -> ()>
   destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
   return %copy : $Optional<@callee_guaranteed () -> ()>
+}
+
+// Hoist over applies of non-barrier fns.
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {
+// CHECK:         destroy_value
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_of_non_barrier_fn'
+sil [ossa] @hoist_over_apply_of_non_barrier_fn : $@convention(thin) (@owned X) -> () {
+entry(%instance : @owned $X):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_value %instance : $X
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // =============================================================================
