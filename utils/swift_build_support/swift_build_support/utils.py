@@ -98,7 +98,20 @@ def log_analyzer():
             print(event_row.format(duration_percentage,
                                    build_event["duration"],
                                    build_event["command"]))
-        print("Total Duration: {}".format(total_duration))
+
+        hours, remainder = divmod(total_duration, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        if hours > 0:
+            formatted_duration = " ({}h {}m {}s)".format(
+                int(hours), int(minutes), int(seconds))
+        elif minutes > 0:
+            formatted_duration = " ({}m {}s)".format(int(minutes), int(seconds))
+        else:
+            formatted_duration = ""
+
+        print("Total Duration: {:.2f} seconds".format(
+            total_duration) + formatted_duration)
     else:
         print("Skip build script analyzer")
         print(".build_script_log file not found at {}".format(build_script_log_path))
