@@ -107,3 +107,19 @@ entry(%0 : @owned $X):
   %res = apply %callee_debug_value(%0) : $@convention(thin) (@owned X) -> @owned X
   return %res : $X
 }
+
+// CHECK-LABEL: sil [ossa] @caller_test_specification : {{.*}} {
+// CHECK:         test_specification "foo bar baz"
+// CHECK-LABEL: } // end sil function 'caller_test_specification'
+sil [always_inline] [ossa] @callee_test_specification : $@convention(thin) () -> () {
+entry:
+  test_specification "foo bar baz"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @caller_test_specification : $@convention(thin) () -> () {
+  %callee = function_ref @callee_test_specification : $@convention(thin) () -> ()
+  %retval = apply %callee() : $@convention(thin) () -> ()
+  return %retval : $()
+}

@@ -110,6 +110,8 @@ void OSSALifetimeAnalysis::run() {
     for (auto &block : function) {
       for (SILInstruction *inst : deleter.updatingRange(&block)) {
         if (auto *debugValue = dyn_cast<DebugValueInst>(inst)) {
+          if (!debugValue->hasTrace())
+            continue;
           traceValues.push_back(debugValue->getOperand());
           deleter.forceDelete(debugValue);
         }

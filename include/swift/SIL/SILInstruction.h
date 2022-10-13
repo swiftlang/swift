@@ -4933,6 +4933,32 @@ public:
   }
 };
 
+class TestSpecificationInst final
+    : public InstructionBase<SILInstructionKind::TestSpecificationInst,
+                             NonValueInstruction>,
+      private llvm::TrailingObjects<TestSpecificationInst, char> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+  unsigned ArgumentsSpecificationLength;
+
+  TestSpecificationInst(SILDebugLocation Loc,
+                        unsigned ArgumentsSpecificationLength)
+      : InstructionBase(Loc),
+        ArgumentsSpecificationLength(ArgumentsSpecificationLength) {}
+
+  static TestSpecificationInst *
+  create(SILDebugLocation Loc, StringRef argumentsSpecification, SILModule &M);
+
+public:
+  StringRef getArgumentsSpecification() const {
+    return StringRef(getTrailingObjects<char>(), ArgumentsSpecificationLength);
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+};
+
 /// An abstract class representing a load from some kind of reference storage.
 template <SILInstructionKind K>
 class LoadReferenceInstBase
