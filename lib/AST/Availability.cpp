@@ -576,6 +576,10 @@ AvailabilityContext ASTContext::getSwift57Availability() {
   }
 }
 
+AvailabilityContext ASTContext::getSwift58Availability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
 
@@ -605,6 +609,7 @@ ASTContext::getSwift5PlusAvailability(llvm::VersionTuple swiftVersion) {
     case 5: return getSwift55Availability();
     case 6: return getSwift56Availability();
     case 7: return getSwift57Availability();
+    case 8: return getSwift58Availability();
     default: break;
     }
   }
