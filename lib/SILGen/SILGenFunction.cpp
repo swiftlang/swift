@@ -1146,18 +1146,11 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   emitEpilog(loc);
 }
 
-static SILLocation getLocation(ASTNode Node) {
-  if (auto *E = Node.dyn_cast<Expr *>())
-    return E;
-  else if (auto *S = Node.dyn_cast<Stmt *>())
-    return S;
-  else if (auto *D = Node.dyn_cast<Decl *>())
-    return D;
-  else
-    llvm_unreachable("unsupported ASTNode");
+void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
+  emitProfilerIncrement(ProfileCounterRef::node(Node));
 }
 
-void SILGenFunction::emitProfilerIncrement(ASTNode N) {
+void SILGenFunction::emitProfilerIncrement(ProfileCounterRef Ref) {
   // Ignore functions which aren't set up for instrumentation.
   SILProfiler *SP = F.getProfiler();
   if (!SP)
@@ -1166,7 +1159,7 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
     return;
 
   const auto &RegionCounterMap = SP->getRegionCounterMap();
-  auto CounterIt = RegionCounterMap.find(N);
+  auto CounterIt = RegionCounterMap.find(Ref);
 
   assert(CounterIt != RegionCounterMap.end() &&
          "cannot increment non-existent counter");
@@ -1177,7 +1170,7 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
     return;
 
   B.createIncrementProfilerCounter(
-      getLocation(N), CounterIt->second, SP->getPGOFuncName(),
+      Ref.getLocation(), CounterIt->second, SP->getPGOFuncName(),
       SP->getNumRegionCounters(), SP->getPGOFuncHash());
 }
 
