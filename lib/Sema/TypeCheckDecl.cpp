@@ -811,22 +811,6 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (!cls)
     return false;
 
-  // Objective-C doesn't have a way to prevent overriding, so if this member
-  // is accessible from ObjC and it's possible to subclass its parent from ObjC,
-  // `final` doesn't make sense even when inferred.
-  //
-  // FIXME: This is technically true iff `!cls->hasKnownSwiftImplementation()`,
-  //        but modeling that would be source-breaking, so instead we only
-  //        enforce it in `@_objcImplementation extension`s.
-  if (auto ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
-    if (ext->isObjCImplementation() && decl->isObjC()) {
-      if (explicitFinalAttr)
-        diagnoseAndRemoveAttr(decl, explicitFinalAttr,
-                              diag::attr_objc_implementation_no_objc_final,
-                              decl->getDescriptiveKind(), decl, cls);
-      return false;
-    }
-
   switch (decl->getKind()) {
     case DeclKind::Var: {
       // Properties are final if they are declared 'static' or a 'let'
@@ -854,6 +838,12 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           return true;
 
         if (VD->isLet()) {
+          // If this `let` is in an `@_objcImplementation extension`, don't
+          // infer `final` unless it is written explicitly.
+          auto ed = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+          if (!explicitFinalAttr && ed && ed->isObjCImplementation())
+            return false;
+
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
@@ -974,6 +964,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return true;
   }
 
+  // @_objcImplementation extension member implementations are implicitly
+  // dynamic.
+  if (decl->isObjCMemberImplementation())
+    return true;
+
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     // Runtime-replaceable accessors are dynamic when their storage declaration
     // is dynamic and they were explicitly defined or they are implicitly defined
@@ -1004,12 +999,6 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto dc = decl->getDeclContext();
   if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl())
     return true;
-
-  // @objc declarations in @_objcImplementation extensions are implicitly
-  // dynamic.
-  if (auto ED = dyn_cast_or_null<ExtensionDecl>(dc->getAsDecl()))
-    if (ED->isObjCImplementation())
-      return true;
 
   // If any of the declarations overridden by this declaration are dynamic
   // or were imported from Objective-C, this declaration is dynamic.
