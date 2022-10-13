@@ -437,7 +437,7 @@ ASTContext::getParameterizedExistentialRuntimeAvailability() {
 
 AvailabilityContext
 ASTContext::getReflectableCastRuntimeAvailability() {
-  return getSwift57Availability();
+  return getSwift58Availability();
 }
 
 AvailabilityContext
