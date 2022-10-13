@@ -1684,7 +1684,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::interleave(
         genericParams,
         [&](GenericTypeParamType *param) {
-          if (param->isTypeSequence())
+          if (param->isParameterPack())
             Printer.printAttrName("@_typeSequence ");
 
           if (!subMap.empty()) {
@@ -3502,7 +3502,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
-    if (decl->isTypeSequence())
+    if (decl->isParameterPack())
       Printer.printAttrName("@_typeSequence ");
     Printer.printName(decl->getName(), PrintNameContext::GenericParameter);
   });
@@ -4585,9 +4585,6 @@ void PrintAST::visitTupleExpr(TupleExpr *expr) {
 }
 
 void PrintAST::visitPackExpr(PackExpr *expr) {
-}
-
-void PrintAST::visitReifyPackExpr(ReifyPackExpr *expr) {
 }
 
 void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
@@ -6490,7 +6487,7 @@ public:
     }
   }
 
-  void visitSequenceArchetypeType(SequenceArchetypeType *T) {
+  void visitPackArchetypeType(PackArchetypeType *T) {
     printArchetypeCommon(T);
   }
 

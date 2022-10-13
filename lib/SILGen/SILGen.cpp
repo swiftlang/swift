@@ -554,10 +554,10 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   if (fn) return fn;
 
   auto rootType =
-      CanGenericTypeParamType::get(/*type sequence*/ false,
+      CanGenericTypeParamType::get(/*isParameterPack*/ false,
                                    /*depth*/ 0, /*index*/ 0, getASTContext());
   auto valueType =
-      CanGenericTypeParamType::get(/*type sequence*/ false,
+      CanGenericTypeParamType::get(/*isParameterPack*/ false,
                                    /*depth*/ 0, /*index*/ 1, getASTContext());
 
   // Build the generic signature <A, B>.

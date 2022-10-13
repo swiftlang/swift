@@ -1186,7 +1186,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     SmallVector<TupleTypeElt, 4> genericElements;
     SmallVector<Requirement, 4> conditionalRequirements;
     for (const auto &elt : tupleType->getElements()) {
-      auto genericParam = GenericTypeParamType::get(/*type sequence*/ false, 0,
+      auto genericParam = GenericTypeParamType::get(/*isParameterPack*/ false, 0,
                                                     genericParams.size(), ctx);
       genericParams.push_back(genericParam);
       typeSubstitutions.push_back(elt.getType());

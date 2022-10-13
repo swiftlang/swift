@@ -1641,7 +1641,7 @@ namespace {
                         bgt->getDecl()->getName(), typeVars.size(),
                         specializations.size(),
                         /*too many arguments*/ false,
-                        /*type sequence?*/ false)
+                        /*isParameterPack?*/ false)
                 .highlight(
                     SourceRange(expr->getLAngleLoc(), expr->getRAngleLoc()));
             de.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,

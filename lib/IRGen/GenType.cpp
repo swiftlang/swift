@@ -2164,7 +2164,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::SequenceArchetype:
+  case TypeKind::PackArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:
@@ -2636,7 +2636,7 @@ void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   auto primary = arch->getRoot();
   if (!isa<PrimaryArchetypeType>(primary) &&
-      !isa<SequenceArchetypeType>(primary))
+      !isa<PackArchetypeType>(primary))
     return true;
   auto genericEnv = primary->getGenericEnvironment();
 

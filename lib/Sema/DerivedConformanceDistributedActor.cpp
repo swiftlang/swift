@@ -215,7 +215,7 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
   // We create the generic param at invalid depth, which means it'll be filled
   // by semantic analysis.
   auto resultGenericParamDecl = GenericTypeParamDecl::create(
-      parentFunc, C.getIdentifier("R"), sloc, /*isTypeSequence=*/false,
+      parentFunc, C.getIdentifier("R"), sloc, /*isParameterPack=*/false,
       /*depth=*/0, /*index=*/0,
       /*isOpaqueType=*/false,
       /*opaqueTypeRepr=*/nullptr);

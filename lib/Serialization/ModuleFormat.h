@@ -1047,7 +1047,7 @@ namespace decls_block {
 
   TYPE_LAYOUT(GenericTypeParamTypeLayout,
     GENERIC_TYPE_PARAM_TYPE,
-    BCFixed<1>,  // type sequence?
+    BCFixed<1>,  // parameter pack?
     DeclIDField, // generic type parameter decl or depth
     BCVBR<4> // index + 1, or zero if we have a generic type
             // parameter decl
@@ -1138,8 +1138,8 @@ namespace decls_block {
     SubstitutionMapIDField // the arguments
   );
 
-  TYPE_LAYOUT(SequenceArchetypeTypeLayout,
-    SEQUENCE_ARCHETYPE_TYPE,
+  TYPE_LAYOUT(PackArchetypeTypeLayout,
+    PACK_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
     TypeIDField              // interface type
   );
@@ -1273,7 +1273,7 @@ namespace decls_block {
   using GenericTypeParamDeclLayout = BCRecordLayout<GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField, // name
     BCFixed<1>,        // implicit flag
-    BCFixed<1>,        // type sequence?
+    BCFixed<1>,        // parameter pack?
     BCVBR<4>,          // depth
     BCVBR<4>,          // index
     BCFixed<1>         // opaque type?

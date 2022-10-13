@@ -201,7 +201,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::SequenceArchetype:
+  case TypeKind::PackArchetype:
     return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
@@ -582,21 +582,21 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
   return transformFn(type);
 }
 
-void TypeBase::getTypeSequenceParameters(
-    SmallVectorImpl<Type> &rootTypeSequenceParams) const {
+void TypeBase::getTypeParameterPacks(
+    SmallVectorImpl<Type> &rootParameterPacks) const {
   llvm::SmallDenseSet<CanType, 2> visited;
 
   auto recordType = [&](Type t) {
     if (visited.insert(t->getCanonicalType()).second)
-      rootTypeSequenceParams.push_back(t);
+      rootParameterPacks.push_back(t);
   };
 
   Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
     if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-      if (paramTy->isTypeSequence()) {
+      if (paramTy->isParameterPack()) {
         recordType(paramTy);
       }
-    } else if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+    } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
       if (archetypeTy->isRoot()) {
         recordType(t);
       }
@@ -1655,7 +1655,7 @@ CanType TypeBase::computeCanonicalType() {
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
     Result =
-        GenericTypeParamType::get(gpDecl->isTypeSequence(), gpDecl->getDepth(),
+        GenericTypeParamType::get(gpDecl->isParameterPack(), gpDecl->getDepth(),
                                   gpDecl->getIndex(), gpDecl->getASTContext());
     break;
   }
@@ -1966,9 +1966,9 @@ unsigned GenericTypeParamType::getIndex() const {
   return fixedNum & 0xFFFF;
 }
 
-bool GenericTypeParamType::isTypeSequence() const {
+bool GenericTypeParamType::isParameterPack() const {
   if (auto param = getDecl()) {
-    return param->isTypeSequence();
+    return param->isParameterPack();
   }
 
   auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
@@ -3582,14 +3582,14 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
 {
 }
 
-SequenceArchetypeType::SequenceArchetypeType(
+PackArchetypeType::PackArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout)
-    : ArchetypeType(TypeKind::SequenceArchetype, Ctx,
+    : ArchetypeType(TypeKind::PackArchetype, Ctx,
                     RecursiveTypeProperties::HasArchetype, InterfaceType,
                     ConformsTo, Superclass, Layout, GenericEnv) {
-  assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isTypeSequence());
+  assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isParameterPack());
 }
 
 CanType OpaqueTypeArchetypeType::getCanonicalInterfaceType(Type interfaceType) {
@@ -3961,8 +3961,8 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
-CanSequenceArchetypeType
-SequenceArchetypeType::get(const ASTContext &Ctx,
+CanPackArchetypeType
+PackArchetypeType::get(const ASTContext &Ctx,
                            GenericEnvironment *GenericEnv,
                            Type InterfaceType,
                            SmallVectorImpl<ProtocolDecl *> &ConformsTo,
@@ -3975,12 +3975,12 @@ SequenceArchetypeType::get(const ASTContext &Ctx,
 
   auto arena = AllocationArena::Permanent;
   void *mem =
-      Ctx.Allocate(SequenceArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type,
-                                                           LayoutConstraint>(
+      Ctx.Allocate(PackArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type,
+                                                       LayoutConstraint>(
                        ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
-                   alignof(SequenceArchetypeType), arena);
+                   alignof(PackArchetypeType), arena);
 
-  return CanSequenceArchetypeType(::new (mem) SequenceArchetypeType(
+  return CanPackArchetypeType(::new (mem) PackArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -5138,7 +5138,7 @@ case TypeKind::Id:
 #include "swift/AST/TypeNodes.def"
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::SequenceArchetype:
+  case TypeKind::PackArchetype:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
@@ -5594,8 +5594,8 @@ case TypeKind::Id:
         }
 
         if (input->is<TypeVariableType>() ||
-            input->isTypeSequenceParameter() ||
-            input->is<SequenceArchetypeType>()) {
+            input->isParameterPack() ||
+            input->is<PackArchetypeType>()) {
           if (auto *PT = (*remap)->getAs<PackType>()) {
             maxArity = std::max(maxArity, PT->getNumElements());
             cache.insert({input, PT});
@@ -6116,7 +6116,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::SequenceArchetype: {
+  case TypeKind::PackArchetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;

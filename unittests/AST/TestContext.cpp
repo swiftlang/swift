@@ -25,7 +25,7 @@ static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
   auto wrapped = GenericTypeParamDecl::create(fileForLookups,
                                               ctx.getIdentifier("Wrapped"),
                                               SourceLoc(),
-                                              /*type sequence*/ false,
+                                              /*isParameterPack*/ false,
                                               /*depth*/0, /*index*/0,
                                               /*opaque type*/false, nullptr);
   auto params = GenericParamList::create(ctx, SourceLoc(), wrapped,

@@ -2871,7 +2871,7 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
    
       // Allocate a new generic parameter to represent this opaque type.
       auto gp = GenericTypeParamDecl::create(
-          dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
+          dc, Identifier(), SourceLoc(), /*isParameterPack=*/false,
           GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
           repr);
       gp->setImplicit();
@@ -2904,7 +2904,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
     auto *genericParam = GenericTypeParamDecl::create(
         tupleDecl->getDeclContext(), ctx.Id_Elements, SourceLoc(),
-        /*isTypeSequence=*/true, /*depth=*/0, /*depth=*/0,
+        /*isParameterPack=*/true, /*depth=*/0, /*depth=*/0,
         /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
 
     return GenericParamList::create(ctx, SourceLoc(), genericParam,
@@ -2946,7 +2946,7 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
     auto selfDecl = GenericTypeParamDecl::create(
-        proto, selfId, SourceLoc(), /*type sequence=*/false,
+        proto, selfId, SourceLoc(), /*isParameterPack=*/false,
         /*depth=*/0, /*index=*/0, /*opaque type=*/false,
         /*opaque type repr=*/nullptr);
     auto protoType = proto->getDeclaredInterfaceType();

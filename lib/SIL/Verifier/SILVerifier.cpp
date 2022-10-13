@@ -90,7 +90,7 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (!isa<PrimaryArchetypeType>(A) && !isa<SequenceArchetypeType>(A))
+  if (!isa<PrimaryArchetypeType>(A) && !isa<PackArchetypeType>(A))
     return true;
   if (isa<OpenedArchetypeType>(A))
     return true;

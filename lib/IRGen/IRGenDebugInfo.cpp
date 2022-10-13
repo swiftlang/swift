@@ -871,7 +871,7 @@ private:
           return true;
         }
 
-        if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+        if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
           Sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
           return true;
         }
@@ -1553,7 +1553,7 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::SequenceArchetype: {
+    case TypeKind::PackArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
       if (auto depMemTy = Archetype->getInterfaceType()
