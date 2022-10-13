@@ -136,14 +136,12 @@ InnerBorrowKind PrunedLiveness::updateForBorrowingOperand(Operand *operand) {
 AddressUseKind PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
   assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
 
-  if (auto *svi = dyn_cast<SingleValueInstruction>(operand->getUser())) {
-    if (auto scopedAddress = ScopedAddressValue(svi)) {
-      scopedAddress.visitScopeEndingUses([this](Operand *end) {
-        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-        return true;
-      });
-      return AddressUseKind::NonEscaping;
-    }
+  if (auto scopedAddress = ScopedAddressValue::forUse(operand)) {
+    scopedAddress.visitScopeEndingUses([this](Operand *end) {
+      updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+      return true;
+    });
+    return AddressUseKind::NonEscaping;
   }
   // FIXME: findTransitiveUses should be a visitor so we're not recursively
   // allocating use vectors and potentially merging the use points.
@@ -151,6 +149,10 @@ AddressUseKind PrunedLiveness::checkAndUpdateInteriorPointer(Operand *operand) {
   auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
   for (auto *use : uses) {
     updateForUse(use->getUser(), /*lifetimeEnding*/ false);
+  }
+  if (uses.empty()) {
+    // Handle a dead address
+    updateForUse(operand->getUser(), /*lifetimeEnding*/ false);
   }
   return useKind;
 }
@@ -301,6 +303,16 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
         }
         return true;
       });
+      break;
+    }
+    case OperandOwnership::TrivialUse: {
+      if (auto scopedAddress = ScopedAddressValue::forUse(use)) {
+        scopedAddress.visitScopeEndingUses([this](Operand *end) {
+          updateForUse(end->getUser(), /*lifetimeEnding*/false);
+          return true;
+        });
+      }
+      updateForUse(use->getUser(), /*lifetimeEnding*/false);
       break;
     }
     default:
