@@ -144,10 +144,10 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
          locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
-bool TypeVariableType::Implementation::isTypeSequence() const {
+bool TypeVariableType::Implementation::isParameterPack() const {
   return locator
       && locator->isForGenericParameter()
-      && locator->getGenericParameter()->isTypeSequence();
+      && locator->getGenericParameter()->isParameterPack();
 }
 
 bool TypeVariableType::Implementation::isCodeCompletionToken() const {

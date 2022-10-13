@@ -103,10 +103,10 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // We always create generic type parameters with an invalid depth.
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
-    const bool isTypeSequence =
+    const bool isParameterPack =
         attributes.getAttribute<TypeSequenceAttr>() != nullptr;
     auto Param = GenericTypeParamDecl::create(
-        CurDeclContext, Name, NameLoc, isTypeSequence,
+        CurDeclContext, Name, NameLoc, isParameterPack,
         GenericTypeParamDecl::InvalidDepth, GenericParams.size(),
         /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
     if (!Inherited.empty())

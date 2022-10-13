@@ -2239,14 +2239,14 @@ static Type validateParameterType(ParamDecl *decl) {
                                      PlaceholderType::get);
     Ty = resolution.resolveType(patternRepr);
 
-    // Find the first type sequence parameter and use that as the count type.
-    SmallVector<Type, 2> rootTypeSequenceParams;
-    Ty->getTypeSequenceParameters(rootTypeSequenceParams);
+    // Find the first type parameter pack and use that as the count type.
+    SmallVector<Type, 2> rootParameterPacks;
+    Ty->getTypeParameterPacks(rootParameterPacks);
 
     // Handle the monovariadic/polyvariadic interface type split.
-    if (!rootTypeSequenceParams.empty()) {
+    if (!rootParameterPacks.empty()) {
       // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty, rootTypeSequenceParams[0]);
+      Ty = PackExpansionType::get(Ty, rootParameterPacks[0]);
     } else {
       // Monovariadic types (T...) for <T> resolve to [T].
       Ty = VariadicSequenceType::get(Ty);

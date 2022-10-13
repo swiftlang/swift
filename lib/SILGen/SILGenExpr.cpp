@@ -446,7 +446,6 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
-    RValue visitReifyPackExpr(ReifyPackExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
@@ -1446,7 +1445,7 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::get(/*type sequence*/ false,
+  auto nativeType = Type(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                    /*depth*/ 0, /*index*/ 0,
                                                    SGF.getASTContext()))
                         .subst(subs);
@@ -1511,11 +1510,6 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
   auto result = SGF.emitNativeToBridgedValue(E, mv, origType, resultType,
                                              loweredResultTy, C);
   return RValue(SGF, E, result);
-}
-
-RValue
-RValueEmitter::visitReifyPackExpr(ReifyPackExpr *E, SGFContext C) {
-  llvm_unreachable("Unimplemented!");
 }
 
 RValue
@@ -3339,7 +3333,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
           formalTy,
-          GenericTypeParamType::get(/*type sequence*/ false,
+          GenericTypeParamType::get(/*isParameterPack*/ false,
                                     /*depth*/ 0, /*index*/ 0, C),
           equatableProtocol);
 

@@ -505,7 +505,7 @@ protected:
 
     Depth : 16,
     Index : 16,
-    TypeSequence : 1,
+    ParameterPack : 1,
 
     /// Whether this generic parameter represents an opaque type.
     IsOpaqueType : 1
@@ -3179,7 +3179,7 @@ class GenericTypeParamDecl final :
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isTypeSequence, unsigned depth, unsigned index,
+                       bool isParameterPack, unsigned depth, unsigned index,
                        bool isOpaqueType, TypeRepr *typeRepr);
 
 public:
@@ -3192,15 +3192,15 @@ public:
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isTypeSequence, unsigned depth, unsigned index)
-      : GenericTypeParamDecl(dc, name, nameLoc, isTypeSequence, depth, index,
+                       bool isParameterPack, unsigned depth, unsigned index)
+      : GenericTypeParamDecl(dc, name, nameLoc, isParameterPack, depth, index,
                              false, nullptr) { }
 
   static const unsigned InvalidDepth = 0xFFFF;
 
   static GenericTypeParamDecl *
   create(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-         bool isTypeSequence, unsigned depth, unsigned index,
+         bool isParameterPack, unsigned depth, unsigned index,
          bool isOpaqueType, TypeRepr *typeRepr);
 
   /// The depth of this generic type parameter, i.e., the number of outer
@@ -3224,13 +3224,13 @@ public:
   }
 
   /// Returns \c true if this generic type parameter is declared as a type
-  /// sequence.
+  /// parameter pack.
   ///
   /// \code
-  /// func foo<@_typeSequence T>(_ : T...) { }
-  /// struct Foo<@_typeSequence T> { }
+  /// func foo<T...>(_ : T...) { }
+  /// struct Foo<T...> { }
   /// \endcode
-  bool isTypeSequence() const { return Bits.GenericTypeParamDecl.TypeSequence; }
+  bool isParameterPack() const { return Bits.GenericTypeParamDecl.ParameterPack; }
 
   /// Determine whether this generic parameter represents an opaque type.
   ///
@@ -8238,7 +8238,7 @@ inline bool Decl::isSyntacticallyOverridable() const {
 }
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
-    : TypeSequence(d->isTypeSequence()), Depth(d->getDepth()),
+    : ParameterPack(d->isParameterPack()), Depth(d->getDepth()),
       Index(d->getIndex()) {}
 
 inline const GenericContext *Decl::getAsGenericContext() const {

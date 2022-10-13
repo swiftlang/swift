@@ -183,22 +183,22 @@ static bool arePackShapesEqual(PackType *lhs, PackType *rhs) {
   return true;
 }
 
-static bool isRootTypeSequenceParameter(Type t) {
+static bool isRootParameterPack(Type t) {
   if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-    return paramTy->isTypeSequence();
-  } else if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+    return paramTy->isParameterPack();
+  } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
     return archetypeTy->isRoot();
   }
 
   return false;
 }
 
-static bool isRootedInTypeSequenceParameter(Type t) {
-  if (auto *archetypeTy = t->getAs<SequenceArchetypeType>()) {
+static bool isRootedInParameterPack(Type t) {
+  if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
     return true;
   }
 
-  return t->getRootGenericParam()->isTypeSequence();
+  return t->getRootGenericParam()->isParameterPack();
 }
 
 namespace {
@@ -225,14 +225,14 @@ protected:
                             unsigned i) {
 
     // Get all pack parameters referenced from the pattern.
-    SmallVector<Type, 2> rootTypeSequenceParams;
-    origPatternType->getTypeSequenceParameters(rootTypeSequenceParams);
+    SmallVector<Type, 2> rootParameterPacks;
+    origPatternType->getTypeParameterPacks(rootParameterPacks);
 
     // Each pack parameter referenced from the pattern must be replaced
     // with a pack type, and all pack types must have the same shape as
     // the expanded count pack type.
     llvm::SmallDenseMap<Type, PackType *, 2> expandedPacks;
-    for (auto origParamType : rootTypeSequenceParams) {
+    for (auto origParamType : rootParameterPacks) {
       auto substParamType = origParamType.subst(subs, conformances, options);
 
       if (auto expandedParamType = substParamType->template getAs<PackType>()) {
@@ -243,7 +243,7 @@ protected:
             std::make_pair(origParamType->getCanonicalType(),
                            expandedParamType)).second;
         assert(inserted &&
-               "getTypeSequenceParameters() should not return duplicates");
+               "getTypeParameterPacks() should not return duplicates");
       } else {
         assert(false &&
                "TODO: Return an invalid conformance if this fails");
@@ -265,7 +265,7 @@ protected:
         auto substType = Type(type).subst(subs, conformances, options);
 
         // If the substituted type is a pack, project the jth element.
-        if (isRootTypeSequenceParameter(type)) {
+        if (isRootParameterPack(type)) {
           // FIXME: What if you have something like G<T...>... where G<> is
           // variadic?
           assert(substType->template is<PackType>() &&
@@ -285,7 +285,7 @@ protected:
         auto substConformance = conformances(origType, substType, proto);
 
         // If the substituted conformance is a pack, project the jth element.
-        if (isRootedInTypeSequenceParameter(origType)) {
+        if (isRootedInParameterPack(origType)) {
           return substConformance.getPack()->getPatternConformances()[j];
         }
 

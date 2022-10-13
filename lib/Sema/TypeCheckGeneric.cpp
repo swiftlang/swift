@@ -161,7 +161,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+      auto *paramType = GenericTypeParamType::get(/*isParameterPack*/ false,
                                                   opaqueSignatureDepth, i, ctx);
       genericParamTypes.push_back(paramType);
     

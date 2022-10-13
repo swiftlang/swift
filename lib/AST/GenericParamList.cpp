@@ -74,7 +74,7 @@ GenericParamList::clone(DeclContext *dc) const {
   SmallVector<GenericTypeParamDecl *, 2> params;
   for (auto param : getParams()) {
     auto *newParam = GenericTypeParamDecl::create(
-        dc, param->getName(), SourceLoc(), param->isTypeSequence(),
+        dc, param->getName(), SourceLoc(), param->isParameterPack(),
         GenericTypeParamDecl::InvalidDepth, param->getIndex(),
         param->isOpaqueType(), param->getOpaqueTypeRepr());
     newParam->setImplicit(true);

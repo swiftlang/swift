@@ -1519,7 +1519,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                        /*depth*/ 0, /*index*/ 0,
                                                        SGF.getASTContext()),
                              MetatypeRepresentation::Thick))
@@ -1545,7 +1545,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
           .build();
   auto genericSig = subs.getGenericSignature().getCanonicalSignature();
   auto genericResult =
-      GenericTypeParamType::get(/*type sequence*/ false,
+      GenericTypeParamType::get(/*isParameterPack*/ false,
                                 /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
   // <T> () async throws -> T
   CanType functionTy =
@@ -1577,7 +1577,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                        /*depth*/ 0, /*index*/ 0,
                                                        SGF.getASTContext()),
                              MetatypeRepresentation::Thick))

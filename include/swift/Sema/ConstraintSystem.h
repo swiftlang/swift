@@ -472,7 +472,9 @@ public:
   /// Determine whether this type variable represents a subscript result type.
   bool isSubscriptResultType() const;
 
-  bool isTypeSequence() const;
+  /// Determine whether this type variable represents an opened
+  /// type parameter pack.
+  bool isParameterPack() const;
 
   /// Determine whether this type variable represents a code completion
   /// expression.

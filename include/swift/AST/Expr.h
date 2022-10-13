@@ -3399,18 +3399,6 @@ public:
   }
 };
 
-/// ReifyPackExpr - Drop the pack structure and reify it either as a tuple or
-/// single value.
-class ReifyPackExpr : public ImplicitConversionExpr {
-public:
-  ReifyPackExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ReifyPack, subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ReifyPack;
-  }
-};
-
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -5926,8 +5914,7 @@ public:
 ///
 /// There is no user-visible way to spell a pack expression, they are always
 /// implicitly created at applies. As such, any appearance of pack types outside
-/// of applies are illegal. In general, packs appearing in such positions should
-/// have a \c ReifyPackExpr to convert them to a user-available AST type.
+/// of applies are illegal.
 class PackExpr final : public Expr,
     private llvm::TrailingObjects<PackExpr, Expr *> {
   friend TrailingObjects;
