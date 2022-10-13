@@ -537,7 +537,6 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
-  emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
 
@@ -547,7 +546,9 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   } else {
     prepareEpilog(fd->getResultInterfaceType(),
                   fd->hasThrows(), CleanupLocation(fd));
-    
+
+    emitProfilerIncrement(fd->getTypecheckedBody());
+
     // Emit the actual function body as usual
     emitStmt(fd->getTypecheckedBody());
 
@@ -564,12 +565,12 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
-  emitProfilerIncrement(ace);
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
              SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace)));
   prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
 
+  emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
   } else {
@@ -1169,6 +1170,11 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
 
   assert(CounterIt != RegionCounterMap.end() &&
          "cannot increment non-existent counter");
+
+  // If we're at an unreachable point, the increment can be elided as the
+  // counter cannot be incremented.
+  if (!B.hasValidInsertionPoint())
+    return;
 
   B.createIncrementProfilerCounter(
       getLocation(N), CounterIt->second, SP->getPGOFuncName(),
