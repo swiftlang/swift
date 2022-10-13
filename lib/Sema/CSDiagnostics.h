@@ -2808,6 +2808,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an implicit conversion to Reflectable, which is not allowed
+/// because the compiler can't statically find all dynamic casts.
+///
+/// ```swift
+/// func cast<T, U>(_ x: U) -> T {
+///  return x as! T
+/// }
+/// let a = cast(1) as Reflectable
+/// let b: Reflectable = cast(1)
+/// ```
+class ImplicitReflectableConversion final : public FailureDiagnostic {
+
+public:
+  ImplicitReflectableConversion(const Solution &solution,
+                              ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

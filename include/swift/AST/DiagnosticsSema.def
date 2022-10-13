@@ -6651,5 +6651,9 @@ ERROR(reflectable_cast_only_version_newer, none,
       "%0 %1 or newer",
       (StringRef, llvm::VersionTuple))
 
+ERROR(implicit_reflectable_conversion,none,
+      "expression can't be implicitly converted to Reflectable; "
+      "use 'as? Reflectable' or 'as! Reflectable' instead", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

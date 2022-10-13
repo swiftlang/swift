@@ -2584,3 +2584,15 @@ RenameConflictingPatternVariables::create(ConstraintSystem &cs, Type expectedTy,
   return new (mem)
       RenameConflictingPatternVariables(cs, expectedTy, conflicts, locator);
 }
+
+bool ImplicitConversionToReflectable::diagnose(const Solution &solution,
+                                                       bool asNote) const {
+  ImplicitReflectableConversion failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+ImplicitConversionToReflectable *
+ImplicitConversionToReflectable::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ImplicitConversionToReflectable(cs, locator);
+}

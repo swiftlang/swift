@@ -82,12 +82,12 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   };
 
   if (auto *protocol = dyn_cast_or_null<ProtocolDecl>(targetType->getAnyNominal())) {
-      if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
-        auto call = 
-        IGF.Builder.CreateCall(IGF.IGM.getReflectableCastFunctionPointer(), args);
-        call->setDoesNotThrow();
-        return call;
-      }
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+      auto call =
+      IGF.Builder.CreateCall(IGF.IGM.getReflectableCastFunctionPointer(), args);
+      call->setDoesNotThrow();
+      return call;
+    }
   }
 
   auto call =

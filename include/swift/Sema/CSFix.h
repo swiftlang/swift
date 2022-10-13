@@ -411,6 +411,9 @@ enum class FixKind : uint8_t {
   /// For example `.a(let x), .b(let x)` where `x` gets bound to different
   /// types.
   RenameConflictingPatternVariables,
+
+  /// Disallow implicit conversion to Reflectable
+  ImplicitConversionToReflectable,
 };
 
 class ConstraintFix {
@@ -3191,6 +3194,26 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::RenameConflictingPatternVariables;
+  }
+};
+
+class ImplicitConversionToReflectable final : public ConstraintFix {
+
+  ImplicitConversionToReflectable(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ImplicitConversionToReflectable, locator) {}
+
+public:
+  std::string getName() const override {
+    return "implicit conversion to Reflectable";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static ImplicitConversionToReflectable *create(ConstraintSystem &cs,
+                                                         ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ImplicitConversionToReflectable;
   }
 };
 

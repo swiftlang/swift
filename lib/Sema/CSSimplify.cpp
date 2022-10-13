@@ -28,6 +28,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
@@ -5970,6 +5971,35 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   auto *typeVar1 = dyn_cast<TypeVariableType>(desugar1);
   auto *typeVar2 = dyn_cast<TypeVariableType>(desugar2);
+
+    // Emit diagnostics for conversion to Reflectable.
+  if (
+    kind == ConstraintKind::Conversion || 
+    kind == ConstraintKind::ArgumentConversion || 
+    kind == ConstraintKind::OperatorArgumentConversion) {
+    // type1 can be an optional type_variable, so let's unwrap it.
+    TypeVariableType* unwrappedTypeVar1 = typeVar1;
+    if (!unwrappedTypeVar1)
+      if (auto unwrappedType1 = type1->getOptionalObjectType())
+        unwrappedTypeVar1 = dyn_cast<TypeVariableType>(unwrappedType1->getDesugaredType());
+
+    // type2 also can be optional
+    Type unwrappedType2 = type2;
+    if (Type _unwrappedType2 = type2->getOptionalObjectType())
+      unwrappedType2 = _unwrappedType2;
+
+    if (unwrappedTypeVar1 && unwrappedType2) {
+      auto *PD = dyn_cast_or_null<ProtocolDecl>(unwrappedType2->getAnyNominal());
+      if (PD && PD->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+        auto anchor = locator.getAnchor();
+        if (anchor && isExpr<Expr>(anchor)) {
+          auto E = getAsExpr(anchor);
+          if (recordFix(ImplicitConversionToReflectable::create(*this, getConstraintLocator(E))))
+            return getTypeMatchFailure(locator);
+        }
+      }
+    }
+  }
 
   // If either (or both) types are type variables, unify the type variables.
   if (typeVar1 || typeVar2) {
@@ -13338,6 +13368,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:
+  case FixKind::ImplicitConversionToReflectable:
     llvm_unreachable("handled elsewhere");
   }
 
