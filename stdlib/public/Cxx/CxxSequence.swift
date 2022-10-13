@@ -85,9 +85,13 @@ public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
   // which would result in dangling pointers for some C++ sequence types.
 
   public typealias Element = T.RawIterator.Pointee
-  private var sequence: T
-  private var rawIterator: T.RawIterator
-  private let endIterator: T.RawIterator
+
+  @usableFromInline
+  internal var sequence: T
+  @usableFromInline
+  internal var rawIterator: T.RawIterator
+  @usableFromInline
+  internal let endIterator: T.RawIterator
 
   public init(sequence: T) {
     self.sequence = sequence
@@ -95,6 +99,7 @@ public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
     self.endIterator = self.sequence.__endUnsafe()
   }
 
+  @inlinable
   public func next() -> Element? {
     if self.rawIterator == self.endIterator {
       return nil
@@ -106,6 +111,7 @@ public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
 }
 
 extension CxxSequence {
+  @inlinable
   public func makeIterator() -> CxxIterator<Self> {
     return CxxIterator(sequence: self)
   }
