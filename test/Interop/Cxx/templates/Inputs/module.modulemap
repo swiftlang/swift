@@ -137,3 +137,8 @@ module DependentTypes {
   header "dependent-types.h"
   requires cplusplus
 }
+
+module UnevaluatedContext {
+  header "unevaluated-context.h"
+  requires cplusplus
+}
