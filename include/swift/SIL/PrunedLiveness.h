@@ -83,6 +83,34 @@
 /// | Use | [LiveWithin]
 ///  -----
 ///
+/// ---------------------------------------------------------------------------
+///
+/// "Use points" are the instructions that "generate" liveness for a given
+/// operand. A generalized use point visitor would look like this:
+///
+/// Given an \p operand, visit the use points relevant for liveness. For most
+/// operands, this is simply the user instruction. For scoped operands, each
+/// scope-ending instruction is a separate use point.
+/// template<typename Operation>
+/// inline bool visitUsePoints(Operand *use, Operation visitUsePoint) {
+///   // Handle TrivialUse operands: begin_access & store_borrow address
+///   // Handle InteriorPointer operands: store_borrow source
+///   if (auto scopedAddress = ScopedAddressValue::forUse(use)) {
+///     return scopedAddress.visitScopeEndingUses(visitUsePoint);
+///   }
+///   // Handle Borrow operands...
+///   // Handles borrow scope introducers: begin_borrow & load_borrow.
+///   // Handles guaranteed return values: begin_apply.
+///   if (!BorrowingOperand(operand).visitScopeEndingUses([this](Operand *end) {
+///     if (!visitUsePoint(end))
+///       return false;
+///     return true;
+///   }
+///   return visitUsePoint(use);
+/// }
+///
+/// The visitors that switch on OperandOwnership use a specialized
+/// implementation because each case above is specific to an ownership case.
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_PRUNEDLIVENESS_H
