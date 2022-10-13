@@ -144,9 +144,9 @@ class BenchmarkDriver(object):
         """Return a list of performance tests to run."""
         lines = self._invoke(self._cmd_list_benchmarks).split("\n")
         json_tests = []
-        for l in lines:
-            if l.strip() != "":
-                json_tests.append(json.loads(l))
+        for line in lines:
+            if line.strip() != "":
+                json_tests.append(json.loads(line))
         self.all_tests = [json["name"] for json in json_tests]
         test_numbers = [json["number"] for json in json_tests]
         self.test_number = dict([(json["name"], json["number"]) for json in json_tests])
@@ -157,18 +157,19 @@ class BenchmarkDriver(object):
         return self.all_tests
 
     def _tests_matching_patterns(self):
-        regexes = map(re.compile, self.args.filters)
         matches = set()
-        for pattern in regexes:
+        for fil in self.args.filters:
+            pattern = re.compile(fil)
             new_matches = filter(pattern.match, self.all_tests)
-            matches.union(new_matches)
+            matches = matches.union(new_matches)
         return sorted(list(matches))
 
     def _tests_by_name_or_number(self, test_numbers):
         benchmarks = set(self.args.benchmarks)
-        number_to_name = dict(zip(test_numbers, self.all_tests))
+        numbers = list(map(str, test_numbers))
+        number_to_name = dict(zip(numbers, self.all_tests))
         tests_by_number = [
-            number_to_name[i] for i in benchmarks.intersection(test_numbers)
+            number_to_name[i] for i in benchmarks.intersection(numbers)
         ]
         return sorted(
             list(benchmarks.intersection(set(self.all_tests)).union(tests_by_number))
@@ -208,7 +209,7 @@ class BenchmarkDriver(object):
         if test:
             cmd.append(test)
         else:
-            cmd.extend([self.test_number.get(name, name) for name in self.tests])
+            cmd.extend([str(self.test_number.get(name, name)) for name in self.tests])
         if num_samples > 0:
             cmd.append("--num-samples={0}".format(num_samples))
         if num_iters > 0:

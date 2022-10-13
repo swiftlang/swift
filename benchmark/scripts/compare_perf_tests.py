@@ -254,7 +254,6 @@ class PerformanceTestResult(object):
         """
         return 0
 
-
     @property
     def max_rss(self):
         """Return max_rss if available
@@ -646,8 +645,8 @@ class ReportFormatter(object):
             # isinstance(result, ResultComparison)
             (
                 result.name,
-                str(result.old.min_value) if result.old.min_value else "-",
-                str(result.new.min_value) if result.new.min_value else "-",
+                str(result.old.min_value) if result.old.min_value is not None else "-",
+                str(result.new.min_value) if result.new.min_value is not None else "-",
                 "{0:+.1f}%".format(result.delta),
                 "{0:.2f}x{1}".format(result.ratio, " (?)" if result.is_dubious else ""),
             )
