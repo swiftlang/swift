@@ -99,3 +99,41 @@ extension MainActor {
   }
 }
 #endif
+
+/// Performs a runtime test to check whether this function was called
+/// while on the MainActor. Then the operation is invoked and its
+/// result is returned.
+///
+/// - Attention:
+/// This operation is unsafe because if the runtime check fails, the
+/// operation may still be invoked off of the MainActor! You can control
+/// the behavior of check failure by setting the environment variable
+/// `SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL` as follows:
+///
+///   - 0 ignores check failures
+///   - 1 will only log a warning (default)
+///   - 2 means fatal error
+///
+/// When in modes other than `0`, a message is output to standard error.
+///
+@available(SwiftStdlib 5.1, *)
+@_unavailableFromAsync(message: "await the call to the @MainActor closure directly")
+@_alwaysEmitIntoClient // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+public
+func _unsafeAssumeOnMainActor<T>(debugFileName: String = #file,
+                                 debugLineNum: Int = #line,
+                                 _ operation: @MainActor () throws -> T
+                                ) rethrows -> T {
+  typealias YesMainActor = @MainActor () throws -> T
+  typealias NoMainActor = () throws -> T
+
+  // even if the check fails, it's not guaranteed to be fatal
+  _checkExpectedExecutor(debugFileName, debugLineNum, Builtin.buildMainActorExecutorRef())
+
+  // To do the unsafe cast, we have to pretend it's @escaping.
+  return try withoutActuallyEscaping(operation) {
+    (_ fn: @escaping YesMainActor) throws -> T in
+    let rawFn = unsafeBitCast(fn, to: NoMainActor.self)
+    return try rawFn()
+  }
+}

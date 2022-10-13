@@ -105,6 +105,31 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
     _filenameStart, _filenameLength, _filenameIsASCII, _line, _executor)
 }
 
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient // FIXME: use @backDeploy(before: SwiftStdlib 5.9)
+public
+func _checkExpectedExecutor(_ fileName: String,
+                            _ line: Int,
+                            _ _executor: Builtin.Executor) {
+  if _taskIsCurrentExecutor(_executor) {
+    return
+  }
+
+  fileName.utf8CString.withUnsafeBufferPointer { (_ bufPtr: UnsafeBufferPointer<CChar>) in
+    let filenameBasePtr: Builtin.RawPointer = bufPtr.baseAddress!._rawValue
+
+    // string lengths exclude trailing \0 byte, which should be there!
+    let filenameLength: Builtin.Word = (bufPtr.count - 1)._builtinWordValue
+
+    // we're handing it UTF-8
+    let falseByte: Int8 = 0
+    let filenameIsASCII: Builtin.Int1 = Builtin.trunc_Int8_Int1(falseByte._value)
+
+    _reportUnexpectedExecutor(filenameBasePtr, filenameLength, filenameIsASCII,
+        line._builtinWordValue, _executor)
+  }
+}
+
 #if !SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 // This must take a DispatchQueueShim, not something like AnyObject,
 // or else SILGen will emit a retain/release in unoptimized builds,
