@@ -125,6 +125,8 @@ struct Arguments {
     untakenIndex = 0;
   }
 
+  bool hasUntaken() { return untakenIndex < storage.size(); }
+
   Arguments() {}
   Arguments(Arguments const &) = delete;
   Arguments &operator=(Arguments const &) = delete;
