@@ -752,7 +752,9 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     LexicalScope trueScope(SGF, S);
 
     auto NumTrueTaken = SGF.loadProfilerCount(S->getThenStmt());
-    auto NumFalseTaken = SGF.loadProfilerCount(S->getElseStmt());
+    auto NumFalseTaken = ProfileCounter();
+    if (auto *Else = S->getElseStmt())
+      NumFalseTaken = SGF.loadProfilerCount(Else);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
                           NumFalseTaken);
