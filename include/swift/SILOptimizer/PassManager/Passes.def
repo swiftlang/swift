@@ -445,6 +445,8 @@ PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-block
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(UnitTestRunner, "unit-test-runner",
+     "Utility pass.  Parses arguments and runs code with them.")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")

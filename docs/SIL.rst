@@ -3924,6 +3924,52 @@ SIL DIExpression can have elements with various types, like AST nodes or strings
 
 The ``[trace]`` flag is available for compiler unit testing. It is not produced during normal compilation. It is used combination with internal logging and optimization controls to select specific values to trace or to transform. For example, liveness analysis combines all "traced" values into a single live range with multiple definitions. This exposes corner cases that cannot be represented by passing valid SIL through the pipeline.
 
+Testing
+~~~~~~~
+
+test_specification
+``````````````````
+::
+
+  sil-instruction ::= 'test_specification' string-literal
+
+  test_specification "parsing @trace[3] @function[other].block[2].instruction[1]"
+
+Exists only for writing FileCheck tests.  Specifies a list of test arguments
+which should be used in order to run a particular test "in the context" of the
+function containing the instruction.
+
+Parsing of these test arguments is done via ``parseTestArgumentsFromSpecification``.
+
+The following types of test arguments are supported:
+
+- boolean: true false
+- unsigned integer: 0...ULONG_MAX
+- string
+- function: @function <-- the current function
+            @function[uint] <-- function at index ``uint``
+            @function[name] <-- function named ``name``
+- block: @block <-- the first block
+         @block[uint] <-- the block at index ``uint``
+         @{function}.{block} <-- the indicated block in the indicated function
+         Example: @function[foo].block[2]
+- trace: @trace <-- the first ``debug_value [trace]`` in the current function
+         @trace[uint] <-- the ``debug_value [trace]`` at index ``uint``
+         @{function}.{trace} <-- the indicated trace in the indicated function
+         Example: @function[bar].trace
+- instruction: @instruction <-- the first instruction
+               @instruction[uint] <-- the instruction at index ``uint``
+               @{function}.{instruction} <-- the indicated instruction in the indicated function
+               Example: @function[baz].instruction[19]
+               @{block}.{instruction} <-- the indicated instruction in the indicated block
+               Example: @function[bam].block.instruction
+- operand: @operand <-- the first operand
+           @operand[uint] <-- the operand at index ``uint``
+           @{instruction}.{operand} <-- the indicated operand of the indicated instruction
+           Example: @block[19].instruction[2].operand[3]
+           Example: @function[2].instruction.operand
+
+
 Profiling
 ~~~~~~~~~
 

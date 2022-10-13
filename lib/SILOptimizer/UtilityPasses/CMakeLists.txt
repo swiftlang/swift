@@ -34,5 +34,8 @@ target_sources(swiftSILOptimizer PRIVATE
   SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
+  UnitTestRunner.cpp
   OwnershipDumper.cpp
-  OwnershipVerifierTextualErrorDumper.cpp)
+  OwnershipVerifierTextualErrorDumper.cpp
+  ParseTestSpecification.cpp)
+  

@@ -2410,7 +2410,11 @@ public:
   void visitReturnInst(ReturnInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
-  
+
+  void visitTestSpecificationInst(TestSpecificationInst *TSI) {
+    *this << QuotedString(TSI->getArgumentsSpecification());
+  }
+
   void visitThrowInst(ThrowInst *TI) {
     *this << getIDAndType(TI->getOperand());
   }

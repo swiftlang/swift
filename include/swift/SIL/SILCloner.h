@@ -2631,6 +2631,15 @@ void SILCloner<ImplClass>::visitIncrementProfilerCounterInst(
                               Inst->getNumCounters(), Inst->getPGOFuncHash()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTestSpecificationInst(
+    TestSpecificationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createTestSpecificationInst(
+                                    getOpLocation(Inst->getLoc()),
+                                    Inst->getArgumentsSpecification()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {

@@ -3406,6 +3406,19 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::TestSpecificationInst: {
+    // Parse the specification string.
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_sil_test_specification_body);
+      return true;
+    }
+    // Drop the double quotes.
+    auto ArgumentsSpecification = P.Tok.getText().drop_front().drop_back();
+    P.consumeToken(tok::string_literal);
+    ResultVal = B.createTestSpecificationInst(InstLoc, ArgumentsSpecification);
+    break;
+  }
+
     // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
     ValueOwnershipKind LHSKind = OwnershipKind::None;
