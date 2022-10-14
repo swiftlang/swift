@@ -845,7 +845,7 @@ class DefaultActorImpl : public HeapObject {
   // the future
   alignas(sizeof(ActiveActorStatus)) char StatusStorage[sizeof(ActiveActorStatus)];
 #endif
-  // TODO(rokhinip): Make this a flagset
+  // TODO (rokhinip): Make this a flagset
   bool isDistributedRemoteActor;
 
 public:
