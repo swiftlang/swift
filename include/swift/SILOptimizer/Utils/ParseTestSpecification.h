@@ -161,8 +161,11 @@ struct Arguments {
 void getTestSpecifications(SILFunction *function,
                            SmallVectorImpl<std::string> &specifications);
 
+/// Given the string \p specification operand of a test_specification
+/// instruction from \p function, parse the arguments which it refers to into
+/// \p arguments and the component strings into \p argumentStrings.
 void parseTestArgumentsFromSpecification(
-    SILFunction *, StringRef specification, Arguments &arguments,
+    SILFunction *function, StringRef specification, Arguments &arguments,
     SmallVectorImpl<StringRef> &argumentStrings);
 
 } // namespace test
