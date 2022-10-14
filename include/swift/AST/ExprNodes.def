@@ -206,7 +206,6 @@ EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
 UNCHECKED_EXPR(OneWay, Expr)
 EXPR(Tap, Expr)
-EXPR(Pack, Expr)
 UNCHECKED_EXPR(TypeJoin, Expr)
 LAST_EXPR(TypeJoin)
 

@@ -359,11 +359,6 @@ protected:
     IsPlaceholder : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(PackExpr, Expr, 32,
-    : NumPadBits,
-    NumElements : 32
-  );
-
   SWIFT_INLINE_BITFIELD_FULL(TypeJoinExpr, Expr, 32,
     : NumPadBits,
     NumElements : 32
@@ -5906,55 +5901,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OneWay;
   }
-};
-
-/// An expression node that aggregates a set of heterogeneous arguments into a
-/// parameter pack suitable for passing off to a variadic generic function
-/// argument.
-///
-/// There is no user-visible way to spell a pack expression, they are always
-/// implicitly created at applies. As such, any appearance of pack types outside
-/// of applies are illegal.
-class PackExpr final : public Expr,
-    private llvm::TrailingObjects<PackExpr, Expr *> {
-  friend TrailingObjects;
-
-  size_t numTrailingObjects() const {
-    return getNumElements();
-  }
-
-  PackExpr(ArrayRef<Expr *> SubExprs, Type Ty);
-
-public:
-  /// Create a pack.
-  static PackExpr *create(ASTContext &ctx, ArrayRef<Expr *> SubExprs, Type Ty);
-
-  /// Create an empty pack.
-  static PackExpr *createEmpty(ASTContext &ctx);
-
-  SourceLoc getLoc() const { return SourceLoc(); }
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  /// Retrieve the elements of this pack.
-  MutableArrayRef<Expr *> getElements() {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
-  }
-
-  /// Retrieve the elements of this pack.
-  ArrayRef<Expr *> getElements() const {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
-  }
-
-  unsigned getNumElements() const { return Bits.PackExpr.NumElements; }
-
-  Expr *getElement(unsigned i) const {
-    return getElements()[i];
-  }
-  void setElement(unsigned i, Expr *e) {
-    getElements()[i] = e;
-  }
-
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
 };
 
 class TypeJoinExpr final : public Expr,

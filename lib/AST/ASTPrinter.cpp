@@ -4583,9 +4583,6 @@ void PrintAST::visitTupleExpr(TupleExpr *expr) {
   Printer << ")";
 }
 
-void PrintAST::visitPackExpr(PackExpr *expr) {
-}
-
 void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
 }
 
