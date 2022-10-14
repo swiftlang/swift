@@ -16,6 +16,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1495,6 +1496,45 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   }
 
   llvm_unreachable("Unhandled access level in switch.");
+}
+
+Expr *SILDeclRef::getInitializationExpr() const {
+  switch (kind) {
+  case Kind::StoredPropertyInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto *pbd = var->getParentPatternBinding();
+    unsigned idx = pbd->getPatternEntryIndexForVarDecl(var);
+    auto *init = pbd->getInit(idx);
+    assert(!pbd->isInitializerSubsumed(idx));
+
+    // If this is the backing storage for a property with an attached wrapper
+    // that was initialized with `=`, use that expression as the initializer.
+    if (auto originalProperty = var->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
+        auto wrapperInfo =
+            originalProperty->getPropertyWrapperInitializerInfo();
+        auto *placeholder = wrapperInfo.getWrappedValuePlaceholder();
+        init = placeholder->getOriginalWrappedValue();
+        assert(init);
+      }
+    }
+    return init;
+  }
+  case Kind::PropertyWrapperBackingInitializer: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromWrappedValue());
+    return wrapperInfo.getInitFromWrappedValue();
+  }
+  case Kind::PropertyWrapperInitFromProjectedValue: {
+    auto *var = cast<VarDecl>(getDecl());
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
+    assert(wrapperInfo.hasInitFromProjectedValue());
+    return wrapperInfo.getInitFromProjectedValue();
+  }
+  default:
+    return nullptr;
+  }
 }
 
 unsigned SILDeclRef::getParameterListCount() const {

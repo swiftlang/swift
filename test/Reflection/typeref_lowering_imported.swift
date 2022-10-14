@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift %S/Inputs/ImportedTypes.swift %S/Inputs/ImportedTypesOther.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -I %S/Inputs -o %t/libTypesToReflect
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect -binary-filename %platform-module-dir/libswiftCore.dylib -dump-type-lowering < %s | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/libTypesToReflect %platform-module-dir/libswiftCore.dylib -dump-type-lowering < %s | %FileCheck %s
 
 // ... now, test single-frontend mode with multi-threaded LLVM emission:
 
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift %S/Inputs/ImportedTypes.swift %S/Inputs/ImportedTypesOther.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -I %S/Inputs -o %t/libTypesToReflect -num-threads 2 -whole-module-optimization
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect -binary-filename %platform-module-dir/libswiftCore.dylib -dump-type-lowering < %s | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/libTypesToReflect %platform-module-dir/libswiftCore.dylib -dump-type-lowering < %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64

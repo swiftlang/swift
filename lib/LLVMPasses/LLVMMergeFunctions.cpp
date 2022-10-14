@@ -1260,6 +1260,26 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   ++NumSwiftThunksWritten;
 }
 
+static llvm::AttributeList
+fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
+                                        llvm::AttributeList attrList) {
+  auto &context = fnType->getContext();
+  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
+    auto paramTy = fnType->getParamType(i);
+    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
+    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
+        paramTy->getPointerElementType() != attrList.getParamStructRetType(i))
+      attrList = attrList.replaceAttributeTypeAtIndex(
+          context, attrListIndex, llvm::Attribute::StructRet,
+          paramTy->getPointerElementType());
+    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
+        paramTy->getPointerElementType() != attrList.getParamByValType(i))
+      attrList = attrList.replaceAttributeTypeAtIndex(
+          context, attrListIndex, llvm::Attribute::ByVal,
+          paramTy->getPointerElementType());
+  }
+  return attrList;
+}
 /// Replace direct callers of Old with New. Also add parameters to the call to
 /// \p New, which are defined by the FuncIdx's value in \p Params.
 bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
@@ -1329,9 +1349,11 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     NewCI->setCallingConv(CI->getCallingConv());
     // Don't transfer attributes from the function to the callee. Function
     // attributes typically aren't relevant to the calling convention or ABI.
-    NewCI->setAttributes(AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
+    auto newAttrList = AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
                                             NewPAL.getRetAttrs(),
-                                            NewArgAttrs));
+                                            NewArgAttrs);
+    newAttrList = fixUpTypesInByValAndStructRetAttributes(FType, newAttrList);
+    NewCI->setAttributes(newAttrList);
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
   }
