@@ -17,6 +17,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -249,4 +250,32 @@ PackType *PackType::flattenPackTypes() {
     return this;
 
   return PackType::get(getASTContext(), elts);
+}
+
+unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
+                                          unsigned substIndex) const {
+  unsigned remappedIndex = substIndex;
+
+  for (unsigned i = 0, e = size(); i < e; ++i) {
+    auto *param = get(i);
+    auto paramType = param->getInterfaceType();
+
+    unsigned substCount = 1;
+    if (auto *packExpansionType = paramType->getAs<PackExpansionType>()) {
+      auto replacementType = packExpansionType->getCountType().subst(subMap);
+      if (auto *packType = replacementType->getAs<PackType>()) {
+        substCount = packType->getNumElements();
+      }
+    }
+
+    if (remappedIndex < substCount)
+      return i;
+
+    remappedIndex -= substCount;
+  }
+
+  llvm::errs() << "Invalid substituted argument index: " << substIndex << "\n";
+  subMap.dump(llvm::errs());
+  dump(llvm::errs());
+  abort();
 }
