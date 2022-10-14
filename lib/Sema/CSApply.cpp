@@ -5865,8 +5865,10 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       if (!varargIndices.empty())
         labelLoc = args->getLabelLoc(varargIndices[0]);
 
+      auto packExpansionType = param.getPlainType()->castTo<PackExpansionType>();
+
       // Convert the arguments.
-      auto paramTuple = param.getPlainType()->castTo<PackType>();
+      auto paramTuple = packExpansionType->getPatternType()->castTo<PackType>();
       for (auto varargIdx : indices(varargIndices)) {
         auto argIdx = varargIndices[varargIdx];
         auto *arg = args->getExpr(argIdx);

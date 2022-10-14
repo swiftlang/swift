@@ -5528,66 +5528,25 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
-        elements.append(transformedPack->getElementTypes().begin(),
-                        transformedPack->getElementTypes().end());
-      } else {
-        elements.push_back(transformedEltTy);
-      }
+      elements.push_back(transformedEltTy);
     }
 
     if (!anyChanged)
       return *this;
 
-    return PackType::get(Ptr->getASTContext(), elements);
+    return PackType::get(Ptr->getASTContext(), elements)->flattenPackTypes();
   }
 
   case TypeKind::PackExpansion: {
     auto expand = cast<PackExpansionType>(base);
-    struct ExpansionGatherer {
-      llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> baselineFn;
-      llvm::DenseMap<TypeBase *, PackType *> cache;
-      unsigned maxArity;
 
-    public:
-      ExpansionGatherer(
-          llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)>
-              baselineFn)
-          : baselineFn(baselineFn), maxArity(0) {}
-
-      Optional<Type> operator()(TypeBase *input, TypePosition pos) {
-        auto remap = baselineFn(input, pos);
-        if (!remap) {
-          return remap;
-        }
-
-        if (input->is<TypeVariableType>() ||
-            input->isParameterPack() ||
-            input->is<PackArchetypeType>()) {
-          if (auto *PT = (*remap)->getAs<PackType>()) {
-            maxArity = std::max(maxArity, PT->getNumElements());
-            cache.insert({input, PT});
-          }
-        }
-        return remap;
-      }
-
-      std::pair<llvm::DenseMap<TypeBase *, PackType *>, unsigned>
-      intoExpansions() && {
-        return std::make_pair(cache, maxArity);
-      }
-    };
-
-    // First, substitute down the pattern type to gather the mapping from
-    // contained substitutable types to packs.
-    auto gather = ExpansionGatherer{fn};
     Type transformedPat =
-        expand->getPatternType().transformWithPosition(pos, gather);
+        expand->getPatternType().transformWithPosition(pos, fn);
     if (!transformedPat)
       return Type();
 
     Type transformedCount =
-        expand->getCountType().transformWithPosition(pos, gather);
+        expand->getCountType().transformWithPosition(pos, fn);
     if (!transformedCount)
       return Type();
 
@@ -5595,52 +5554,7 @@ case TypeKind::Id:
         transformedCount.getPointer() == expand->getCountType().getPointer())
       return *this;
 
-    llvm::DenseMap<TypeBase *, PackType *> expansions;
-    unsigned arity;
-    std::tie(expansions, arity) = std::move(gather).intoExpansions();
-    if (expansions.empty()) {
-      // If we didn't find any expansions, either the caller wasn't interested
-      // in expanding this pack, or something has gone wrong. Leave off the
-      // expansion and return the transformed type.
-      return PackExpansionType::get(transformedPat, transformedCount);
-    }
-
-    SmallVector<Type, 8> elts;
-    elts.reserve(arity);
-    // Perform the expansion element-wise according to the maximum arity we
-    // picked up during the gather step above.
-    //
-    // For a pack expansion (F<... T..., U..., ...>) and mapping
-    //
-    //   T... -> <X, Y, Z>
-    //   U... -> <A, B, C>
-    //
-    // The expected expansion is
-    //
-    // <F<... X, A, ...>, F<... Y, B, ...>, F<... Z, C, ...> ...>
-    for (unsigned i = 0; i < arity; ++i) {
-      struct ElementExpander {
-        const llvm::DenseMap<TypeBase *, PackType *> &expansions;
-        llvm::function_ref<Optional<Type>(TypeBase *, TypePosition)> outerFn;
-        unsigned index;
-
-      public:
-        Optional<Type> operator()(TypeBase *input, TypePosition pos) {
-          // FIXME: Does this need to do bounds checking?
-          if (PackType *element = expansions.lookup(input))
-            return element->getElementType(index);
-          return outerFn(input, pos);
-        }
-      };
-
-      auto expandedElt = expand->getPatternType().transformWithPosition(
-          pos, ElementExpander{expansions, fn, i});
-      if (!expandedElt)
-        return Type();
-
-      elts.push_back(expandedElt);
-    }
-    return PackType::get(base->getASTContext(), elts);
+    return PackExpansionType::get(transformedPat, transformedCount)->expand();
   }
 
   case TypeKind::Tuple: {
@@ -5670,26 +5584,14 @@ case TypeKind::Id:
         anyChanged = true;
       }
 
-      // "Splat" the elements of the transformed pack expansion into the tuple.
-      if (auto *transformedPack = transformedEltTy->getAs<PackType>()) {
-        auto transformedEltTypes = transformedPack->getElementTypes();
-        if (!transformedEltTypes.empty()) {
-          // Keep the label on the first element.
-
-          elements.push_back(elt.getWithType(transformedEltTypes.front()));
-          elements.append(transformedEltTypes.begin() + 1,
-                          transformedEltTypes.end());
-        }
-      } else {
-        // Add the new tuple element, with the transformed type.
-        elements.push_back(elt.getWithType(transformedEltTy));
-      }
+      // Add the new tuple element, with the transformed type.
+      elements.push_back(elt.getWithType(transformedEltTy));
     }
 
     if (!anyChanged)
       return *this;
 
-    return TupleType::get(elements, Ptr->getASTContext());
+    return TupleType::get(elements, Ptr->getASTContext())->flattenPackTypes();
   }
 
 
@@ -5785,7 +5687,8 @@ case TypeKind::Id:
         return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(genericSig, substParams, resultTy,
                                       function->getExtInfo()
-                                          .withGlobalActor(globalActorType));
+                                          .withGlobalActor(globalActorType))
+          ->flattenPackTypes();
     }
 
     if (isUnchanged) return *this;
@@ -5794,7 +5697,8 @@ case TypeKind::Id:
       return FunctionType::get(substParams, resultTy);
     return FunctionType::get(substParams, resultTy,
                              function->getExtInfo()
-                                 .withGlobalActor(globalActorType));
+                                 .withGlobalActor(globalActorType))
+        ->flattenPackTypes();
   }
 
   case TypeKind::ArraySlice: {
