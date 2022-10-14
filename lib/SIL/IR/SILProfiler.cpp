@@ -25,13 +25,75 @@
 
 using namespace swift;
 
-/// Check whether a root AST node should be profiled.
-static bool shouldProfile(ASTNode N, SILDeclRef Constant) {
+/// Unfortunately this is needed as ASTNode can't currently represent a
+/// SourceFile.
+class NodeToProfile final {
+  /// For a direct ASTNode, this stores the node itself. For a main SourceFile,
+  /// it stores the corresponding ModuleDecl.
+  ASTNode Storage;
+
+  explicit NodeToProfile(ASTNode Node) : Storage(Node) {}
+
+public:
+  static NodeToProfile node(ASTNode Node) {
+    assert(!isa_and_nonnull<ModuleDecl>(Node.dyn_cast<Decl *>()));
+    return NodeToProfile(Node);
+  }
+  static NodeToProfile mainSourceFile(SourceFile *SF) {
+    assert(SF->isScriptMode());
+    auto N = NodeToProfile(SF->getParentModule());
+    assert(N.getAsSourceFile() == SF);
+    return N;
+  }
+
+  /// If an ASTNode is being stored, returns it, otherwise \c nullptr.
+  ASTNode getAsNode() const {
+    return isSourceFile() ? nullptr : Storage;
+  }
+
+  /// Whether this is storing a main SourceFile.
+  bool isSourceFile() const {
+    return getAsSourceFile();
+  }
+
+  /// If a main SourceFile is being stored, returns it, otherwise \c nullptr.
+  SourceFile *getAsSourceFile() const {
+    auto *M = dyn_cast_or_null<ModuleDecl>(Storage.dyn_cast<Decl *>());
+    return M ? &M->getMainSourceFile() : nullptr;
+  }
+};
+
+static NodeToProfile getNodeToProfile(SILDeclRef Constant) {
+  // If we have an initialization expression, walk that instead of the variable.
+  if (auto *E = Constant.getInitializationExpr())
+    return NodeToProfile::node(E);
+
+  // Otherwise, we walk the SILDeclRef's node directly.
+  using LocKind = SILDeclRef::LocKind;
+  switch (Constant.getLocKind()) {
+  case LocKind::Decl:
+    return NodeToProfile::node(Constant.getDecl());
+  case LocKind::Closure:
+    return NodeToProfile::node(Constant.getAbstractClosureExpr());
+  case LocKind::File: {
+    auto *SF = cast<SourceFile>(Constant.getFileUnit());
+    return NodeToProfile::mainSourceFile(SF);
+  }
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
+
+/// Check whether we should profile a given SILDeclRef.
+static bool shouldProfile(SILDeclRef Constant) {
+  auto Root = getNodeToProfile(Constant);
+
   // Do not profile AST nodes with invalid source locations.
-  if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Skipping ASTNode: invalid start/end locations\n");
-    return false;
+  if (auto N = Root.getAsNode()) {
+    if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Skipping ASTNode: invalid start/end locations\n");
+      return false;
+    }
   }
 
   // Do not profile AST nodes in unavailable contexts.
@@ -62,18 +124,17 @@ static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
   llvm_unreachable("invalid parent kind");
 }
 
-SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
+SILProfiler *SILProfiler::create(SILModule &M, SILDeclRef Ref) {
   // If profiling isn't enabled, don't profile anything.
   const auto &Opts = M.getOptions();
   if (!Opts.GenerateProfile && Opts.UseProfile.empty())
     return nullptr;
 
-  if (!shouldProfile(N, Ref))
+  if (!shouldProfile(Ref))
     return nullptr;
 
   auto *Buf = M.allocate<SILProfiler>(1);
-  auto *SP =
-      ::new (Buf) SILProfiler(M, N, Ref, Opts.EmitProfileCoverageMapping);
+  auto *SP = ::new (Buf) SILProfiler(M, Ref, Opts.EmitProfileCoverageMapping);
   SP->assignRegionCounters();
   return SP;
 }
@@ -1277,6 +1338,16 @@ static StringRef getCurrentFileName(SILDeclRef forDecl) {
   return {};
 }
 
+static void walkNode(NodeToProfile Node, ASTWalker &Walker) {
+  if (auto N = Node.getAsNode()) {
+    N.walk(Walker);
+  } else {
+    // We want to walk the SourceFile for a top-level entry point. We will only
+    // assign regions to TopLevelCodeDecls.
+    Node.getAsSourceFile()->walk(Walker);
+  }
+}
+
 void SILProfiler::assignRegionCounters() {
   const auto &SM = M.getASTContext().SourceMgr;
 
@@ -1284,22 +1355,16 @@ void SILProfiler::assignRegionCounters() {
 
   MapRegionCounters Mapper(forDecl, RegionCounterMap);
 
-  std::string CurrentFuncName;
-  FormalLinkage CurrentFuncLinkage;
-  if (auto *D = Root.dyn_cast<Decl *>()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      CurrentFuncName = forDecl.mangle();
-      CurrentFuncLinkage = getDeclLinkage(AFD);
-    } else {
-      auto *TLCD = cast<TopLevelCodeDecl>(D);
-      llvm::raw_string_ostream OS{CurrentFuncName};
-      OS << "__tlcd_";
-      TLCD->getStartLoc().printLineAndColumn(OS, SM);
-      CurrentFuncLinkage = FormalLinkage::HiddenUnique;
+  auto Root = getNodeToProfile(forDecl);
+
+  auto CurrentFuncName = forDecl.mangle();
+  auto CurrentFuncLinkage = FormalLinkage::HiddenUnique;
+
+  if (auto N = Root.getAsNode()) {
+    if (auto *D = N.dyn_cast<Decl *>()) {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+        CurrentFuncLinkage = getDeclLinkage(AFD);
     }
-  } else {
-    CurrentFuncName = forDecl.mangle();
-    CurrentFuncLinkage = FormalLinkage::HiddenUnique;
   }
 
   PGOFuncName = llvm::getPGOFuncName(
@@ -1311,7 +1376,7 @@ void SILProfiler::assignRegionCounters() {
 
   LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
                           << "\n");
-  Root.walk(Mapper);
+  walkNode(Root, Mapper);
 
   NumRegionCounters = Mapper.NextCounter;
   // TODO: Mapper needs to calculate a function hash as it goes.
@@ -1319,7 +1384,7 @@ void SILProfiler::assignRegionCounters() {
 
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SM, forDecl);
-    Root.walk(Coverage);
+    walkNode(Root, Coverage);
     CovMap =
         Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
                                    RegionCounterMap, CurrentFileName);
@@ -1337,7 +1402,7 @@ void SILProfiler::assignRegionCounters() {
     }
     PGOMapping pgoMapper(forDecl, RegionCounterMap, LoadedCounts.get(),
                          RegionLoadedCounterMap, RegionCondToParentMap);
-    Root.walk(pgoMapper);
+    walkNode(Root, pgoMapper);
   }
 }
 

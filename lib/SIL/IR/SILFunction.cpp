@@ -332,12 +332,11 @@ void SILFunction::deleteSnapshot(int ID) {
   } while ((f = f->snapshots) != nullptr);
 }
 
-void SILFunction::createProfiler(ASTNode Root, SILDeclRef Ref) {
+void SILFunction::createProfiler(SILDeclRef Ref) {
   assert(!Profiler && "Function already has a profiler");
-  assert(Root && "Cannot profile a null ASTNode");
   assert(Ref && "Must have non-null SILDeclRef");
 
-  Profiler = SILProfiler::create(Module, Root, Ref);
+  Profiler = SILProfiler::create(Module, Ref);
   if (!Profiler)
     return;
 
