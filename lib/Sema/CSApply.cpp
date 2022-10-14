@@ -7459,7 +7459,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
-  llvm_unreachable("Unhandled coercion");
+  llvm::errs() << "Unhandled coercion:\n";
+  fromType->dump(llvm::errs());
+  toType->dump(llvm::errs());
+  abort();
 }
 
 /// Detect whether an assignment to \c baseExpr.member in the given
