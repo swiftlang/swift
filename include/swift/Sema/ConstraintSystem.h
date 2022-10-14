@@ -5197,15 +5197,6 @@ public:
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
-  /// Subroutine of \c matchTypes(), which matches a scalar type to
-  /// a tuple type.
-  ///
-  /// \returns the result of performing the scalar-to-tuple conversion.
-  TypeMatchResult matchScalarToTupleTypes(Type type1, TupleType *tuple2,
-                                          ConstraintKind kind,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
-
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
   TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
