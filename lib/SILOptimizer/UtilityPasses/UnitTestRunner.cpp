@@ -216,6 +216,14 @@ struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
   }
 };
 
+// Arguments: NONE
+// Dumps:
+// - the function
+struct DumpFunction : UnitTest {
+  DumpFunction(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override { getFunction()->dump(); }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line.
 
 class UnitTestRunner : public SILFunctionTransform {
@@ -244,6 +252,8 @@ class UnitTestRunner : public SILFunctionTransform {
     doit(&it);                                                                 \
     return;                                                                    \
   }
+
+    ADD_UNIT_TEST_SUBCLASS("dump-function", DumpFunction)
 
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime",
