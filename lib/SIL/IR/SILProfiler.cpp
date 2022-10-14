@@ -62,34 +62,6 @@ static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
   llvm_unreachable("invalid parent kind");
 }
 
-/// Check that the input AST has at least been type-checked.
-LLVM_ATTRIBUTE_UNUSED
-static bool hasFileBeenTypeChecked(SILDeclRef forDecl) {
-  auto *SF = forDecl.getInnermostDeclContext()->getParentSourceFile();
-  return SF && SF->ASTStage >= SourceFile::TypeChecked;
-}
-
-/// Check whether a mapped AST node is valid for profiling.
-static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
-  assert(hasFileBeenTypeChecked(forDecl) &&
-         "Cannot use this AST for profiling");
-
-  if (auto *D = N.dyn_cast<Decl *>()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      return AFD->hasBody();
-
-    if (isa<TopLevelCodeDecl>(D))
-      return true;
-  } else if (N.get<Expr *>()) {
-    if (auto *closure = forDecl.getAbstractClosureExpr())
-      return closure->hasBody();
-    if (forDecl.isStoredPropertyInitializer() ||
-        forDecl.isPropertyWrapperBackingInitializer())
-      return true;
-  }
-  return false;
-}
-
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
   // If profiling isn't enabled, don't profile anything.
   const auto &Opts = M.getOptions();
@@ -98,11 +70,6 @@ SILProfiler *SILProfiler::create(SILModule &M, ASTNode N, SILDeclRef Ref) {
 
   if (!shouldProfile(N, Ref))
     return nullptr;
-
-  if (!canCreateProfilerForAST(N, Ref)) {
-    N.dump(llvm::errs());
-    llvm_unreachable("Invalid AST node for profiling");
-  }
 
   auto *Buf = M.allocate<SILProfiler>(1);
   auto *SP =
@@ -163,6 +130,7 @@ namespace {
 template <typename F>
 ASTWalker::PreWalkAction
 visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
+  assert(AFD->hasBody());
   if (Walker.Parent.isNull()) {
     Func();
     return ASTWalker::Action::Continue();
@@ -177,7 +145,9 @@ shouldWalkIntoExpr(Expr *E, ASTWalker::ParentTy Parent, SILDeclRef Constant) {
 
   // Profiling for closures should be handled separately. Do not visit
   // closure expressions twice.
-  if (isa<AbstractClosureExpr>(E)) {
+  if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+    assert(CE->hasBody());
+
     // A non-null parent means we have a closure child, which we will visit
     // separately. Even if the parent is null, don't walk into a closure if the
     // SILDeclRef is not for a closure, as it could be for a property
