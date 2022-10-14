@@ -440,3 +440,6 @@ SWIFT_REQUEST(TypeChecker, SynthesizeLocalVariableForTypeWrapperStorage,
 SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeHasSymbolQueryRequest,
+              FuncDecl *(ValueDecl *),
+              Cached, NoLocationInfo)

@@ -4410,9 +4410,27 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
   if (!ctx.LangOpts.Target.isOSDarwin()) {
     // SILGen for #_hasSymbol is currently implemented assuming the target OS
     // is a Darwin platform.
-    ctx.Diags.diagnose(info->getStartLoc(), diag::has_symbol_unsupported,
+    ctx.Diags.diagnose(info->getStartLoc(),
+                       diag::has_symbol_unsupported_on_target,
                        ctx.LangOpts.Target.str());
     return true;
+  }
+
+  if (DC->getAsDecl()) {
+    auto fragileKind = DC->getFragileFunctionKind();
+    if (fragileKind.kind != FragileFunctionKind::None) {
+      // #_hasSymbol cannot be used in inlinable code because of limitations of
+      // the current implementation strategy. It relies on recording the
+      // referenced ValueDecl, mangling a helper function name using that
+      // ValueDecl, and then passing the responsibility of generating the
+      // definition for that helper function to IRGen. In order to lift this
+      // restriction, we will need teach SIL to encode the ValueDecl, or take
+      // another approach entirely.
+      ctx.Diags.diagnose(info->getStartLoc(),
+                         diag::has_symbol_condition_in_inlinable,
+                         fragileKind.getSelector());
+      return true;
+    }
   }
 
   auto decl = info->getReferencedDecl().getDecl();

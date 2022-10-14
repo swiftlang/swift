@@ -604,6 +604,7 @@ private:
     case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
+    case Node::Kind::HasSymbolQuery:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3046,6 +3047,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
 
     return nullptr;
   }
+  case Node::Kind::HasSymbolQuery:
+    Printer << "#_hasSymbol query for ";
+    return nullptr;
   }
 
   printer_unreachable("bad node kind!");
