@@ -228,9 +228,9 @@ void swift::conformToCxxSequenceIfNeeded(
     return;
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef = decl->getModuleContext()->lookupConformance(
+  auto rawIteratorConformanceRef = decl->getModuleContext()->conformsToProtocol(
       rawIteratorTy, cxxIteratorProto);
-  if (!rawIteratorConformanceRef.isConcrete())
+  if (!rawIteratorConformanceRef || !rawIteratorConformanceRef.isConcrete())
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
