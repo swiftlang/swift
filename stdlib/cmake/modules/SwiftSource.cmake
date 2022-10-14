@@ -499,10 +499,18 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
 
-  if(NOT SWIFT_ENABLE_REFLECTION)
-    list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
-  else()
+  if(SWIFT_ENABLE_REFLECTION)
     list(APPEND swift_flags "-D" "SWIFT_ENABLE_REFLECTION")
+  endif()
+
+  if("${SWIFT_STDLIB_REFLECTION_METADATA}" STREQUAL "enabled")
+    # do nothing, emitting reflection metadata is the default in swiftc
+  elseif("${SWIFT_STDLIB_REFLECTION_METADATA}" STREQUAL "debugger-only")
+    list(APPEND swift_flags "-Xfrontend" "-reflection-metadata-for-debugger-only")
+  elseif("${SWIFT_STDLIB_REFLECTION_METADATA}" STREQUAL "disabled")
+    list(APPEND swift_flags "-Xfrontend" "-disable-reflection-metadata")
+  else()
+    message(FATAL_ERROR "Invalid SWIFT_STDLIB_REFLECTION_METADATA value: ${SWIFT_STDLIB_REFLECTION_METADATA}")
   endif()
 
   if(NOT "${SWIFT_STDLIB_TRAP_FUNCTION}" STREQUAL "")
