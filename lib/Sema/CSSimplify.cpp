@@ -10694,7 +10694,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   setSolutionApplicationTarget(closure, target);
 
   // Generate constraints from the body of this closure.
-  return !generateConstraints(closure);
+  return !generateConstraints(
+      AnyFunctionRef(cast<AbstractClosureExpr>(closure)), closure->getBody());
 }
 
 ConstraintSystem::SolutionKind
@@ -14465,7 +14466,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
-    // {Dis, Con}junction constraints are never solved here.
+    // See {Dis, Con}junctionStep class in CSStep.cpp for solving
     return SolutionKind::Unsolved;
 
   case ConstraintKind::OneWayEqual:

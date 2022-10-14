@@ -475,8 +475,10 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
 Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                       DeclContext *DC,
                                       bool replaceInvalidRefsWithErrors) {
-  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
-  DeclNameRef Name = UDRE->getName();
+
+  DeclNameRef Name;
+  Name = UDRE->getName();
+
   SourceLoc Loc = UDRE->getLoc();
 
   DeclNameRef LookupName = Name;
@@ -2243,6 +2245,9 @@ bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
                                           bool leaveClosureBodiesUnchecked) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
+
+  // We need to forbid from walking into anything besides closures in
+  // PreCheckExpression walker
 
   PreCheckExpression preCheck(dc, expr,
                               replaceInvalidRefsWithErrors,
