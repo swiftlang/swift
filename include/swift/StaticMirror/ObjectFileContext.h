@@ -144,10 +144,12 @@ T unwrap(llvm::Expected<T> value) {
 }
 
 std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
-    const std::vector<const llvm::object::ObjectFile *> &objectFiles);
+    const std::vector<const llvm::object::ObjectFile *> &objectFiles,
+    bool objcInterOp);
 
 std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
-    std::shared_ptr<ObjectMemoryReader> reader);
+    std::shared_ptr<ObjectMemoryReader> reader,
+    bool objcInterOp);
 
 } // end namespace static_mirror
 } // end namespace swift
