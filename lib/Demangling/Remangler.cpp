@@ -1669,6 +1669,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AccessibleFunctionRecord:
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
+      case Node::Kind::HasSymbolQuery:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3500,6 +3501,11 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
   else
     Buffer << "Xg";
 
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
+  Buffer << "TwS";
   return ManglingError::Success;
 }
 

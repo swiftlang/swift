@@ -2854,3 +2854,8 @@ ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
   Buffer << "TwB";
   return ManglingError::Success;
 }
+
+ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
+  Buffer << "TwS";
+  return ManglingError::Success;
+}
