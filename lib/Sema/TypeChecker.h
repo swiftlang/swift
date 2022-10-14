@@ -1103,11 +1103,6 @@ diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
                                           const DeclContext *ReferenceDC,
                                           const UnavailabilityReason &Reason);
 
-void
-diagnosePotentialPayloadCaseKeyPathUnavailability(SourceRange ReferenceRange,
-                                            const DeclContext *ReferenceDC,
-                                            const UnavailabilityReason &Reason);
-
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 

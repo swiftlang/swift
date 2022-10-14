@@ -2671,6 +2671,9 @@ public:
         printValueDecl(id.getProperty(), PrintState.OS);
         break;
       }
+      case KeyPathPatternComponent::ComputedPropertyId::EnumElement: {
+        break;
+      }
       }
       *this << ", getter ";
       component.getComputedPropertyGetter()->printName(PrintState.OS);
@@ -2731,11 +2734,22 @@ public:
       *this << " : $" << component.getComponentType();
       break;
     }
-    case KeyPathPatternComponent::Kind::PayloadCase: {
+    case KeyPathPatternComponent::Kind::EnumCase: {
       auto enumElement = component.getEnumElement();
-      *this << "payload_case #";
+      *this << "enum_case #";
       printValueDecl(enumElement, PrintState.OS);
       *this << " : $" << component.getComponentType();
+      break;
+    }
+    case KeyPathPatternComponent::Kind::ComputedEnumCase: {
+      auto enumElement = component.getEnumElement();
+      *this << "computed_enum_case #";
+      printValueDecl(enumElement, PrintState.OS);
+      *this << " : $" << component.getComponentType();
+      *this << ", getter ";
+      component.getComputedPropertyGetter()->printName(PrintState.OS);
+      *this << " : "
+            << component.getComputedPropertyGetter()->getLoweredType();
       break;
     }
     }

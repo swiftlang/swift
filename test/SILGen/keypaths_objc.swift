@@ -45,6 +45,8 @@ func objcKeypaths() {
   _ = \Foo.bar.foo.nonobjc.y
   // CHECK: keypath $KeyPath<Foo, Bar>, (objc "thisIsADifferentName"
   _ = \Foo.differentName
+  // CHECK: keypath $KeyPath<Optional<Int>, Optional<Int>>, (objc "self"
+  _ = \Int?.some
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B18KeypathIdentifiersyyF

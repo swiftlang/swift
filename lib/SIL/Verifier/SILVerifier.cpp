@@ -435,9 +435,24 @@ void verifyKeyPathComponent(SILModule &M,
 
     break;
   }
-  case KeyPathPatternComponent::Kind::PayloadCase: {
+  case KeyPathPatternComponent::Kind::EnumCase:
+  case KeyPathPatternComponent::Kind::ComputedEnumCase: {
+    require((bool)baseTy->getEnumOrBoundGenericEnum(),
+            "key path with enum case component should have an enum type base");
     require((bool)leafTy->getOptionalObjectType(),
-            "key path with payload case component should have option result");
+            "key path with payload case component should have optional result");
+
+    auto enumCase = component.getEnumElement();
+
+    if (enumCase->hasAssociatedValues()) {
+
+    } else {
+      auto voidOptTy = OptionalType::get(M.getASTContext().TheEmptyTupleType);
+
+      require(componentTy->isEqual(voidOptTy),
+              "component type should be equal to the enum case's argument type");
+    }
+
     break;
   }
   }
@@ -5148,7 +5163,8 @@ public:
         case KeyPathPatternComponent::Kind::OptionalWrap:
         case KeyPathPatternComponent::Kind::OptionalForce:
         case KeyPathPatternComponent::Kind::TupleElement:
-        case KeyPathPatternComponent::Kind::PayloadCase:
+        case KeyPathPatternComponent::Kind::EnumCase:
+        case KeyPathPatternComponent::Kind::ComputedEnumCase:
           hasIndices = false;
           break;
         }

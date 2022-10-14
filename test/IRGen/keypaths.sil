@@ -422,24 +422,24 @@ bb0(%0 : $*@callee_guaranteed @substituted <A> () -> @out A for <()>, %1 : $*S):
 sil @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed @substituted <A> () -> @out A for <()>
 sil @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed @substituted <A> () -> @out A for <()>, @inout C2) -> ()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @payload_cases()
-sil @payload_cases : $@convention(thin) () -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @enum_cases()
+sil @enum_cases : $@convention(thin) () -> () {
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_PC0]] to i8*), i8* undef)
-  %pc0 = keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+  %pc0 = keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
 
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_PC1]] to i8*), i8* undef)
-  %pc1 = keypath $KeyPath<Mirror.AncestorRepresentation, Optional<() -> Mirror>>, (root $Mirror.AncestorRepresentation; payload_case #Mirror.AncestorRepresentation.customized : $Optional<() -> Mirror>)
+  %pc1 = keypath $KeyPath<Mirror.AncestorRepresentation, Optional<() -> Mirror>>, (root $Mirror.AncestorRepresentation; enum_case #Mirror.AncestorRepresentation.customized : $Optional<() -> Mirror>)
 
   return undef : $()
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @payload_cases_generics(%swift.type* %T, %swift.type* %U)
-sil @payload_cases_generics : $@convention(thin) <T, U> () -> () {
+sil @enum_cases_generics : $@convention(thin) <T, U> () -> () {
 entry:
   // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
   // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_PCG0]] to i8*), i8* [[ARGS]])
-  %pcg0 = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <A, B> (root $Optional<(A, B)>; payload_case #Optional.some : $Optional<(A, B)>; optional_chain : $(A, B); tuple_element #1 : $B; optional_wrap : $Optional<B>) <T, U>
+  %pcg0 = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <A, B> (root $Optional<(A, B)>; enum_case #Optional.some : $Optional<(A, B)>; optional_chain : $(A, B); tuple_element #1 : $B; optional_wrap : $Optional<B>) <T, U>
 
   return undef : $()
 }

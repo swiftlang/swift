@@ -8551,10 +8551,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
           memberLocator->isLastElement<LocatorPathElt::KeyPathComponent>()) {
         if (auto enumElement = 
               dyn_cast_or_null<EnumElementDecl>(candidate.getDecl())) {
-          if (enumElement->hasAssociatedValues()) {
-            result.addViable(candidate);
-            return;
-          }
+          result.addViable(candidate);
+          return;
         }
       }
 
@@ -9045,7 +9043,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     }
 
     if (locator->isForKeyPathDynamicMemberLookup()) {
-      if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, decl, locator))
+      if (auto *fix = AllowInvalidRefInKeyPath::forRef(cs, choice, locator))
         return fix;
     }
   }
@@ -10908,7 +10906,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
       if (auto *fix = AllowInvalidRefInKeyPath::forRef(
-              *this, choice.getDecl(), calleeLoc)) {
+              *this, choice, calleeLoc)) {
         if (!hasFixFor(calleeLoc, FixKind::AllowTypeOrInstanceMember))
           if (!shouldAttemptFixes() || recordFix(fix))
             return SolutionKind::Error;
@@ -10964,7 +10962,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       llvm_unreachable("DictionaryKey only valid in #keyPath");
       break;
 
-    case KeyPathExpr::Component::Kind::PayloadCase:
+    case KeyPathExpr::Component::Kind::EnumCase:
       llvm_unreachable("not implemented");
       break;
     }

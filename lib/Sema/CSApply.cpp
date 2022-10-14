@@ -309,7 +309,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
       // when indexing a Dictionary or NSDictionary by string, or when applying
       // a mapping subscript operation to Array/Set or NSArray/NSSet.
       return false;
-    case KeyPathExpr::Component::Kind::PayloadCase:
+    case KeyPathExpr::Component::Kind::EnumCase:
       return false;
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
@@ -4850,6 +4850,7 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
+      bool didOptionalChainWithSomeCase = false;
       bool isFunctionType = false;
       Type baseTy, leafTy;
       Type exprType = cs.getType(E);
@@ -4917,6 +4918,7 @@ namespace {
           if (resolvedComponents.back().getKind() ==
               KeyPathExpr::Component::Kind::OptionalChain) {
             didOptionalChain = true;
+            didOptionalChainWithSomeCase = true;
           }
 
           break;
@@ -4932,7 +4934,8 @@ namespace {
           // If we have already chained, do not add another chain. This can
           // occur if we had an unresolved property resolve to Optional.some.
           // E.g. \(Int, Int)?.some?.1 resolves the .some to an optional chain.
-          if (didOptionalChain) {
+          if (didOptionalChainWithSomeCase) {
+            didOptionalChainWithSomeCase = false;
             continue;
           }
 
@@ -4982,7 +4985,7 @@ namespace {
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:
         case KeyPathExpr::Component::Kind::TupleElement:
-        case KeyPathExpr::Component::Kind::PayloadCase:
+        case KeyPathExpr::Component::Kind::EnumCase:
           llvm_unreachable("already resolved");
           break;
         case KeyPathExpr::Component::Kind::DictionaryKey:
@@ -5165,10 +5168,9 @@ namespace {
           // Compute the concrete reference to the member.
           auto ref = resolveConcreteDeclRef(decl, locator);
           components.push_back(
-              KeyPathExpr::Component::forProperty(ref, resolvedTy, componentLoc));
-        } else if (auto enumElement = dyn_cast<EnumElementDecl>()) {
-          assert(enumElement->hasAssociatedValues());
-
+              KeyPathExpr::Component::forProperty(ref, resolvedTy,
+                                                  componentLoc));
+        } else if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
           auto ref = resolveConcreteDeclRef(decl, locator);
 
           // If our ref is Optional.some, lower that as the start of an optional
@@ -5183,8 +5185,8 @@ namespace {
                                                          componentLoc));
             } else {
               components.push_back(
-                  KeyPathExpr::Component::forPayloadCase(ref, resolvedTy,
-                                                         componentLoc));
+                  KeyPathExpr::Component::forEnumCase(ref, resolvedTy,
+                                                      componentLoc));
             }
           }
         } else {

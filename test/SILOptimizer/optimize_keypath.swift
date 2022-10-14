@@ -5,7 +5,7 @@
 
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
-// REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: executable_test,optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
 protocol P {
@@ -112,6 +112,20 @@ struct SimpleStruct: P {
   }
   
   var computed: Int { get { i + 1 } set { i = newValue - 1} }
+}
+
+enum Color {
+  case blue
+  case generic(String)
+
+  indirect case recursive(Color)
+}
+
+enum GenericColor<T> {
+  case blue
+  case generic(T)
+
+  indirect case recursive(GenericColor<T>)
 }
 
 // Check if all keypath instructions have been optimized away
@@ -712,4 +726,60 @@ print("SimpleClass obj count: \(SimpleClass.numObjs)")
 // CHECK-OUTPUT: GenClass obj count: 0
 print("GenClass obj count: \(numGenClassObjs)")
 
+// CHECK-LABEL: sil {{.*}}enumCaseEmpty
+// CHECK: switch_enum [[CASE:%[0-9]+]] : $Color, case #Color.blue!enumelt
+// some case
+// CHECK: inject_enum_addr [[RESULT_ADDR:%[0-9]+]] : $*Optional<()>, #Optional.some!enumelt
+// none case
+// CHECK: [[NONE:%[0-9]+]] = enum $Optional<()>, #Optional.none!enumelt
+// return
+// CHECK: return [[RESULT:%[0-9]+]] : $Optional<()>
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+@available(SwiftStdlib 5.8, macOS 999, *)
+func enumCaseEmpty(_ color: Color) -> Void? {
+  color[keyPath: \.blue]
+}
 
+// CHECK-LABEL: sil {{.*}}enumCasePayload
+// CHECK: switch_enum [[CASE:%[0-9]+]] : $Color, case #Color.generic!enumelt
+// some case
+// CHECK: {{bb.}}([[PAYLOAD:%[0-9]+]] : $String):
+// CHECK:   [[RESULT0:%[0-9]+]] = enum $Optional<String>, #Optional.some!enumelt, [[PAYLOAD]] : $String
+// CHECK:   [[STRING:%[0-9]+]] = unchecked_enum_data [[CASE]] : $Color, #Color.generic!enumelt
+// none case
+// CHECK: [[RESULT1:%[0-9]+]] = enum $Optional<String>, #Optional.none!enumelt
+// return
+// CHECK: {{bb.}}([[RESULT2:%[0-9]+]] : $Optional<String>):
+// CHECK:   return [[RESULT2]] : $Optional<String>
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+@available(SwiftStdlib 5.8, macOS 999, *)
+func enumCasePayload(_ color: Color) -> String? {
+  color[keyPath: \.generic]
+}
+
+// CHECK-LABEL: sil {{.*}}enumCaseIndirect
+// CHECK: switch_enum [[CASE:%[0-9]+]] : $Color, case #Color.recursive!enumelt
+// some case
+// CHECK: {{bb.}}([[BOX:%[0-9]+]] : ${ var Color }):
+// CHECK:   [[COLOR_ADDR:%[0-9]+]] = project_box [[BOX]] : ${ var Color }, 0
+// CHECK:   [[CASE:%[0-9]+]] = load [[COLOR_ADDR]] : $*Color
+// CHECK:   switch_enum [[CASE]] : $Color, case #Color.generic!enumelt
+// Color.generic case
+// CHECK: {{bb.}}([[PAYLOAD:%[0-9]+]] : $String):
+// CHECK:   [[RESULT0:%[0-9]+]] = enum $Optional<String>, #Optional.some!enumelt, [[PAYLOAD]] : $String
+// CHECK:   [[STRING:%[0-9]+]] = unchecked_enum_data [[CASE]] : $Color, #Color.generic!enumelt
+// not Color.generic case
+// CHECK: [[RESULT1:%[0-9]+]] = enum $Optional<String>, #Optional.none!enumelt
+// none case
+// CHECK: [[RESULT2:%[0-9]+]] = enum $Optional<String>, #Optional.none!enumelt
+// return
+// CHECK: {{bb.}}([[RESULT2:%[0-9]+]] : $Optional<String>):
+// CHECK:   return [[RESULT2]] : $Optional<String>
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+@available(SwiftStdlib 5.8, macOS 999, *)
+func enumCaseIndirect(_ color: Color) -> String? {
+  color[keyPath: \.recursive?.generic]
+}

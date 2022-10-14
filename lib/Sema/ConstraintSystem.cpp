@@ -524,7 +524,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     case ComponentKind::TupleElement:
       llvm_unreachable("Not implemented by CSGen");
       break;
-    case ComponentKind::PayloadCase:
+    case ComponentKind::EnumCase:
       llvm_unreachable("Not implemented by CSGen");
       break;
     case ComponentKind::Invalid:
@@ -3532,18 +3532,24 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    // If we're referring to an overload of an enum element with an associated
-    // value as a key path component, the resulting ref type will be
-    // (T, ...) -> Root. In this case, we want our component type to actually
-    // be the tuple of the parameter types (T, ...).
+    // If we're referring to an overload of an enum element as a key path
+    // component, the resulting ref type will be (...) -> Root. In this case,
+    // we want our component type to actually be the optional tuple of the
+    // parameter types (...)?.
     if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
-      if (locator->isLastElement<LocatorPathElt::KeyPathComponent>() &&
-          enumElement->hasAssociatedValues()) {
-        auto fnTy = refType->castTo<FunctionType>();
-        refType = FunctionType::composeTuple(getASTContext(),
-                                             fnTy->getParams());
-        refType = refType->getDesugaredType();
-        refType = OptionalType::get(refType);
+      if (locator->isLastElement<LocatorPathElt::KeyPathComponent>()) {
+        if (auto fnTy = refType->getAs<FunctionType>()) {
+          refType = FunctionType::composeTuple(getASTContext(),
+                                               fnTy->getParams(),
+                                            ParameterFlagHandling::AssertEmpty);
+          refType = refType->getDesugaredType();
+          refType = OptionalType::get(refType);
+        } else {
+          // Otherwise, this is a non-payload case
+          refType = OptionalType::get(getASTContext().TheEmptyTupleType);
+        }
+
+        adjustedRefType = refType;
       }
     }
   }

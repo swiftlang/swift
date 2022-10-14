@@ -219,18 +219,27 @@ entry:
   return undef : $()
 }
 
+sil @get_enum_case : $@convention(thin) (@in_guaranteed Color) -> @out Optional<String>
+sil @get_gen_enum_case : $@convention(thin) <T, U> (@in_guaranteed Optional<(T, U)>) -> @out Optional<(T, U)>
+
 sil shared [serialized] @JJ_payload_case : $@convention(thin) () -> () {
 entry:
-  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
-  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; computed_enum_case #Color.generic : $Optional<String>, getter @get_enum_case : $@convention(thin) (@in_guaranteed Color) -> @out Optional<String>)
+  %b = keypath $KeyPath<Color, Optional<String>>, (root $Color; computed_enum_case #Color.generic : $Optional<String>, getter @get_enum_case : $@convention(thin) (@in_guaranteed Color) -> @out Optional<String>)
 
   return undef : $()
 }
 
 sil shared [serialized] @KK_payload_case_generic : $@convention(thin) <T, U> () -> () {
 entry:
-  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
-  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; computed_enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>, getter @get_gen_enum_case : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed Optional<(τ_0_0, τ_0_1)>) -> @out Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %b = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; computed_enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>, getter @get_gen_enum_case : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed Optional<(τ_0_0, τ_0_1)>) -> @out Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
 
   return undef : $()
 }

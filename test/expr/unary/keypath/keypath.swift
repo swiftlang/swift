@@ -1182,7 +1182,7 @@ func f_56854() {
   }
 }
 
-// Payload case keypaths
+// Enum case keypaths
 
 enum Color {
   case red
@@ -1191,11 +1191,25 @@ enum Color {
   case generic(String)
   case generic(String, Int)
   case generic(name: String)
+
+  indirect case recursive(Color, Color)
 }
 
-@available(SwiftStdlib 9999, *)
-func testPayloadKeyPaths() {
-  let _ = \Color.red // expected-error {{key path cannot refer to static member 'red'}}
+func testEnumKeyPaths() {
+  let _ = \Color.red
+  let _ = \Color.green
+  let _ = \Color.blue
+  let _ = \Color.generic // expected-error {{type of expression is ambiguous without more context}}
+  let _ = \Color.generic(_) // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
+  let _ = \Color.generic(_:) // ok
+  let _ = \Color.generic(_:_:) // ok
+  let _ = \Color.generic(name:) // ok
 
-  //let _ = 
+  let _ = \Color.recursive // ok
+
+  let _ = \Color.recursive?.generic // expected-error {{value of tuple type '(Color, Color)' has no member 'generic'}}
+  let _ = \Color.recursive?.0.generic // expected-error {{type of expression is ambiguous without more context}}
+  let _ = \Color.recursive?.0.generic(_:) // ok
+
+  let _ = \Color.generic(_:_:)?.1.words // ok
 }

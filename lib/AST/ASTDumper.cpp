@@ -2891,8 +2891,8 @@ public:
       case KeyPathExpr::Component::Kind::CodeCompletion:
         PrintWithColorRAII(OS, ASTNodeColor) << "completion";
         break;
-      case KeyPathExpr::Component::Kind::PayloadCase:
-        PrintWithColorRAII(OS, ASTNodeColor) << "payload_case";
+      case KeyPathExpr::Component::Kind::EnumCase:
+        PrintWithColorRAII(OS, ASTNodeColor) << "enum_case";
         PrintWithColorRAII(OS, DeclColor) << " decl=";
         printDeclRef(component.getDeclRef());
         break;

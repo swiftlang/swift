@@ -234,21 +234,34 @@ public:
   
   // Use this initializer for resilient enums.
   constexpr static KeyPathComponentHeader
-  forPayloadCase() {
+  forEnumCase() {
     return KeyPathComponentHeader(
-    (_SwiftKeyPathComponentHeader_PayloadCaseTag
+    (_SwiftKeyPathComponentHeader_EnumCaseTag
      << _SwiftKeyPathComponentHeader_DiscriminatorShift)
     | _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload);
   }
 
   constexpr static KeyPathComponentHeader
-  forPayloadCase(unsigned caseTag) {
+  forEnumCase(unsigned caseTag) {
     return KeyPathComponentHeader(
-    (_SwiftKeyPathComponentHeader_PayloadCaseTag
+    (_SwiftKeyPathComponentHeader_EnumCaseTag
      << _SwiftKeyPathComponentHeader_DiscriminatorShift)
     | validateInlineOffset(caseTag));
   }
   
+  constexpr static KeyPathComponentHeader
+  forComputedEnumCase(ComputedPropertyIDKind idKind,
+                      ComputedPropertyIDResolution resolution) {
+    return KeyPathComponentHeader(
+      (_SwiftKeyPathComponentHeader_ComputedTag
+        << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+      | (idKind == StoredPropertyIndex
+           ? _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag : 0)
+      | (resolution == Resolved ? _SwiftKeyPathComponentHeader_ComputedIDResolved
+       : resolution == IndirectPointer ? _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
+       : (assert(false && "invalid resolution"), 0)));
+  }
+
   constexpr uint32_t getData() const { return Data; }
 };
 

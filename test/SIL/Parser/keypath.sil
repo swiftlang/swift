@@ -98,14 +98,6 @@ entry:
   return undef : $()
 }
 
-sil shared @payload_cases : $@convention(thin) () -> () {
-entry:
-  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
-  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; payload_case #Color.generic : $Optional<String>)
-
-  return undef : $()
-}
-
 sil @id_a : $@convention(thin) () -> ()
 sil @get_s_int : $@convention(thin) (@in_guaranteed S) -> @out Int
 sil @set_s_int : $@convention(thin) (@in_guaranteed Int, @in_guaranteed S) -> ()
@@ -121,7 +113,6 @@ sil @get_gen_int_subs : $@convention(thin) <A: Hashable, B: Hashable, C: Hashabl
 sil @set_gen_int_subs : $@convention(thin) <A: Hashable, B: Hashable, C: Hashable> (@in_guaranteed C, @in_guaranteed A, UnsafeRawPointer) -> ()
 sil @gen_subs_eq : $@convention(thin) <A: Hashable, B: Hashable, C: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool
 sil @gen_subs_hash : $@convention(thin) <A: Hashable, B: Hashable, C: Hashable> (UnsafeRawPointer) -> Int
-
 
 // CHECK-LABEL: sil shared @computed_properties
 sil shared @computed_properties : $@convention(thin) () -> () {
@@ -166,10 +157,29 @@ entry:
   return undef : $()
 }
 
-sil shared @payload_cases_generic : $@convention(thin) <T, U> () -> () {
+sil @get_enum_case : $@convention(thin) (@in_guaranteed Color) -> @out Optional<String>
+sil @get_gen_enum_case : $@convention(thin) <T, U> (@in_guaranteed Optional<(T, U)>) -> @out Optional<(T, U)>
+
+// CHECK-LABEL: sil shared @enum_cases
+sil shared @enum_cases : $@convention(thin) () -> () {
 entry:
-  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
-  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; payload_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+  %a = keypath $KeyPath<Color, Optional<String>>, (root $Color; enum_case #Color.generic : $Optional<String>)
+
+  // CHECK: keypath $KeyPath<Color, Optional<String>>, (root $Color; computed_enum_case #Color.generic : $Optional<String>, getter @get_enum_case : $@convention(thin) (@in_guaranteed Color) -> @out Optional<String>)
+  %b = keypath $KeyPath<Color, Optional<String>>, (root $Color; computed_enum_case #Color.generic : $Optional<String>, getter @get_enum_case : $@convention(thin) (@in_guaranteed Color) -> @out Optional<String>)
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared @enum_cases_generic
+sil shared @enum_cases_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %a = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+
+  // CHECK: keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; computed_enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>, getter @get_gen_enum_case : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed Optional<(τ_0_0, τ_0_1)>) -> @out Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
+  %b = keypath $KeyPath<Optional<(T, U)>, Optional<U>>, <τ_0_0, τ_0_1> (root $Optional<(τ_0_0, τ_0_1)>; computed_enum_case #Optional.some : $Optional<(τ_0_0, τ_0_1)>, getter @get_gen_enum_case : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed Optional<(τ_0_0, τ_0_1)>) -> @out Optional<(τ_0_0, τ_0_1)>; optional_chain : $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1; optional_wrap : $Optional<τ_0_1>) <T, U>
 
   return undef : $()
 }

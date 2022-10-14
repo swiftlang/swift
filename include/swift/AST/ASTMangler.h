@@ -301,6 +301,11 @@ public:
                                      AutoDiffLinearMapKind linearMapKind,
                                      const AutoDiffConfig &config);
 
+  std::string mangleKeyPathGetterThunkHelper(const EnumElementDecl *enumElement,
+                                             GenericSignature signature,
+                                             CanType baseType,
+                                             SubstitutionMap sub,
+                                             ResilienceExpansion expansion);
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,

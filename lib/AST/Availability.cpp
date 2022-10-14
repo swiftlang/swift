@@ -443,7 +443,8 @@ ASTContext::getImmortalRefCountSymbolsAvailability() {
 }
 
 AvailabilityContext
-ASTContext::getPayloadCaseKeyPathAvailability() {
+ASTContext::getEnumCaseKeyPathAvailability() {
+  // TODO: replace this with a concrete swift version once we have it.
   return getSwiftFutureAvailability();
 }
 

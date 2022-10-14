@@ -183,7 +183,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
           offset += rawComponent._structOrClassOffset
 
         case .class, .computed, .optionalChain, .optionalForce, .optionalWrap,
-             .external, .payloadCase:
+             .external, .enumCase:
           return .none
         }
 
@@ -445,7 +445,7 @@ internal enum KeyPathComponentKind {
   /// The keypath refers to an enum case with an associated value. Accessing
   /// this kind of component returns an optional of a tuple of the associated
   /// value types.
-  case payloadCase
+  case enumCase
 }
 
 internal struct ComputedPropertyID: Hashable {
@@ -667,7 +667,7 @@ internal enum KeyPathComponent: Hashable {
   /// The keypath wraps a value in an optional.
   case optionalWrap
   /// The keypath references an enum case with an associated value.
-  case payloadCase(tag: Int)
+  case enumCase(tag: Int)
 
   internal static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
     switch (a, b) {
@@ -699,7 +699,7 @@ internal enum KeyPathComponent: Hashable {
       // only arguments in that component were generic captures and therefore
       // not affecting equality.
       return true
-    case(.payloadCase(let tagA), .payloadCase(let tagB)):
+    case(.enumCase(let tagA), .enumCase(let tagB)):
       return tagA == tagB
     case (.struct, _),
          (.class,  _),
@@ -709,7 +709,7 @@ internal enum KeyPathComponent: Hashable {
          (.get, _),
          (.mutatingGetSet, _),
          (.nonmutatingGetSet, _),
-         (.payloadCase, _):
+         (.enumCase, _):
       return false
     }
   }
@@ -756,7 +756,7 @@ internal enum KeyPathComponent: Hashable {
       hasher.combine(7)
       hasher.combine(id)
       appendHashFromArgument(argument)
-    case .payloadCase(let tag):
+    case .enumCase(let tag):
       hasher.combine(8)
       hasher.combine(tag)
     }
@@ -987,8 +987,8 @@ internal struct RawKeyPathComponent {
         return .optionalWrap
       case (Header.optionalTag, Header.optionalForcePayload):
         return .optionalForce
-      case (Header.payloadCaseTag, _):
-        return .payloadCase
+      case (Header.enumCaseTag, _):
+        return .enumCase
       default:
         _internalInvariantFailure("invalid header")
       }
@@ -1027,8 +1027,8 @@ internal struct RawKeyPathComponent {
     internal static var optionalForcePayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalForcePayload
     }
-    internal static var payloadCaseTag: UInt32 {
-      return _SwiftKeyPathComponentHeader_PayloadCaseTag
+    internal static var enumCaseTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_EnumCaseTag
     }
 
     internal static var endOfReferencePrefixFlag: UInt32 {
@@ -1221,7 +1221,7 @@ internal struct RawKeyPathComponent {
         // Otherwise, there's no body.
         return 0
 
-      case .payloadCase:
+      case .enumCase:
         // If the enum in question was resilient, we would have stored a
         // relative reference to the enum case symbol.
         if payload == Header.outOfLineOffsetPayload {
@@ -1247,9 +1247,9 @@ internal struct RawKeyPathComponent {
                 payload: Header.optionalChainPayload)
     }
 
-    init(payloadCaseTag: Int) {
-      self.init(discriminator: Header.payloadCaseTag,
-                payload: UInt32(payloadCaseTag))
+    init(enumCaseTag: Int) {
+      self.init(discriminator: Header.enumCaseTag,
+                payload: UInt32(enumCaseTag))
     }
 
     init(stored kind: KeyPathStructOrClass,
@@ -1338,7 +1338,7 @@ internal struct RawKeyPathComponent {
         }
       }
       return total
-    case .payloadCase:
+    case .enumCase:
       // If the enum in question was resilient, we would have stored a
       // relative reference to the enum case symbol.
       if header.payload == Header.outOfLineOffsetPayload {
@@ -1431,8 +1431,8 @@ internal struct RawKeyPathComponent {
     return 0
   }
 
-  internal var _payloadCaseTag: Int {
-    _internalInvariant(header.kind == .payloadCase)
+  internal var _enumCaseTag: Int {
+    _internalInvariant(header.kind == .enumCase)
 
     return Int(header.payload)
   }
@@ -1483,8 +1483,8 @@ internal struct RawKeyPathComponent {
       }
     case .external:
       _internalInvariantFailure("should have been instantiated away")
-    case .payloadCase:
-      return .payloadCase(tag: _payloadCaseTag)
+    case .enumCase:
+      return .enumCase(tag: _enumCaseTag)
     }
   }
 
@@ -1495,7 +1495,7 @@ internal struct RawKeyPathComponent {
          .optionalChain,
          .optionalForce,
          .optionalWrap,
-         .payloadCase:
+         .enumCase:
       // trivial
       break
     case .computed:
@@ -1530,7 +1530,7 @@ internal struct RawKeyPathComponent {
          .optionalForce,
          .optionalWrap:
       break
-    case .payloadCase:
+    case .enumCase:
       break
     case .computed:
       // Fields are pointer-aligned after the header
@@ -1685,7 +1685,7 @@ internal struct RawKeyPathComponent {
       return .continue(
         unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
 
-    case .payloadCase(let tag):
+    case .enumCase(let tag):
       guard _getEnumTag(of: base) == tag else {
         return .continue((Optional<()>.none as any Any) as! NewValue)
       }
@@ -1775,7 +1775,7 @@ internal struct RawKeyPathComponent {
       _ = baseOptionalPointer.pointee!
       return base
     
-    case .optionalChain, .optionalWrap, .get, .payloadCase:
+    case .optionalChain, .optionalWrap, .get, .enumCase:
       _internalInvariantFailure("not a mutable key path component")
     }
   }
@@ -2859,7 +2859,7 @@ internal protocol KeyPathPatternVisitor {
   mutating func visitOptionalChainComponent()
   mutating func visitOptionalForceComponent()
   mutating func visitOptionalWrapComponent()
-  mutating func visitPayloadCaseComponent(tag: Int)
+  mutating func visitEnumCaseComponent(tag: Int)
 
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference)
 
@@ -3062,7 +3062,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
       walker.visitOptionalWrapComponent()
     case .optionalForce:
       walker.visitOptionalForceComponent()
-    case .payloadCase:
+    case .enumCase:
       var tag = header.payload
 
       // If our payload is equal to the out of line payload, then it means our
@@ -3079,7 +3079,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
         tag = enumCase.load(as: UInt32.self)
       }
 
-      walker.visitPayloadCaseComponent(tag: Int(tag))
+      walker.visitEnumCaseComponent(tag: Int(tag))
     case .external:
       // Look at the external property descriptor to see if we should take it
       // over the component given in the pattern.
@@ -3165,7 +3165,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
           arguments: arguments,
           externalArgs: genericParamCount > 0 ? externalArgs : nil)
       case .optionalChain, .optionalWrap, .optionalForce, .external,
-           .payloadCase:
+           .enumCase:
         _internalInvariantFailure("not possible for property descriptor")
       }
     }
@@ -3360,7 +3360,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     size += 4
   }
 
-  mutating func visitPayloadCaseComponent(tag: Int) {
+  mutating func visitEnumCaseComponent(tag: Int) {
     capability = .readOnly
     size += 4
   }
@@ -3709,9 +3709,9 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     pushDest(header)
   }
 
-  mutating func visitPayloadCaseComponent(tag: Int) {
+  mutating func visitEnumCaseComponent(tag: Int) {
     let _ = updatePreviousComponentAddr()
-    let header = RawKeyPathComponent.Header(payloadCaseTag: tag)
+    let header = RawKeyPathComponent.Header(enumCaseTag: tag)
     pushDest(header)
   }
 
@@ -3815,9 +3815,9 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     checkSizeConsistency()
   }
 
-  mutating func visitPayloadCaseComponent(tag: Int) {
-    sizeVisitor.visitPayloadCaseComponent(tag: tag)
-    instantiateVisitor.visitPayloadCaseComponent(tag: tag)
+  mutating func visitEnumCaseComponent(tag: Int) {
+    sizeVisitor.visitEnumCaseComponent(tag: tag)
+    instantiateVisitor.visitEnumCaseComponent(tag: tag)
     checkSizeConsistency()
   }
 
@@ -4003,6 +4003,19 @@ extension AnyKeyPath: CustomDebugStringConvertible {
           description.append("?")
         case .optionalForce:
           description.append("!")
+        case .enumCase(let tag):
+          var field = _FieldReflectionMetadata()
+          _ = _getChildMetadata(
+            valueType,
+            index: tag,
+            fieldMetadata: &field
+          )
+
+          defer {
+            field.freeFunc?(field.name)
+          }
+
+          description.append(String(cString: field.name))
         }
         if hasEnded {
           break

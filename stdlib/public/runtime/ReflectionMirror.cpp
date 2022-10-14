@@ -565,7 +565,15 @@ struct EnumImpl : ReflectionMirrorImpl {
 
   const FieldType childMetadata(intptr_t i, const char **outName,
                                 void (**outFreeFunc)(const char *)) override {
-    return FieldType();
+    StringRef name;
+    FieldType info;
+
+    std::tie(name, info) = getFieldAt(type, i);
+
+    *outName = name.data();
+    *outFreeFunc = nullptr;
+
+    return info;
   }
 
   AnyReturn subscript(intptr_t i, const char **outName,
