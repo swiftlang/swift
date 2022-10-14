@@ -118,3 +118,47 @@ func genericReturnTupleInvalid<@_typeSequence T>(_: T...) {
 
   let _: (T..., y: Int) = returnTupleLabel6() // expected-error {{cannot convert value of type '(Int, y: Int)' to specified type '(T..., y: Int)'}}
 }
+
+func returnFunction1<@_typeSequence T>() -> (T...) -> () {}
+
+func returnFunction2<@_typeSequence T>() -> (Int, T...) -> () {} // expected-note {{in call to function 'returnFunction2()'}}
+
+func returnFunction3<@_typeSequence T>() -> (T..., Float) -> () {} // expected-note {{in call to function 'returnFunction3()'}}
+
+func returnFunction4<@_typeSequence T>() -> (Int, T..., Float) -> () {} // expected-note 2{{in call to function 'returnFunction4()'}}
+
+func concreteReturnFunctionValid() {
+  let _: () -> () = returnFunction1()
+  let _: (Int) -> () = returnFunction1()
+  let _: (String, Double) -> () = returnFunction1()
+
+  let _: (Int) -> () = returnFunction2()
+  let _: (Int, Int) -> () = returnFunction2()
+  let _: (Int, String, Double) -> () = returnFunction2()
+
+  let _: (Float) -> () = returnFunction3()
+  let _: (Int, Float) -> () = returnFunction3()
+  let _: (String, Double, Float) -> () = returnFunction3()
+
+  let _: (Int, Float) -> () = returnFunction4()
+  let _: (Int, Int, Float) -> () = returnFunction4()
+  let _: (Int, String, Double, Float) -> () = returnFunction4()
+}
+
+func concreteReturnFunctionInvalid() {
+  let _: () -> () = returnFunction2() // expected-error {{cannot convert value of type '(Int, T...) -> ()' to specified type '() -> ()'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: (String) -> () = returnFunction2() // expected-error {{cannot convert value of type '(Int) -> ()' to specified type '(String) -> ()'}}
+  let _: (String, Int) -> () = returnFunction2() // expected-error {{cannot convert value of type '(Int, Int) -> ()' to specified type '(String, Int) -> ()'}}
+
+  let _: () -> () = returnFunction3() // expected-error {{cannot convert value of type '(T..., Float) -> ()' to specified type '() -> ()'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: (Float, Int) -> () = returnFunction3() // expected-error {{cannot convert value of type '(Float, Float) -> ()' to specified type '(Float, Int) -> ()'}}
+  let _: (Float, Double, String) -> () = returnFunction3() // expected-error {{cannot convert value of type '(Float, Double, Float) -> ()' to specified type '(Float, Double, String) -> ()'}}
+
+  let _: () -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, T..., Float) -> ()' to specified type '() -> ()'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: (Int) -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, T..., Float) -> ()' to specified type '(Int) -> ()'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: (Float, Int) -> () = returnFunction4() // expected-error {{cannot convert value of type '(Int, Float) -> ()' to specified type '(Float, Int) -> ()'}}
+}
