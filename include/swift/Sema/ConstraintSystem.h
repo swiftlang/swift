@@ -330,6 +330,9 @@ enum TypeVariableOptions {
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
   TVO_PrefersSubtypeBinding = 0x10,
+
+  /// Whether the type variable can be bound to a pack type or not.
+  TVO_CanBindToPack = 0x20,
 };
 
 /// The implementation object for a type variable used within the
@@ -387,17 +390,20 @@ public:
            && "Truncation");
   }
 
-  /// Whether this type variable can bind to an lvalue type.
+  /// Whether this type variable can bind to an LValueType.
   bool canBindToLValue() const { return getRawOptions() & TVO_CanBindToLValue; }
 
-  /// Whether this type variable can bind to an inout type.
+  /// Whether this type variable can bind to an InOutType.
   bool canBindToInOut() const { return getRawOptions() & TVO_CanBindToInOut; }
 
-  /// Whether this type variable can bind to an inout type.
+  /// Whether this type variable can bind to a noescape FunctionType.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
-  /// Whether this type variable can bind to a hole.
+  /// Whether this type variable can bind to a PlaceholderType.
   bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
+
+  /// Whether this type variable can bind to a PackType.
+  bool canBindToPack() const { return getRawOptions() & TVO_CanBindToPack; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -638,6 +644,7 @@ private:
     ENTRY(TVO_CanBindToNoEscape, "noescape");
     ENTRY(TVO_CanBindToHole, "hole");
     ENTRY(TVO_PrefersSubtypeBinding, "");
+    ENTRY(TVO_CanBindToPack, "pack");
     }
   #undef ENTRY
   }
