@@ -1891,43 +1891,73 @@ static inline Type applyToFunctionType(
   return type;
 }
 
-inline Optional<const clang::EnumDecl *> findAnonymousEnumForTypedef(
-    const ASTContext &ctx,
-    const clang::TypedefType *typedefType) {
+inline Optional<const clang::EnumDecl *>
+findAnonymousEnumForTypedef(const ASTContext &ctx,
+                            importer::NameImporter &nameImporter,
+                            const clang::TypedefType *typedefType) {
+
+  // In some cases, we import a typedef paired with an anonymous enum like so:
+  // typedef int __attribute__((availability(swift, unavailable))) MyBitSetType;
+  // enum {
+  //   Option1 = 1 << 0,
+  //   Option2 = 1 << 1,
+  // };
+  // In order to preserve the intended semantics when imported into Swift, we
+  // often need to import the enum, even when the Clang AST refers to the
+  // typedef. This function is designed to find the anonymous enum, given the
+  // typedef. When the anonymous enum is added to the Swift lookup table, it is
+  // added under the same name as the typedef -- name altering attributes not
+  // with standing. To find the enum, we attempt to look it up via the typedef's
+  // Swift name.
+
   auto *typedefDecl = typedefType->getDecl();
   auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(typedefDecl->getOwningModule());
 
-  auto foundDecls = lookupTable->lookup(
-      SerializedSwiftName(typedefDecl->getName()), EffectiveClangContext());
+  auto lookupAnonymousEnumBySwiftName = [&](const SerializedSwiftName &name)
+      -> Optional<const clang::EnumDecl *> {
+    auto foundDecls = lookupTable->lookup(name, EffectiveClangContext());
 
-  auto found = llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
-    return decl.is<clang::NamedDecl *>() &&
-        isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>());
-  });
+    auto found =
+        llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
+          return decl.is<clang::NamedDecl *>() &&
+                 isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>());
+        });
 
-  if (found != foundDecls.end())
-    return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
+    if (found != foundDecls.end())
+      return cast<clang::EnumDecl>(found->get<clang::NamedDecl *>());
 
-  // If a swift_private attribute has been attached to the enum, its name will
-  // be prefixed with two underscores
-  llvm::SmallString<32> swiftPrivateName;
-  swiftPrivateName += "__";
-  swiftPrivateName += typedefDecl->getName();
-  foundDecls = lookupTable->lookup(
-      SerializedSwiftName(ctx.getIdentifier(swiftPrivateName)),
-      EffectiveClangContext());
+    return None;
+  };
 
-  auto swiftPrivateFound =
-      llvm::find_if(foundDecls, [](SwiftLookupTable::SingleEntry decl) {
-        return decl.is<clang::NamedDecl *>() &&
-               isa<clang::EnumDecl>(decl.get<clang::NamedDecl *>()) &&
-               decl.get<clang::NamedDecl *>()
-                   ->hasAttr<clang::SwiftPrivateAttr>();
-      });
+  if (auto result = lookupAnonymousEnumBySwiftName(
+          SerializedSwiftName(typedefDecl->getName())))
+    return result;
 
-  if (swiftPrivateFound != foundDecls.end())
-    return cast<clang::EnumDecl>(swiftPrivateFound->get<clang::NamedDecl *>());
-
+  // In some cases, the anonymous enum has name alterating attributes such as
+  // NS_SWIFT_NAME that make it impossible to find using the tyedef's Swift
+  // name. In such cases, we attempt to find it by walking the enclosing decl
+  // context, looking for an anonymous enum backed by the typedef with
+  // attributes.
+  const clang::DeclContext *declContext = typedefDecl->getDeclContext();
+  for (const clang::Decl *siblingDecl : declContext->decls()) {
+    if (const clang::EnumDecl *enumDecl =
+            dyn_cast<clang::EnumDecl>(siblingDecl)) {
+      if (enumDecl->getDeclName().isEmpty() && enumDecl->hasAttrs() &&
+          enumDecl->getIntegerType().getTypePtrOrNull() == typedefType) {
+        // Once we find a candidate, we take the attributes on the enum, and
+        // redo the name lookup, but this time considering these attributes.
+        auto nameVersion =
+            ImportNameVersion::fromOptions(nameImporter.getLangOpts());
+        auto nameForCandidate = nameImporter.importNameWithAttrs(
+            typedefDecl, nameVersion, enumDecl->getAttrs());
+        auto candidateLookupResult = lookupAnonymousEnumBySwiftName(
+            SerializedSwiftName(nameForCandidate.getDeclName().getBaseName()));
+        // If we do fine the same enum decl, we return it.
+        if (candidateLookupResult && *candidateLookupResult == enumDecl)
+          return enumDecl;
+      }
+    }
+  }
   return None;
 }
 

@@ -5683,7 +5683,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   // use the enum, not the typedef here.
   if (auto typedefType = dyn_cast<clang::TypedefType>(propertyType.getTypePtr())) {
     if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(
+              Impl.SwiftContext, Impl.getNameImporter(), typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
         assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==

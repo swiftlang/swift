@@ -1800,19 +1800,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
-          StringRef baseName = typedefType->getDecl()->getName();
-          SmallString<16> swiftPrivateScratch;
-          // If this declaration has the swift_private attribute, prepend "__"
-          if (shouldBeSwiftPrivate(*this, D, version,
-                                   result.info.hasAsyncInfo)) {
-            swiftPrivateScratch = "__";
-            swiftPrivateScratch += baseName;
-            baseName = swiftPrivateScratch;
-          }
-
-          result.setDeclName(swiftCtx.getIdentifier(baseName));
-          result.setEffectiveContext(D->getDeclContext());
-          return result;
+          if (enumDecl->hasAttrs())
+            return importNameImplWithAttrs(typedefType->getDecl(), version,
+                                           givenName, enumDecl->getAttrs());
+          return importNameImpl(typedefType->getDecl(), version, givenName);
         }
       }
     }
@@ -2298,6 +2289,24 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   return result;
 }
 
+ImportedName NameImporter::importNameImplWithAttrs(
+    const clang::NamedDecl *decl, ImportNameVersion version,
+    clang::DeclarationName givenName, const clang::AttrVec &attrs) {
+  clang::AttrVec originalAttrs;
+  bool originallyHadAttrs = decl->hasAttrs();
+  if (originallyHadAttrs)
+    originalAttrs = decl->getAttrs();
+  clang::NamedDecl *mutableDecl = const_cast<clang::NamedDecl *>(decl);
+  for (clang::Attr *attr : attrs) {
+    mutableDecl->addAttr(attr);
+  }
+  ImportedName result = importNameImpl(decl, version, givenName);
+  mutableDecl->dropAttrs();
+  if (originallyHadAttrs)
+    mutableDecl->setAttrs(originalAttrs);
+  return result;
+}
+
 /// Returns true if it is expected that the macro is ignored.
 static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
                               clang::Preprocessor &PP) {
@@ -2370,6 +2379,12 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   if (!givenName)
     importNameCache[key] = res;
   return res;
+}
+
+ImportedName NameImporter::importNameWithAttrs(
+    const clang::NamedDecl *decl, ImportNameVersion version,
+    const clang::AttrVec &attrs, clang::DeclarationName givenName) {
+  return importNameImplWithAttrs(decl, version, givenName, attrs);
 }
 
 bool NameImporter::forEachDistinctImportName(

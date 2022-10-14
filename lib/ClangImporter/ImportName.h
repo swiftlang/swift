@@ -399,6 +399,11 @@ public:
                           clang::DeclarationName preferredName =
                             clang::DeclarationName());
 
+  ImportedName importNameWithAttrs(
+      const clang::NamedDecl *decl, ImportNameVersion version,
+      const clang::AttrVec &attrs,
+      clang::DeclarationName preferredName = clang::DeclarationName());
+
   /// Attempts to import the name of \p decl with each possible
   /// ImportNameVersion. \p action will be called with each unique name.
   ///
@@ -496,6 +501,14 @@ private:
   ImportedName importNameImpl(const clang::NamedDecl *,
                               ImportNameVersion version,
                               clang::DeclarationName);
+
+  // Performs importNameImpl, but with additional attributes attached to the
+  // ClangNode. To be used when the name of one Clang node is to be
+  // imported in terms of the name of another, but with additional attributes.
+  ImportedName importNameImplWithAttrs(const clang::NamedDecl *decl,
+                                       ImportNameVersion version,
+                                       clang::DeclarationName givenName,
+                                       const clang::AttrVec &attrs);
 };
 
 }

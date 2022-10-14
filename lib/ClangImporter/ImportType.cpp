@@ -2114,7 +2114,8 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
 
   if (auto typedefType = dyn_cast<clang::TypedefType>(clangDecl->getReturnType().getTypePtr())) {
     if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(
+              SwiftContext, getNameImporter(), typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
         assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
@@ -2176,7 +2177,8 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
                                 clangDecl->getSourceRange().getBegin());
   if (auto typedefType = dyn_cast<clang::TypedefType>(clangDecl->getReturnType().getTypePtr())) {
     if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(
+              SwiftContext, getNameImporter(), typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
         assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==
@@ -2272,8 +2274,8 @@ ClangImporter::Implementation::importParameterType(
   // use the enum, not the typedef here.
   if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
     if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum =
-              findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(
+              SwiftContext, getNameImporter(), typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
         assert(clangEnum.getValue()
@@ -2865,7 +2867,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   ImportedType importedType;
   if (auto typedefType = dyn_cast<clang::TypedefType>(resultType.getTypePtr())) {
     if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
+      if (auto clangEnum = findAnonymousEnumForTypedef(
+              SwiftContext, getNameImporter(), typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
         assert(clangEnum.getValue()->getIntegerType()->getCanonicalTypeInternal() ==

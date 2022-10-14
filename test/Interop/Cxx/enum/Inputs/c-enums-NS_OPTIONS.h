@@ -18,6 +18,7 @@ extern "C" {
 #define CF_OPTIONS(_type, _name) _type __attribute__((availability(swift, unavailable))) _name; enum __CF_OPTIONS_ATTRIBUTES : _name
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
 #define NS_REFINED_FOR_SWIFT __attribute__((swift_private))
+#define NS_SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
 typedef unsigned long NSUInteger;
 
@@ -32,11 +33,18 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringFormattingOptions) {
   NSAttributedStringFormattingApplyReplacementIndexAttribute = 1 << 1,
 } NS_REFINED_FOR_SWIFT;
 
+typedef NS_OPTIONS(NSUInteger, NSNameThatWillNotBeUsed) {
+  NSNameThatWillNotBeUsedMemberOne = 1 << 0,
+  NSNameThatWillNotBeUsedMemberTwo = 1 << 1,
+} NS_SWIFT_NAME(SomeCustomName);
+
 @interface NSAttributedString
 @end
 
 @interface NSAttributedString (NSAttributedStringFormatting)
 - (instancetype)initWithOptions:(NSAttributedStringFormattingOptions)options
+    NS_REFINED_FOR_SWIFT;
+- (instancetype)initWithOtherOptions:(NSNameThatWillNotBeUsed)options
     NS_REFINED_FOR_SWIFT;
 @end
 }
