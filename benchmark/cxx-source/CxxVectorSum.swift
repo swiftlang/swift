@@ -14,6 +14,14 @@
 // as compared to the C++ implementation of such sum.
 
 import TestsUtils
+import std
+
+// FIXME: remove workaround for: https://github.com/apple/swift/issues/61472
+public func __workaround_std_import() {
+    let s = std.string()
+    blackHole(s.size())
+}
+
 import CxxStdlibPerformance
 import Cxx
 
