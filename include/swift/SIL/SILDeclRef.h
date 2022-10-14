@@ -565,6 +565,11 @@ struct SILDeclRef {
   /// subclassed.
   SubclassScope getSubclassScope() const;
 
+  /// For a SILDeclRef that describes a variable initializer or backing
+  /// initializer, retrieves the expression that will be emitted for that
+  /// initialization. Otherwise, returns \c nullptr.
+  Expr *getInitializationExpr() const;
+
   bool isDynamicallyReplaceable() const;
 
   bool canBeDynamicReplacement() const;

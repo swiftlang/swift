@@ -576,9 +576,7 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root, SILDeclRef Ref);
-
-  void discardProfiler() { Profiler = nullptr; }
+  void createProfiler(SILDeclRef Ref);
 
   ProfileCounter getEntryCount() const { return EntryCount; }
 
