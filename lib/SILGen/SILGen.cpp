@@ -1000,7 +1000,6 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     auto *init = constant.getInitializationExpr();
     assert(init);
 
-    f->createProfiler(init, constant);
     auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
     SGF.emitGeneratorFunction(constant, init);
