@@ -128,7 +128,7 @@
                 "cmake": "v3.19.6",
                 "libxml2": "v2.9.12",
                 "curl": "curl-7_77_0",
-                "zlib": "v1.2.12",
+                "zlib": "v1.2.13",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
