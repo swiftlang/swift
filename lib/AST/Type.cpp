@@ -582,28 +582,6 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
   return transformFn(type);
 }
 
-void TypeBase::getTypeParameterPacks(
-    SmallVectorImpl<Type> &rootParameterPacks) const {
-  llvm::SmallDenseSet<CanType, 2> visited;
-
-  auto recordType = [&](Type t) {
-    if (visited.insert(t->getCanonicalType()).second)
-      rootParameterPacks.push_back(t);
-  };
-
-  Type(const_cast<TypeBase *>(this)).visit([&](Type t) {
-    if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
-      if (paramTy->isParameterPack()) {
-        recordType(paramTy);
-      }
-    } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      if (archetypeTy->isRoot()) {
-        recordType(t);
-      }
-    }
-  });
-}
-
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
@@ -1964,16 +1942,6 @@ unsigned GenericTypeParamType::getIndex() const {
 
   auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return fixedNum & 0xFFFF;
-}
-
-bool GenericTypeParamType::isParameterPack() const {
-  if (auto param = getDecl()) {
-    return param->isParameterPack();
-  }
-
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return (fixedNum & GenericTypeParamType::TYPE_SEQUENCE_BIT) ==
-         GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
 Identifier GenericTypeParamType::getName() const {
@@ -3459,15 +3427,6 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
-bool TupleType::containsPackExpansionType() const {
-  for (auto elt : getElements()) {
-    if (elt.getType()->is<PackExpansionType>())
-      return true;
-  }
-
-  return false;
-}
-
 ArchetypeType::ArchetypeType(TypeKind Kind,
                              const ASTContext &Ctx,
                              RecursiveTypeProperties properties,
@@ -4280,15 +4239,6 @@ bool AnyFunctionType::hasNonDerivableClangType() {
 
 bool AnyFunctionType::hasSameExtInfoAs(const AnyFunctionType *otherFn) {
   return getExtInfo().isEqualTo(otherFn->getExtInfo(), useClangTypes(this));
-}
-
-bool AnyFunctionType::containsPackExpansionType(ArrayRef<Param> params) {
-  for (auto param : params) {
-    if (param.getPlainType()->is<PackExpansionType>())
-      return true;
-  }
-
-  return false;
 }
 
 ClangTypeInfo SILFunctionType::getClangTypeInfo() const {
