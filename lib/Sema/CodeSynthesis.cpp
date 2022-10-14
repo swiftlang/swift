@@ -232,9 +232,9 @@ enum class ImplicitConstructorKind {
   /// the instance variables from a parameter of the same type and
   /// name.
   Memberwise,
-  /// The constructor of a type wrapped type which is going to
+  /// The memberwise constructor of a type wrapped type which is going to
   /// initialize underlying storage for all applicable properties.
-  TypeWrapper,
+  TypeWrapperMemberwise,
 };
 
 static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
@@ -358,7 +358,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       params.push_back(arg);
     }
-  } else if (ICK == ImplicitConstructorKind::TypeWrapper) {
+  } else if (ICK == ImplicitConstructorKind::TypeWrapperMemberwise) {
     // Access to the initializer should match that of its parent type.
     accessLevel = decl->getEffectiveAccess();
 
@@ -1689,7 +1689,7 @@ ConstructorDecl *SynthesizeTypeWrappedTypeMemberwiseInitializer::evaluate(
   // Create the implicit memberwise constructor.
   auto &ctx = wrappedType->getASTContext();
   auto ctor = createImplicitConstructor(
-      wrappedType, ImplicitConstructorKind::TypeWrapper, ctx);
+      wrappedType, ImplicitConstructorKind::TypeWrapperMemberwise, ctx);
   wrappedType->addMember(ctor);
 
   ctor->setBodySynthesizer(synthesizeTypeWrappedTypeMemberwiseInitializerBody);
