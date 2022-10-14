@@ -55,15 +55,15 @@
         },
         "libxml2": {
             "remote": { "id": "gnome/libxml2" },
-            "platforms": [ "Linux" ]
+            "platforms": [ "Linux", "Windows" ]
         },
         "curl": {
             "remote": { "id": "curl/curl" },
-            "platforms": [ "Linux" ]
+            "platforms": [ "Linux", "Windows" ]
         },
         "zlib": {
             "remote": { "id": "madler/zlib" },
-            "platforms": [ "Linux" ]
+            "platforms": [ "Linux", "Windows" ]
         },
         "swift-cmark-gfm": {
              "remote": { "id": "apple/swift-cmark" } },
