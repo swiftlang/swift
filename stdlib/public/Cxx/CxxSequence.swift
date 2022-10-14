@@ -80,27 +80,39 @@ public protocol CxxSequence: Sequence {
   mutating func __endUnsafe() -> RawIterator
 }
 
-public class CxxIterator<T>: IteratorProtocol where T: CxxSequence {
-  // Declared as a class instead of a struct to avoid copies of this object,
-  // which would result in dangling pointers for some C++ sequence types.
+/// Prevents a C++ sequence from being copied or moved implicitly. Makes sure
+/// that raw C++ iterators pointing into the sequence are not invalidated.
+@usableFromInline
+internal final class CxxSequenceBox<T> where T: CxxSequence {
+  @usableFromInline
+  internal var sequence: T
 
+  @usableFromInline
+  internal init(_ sequence: __shared T) {
+    self.sequence = sequence
+  }
+}
+
+@frozen
+public struct CxxIterator<T>: IteratorProtocol where T: CxxSequence {
   public typealias Element = T.RawIterator.Pointee
 
   @usableFromInline
-  internal var sequence: T
+  internal let sequence: CxxSequenceBox<T>
   @usableFromInline
   internal var rawIterator: T.RawIterator
   @usableFromInline
   internal let endIterator: T.RawIterator
 
-  public init(sequence: T) {
-    self.sequence = sequence
-    self.rawIterator = self.sequence.__beginUnsafe()
-    self.endIterator = self.sequence.__endUnsafe()
+  @inlinable
+  public init(sequence: __shared T) {
+    self.sequence = CxxSequenceBox<T>(sequence)
+    self.rawIterator = self.sequence.sequence.__beginUnsafe()
+    self.endIterator = self.sequence.sequence.__endUnsafe()
   }
 
   @inlinable
-  public func next() -> Element? {
+  public mutating func next() -> Element? {
     if self.rawIterator == self.endIterator {
       return nil
     }
