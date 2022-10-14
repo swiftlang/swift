@@ -3183,11 +3183,18 @@ class GenericTypeParamDecl final :
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
+  ///
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isParameterPack, unsigned depth, unsigned index,
-                       bool isOpaqueType, TypeRepr *typeRepr);
+                       unsigned depth, unsigned index, bool isParameterPack,
+                       bool isOpaqueType, TypeRepr *opaqueTypeRepr);
 
-public:
   /// Construct a new generic type parameter.
   ///
   /// \param dc The DeclContext in which the generic type parameter's owner
@@ -3196,17 +3203,85 @@ public:
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
-  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isParameterPack, unsigned depth, unsigned index)
-      : GenericTypeParamDecl(dc, name, nameLoc, isParameterPack, depth, index,
-                             false, nullptr) { }
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
+  ///
+  static GenericTypeParamDecl *create(DeclContext *dc, Identifier name,
+                                      SourceLoc nameLoc, unsigned depth,
+                                      unsigned index, bool isParameterPack,
+                                      bool isOpaqueType,
+                                      TypeRepr *opaqueTypeRepr);
 
+public:
   static const unsigned InvalidDepth = 0xFFFF;
 
+  /// Construct a new generic type parameter. This should only be used by the
+  /// ClangImporter, use \c GenericTypeParamDecl::create[...] instead.
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+                       unsigned depth, unsigned index, bool isParameterPack)
+      : GenericTypeParamDecl(dc, name, nameLoc, depth, index, isParameterPack,
+                             /*isOpaqueType*/ false, nullptr) {}
+
+  /// Construct a deserialized generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  ///
   static GenericTypeParamDecl *
-  create(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-         bool isParameterPack, unsigned depth, unsigned index,
-         bool isOpaqueType, TypeRepr *typeRepr);
+  createDeserialized(DeclContext *dc, Identifier name, unsigned depth,
+                     unsigned index, bool isParameterPack, bool isOpaqueType);
+
+  /// Construct a new parsed generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param nameLoc The location of the name.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  ///
+  static GenericTypeParamDecl *
+  createParsed(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+               unsigned index, bool isParameterPack);
+
+  /// Construct a new implicit generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
+  /// \param nameLoc The location of the name.
+  ///
+  static GenericTypeParamDecl *
+  createImplicit(DeclContext *dc, Identifier name, unsigned depth,
+                 unsigned index, bool isParameterPack = false,
+                 bool isOpaqueType = false, TypeRepr *opaqueTypeRepr = nullptr,
+                 SourceLoc nameLoc = SourceLoc());
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.

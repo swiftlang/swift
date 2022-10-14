@@ -5459,10 +5459,8 @@ GenericParamList *ASTContext::getSelfGenericParamList(DeclContext *dc) const {
   // Note: we always return a GenericParamList rooted at the first
   // DeclContext this was called with. Since this is just a giant
   // hack for SIL mode, that should be OK.
-  auto *selfParam = GenericTypeParamDecl::create(
-      dc, Id_Self, SourceLoc(),
-      /*isParameterPack=*/false, /*depth=*/0, /*index=*/0,
-      /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+  auto *selfParam = GenericTypeParamDecl::createImplicit(
+      dc, Id_Self, /*depth*/ 0, /*index*/ 0);
 
   theParamList = GenericParamList::create(
       const_cast<ASTContext &>(*this), SourceLoc(), {selfParam}, SourceLoc());
