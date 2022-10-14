@@ -695,8 +695,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subMap, args);
 
-  emitProfilerIncrement(ctor->getTypecheckedBody());
-
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation(Loc), initedSelfValue);
 }
