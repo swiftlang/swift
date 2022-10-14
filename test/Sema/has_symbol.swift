@@ -115,18 +115,21 @@ func testWhile() {
   while #_hasSymbol(localFunc) { break } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
 }
 
+func doIt(_ closure: () -> ()) {
+  closure()
+}
+
 @inlinable
 func testInlinable() {
   if #_hasSymbol(noArgFunc) {} // expected-error {{'#_hasSymbol' cannot be used in an '@inlinable' function}}
+  doIt {
+    if #_hasSymbol(noArgFunc) {} // expected-error {{'#_hasSymbol' cannot be used in an '@inlinable' function}}
+  }
 }
 
 @_alwaysEmitIntoClient
 func testAEIC() {
   if #_hasSymbol(noArgFunc) {} // expected-error {{'#_hasSymbol' cannot be used in an '@_alwaysEmitIntoClient' function}}
-}
-
-func doIt(_ closure: () -> ()) {
-  closure()
 }
 
 func testClosure() {
