@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-O -Xfrontend -enable-opt-in-reflection-metadata) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -enable-opt-in-reflection-metadata -target %target-cpu-apple-macosx99.99) | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // REQUIRES: executable_test
@@ -21,8 +21,11 @@ let bar = Bar(a: 999, b: "bar")
 
 Tests.test("Forced Cast to Reflectable") {
   do {
-    let _bar = bar as? Reflectable
-    expectNil(_bar)
+    let bar1 = bar as? Reflectable
+    expectNil(bar1)
+
+    let bar2 = bar as? Reflectable????
+    expectNil(bar2)
   }
   
   // CHECK-LABEL: [ RUN      ] Reflectable casting.Forced Cast to Reflectable
@@ -31,7 +34,6 @@ Tests.test("Forced Cast to Reflectable") {
   // CHECK: [       OK ] Reflectable casting.Forced Cast to Reflectable
   expectCrashLater()
   do {
-    let _bar = bar as! Reflectable
-    debugPrint(_bar)
+    debugPrint(bar as! Reflectable)
   }
 }

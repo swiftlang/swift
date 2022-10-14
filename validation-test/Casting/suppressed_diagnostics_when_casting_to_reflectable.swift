@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck %s -verify
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx99.99 -typecheck %s -verify
+
+// The compiler shouldn't emit any diagnostics even if conformance to Reflectable is visible.
 
 public enum Foo: Reflectable {
 	case A(Int)

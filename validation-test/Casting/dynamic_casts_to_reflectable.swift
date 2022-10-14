@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -DOPTIN -Xfrontend -enable-opt-in-reflection-metadata -O %s -o %t/opt_in.out
+// RUN: %target-build-swift -target %target-cpu-apple-macosx99.99 -DOPTIN -Xfrontend -enable-opt-in-reflection-metadata -O %s -o %t/opt_in.out
 // RUN: %target-codesign %t/opt_in.out
 // RUN: %target-run %t/opt_in.out | %FileCheck %s --check-prefix=CHECK-OPT-IN
 
-// RUN: %target-build-swift -DFULL %s -o %t/full.out
+// RUN: %target-build-swift -target %target-cpu-apple-macosx99.99 -DFULL %s -o %t/full.out
 // RUN: %target-codesign %t/full.out
 // RUN: %target-run %t/full.out | %FileCheck %s --check-prefix=CHECK-FULL
 
@@ -28,6 +28,17 @@ public func consumeOptional<T: Reflectable>(_ t: T?) {
 	debugPrint(t as Any)
 }
 
+public func consumeOptionalOptional<T: Reflectable>(_ t: T??) {
+	debugPrint(t as Any)
+}
+
+public func castToReflectable<T>(_ t: T) -> Reflectable? {
+	return t as? Reflectable
+}
+
+debugPrint(castToReflectable(Foo.A(123)))
+// CHECK-OPT-IN-DAG: Optional(opt_in.Foo.A(123))
+// CHECK-FULL-DAG: Optional(full.Foo.A(123))
 
 debugPrint(Foo.A(123))
 // CHECK-OPT-IN-DAG: opt_in.Foo.A(123)
@@ -40,6 +51,10 @@ debugPrint(Bar(a: 999, b: "bar"))
 consumeOptional(Foo.A(123) as? Reflectable)
 // CHECK-OPT-IN-DAG: Optional(opt_in.Foo.A(123))
 // CHECK-FULL-DAG: Optional(full.Foo.A(123))
+
+consumeOptionalOptional(Foo.A(123) as? Reflectable?)
+// CHECK-OPT-IN-DAG: Optional(Optional(opt_in.Foo.A(123)))
+// CHECK-FULL-DAG: Optional(Optional(full.Foo.A(123)))
 
 print(Foo.A(123) is Reflectable)
 // CHECK-OPT-IN-DAG: true
