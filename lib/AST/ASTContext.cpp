@@ -352,7 +352,7 @@ struct ASTContext::Implementation {
       ExistentialSignatures;
 
   /// The element signature for a generic signature, constructed by dropping
-  /// @_typeSequence attributes from generic parameters.
+  /// the parameter pack bit from generic parameters.
   llvm::DenseMap<const GenericSignatureImpl *,
                  CanGenericSignature> ElementSignatures;
 

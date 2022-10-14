@@ -107,9 +107,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    const bool isParameterPack =
-        attributes.getAttribute<TypeSequenceAttr>() != nullptr ||
-        EllipsisLoc.isValid();
+    const bool isParameterPack = EllipsisLoc.isValid();
     auto *Param = GenericTypeParamDecl::createParsed(
         CurDeclContext, Name, NameLoc, EllipsisLoc,
         /*index*/ GenericParams.size(), isParameterPack);

@@ -2190,20 +2190,6 @@ public:
   }
 };
 
-/// The @_typeSequence attribute, which treats a generic param decl as a variadic
-/// sequence of value/type pairs.
-class TypeSequenceAttr : public DeclAttribute {
-  TypeSequenceAttr(SourceLoc atLoc, SourceRange Range);
-
-public:
-  static TypeSequenceAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                  SourceRange Range);
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_TypeSequence;
-  }
-};
-
 /// The @_unavailableFromAsync attribute, used to make function declarations
 /// unavailable from async contexts.
 class UnavailableFromAsyncAttr : public DeclAttribute {

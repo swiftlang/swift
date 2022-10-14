@@ -1357,7 +1357,7 @@ public:
   /// Get a generic signature where the generic parameter τ_d_i represents
   /// the element of the pack generic parameter τ_d_i… in \p baseGenericSig.
   ///
-  /// This drops the @_typeSequence attribute from each generic parameter,
+  /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
   CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig);
 
