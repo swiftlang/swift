@@ -370,8 +370,10 @@ public protocol Sequence<Element> {
   /// should only implement this method if they can do it in better than linear
   /// time.
   ///
-  /// This method must not return non-nil on sequences that are destructively
-  /// consumed by iteration.
+  /// For sequences that are destructively consumed by iteration, calling this
+  /// method must not consume any elements. (Such sequences usually leave this
+  /// method with its default, `nil`-returning implementation, which trivially
+  /// satisfies this requirement.)
   ///
   /// - Returns: `nil` if containment cannot be verified in better than linear
   ///    time; otherwise, the method returns a boolean value indicating whether
