@@ -3166,13 +3166,18 @@ public:
 /// \code
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
-class GenericTypeParamDecl final :
-    public AbstractTypeParamDecl,
-    private llvm::TrailingObjects<GenericTypeParamDecl, TypeRepr *>{
+class GenericTypeParamDecl final
+    : public AbstractTypeParamDecl,
+      private llvm::TrailingObjects<GenericTypeParamDecl, TypeRepr *,
+                                    SourceLoc> {
   friend TrailingObjects;
 
-  size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
+  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
     return isOpaqueType() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return isParameterPack() ? 1 : 0;
   }
 
   /// Construct a new generic type parameter.
@@ -3183,6 +3188,7 @@ class GenericTypeParamDecl final :
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
   /// \param depth The generic signature depth.
   /// \param index The index of the parameter in the generic signature.
   /// \param isParameterPack Whether the generic parameter is for a type
@@ -3192,8 +3198,9 @@ class GenericTypeParamDecl final :
   /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
   ///
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       unsigned depth, unsigned index, bool isParameterPack,
-                       bool isOpaqueType, TypeRepr *opaqueTypeRepr);
+                       SourceLoc ellipsisLoc, unsigned depth, unsigned index,
+                       bool isParameterPack, bool isOpaqueType,
+                       TypeRepr *opaqueTypeRepr);
 
   /// Construct a new generic type parameter.
   ///
@@ -3203,6 +3210,7 @@ class GenericTypeParamDecl final :
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
   /// \param depth The generic signature depth.
   /// \param index The index of the parameter in the generic signature.
   /// \param isParameterPack Whether the generic parameter is for a type
@@ -3212,9 +3220,9 @@ class GenericTypeParamDecl final :
   /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
   ///
   static GenericTypeParamDecl *create(DeclContext *dc, Identifier name,
-                                      SourceLoc nameLoc, unsigned depth,
-                                      unsigned index, bool isParameterPack,
-                                      bool isOpaqueType,
+                                      SourceLoc nameLoc, SourceLoc ellipsisLoc,
+                                      unsigned depth, unsigned index,
+                                      bool isParameterPack, bool isOpaqueType,
                                       TypeRepr *opaqueTypeRepr);
 
 public:
@@ -3223,9 +3231,11 @@ public:
   /// Construct a new generic type parameter. This should only be used by the
   /// ClangImporter, use \c GenericTypeParamDecl::create[...] instead.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       unsigned depth, unsigned index, bool isParameterPack)
-      : GenericTypeParamDecl(dc, name, nameLoc, depth, index, isParameterPack,
-                             /*isOpaqueType*/ false, nullptr) {}
+                       SourceLoc ellipsisLoc, unsigned depth, unsigned index,
+                       bool isParameterPack)
+      : GenericTypeParamDecl(dc, name, nameLoc, ellipsisLoc, depth, index,
+                             isParameterPack, /*isOpaqueType*/ false, nullptr) {
+  }
 
   /// Construct a deserialized generic type parameter.
   ///
@@ -3253,13 +3263,14 @@ public:
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
   /// \param index The index of the parameter in the generic signature.
   /// \param isParameterPack Whether the generic parameter is for a type
   ///                        parameter pack, denoted by \c <T...>.
   ///
   static GenericTypeParamDecl *
   createParsed(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-               unsigned index, bool isParameterPack);
+               SourceLoc ellipsisLoc, unsigned index, bool isParameterPack);
 
   /// Construct a new implicit generic type parameter.
   ///
@@ -3276,12 +3287,14 @@ public:
   ///                     parameter e.g 'some Collection'.
   /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
   /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
   ///
   static GenericTypeParamDecl *
   createImplicit(DeclContext *dc, Identifier name, unsigned depth,
                  unsigned index, bool isParameterPack = false,
                  bool isOpaqueType = false, TypeRepr *opaqueTypeRepr = nullptr,
-                 SourceLoc nameLoc = SourceLoc());
+                 SourceLoc nameLoc = SourceLoc(),
+                 SourceLoc ellipsisLoc = SourceLoc());
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -3347,6 +3360,14 @@ public:
   ///
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
   unsigned getIndex() const { return Bits.GenericTypeParamDecl.Index; }
+
+  /// Retrieve the ellipsis location for a type parameter pack \c T...
+  SourceLoc getEllipsisLoc() const {
+    if (!isParameterPack())
+      return SourceLoc();
+
+    return *getTrailingObjects<SourceLoc>();
+  }
 
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;

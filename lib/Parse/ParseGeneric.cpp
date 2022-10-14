@@ -73,6 +73,13 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       break;
     }
 
+    // Parse the ellipsis for a type parameter pack  'T...'.
+    SourceLoc EllipsisLoc;
+    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+        startsWithEllipsis(Tok)) {
+      EllipsisLoc = consumeStartingEllipsis();
+    }
+
     // Parse the ':' followed by a type.
     SmallVector<InheritedEntry, 1> Inherited;
     if (Tok.is(tok::colon)) {
@@ -101,10 +108,11 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     }
 
     const bool isParameterPack =
-        attributes.getAttribute<TypeSequenceAttr>() != nullptr;
+        attributes.getAttribute<TypeSequenceAttr>() != nullptr ||
+        EllipsisLoc.isValid();
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, /*index*/ GenericParams.size(),
-        isParameterPack);
+        CurDeclContext, Name, NameLoc, EllipsisLoc,
+        /*index*/ GenericParams.size(), isParameterPack);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
