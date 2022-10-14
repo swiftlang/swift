@@ -1122,46 +1122,44 @@ private:
 };
 }
 
-bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
-  auto &ctx = closure->getASTContext();
-
-  if (participatesInInference(closure)) {
-    SyntacticElementConstraintGenerator generator(
-        *this, SyntacticElementContext::forClosure(closure),
-        getConstraintLocator(closure));
-
-    generator.visit(closure->getBody());
-
-    if (closure->hasSingleExpressionBody())
-      return generator.hadError;
-  }
-
-  // If this closure has an empty body and no explicit result type
-  // let's bind result type to `Void` since that's the only type empty body
-  // can produce. Otherwise, if (multi-statement) closure doesn't have
-  // an explicit result (no `return` statements) let's default it to `Void`.
-  if (!hasExplicitResult(closure)) {
-    auto constraintKind =
-        (closure->hasEmptyBody() && !closure->hasExplicitResultType())
-            ? ConstraintKind::Bind
-            : ConstraintKind::Defaultable;
-
-    addConstraint(
-        constraintKind, getClosureType(closure)->getResult(),
-        ctx.TheEmptyTupleType,
-        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
-  }
-
-  return false;
-}
-
 bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
   NullablePtr<ConstraintLocator> locator;
 
   if (auto *func = fn.getAbstractFunctionDecl()) {
     locator = getConstraintLocator(func);
   } else {
-    locator = getConstraintLocator(fn.getAbstractClosureExpr());
+    auto closure = cast<ClosureExpr>(fn.getAbstractClosureExpr());
+    locator = getConstraintLocator(closure);
+
+    auto &ctx = closure->getASTContext();
+
+    if (participatesInInference(closure)) {
+      SyntacticElementConstraintGenerator generator(
+          *this, closure, getConstraintLocator(closure));
+
+      generator.visit(closure->getBody());
+
+      if (closure->hasSingleExpressionBody())
+        return generator.hadError;
+    }
+
+    // If this closure has an empty body and no explicit result type
+    // let's bind result type to `Void` since that's the only type empty body
+    // can produce. Otherwise, if (multi-statement) closure doesn't have
+    // an explicit result (no `return` statements) let's default it to `Void`.
+    if (!hasExplicitResult(closure)) {
+      auto constraintKind =
+          (closure->hasEmptyBody() && !closure->hasExplicitResultType())
+              ? ConstraintKind::Bind
+              : ConstraintKind::Defaultable;
+
+      addConstraint(
+          constraintKind, getClosureType(closure)->getResult(),
+          ctx.TheEmptyTupleType,
+          getConstraintLocator(closure, ConstraintLocator::ClosureResult));
+    }
+
+    return false;
   }
 
   SyntacticElementConstraintGenerator generator(
