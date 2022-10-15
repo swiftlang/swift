@@ -4044,7 +4044,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               if (result == SolutionKind::Solved) {
                 auto fix = ForceOptional::create(*this, type1, proto,
                                                  getConstraintLocator(locator));
-                if (recordFix(fix))
+                if (recordFix(fix, /*impact=*/fix->getUnwrapCount()))
                   return getTypeMatchFailure(locator);
                 break;
               }
@@ -4776,23 +4776,26 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   std::tie(fromObjectType, fromUnwraps) = getObjectTypeAndNumUnwraps(fromType);
   std::tie(toObjectType, toUnwraps) = getObjectTypeAndNumUnwraps(toType);
 
-  // Since equality is symmetric and it decays into a `Bind`, eagerly
-  // unwrapping optionals from either side might be incorrect since
-  // there is not enough information about what is expected e.g.
-  // `Int?? equal T0?` just like `T0? equal Int??` allows `T0` to be
-  // bound to `Int?` and there is no need to unwrap. Solver has to wait
-  // until more information becomes available about what `T0` is expected
-  // to be before taking action.
-  if (matchKind == ConstraintKind::Equal &&
-      (fromObjectType->is<TypeVariableType>() ||
-       toObjectType->is<TypeVariableType>())) {
+  // This failure is comming from a binding of a type variable to a fixed type
+  // e.g. $T0? bind Int
+  auto isBindingToFixedType = matchKind == ConstraintKind::Bind &&
+                              fromObjectType->is<TypeVariableType>() &&
+                              !toObjectType->is<TypeVariableType>();
+  // If there are type variable on either side eagerly unwrapping optionals from
+  // either side might be incorrect since there is not enough information about
+  // what is expected and there is no need to unwrap. Solver has to wait until
+  // more information becomes available about what those variables are expected
+  // to be before taking action. Except for when binding to a fixed type because
+  // we fail but fromUnwraps <= toUnwraps and fromObjectType can be bound to
+  // this concrete type, we know a force optional is the correct fix.
+  if (!isBindingToFixedType && (fromObjectType->is<TypeVariableType>() ||
+                                toObjectType->is<TypeVariableType>())) {
     return false;
   }
 
   // If `from` is not less optional than `to`, force unwrap is
-  // not going to help here. In case of object type of `from`
-  // is a type variable, let's assume that it might be optional.
-  if (fromUnwraps <= toUnwraps && !fromObjectType->is<TypeVariableType>())
+  // not going to help here.
+  if (fromUnwraps <= toUnwraps)
     return false;
 
   // If the result of optional chaining is converted to
@@ -14831,16 +14834,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix->getKind()) {
   case FixKind::ForceOptional: {
-    SmallVector<Type, 4> unwraps1;
-    type1->lookThroughAllOptionalTypes(unwraps1);
-
-    SmallVector<Type, 4> unwraps2;
-    type2->lookThroughAllOptionalTypes(unwraps2);
-
-    auto impact = unwraps1.size() != unwraps2.size()
-                      ? unwraps1.size() - unwraps2.size()
-                      : 1;
-    return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
+    auto *theFix = static_cast<ForceOptional *>(fix);
+    return recordFix(fix, /*impact=*/theFix->getUnwrapCount())
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   case FixKind::UnwrapOptionalBase:

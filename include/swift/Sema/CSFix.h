@@ -936,17 +936,26 @@ public:
 
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ContextualMismatch {
+  unsigned int UnwrapCount;
+
   ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
                 ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::ForceOptional, fromType, toType,
                            locator) {
     assert(fromType && "Base type must not be null");
     assert(fromType->getOptionalObjectType() &&
-           "Unwrapped type must not be null");
+           "From type must be optional");
+
+    auto fromOptionals = fromType->getOptionalityDepth();
+    auto toOptionals = toType->getOptionalityDepth();
+    assert(fromOptionals > toOptionals);
+
+    UnwrapCount = fromOptionals - toOptionals;
   }
 
 public:
   std::string getName() const override { return "force optional"; }
+  unsigned int getUnwrapCount() const { return UnwrapCount; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 

@@ -833,10 +833,16 @@ public:
 /// Diagnose failures related to use of the unwrapped optional types,
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public ContextualFailure {
+  unsigned int UnwrapCount;
+
 public:
   MissingOptionalUnwrapFailure(const Solution &solution, Type fromType,
-                               Type toType, ConstraintLocator *locator)
-      : ContextualFailure(solution, fromType, toType, locator) {}
+                               Type toType, unsigned int unwrapCount,
+                               ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator),
+        UnwrapCount(unwrapCount) {
+    assert(unwrapCount > 0);
+  }
 
   bool diagnoseAsError() override;
 
@@ -846,8 +852,23 @@ private:
   }
 
   Type getUnwrappedType() const {
-    return resolveType(getBaseType()->getOptionalObjectType(),
-                       /*reconstituteSugar=*/true);
+    auto unwrappedType = getFromType();
+    unsigned i = 0;
+    while (i != UnwrapCount) {
+      unwrappedType = unwrappedType->getOptionalObjectType();
+      ++i;
+    }
+    return resolveType(unwrappedType, /*reconstituteSugar=*/true);
+  }
+
+  std::string getForceUnwrapString() const {
+    std::string forceUnwrapStr;
+    unsigned i = 0;
+    while (i != UnwrapCount) {
+      forceUnwrapStr += '!';
+      ++i;
+    }
+    return forceUnwrapStr;
   }
 
   /// Suggest a default value via `?? <default value>`
