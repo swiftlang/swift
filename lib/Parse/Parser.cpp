@@ -659,6 +659,18 @@ SourceLoc Parser::consumeStartingGreater() {
   return consumeStartingCharacterOfCurrentToken(tok::r_angle);
 }
 
+bool Parser::startsWithEllipsis(Token Tok) {
+  if (!Tok.isAnyOperator() && !Tok.isPunctuation())
+    return false;
+
+  return Tok.getText().startswith("...");
+}
+
+SourceLoc Parser::consumeStartingEllipsis() {
+  assert(startsWithEllipsis(Tok) && "Token does not start with '...'");
+  return consumeStartingCharacterOfCurrentToken(tok::ellipsis, /*length*/ 3);
+}
+
 ParserStatus Parser::skipSingle() {
   ParserStatus status;
   switch (Tok.getKind()) {

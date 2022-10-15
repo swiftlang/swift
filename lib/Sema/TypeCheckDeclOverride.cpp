@@ -1610,7 +1610,6 @@ namespace  {
     UNINTERESTING_ATTR(NoImplicitCopy)
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
-    UNINTERESTING_ATTR(TypeSequence)
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeConst)
 
