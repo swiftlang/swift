@@ -563,8 +563,13 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
 
   // Stored property initializers have linkage based on the access level of
   // their nominal.
-  if (isStoredPropertyInitializer())
-    decl = cast<NominalTypeDecl>(decl->getDeclContext());
+  if (isStoredPropertyInitializer()) {
+    if (auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      decl = extension->getExtendedNominal();
+    } else {
+      decl = cast<NominalTypeDecl>(decl->getDeclContext());
+    }
+  }
 
   // Compute the effective access level, taking e.g testable into consideration.
   auto effectiveAccess = decl->getEffectiveAccess();
@@ -790,7 +795,13 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    NominalTypeDecl *nominal;
+    if (auto extension = dyn_cast<ExtensionDecl>(d->getDeclContext())) {
+      nominal = extension->getExtendedNominal();
+    } else {
+      nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    }
+    
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);

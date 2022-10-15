@@ -1305,7 +1305,13 @@ public:
     // Emit initializers for static variables.
     for (auto i : range(pd->getNumPatternEntries())) {
       if (pd->getExecutableInit(i)) {
-        assert(pd->isStatic() && "stored property in extension?!");
+        // Ignore any stored properties, since at codegen time
+        // these are handled as if they were defined in the type
+        // being extended rather than the extension itself
+        if (!pd->isStatic()) {
+          continue;;
+        }
+        
         SGM.emitGlobalInitialization(pd, i);
       }
     }
@@ -1315,8 +1321,14 @@ public:
     if (vd->hasStorage()) {
       bool hasDidSetOrWillSetDynamicReplacement =
           vd->hasDidSetOrWillSetDynamicReplacement();
-      assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&
-             "stored property in extension?!");
+      
+      // Ignore any stored properties, since at codegen time
+      // these are handled as if they were defined in the type
+      // being extended rather than the extension itself
+      if (!(vd->isStatic() || hasDidSetOrWillSetDynamicReplacement)) {
+        return;
+      }
+
       if (!hasDidSetOrWillSetDynamicReplacement) {
         emitTypeMemberGlobalVariable(SGM, vd);
         visitAccessors(vd);

@@ -3325,11 +3325,14 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
       info = StorageImplInfo::getMutableComputed();
     } else if (isa<ExtensionDecl>(dc) &&
               !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-      storage->diagnose(diag::extension_stored_property);
-
-      info = (info.supportsMutation()
-              ? StorageImplInfo::getMutableComputed()
-              : StorageImplInfo::getImmutableComputed());
+      // TODO: We still need to emit this error if the stored property
+      // isn't a member of the extensions's type
+      
+//      storage->diagnose(diag::extension_stored_property);
+//
+//      info = (info.supportsMutation()
+//              ? StorageImplInfo::getMutableComputed()
+//              : StorageImplInfo::getImmutableComputed());
     }
   }
 }
