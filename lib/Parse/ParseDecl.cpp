@@ -3050,15 +3050,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         *name, AtLoc, range, /*implicit*/ false));
     break;
   }
-  case DAK_TypeSequence: {
-    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics)) {
-      auto range = SourceRange(Loc, Tok.getRange().getStart());
-      Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
-    } else {
-      DiscardAttribute = true;
-    }
-    break;
-  }
 
   case DAK_UnavailableFromAsync: {
     StringRef message;
@@ -6146,7 +6137,15 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
       .fixItRemove(genericParams->getSourceRange());
     }
   }
-  
+
+  // Reject variadic associated types with a specific error.
+  if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+      startsWithEllipsis(Tok)) {
+    auto Ellipsis = consumeStartingEllipsis();
+    diagnose(Ellipsis, diag::associatedtype_cannot_be_variadic)
+      .fixItRemoveChars(Ellipsis, Tok.getLoc());
+  }
+
   // Parse optional inheritance clause.
   // FIXME: Allow class requirements here.
   SmallVector<InheritedEntry, 2> Inherited;

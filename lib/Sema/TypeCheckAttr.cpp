@@ -287,7 +287,6 @@ public:
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
-  void visitTypeSequenceAttr(TypeSequenceAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
@@ -4062,13 +4061,6 @@ AttributeChecker::visitSPIOnlyAttr(SPIOnlyAttr *attr) {
   if (!Ctx.LangOpts.EnableSPIOnlyImports &&
       SF->Kind != SourceFileKind::Interface) {
     diagnoseAndRemoveAttr(attr, diag::spi_only_imports_not_enabled);
-  }
-}
-
-void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
-  if (!isa<GenericTypeParamDecl>(D)) {
-    attr->setInvalid();
-    diagnoseAndRemoveAttr(attr, diag::type_sequence_on_non_generic_param);
   }
 }
 

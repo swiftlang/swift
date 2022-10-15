@@ -1965,6 +1965,13 @@ ERROR(attr_requires_concurrency, none,
       (StringRef, bool))
 
 //------------------------------------------------------------------------------
+// MARK: Variadics
+//------------------------------------------------------------------------------
+
+ERROR(associatedtype_cannot_be_variadic,none,
+      "associated types cannot be variadic", ())
+
+//------------------------------------------------------------------------------
 // MARK: Consistency diagnostics
 //------------------------------------------------------------------------------
 ERROR(new_parser_failure, none,

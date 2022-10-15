@@ -6483,14 +6483,6 @@ ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 
 //------------------------------------------------------------------------------
-// MARK: variadics
-//------------------------------------------------------------------------------
-
-ERROR(type_sequence_on_non_generic_param, none,
-      "'@_typeSequence' must appear on a generic parameter",
-      ())
-
-//------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
 //------------------------------------------------------------------------------
 

@@ -1264,11 +1264,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_TypeSequence: {
-    Printer.printAttrName("@_typeSequence");
-    break;
-  }
-
   case DAK_UnavailableFromAsync: {
     Printer.printAttrName("@_unavailableFromAsync");
     const UnavailableFromAsyncAttr *attr = cast<UnavailableFromAsyncAttr>(this);
@@ -1454,8 +1449,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
-  case DAK_TypeSequence:
-    return "_typeSequence";
   case DAK_UnavailableFromAsync:
     return "_unavailableFromAsync";
   case DAK_BackDeploy:
@@ -2287,15 +2280,6 @@ bool CustomAttr::isArgUnsafe() const {
   }
 
   return isArgUnsafeBit;
-}
-
-TypeSequenceAttr::TypeSequenceAttr(SourceLoc atLoc, SourceRange range)
-    : DeclAttribute(DAK_TypeSequence, atLoc, range, /*Implicit=*/false) {}
-
-TypeSequenceAttr *TypeSequenceAttr::create(ASTContext &Ctx, SourceLoc atLoc,
-                                           SourceRange range) {
-  void *mem = Ctx.Allocate(sizeof(TypeSequenceAttr), alignof(TypeSequenceAttr));
-  return new (mem) TypeSequenceAttr(atLoc, range);
 }
 
 const DeclAttribute *
