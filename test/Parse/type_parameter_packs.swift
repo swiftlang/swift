@@ -30,3 +30,7 @@ func quux<T...: P>(_ x: T...) {}
 func foobar<T, U, V...>(x: T, y: U, z: V...) { }
 func foobaz<T, U..., V>(x: T, y: U..., z: V) { }
 func fooqux<T..., U..., V...>(x: T..., y: U..., z: V...) { }
+
+// We allow whitespace between the generic parameter and the '...', this is
+// consistent with regular variadic parameters.
+func withWhitespace<T ...>(_ x: T ...) -> (T ...) {}
