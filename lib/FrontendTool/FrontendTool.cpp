@@ -423,6 +423,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
                           .SupplementaryOutputs.ABIDescriptorOutputPath;
+  bool IgnoreAdjacentModules = Instance.hasASTContext() &&
+                               Instance.getASTContext().IgnoreAdjacentModules;
 
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
@@ -444,7 +446,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getOutputFilename(), ABIPath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
-      RequireOSSAModules_t(Invocation.getSILOptions()));
+      RequireOSSAModules_t(Invocation.getSILOptions()),
+      IgnoreAdjacentModules);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {

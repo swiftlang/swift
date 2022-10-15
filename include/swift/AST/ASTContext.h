@@ -307,6 +307,10 @@ public:
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
 
+  /// Should we globally ignore swiftmodule files adjacent to swiftinterface
+  /// files?
+  bool IgnoreAdjacentModules = false;
+
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
@@ -1165,7 +1169,10 @@ public:
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
 
-public:
+  /// Change the behavior of all loaders to ignore swiftmodules next to
+  /// swiftinterfaces and clear the in-memory cache on a change of value.
+  void setIgnoreAdjacentModules(bool value);
+
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.

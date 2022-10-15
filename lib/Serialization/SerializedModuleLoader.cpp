@@ -444,7 +444,8 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
 
-  if (LoadMode == ModuleLoadingMode::OnlyInterface)
+  if (LoadMode == ModuleLoadingMode::OnlyInterface ||
+      Ctx.IgnoreAdjacentModules)
     return std::make_error_code(std::errc::not_supported);
 
   auto ModuleErr = openModuleFile(ModuleID, BaseName, ModuleBuffer);
