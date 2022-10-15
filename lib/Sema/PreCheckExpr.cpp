@@ -2119,8 +2119,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  SmallVector<ProtocolConformance *, 2> conformances;
-  return castTy->getAnyNominal()->lookupConformance(protocol, conformances)
+  return DC->getParentModule()->lookupConformance(castTy, protocol)
              ? CoerceExpr::forLiteralInit(getASTContext(), literal,
                                           call->getSourceRange(),
                                           typeExpr->getTypeRepr())
