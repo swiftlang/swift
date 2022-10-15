@@ -238,10 +238,9 @@ class UnitTestRunner : public SILFunctionTransform {
       llvm::errs() << components[index];
       if (index != size - 1) {
         llvm::errs() << ", ";
-      } else {
-        llvm::errs() << "\n";
       }
     }
+    llvm::errs() << "\n";
   }
 
   template <typename Doit>
