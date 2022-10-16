@@ -5978,15 +5978,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     kind == ConstraintKind::ArgumentConversion || 
     kind == ConstraintKind::OperatorArgumentConversion) {
     // type1 can be an optional type_variable, so let's unwrap it.
-    TypeVariableType* unwrappedTypeVar1 = typeVar1;
-    if (!unwrappedTypeVar1)
-      if (auto unwrappedType1 = type1->getOptionalObjectType())
-        unwrappedTypeVar1 = dyn_cast<TypeVariableType>(unwrappedType1->getDesugaredType());
-
-    // type2 also can be optional
-    Type unwrappedType2 = type2;
-    if (Type _unwrappedType2 = type2->getOptionalObjectType())
-      unwrappedType2 = _unwrappedType2;
+    auto unwrappedType1 = type1->lookThroughAllOptionalTypes();
+    auto unwrappedTypeVar1 = dyn_cast<TypeVariableType>(unwrappedType1->getDesugaredType());
+    Type unwrappedType2 = type2->lookThroughAllOptionalTypes();
 
     if (unwrappedTypeVar1 && unwrappedType2) {
       auto *PD = dyn_cast_or_null<ProtocolDecl>(unwrappedType2->getAnyNominal());

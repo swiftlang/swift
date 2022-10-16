@@ -3276,20 +3276,20 @@ public:
     if (auto *CC = dyn_cast<CheckedCastExpr>(E)) {
       auto toType = CC->getCastType();
       auto &ctx = DC->getASTContext();
-      if (auto *protocol = dyn_cast_or_null<ProtocolDecl>(toType->getAnyNominal()))
-        if (protocol->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
-          auto availability = ctx.getReflectableCastRuntimeAvailability();
-          const bool hasReflectableCastSupport = 
-          AvailabilityContext::forDeploymentTarget(ctx).isContainedIn(availability);
+      auto *protocol = dyn_cast_or_null<ProtocolDecl>(toType->lookThroughAllOptionalTypes()->getAnyNominal());
+      if (protocol && protocol->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+        auto availability = ctx.getReflectableCastRuntimeAvailability();
+        const bool hasReflectableCastSupport =
+        AvailabilityContext::forDeploymentTarget(ctx).isContainedIn(availability);
 
-          if (!hasReflectableCastSupport) {
-            auto ev = UnavailabilityReason::requiresVersionRange(availability.getOSVersion());
-            ctx.Diags.diagnose(CC->getLoc(),
-                           diag::reflectable_cast_only_version_newer,
-                           prettyPlatformString(targetPlatform(Context.LangOpts)),
-                           ev.getRequiredOSVersionRange().getLowerEndpoint());
-          }
+        if (!hasReflectableCastSupport) {
+          auto UR = UnavailabilityReason::requiresVersionRange(availability.getOSVersion());
+          ctx.Diags.diagnose(CC->getLoc(),
+                          diag::reflectable_cast_only_version_newer,
+                          prettyPlatformString(targetPlatform(Context.LangOpts)),
+                          UR.getRequiredOSVersionRange().getLowerEndpoint());
         }
+      }
     }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);
