@@ -3345,22 +3345,36 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     } else if (isa<ExtensionDecl>(dc) &&
               !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
 
-      // VarDecls with storage are permitted to be defined in extensions
-      // as long as the extension is in the same file as the extended type
+      // VarDecls with storage are permitted to be defined in unconstrained
+      // extensions on concrete types (e.g. not protocols) as long as the
+      // extension is in the same file as the extended type
       bool extensionInSameFileAsType = false;
+      bool extendsProtocol = false;
       auto ext = dyn_cast<ExtensionDecl>(dc);
       if (auto type = ext->getExtendedNominal()) {
         auto typeFile = dyn_cast<SourceFile>(type->getModuleScopeContext());
         auto extFile = dyn_cast<SourceFile>(ext->getModuleScopeContext());
         extensionInSameFileAsType = typeFile && extFile && typeFile == extFile;
+        extendsProtocol = isa<ProtocolDecl>(type);
       }
 
       bool storedPropertyIsPermitted =
-          extensionInSameFileAsType && isa<VarDecl>(storage);
+          isa<VarDecl>(storage) && extensionInSameFileAsType &&
+          !ext->isConstrainedExtension() && !extendsProtocol;
 
       if (!storedPropertyIsPermitted) {
+        // Tailor the diagnostic to match the specific reason this decl
+        // is not permitted
         if (isa<VarDecl>(storage)) {
-          storage->diagnose(diag::extension_stored_property_in_different_file);
+          if (ext->isConstrainedExtension()) {
+            storage->diagnose(
+                diag::extension_stored_property_in_constrained_extension);
+          } else if (extendsProtocol) {
+            storage->diagnose(diag::extension_stored_property_on_protocol);
+          } else {
+            storage->diagnose(
+                diag::extension_stored_property_in_different_file);
+          }
         } else {
           storage->diagnose(diag::extension_stored_property);
         }

@@ -1413,6 +1413,15 @@ HasMemberwiseInitRequest::evaluate(Evaluator &evaluator,
         return true;
     }
   }
+
+  // Also check the list of stored properties, which may include
+  // properties defined in extensions and not included as direct members
+  for (auto var : decl->getStoredProperties()) {
+    if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
+      return true;
+    }
+  }
+
   return false;
 }
 

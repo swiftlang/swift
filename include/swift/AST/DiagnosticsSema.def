@@ -1963,6 +1963,10 @@ ERROR(extension_placeholder,none,
       "cannot extend a type that contains placeholders", ())
 ERROR(extension_stored_property,none,
       "stored property is not permitted in extension", ())
+ERROR(extension_stored_property_in_constrained_extension,none,
+      "stored property is not permitted in constrained extension", ())
+ERROR(extension_stored_property_on_protocol,none,
+      "stored property is not permitted in extension of protocol", ())
 ERROR(extension_stored_property_in_different_file,none,
       "only extensions defined in the same file as the extended type "
       "are permitted to define stored properties", ())

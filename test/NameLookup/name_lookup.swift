@@ -369,7 +369,7 @@ extension ThisBase1 {
 
   func baseExtFunc0() {}
 
-  var baseExtStaticVar: Int // expected-error {{extensions must not contain stored properties}} // expected-note 2 {{'baseExtStaticVar' declared here}}
+  var baseExtStaticVar: Int = 42 // expected-note 2 {{'baseExtStaticVar' declared here}}
 
   var baseExtStaticProp: Int { // expected-note 2 {{'baseExtStaticProp' declared here}}
     get {
@@ -401,7 +401,7 @@ extension ThisDerived1 {
 
   func derivedExtFunc0() {}
 
-  var derivedExtStaticVar: Int // expected-error {{extensions must not contain stored properties}}
+  var derivedExtStaticVar: Int = 42
 
   var derivedExtStaticProp: Int {
     get {

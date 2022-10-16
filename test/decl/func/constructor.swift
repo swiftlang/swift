@@ -108,3 +108,14 @@ var noCrash1c : NoCrash1a
 class MissingDef {
   init() // expected-error{{initializer requires a body}}
 }
+
+// Stored properties in extensions appear in implicit constructor
+struct X { }
+
+extension X {
+  let t: String
+  let u: Int
+  let v: Double
+}
+
+X(t: "test", u: 42, v: 1.0)

@@ -20,10 +20,20 @@ extension Double : P2 {
 
 extension X<Int, Double, String> {
   let x = 0
-  // expected-error@-1 {{extensions must not contain stored properties}}
+  // expected-error@-1 {{stored property is not permitted in constrained extension}}
   static let x = 0
   func f() -> Int {}
   class C<T> {}
+}
+
+extension X {
+  let t: T
+  let u: U
+  let v: V
+
+  static func makeX(t: T, u: U, v: V) -> X<T, U, V> {
+    X(t: t, u: u, v: v)
+  }
 }
 
 typealias GGG = X<Int, Double, String>
