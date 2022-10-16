@@ -1354,6 +1354,10 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
+  bool isSPI(const ValueDecl* VD) {
+    assert(VD);
+    return VD->isSPI() || VD->isAvailableAsSPI();
+  }
 public:
   APIGenRecorder(apigen::API &api, ModuleDecl *module)
       : api(api), module(module) {
@@ -1373,13 +1377,13 @@ public:
       auto ref = source.getSILDeclRef();
       if (ref.hasDecl()) {
         availability = getAvailability(ref.getDecl());
-        if (ref.getDecl()->isSPI())
+        if (isSPI(ref.getDecl()))
           access = apigen::APIAccess::Private;
       }
     } else if (source.kind == SymbolSource::Kind::IR) {
       auto ref = source.getIRLinkEntity();
       if (ref.hasDecl()) {
-        if (ref.getDecl()->isSPI())
+        if (isSPI(ref.getDecl()))
           access = apigen::APIAccess::Private;
       }
     }
