@@ -203,11 +203,14 @@ struct HasWrapper { }
 
 extension HasWrapper {
   @Wrapper(stored: 17)
-  var inExt: Int // expected-error{{property 'inExt' declared inside an extension cannot have a wrapper}}
-  // expected-error@-1{{extensions must not contain stored properties}}
+  var inExt: Int
 
   @Wrapper(stored: 17)
   static var x: Int
+
+  static func makeHasWrapper() -> HasWrapper {
+    HasWrapper(inExt: Wrapper(stored: 42))
+  }
 }
 
 class ClassWithWrappers {

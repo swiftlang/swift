@@ -1967,6 +1967,8 @@ ERROR(extension_stored_property_in_constrained_extension,none,
       "stored property is not permitted in constrained extension", ())
 ERROR(extension_stored_property_on_protocol,none,
       "stored property is not permitted in extension of protocol", ())
+ERROR(extension_stored_property_on_enum,none,
+      "stored property is not permitted in extension of enum", ())
 ERROR(extension_stored_property_in_different_file,none,
       "only extensions defined in the same file as the extended type "
       "are permitted to define stored properties", ())
@@ -6213,7 +6215,7 @@ ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
 ERROR(property_with_wrapper_in_bad_context,none,
       "%select{|non-static|non-static}1 %2 %0 declared inside "
-      "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
+      "%select{a protocol|an enum}1 cannot have a wrapper",
       (Identifier, int, DescriptiveDeclKind))
 ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",

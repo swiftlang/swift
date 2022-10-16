@@ -448,11 +448,11 @@ extension S {
 }
 
 struct StructWithExtension1 {
-  var foo: Int
+  var foo: Int = 42
   static var fooStatic = 4
 }
 extension StructWithExtension1 {
-  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
+  var fooExt: Int
   static var fooExtStatic = 4
 }
 
@@ -461,7 +461,7 @@ class ClassWithExtension1 {
   class var fooStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 extension ClassWithExtension1 {
-  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
+  var fooExt: Int = 42
   class var fooExtStatic = 4 // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
 
@@ -470,7 +470,7 @@ enum EnumWithExtension1 {
   static var fooStatic  = 4
 }
 extension EnumWithExtension1 {
-  var fooExt: Int // expected-error {{extensions must not contain stored properties}}
+  var fooExt: Int // expected-error {{stored property is not permitted in extension of enum}}
   static var fooExtStatic = 4
 }
 
@@ -479,7 +479,7 @@ protocol ProtocolWithExtension1 {
   static var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 {
-  var fooExt: Int // expected-error{{extensions must not contain stored properties}}
+  var fooExt: Int // expected-error{{stored property is not permitted in extension of protocol}}
   static var fooExtStatic = 4 // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
@@ -1154,8 +1154,8 @@ class rdar17391625 {
 }
 
 extension rdar17391625 {
-  var someStoredVar: Int       // expected-error {{extensions must not contain stored properties}}
-  var someObservedVar: Int {   // expected-error {{extensions must not contain stored properties}}
+  var someStoredVar: Int = 42
+  var someObservedVar: Int {
   didSet {
   }
   }
@@ -1177,7 +1177,7 @@ extension rdar17391625derived {
 public protocol rdar27671033P {}
 struct rdar27671033S<Key, Value> {}
 extension rdar27671033S : rdar27671033P where Key == String {
-  let d = rdar27671033S<Int, Int>() // expected-error {{extensions must not contain stored properties}}
+  let d = rdar27671033S<Int, Int>() // expected-error {{stored property is not permitted in constrained extension}}
 }
 
 // <rdar://problem/19874152> struct memberwise initializer violates new sanctity of previously set `let` property
@@ -1313,7 +1313,7 @@ class C_53385 {
 
 class C1_51744 {}
 extension C1_51744 {
-  var foo: String = { // expected-error {{extensions must not contain stored properties}} // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'foo' a computed property}}{{19-21=}}
+  var foo: String = { // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'foo' a computed property}}{{19-21=}}
     return "Hello"
   }
 }
@@ -1322,6 +1322,10 @@ enum E_51744 {
   var prop: String = { // expected-error {{enums must not contain stored properties}} // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'prop' a computed property}}{{20-22=}}
     return "Hello"
   }
+}
+
+extension E_51744 {
+  var storedPropertyInEnumExtension: Int = 42 // expected-error {{stored property is not permitted in extension of enum}}
 }
 
 var v_51744: Int = { // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} // expected-note {{Remove '=' to make 'v_51744' a computed property}}{{18-20=}}
@@ -1351,4 +1355,8 @@ enum E1_57936 {
 
 enum E2_57936<T> {
   var foo: T {} // expected-error{{missing return in accessor expected to return 'T'}}
+}
+
+extension String {
+  let storedPropertyInStringExtension: Int = 42 // expected-error {{only extensions defined in the same file as the extended type are permitted to define stored properties}}
 }

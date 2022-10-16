@@ -517,18 +517,14 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       dc = dc->getAsDecl()->getDeclContext();
     }
 
-    // A property with a wrapper cannot be declared in a protocol, enum, or
-    // an extension.
+    // A property with a wrapper cannot be declared in a protocol or enum
     if (isa<ProtocolDecl>(dc) ||
-        (isa<ExtensionDecl>(dc) && var->isInstanceMember()) ||
         (isa<EnumDecl>(dc) && var->isInstanceMember())) {
       int whichKind;
       if (isa<ProtocolDecl>(dc))
         whichKind = 0;
-      else if (isa<ExtensionDecl>(dc))
-        whichKind = 1;
       else
-        whichKind = 2;
+        whichKind = 1;
       var->diagnose(diag::property_with_wrapper_in_bad_context,
                     var->getName(), whichKind, var->getDescriptiveKind())
         .highlight(attr->getRange());

@@ -110,12 +110,37 @@ class MissingDef {
 }
 
 // Stored properties in extensions appear in implicit constructor
-struct X { }
+struct StructWithExtension { }
 
-extension X {
+extension StructWithExtension {
   let t: String
   let u: Int
   let v: Double
 }
 
-X(t: "test", u: 42, v: 1.0)
+_ = StructWithExtension(t: "T", u: 42, v: 1.0)
+
+class ClassWithExtension { 
+  init(t: String) {
+    self.t = t
+  }
+}
+
+extension ClassWithExtension {
+  let t: String
+}
+
+_ = ClassWithExtension(t: "T")
+
+class SubclassWithExtendedSuperclass: ClassWithExtension { 
+  init(t: String, u: String) {
+    self.u = u
+    super.init(t: t)
+  }
+}
+
+extension SubclassWithExtendedSuperclass {
+  let u: String
+}
+
+_ = SubclassWithExtendedSuperclass(t: "T", u: "U")

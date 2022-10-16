@@ -219,7 +219,10 @@ static void enumerateStoredPropertiesAndMissing(
 
       for (auto member : extension->getMembers()) {
         if (auto *var = dyn_cast<VarDecl>(member)) {
-          if (!var->isStatic() && var->hasStorage()) {
+          if (!var->isStatic() &&
+              var->hasStorage()
+              // @_dynamicReplacament properties are handled elsewhere
+              && !var->getAttrs().getAttribute<DynamicReplacementAttr>()) {
             addStoredProperty(var);
           }
         }
@@ -3346,31 +3349,35 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
               !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
 
       // VarDecls with storage are permitted to be defined in unconstrained
-      // extensions on concrete types (e.g. not protocols) as long as the
-      // extension is in the same file as the extended type
+      // extensions on concrete types (but not protocols or enums) as long as
+      // the extension is in the same file as the extended type
       bool extensionInSameFileAsType = false;
       bool extendsProtocol = false;
+      bool extendsEnum = false;
       auto ext = dyn_cast<ExtensionDecl>(dc);
       if (auto type = ext->getExtendedNominal()) {
         auto typeFile = dyn_cast<SourceFile>(type->getModuleScopeContext());
         auto extFile = dyn_cast<SourceFile>(ext->getModuleScopeContext());
         extensionInSameFileAsType = typeFile && extFile && typeFile == extFile;
         extendsProtocol = isa<ProtocolDecl>(type);
+        extendsEnum = isa<EnumDecl>(type);
       }
 
       bool storedPropertyIsPermitted =
           isa<VarDecl>(storage) && extensionInSameFileAsType &&
-          !ext->isConstrainedExtension() && !extendsProtocol;
+          !ext->isConstrainedExtension() && !extendsProtocol && !extendsEnum;
 
       if (!storedPropertyIsPermitted) {
         // Tailor the diagnostic to match the specific reason this decl
         // is not permitted
         if (isa<VarDecl>(storage)) {
-          if (ext->isConstrainedExtension()) {
+          if (extendsProtocol) {
+            storage->diagnose(diag::extension_stored_property_on_protocol);
+          } else if (extendsEnum) {
+            storage->diagnose(diag::extension_stored_property_on_enum);
+          } else if (ext->isConstrainedExtension()) {
             storage->diagnose(
                 diag::extension_stored_property_in_constrained_extension);
-          } else if (extendsProtocol) {
-            storage->diagnose(diag::extension_stored_property_on_protocol);
           } else {
             storage->diagnose(
                 diag::extension_stored_property_in_different_file);

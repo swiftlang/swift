@@ -108,22 +108,6 @@ foo(b:
 // CHECK:             | ^ note: did you mean to disable error propagation? [insert 'try! ']
 // CHECK: [[#LINE+1]] |
 
-
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:7
-// CHECK: [[#LINE-1]] | extension A {
-// CHECK: [[#LINE]]   |   let x: Int = { 42 }
-// CHECK:             |       ^ error: extensions must not contain stored properties
-// CHECK: [[#LINE+1]] | }
-
-// Test complex out-of-line fix-its.
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:16
-// CHECK: [[#LINE-1]] | extension A {
-// CHECK: [[#LINE]]   |   let x: Int = { 42 }()
-// CHECK:             |                ~~~~~~++
-// CHECK:             |                ^ error: function produces expected type 'Int'; did you mean to call it with '()'?
-// CHECK:             |                ^ note: Remove '=' to make 'x' a computed property [remove '= ' and replace 'let' with 'var']
-// CHECK: [[#LINE+1]] | }
-
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:8
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | struct B: Decodable {
