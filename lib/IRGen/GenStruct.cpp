@@ -993,9 +993,10 @@ namespace {
     SILType getType(VarDecl *field) {
       auto DC = field->getDeclContext();
       assert(DC == TheStruct->getAnyNominal()
-            // Stored properties in extensions within the same file are added
-            // as members to the defining type, so we shouldn't assert in that case
-            || DC->getContextKind() == DeclContextKind::ExtensionDecl);
+             // Stored properties in extensions within the same file are added
+             // as members to the defining type, so we shouldn't assert in that
+             // case
+             || DC->getContextKind() == DeclContextKind::ExtensionDecl);
       auto silType = SILType::getPrimitiveAddressType(TheStruct);
       return silType.getFieldType(
           field, IGM.getSILModule(),

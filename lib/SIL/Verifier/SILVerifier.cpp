@@ -3266,9 +3266,10 @@ public:
 
     auto DC = EI->getField()->getDeclContext();
     require(DC == sd
-            // Stored properties in extensions within the same file are added
-            // as members to the defining type, so we shouldn't assert in that case
-            || DC->getContextKind() == DeclContextKind::ExtensionDecl,
+                // Stored properties in extensions within the same file are
+                // added as members to the defining type, so we shouldn't assert
+                // in that case
+                || DC->getContextKind() == DeclContextKind::ExtensionDecl,
             "struct_element_addr field is not a member of the struct");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {

@@ -68,14 +68,13 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
     return range.contains(childCharRange);
   }();
 
-  // TODO: Need to find a way to handle this
-//  if (!childContainedInParent) {
-//    auto &out = verificationError() << "child not contained in its parent:\n";
-//    child->print(out);
-//    out << "\n***Parent node***\n";
-//    this->print(out);
-//    abort();
-//  }
+  if (!childContainedInParent) {
+    auto &out = verificationError() << "child not contained in its parent:\n";
+    child->print(out);
+    out << "\n***Parent node***\n";
+    this->print(out);
+    abort();
+  }
 
   if (!storedChildren.empty()) {
     auto previousChild = storedChildren.back();

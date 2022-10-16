@@ -2445,45 +2445,12 @@ public:
 
     TypeChecker::checkConformancesInContext(ED);
   }
-  
-  /// If any extensions on this type (in the same file) define
-  /// stored instance properties, add them to the type itself
-  void addStoredMembersFromExtensions(NominalTypeDecl *type) {
-    for (auto extension : type->getExtensions()) {
-      for (auto member : extension->getMembers()) {
-        auto PBD = dyn_cast<PatternBindingDecl>(member);
-        if (!PBD) {
-          continue;
-        }
-        
-        if (!PBD->hasStorage() || PBD->isStatic()) {
-          continue;
-        }
-        
-        type->addMember(PBD);
-        
-        for (auto index : range(PBD->getNumPatternEntries())) {
-          SmallVector<VarDecl *, 8> variables;
-          PBD->getPattern(index)->collectVariables(variables);
-          
-          for (auto var : variables) {
-            type->addMember(var);
-          }
-        }
-      }
-    }
-  }
 
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
     checkGenericParams(SD);
 
-    // Before computing the set of store properties, add any
-    // stored property members that were defined in extensions
-    // in the same file
-    addStoredMembersFromExtensions(SD);
-    
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
 
@@ -2635,11 +2602,6 @@ public:
     if (CD->isDistributedActor()) {
       TypeChecker::checkDistributedActor(SF, CD);
     }
-    
-    // Before computing the set of store properties, add any
-    // stored property members that were defined in extensions
-    // in the same file
-    addStoredMembersFromExtensions(CD);
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();

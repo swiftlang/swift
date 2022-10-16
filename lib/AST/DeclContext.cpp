@@ -865,11 +865,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
   case IterableDeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
     nominal->addedMember(member);
-    
-    assert((member->getDeclContext() == nominal ||
-            // Stored properties in extensions within the same file are added
-            // as members to the defining type, so we shouldn't assert in that case
-            member->getDeclContext()->getContextKind() == DeclContextKind::ExtensionDecl) &&
+    assert(member->getDeclContext() == nominal &&
            "Added member to the wrong context");
     break;
   }
@@ -887,12 +883,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
 void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
                                             bool insertAtHead) const {
   assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
-  
-  assert(!member->NextDecl
-      // Stored properties in extensions within the same file are added
-      // as members to the defining type, so we shouldn't assert in that case
-      || member->NextDecl->getDeclContext()->getContextKind() == DeclContextKind::ExtensionDecl
-      && "Already added to a container");
+  assert(!member->NextDecl && "Already added to a container");
 
 #ifndef NDEBUG
   // Assert that new declarations are always added in source order.

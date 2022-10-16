@@ -339,11 +339,28 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    for (auto member : decl->getMembers()) {
-      auto var = dyn_cast<VarDecl>(member);
-      if (!var)
-        continue;
+    // open question: is there a good "ordered set" type we could use
+    // here instead of a parallel array / unordered set?
+    llvm::SmallVector<VarDecl *, 4> varDecls;
+    llvm::SmallDenseSet<VarDecl *, 4> seenDecls;
 
+    for (auto member : decl->getMembers()) {
+      if (auto var = dyn_cast<VarDecl>(member)) {
+        varDecls.push_back(var);
+        seenDecls.insert(var);
+      }
+    }
+
+    // A type can also have stored properties that aren't direct members,
+    // e.g. if they were defined in an extension.
+    for (auto storedDecl : decl->getStoredProperties()) {
+      if (!seenDecls.count(storedDecl)) {
+        varDecls.push_back(storedDecl);
+        seenDecls.insert(storedDecl);
+      }
+    }
+
+    for (auto var : varDecls) {
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 

@@ -1076,6 +1076,7 @@ class SILGenType : public TypeMemberVisitor<SILGenType> {
 public:
   SILGenModule &SGM;
   NominalTypeDecl *theType;
+  llvm::SmallDenseSet<VarDecl *> visitedVarDecls;
 
   SILGenType(SILGenModule &SGM, NominalTypeDecl *theType)
     : SGM(SGM), theType(theType) {}
@@ -1086,6 +1087,14 @@ public:
 
     for (Decl *member : theType->getABIMembers())
       visit(member);
+
+    // Types can have stored properties that aren't included in
+    // `getABIMembers()`, so we have to handle those manually
+    for (VarDecl *VD : theType->getStoredProperties()) {
+      if (!visitedVarDecls.count(VD)) {
+        visit(VD);
+      }
+    }
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
@@ -1176,6 +1185,8 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
+    visitedVarDecls.insert(vd);
+
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
@@ -1309,9 +1320,9 @@ public:
         // these are handled as if they were defined in the type
         // being extended rather than the extension itself
         if (!pd->isStatic()) {
-          continue;;
+          continue;
         }
-        
+
         SGM.emitGlobalInitialization(pd, i);
       }
     }
@@ -1321,7 +1332,7 @@ public:
     if (vd->hasStorage()) {
       bool hasDidSetOrWillSetDynamicReplacement =
           vd->hasDidSetOrWillSetDynamicReplacement();
-      
+
       // Ignore any stored properties, since at codegen time
       // these are handled as if they were defined in the type
       // being extended rather than the extension itself

@@ -207,6 +207,25 @@ static void enumerateStoredPropertiesAndMissing(
       if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
         addMissing(missing);
   }
+
+  // Extensions within the same file as this NominalTypeDecl can define
+  // stored properties for this type
+  if (auto declFile = dyn_cast<SourceFile>(decl->getModuleScopeContext())) {
+    for (auto extension : decl->getExtensions()) {
+      auto extensionFile = dyn_cast<SourceFile>(decl->getModuleScopeContext());
+      if (!extensionFile || extensionFile != declFile) {
+        continue;
+      }
+
+      for (auto member : extension->getMembers()) {
+        if (auto *var = dyn_cast<VarDecl>(member)) {
+          if (!var->isStatic() && var->hasStorage()) {
+            addStoredProperty(var);
+          }
+        }
+      }
+    }
+  }
 }
 
 ArrayRef<VarDecl *>
@@ -3325,14 +3344,31 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
       info = StorageImplInfo::getMutableComputed();
     } else if (isa<ExtensionDecl>(dc) &&
               !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-      // TODO: We still need to emit this error if the stored property
-      // isn't a member of the extensions's type
-      
-//      storage->diagnose(diag::extension_stored_property);
-//
-//      info = (info.supportsMutation()
-//              ? StorageImplInfo::getMutableComputed()
-//              : StorageImplInfo::getImmutableComputed());
+
+      // VarDecls with storage are permitted to be defined in extensions
+      // as long as the extension is in the same file as the extended type
+      bool extensionInSameFileAsType = false;
+      auto ext = dyn_cast<ExtensionDecl>(dc);
+      if (auto type = ext->getExtendedNominal()) {
+        auto typeFile = dyn_cast<SourceFile>(type->getModuleScopeContext());
+        auto extFile = dyn_cast<SourceFile>(ext->getModuleScopeContext());
+        extensionInSameFileAsType = typeFile && extFile && typeFile == extFile;
+      }
+
+      bool storedPropertyIsPermitted =
+          extensionInSameFileAsType && isa<VarDecl>(storage);
+
+      if (!storedPropertyIsPermitted) {
+        if (isa<VarDecl>(storage)) {
+          storage->diagnose(diag::extension_stored_property_in_different_file);
+        } else {
+          storage->diagnose(diag::extension_stored_property);
+        }
+
+        info =
+            (info.supportsMutation() ? StorageImplInfo::getMutableComputed()
+                                     : StorageImplInfo::getImmutableComputed());
+      }
     }
   }
 }

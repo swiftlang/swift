@@ -801,7 +801,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     } else {
       nominal = cast<NominalTypeDecl>(d->getDeclContext());
     }
-    
+
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);

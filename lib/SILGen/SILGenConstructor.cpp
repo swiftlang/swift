@@ -1067,7 +1067,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
     } else {
       nominal = cast<NominalTypeDecl>(field->getDeclContext());
     }
-    
+
     if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
       slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
                                            fieldTy.getAddressType());
@@ -1169,73 +1169,95 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                             NominalTypeDecl *nominal) {
   auto subs = getSubstitutionsForPropertyInitializer(dc, nominal);
 
+  // open question: is there a good "ordered set" type we could use
+  // here instead of a parallel array / unordered set?
+  llvm::SmallVector<PatternBindingDecl *, 4> patternDecls;
+  llvm::SmallDenseSet<PatternBindingDecl *, 4> seenPatterns;
+
   for (auto member : nominal->getMembers()) {
-    // Find instance pattern binding declarations that have initializers.
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->isStatic()) continue;
+      patternDecls.push_back(pbd);
+      seenPatterns.insert(pbd);
+    }
+  }
 
-      for (auto i : range(pbd->getNumPatternEntries())) {
-        auto init = pbd->getExecutableInit(i);
-        if (!init) continue;
+  // A type can also have stored properties that aren't direct members,
+  // e.g. if they were defined in an extension.
+  for (auto storedProperty : nominal->getStoredProperties()) {
+    if (auto pbd = storedProperty->getParentPatternBinding()) {
+      if (!seenPatterns.count(pbd)) {
+        patternDecls.push_back(pbd);
+        seenPatterns.insert(pbd);
+      }
+    }
+  }
 
-        auto *varPattern = pbd->getPattern(i);
+  for (auto pbd : patternDecls) {
+    // Find instance pattern binding declarations that have initializers.
+    if (pbd->isStatic())
+      continue;
 
-        // Cleanup after this initialization.
-        FullExpr scope(Cleanups, varPattern);
+    for (auto i : range(pbd->getNumPatternEntries())) {
+      auto init = pbd->getExecutableInit(i);
+      if (!init)
+        continue;
 
-        // Get the type of the initialization result, in terms
-        // of the constructor context's archetypes.
-        auto resultType = getInitializationTypeInContext(
-            pbd->getDeclContext(), dc, varPattern);
-        AbstractionPattern origType = resultType.first;
-        CanType substType = resultType.second;
+      auto *varPattern = pbd->getPattern(i);
 
-        // Figure out what we're initializing.
-        auto memberInit = emitMemberInit(*this, selfDecl, varPattern);
+      // Cleanup after this initialization.
+      FullExpr scope(Cleanups, varPattern);
 
-        // This whole conversion thing is about eliminating the
-        // paired orig-to-subst subst-to-orig conversions that
-        // will happen if the storage is at a different abstraction
-        // level than the constructor. When emitApply() is used
-        // to call the stored property initializer, it naturally
-        // wants to convert the result back to the most substituted
-        // abstraction level. To undo this, we use a converting
-        // initialization and rely on the peephole that optimizes
-        // out the redundant conversion.
-        SILType loweredResultTy;
-        SILType loweredSubstTy;
+      // Get the type of the initialization result, in terms
+      // of the constructor context's archetypes.
+      auto resultType =
+          getInitializationTypeInContext(pbd->getDeclContext(), dc, varPattern);
+      AbstractionPattern origType = resultType.first;
+      CanType substType = resultType.second;
 
-        // A converting initialization isn't necessary if the member is
-        // a property wrapper. Though the initial value can have a
-        // reabstractable type, the result of the initialization is
-        // always the property wrapper type, which is never reabstractable.
-        bool needsConvertingInit = false;
-        auto *singleVar = varPattern->getSingleVar();
-        if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
-          loweredResultTy = getLoweredType(origType, substType);
-          loweredSubstTy = getLoweredType(substType);
-          needsConvertingInit = loweredResultTy != loweredSubstTy;
-        }
+      // Figure out what we're initializing.
+      auto memberInit = emitMemberInit(*this, selfDecl, varPattern);
 
-        if (needsConvertingInit) {
-          Conversion conversion = Conversion::getSubstToOrig(
-              origType, substType,
-              loweredResultTy);
+      // This whole conversion thing is about eliminating the
+      // paired orig-to-subst subst-to-orig conversions that
+      // will happen if the storage is at a different abstraction
+      // level than the constructor. When emitApply() is used
+      // to call the stored property initializer, it naturally
+      // wants to convert the result back to the most substituted
+      // abstraction level. To undo this, we use a converting
+      // initialization and rely on the peephole that optimizes
+      // out the redundant conversion.
+      SILType loweredResultTy;
+      SILType loweredSubstTy;
 
-          ConvertingInitialization convertingInit(conversion,
-                                                  SGFContext(memberInit.get()));
+      // A converting initialization isn't necessary if the member is
+      // a property wrapper. Though the initial value can have a
+      // reabstractable type, the result of the initialization is
+      // always the property wrapper type, which is never reabstractable.
+      bool needsConvertingInit = false;
+      auto *singleVar = varPattern->getSingleVar();
+      if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
+        loweredResultTy = getLoweredType(origType, substType);
+        loweredSubstTy = getLoweredType(substType);
+        needsConvertingInit = loweredResultTy != loweredSubstTy;
+      }
 
-          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
-                                       origType, substType, &convertingInit);
+      if (needsConvertingInit) {
+        Conversion conversion =
+            Conversion::getSubstToOrig(origType, substType, loweredResultTy);
 
-          auto finalValue = convertingInit.finishEmission(
-              *this, varPattern, ManagedValue::forInContext());
-          if (!finalValue.isInContext())
-            finalValue.forwardInto(*this, varPattern, memberInit.get());
-        } else {
-          emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs,
-                                       origType, substType, memberInit.get());
-        }
+        ConvertingInitialization convertingInit(conversion,
+                                                SGFContext(memberInit.get()));
+
+        emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs, origType,
+                                     substType, &convertingInit);
+
+        auto finalValue = convertingInit.finishEmission(
+            *this, varPattern, ManagedValue::forInContext());
+        if (!finalValue.isInContext())
+          finalValue.forwardInto(*this, varPattern, memberInit.get());
+      } else {
+        emitAndStoreInitialValueInto(*this, varPattern, pbd, i, subs, origType,
+                                     substType, memberInit.get());
       }
     }
   }

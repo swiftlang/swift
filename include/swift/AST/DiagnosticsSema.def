@@ -1962,7 +1962,10 @@ ERROR(extension_metatype,none,
 ERROR(extension_placeholder,none,
       "cannot extend a type that contains placeholders", ())
 ERROR(extension_stored_property,none,
-      "extensions must not contain stored properties", ())
+      "stored property is not permitted in extension", ())
+ERROR(extension_stored_property_in_different_file,none,
+      "only extensions defined in the same file as the extended type "
+      "are permitted to define stored properties", ())
 NOTE(extension_stored_property_fixit,none,
      "Remove '=' to make %0 a computed property", (Identifier))
 ERROR(extension_nongeneric_trailing_where,none,
