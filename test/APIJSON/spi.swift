@@ -17,6 +17,10 @@ public class MyClass2 : NSObject {
   @_spi(Experimental) @objc public func spiMethod() {}
 }
 
+@_spi_available(macOS 10.10, tvOS 14.0, *)
+@available(iOS 8.0, *)
+public func spiAvailableFunc() {}
+
 // CHECK:      {
 // CHECK-NEXT:   "target":
 // CHECK-NEXT:   "globals": [
@@ -61,6 +65,13 @@ public class MyClass2 : NSObject {
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
 // CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule16spiAvailableFuncyyF",
+// CHECK-NEXT:       "access": "public",
+// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "unavailable": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_OBJC_CLASS_$__TtC8MyModule8MyClass2",
@@ -224,6 +235,13 @@ public class MyClass2 : NSObject {
 // CHECK-SPI-NEXT:       "access": "private",
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
 // CHECK-SPI-NEXT:       "linkage": "exported"
+// CHECK-SPI-NEXT:     },
+// CHECK-SPI-NEXT:    {
+// CHECK-SPI-NEXT:       "name": "_$s8MyModule16spiAvailableFuncyyF",
+// CHECK-SPI-NEXT:       "access": "private",
+// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
+// CHECK-SPI-NEXT:       "linkage": "exported",
+// CHECK-SPI-NEXT:       "introduced": "10.10"
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_OBJC_CLASS_$__TtC8MyModule7MyClass",
