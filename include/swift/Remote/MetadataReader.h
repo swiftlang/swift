@@ -70,10 +70,21 @@ public:
   explicit RemoteRef(StoredPointer address, const T *localBuffer)
     : Address((uint64_t)address), LocalBuffer(localBuffer) {}
 
+  // <rdar://99715218> Some versions of clang++ sometimes fail to generate the
+  // copy constructor for this type correctly - add a workaround
+  RemoteRef(const RemoteRef &other)
+    : Address(other.Address), LocalBuffer(other.LocalBuffer) {}
+
+  RemoteRef& operator=(const RemoteRef &other) {
+    Address = other.Address;
+    LocalBuffer = other.LocalBuffer;
+    return *this;
+  }
+
   uint64_t getAddressData() const {
     return Address;
   }
-  
+
   const T *getLocalBuffer() const {
     return LocalBuffer;
   }
