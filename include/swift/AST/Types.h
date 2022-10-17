@@ -384,9 +384,9 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 5+32,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 6+32,
     /// Type variable options.
-    Options : 5,
+    Options : 6,
     : NumPadBits,
     /// The unique number assigned to this type variable.
     ID : 32
@@ -2323,6 +2323,10 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       ArrayRef<TupleTypeElt> Elements);
   
+  bool containsPackExpansionType() const;
+
+  TupleType *flattenPackTypes();
+
 private:
   TupleType(ArrayRef<TupleTypeElt> elements, const ASTContext *CanCtx,
             RecursiveTypeProperties properties)
@@ -3356,6 +3360,10 @@ public:
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
+
+  static bool containsPackExpansionType(ArrayRef<Param> params);
+
+  AnyFunctionType *flattenPackTypes();
 
   static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
                           const PrintOptions &PO = PrintOptions());
@@ -6410,6 +6418,10 @@ public:
     return getTrailingObjects<Type>()[index];
   }
 
+  bool containsPackExpansionType() const;
+
+  PackType *flattenPackTypes();
+
 public:
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Profile(ID, getElementTypes());
@@ -6479,6 +6491,8 @@ public:
 
   /// Retrieves the count type of this pack expansion.
   Type getCountType() const { return countType; }
+
+  PackExpansionType *expand();
 
 public:
   void Profile(llvm::FoldingSetNodeID &ID) {

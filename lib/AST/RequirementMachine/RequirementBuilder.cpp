@@ -289,9 +289,6 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
   for (unsigned ruleID : rules) {
     const auto &rule = System.getRule(ruleID);
     auto name = *rule.isProtocolTypeAliasRule();
-    Type underlyingType;
-
-    auto subjectType = Map.getTypeForTerm(rule.getRHS(), GenericParams);
 
     if (auto prop = rule.isPropertyRule()) {
       assert(prop->getKind() == Symbol::Kind::ConcreteType);

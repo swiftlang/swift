@@ -526,7 +526,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         return;
 
       // Get underlying params for both callee and caller, if declared.
-      auto *calleeParam = getParameterAt(callee.getDecl(), argIndex);
+      auto *calleeParam = getParameterAt(callee, argIndex);
       auto *callerParam = dyn_cast_or_null<ParamDecl>(
           arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
       );
