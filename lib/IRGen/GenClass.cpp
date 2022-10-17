@@ -16,6 +16,9 @@
 
 #include "GenClass.h"
 
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/RecordLayout.h"
 #include "swift/ABI/Class.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -28,6 +31,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
@@ -281,6 +285,55 @@ namespace {
                                superclass);
     }
 
+    void maybeAddCxxRecordBases(ClassDecl *cd) {
+      auto cxxRecord = dyn_cast_or_null<clang::CXXRecordDecl>(cd->getClangDecl());
+      if (!cxxRecord)
+        return;
+
+      auto &layout = cxxRecord->getASTContext().getASTRecordLayout(cxxRecord);
+
+      for (auto base : cxxRecord->bases()) {
+        if (base.isVirtual())
+          continue;
+
+        auto baseType = base.getType().getCanonicalType();
+
+        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
+
+        if (baseCxxRecord->isEmpty())
+          continue;
+
+        auto offset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
+        auto size = Size(cxxRecord->getASTContext().getTypeSizeInChars(baseType).getQuantity());
+
+        if (offset != CurSize) {
+          assert(offset > CurSize);
+          auto paddingSize = offset - CurSize;
+          auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+          auto element = ElementLayout::getIncomplete(opaqueTI);
+          addField(element, LayoutStrategy::Universal);
+        }
+
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(size, Alignment(1));
+        auto element = ElementLayout::getIncomplete(opaqueTI);
+        addField(element, LayoutStrategy::Universal);
+      }
+    }
+
+    void addPaddingBeforeClangField(const clang::FieldDecl *fd) {
+      auto offset = Size(fd->getASTContext().toCharUnitsFromBits(
+          fd->getASTContext().getFieldOffset(fd)).getQuantity());
+
+      if (offset != CurSize) {
+        assert(offset > CurSize);
+        auto paddingSize = offset - CurSize;
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+        auto element = ElementLayout::getIncomplete(opaqueTI);
+        addField(element, LayoutStrategy::Universal);
+      }
+    }
+
     void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
                                   ClassDecl *theClass, SILType classType,
                                   bool superclass) {
@@ -290,7 +343,9 @@ namespace {
                                                ->getRecursiveProperties()
                                                .hasUnboundGeneric());
 
-      forEachField(IGM, theClass, [&](Field field) {
+      maybeAddCxxRecordBases(theClass);
+
+      auto fn = [&](Field field) {
         // Ignore missing properties here; we should have flagged these
         // with the classHasIncompleteLayout call above.
         if (!field.isConcrete()) {
@@ -325,7 +380,25 @@ namespace {
           AllStoredProperties.push_back(field);
           AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
-      });
+      };
+
+      auto classDecl = dyn_cast<ClassDecl>(theClass);
+      if (classDecl && classDecl->isRootDefaultActor()) {
+        fn(Field::DefaultActorStorage);
+      }
+
+      for (auto decl :
+           theClass->getStoredPropertiesAndMissingMemberPlaceholders()) {
+        if (decl->getClangDecl())
+          if (auto clangField = cast<clang::FieldDecl>(decl->getClangDecl()))
+            addPaddingBeforeClangField(clangField);
+
+        if (auto var = dyn_cast<VarDecl>(decl)) {
+          fn(var);
+        } else {
+          fn(cast<MissingMemberDecl>(decl));
+        }
+      }
 
       if (!superclass) {
         // If we're calculating the layout of a specialized generic class type,
