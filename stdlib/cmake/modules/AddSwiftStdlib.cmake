@@ -82,7 +82,29 @@ function(_add_target_variant_c_compile_link_flags)
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     list(APPEND result "-target" "${target}")
     if(target_variant)
-      list(APPEND result "-target-variant" "${target_variant}")
+      # Check if the C compiler supports `-target-variant` flag
+      # TODO (etcwilde): This is a massive hack to deal with the fact that we
+      # are lying to cmake about what compiler is being used. Normally we could
+      # use `check_compiler_flag(C ...)` here. Unfortunately, that uses a
+      # different compiler since we swap out the C/CXX compiler part way through
+      # the build.
+      file(WRITE "${CMAKE_BINARY_DIR}/stdlib/empty" "")
+      execute_process(
+        COMMAND
+          "${CMAKE_C_COMPILER}"
+          -Wno-unused-command-line-argument
+          -target-variant x86_64-apple-ios14.5-macabi -x c -c - -o /dev/null
+        INPUT_FILE
+          "${CMAKE_BINARY_DIR}/stdlib/empty"
+        OUTPUT_QUIET ERROR_QUIET
+        RESULT_VARIABLE
+          SUPPORTS_TARGET_VARIANT)
+
+      if(NOT SUPPORTS_TARGET_VARIANT)
+        list(APPEND result "-target-variant" "${target_variant}")
+      else()
+        list(APPEND result "-darwin-target-variant" "${target_variant}")
+      endif()
     endif()
   endif()
 
