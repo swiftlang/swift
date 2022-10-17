@@ -4,6 +4,7 @@
 
 // RUN: %check-in-clang -std=c99 %t/empty.h
 // RUN: %check-in-clang -std=c11 %t/empty.h
+// RUN: %check-cxx-header-in-clang -x objective-c++-header -std=c++98 -D_LIBCPP_CSTDLIB %t/empty.h
 // RUN: %check-cxx-header-in-clang -x objective-c++-header -std=c++11 -D_LIBCPP_CSTDLIB %t/empty.h
 // RUN: %check-cxx-header-in-clang -x objective-c++-header -std=c++14 -D_LIBCPP_CSTDLIB %t/empty.h
 
