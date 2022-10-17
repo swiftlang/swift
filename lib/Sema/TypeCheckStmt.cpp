@@ -471,24 +471,6 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   // Typecheck a #available or #unavailable condition.
   if (elt.getKind() == StmtConditionElement::CK_Availability) {
     isFalsable = true;
-
-    // Reject inlinable code using availability macros.
-    PoundAvailableInfo *info = elt.getAvailability();
-    if (auto *decl = dc->getAsDecl()) {
-      auto fragileKind = dc->getFragileFunctionKind();
-      if (fragileKind.kind != FragileFunctionKind::None)
-        for (auto queries : info->getQueries())
-          if (auto availSpec =
-                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
-            if (availSpec->getMacroLoc().isValid()) {
-              Context.Diags.diagnose(
-                  availSpec->getMacroLoc(),
-                  swift::diag::availability_macro_in_inlinable,
-                  fragileKind.getSelector());
-              break;
-            }
-    }
-
     return false;
   }
 

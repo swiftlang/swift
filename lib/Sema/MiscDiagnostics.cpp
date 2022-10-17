@@ -4390,6 +4390,32 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
+/// Diagnoses a `if #available(...)` condition. Returns true if a diagnostic
+/// was emitted.
+static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
+                                          DeclContext *DC) {
+  // Reject inlinable code using availability macros. In order to lift this
+  // restriction, macros would need to either be expanded when printed in
+  // swiftinterfaces or be parsable as macros by module clients.
+  auto fragileKind = DC->getFragileFunctionKind();
+  if (fragileKind.kind != FragileFunctionKind::None) {
+    for (auto queries : info->getQueries()) {
+      if (auto availSpec =
+              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries)) {
+        if (availSpec->getMacroLoc().isValid()) {
+          DC->getASTContext().Diags.diagnose(
+              availSpec->getMacroLoc(),
+              swift::diag::availability_macro_in_inlinable,
+              fragileKind.getSelector());
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 /// Diagnoses a `if #_hasSymbol(...)` condition. Returns true if a diagnostic
 /// was emitted.
 static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
@@ -4416,21 +4442,19 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
     return true;
   }
 
-  if (DC->getAsDecl()) {
-    auto fragileKind = DC->getFragileFunctionKind();
-    if (fragileKind.kind != FragileFunctionKind::None) {
-      // #_hasSymbol cannot be used in inlinable code because of limitations of
-      // the current implementation strategy. It relies on recording the
-      // referenced ValueDecl, mangling a helper function name using that
-      // ValueDecl, and then passing the responsibility of generating the
-      // definition for that helper function to IRGen. In order to lift this
-      // restriction, we will need teach SIL to encode the ValueDecl, or take
-      // another approach entirely.
-      ctx.Diags.diagnose(info->getStartLoc(),
-                         diag::has_symbol_condition_in_inlinable,
-                         fragileKind.getSelector());
-      return true;
-    }
+  auto fragileKind = DC->getFragileFunctionKind();
+  if (fragileKind.kind != FragileFunctionKind::None) {
+    // #_hasSymbol cannot be used in inlinable code because of limitations of
+    // the current implementation strategy. It relies on recording the
+    // referenced ValueDecl, mangling a helper function name using that
+    // ValueDecl, and then passing the responsibility of generating the
+    // definition for that helper function to IRGen. In order to lift this
+    // restriction, we will need teach SIL to encode the ValueDecl, or take
+    // another approach entirely.
+    ctx.Diags.diagnose(info->getStartLoc(),
+                       diag::has_symbol_condition_in_inlinable,
+                       fragileKind.getSelector());
+    return true;
   }
 
   auto decl = info->getReferencedDecl().getDecl();
@@ -4465,9 +4489,12 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_Boolean:
     case StmtConditionElement::CK_PatternBinding:
-    case StmtConditionElement::CK_Availability:
       break;
-
+    case StmtConditionElement::CK_Availability: {
+      auto info = elt.getAvailability();
+      (void)diagnoseAvailabilityCondition(info, DC);
+      break;
+    }
     case StmtConditionElement::CK_HasSymbol: {
       auto info = elt.getHasSymbolInfo();
       if (diagnoseHasSymbolCondition(info, DC))
