@@ -24,7 +24,6 @@ import std
 public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
                    file: StaticString = #fileID, line: UInt = #line) {
   if !condition {
-    print("### basic")
     fatalError(message(), file: file, line: line)
   }
 }
