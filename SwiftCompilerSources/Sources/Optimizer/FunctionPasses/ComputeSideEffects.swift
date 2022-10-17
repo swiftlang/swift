@@ -168,6 +168,11 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
+    case is BeginCOWMutationInst, is IsUniqueInst, is IsEscapingClosureInst:
+      // Model reference count reading as "destroy" for now. Although we could intoduce a "read-refcount"
+      // effect, it would not give any significant benefit in any of our current optimizations.
+      addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+
     default:
       if inst.mayRelease {
         globalEffects = .worstEffects
