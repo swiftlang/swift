@@ -63,8 +63,9 @@ namespace swift {
 
   enum class ReflectionMetadataLevel {
     OptIn,
-    None,      ///< Don't emit reflection metadata at all.
-    Full,      ///< Make reflection metadata fully available.
+    None,          ///< Don't emit reflection metadata at all.
+    DebuggerOnly,  ///< Make reflection metadata availabe for the debugger.
+    Full,          ///< Make reflection metadata fully available.
   };
 
   /// Describes how strict concurrency checking should be.
@@ -462,7 +463,7 @@ namespace swift {
     /// Allows to add implicit conformance to Reflectable 
     /// and diagnose `Reflectable` declarations
     /// when reflection metadata is disabled.
-    ReflectionMetadataLevel ReflectionMetadata = ReflectionMetadataLevel::OptIn;
+    ReflectionMetadataLevel ReflectionMetadata = ReflectionMetadataLevel::Full;
 
     // Allow errors during module generation. See corresponding option in
     // FrontendOptions.

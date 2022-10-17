@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-O -Xfrontend -enable-opt-in-reflection-metadata -target %target-cpu-apple-macosx99.99) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-upcoming-feature OptInReflection -target %target-cpu-apple-macosx99.99) | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // REQUIRES: executable_test

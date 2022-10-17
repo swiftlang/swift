@@ -93,6 +93,8 @@ UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 6)
+// TODO: Fix SE number when known
+UPCOMING_FEATURE(OptInReflection, 0, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert)
 EXPERIMENTAL_FEATURE(VariadicGenerics)

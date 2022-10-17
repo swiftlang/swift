@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -DOPTIN -O -enable-opt-in-reflection-metadata -target %target-cpu-apple-macosx99.99 -emit-ir %s | %FileCheck %s --check-prefix=CHECK-OPT-IN
-// RUN: %target-swift-frontend -DFULL -O -enable-opt-in-reflection-metadata -target %target-cpu-apple-macosx99.99 -emit-ir %s | %FileCheck %s --check-prefix=CHECK-FULL
+// RUN: %target-swift-frontend -DOPTIN -O -enable-upcoming-feature OptInReflection -target %target-cpu-apple-macosx99.99 -emit-ir %s | %FileCheck %s --check-prefix=CHECK-OPT-IN
+// RUN: %target-swift-frontend -DFULL -O -enable-upcoming-feature OptInReflection -target %target-cpu-apple-macosx99.99 -emit-ir %s | %FileCheck %s --check-prefix=CHECK-FULL
 
 #if OPTIN
 public enum R: Reflectable {

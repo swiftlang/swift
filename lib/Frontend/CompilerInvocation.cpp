@@ -219,24 +219,6 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 }
 
 static void
-setLangOptsFromIRGenOptions(LangOptions &LangOpts,
-                            const IRGenOptions &IRGenOpts) {
-
-  switch (IRGenOpts.ReflectionMetadata) {
-    case ReflectionMetadataMode::None:
-      LangOpts.ReflectionMetadata = ReflectionMetadataLevel::None;
-      break;
-    case ReflectionMetadataMode::DebuggerOnly:
-    case ReflectionMetadataMode::Runtime:
-      LangOpts.ReflectionMetadata = ReflectionMetadataLevel::Full;
-      break;
-    case ReflectionMetadataMode::OptIn:
-      LangOpts.ReflectionMetadata = ReflectionMetadataLevel::OptIn;
-      break;    
-  }
-}
-
-static void
 setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
                                       const FrontendOptions &FrontendOpts) {
   // Set the OutputKind for the given Action.
@@ -265,6 +247,26 @@ setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+}
+
+static void
+setIRGenOutputOptsFromLangOpts(IRGenOptions &IRGenOpts,
+                               const LangOptions &LangOpts) {
+  switch (LangOpts.ReflectionMetadata) {
+    case ReflectionMetadataLevel::None:
+      IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
+      IRGenOpts.EnableReflectionNames = false;
+      break;
+    case ReflectionMetadataLevel::DebuggerOnly:
+      IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::DebuggerOnly;
+      break;
+    case ReflectionMetadataLevel::OptIn:
+      IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::OptIn;
+      break;
+    case ReflectionMetadataLevel::Full:
+      IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::Runtime;
+      break;
   }
 }
 
@@ -1099,6 +1101,25 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Case("standard", ConcurrencyModel::Standard)
             .Case("task-to-thread", ConcurrencyModel::TaskToThread)
             .Default(ConcurrencyModel::Standard);
+  }
+
+  // If Swift 6 or feature argument is passed
+  if (Opts.hasFeature(Feature::OptInReflection)) {
+    Opts.ReflectionMetadata = ReflectionMetadataLevel::OptIn;
+  // Reflection migth be disabled explicitly only for Swift pre-6.
+  } else if (Args.hasArg(OPT_disable_reflection_metadata)) {
+    // This mode is available only for Swift pre-6,
+    // In Swift 6 `Feature::OptInReflection` will be always true.
+    Opts.ReflectionMetadata = ReflectionMetadataLevel::None;
+  } else if (Args.hasArg(OPT_reflection_metadata_for_debugger_only)) {
+    // This mode is available only for Swift pre-6,
+    // In Swift 6 `Feature::OptInReflection` will be always true.
+    Opts.ReflectionMetadata = ReflectionMetadataLevel::DebuggerOnly;
+  }
+
+  // Override Opt-in if full reflection is requested in all modes.
+  if (Args.hasArg(OPT_enable_full_reflection_metadata)) {
+    Opts.ReflectionMetadata = ReflectionMetadataLevel::Full;
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
@@ -2254,20 +2275,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 
-  if (Args.hasArg(OPT_disable_reflection_metadata)) {
-    Opts.ReflectionMetadata = ReflectionMetadataMode::None;
+  if (Args.hasArg(OPT_disable_reflection_names))
     Opts.EnableReflectionNames = false;
-  } else {
-    if (Args.hasArg(OPT_disable_reflection_names))
-      Opts.EnableReflectionNames = false;
-
-    if (Args.hasArg(OPT_enable_opt_in_reflection_metadata)) {
-      Opts.ReflectionMetadata = ReflectionMetadataMode::OptIn;
-    } else if (Args.hasArg(OPT_reflection_metadata_for_debugger_only)) {
-      Opts.ReflectionMetadata = ReflectionMetadataMode::DebuggerOnly;
-      Opts.EnableReflectionNames = true;
-    }
-  }
+  else
+    Opts.EnableReflectionNames = true;
 
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
     Opts.EnableAnonymousContextMangledNames = true;
@@ -2645,7 +2656,7 @@ bool CompilerInvocation::parseArgs(
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
-  setLangOptsFromIRGenOptions(LangOpts, IRGenOpts);
+  setIRGenOutputOptsFromLangOpts(IRGenOpts, LangOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
 
   return false;

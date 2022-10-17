@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -enable-opt-in-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=CHECK-REL
-// RUN: %target-swift-frontend -enable-opt-in-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=CHECK-DEB
+// RUN: %target-swift-frontend -O -enable-upcoming-feature OptInReflection -emit-ir %s | %FileCheck %s --check-prefix=CHECK-REL
+// RUN: %target-swift-frontend -enable-upcoming-feature OptInReflection -emit-ir %s | %FileCheck %s --check-prefix=CHECK-DEB
 
 // reflection metadata field descriptor opt_in_reflection_metadata.RefProtocol
 // CHECK-REL-DAG: @"$s26opt_in_reflection_metadata11RefProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
