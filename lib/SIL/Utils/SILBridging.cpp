@@ -183,10 +183,12 @@ SwiftInt SILFunction_numParameterArguments(BridgedFunction function) {
 }
 
 SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function) {
+  SILFunction *f = castToFunction(function);
+  SILFunctionConventions conv(f->getConventionsInContext());
   CanSILFunctionType fTy = castToFunction(function)->getLoweredFunctionType();
   if (!fTy->hasSelfParam())
     return -1;
-  return fTy->getNumParameters() + fTy->getNumIndirectFormalResults() - 1;
+  return conv.getNumParameters() + conv.getNumIndirectSILResults() - 1;
 }
 
 SwiftInt SILFunction_getNumSILArguments(BridgedFunction function) {
