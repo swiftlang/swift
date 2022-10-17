@@ -1,22 +1,22 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-variadic-generics
 
-func returnTuple1<@_typeSequence T>() -> (T...) { fatalError() }
+func returnTuple1<T...>() -> (T...) { fatalError() }
 
-func returnTuple2<@_typeSequence T>() -> (Int, T...) { fatalError() }
+func returnTuple2<T...>() -> (Int, T...) { fatalError() }
 
-func returnTupleLabel1<@_typeSequence T>() -> (x: T...) { fatalError() }
+func returnTupleLabel1<T...>() -> (x: T...) { fatalError() }
 
-func returnTupleLabel2<@_typeSequence T>() -> (Int, x: T...) { fatalError() }
+func returnTupleLabel2<T...>() -> (Int, x: T...) { fatalError() }
 
-func returnTupleLabel3<@_typeSequence T>() -> (Int, T..., y: Float) { fatalError() }
+func returnTupleLabel3<T...>() -> (Int, T..., y: Float) { fatalError() }
 // expected-note@-1 {{in call to function 'returnTupleLabel3()'}}
 
-func returnTupleLabel4<@_typeSequence T>() -> (Int, x: T..., y: Float) { fatalError() }
+func returnTupleLabel4<T...>() -> (Int, x: T..., y: Float) { fatalError() }
 
-func returnTupleLabel5<@_typeSequence T, @_typeSequence U>() -> (Int, T..., y: U...) { fatalError() }
+func returnTupleLabel5<T..., U...>() -> (Int, T..., y: U...) { fatalError() }
 // expected-note@-1 {{in call to function 'returnTupleLabel5()'}}
 
-func returnTupleLabel6<@_typeSequence T, @_typeSequence U>() -> (Int, x: T..., y: U...) { fatalError() }
+func returnTupleLabel6<T..., U...>() -> (Int, x: T..., y: U...) { fatalError() }
 
 func concreteReturnTupleValid() {
   let _: () = returnTuple1()
@@ -66,7 +66,7 @@ func concreteReturnTypeInvalid() {
   let _: () = returnTupleLabel5() // expected-error {{type of expression is ambiguous without more context}} 
 }
 
-func genericReturnTupleValid<@_typeSequence T>(_: T...) {
+func genericReturnTupleValid<T...>(_: T...) {
   let _: (T...) = returnTuple1()
   let _: (Int, T...) = returnTuple1()
 
@@ -92,7 +92,7 @@ func genericReturnTupleValid<@_typeSequence T>(_: T...) {
   let _: (Int, x: String, T..., y: Float, T...) = returnTupleLabel6()
 }
 
-func genericReturnTupleInvalid<@_typeSequence T>(_: T...) {
+func genericReturnTupleInvalid<T...>(_: T...) {
   let _: (x: T...) = returnTuple1() // expected-error {{type of expression is ambiguous without more context}}
   let _: (x: Int, T...) = returnTuple1() // expected-error {{type of expression is ambiguous without more context}}
 
@@ -119,13 +119,13 @@ func genericReturnTupleInvalid<@_typeSequence T>(_: T...) {
   let _: (T..., y: Int) = returnTupleLabel6() // expected-error {{cannot convert value of type '(Int, y: Int)' to specified type '(T..., y: Int)'}}
 }
 
-func returnFunction1<@_typeSequence T>() -> (T...) -> () {}
+func returnFunction1<T...>() -> (T...) -> () {}
 
-func returnFunction2<@_typeSequence T>() -> (Int, T...) -> () {} // expected-note {{in call to function 'returnFunction2()'}}
+func returnFunction2<T...>() -> (Int, T...) -> () {} // expected-note {{in call to function 'returnFunction2()'}}
 
-func returnFunction3<@_typeSequence T>() -> (T..., Float) -> () {} // expected-note {{in call to function 'returnFunction3()'}}
+func returnFunction3<T...>() -> (T..., Float) -> () {} // expected-note {{in call to function 'returnFunction3()'}}
 
-func returnFunction4<@_typeSequence T>() -> (Int, T..., Float) -> () {} // expected-note 2{{in call to function 'returnFunction4()'}}
+func returnFunction4<T...>() -> (Int, T..., Float) -> () {} // expected-note 2{{in call to function 'returnFunction4()'}}
 
 func concreteReturnFunctionValid() {
   let _: () -> () = returnFunction1()
