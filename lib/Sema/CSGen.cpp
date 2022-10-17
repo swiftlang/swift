@@ -1789,18 +1789,6 @@ namespace {
       return TupleType::get(elements, CS.getASTContext());
     }
 
-    Type visitPackExpr(PackExpr *expr) {
-      // The type of a pack expression is simply a pack of the types of
-      // its subexpressions.
-      SmallVector<Type, 4> elements;
-      elements.reserve(expr->getNumElements());
-      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
-        elements.emplace_back(CS.getType(expr->getElement(i)));
-      }
-
-      return PackType::get(CS.getASTContext(), elements);
-    }
-
     Type visitSubscriptExpr(SubscriptExpr *expr) {
       ValueDecl *decl = nullptr;
       if (expr->hasDecl()) {
