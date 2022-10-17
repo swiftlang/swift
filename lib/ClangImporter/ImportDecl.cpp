@@ -2133,7 +2133,16 @@ namespace {
         if (auto friendDecl = dyn_cast<clang::FriendDecl>(m)) {
           if (friendDecl->getFriendDecl()) {
             m = friendDecl->getFriendDecl();
-            auto lookupTable = Impl.findLookupTable(m->getOwningModule());
+
+            // Find the owning module of the class template. Members of class
+            // template specializations don't have an owning module.
+            clang::Module *owningModule = nullptr;
+            if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(decl))
+              owningModule = spec->getSpecializedTemplate()->getOwningModule();
+            else
+              owningModule = decl->getOwningModule();
+
+            auto lookupTable = Impl.findLookupTable(owningModule);
             addEntryToLookupTable(*lookupTable, friendDecl->getFriendDecl(),
                                   Impl.getNameImporter());
           }
@@ -8232,6 +8241,15 @@ ClangImporter::Implementation::importDeclContextOf(
     // decl (aka LinkageSpecDecl) and then proceed.
     if (dc->getDeclKind() == clang::Decl::LinkageSpec)
       dc = dc->getParent();
+
+    // Treat friend decls like top-level decls.
+    if (auto functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
+      if (functionDecl->getFriendObjectKind()) {
+        // Find the top-level decl context.
+        while (isa<clang::NamedDecl>(dc))
+          dc = dc->getParent();
+      }
+    }
 
     if (dc->isTranslationUnit()) {
       if (auto *module = getClangModuleForDecl(decl))

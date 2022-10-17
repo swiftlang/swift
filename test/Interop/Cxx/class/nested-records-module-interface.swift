@@ -82,7 +82,7 @@
 // CHECK:   struct ForwardDeclaredFriend {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   static func takesFriend(_ f: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
+// CHECK:   func takesFriend(_ f: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
 // CHECK:   struct HasNestedForwardDeclaration {
 // CHECK:     init()
 // CHECK:     struct IsNestedForwardDeclaration {

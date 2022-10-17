@@ -2712,6 +2712,11 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   if (OwningClangModule == ModuleFilter->getClangModule())
     return true;
 
+  // Friends from class templates don't have an owning module. Just return true.
+  if (isa<clang::FunctionDecl>(D) &&
+      cast<clang::FunctionDecl>(D)->isThisDeclarationInstantiatedFromAFriendDefinition())
+    return true;
+
   // Handle redeclarable Clang decls by checking each redeclaration.
   bool IsTagDecl = isa<clang::TagDecl>(D);
   if (!(IsTagDecl || isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
@@ -4124,7 +4129,13 @@ bool ClangImporter::Implementation::lookupValue(SwiftLookupTable &table,
 
     // If the name matched, report this result.
     bool anyMatching = false;
-    if (decl->getName().matchesRef(name) &&
+
+    // Use the base name for operators; they likely won't have parameters.
+    auto foundDeclName = decl->getName();
+    if (foundDeclName.isOperator())
+      foundDeclName = foundDeclName.getBaseName();
+
+    if (foundDeclName.matchesRef(name) &&
         decl->getDeclContext()->isModuleScopeContext()) {
       consumer.foundDecl(decl, DeclVisibilityKind::VisibleAtTopLevel);
       anyMatching = true;
