@@ -884,9 +884,13 @@ Type TypeBase::lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals){
 }
 
 unsigned int TypeBase::getOptionalityDepth() {
-  SmallVector<Type> types;
-  lookThroughAllOptionalTypes(types);
-  return types.size();
+  Type type(this);
+  unsigned int depth = 0;
+  while (auto objType = type->getOptionalObjectType()) {
+    type = objType;
+    ++depth;
+  }
+  return depth;
 }
 
 Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
