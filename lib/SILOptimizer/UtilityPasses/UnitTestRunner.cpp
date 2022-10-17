@@ -68,6 +68,7 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -224,6 +225,17 @@ struct DumpFunction : UnitTest {
   void invoke(Arguments &arguments) override { getFunction()->dump(); }
 };
 
+// Arguments: NONE
+// Dumps: the index of the self argument of the current function
+struct FunctionGetSelfArgumentIndex : UnitTest {
+  FunctionGetSelfArgumentIndex(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto index =
+        SILFunction_getSelfArgumentIndex(BridgedFunction{getFunction()});
+    llvm::errs() << "self argument index = " << index << "\n";
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line.
 
 class UnitTestRunner : public SILFunctionTransform {
@@ -238,10 +250,9 @@ class UnitTestRunner : public SILFunctionTransform {
       llvm::errs() << components[index];
       if (index != size - 1) {
         llvm::errs() << ", ";
-      } else {
-        llvm::errs() << "\n";
       }
     }
+    llvm::errs() << "\n";
   }
 
   template <typename Doit>
@@ -260,6 +271,8 @@ class UnitTestRunner : public SILFunctionTransform {
                            CanonicalizeOSSALifetimeTest)
     ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi",
                            VisitAdjacentReborrowsOfPhiTest)
+    ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index",
+                           FunctionGetSelfArgumentIndex)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
 #undef ADD_UNIT_TEST_SUBCLASS
