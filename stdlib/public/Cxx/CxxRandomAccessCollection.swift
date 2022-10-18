@@ -40,26 +40,30 @@ public protocol CxxRandomAccessCollection: CxxSequence, RandomAccessCollection {
 }
 
 extension CxxRandomAccessCollection {
+  @inlinable
   public var startIndex: Int {
     return 0
   }
 
+  @inlinable
   public var endIndex: Int {
     return count
   }
 
+  @inlinable
   public var count: Int {
     return Int(__endUnsafe() - __beginUnsafe())
   }
 
   /// A C++ implementation of the subscript might be more performant. This 
   /// overload should only be used if the C++ type does not define `operator[]`.
+  @inlinable
   public subscript(_ index: Int) -> Element {
-    get {
+    _read {
       // Not using CxxIterator here to avoid making a copy of the collection.
       var rawIterator = __beginUnsafe()
       rawIterator += RawIterator.Distance(index)
-      return rawIterator.pointee as! Element
+      yield rawIterator.pointee as! Element
     }
   }
 }
