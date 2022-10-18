@@ -189,7 +189,8 @@ enum class DescriptiveDeclKind : uint8_t {
   MissingMember,
   Requirement,
   OpaqueResultType,
-  OpaqueVarType
+  OpaqueVarType,
+  MacroExpansion
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -8250,6 +8251,33 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::MissingMember;
+  }
+};
+
+class MacroExpansionDecl : public Decl {
+  SourceLoc PoundLoc;
+  DeclNameRef Macro;
+  DeclNameLoc MacroLoc;
+  ArgumentList *ArgList;
+  Decl *Rewritten;
+
+public:
+  MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
+                     DeclNameLoc macroLoc, ArgumentList *args)
+      : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
+        Macro(macro), MacroLoc(macroLoc), ArgList(args), Rewritten(nullptr) {}
+
+  SourceRange getSourceRange() const;
+  SourceLoc getLocFromSource() const { return PoundLoc; }
+  SourceLoc getPoundLoc() const { return PoundLoc; }
+  DeclNameLoc getMacroLoc() const { return MacroLoc; }
+  DeclNameRef getMacro() const { return Macro; }
+  ArgumentList *getArgs() const { return ArgList; }
+  Decl *getRewritten() const { return Rewritten; }
+  void setRewritten(Decl *rewritten) { Rewritten = rewritten; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::MacroExpansion;
   }
 };
 

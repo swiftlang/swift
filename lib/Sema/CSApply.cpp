@@ -5342,6 +5342,11 @@ namespace {
       llvm_unreachable("already type-checked?");
     }
 
+    Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
+      // TODO: Expand macro.
+      return E;
+    }
+
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       // If we have an apply, make a note of its callee locator prior to

@@ -3572,6 +3572,11 @@ namespace {
       return resultTy;
     }
 
+    Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
+      // FIXME: not implemented
+      return Type();
+    }
+
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
                                                    ASTContext &Context) {
       auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());

@@ -1771,6 +1771,12 @@ namespace {
       llvm_unreachable("should not IRGen classes with missing members");
     }
 
+    void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+      auto *rewritten = med->getRewritten();
+      assert(rewritten && "Macro should have already been expanded by IRGen");
+      visit(rewritten);
+    }
+
     void addIVarInitializer() {
       if (auto fn = IGM.getAddrOfIVarInitDestroy(getClass(),
                                                  /*destroy*/ false,

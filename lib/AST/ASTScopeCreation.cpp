@@ -282,6 +282,7 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(PoundDiagnosticDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
+  VISIT_AND_IGNORE(MacroExpansionDecl)
 
   // Only members of the active clause are in scope, and those
   // are visited separately.
