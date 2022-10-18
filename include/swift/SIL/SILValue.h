@@ -274,8 +274,12 @@ struct ValueOwnershipKind {
   bool operator==(ValueOwnershipKind other) const {
     return value == other.value;
   }
+  bool operator!=(ValueOwnershipKind other) const {
+    return !(value == other.value);
+  }
 
   bool operator==(innerty other) const { return value == other; }
+  bool operator!=(innerty other) const { return !(value == other); }
 
   /// We merge by moving down the lattice.
   ValueOwnershipKind merge(ValueOwnershipKind rhs) const {
