@@ -1173,7 +1173,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   if (swiftInterfaceVersion.empty() && *unusedModuleBuffer) {
     auto metaData = serialization::validateSerializedAST(
         (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-        Ctx.LangOpts.SDKName);
+        Ctx.LangOpts.SDKName, !Ctx.LangOpts.DebuggerSupport);
     versionInfo->setVersion(metaData.userModuleVersion,
                             ModuleVersionSourceKind::SwiftBinaryModule);
   } else {
