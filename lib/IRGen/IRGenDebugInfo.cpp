@@ -725,6 +725,7 @@ private:
       return cast<llvm::DIModule>(Val->second);
 
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
+    std::string RemappedASTFile = DebugPrefixMap.remapPath(ASTFile);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     if (!Opts.DisableClangModuleSkeletonCUs) {
@@ -736,7 +737,7 @@ private:
                                               : llvm::dwarf::DW_LANG_C99,
                               DIB.createFile(Name, RemappedIncludePath),
                               TheCU->getProducer(), true, StringRef(), 0,
-                              ASTFile, llvm::DICompileUnit::FullDebug,
+                              RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
         DIB.finalize();
       }
