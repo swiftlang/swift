@@ -503,8 +503,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             IGF.Builder.CreateBitCast(layoutArray, IGF.Builder.getInt8PtrTy());
         llvm::Value *metadata = &*(fn->arg_begin() + 2);
         metadata->setName("typeMetadata");
-        IGF.Builder.CreateCall(
-            IGF.IGM.getGenericAssignFn(),
+        auto *assignFn = IGF.IGM.getGenericAssignFn();
+        auto *assignFnTy = IGF.IGM.getGenericAssignFnType();
+        IGF.Builder.CreateCallWithoutDbgLoc(
+            assignFnTy,
+            assignFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(false)});
@@ -542,8 +545,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             IGF.Builder.CreateBitCast(layoutArray, IGF.Builder.getInt8PtrTy());
         llvm::Value *metadata = &*(fn->arg_begin() + 2);
         metadata->setName("typeMetadata");
-        IGF.Builder.CreateCall(
-            IGF.IGM.getGenericAssignFn(),
+        auto *assignFn = IGF.IGM.getGenericAssignFn();
+        auto *assignFnTy = IGF.IGM.getGenericAssignFnType();
+        IGF.Builder.CreateCallWithoutDbgLoc(
+            assignFnTy,
+            assignFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(true)});
@@ -577,8 +583,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             IGF.Builder.CreateBitCast(layoutArray, IGF.Builder.getInt8PtrTy());
         llvm::Value *metadata = &*(fn->arg_begin() + 1);
         metadata->setName("typeMetadata");
-        IGF.Builder.CreateCall(
-            IGF.IGM.getGenericDestroyFn(),
+        auto *destroyFn = IGF.IGM.getGenericDestroyFn();
+        auto *destroyFnTy = IGF.IGM.getGenericDestroyFnType();
+        IGF.Builder.CreateCallWithoutDbgLoc(
+            destroyFnTy,
+            destroyFn,
             {castAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr});
@@ -634,8 +643,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             IGF.Builder.CreateBitCast(layoutArray, IGF.Builder.getInt8PtrTy());
         llvm::Value *metadata = &*(fn->arg_begin() + 2);
         metadata->setName("typeMetadata");
-        IGF.Builder.CreateCall(
-            IGF.IGM.getGenericInitializeFn(),
+        auto *initFn = IGF.IGM.getGenericInitializeFn();
+        auto *initFnTy = IGF.IGM.getGenericInitializeFnType();
+        IGF.Builder.CreateCallWithoutDbgLoc(
+            initFnTy,
+            initFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(false)});
@@ -675,8 +687,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             IGF.Builder.CreateBitCast(layoutArray, IGF.Builder.getInt8PtrTy());
         llvm::Value *metadata = &*(fn->arg_begin() + 2);
         metadata->setName("typeMetadata");
-        IGF.Builder.CreateCall(
-            IGF.IGM.getGenericInitializeFn(),
+        auto *initFn = IGF.IGM.getGenericInitializeFn();
+        auto *initFnTy = IGF.IGM.getGenericInitializeFnType();
+        IGF.Builder.CreateCallWithoutDbgLoc(
+            initFnTy,
+            initFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(true)});

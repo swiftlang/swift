@@ -56,7 +56,6 @@ if(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
   add_subdirectory(CompatibilityDynamicReplacements)
   add_subdirectory(CompatibilityConcurrency)
   add_subdirectory(CompatibilityThreading)
-  add_subdirectory(CompatibilityBytecodeLayouts)
 
   # This is a convenience target to have the list
   # of all the compatibility libraries needed to build

@@ -755,7 +755,7 @@ namespace {
     } \
     Address projectValue(IRGenFunction &IGF, Address addr) const { \
       Address valueAddr = ScalarExistentialTypeInfoBase::projectValue(IGF, addr); \
-      return IGF.Builder.CreateBitCast(valueAddr, ValueType->getPointerTo()); \
+      return IGF.Builder.CreateElementBitCast(valueAddr, ValueType); \
     } \
     void emitValueRetain(IRGenFunction &IGF, llvm::Value *value, \
                          Atomicity atomicity) const { \
@@ -2327,13 +2327,14 @@ void irgen::emitDestroyBoxedOpaqueExistentialBuffer(
   auto *bufferAddr = IGF.Builder.CreateBitCast(
       existentialContainer.getAddress(),
       IGF.IGM.getExistentialPtrTy(existLayout.getNumTables()));
-  auto *call = IGF.Builder.CreateCall(deallocateFun, {bufferAddr});
+  auto *call = IGF.Builder.CreateCallWithoutDbgLoc(
+    deallocateFun->getFunctionType(), deallocateFun, {bufferAddr});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return;
 }
 
-static llvm::Constant *
+static llvm::Function *
 getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
                                          OpenedExistentialAccess accessKind,
                                          OpaqueExistentialLayout existLayout) {

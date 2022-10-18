@@ -154,7 +154,7 @@ namespace {
       return ValueTypeAndIsOptional.getPointer(); \
     } \
     Address projectScalar(IRGenFunction &IGF, Address addr) const { \
-      return IGF.Builder.CreateBitCast(addr, getScalarType()->getPointerTo()); \
+      return IGF.Builder.CreateElementBitCast(addr, getScalarType()); \
     } \
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value, \
                           Atomicity atomicity) const { \
