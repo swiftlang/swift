@@ -151,6 +151,13 @@ VarDecl *NominalTypeDecl::getTypeWrapperProperty() const {
                            GetTypeWrapperProperty{mutableSelf}, nullptr);
 }
 
+ConstructorDecl *NominalTypeDecl::getTypeWrappedTypeStorageInitializer() const {
+  auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      SynthesizeTypeWrappedTypeStorageWrapperInitializer{mutableSelf}, nullptr);
+}
+
 ConstructorDecl *
 NominalTypeDecl::getTypeWrappedTypeMemberwiseInitializer() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);

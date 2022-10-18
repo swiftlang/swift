@@ -3689,6 +3689,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class SynthesizeTypeWrappedTypeStorageWrapperInitializer
+    : public SimpleRequest<SynthesizeTypeWrappedTypeStorageWrapperInitializer,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class SynthesizeLocalVariableForTypeWrapperStorage
     : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
                            VarDecl *(ConstructorDecl *), RequestFlags::Cached> {

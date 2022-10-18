@@ -232,6 +232,9 @@ enum class ImplicitConstructorKind {
   /// the instance variables from a parameter of the same type and
   /// name.
   Memberwise,
+  /// The constructor of a type wrapped type that accepts an instance of
+  /// type wrapper i.e. `init(storageWrapper: Wrapper<Self, $Storage>)`.
+  TypeWrapperStorage,
   /// The memberwise constructor of a type wrapped type which is going to
   /// initialize underlying storage for all applicable properties.
   TypeWrapperMemberwise,
@@ -358,6 +361,37 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       params.push_back(arg);
     }
+  } else if (ICK == ImplicitConstructorKind::TypeWrapperStorage) {
+    accessLevel = AccessLevel::Public;
+
+    auto *typeWrapper = decl->getTypeWrapper();
+
+    auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_storageWrapper,
+                                    Loc, ctx.Id_storageWrapper, decl);
+
+    auto typeWrapperType = typeWrapper->getDeclaredInterfaceType();
+
+    TypeSubstitutionMap subs;
+    {
+      auto genericParams =
+          typeWrapper->getGenericSignature().getInnermostGenericParams();
+      // Wrapped -> wrapped type
+      subs[genericParams[0]->getCanonicalType()->castTo<SubstitutableType>()] =
+          decl->getDeclaredInterfaceType();
+      // Storage -> $Storage
+      subs[genericParams[1]->getCanonicalType()->castTo<SubstitutableType>()] =
+          decl->getTypeWrapperStorageDecl()->getDeclaredInterfaceType();
+    }
+
+    auto paramType = typeWrapperType.subst(SubstitutionMap::get(
+        typeWrapper->getGenericSignature(), QueryTypeSubstitutionMap{subs},
+        LookUpConformanceInModule(decl->getParentModule())));
+
+    arg->setSpecifier(ParamSpecifier::Default);
+    arg->setInterfaceType(paramType);
+    arg->setImplicit();
+
+    params.push_back(arg);
   } else if (ICK == ImplicitConstructorKind::TypeWrapperMemberwise) {
     // Access to the initializer should match that of its parent type.
     accessLevel = decl->getEffectiveAccess();
@@ -1247,6 +1281,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (!shouldAttemptInitializerSynthesis(decl)) {
     if (decl->hasTypeWrapper()) {
       auto &ctx = decl->getASTContext();
+
+      // Synthesize a special `init(storageWrapper: <Wrapper>)`
+      // initializer if possible.
+      (void)decl->getTypeWrappedTypeStorageInitializer();
+
       // If declaration is type wrapped and there are no
       // designated initializers, synthesize a special
       // memberwise initializer that would instantiate `$storage`.
@@ -1572,6 +1611,34 @@ void swift::addNonIsolatedToSynthesized(
 
   ASTContext &ctx = nominal->getASTContext();
   value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
+}
+
+static std::pair<BraceStmt *, /*isTypeChecked=*/bool>
+synthesizeTypeWrappedTypeStorageWrapperInitializerBody(
+    AbstractFunctionDecl *decl, void *) {
+  return {nullptr, /*isTypeChecked=*/false};
+}
+
+ConstructorDecl *SynthesizeTypeWrappedTypeStorageWrapperInitializer::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *wrappedType) const {
+  if (!wrappedType->hasTypeWrapper())
+    return nullptr;
+
+  // `@typeWrapperIgnored` properties suppress this initializer.
+  if (llvm::any_of(wrappedType->getMembers(), [&](Decl *member) {
+        return member->getAttrs().hasAttribute<TypeWrapperIgnoredAttr>();
+      }))
+    return nullptr;
+
+  // Create the implicit type wrapper storage constructor.
+  auto &ctx = wrappedType->getASTContext();
+  auto ctor = createImplicitConstructor(
+      wrappedType, ImplicitConstructorKind::TypeWrapperStorage, ctx);
+  wrappedType->addMember(ctor);
+
+  ctor->setBodySynthesizer(
+      synthesizeTypeWrappedTypeStorageWrapperInitializerBody);
+  return ctor;
 }
 
 static std::pair<BraceStmt *, /*isTypeChecked=*/bool>
