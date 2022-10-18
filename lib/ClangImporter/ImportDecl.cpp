@@ -2619,6 +2619,8 @@ namespace {
         if (auto structDecl = dyn_cast_or_null<NominalTypeDecl>(result)) {
           conformToCxxIteratorIfNeeded(Impl, structDecl, decl);
           conformToCxxSequenceIfNeeded(Impl, structDecl, decl);
+          conformToComparableIfNeeded(Impl, structDecl, decl);
+          conformToCxxCollectionIfNeeded(Impl, structDecl, decl);
         }
       }
 

@@ -122,9 +122,43 @@ public struct CxxIterator<T>: IteratorProtocol where T: CxxSequence {
   }
 }
 
+public struct CxxIndex<T: UnsafeCxxInputIterator>: Comparable where T: Comparable {
+  fileprivate let index: T
+
+  init(_ i: T) {
+    self.index = i
+  }
+
+  public static func <(lhs: CxxIndex, rhs: CxxIndex) -> Bool { lhs.index < rhs.index }
+  public static func ==(lhs: CxxIndex, rhs: CxxIndex) -> Bool { lhs.index == rhs.index }
+}
+
 extension CxxSequence {
   @inlinable
   public func makeIterator() -> CxxIterator<Self> {
     return CxxIterator(sequence: self)
+  }
+}
+
+public protocol CxxCollection: CxxSequence, Collection where RawIterator: Comparable {
+  override associatedtype Index = CxxIndex<RawIterator>
+}
+
+extension CxxCollection {
+  public var startIndex: CxxIndex<RawIterator> {
+    var s = self
+    return CxxIndex(s.__beginUnsafe())
+  }
+  public var endIndex: CxxIndex<RawIterator> {
+    var s = self
+    return CxxIndex(s.__endUnsafe())
+  }
+
+  public subscript(_ i: CxxIndex<RawIterator>) -> RawIterator.Pointee {
+    i.index.pointee
+  }
+
+  public func index(after i: CxxIndex<RawIterator>) -> CxxIndex<RawIterator> {
+    CxxIndex(i.index.successor())
   }
 }
