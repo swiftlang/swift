@@ -66,6 +66,7 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridging.h"
@@ -217,6 +218,24 @@ struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
   }
 };
 
+// Arguments:
+// - variadic list of - instruction: a last user
+// Dumps:
+// - the insertion points
+struct PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest : UnitTest {
+  PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest(
+      UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    PrunedLivenessBoundary boundary;
+    while (arguments.hasUntaken()) {
+      boundary.lastUsers.push_back(arguments.takeInstruction());
+    }
+    boundary.visitInsertionPoints(
+        [](SILBasicBlock::iterator point) { point->dump(); });
+  }
+};
+
 // Arguments: NONE
 // Dumps:
 // - the function
@@ -273,6 +292,9 @@ class UnitTestRunner : public SILFunctionTransform {
                            VisitAdjacentReborrowsOfPhiTest)
     ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index",
                            FunctionGetSelfArgumentIndex)
+    ADD_UNIT_TEST_SUBCLASS(
+        "pruned-liveness-boundary-with-list-of-last-users-insertion-points",
+        PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
 #undef ADD_UNIT_TEST_SUBCLASS
