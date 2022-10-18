@@ -62,7 +62,7 @@ bool TuplePackMatcher::match() {
     // A pack expansion type on the left hand side absorbs all elements
     // from the right hand side up to the next mismatched label.
     auto lhsElt = lhsElts.front();
-    if (lhsElt.getType()->is<PackExpansionType>()) {
+    if (auto *lhsExpansionType = lhsElt.getType()->getAs<PackExpansionType>()) {
       lhsElts = lhsElts.slice(1);
 
       assert(lhsElts.empty() || lhsElts.front().hasName() &&
@@ -70,7 +70,7 @@ bool TuplePackMatcher::match() {
              "by an unlabeled element");
 
       auto *rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
-      pairs.emplace_back(lhsElt.getType(), rhs, idx++);
+      pairs.emplace_back(lhsExpansionType->getPatternType(), rhs, idx++);
       continue;
     }
 
@@ -82,7 +82,7 @@ bool TuplePackMatcher::match() {
     // A pack expansion type on the right hand side absorbs all elements
     // from the left hand side up to the next mismatched label.
     auto rhsElt = rhsElts.front();
-    if (rhsElt.getType()->is<PackExpansionType>()) {
+    if (auto *rhsExpansionType = rhsElt.getType()->getAs<PackExpansionType>()) {
       rhsElts = rhsElts.slice(1);
 
       assert(rhsElts.empty() || rhsElts.front().hasName() &&
@@ -90,7 +90,7 @@ bool TuplePackMatcher::match() {
              "by an unlabeled element");
 
       auto *lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
-      pairs.emplace_back(lhs, rhsElt.getType(), idx++);
+      pairs.emplace_back(lhs, rhsExpansionType->getPatternType(), idx++);
       continue;
     }
 
@@ -169,34 +169,38 @@ bool ParamPackMatcher::match() {
 
   // If the left hand side is a single pack expansion type, bind it
   // to what remains of the right hand side.
-  if (lhsParams.size() == 1 &&
-      lhsParams[0].getPlainType()->is<PackExpansionType>()) {
-    SmallVector<Type, 2> rhsTypes;
-    for (auto rhsParam : rhsParams) {
-      // FIXME: Check rhs flags
-      rhsTypes.push_back(rhsParam.getPlainType());
-    }
-    auto rhs = PackType::get(ctx, rhsTypes);
+  if (lhsParams.size() == 1) {
+    auto lhsType = lhsParams[0].getPlainType();
+    if (auto *lhsExpansionType = lhsType->getAs<PackExpansionType>()) {
+      SmallVector<Type, 2> rhsTypes;
+      for (auto rhsParam : rhsParams) {
+        // FIXME: Check rhs flags
+        rhsTypes.push_back(rhsParam.getPlainType());
+      }
+      auto rhs = PackType::get(ctx, rhsTypes);
 
-    // FIXME: Check lhs flags
-    pairs.emplace_back(lhsParams[0].getPlainType(), rhs, prefixLength);
-    return false;
+      // FIXME: Check lhs flags
+      pairs.emplace_back(lhsExpansionType->getPatternType(), rhs, prefixLength);
+      return false;
+    }
   }
 
   // If the right hand side is a single pack expansion type, bind it
   // to what remains of the left hand side.
-  if (rhsParams.size() == 1 &&
-      rhsParams[0].getPlainType()->is<PackExpansionType>()) {
-    SmallVector<Type, 2> lhsTypes;
-    for (auto lhsParam : lhsParams) {
-      // FIXME: Check lhs flags
-      lhsTypes.push_back(lhsParam.getPlainType());
-    }
-    auto lhs = PackType::get(ctx, lhsTypes);
+  if (rhsParams.size() == 1) {
+    auto rhsType = rhsParams[0].getPlainType();
+    if (auto *rhsExpansionType = rhsType->getAs<PackExpansionType>()) {
+      SmallVector<Type, 2> lhsTypes;
+      for (auto lhsParam : lhsParams) {
+        // FIXME: Check lhs flags
+        lhsTypes.push_back(lhsParam.getPlainType());
+      }
+      auto lhs = PackType::get(ctx, lhsTypes);
 
-    // FIXME: Check rhs flags
-    pairs.emplace_back(lhs, rhsParams[0].getPlainType(), prefixLength);
-    return false;
+      // FIXME: Check rhs flags
+      pairs.emplace_back(lhs, rhsParams[0].getPlainType(), prefixLength);
+      return false;
+    }
   }
 
   // Otherwise, all remaining possibilities are invalid:

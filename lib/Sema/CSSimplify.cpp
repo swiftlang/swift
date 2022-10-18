@@ -2425,6 +2425,23 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
   return getTypeMatchSuccess();
 }
 
+ConstraintSystem::TypeMatchResult
+ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
+                                          PackExpansionType *expansion2,
+                                          ConstraintKind kind, TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator) {
+  // FIXME: Should we downgrade kind to Bind or something here?
+  auto result = matchTypes(expansion1->getCountType(),
+                           expansion2->getCountType(),
+                           kind, flags, locator);
+  if (result.isFailure())
+    return result;
+
+  return matchTypes(expansion1->getPatternType(),
+                    expansion2->getPatternType(),
+                    kind, flags, locator);
+}
+
 /// Check where a representation is a subtype of another.
 ///
 /// The subtype relationship is defined as:
@@ -6636,10 +6653,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             kind, subflags, packLoc);
     }
     case TypeKind::PackExpansion: {
-      // FIXME: we need to match the count types as well
-      return matchTypes(cast<PackExpansionType>(desugar1)->getPatternType(),
-                        cast<PackExpansionType>(desugar2)->getPatternType(),
-                        kind, subflags, locator);
+      // FIXME: Need a new locator element
+
+      auto expansion1 = cast<PackExpansionType>(desugar1);
+      auto expansion2 = cast<PackExpansionType>(desugar2);
+
+      return matchPackExpansionTypes(expansion1, expansion2, kind, subflags,
+                                     locator);
     }
     }
   }
@@ -7032,20 +7052,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             ConstraintLocator::LValueConversion));
       }
     }
-  }
-
-  if (isa<PackExpansionType>(desugar1) && isa<PackType>(desugar2)) {
-    auto *packExpansionType = cast<PackExpansionType>(desugar1);
-    auto *packType = cast<PackType>(desugar2);
-
-    if (packExpansionType->getPatternType()->is<TypeVariableType>())
-      return matchTypes(packExpansionType->getPatternType(), packType, kind, subflags, locator);
-  } else if (isa<PackType>(desugar1) && isa<PackExpansionType>(desugar2)) {
-    auto *packType = cast<PackType>(desugar1);
-    auto *packExpansionType = cast<PackExpansionType>(desugar2);
-
-    if (packExpansionType->getPatternType()->is<TypeVariableType>())
-      return matchTypes(packType, packExpansionType->getPatternType(), kind, subflags, locator);
   }
 
   // Attempt fixes iff it's allowed, both types are concrete and
