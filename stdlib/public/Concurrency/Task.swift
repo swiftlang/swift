@@ -1024,6 +1024,7 @@ extension Task where Failure == Error {
 
 #if _runtime(_ObjC)
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
 @available(SwiftStdlib 5.1, *)
@@ -1039,5 +1040,6 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
   }
 #endif
 }
+#endif
 
 #endif
