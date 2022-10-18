@@ -5197,6 +5197,12 @@ public:
                  ConstraintKind kind, TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
+  TypeMatchResult
+  matchPackExpansionTypes(PackExpansionType *expansion1,
+                          PackExpansionType *expansion2,
+                          ConstraintKind kind, TypeMatchOptions flags,
+                          ConstraintLocatorBuilder locator);
+
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
