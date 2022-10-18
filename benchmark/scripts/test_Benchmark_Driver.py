@@ -328,7 +328,9 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 
     def test_run_benchmark_with_multiple_samples(self):
         self.driver.run("b1")
-        self.subprocess_mock.assert_called_with(("/benchmarks/Benchmark_O-*", "b1", "--json"))
+        self.subprocess_mock.assert_called_with(
+            ("/benchmarks/Benchmark_O-*", "b1", "--json")
+        )
         self.driver.run("b2", num_samples=5)
         self.subprocess_mock.assert_called_with(
             ("/benchmarks/Benchmark_O-*", "b2", "--num-samples=5", "--json")
@@ -360,7 +362,9 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         """
         self.driver.tests = ["b1", "bx"]
         self.driver.run()
-        self.subprocess_mock.assert_called_with(("/benchmarks/Benchmark_O-*", "1", "bx", "--json"))
+        self.subprocess_mock.assert_called_with(
+            ("/benchmarks/Benchmark_O-*", "1", "bx", "--json")
+        )
 
     def test_parse_results_from_running_benchmarks(self):
         """Parse measurements results using LogParser.
@@ -924,7 +928,11 @@ class TestBenchmarkDoctor(unittest.TestCase):
                 }
             )
             doctor.analyze(
-                {"name": "Zero", "Zero O i1a": _PTR(min_value=0), "Zero O i2a": _PTR(min_value=0)}
+                {
+                    "name": "Zero",
+                    "Zero O i1a": _PTR(min_value=0),
+                    "Zero O i2a": _PTR(min_value=0)
+                }
             )
             doctor.analyze(
                 {
