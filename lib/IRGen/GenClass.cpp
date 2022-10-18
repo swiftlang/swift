@@ -2871,7 +2871,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
     return FunctionPointer::createSigned(methodType, fnPtr, authInfo,
-                                         signature);
+                                         signature, true);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
@@ -2884,7 +2884,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
           IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
     }
     return FunctionPointer::forDirect(methodType, fnPtr, secondaryValue,
-                                      signature);
+                                      signature, true);
   }
   }
   llvm_unreachable("covered switch");

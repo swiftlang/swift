@@ -690,7 +690,10 @@ public:
       return;
 
     // Only do this at -Onone.
-    uint64_t Size = *AI->getAllocationSizeInBits(IGM.DataLayout) / 8;
+    auto optAllocationSize = AI->getAllocationSizeInBits(IGM.DataLayout);
+    if (!optAllocationSize)
+      return;
+    uint64_t Size = *optAllocationSize / 8;
     if (IGM.IRGen.Opts.shouldOptimize() || !Size)
       return;
 
@@ -2605,7 +2608,7 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
       Builder.CreateBitCast(diffWitness, signature.getType()->getPointerTo());
 
   setLoweredFunctionPointer(
-      i, FunctionPointer::createUnsigned(fnType, diffWitness, signature));
+      i, FunctionPointer::createUnsigned(fnType, diffWitness, signature, true));
 }
 
 FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
@@ -3016,10 +3019,12 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
 
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thin:
-    case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::Method:
       return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
-                                           std::move(calleeInfo), false);
+                                           std::move(calleeInfo), false, false);
+    case SILFunctionType::Representation::Closure:
+      return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
+                                           std::move(calleeInfo), false, true);
 
     case SILFunctionType::Representation::CFunctionPointer:
       assert(!selfValue && "C function pointer has self?");
@@ -3041,7 +3046,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     bool castToRefcountedContext = calleeInfo.OrigFnType->isNoEscape();
     return getSwiftFunctionPointerCallee(IGF, functionValue, contextValue,
                                          std::move(calleeInfo),
-                                         castToRefcountedContext);
+                                         castToRefcountedContext, true);
   }
 
   case LoweredValue::Kind::EmptyExplosion:
@@ -5248,9 +5253,8 @@ static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
   auto &operTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(operand->getType()));
   LoadedRef ref =
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));
-
   return
-    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull());
+    IGF.emitIsUniqueCall(ref.getValue(), ref.getStyle(), loc, ref.isNonNull());
 }
 
 void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
@@ -5281,7 +5285,7 @@ void IRGenSILFunction::visitBeginCOWMutationInst(BeginCOWMutationInst *i) {
       llvm::Value *castBuffer =
         Builder.CreateBitCast(buffer, IGM.getReferenceType(style));
 
-      isUnique.add(emitIsUniqueCall(castBuffer, i->getLoc().getSourceLoc(),
+      isUnique.add(emitIsUniqueCall(castBuffer, style, i->getLoc().getSourceLoc(),
                                     /*isNonNull*/ true));
     }
   } else {
@@ -5428,7 +5432,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     } else if (isCallToSwiftTaskAlloc(shadow)) {
       shadowTy = IGM.Int8Ty;
     }
-    assert(shadowTy == shadow->getType()->getPointerElementType());
+    assert(!IGM.getLLVMContext().supportsTypedPointers() ||
+           shadowTy == shadow->getType()->getPointerElementType());
     addr = builder.CreateLoad(shadowTy, shadow);
   }
 
@@ -6857,7 +6862,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
     }
 
     auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnType, fnPtr, secondaryValue, sig);
+    auto fn = FunctionPointer::forDirect(fnType, fnPtr, secondaryValue, sig, true);
 
     setLoweredFunctionPointer(i, fn);
     return;
@@ -7090,7 +7095,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto authInfo =
       PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
 
-    auto fn = FunctionPointer::createSigned(methodType, fnPtr, authInfo, sig);
+    auto fn = FunctionPointer::createSigned(methodType, fnPtr, authInfo, sig, true);
 
     setLoweredFunctionPointer(i, fn);
     return;
@@ -7152,8 +7157,10 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
       fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
     }
 
-    auto sig = IGM.getSignature(methodType);
-    auto fn = FunctionPointer::createUnsigned(methodType, fnPtr, sig);
+    auto fnType = IGM.getSILTypes().getConstantFunctionType(
+      IGM.getMaximalTypeExpansionContext(), method);
+    auto sig = IGM.getSignature(fnType);
+    auto fn = FunctionPointer::createUnsigned(methodType, fnPtr, sig, true);
 
     setLoweredFunctionPointer(i, fn);
     return;

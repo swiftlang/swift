@@ -522,8 +522,8 @@ public:
   void emitErrorStrongRetain(llvm::Value *value);
   void emitErrorStrongRelease(llvm::Value *value);
 
-  llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
-                                bool isNonNull);
+  llvm::Value *emitIsUniqueCall(llvm::Value *value, ReferenceCounting style,
+                                SourceLoc loc, bool isNonNull);
 
   llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
                                          unsigned verificationType);
