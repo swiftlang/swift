@@ -188,6 +188,7 @@ class PerformanceTestResult(object):
         return PerformanceTestResult(json_data)
 
     def __init__(self, json_data):
+        # Ugly hack to get the old tests to run
         if isinstance(json_data, str):
             json_data = json.loads(json_data)
 
@@ -449,6 +450,17 @@ class ResultComparison(object):
         ratio = (new.min_value + 0.001) / (old.min_value + 0.001)
         self.delta = (ratio - 1) * 100
 
+
+        # If we have full samples for both old and new...
+        if (len(old.samples) == old.num_samples
+            and len(new.samples) == new.num_samples):
+            # TODO: Use a T-Test or U-Test to determine whether
+            # one set of samples should be considered reliably better than
+            # the other.
+            None
+
+        # If we do not have full samples, we'll use the
+        # legacy calculation for compatibility.
         # Indication of dubious changes: when result's MIN falls inside the
         # (MIN, MAX) interval of result they are being compared with.
         self.is_dubious = (
