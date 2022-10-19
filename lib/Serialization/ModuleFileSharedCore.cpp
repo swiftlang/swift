@@ -470,7 +470,7 @@ bool serialization::isSerializedAST(StringRef data) {
 
 ValidationInfo serialization::validateSerializedAST(
     StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
-    ExtendedValidationInfo *extendedInfo,
+    bool requiresRevisionMatch, ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
   ValidationInfo result;
 
@@ -512,7 +512,7 @@ ValidationInfo serialization::validateSerializedAST(
       result = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          requiresOSSAModules, /*requiresRevisionMatch=*/true,
+          requiresOSSAModules, requiresRevisionMatch,
           requiredSDK,
           extendedInfo, localObfuscator);
       if (result.status == Status::Malformed)
