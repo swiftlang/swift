@@ -54,6 +54,10 @@ import Builtin
 // CHECK: value: {{%[^,]+}} = tuple ({{%[^,]+}} : $(), {{%[^,]+}} : $(_: ()), {{%[^,]+}} : $((), (_: ())))
 // CHECK: string: howdy
 // CHECK-LABEL: end running test 7 of {{[^,]+}} on test_arg_parsing: test-specification-parsing
+// CHECK-LABEL: begin running test 8 of {{[^,]+}} on test_arg_parsing: test-specification-parsing
+// CHECK: value: 
+// CHECK: function_ref @something_remarkable
+// CHECK-LABEL: end running test 8 of {{[^,]+}} on test_arg_parsing: test-specification-parsing
 sil [ossa] @test_arg_parsing : $() -> () {
 entry:
   test_specification "test-specification-parsing FFFbb @function[test_arg_parsing_reference] @function[2] @function true false"
@@ -63,6 +67,7 @@ entry:
   test_specification "test-specification-parsing IIIIIIII @function.block.instruction @function[0].block.instruction @function.block[0].instruction @function.block.instruction[0] @function[0].block[0].instruction @function[0].block.instruction[0] @function.block[0].instruction[0] @function[0].block[0].instruction[0]"
   test_specification "test-specification-parsing OO @instruction[2].operand @function[test_arg_parsing_callee].trace.operand[1]"
   test_specification "test-specification-parsing Vs @function[4].trace[0] howdy"
+  test_specification "test-specification-parsing V @instruction[0]"
   %something_remarkable = function_ref @something_remarkable : $@convention(thin) () -> ()
   %retval = tuple ()
   return %retval : $()

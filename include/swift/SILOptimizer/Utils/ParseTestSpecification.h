@@ -18,6 +18,7 @@
 #define SWIFT_SIL_PARSETESTSPECIFICATION
 
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -140,7 +141,13 @@ struct Arguments {
     return cast<UIntArgument>(takeArgument()).getValue();
   }
   SILValue takeValue() {
-    return cast<ValueArgument>(takeArgument()).getValue();
+    auto argument = takeArgument();
+    if (isa<InstructionArgument>(argument)) {
+      auto *instruction = cast<InstructionArgument>(argument).getValue();
+      auto *svi = cast<SingleValueInstruction>(instruction);
+      return svi;
+    }
+    return cast<ValueArgument>(argument).getValue();
   }
   Operand *takeOperand() {
     return cast<OperandArgument>(takeArgument()).getValue();
