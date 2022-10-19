@@ -8,6 +8,10 @@ import _Differentiation
 @differentiable(reverse)
 public func topLevelDifferentiable(_ x: Float, _ y: Float) -> Float { x }
 
+@differentiable(reverse)
+@inlinable
+public func topLevelDifferentiableInlinable(_ x: Float, _ y: Float) -> Float { x }
+
 public func topLevelHasDerivative<T: Differentiable>(_ x: T) -> T {
   x
 }
