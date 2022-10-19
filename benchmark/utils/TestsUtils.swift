@@ -307,6 +307,7 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+@_semantics("optimize.no.crossmodule")
 public func getFalse() -> Bool { return false }
 
 @available(*, deprecated, renamed: "getFalse()")
