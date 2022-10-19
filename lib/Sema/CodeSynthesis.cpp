@@ -1616,7 +1616,32 @@ void swift::addNonIsolatedToSynthesized(
 static std::pair<BraceStmt *, /*isTypeChecked=*/bool>
 synthesizeTypeWrappedTypeStorageWrapperInitializerBody(
     AbstractFunctionDecl *decl, void *) {
-  return {nullptr, /*isTypeChecked=*/false};
+  auto &ctx = decl->getASTContext();
+  auto *ctor = cast<ConstructorDecl>(decl);
+  auto *wrappedType = ctor->getDeclContext()->getSelfNominalTypeDecl();
+  auto *storageProperty = wrappedType->getTypeWrapperProperty();
+
+  // self.$storage = storageWrapper
+  SmallVector<ASTNode, 2> body;
+  {
+    auto *storageVarRef = UnresolvedDotExpr::createImplicit(
+        ctx,
+        new (ctx) DeclRefExpr({ctor->getImplicitSelfDecl()},
+                              /*Loc=*/DeclNameLoc(), /*Implicit=*/true),
+        storageProperty->getName());
+
+    auto *paramRef = new (ctx)
+        DeclRefExpr(ctor->getParameters()->get(0), /*Loc=*/DeclNameLoc(),
+                    /*Implicit=*/true);
+
+    body.push_back(new (ctx) AssignExpr(storageVarRef, /*EqualLoc=*/SourceLoc(),
+                                        paramRef,
+                                        /*Implicit=*/true));
+  }
+
+  return {BraceStmt::create(ctx, /*lbloc=*/ctor->getLoc(), body,
+                            /*rbloc=*/ctor->getLoc(), /*implicit=*/true),
+          /*isTypeChecked=*/false};
 }
 
 ConstructorDecl *SynthesizeTypeWrappedTypeStorageWrapperInitializer::evaluate(

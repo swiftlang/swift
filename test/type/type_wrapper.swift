@@ -146,6 +146,9 @@ do {
 
 @typeWrapper
 struct NoopWrapper<W, S> {
+  // expected-note@-1 {{arguments to generic parameter 'W' ('Test1' and 'Test2') are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'S' ('Test1.$Storage' and 'Test2.$Storage') are expected to be equal}}
+
   init(for: W.Type, storage: S) {}
 
   subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V {
@@ -607,4 +610,34 @@ do {
   struct Product {
     var name: String
   }
+}
+
+do {
+  @NoopWrapper
+  struct Test1 {
+    var a: Int
+    var b: [String]
+  }
+
+  let wrapper = NoopWrapper(for: Test1.self, storage: Test1.$Storage(a: 42, b: [""]))
+  _ = Test1(storageWrapper: wrapper) // Ok
+
+  @NoopWrapper
+  struct Test2 {
+  }
+
+  _ = Test2(storageWrapper: NoopWrapper(for: Test2.self, storage: Test2.$Storage())) // Ok
+  _ = Test2(storageWrapper: wrapper)
+  // expected-error@-1 {{cannot convert value of type 'NoopWrapper<Test1, Test1.$Storage>' to expected argument type 'NoopWrapper<Test2, Test2.$Storage>'}}
+
+  @NoopWrapper
+  struct Test3 { // expected-note {{'init(a:b:)' declared here}}
+    var a: Int
+    @typeWrapperIgnored var b: String
+  }
+
+  // @typeWrapperIgnored suppresses `storageWrapper:` initializer
+  _ = Test3(storageWrapper: NoopWrapper(for: Test3.self, storage: Test3.$Storage(a: 42)))
+  // expected-error@-1 {{missing arguments for parameters 'a', 'b' in call}}
+  // expected-error@-2 {{extra argument 'storageWrapper' in call}}
 }

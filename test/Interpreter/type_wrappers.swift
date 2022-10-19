@@ -646,3 +646,23 @@ do {
   // CHECK-NEXT: in (reference type) getter storage: \$Storage._c, property: \TypeWithSomeDefaultedLetProperties<Array<Any>>.<{{.*}} (PropWrapper<String>)>
   // CHECK-NEXT: a
 }
+
+do {
+  @Wrapper
+  struct Test<T> {
+    var a: T
+    var b: Int
+  }
+
+  let wrapper = Wrapper(for: Test<[Float?]>.self, storage: Test<[Float?]>.$Storage(a: [1.0], b: 42))
+  // CHECK: Wrapper.init(for: Test<Array<Optional<Float>>>, storage: $Storage(a: [Optional(1.0)], b: 42))
+
+  var test = Test(storageWrapper: wrapper)
+
+  print(test.a)
+  print(test.b)
+  // CHECK-NEXT: in getter storage: \$Storage.a, property: \Test<Array<Optional<Float>>>.<{{.*}} (Array<Optional<Float>>)>
+  // CHECK-NEXT: [Optional(1.0)]
+  // CHECK-NEXT: in getter storage: \$Storage.b, property: \Test<Array<Optional<Float>>>.b
+  // CHECK-NEXT: 42
+}
