@@ -15,7 +15,7 @@ toolchain as a one-off, there are a couple of differences:
 - [Cloning the project](#cloning-the-project)
   - [Troubleshooting cloning issues](#troubleshooting-cloning-issues)
 - [Installing dependencies](#installing-dependencies)
-  - [macOS](#macOS)
+  - [macOS](#macos)
   - [Linux](#linux)
 - [Building the project for the first time](#building-the-project-for-the-first-time)
   - [Spot check dependencies](#spot-check-dependencies)
@@ -245,7 +245,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        ```sh
        utils/build-script --skip-build-benchmarks \
          --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-         --sccache --release-debuginfo --swift-disable-dead-stripping --test
+         --sccache --release-debuginfo --swift-disable-dead-stripping
        ```
      - Via Xcode:
        ```sh
@@ -254,25 +254,16 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
          --sccache --release-debuginfo --swift-disable-dead-stripping \
          --xcode
        ```
-       **Note:** Building `--xcode` together with `--test` is a common source of issues. So to run
-       tests is recommended to use `ninja` because is normally more stable.
    - Linux (uses Ninja):
      ```sh
-     utils/build-script --release-debuginfo --test --skip-early-swift-driver \
+     utils/build-script --release-debuginfo --skip-early-swift-driver \
        --skip-early-swiftsyntax
      ```
    This will create a directory
    `swift-project/build/Ninja-RelWithDebInfoAssert`
    (with `Xcode` instead of `Ninja` if you used `--xcode`)
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
-   - If the build succeeds: Once the build is complete, the tests will run.
-     - If the tests are passing: Great! We can go to the next step.
-     - If some tests are failing:
-       - Consider [filing a bug report](https://swift.org/contributing/#reporting-bugs).
-       - Note down which tests are failing as a baseline. This baseline will be
-         handy later when you run the tests after making a change.
-   - If the build fails:
-     See [Troubleshooting build issues](#troubleshooting-build-issues).
+   If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
 
    If you would like to additionally build the Swift corelibs,
    ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
@@ -514,14 +505,13 @@ compiler. Then your changes will not be reflected when the test runs because the
 option, but it will lead to a longer feedback loop due to more things getting
 rebuilt.
 
+In the rare event that a local test failure happens to be unrelated to your
+changes (is not due to stale binaries and reproduces without your changes),
+there is a good chance that it has already been caught by our continuous
+integration infrastructure, and it may be ignored.
+
 If you want to rerun all the tests, you can either rebuild the whole project
 and use `lit.py` without `--filter` or use `run-test` to handle both aspects.
-
-Recall the baseline failures mentioned in
-[the build section](#the-actual-build). If your baseline had failing tests, make
-sure you compare the failures seen after your changes to the baseline. If some
-test failures look totally unrelated to your changes, there is a good chance
-that they were already failing as part of the baseline.
 
 For more details on running tests and understanding the various Swift-specific
 lit customizations, see [Testing.md](/docs/Testing.md). Also check out the
