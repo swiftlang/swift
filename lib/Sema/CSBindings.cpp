@@ -1281,6 +1281,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
     switch (constraint->getKind()) {
     case ConstraintKind::Subtype:
+    case ConstraintKind::SubclassOf:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
@@ -1358,6 +1359,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::Subtype:
+  case ConstraintKind::SubclassOf:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:

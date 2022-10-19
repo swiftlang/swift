@@ -97,6 +97,9 @@ enum class ConstraintKind : char {
   ArgumentConversion,
   /// The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
+  /// The first type must be a subclass of the second type (which is a
+  /// class type).
+  SubclassOf,
   /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
@@ -669,6 +672,7 @@ public:
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
+    case ConstraintKind::SubclassOf:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
