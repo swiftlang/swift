@@ -1278,13 +1278,13 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     //
     SILBasicBlock *remainingBlock = nullptr, *deletedBlock = nullptr;
     if (BB != Fn.getEntryBlock() && hasLessInstructions(BB, DestBB)) {
+      DestBB->spliceAtBegin(BB);
+      DestBB->dropAllArguments();
+      DestBB->moveArgumentList(BB);
       while (!BB->pred_empty()) {
         SILBasicBlock *pred = *BB->pred_begin();
         replaceBranchTarget(pred->getTerminator(), BB, DestBB, true);
       }
-      DestBB->spliceAtBegin(BB);
-      DestBB->dropAllArguments();
-      DestBB->moveArgumentList(BB);
       remainingBlock = DestBB;
       deletedBlock = BB;
     } else {

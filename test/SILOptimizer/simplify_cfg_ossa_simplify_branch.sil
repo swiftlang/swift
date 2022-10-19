@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg
+
+enum FakeOptional<T> {
+  case some(T)
+  case none
+}
+
+class SuperKlass {
+}
+
+class Klass : SuperKlass {
+}
+
+sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// Test we don't get an assert while replacing branch target of checked_cast_br
+sil [ossa] @test_cfg1 : $@convention(thin) (@guaranteed SuperKlass) -> @out FakeOptional<Klass> {
+bb0(%0 : $*FakeOptional<Klass>, %1 : @guaranteed $SuperKlass):
+  %2 = init_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  checked_cast_br %1 : $SuperKlass to Klass, bb1, bb2
+
+bb1(%6 : @guaranteed $Klass):
+  %7 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %6 : $Klass
+  br bb3(%7 : $FakeOptional<Klass>)
+
+bb2(%9 : @guaranteed $SuperKlass):
+  %10 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%10 : $FakeOptional<Klass>)
+
+
+bb3(%12 : @guaranteed $FakeOptional<Klass>):
+  switch_enum %12 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
+
+bb4(%14 : @guaranteed $Klass):
+  %15 = copy_value %14 : $Klass
+  store %15 to [init] %2 : $*Klass
+  inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  br bb5
+
+bb5:
+  %21 = tuple ()
+  return %21 : $()
+
+bb6:
+  inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb5
+}
