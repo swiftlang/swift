@@ -244,12 +244,14 @@ typedef BridgedParsingError (*_Nonnull FunctionParseFn)(BridgedFunction,
 typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
                                                     BridgedFunction);
 typedef BridgedEffectInfo (* _Nonnull FunctionGetEffectInfoFn)(BridgedFunction, SwiftInt);
+typedef BridgedMemoryBehavior (* _Nonnull FunctionGetMemBehviorFn)(BridgedFunction, bool);
 
 void Function_register(SwiftMetatype metatype,
             FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectInfoFn effectInfoFn);
+            FunctionGetEffectInfoFn effectInfoFn,
+            FunctionGetMemBehviorFn memBehaviorFn);
 
 SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
                                                 OptionalBridgedInstruction inst);
