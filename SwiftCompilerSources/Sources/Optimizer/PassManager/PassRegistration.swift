@@ -79,5 +79,6 @@ private func registerSwiftPasses() {
 }
 
 private func registerSwiftAnalyses() {
+  AliasAnalysis.register()
   CalleeAnalysis.register()
 }

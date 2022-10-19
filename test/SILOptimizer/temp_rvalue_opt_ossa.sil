@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -temp-rvalue-opt | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
@@ -870,6 +872,8 @@ bb0:
 }
 
 sil [ossa] @loadString : $@convention(thin) (@in_guaranteed String) -> @owned String {
+[%0: read v**]
+[global: ]
 bb0(%0 : $*String):
   %1 = load [copy] %0 : $*String
   return %1 : $String

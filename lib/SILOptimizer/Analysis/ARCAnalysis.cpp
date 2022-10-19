@@ -282,24 +282,14 @@ bool swift::mayHaveSymmetricInterference(SILInstruction *User, SILValue Ptr, Ali
   if (!canUseObject(User))
     return false;
 
-  // Check whether releasing this value can call deinit and interfere with User.
-  if (AA->mayValueReleaseInterfereWithInstruction(User, Ptr))
+  if (auto *LI = dyn_cast<LoadInst>(User)) {
+    return AA->isAddrVisibleFromObject(LI->getOperand(), Ptr);
+  }
+  if (auto *SI = dyn_cast<StoreInst>(User)) {
+    return AA->isAddrVisibleFromObject(SI->getDest(), Ptr);
+  }
+  if (User->mayReadOrWriteMemory())
     return true;
-
-  // If the user is a load or a store and we can prove that it does not access
-  // the object then return true.
-  // Notice that we need to check all of the values of the object.
-  if (isa<StoreInst>(User)) {
-    if (AA->mayWriteToMemory(User, Ptr))
-      return true;
-    return false;
-  }
-
-  if (isa<LoadInst>(User) ) {
-    if (AA->mayReadFromMemory(User, Ptr))
-      return true;
-    return false;
-  }
 
   // If we have a terminator instruction, see if it can use ptr. This currently
   // means that we first show that TI cannot indirectly use Ptr and then use

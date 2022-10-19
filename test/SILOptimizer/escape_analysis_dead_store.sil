@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt %s -dead-store-elim -enable-sil-verify-all -escapes-internal-verify | %FileCheck %s
+// RUN: %target-sil-opt %s -dead-store-elim -enable-sil-verify-all | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
