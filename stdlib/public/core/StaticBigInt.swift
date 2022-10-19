@@ -46,6 +46,7 @@ public struct StaticBigInt:
 
   /// Returns the given value unchanged.
   @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.8, *)
   @inline(__always)
   public static prefix func + (_ rhs: Self) -> Self {
     rhs
