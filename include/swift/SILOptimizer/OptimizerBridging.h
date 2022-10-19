@@ -81,14 +81,6 @@ enum {
   BridgedSlabCapacity = 64 * sizeof(uintptr_t)
 };
 
-typedef struct {
-  void * _Nullable rcia;
-} BridgedRCIdentityAnalysis;
-
-typedef struct {
-  void * _Nonnull functionInfo;
-} BridgedRCIdentityFunctionInfo;
-
 typedef void (* _Nonnull BridgedModulePassRunFn)(BridgedPassContext);
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
