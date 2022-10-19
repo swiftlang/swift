@@ -15,7 +15,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -120,7 +120,7 @@ class SILPerformanceInliner {
 
   DominanceAnalysis *DA;
   SILLoopAnalysis *LA;
-  SideEffectAnalysis *SEA;
+  BasicCalleeAnalysis *BCA;
 
   // For keys of SILFunction and SILLoop.
   llvm::DenseMap<SILFunction *, ShortestPathAnalysis *> SPAs;
@@ -246,10 +246,10 @@ class SILPerformanceInliner {
 public:
   SILPerformanceInliner(StringRef PassName, SILOptFunctionBuilder &FuncBuilder,
                         InlineSelection WhatToInline, DominanceAnalysis *DA,
-                        SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
+                        SILLoopAnalysis *LA, BasicCalleeAnalysis *BCA,
                         OptimizationMode OptMode, OptRemark::Emitter &ORE)
       : PassName(PassName), FuncBuilder(FuncBuilder),
-        WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA), ORE(ORE),
+        WhatToInline(WhatToInline), DA(DA), LA(LA), BCA(BCA), CBI(DA), ORE(ORE),
         OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
@@ -352,7 +352,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
-  if (isPureCall(AI, SEA)) {
+  if (isPureCall(AI, BCA)) {
     OptRemark::Emitter::emitOrDebug(DEBUG_TYPE, &ORE, [&]() {
       using namespace OptRemark;
       return RemarkPassed("Inline", *AI.getInstruction())
@@ -1125,7 +1125,7 @@ public:
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
+    BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
     OptRemark::Emitter ORE(DEBUG_TYPE, *getFunction());
 
     if (getOptions().InlineThreshold == 0) {
@@ -1137,7 +1137,7 @@ public:
     SILOptFunctionBuilder FuncBuilder(*this);
 
     SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline, DA, LA,
-                                  SEA, OptMode, ORE);
+                                  BCA, OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");
