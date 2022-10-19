@@ -27,7 +27,7 @@ int main() {
   try {
     Functions::throwFunction();
   } catch (swift::Error& e) {
-      auto errorVal = e.as<Functions::NaiveErrors, Functions::_impl::_impl_NaiveErrors>();
+      auto errorVal = e.as<Functions::NaiveErrors>();
       if (errorVal) {
         assert(errorVal == Functions::NaiveErrors::throwError);
         errorVal->getMessage();

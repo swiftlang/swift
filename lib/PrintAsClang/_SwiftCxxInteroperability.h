@@ -255,7 +255,7 @@ public:
     opaqueValue = other.opaqueValue;
   }
 
-  template<class T, class U>
+  template<class T>
   std::optional<T> as() {
     char *ptr = (char*)malloc(100);
     const void *em = testErrorCall();
@@ -264,12 +264,15 @@ public:
 
     // Dynamic cast will release the error, so we need to retain it.
     swift::swift_errorRetain(ep);
-    bool dynamicCast = swift::swift_dynamicCast(ptr, &ep, em, metadata,/*take on success  destroy on failure*/ 6);
+    bool dynamicCast =
+        swift::swift_dynamicCast(ptr, &ep, em, metadata,
+                                 /*take on success  destroy on failure*/ 6);
 
     if (dynamicCast) {
-      //swift::_impl::implClassFor<T>::initializeWithTake
       auto result =
-          U::returnNewValue([&](char *dest) { U::initializeWithTake(dest, ptr); });
+          swift::_impl::implClassFor<T>::type::returnNewValue([&](char *dest) {
+            swift::_impl::implClassFor<T>::type::initializeWithTake(dest, ptr);
+          });
       return std::optional(result);
     }
     return std::nullopt;
