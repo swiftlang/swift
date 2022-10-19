@@ -178,6 +178,58 @@ private:
   evaluate(Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const;
 };
 
+/// The input type for a clang category lookup request.
+struct ClangCategoryLookupDescriptor final {
+  const ClassDecl *classDecl;
+  Identifier categoryName;
+
+  ClangCategoryLookupDescriptor(const ClassDecl *classDecl,
+                                Identifier categoryName)
+      : classDecl(classDecl), categoryName(categoryName) {}
+
+  friend llvm::hash_code hash_value(const ClangCategoryLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.classDecl, desc.categoryName);
+  }
+
+  friend bool operator==(const ClangCategoryLookupDescriptor &lhs,
+                         const ClangCategoryLookupDescriptor &rhs) {
+    return lhs.classDecl == rhs.classDecl
+               && lhs.categoryName == rhs.categoryName;
+  }
+
+  friend bool operator!=(const ClangCategoryLookupDescriptor &lhs,
+                         const ClangCategoryLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ClangCategoryLookupDescriptor &desc);
+SourceLoc extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc);
+
+/// Given a Swift class, find the imported Swift decl representing the
+/// \c \@interface with the given category name. That is, this will return an
+/// \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl, or a
+/// \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, or \c nullptr
+/// if the class is not imported from Clang or it does not have a category by
+/// that name.
+///
+/// An empty/invalid \c categoryName requests the main interface for the class.
+class ClangCategoryLookupRequest
+    : public SimpleRequest<ClangCategoryLookupRequest,
+                           Decl *(ClangCategoryLookupDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Decl *evaluate(Evaluator &evaluator,
+                 ClangCategoryLookupDescriptor desc) const;
+};
+
 enum class CxxRecordSemanticsKind {
   Trivial,
   Owned,

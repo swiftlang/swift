@@ -676,7 +676,73 @@ be added to a given type, while `@_nonSendable` indicates that an unavailable
 `(_assumed)` after it, in which case `@Sendable` "beats" it.
 `@_nonSendable(_assumed)` is intended to be used when mass-marking whole regions
 of a header as non-`Sendable` so that you can make spot exceptions with
-`@Sendable`.   
+`@Sendable`.
+
+## `@_objcImplementation(CategoryName)`
+
+Declares an extension that defines an implementation for the Objective-C
+category `CategoryName` on the class in question, or for the main `@interface`
+if the argument list is omitted.
+
+This attribute is used to write fully Objective-C-compatible implementations in
+Swift. Normal Objective-C interop allows Objective-C clients to use instances of
+the subclass, but not to subclass them, and uses a generated header that is not
+meant to be read by humans. `@_objcImplementation`, on the other hand, creates
+classes that are virtually indistinguishable from classes implemented in native 
+Objective-C: they do not have a Swift vtable or any other Swift-specific
+metadata, Swift does not use any special knowledge of the class's "Swiftiness" 
+when using the class so ObjC runtime calls work correctly and they can even be 
+subclassed by Objective-C code, and you write a header for the class by hand 
+that looks exactly like an equivalent ObjC class. Clients should not notice if 
+you replace a native Objective-C `@implementation Foo (Bar)` with a Swift 
+`@_objcImplementation(Bar) extension Foo`.
+
+You create a class with this feature very differently from normal ObjC interop:
+
+1. Hand-write headers that declare the classes' Objective-C interface, just as
+   you would for a native Objective-C class. Since you're handwriting these
+   headers, you can write them just as you would for an Objective-C class:
+   splitting them across multiple files, grouping related declarations together,
+   adding comments, declaring Swift behavior using C attributes or API notes,
+   etc.
+   
+2. Import your headers into Swift using a bridging header or umbrella header so
+   Swift can see them.
+
+3. Implement your class using a mixture of `@implementation` declarations in
+   `.m` files and `@_objcImplementation extension`s in `.swift` files. Each
+   `@interface` should have exactly one corresponding implementation; don't try
+   to implement some members of a single `@interface` in ObjC and others in
+   Swift.
+
+   * To implement the main `@interface` of a class in Swift, use
+     `@_objcImplementation extension ClassName`.
+     
+   * To implement a category in Swift, use
+     `@_objcImplementation(CategoryName) extension ClassName`.
+     
+   * We should think about Objective-C generics.
+
+4. Every member of an `@_objcImplementation` extension should be either `@objc`
+   or `final`. The `final` members can be made `public` if you want to expose
+   them to Swift clients. The `@objc` members are implicitly `dynamic`.
+   
+   * Eventually, we'd like to allow members which are not explicitly marked
+     `@objc`. The compiler will check that they match something declared in the
+     header, and if they do, it will automatically apply appropriate attributes.
+     If not, it will reject them. Members with an explicit `@objc` will not be
+     checked, so you can define helpers that are callable by selector but not in
+     any header.
+  
+   * Eventually, we want the main `@_objcImplementation` extension to be able to
+     declare stored properties that aren't in the interface. We also want
+     `final` stored properties to be allowed to be resilent Swift types, but
+     it's not clear how to achieve that without boxing them in `__SwiftValue`
+     (which we might do as a stopgap).
+     
+   * We should think about ObjC `direct` members.
+      
+   * Access control design for ObjC methods TBD.
 
 ## `@_objc_non_lazy_realization`
 

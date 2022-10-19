@@ -5032,6 +5032,56 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   return result;
 }
 
+Decl *ClangCategoryLookupRequest::
+evaluate(Evaluator &evaluator, ClangCategoryLookupDescriptor desc) const {
+  const ClassDecl *CD = desc.classDecl;
+  Identifier categoryName = desc.categoryName;
+
+  auto clangClass =
+      dyn_cast_or_null<clang::ObjCInterfaceDecl>(CD->getClangDecl());
+  if (!clangClass)
+    return nullptr;
+
+  if (categoryName.empty())
+    // No category name, so we want the decl for the `@interface` in
+    // `clangClass`.
+    return const_cast<ClassDecl *>(CD);
+
+  auto ident = &clangClass->getASTContext().Idents.get(categoryName.str());
+  auto clangCategory = clangClass->FindCategoryDeclaration(ident);
+  if (!clangCategory)
+    return nullptr;
+
+  ASTContext &ctx = CD->getASTContext();
+  return ctx.getClangModuleLoader()->importDeclDirectly(clangCategory);
+}
+
+Decl *ClassDecl::getImportedObjCCategory(Identifier name) const {
+  ClangCategoryLookupDescriptor desc{this, name};
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ClangCategoryLookupRequest(desc),
+                           nullptr);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ClangCategoryLookupDescriptor &desc) {
+  out << "Looking up @interface for ";
+  if (!desc.categoryName.empty()) {
+    out << "category ";
+    simple_display(out, desc.categoryName);
+  }
+  else {
+    out << "main body";
+  }
+  out << " of ";
+  simple_display(out, desc.classDecl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.classDecl);
+}
+
 TinyPtrVector<ValueDecl *>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {

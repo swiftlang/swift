@@ -1492,6 +1492,26 @@ ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
 
+ERROR(attr_objc_implementation_must_be_unconditional,none,
+      "only unconditional extensions can implement an Objective-C '@interface'",
+      ())
+ERROR(attr_objc_implementation_must_extend_class,none,
+      "cannot mark extension of %0 %1 with '@_objcImplementation'; it is not "
+      "an imported Objective-C class",
+      (DescriptiveDeclKind, ValueDecl *))
+ERROR(attr_objc_implementation_must_be_imported,none,
+      "'@_objcImplementation' cannot be used to extend %0 %1 because it was "
+      "defined by a Swift 'class' declaration, not an imported Objective-C "
+      "'@interface' declaration",
+      (DescriptiveDeclKind, ValueDecl *))
+ERROR(attr_objc_implementation_category_not_found,none,
+      "could not find category %0 on Objective-C class %1; make sure your "
+      "umbrella or bridging header imports the header that declares it",
+      (Identifier, ValueDecl*))
+NOTE(attr_objc_implementation_fixit_remove_category_name,none,
+     "remove arguments to implement the main '@interface' for this class",
+     ())
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,

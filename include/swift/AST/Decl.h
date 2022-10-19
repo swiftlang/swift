@@ -1496,6 +1496,18 @@ public:
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
 
+  /// True if this extension provides an implementation for an imported
+  /// Objective-C \c \@interface. This implies various restrictions and special
+  /// behaviors for its members.
+  bool isObjCImplementation() const;
+
+  /// Returns the \c clang::ObjCCategoryDecl or \c clang::ObjCInterfaceDecl
+  /// implemented by this extension.
+  ///
+  /// This can return \c nullptr if the category doesn't exist. Do not call it
+  /// unless \c isObjCImplementation() returns \c true.
+  const clang::ObjCContainerDecl *getInterfaceForObjCImplementation() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;
@@ -4459,6 +4471,12 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Return the imported declaration for the category with the given name; this
+  /// will always be an Objective-C-backed \c ExtensionDecl or, if \p name is
+  /// empty, \c ClassDecl. Returns \c nullptr if the class was not imported from
+  /// Objective-C or does not have an imported category by that name.
+  Decl *getImportedObjCCategory(Identifier name) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

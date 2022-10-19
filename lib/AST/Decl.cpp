@@ -1465,6 +1465,31 @@ Type ExtensionDecl::getExtendedType() const {
   return ErrorType::get(ctx);
 }
 
+bool ExtensionDecl::isObjCImplementation() const {
+  return getAttrs().hasAttribute<ObjCImplementationAttr>();
+}
+
+const clang::ObjCContainerDecl *
+ExtensionDecl::getInterfaceForObjCImplementation() const {
+  assert(isObjCImplementation());
+
+  auto attr = getAttrs().getAttribute<ObjCImplementationAttr>();
+  if (attr->isCategoryNameInvalid())
+    return nullptr;
+
+  auto CD = dyn_cast_or_null<ClassDecl>(getExtendedNominal());
+  if (!CD)
+    return nullptr;
+
+  auto importedDecl = CD->getImportedObjCCategory(attr->CategoryName);
+  if (!importedDecl)
+    return nullptr;
+
+  assert(importedDecl->hasClangNode() &&
+         "@interface imported as clang-node-less decl?");
+  return cast<clang::ObjCContainerDecl>(importedDecl->getClangDecl());
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,

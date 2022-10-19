@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 716; // remove @_typeSequence
+const uint16_t SWIFTMODULE_VERSION_MINOR = 717; // @_objcImplementation
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2021,6 +2021,13 @@ namespace decls_block {
     BCFixed<1>, // implicit name flag
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
+  >;
+
+  using ObjCImplementationDeclAttrLayout = BCRecordLayout<
+    ObjCImplementation_DECL_ATTR,
+    BCFixed<1>,                // implicit flag
+    BCFixed<1>,                // category name invalid
+    IdentifierIDField          // category name
   >;
 
   using SpecializeDeclAttrLayout = BCRecordLayout<

@@ -2681,6 +2681,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_ObjCImplementation: {
+      auto *theAttr = cast<ObjCImplementationAttr>(DA);
+      auto categoryNameID = S.addDeclBaseNameRef(theAttr->CategoryName);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[ObjCImplementationDeclAttrLayout::Code];
+      ObjCImplementationDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord,
+          abbrCode, theAttr->isImplicit(), theAttr->isCategoryNameInvalid(),
+          categoryNameID);
+      return;
+    }
+
     case DAK_MainType: {
       auto abbrCode = S.DeclTypeAbbrCodes[MainTypeDeclAttrLayout::Code];
       MainTypeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,

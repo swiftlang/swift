@@ -239,6 +239,7 @@ public:
 
   void visitObjCAttr(ObjCAttr *attr);
   void visitNonObjCAttr(NonObjCAttr *attr);
+  void visitObjCImplementationAttr(ObjCImplementationAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 
   void visitOptionalAttr(OptionalAttr *attr);
@@ -1388,6 +1389,54 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   if (auto ext = dyn_cast<ExtensionDecl>(D)) {
     if (!ext->getSelfClassDecl())
       diagnoseAndRemoveAttr(attr, diag::invalid_nonobjc_extension);
+  }
+}
+
+void AttributeChecker::
+visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
+  auto ED = cast<ExtensionDecl>(D);
+  if (ED->isConstrainedExtension())
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_objc_implementation_must_be_unconditional);
+
+  auto CD = dyn_cast<ClassDecl>(ED->getExtendedNominal());
+  if (!CD) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_objc_implementation_must_extend_class,
+                          ED->getExtendedNominal()->getDescriptiveKind(),
+                          ED->getExtendedNominal());
+    ED->getExtendedNominal()->diagnose(diag::decl_declared_here,
+                                       ED->getExtendedNominal()->getName());
+    return;
+  }
+
+  if (!CD->hasClangNode()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_objc_implementation_must_be_imported,
+                          CD->getDescriptiveKind(), CD);
+    CD->diagnose(diag::decl_declared_here, CD->getName());
+    return;
+  }
+
+  if (!attr->isCategoryNameInvalid() &&
+      !CD->getImportedObjCCategory(attr->CategoryName)) {
+    diagnose(attr->getLocation(),
+             diag::attr_objc_implementation_category_not_found,
+             attr->CategoryName, CD);
+
+    // attr->getRange() covers the attr name and argument list; adjust it to
+    // exclude the first token.
+    auto newStart = Lexer::getLocForEndOfToken(Ctx.SourceMgr,
+                                               attr->getRange().Start);
+    if (attr->getRange().contains(newStart)) {
+      auto argListRange = SourceRange(newStart, attr->getRange().End);
+      diagnose(attr->getLocation(),
+               diag::attr_objc_implementation_fixit_remove_category_name)
+        .fixItRemove(argListRange);
+    }
+
+    attr->setCategoryNameInvalid();
+
+    return;
   }
 }
 
