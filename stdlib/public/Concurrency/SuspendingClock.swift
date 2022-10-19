@@ -77,6 +77,7 @@ extension SuspendingClock: Clock {
     return .seconds(seconds) + .nanoseconds(nanoseconds)
   }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
   /// to coalesce CPU wake-ups to more efficiently process the wake-ups in
@@ -96,6 +97,15 @@ extension SuspendingClock: Clock {
       tolerance: tolerance,
       clock: .suspending)
   }
+#else
+  @available(SwiftStdlib 5.7, *)
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public func sleep(
+    until deadline: Instant, tolerance: Swift.Duration? = nil
+  ) async throws {
+      fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#endif
 }
 
 @available(SwiftStdlib 5.7, *)
