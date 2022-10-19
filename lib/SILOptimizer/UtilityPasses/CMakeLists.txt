@@ -31,7 +31,6 @@ target_sources(swiftSILOptimizer PRIVATE
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
   SILSkippingChecker.cpp
-  SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
   UnitTestRunner.cpp
