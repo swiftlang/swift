@@ -7,6 +7,7 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 // REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: swift_in_compiler
 
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for static String variables.

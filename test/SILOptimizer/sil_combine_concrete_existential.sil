@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
 // RUN: %target-swift-frontend -O %s -emit-ir
 
+// REQUIRES: swift_in_compiler
+
 // These tests exercise the same SILCombine optimization as
 // existential_type_propagation.sil, but cover additional corner
 // cases. These are pure unit tests. They do not run the devirtualizer

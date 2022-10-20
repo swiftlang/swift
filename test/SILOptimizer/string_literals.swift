@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -O -emit-ir  %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-as-library -Osize -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_in_compiler
 
 // FIXME(rdar://problem/45856408): The 7-bit discriminator complicates codegen
 // on 32-bit platforms.

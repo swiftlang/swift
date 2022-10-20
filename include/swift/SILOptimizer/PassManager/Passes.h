@@ -76,9 +76,6 @@ namespace swift {
 
 #define PASS(ID, TAG, NAME) \
   SILTransform *create##ID();
-#define SWIFT_FUNCTION_PASS_WITH_LEGACY(ID, TAG, NAME) \
-  PASS(ID, TAG, NAME) \
-  SILTransform *createLegacy##ID();
 #define IRGEN_PASS(ID, TAG, NAME)
 #include "Passes.def"
 

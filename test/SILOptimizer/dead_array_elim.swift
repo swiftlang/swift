@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 // XFAIL: OS=linux-androideabi
 
 // Test needs to be updated for 32bit.
