@@ -75,6 +75,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -303,6 +304,18 @@ struct DumpFunction : UnitTest {
   void invoke(Arguments &arguments) override { getFunction()->dump(); }
 };
 
+struct SimplifyCFGCanonicalizeSwitchEnum : UnitTest {
+  SimplifyCFGCanonicalizeSwitchEnum(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .canonicalizeSwitchEnums();
+  }
+};
+
 // Arguments: NONE
 // Dumps: the index of the self argument of the current function
 struct FunctionGetSelfArgumentIndex : UnitTest {
@@ -386,6 +399,8 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
         PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum",
+                           SimplifyCFGCanonicalizeSwitchEnum)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
 #undef ADD_UNIT_TEST_SUBCLASS

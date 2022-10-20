@@ -2748,9 +2748,6 @@ bool SimplifyCFG::simplifyBlocks() {
 /// Canonicalize all switch_enum and switch_enum_addr instructions.
 /// If possible, replace the default with the corresponding unique case.
 bool SimplifyCFG::canonicalizeSwitchEnums() {
-  if (!EnableOSSASimplifyCFG && Fn.hasOwnership()) {
-    return false;
-  }
   bool Changed = false;
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
@@ -2768,13 +2765,7 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     NullablePtr<EnumElementDecl> defaultDecl = SWI.getUniqueCaseForDefault();
     if (!defaultDecl)
       continue;
-    
-    if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-      if (!SWI.getOperand()->getType().isTrivial(Fn)) {
-        // TODO: Test and enable this case.
-        continue;
-      }
-    }
+
     LLVM_DEBUG(llvm::dbgs() << "simplify canonical switch_enum\n");
 
     // Construct a new instruction by copying all the case entries.
