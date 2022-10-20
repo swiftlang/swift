@@ -1,7 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s
 
-// CHECK: import Cxx
-
 // CHECK: struct SimpleSequence : CxxSequence {
 // CHECK:   typealias Element = ConstIterator.Pointee
 // CHECK:   typealias Iterator = CxxIterator<SimpleSequence>

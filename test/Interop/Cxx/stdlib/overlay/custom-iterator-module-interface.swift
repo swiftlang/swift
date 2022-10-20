@@ -1,7 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s
 
-// CHECK: import Cxx
-
 // CHECK: struct ConstIterator : UnsafeCxxInputIterator {
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   func successor() -> ConstIterator
