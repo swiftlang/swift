@@ -574,9 +574,6 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
 #define SWIFT_INSTRUCTION_PASS(INST, TAG) \
   SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return nullptr; })
 
-#define SWIFT_INSTRUCTION_PASS_WITH_LEGACY(INST, TAG) \
-  SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return legacyVisit##INST(inst); })
-
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
 #undef SWIFT_INSTRUCTION_PASS_COMMON
