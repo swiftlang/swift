@@ -162,27 +162,23 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 
   func getOffsetFromStorage() -> Int? {
     let maximumOffsetOn32BitArchitecture = 4094
-    guard let storage = _kvcKeyPathStringPtr else {
+    guard _kvcKeyPathStringPtr != nil else {
       return nil
     }
 
-    // TODO: Maybe we can get a pointer's raw bits instead of doing
-    // a distance calculation. Note: offsetBase can't be unwrapped
-    // forcefully if its bitPattern is 0x00. Hence the 0x01.
-    let offsetBase = UnsafePointer<CChar>(bitPattern: 0x01)
     let architectureSize = MemoryLayout<Int>.size
     if architectureSize == 8 {
-      let storageDistance = storage.distance(to: offsetBase!) - 2
-      guard storageDistance >= 0 else {
+      let offset = -Int(bitPattern: _kvcKeyPathStringPtr) - 1
+      guard offset >= 0 else {
         // This happens to be an actual _kvcKeyPathStringPtr, not an offset, if we get here.
         return nil
       }
-      return storageDistance
+      return offset
     }
     else {
-      let storageDistance = offsetBase!.distance(to: storage)
-      if (storageDistance <= maximumOffsetOn32BitArchitecture) {
-        return storageDistance
+      let offset = Int(bitPattern: _kvcKeyPathStringPtr) - 1
+      if (offset <= maximumOffsetOn32BitArchitecture) {
+        return offset
       }
       return nil
     }
