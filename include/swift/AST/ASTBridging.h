@@ -45,6 +45,8 @@ void DiagnosticEngine_diagnose(swift::DiagnosticEngine &, swift::SourceLoc loc,
                                swift::CharSourceRange highlight,
                                BridgedArrayRef fixIts);
 
+using ArrayRefOfDiagnosticArgument = llvm::ArrayRef<swift::DiagnosticArgument>;
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_AST_ASTBRIDGING_H
