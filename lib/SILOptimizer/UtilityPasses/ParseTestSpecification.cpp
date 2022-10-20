@@ -84,6 +84,40 @@ SILInstruction *getInstruction(SILBasicBlock *block, unsigned long index) {
   llvm_unreachable("bad index!?");
 }
 
+SILInstruction *getInstructionOffsetFrom(SILInstruction *base, long offset) {
+  if (offset == 0) {
+    return base;
+  }
+  if (offset > 0) {
+    Optional<unsigned long> baseIndex;
+    unsigned long index = 0;
+    for (auto &block : *base->getFunction()) {
+      for (auto &other : block) {
+        if (baseIndex && index == (*baseIndex + offset)) {
+          return &other;
+        }
+        if (&other == base) {
+          baseIndex = index;
+        }
+        ++index;
+      }
+    }
+    llvm_unreachable("positive offset outside of function!?");
+  }
+  SmallVector<SILInstruction *, 64> instructions;
+  unsigned long index = 0;
+  for (auto &block : *base->getFunction()) {
+    for (auto &other : block) {
+      instructions.push_back(&other);
+      if (&other == base) {
+        return instructions[index + offset];
+      }
+      ++index;
+    }
+  }
+  llvm_unreachable("never found instruction in its own function!?");
+}
+
 SILBasicBlock *getBlock(SILFunction *function, unsigned long index) {
   auto iterator = function->begin();
   for (unsigned long i = 0; i < index; ++i) {

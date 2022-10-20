@@ -3958,6 +3958,8 @@ The following types of test arguments are supported:
          @{function}.{trace} <-- the indicated trace in the indicated function
          Example: @function[bar].trace
 - instruction: @instruction <-- the instruction after* the test_specification instruction
+               @instruction[+uint] <-- the instruction ``uint`` instructions after* the test_specification instruction
+               @instruction[-uint] <-- the instruction ``uint`` instructions before* the test_specification instruction
                @instruction[uint] <-- the instruction at index ``uint``
                @{function}.{instruction} <-- the indicated instruction in the indicated function
                Example: @function[baz].instruction[19]
@@ -3969,7 +3971,7 @@ The following types of test arguments are supported:
            Example: @block[19].instruction[2].operand[3]
            Example: @function[2].instruction.operand
 
-* The first instruction that isn't deleted when processing functions for tests.
+* Not counting instructions that are deleted when processing functions for tests.
   The following instructions currently are deleted:
     test_specification
     debug_value [trace]

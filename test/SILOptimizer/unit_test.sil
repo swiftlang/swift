@@ -98,8 +98,14 @@ bb1:
 // CHECK: tuple
 // CHECK-LABEL: end running test 2 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
 // CHECK-LABEL: begin running test 3 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
-// CHECK: function: test_contextual_arg_parsing
+// CHECK: instruction: br bb2
+// CHECK: instruction: {{%[^,]+}} = tuple ()
+// CHECK: instruction: br bb3
+// CHECK: instruction: return
 // CHECK-LABEL: end running test 3 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK-LABEL: begin running test 4 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK: function: test_contextual_arg_parsing
+// CHECK-LABEL: end running test 4 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
 sil [ossa] @test_contextual_arg_parsing : $() -> () {
 entry:
   br one
@@ -108,6 +114,7 @@ one:
   br two
 two:
   test_specification "test-specification-parsing I @instruction"
+  test_specification "test-specification-parsing IIII @instruction[-1] @instruction[+0] @instruction[+1] @instruction[+2]"
   %retval = tuple ()
   br exit
 exit:
