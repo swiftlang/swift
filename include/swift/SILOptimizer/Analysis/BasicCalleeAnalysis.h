@@ -230,6 +230,9 @@ public:
   }
 };
 
+bool isDeinitBarrier(SILInstruction *const instruction,
+                     BasicCalleeAnalysis *bca);
+
 } // end namespace swift
 
 #endif

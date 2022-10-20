@@ -97,9 +97,11 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
 using namespace swift;
@@ -192,6 +194,8 @@ class DestroyReachability;
 /// Step #2: Perform backward dataflow from KnownStorageUses.originalDestroys to
 /// KnownStorageUses.storageUsers to find deinitialization barriers.
 class DeinitBarriers final {
+  BasicCalleeAnalysis *calleeAnalysis;
+
 public:
   // Instructions beyond which a destroy_addr cannot be hoisted, reachable from
   // a destroy_addr.  Deinit barriers or storage uses.
@@ -217,8 +221,10 @@ public:
 
   explicit DeinitBarriers(bool ignoreDeinitBarriers,
                           const KnownStorageUses &knownUses,
-                          SILFunction *function)
-      : ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
+                          SILFunction *function,
+                          BasicCalleeAnalysis *calleeAnalysis)
+      : calleeAnalysis(calleeAnalysis),
+        ignoreDeinitBarriers(ignoreDeinitBarriers), knownUses(knownUses) {
     auto rootValue = knownUses.getStorage().getRoot();
     assert(rootValue && "HoistDestroys requires a single storage root");
     // null for function args
@@ -339,7 +345,7 @@ DeinitBarriers::classifyInstruction(SILInstruction *inst) const {
   if (knownUses.storageUsers.contains(inst)) {
     return Classification::Barrier;
   }
-  if (!ignoreDeinitBarriers && isDeinitBarrier(inst)) {
+  if (!ignoreDeinitBarriers && isDeinitBarrier(inst, calleeAnalysis)) {
     return Classification::Barrier;
   }
   if (auto *eai = dyn_cast<EndAccessInst>(inst)) {
@@ -401,6 +407,7 @@ class HoistDestroys {
   bool ignoreDeinitBarriers;
   SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs;
   InstructionDeleter &deleter;
+  BasicCalleeAnalysis *calleeAnalysis;
 
   // Book-keeping for the rewriting stage.
   SmallPtrSet<SILInstruction *, 4> reusedDestroys;
@@ -410,12 +417,13 @@ class HoistDestroys {
 public:
   HoistDestroys(SILValue storageRoot, bool ignoreDeinitBarriers,
                 SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
-                InstructionDeleter &deleter)
+                InstructionDeleter &deleter,
+                BasicCalleeAnalysis *calleeAnalysis)
       : storageRoot(storageRoot), function(storageRoot->getFunction()),
         module(function->getModule()), typeExpansionContext(*function),
         ignoreDeinitBarriers(ignoreDeinitBarriers),
         remainingDestroyAddrs(remainingDestroyAddrs), deleter(deleter),
-        destroyMergeBlocks(getFunction()) {}
+        calleeAnalysis(calleeAnalysis), destroyMergeBlocks(getFunction()) {}
 
   bool perform();
 
@@ -463,7 +471,8 @@ bool HoistDestroys::perform() {
   if (!knownUses.findUses())
     return false;
 
-  DeinitBarriers deinitBarriers(ignoreDeinitBarriers, knownUses, getFunction());
+  DeinitBarriers deinitBarriers(ignoreDeinitBarriers, knownUses, getFunction(),
+                                calleeAnalysis);
   deinitBarriers.compute();
 
   // No SIL changes happen before rewriting.
@@ -827,7 +836,8 @@ void HoistDestroys::mergeDestroys(SILBasicBlock *mergeBlock) {
 
 bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
                    SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
-                   InstructionDeleter &deleter) {
+                   InstructionDeleter &deleter,
+                   BasicCalleeAnalysis *calleeAnalysis) {
   LLVM_DEBUG(llvm::dbgs() << "Performing destroy hoisting on " << root);
 
   SILFunction *function = root->getFunction();
@@ -844,7 +854,7 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
   ignoreDeinitBarriers = ignoreDeinitBarriers || !enableLexicalLifetimes;
 
   return HoistDestroys(root, ignoreDeinitBarriers, remainingDestroyAddrs,
-                       deleter)
+                       deleter, calleeAnalysis)
       .perform();
 }
 
@@ -953,17 +963,20 @@ void SSADestroyHoisting::run() {
     ++splitDestroys;
   }
 
+  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
+
   // We assume that the function is in reverse post order so visiting the
   // blocks and pushing begin_access as we see them and then popping them off
   // the end will result in hoisting inner begin_access' destroy_addrs first.
   for (auto *bai : llvm::reverse(bais)) {
     changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
-                             remainingDestroyAddrs, deleter);
+                             remainingDestroyAddrs, deleter, calleeAnalysis);
   }
   // Alloc stacks always enclose their accesses.
   for (auto *asi : asis) {
-    changed |= hoistDestroys(asi, /*ignoreDeinitBarriers=*/!asi->isLexical(),
-                             remainingDestroyAddrs, deleter);
+    changed |= hoistDestroys(asi,
+                             /*ignoreDeinitBarriers=*/!asi->isLexical(),
+                             remainingDestroyAddrs, deleter, calleeAnalysis);
   }
   // Arguments enclose everything.
   for (auto *uncastArg : getFunction()->getArguments()) {
@@ -981,7 +994,7 @@ void SSADestroyHoisting::run() {
       auto lifetime = arg->getLifetime();
       bool ignoreDeinitBarriers = ignoredByConvention || lifetime.isEagerMove();
       changed |= hoistDestroys(arg, ignoreDeinitBarriers, remainingDestroyAddrs,
-                               deleter);
+                               deleter, calleeAnalysis);
     }
   }
 

@@ -79,6 +79,10 @@ public func inlineWithEffects(_ x: X) -> Int {
   return internalCallee(x)
 }
 
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @loadWeakX_from : {{.*}} {
+// CHECK-LE-MODULE:       {{^[^[]}}
+// CHECK-LE-MODULE-LABEL: } // end sil function 'loadWeakX_from'
+
 // CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: ]
@@ -89,6 +93,21 @@ public func inlineWithEffects(_ x: X) -> Int {
 @inline(never)
 public func simpleInline(_ x: X) -> Int {
   return x.i
+}
+
+public struct S {
+  public init(_ x: X) { self.x = x }
+  public weak var x: X?
+}
+
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @loadWeakX_from : {{.*}} {
+// CHECK-FR-MODULE:       [global: deinit_barrier]
+// CHECK-FR-MODULE-LABEL: } // end sil function 'loadWeakX_from'
+@inlinable
+@inline(never)
+@_silgen_name("loadWeakX_from")
+public func loadWeakX(from s: S) -> X? {
+  return s.x
 }
 
 #else
@@ -175,6 +194,27 @@ public func callit5() -> Int {
 // CHECK-FR-MAIN-NEXT:  {{^[^[]}}
 // CHECK-LE-MAIN-LABEL: sil public_external [noinline] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MAIN-NEXT:  {{^[^[]}}
+
+// CHECK-MAIN-LABEL: sil [noinline] @callit6 : {{.*}} {
+// CHECK-MAIN:         [[GET_X:%[^,]+]] = function_ref @$s6Module1XCACycfc
+// CHECK-MAIN:         [[X:%[^,]+]] = apply [[GET_X]]({{%[^,]+}})
+// CHECK-MAIN:         [[LOAD_WEAK_X_FROM:%[^,]+]] = function_ref @loadWeakX_from
+// CHECK-MAIN:         apply [[LOAD_WEAK_X_FROM]]({{%[^,]+}})
+// CHECK-MAIN:         strong_release [[X]]
+// CHECK-MAIN-LABEL: } // end sil function 'callit6'
+@_silgen_name("callit6")
+@inline(never)
+public func callit6() -> X? {
+  let x = X()
+  let s = S(x)
+  let out = loadWeakX(from: s)
+  return out
+}
+
+// CHECK-MAIN-LABEL: sil public_external [noinline] @loadWeakX_from : {{.*}} {
+// CHECK-FR-MAIN:       [global: deinit_barrier]
+// CHECK-LE-MAIN:       {{^[^[]}}
+// CHECK-MAIN-LABEL: } // end sil function 'loadWeakX_from'
 
 // CHECK-FR-MAIN-LABEL: sil @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]

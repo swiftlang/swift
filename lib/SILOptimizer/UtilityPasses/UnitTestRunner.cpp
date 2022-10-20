@@ -72,9 +72,11 @@
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ParseTestSpecification.h"
 #include "llvm/ADT/StringRef.h"
@@ -255,6 +257,23 @@ struct FunctionGetSelfArgumentIndex : UnitTest {
   }
 };
 
+// Arguments:
+// - instruction
+// Dumps:
+// - instruction
+// - whether it's a deinit barrier
+struct IsDeinitBarrierTest : UnitTest {
+  IsDeinitBarrierTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *instruction = arguments.takeInstruction();
+    auto *analysis = getAnalysis<BasicCalleeAnalysis>();
+    auto isBarrier = isDeinitBarrier(instruction, analysis);
+    instruction->dump();
+    auto *boolString = isBarrier ? "true" : "false";
+    llvm::errs() << boolString << "\n";
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line.
 
 class UnitTestRunner : public SILFunctionTransform {
@@ -295,6 +314,7 @@ class UnitTestRunner : public SILFunctionTransform {
     ADD_UNIT_TEST_SUBCLASS(
         "pruned-liveness-boundary-with-list-of-last-users-insertion-points",
         PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
+    ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
 #undef ADD_UNIT_TEST_SUBCLASS

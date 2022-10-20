@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift
@@ -50,6 +52,11 @@ sil [ossa] @synchronization_point : $@convention(thin) () -> ()
 sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
 sil [ossa] @barrier : $@convention(thin) () -> ()
 sil [ossa] @failable : $@convention(thin) () -> @error Error
+// This function is not a synchronization point.
+sil [ossa] @empty : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
 
 
 // =============================================================================
@@ -1092,6 +1099,27 @@ bb0(%0 : $*ClassWrapper):
   store %11 to [init] %0 : $*ClassWrapper
   %23 = tuple ()
   return %23 : $()
+}
+
+// Hoist over applies of non-barrier fns.
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {
+// CHECK:         apply
+// CHECK:         end_borrow
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_of_non_barrier_fn'
+sil [ossa] @hoist_over_apply_of_non_barrier_fn : $@convention(thin) () -> () {
+entry:
+  %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
+  %c = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
+  %borrow = begin_borrow [lexical] %c : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  apply %callee_guaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  end_borrow %borrow : $C
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // =============================================================================

@@ -129,7 +129,7 @@ bb0(%0 : $X, %1 : $*Int32):
 // CHECK-NEXT:  [%0: read v**]
 // CHECK-NEXT:  [%1: write v**]
 // CHECK-NEXT:  [%2: write c0.v**, destroy c*.v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @partial_apply_load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
 bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
@@ -220,7 +220,7 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: sil @call_unknown
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_unknown : $@convention(thin) () -> () {
 bb0:
@@ -233,7 +233,7 @@ bb0:
 
 // CHECK-LABEL: sil @call_unknown_func_with_trivial_args
 // CHECK-NEXT:  [%0: read v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> () {
 bb0(%0 : $*Int32, %1 : $Int32):
@@ -293,7 +293,7 @@ bb0(%0 : $Builtin.NativeObject):
 sil @checkedaddr : $@convention(thin) (Builtin.NativeObject, X) -> () {
 // CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
 // CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 bb0(%0 : $Builtin.NativeObject, %1 : $X):
   unconditional_checked_cast_addr Builtin.NativeObject in %0 : $Builtin.NativeObject to X in %1 : $X
@@ -450,7 +450,7 @@ bb0(%0 : $*X, %1 : @owned $X):
 // CHECK-LABEL: sil [ossa] @unknown_destructor_effects
 // CHECK-NEXT:  [%0: write v**, destroy v**]
 // CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @unknown_destructor_effects : $@convention(thin) (@inout Y, @owned Y) -> () {
 bb0(%0 : $*Y, %1 : @owned $Y):
@@ -496,7 +496,7 @@ bb0(%0 : $*X, %1 : $*X):
 
 // CHECK-LABEL: sil [ossa] @destroy_value_effects1
 // CHECK-NEXT:  [%0: destroy v**.c*.v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @destroy_value_effects1 : $@convention(thin) (@owned SP) -> () {
 bb0(%0 : @owned $SP):
@@ -628,7 +628,7 @@ bb0(%0 : $*X):
 
 // CHECK-LABEL: sil [ossa] @pass_arg_to_unknown_function
 // CHECK-NEXT:  [%0: read s1.v**, write s1.v**, copy s1.v**, destroy s1.v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @pass_arg_to_unknown_function : $@convention(thin) (@inout TwoSPs) -> () {
 bb0(%0 : $*TwoSPs):
@@ -641,7 +641,7 @@ bb0(%0 : $*TwoSPs):
 
 // CHECK-LABEL: sil [ossa] @copy_addr_and_consume_by_unknown_func
 // CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @copy_addr_and_consume_by_unknown_func : $@convention(thin) (@in X) -> () {
 bb0(%0 : $*X):
@@ -672,7 +672,7 @@ bb2:
 }
 
 // CHECK-LABEL: sil @call_readnone
-// CHECK-NEXT:  [global: copy]
+// CHECK-NEXT:  [global: copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_readnone : $@convention(thin) () -> () {
 bb0:
@@ -683,7 +683,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @call_releasenone
-// CHECK-NEXT:  [global: read,write,copy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_releasenone : $@convention(thin) () -> () {
 bb0:
@@ -696,7 +696,7 @@ bb0:
 
 // CHECK-LABEL: sil @call_readonly_owned
 // CHECK-NEXT:  [%0: read c*.v**, copy c*.v**]
-// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_readonly_owned : $@convention(thin) (@owned X) -> () {
 bb0(%0 : $X):
@@ -708,7 +708,7 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: sil [ossa] @call_readnone_owned
 // CHECK-NEXT:  [%0: copy c*.v**]
-// CHECK-NEXT:  [global: copy]
+// CHECK-NEXT:  [global: copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @call_readnone_owned : $@convention(thin) (@owned X) -> @owned X {
 bb0(%0 : @owned $X):
@@ -719,7 +719,7 @@ bb0(%0 : @owned $X):
 
 // CHECK-LABEL: sil @call_readonly_guaranteed
 // CHECK-NEXT:  [%0: read c*.v**, copy c*.v**]
-// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_readonly_guaranteed : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 : $X):
@@ -733,7 +733,7 @@ bb0(%0 : $X):
 // CHECK-NEXT:  [%0: write v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [%2: read v**, copy v**]
-// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_readonly_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X {
 bb0(%0 : $*X, %1 : $*X, %2 : $*X):
@@ -747,7 +747,7 @@ bb0(%0 : $*X, %1 : $*X, %2 : $*X):
 // CHECK-NEXT:  [%0: write v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [%2: read v**, copy v**]
-// CHECK-NEXT:  [global: read,copy]
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_readnone_indirect_params : $@convention(thin) (@in_guaranteed X, @inout X) -> @out X {
 bb0(%0 : $*X, %1 : $*X, %2 : $*X):
@@ -759,7 +759,7 @@ bb0(%0 : $*X, %1 : $*X, %2 : $*X):
 
 // CHECK-LABEL: sil @call_unknown_func_with_in_guaranteed_arg
 // CHECK-NEXT:  [%0: read v**, copy v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_unknown_func_with_in_guaranteed_arg : $@convention(thin) (@in_guaranteed X) -> () {
 bb0(%0 : $*X):
@@ -771,7 +771,7 @@ bb0(%0 : $*X):
 
 // CHECK-LABEL: sil @test_escaping_in_argument
 // CHECK-NEXT:  [%0: read v**, copy v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @test_escaping_in_argument : $@convention(thin) (@in_guaranteed X) -> () {
 bb0(%0 : $*X):
@@ -859,7 +859,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @call_public_external_func
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_public_external_func : $@convention(thin) () -> () {
 bb0:
@@ -969,7 +969,7 @@ bb3:
 
 // CHECK-LABEL: sil @storeMaybeLocalPhi
 // CHECK-NEXT:  [%0: read c*.v**, write c*.v**, copy **, destroy c*.v**]
-// CHECK-NEXT:  [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @storeMaybeLocalPhi : $@convention(thin) (@guaranteed List) -> () {
 bb0(%1 : $List):
@@ -1068,4 +1068,14 @@ bb0(%0 : @guaranteed ${ var Int32 }):
   %6 = load [trivial] %5 : $*Int32
   end_access %5 : $*Int32
   return %6 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @callUnknownIsDeinitBarrier : {{.*}} {
+// CHECK-NEXT:  [global: {{.*}}deinit_barrier]
+// CHECK-LABEL: } // end sil function 'callUnknownIsDeinitBarrier'
+sil [ossa] @callUnknownIsDeinitBarrier : $@convention(thin) () -> () {
+  %callee = function_ref @unknown_func : $@convention(thin) () -> ()
+  apply %callee() : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
 }
