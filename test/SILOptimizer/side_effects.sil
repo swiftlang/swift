@@ -1070,6 +1070,7 @@ bb0(%0 : @guaranteed ${ var Int32 }):
   return %6 : $Int32
 }
 
+
 // CHECK-LABEL: sil [ossa] @callUnknownIsDeinitBarrier : {{.*}} {
 // CHECK-NEXT:  [global: {{.*}}deinit_barrier]
 // CHECK-LABEL: } // end sil function 'callUnknownIsDeinitBarrier'
@@ -1079,3 +1080,36 @@ sil [ossa] @callUnknownIsDeinitBarrier : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil @begin_cow_test
+// CHECK-NEXT:  [%0: destroy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @begin_cow_test : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  (%1, %2) = begin_cow_mutation %0 : $X
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @is_unique_test
+// CHECK-NEXT:  [%0: destroy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @is_unique_test : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = is_unique %0 : $*X
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @is_escaping_closure_test
+// CHECK-NEXT:  [%0: destroy v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @is_escaping_closure_test : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
+  return %1 : $Builtin.Int1
+}
+

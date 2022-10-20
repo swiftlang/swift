@@ -41,8 +41,11 @@ typedef struct {
 } BridgedCalleeAnalysis;
 
 typedef bool (* _Nonnull InstructionIsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
+typedef BridgedMemoryBehavior(* _Nonnull CalleeAnalysisGetMemBehvaiorFn)(
+      BridgedPassContext context, BridgedInstruction apply, bool observeRetains);
 
-void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn);
+void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn,
+                             CalleeAnalysisGetMemBehvaiorFn getEffectsFn);
 
 typedef struct {
   void * _Nullable dea;
@@ -77,14 +80,6 @@ typedef struct {
 enum {
   BridgedSlabCapacity = 64 * sizeof(uintptr_t)
 };
-
-typedef struct {
-  void * _Nullable rcia;
-} BridgedRCIdentityAnalysis;
-
-typedef struct {
-  void * _Nonnull functionInfo;
-} BridgedRCIdentityFunctionInfo;
 
 typedef void (* _Nonnull BridgedModulePassRunFn)(BridgedPassContext);
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);

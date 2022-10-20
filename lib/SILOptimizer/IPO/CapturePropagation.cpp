@@ -616,7 +616,7 @@ void CapturePropagation::run() {
     }
   }
   if (HasChanged) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
 

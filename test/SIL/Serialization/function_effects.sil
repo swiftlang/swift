@@ -1,0 +1,41 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name effects
+// RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name effects
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name effects -emit-sorted-sil | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+import Swift
+
+final class X {
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
+}
+
+// CHECK-LABEL: sil @test_global_effects1
+// CHECK-NEXT:    [%0: escape => %r, escape c*.c*.v** => %r.c*.c*.v**, copy v**, destroy v**]
+// CHECK-NEXT:    [%1: noescape **, read c*.v**, write c0.s0]
+// CHECK-NEXT:    [global: read,write,copy,destroy,allocate]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_global_effects1 : $@convention(thin) (@guaranteed X, @guaranteed X) -> () {
+[%0: escape => %r, escape c*.c*.v** => %r.c*.c*.v**, copy v**, destroy v**]
+[%1: noescape **, read c*.v**, write c0.s0]
+[global: read, write, copy, destroy, allocate]
+bb0(%0 : $X, %1 : $X):
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_global_effects2
+// CHECK-NEXT:    [%0: copy v**]
+// CHECK-NEXT:    [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_global_effects2 : $@convention(thin) (@guaranteed X, @guaranteed X) -> () {
+[%0: copy v**]
+bb0(%0 : $X, %1 : $X):
+  %r = tuple ()
+  return %r : $()
+}
+

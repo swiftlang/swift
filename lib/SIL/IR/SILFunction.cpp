@@ -146,6 +146,7 @@ static FunctionWriteFn writeFunction = nullptr;
 static FunctionParseFn parseFunction = nullptr;
 static FunctionCopyEffectsFn copyEffectsFunction = nullptr;
 static FunctionGetEffectInfoFn getEffectInfoFunction = nullptr;
+static FunctionGetMemBehviorFn getMemBehvaiorFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
@@ -932,7 +933,8 @@ void Function_register(SwiftMetatype metatype,
             FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectInfoFn effectInfoFn) {
+            FunctionGetEffectInfoFn effectInfoFn,
+            FunctionGetMemBehviorFn memBehaviorFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -940,6 +942,7 @@ void Function_register(SwiftMetatype metatype,
   parseFunction = parseFn;
   copyEffectsFunction = copyEffectsFn;
   getEffectInfoFunction = effectInfoFn;
+  getMemBehvaiorFunction = memBehaviorFn;
 }
 
 std::pair<const char *, int>  SILFunction::
@@ -1018,6 +1021,14 @@ visitArgEffects(std::function<void(int, int, bool)> c) const {
     }
     idx++;
   }
+}
+
+SILInstruction::MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetains) {
+  if (!getMemBehvaiorFunction)
+    return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+
+  auto b = getMemBehvaiorFunction({this}, observeRetains);
+  return (SILInstruction::MemoryBehavior)b;
 }
 
 SILFunction *SILFunction::getFunction(SILDeclRef ref, SILModule &M) {

@@ -21,6 +21,13 @@ public struct CalleeAnalysis {
       // isDeinitBarrierFn:
       { (inst : BridgedInstruction, bca: BridgedCalleeAnalysis) -> Bool in
         return inst.instruction.isDeinitBarrier(bca.analysis)
+      },
+      // getMemBehaviorFn
+      { (bridgedCtxt: BridgedPassContext, bridgedApply: BridgedInstruction, observeRetains: Bool) -> BridgedMemoryBehavior in
+        let context = PassContext(_bridged: bridgedCtxt)
+        let apply = bridgedApply.instruction as! ApplySite
+        let e = context.calleeAnalysis.getSideEffects(of: apply)
+        return e.getMemBehavior(observeRetains: observeRetains)
       }
     )
   }
@@ -51,6 +58,40 @@ public struct CalleeAnalysis {
       return nil
     }
     return FunctionArray(bridged: bridgedDtors)
+  }
+
+  /// Returns the global (i.e. not argument specific) side effects of an apply.
+  public func getSideEffects(of apply: ApplySite) -> SideEffects.GlobalEffects {
+    guard let callees = getCallees(callee: apply.callee) else {
+      return .worstEffects
+    }
+
+    var result = SideEffects.GlobalEffects()
+    for callee in callees {
+      let calleeEffects = callee.getSideEffects()
+      result.merge(with: calleeEffects)
+    }
+    return result
+  }
+
+  /// Returns the argument specific side effects of an apply.
+  public func getSideEffects(of apply: ApplySite, forArgument argumentIdx: Int, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
+    let calleeArgIdx = apply.calleeArgIndex(callerArgIndex: argumentIdx)
+    let convention = apply.getArgumentConvention(calleeArgIndex: calleeArgIdx)
+    let argument = apply.arguments[argumentIdx].at(path)
+
+    guard let callees = getCallees(callee: apply.callee) else {
+      return .worstEffects.restrictedTo(argument: argument, withConvention: convention)
+    }
+  
+    var result = SideEffects.GlobalEffects()
+    for callee in callees {
+      let calleeEffects = callee.getSideEffects(forArgument: argument,
+                                                atIndex: calleeArgIdx,
+                                                withConvention: convention)
+      result.merge(with: calleeEffects)
+    }
+    return result.restrictedTo(argument: argument, withConvention: convention)
   }
 }
 

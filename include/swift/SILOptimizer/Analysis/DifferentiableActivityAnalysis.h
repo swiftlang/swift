@@ -83,7 +83,7 @@ public:
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) override {
-    return k & InvalidationKind::Everything;
+    return k & InvalidationKind::FunctionBody;
   }
 
   virtual std::unique_ptr<DifferentiableActivityCollection>
