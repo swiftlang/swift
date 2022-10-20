@@ -3,6 +3,7 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64
+// REQUIRES: swift_in_compiler
 
 // This tests the optimality of the IR generated for the new os log APIs. This
 // is not testing the output of a specific optimization pass (which has separate

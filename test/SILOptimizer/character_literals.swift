@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -O -target-cpu core2 -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,CPU=x86_64
+// REQUIRES: swift_in_compiler
 
 // This is an end-to-end test to ensure that the optimizer generates
 // a simple literal for character literals.

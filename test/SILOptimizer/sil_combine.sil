@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
 // required to allow address-type block args in canonical SIL.
