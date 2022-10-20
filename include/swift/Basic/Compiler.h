@@ -186,4 +186,10 @@
 #define SWIFT_IMPORT_REFERENCE
 #endif
 
+#if __has_attribute(enum_extensibility)
+#define ENUM_EXTENSIBILITY_ATTR(arg) __attribute__((enum_extensibility(arg)))
+#else
+#define ENUM_EXTENSIBILITY_ATTR(arg)
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H
