@@ -495,6 +495,22 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  IndexUnitWriter &parentUnitWriter,
                                  const PathRemapper &pathRemapper,
                                  SourceFile *initialFile) {
+  // Reload resilient modules from swiftinterface to avoid indexing
+  // internal details.
+  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient) {
+    module->getASTContext().setIgnoreAdjacentModules(true);
+
+    ImportPath::Module::Builder builder(module->getName());
+    auto reloadedModule = module->getASTContext().getModule(builder.get());
+
+    if (reloadedModule) {
+      module = reloadedModule;
+    } else {
+      // If we can't rebuild from the swiftinterface, don't index this module.
+      return true;
+    }
+  }
+
   StringRef filename = module->getModuleFilename();
   std::string moduleName = module->getNameStr().str();
 
