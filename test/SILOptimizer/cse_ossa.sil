@@ -1318,8 +1318,7 @@ left:
     %old = struct_extract %guaranteed_s_left : $S, #S.c
     %take_guaranteed_c = function_ref @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
     apply %take_guaranteed_c(%new) : $@convention(thin) (@guaranteed C) -> ()
-    %borrow = begin_borrow %old : $C
-    br exit(%borrow : $C, %guaranteed_s_left : $S, %instance : $S)
+    br exit(%old : $C, %guaranteed_s_left : $S, %instance : $S)
 
 right:
     destroy_value %instance : $S
@@ -1327,13 +1326,12 @@ right:
     %owned_s = apply %get_owned_s() : $@convention(thin) () -> (@owned S)
     %guaranteed_s = begin_borrow %owned_s : $S
     %projection = struct_extract %guaranteed_s : $S, #S.c
-    %borrow_right = begin_borrow %projection : $C
-    br exit(%borrow_right : $C, %guaranteed_s : $S, %owned_s : $S)
+    br exit(%projection : $C, %guaranteed_s : $S, %owned_s : $S)
     
-exit(%borrow_2 : @guaranteed $C, %guaranteed_s_2 : @guaranteed $S, %owned_s_2 : @owned $S):
-    %copy = copy_value %borrow_2 : $C
-    end_borrow %borrow_2 : $C
-    end_borrow %guaranteed_s_2 : $S
+exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
+    %copy = copy_value %proj : $C
+    end_borrow %borrow : $S
     destroy_value %owned_s_2 : $S
     return %copy : $C
 }
+

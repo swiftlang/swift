@@ -176,6 +176,9 @@ struct OwnershipModelEliminatorVisitor
 
 #define HANDLE_FORWARDING_INST(Cls)                                            \
   bool visit##Cls##Inst(Cls##Inst *i) {                                        \
+    if (isa<SelectValueInst>(i)) {                                             \
+      return true;                                                             \
+    }                                                                          \
     OwnershipForwardingMixin::get(i)->setForwardingOwnershipKind(              \
         OwnershipKind::None);                                                  \
     return true;                                                               \

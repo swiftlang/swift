@@ -349,17 +349,14 @@ bb3(%res : $Builtin.Int32):
 // CHECK: bb1([[UNWRAP:%.*]] : @guaranteed $AAA):
 // CHECK:   [[ACAST:%.*]] = unchecked_ref_cast [[UNWRAP]] : $AAA to $B
 // CHECK:   [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
-// CHECK:   [[BORROWSOME:%.*]] = begin_borrow [[SOME]] : $Optional<B>
-// CHECK:   br bb3([[BORROWSOME]] : $Optional<B>)
+// CHECK:   br bb3([[SOME]] : $Optional<B>)
 // CHECK: bb2:
 // CHECK:   [[NONE:%.*]] = enum $Optional<B>, #Optional.none!enumelt
-// CHECK:   [[BORROWNONE:%.*]] = begin_borrow [[NONE]] : $Optional<B>
-// CHECK:   br bb3([[BORROWNONE]] : $Optional<B>)
+// CHECK:   br bb3([[NONE]] : $Optional<B>)
 // CHECK: bb3([[REWRAP:%.*]] : @guaranteed $Optional<B>):
 // CHECK:   [[ECAST:%.*]] = upcast [[EXTR1]] : $E to $B
 // CHECK:   [[OUTTUP:%.*]] = tuple ([[REWRAP]] : $Optional<B>, [[ECAST]] : $B)
 // CHECK:   apply %{{.*}}([[OUTTUP]]) : $@convention(thin) (@guaranteed (Optional<B>, B)) -> Int
-// CHECK:   end_borrow [[REWRAP]] : $Optional<B>
 // CHECK:   return
 // CHECK-LABEL: } // end sil function 'replaceTryApplyGuaranteedTuple'
 sil [ossa] @replaceTryApplyGuaranteedTuple : $@convention(thin) (@guaranteed Optional<B>, @guaranteed E) -> Int {

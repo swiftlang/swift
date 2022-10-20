@@ -73,21 +73,47 @@ struct BorrowedValue;
 /// values?
 ///
 /// This may be true even if the current instance of the instruction is not a
-/// ForwardingBorrow. If true, then the operation may be trivially rewritten
+/// GuaranteedForwarding. If true, then the operation may be trivially rewritten
 /// with Guaranteed ownership.
 bool canOpcodeForwardGuaranteedValues(SILValue value);
 
 /// Is the opcode that consumes \p use capable of forwarding guaranteed values?
 ///
-/// This may be true even if \p use is not a ForwardingBorrow. If true, then the
-/// operation may be trivially rewritten with Guaranteed ownership.
+/// This may be true even if \p use is not a GuaranteedForwarding. If true, then
+/// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardGuaranteedValues(Operand *use);
 
 // This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::ForwardingBorrow.
-inline bool isForwardingBorrow(SILValue value) {
+// OperandOwnership::GuaranteedForwarding.
+inline bool isGuaranteedForwarding(SILValue value) {
   assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
   return canOpcodeForwardGuaranteedValues(value);
+}
+
+/// Returns true if it is a forwarding phi
+inline bool isGuaranteedForwardingPhi(SILValue value) {
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+  if (isa<BeginBorrowInst>(value) || isa<LoadBorrowInst>(value)) {
+    return false;
+  }
+  auto *phi = dyn_cast<SILPhiArgument>(value);
+  if (!phi || !phi->isPhi()) {
+    return true;
+  }
+  bool isGuaranteedForwardingPhi = true;
+  phi->visitTransitiveIncomingPhiOperands(
+      [&](auto *phi, auto *operand) -> bool {
+        if (isa<BeginBorrowInst>(operand->get()) ||
+            isa<LoadBorrowInst>(operand->get())) {
+          isGuaranteedForwardingPhi = false;
+          return false;
+        }
+        return true;
+      });
+
+  return isGuaranteedForwardingPhi;
 }
 
 /// Is the opcode that produces \p value capable of forwarding owned values?
@@ -214,6 +240,11 @@ bool findExtendedTransitiveGuaranteedUses(
 /// the value is reborrowed, returns false.
 bool findUsesOfSimpleValue(SILValue value,
                            SmallVectorImpl<Operand *> *usePoints = nullptr);
+
+/// Visit all GuaranteedForwardingPhis of \p value, not looking through
+/// reborrows.
+bool visitGuaranteedForwardingPhisForSSAValue(
+    SILValue value, function_ref<bool(Operand *)> func);
 
 /// An operand that forwards ownership to one or more results.
 class ForwardingOperand {
@@ -447,13 +478,7 @@ struct BorrowingOperand {
   /// set of its operands uses.
   ///
   /// E.x.: end_apply uses.
-  ///
-  /// \p errorFunction a callback that if non-null is passed an operand that
-  /// triggers a mal-formed SIL error. This is just needed for the ownership
-  /// verifier to emit good output.
-  void getImplicitUses(
-      SmallVectorImpl<Operand *> &foundUses,
-      std::function<void(Operand *)> *errorFunction = nullptr) const;
+  void getImplicitUses(SmallVectorImpl<Operand *> &foundUses) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -1249,14 +1274,19 @@ OwnedValueIntroducer getSingleOwnedValueIntroducer(SILValue value);
 
 using BaseValueSet = SmallPtrSet<SILValue, 8>;
 
-/// Starting from \p initialScopeOperand, find all reborrows and their
-/// corresponding base values, and run the visitor function \p
-/// visitReborrowBaseValuePair on them.
-///  Note that a reborrow phi, can have different base values based on different
-/// control flow paths.
-void findTransitiveReborrowBaseValuePairs(
-    BorrowingOperand initialScopeOperand, SILValue origBaseValue,
-    function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
+/// Starting from \p borrowInst, find all reborrows along with their base
+/// values, and run the visitor function \p visitReborrowPhiBaseValuePair on
+/// them.
+void visitExtendedReborrowPhiBaseValuePairs(
+    BeginBorrowInst *borrowInst, function_ref<void(SILPhiArgument *, SILValue)>
+                                     visitReborrowPhiBaseValuePair);
+
+/// Starting from \p borrow, find all GuaranteedForwardingPhi uses along with
+/// their base values, and run the visitor function \p
+/// visitGuaranteedForwardingPhiBaseValuePair on them.
+void visitExtendedGuaranteedForwardingPhiBaseValuePairs(
+    BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
+                              visitGuaranteedForwardingPhiBaseValuePair);
 
 /// Visit the phis in the same block as \p phi which are reborrows of a borrow
 /// of one of the values reaching \p phi.
