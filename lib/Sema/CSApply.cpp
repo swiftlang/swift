@@ -3598,7 +3598,23 @@ namespace {
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
-      return simplifyExprType(expr);
+      Expr *result = expr;
+      auto type = simplifyType(cs.getType(expr));
+
+      // A ParenExpr can end up with a tuple type if it contains
+      // a pack expansion. Rewrite it to a TupleExpr.
+      if (dyn_cast<PackExpansionExpr>(expr->getSubExpr())) {
+        auto &ctx = cs.getASTContext();
+        result = TupleExpr::create(ctx, expr->getLParenLoc(),
+                                   {expr->getSubExpr()},
+                                   /*elementNames=*/{},
+                                   /*elementNameLocs=*/{},
+                                   expr->getRParenLoc(),
+                                   expr->isImplicit());
+      }
+
+      cs.setType(result, type);
+      return result;
     }
 
     Expr *visitUnresolvedMemberChainResultExpr(
@@ -3802,7 +3818,13 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
-      llvm_unreachable("not implemented for PackExpansionExpr");
+      for (unsigned i = 0; i < expr->getNumBindings(); ++i) {
+        auto *binding = expr->getBindings()[i];
+        expr->setBinding(i, visit(binding));
+      }
+
+      simplifyExprType(expr);
+      return expr;
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -3814,7 +3836,6 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type-checked");
       return expr;
     }
 

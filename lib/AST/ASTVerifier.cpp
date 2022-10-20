@@ -820,6 +820,25 @@ public:
       OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
     }
 
+    bool shouldVerify(PackExpansionExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      for (auto *placeholder : expr->getOpaqueValues()) {
+        assert(!OpaqueValues.count(placeholder));
+        OpaqueValues[placeholder] = 0;
+      }
+
+      return true;
+    }
+
+    void cleanup(PackExpansionExpr *expr) {
+      for (auto *placeholder : expr->getOpaqueValues()) {
+        assert(OpaqueValues.count(placeholder));
+        OpaqueValues.erase(placeholder);
+      }
+    }
+
     bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;

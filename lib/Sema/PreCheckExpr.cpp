@@ -414,6 +414,50 @@ static bool exprLooksLikeAType(Expr *expr) {
       getCompositionExpr(expr);
 }
 
+static Expr *getPackExpansion(ASTContext &ctx, Expr *expr, SourceLoc opLoc) {
+  struct PackReferenceFinder : public ASTWalker {
+    ASTContext &ctx;
+    llvm::SmallVector<OpaqueValueExpr *, 2> opaqueValues;
+    llvm::SmallVector<Expr *, 2> bindings;
+
+    PackReferenceFinder(ASTContext &ctx) : ctx(ctx) {}
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (auto *declRef = dyn_cast<DeclRefExpr>(E)) {
+        auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
+        if (!decl)
+          return Action::Continue(E);
+
+        if (auto expansionType = decl->getType()->getAs<PackExpansionType>()) {
+          auto sourceRange = declRef->getSourceRange();
+
+          // FIXME: The OpaqueValueExpr should use the opened element
+          // type of the pattern.
+          auto patternType = expansionType->getPatternType();
+          auto *opaqueValue = new (ctx) OpaqueValueExpr(sourceRange,
+                                                        patternType);
+          opaqueValues.push_back(opaqueValue);
+          bindings.push_back(declRef);
+          return Action::Continue(opaqueValue);
+        }
+      }
+
+      return Action::Continue(E);
+    }
+  } packReferenceFinder(ctx);
+
+  auto *pattern = expr->walk(packReferenceFinder);
+
+  if (!packReferenceFinder.bindings.empty()) {
+    return PackExpansionExpr::create(ctx, pattern,
+                                     packReferenceFinder.opaqueValues,
+                                     packReferenceFinder.bindings,
+                                     opLoc);
+  }
+
+  return nullptr;
+}
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -1304,6 +1348,18 @@ namespace {
           return Action::Stop();
 
         return Action::Continue(result);
+      }
+
+      // Rewrite postfix unary '...' expressions containing pack
+      // references to PackExpansionExpr.
+      if (auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(expr)) {
+        auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn());
+        if (op && op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
+          auto *operand = postfixExpr->getOperand();
+          if (auto *expansion = getPackExpansion(Ctx, operand, op->getLoc())) {
+            return Action::Continue(expansion);
+          }
+        }
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.

@@ -128,6 +128,10 @@ public:
     return is("??");
   }
 
+  bool isExpansionOperator() const {
+    return is("...");
+  }
+
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
   static bool isOperatorStartCodePoint(uint32_t C) {

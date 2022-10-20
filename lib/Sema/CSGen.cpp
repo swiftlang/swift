@@ -1770,6 +1770,13 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
+      // If the ParenExpr contains a pack expansion, generate a tuple
+      // type containing the pack expansion type.
+      if (CS.getType(expr->getSubExpr())->getAs<PackExpansionType>()) {
+        return TupleType::get({CS.getType(expr->getSubExpr())},
+                              CS.getASTContext());
+      }
+
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
@@ -2874,7 +2881,19 @@ namespace {
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
-      llvm_unreachable("not implemented for PackExpansionExpr");
+      for (auto *binding : expr->getBindings()) {
+        auto type = visit(binding);
+        CS.setType(binding, type);
+      }
+
+      auto patternTy = CS.getType(expr->getPatternExpr());
+
+      // FIXME: Use a ShapeOf constraint here.
+      auto *declRef = dyn_cast<DeclRefExpr>(expr->getBindings().front());
+      auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
+      auto shapeType = decl->getType()->getAs<PackExpansionType>()->getCountType();
+
+      return PackExpansionType::get(patternTy, shapeType);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -2887,7 +2906,6 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type checked");
       return expr->getType();
     }
 
