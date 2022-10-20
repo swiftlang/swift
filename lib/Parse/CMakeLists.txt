@@ -54,6 +54,8 @@ if (SWIFT_SWIFT_PARSER)
     $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntaxBuilder>
+    $<TARGET_OBJECTS:SwiftSyntax::_SwiftSyntaxMacros>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftCompilerSupport>
     $<TARGET_OBJECTS:swiftASTGen>
   )
@@ -64,6 +66,8 @@ if (SWIFT_SWIFT_PARSER)
     SwiftSyntax::SwiftDiagnostics
     SwiftSyntax::SwiftSyntax
     SwiftSyntax::SwiftOperators
+    SwiftSyntax::SwiftSyntaxBuilder
+    SwiftSyntax::_SwiftSyntaxMacros
     SwiftSyntax::SwiftCompilerSupport
     swiftASTGen
   )
