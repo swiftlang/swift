@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This roadmap document presents a high level overview of the “reverse” (i.e. using Swift APIs from C++) half of the C++ interoperability Swift language feature. It highlights the key principles and goals that determine how Swift APIs are exposed to C++ users. It also outlines the evolution process for this feature. This document does not present the final design for how Swift APIs get mapped to C++ language constructs. The final design of this feature will evolve as this feature goes through the Swift evolution process.
+This vision document presents a high level overview of the “reverse” (i.e. using Swift APIs from C++) half of the C++ interoperability Swift language feature. It highlights the key principles and goals that determine how Swift APIs are exposed to C++ users. It also outlines the evolution process for this feature. This document does not present the final design for how Swift APIs get mapped to C++ language constructs. The final design of this feature will evolve as this feature goes through the Swift evolution process.
 
 This document does not cover the “forward” (i.e. using C++ APIs from Swift) half of the C++ interoperability feature, as it’s already covered by a sibling document that can be found here: https://github.com/apple/swift/pull/60501 (https://github.com/apple/swift/pull/60501/files).
 
@@ -106,7 +106,7 @@ The generated header is useful in mixed language projects as C++ sources can inc
 
 ## Evolution Process
 
-The approach and the goals for how Swift APIs get bridged to C++ are outlined above. Each distinct Swift language construct that’s bridged to C++ will need to be covered by a detailed evolution proposal. These evolution proposals can refer to this roadmap as a general context document for how Swift APIs should be bridged to C++. Every Swift API pattern that has a distinct mapping in C++ will also need a detailed and self-contained evolution proposal as well. The design for how each district language feature or API pattern is bridged to C++ is ratified only once its respective proposal goes through the Swift evolution process and is accepted by the Swift community.
+The approach and the goals for how Swift APIs get bridged to C++ are outlined above. Each distinct Swift language construct that’s bridged to C++ will need to be covered by a detailed evolution proposal. These evolution proposals can refer to this vision document as a general context document for how Swift APIs should be bridged to C++. Every Swift API pattern that has a distinct mapping in C++ will also need a detailed and self-contained evolution proposal as well. The design for how each district language feature or API pattern is bridged to C++ is ratified only once its respective proposal goes through the Swift evolution process and is accepted by the Swift community.
 
 ## The Swift Ecosystem
 
