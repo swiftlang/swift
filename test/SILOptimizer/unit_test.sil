@@ -89,6 +89,32 @@ bb1:
   return %zero : $()
 }
 
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK: block:
+// CHECK: bb1
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK-LABEL: begin running test 2 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK: instruction:
+// CHECK: tuple
+// CHECK-LABEL: end running test 2 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK-LABEL: begin running test 3 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+// CHECK: function: test_contextual_arg_parsing
+// CHECK-LABEL: end running test 3 of {{[^,]+}} on test_contextual_arg_parsing: test-specification-parsing
+sil [ossa] @test_contextual_arg_parsing : $() -> () {
+entry:
+  br one
+one:
+  test_specification "test-specification-parsing B @block"
+  br two
+two:
+  test_specification "test-specification-parsing I @instruction"
+  %retval = tuple ()
+  br exit
+exit:
+  test_specification "test-specification-parsing F @function"
+  return %retval : $()
+}
+
 class C {}
 
 sil [ossa] @getC : $@convention(thin) () -> @owned C

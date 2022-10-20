@@ -325,7 +325,7 @@ class UnitTestRunner : public SILFunctionTransform {
   }
 
   void run() override {
-    llvm::SmallVector<std::string, 2> testSpecifications;
+    llvm::SmallVector<UnparsedSpecification, 2> testSpecifications;
     getTestSpecifications(getFunction(), testSpecifications);
     Arguments arguments;
     SmallVector<StringRef, 4> components;
