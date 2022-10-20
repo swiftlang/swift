@@ -215,9 +215,21 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       flags |= SCC_FoldSequences;
 
     if (flags) {
+      SourceLoc startLoc =
+          parser.SourceMgr.getLocForBufferStart(parser.L->getBufferID());
+      struct ParserContext {
+        SourceLoc startLoc;
+        DiagnosticEngine *engine;
+      } context{startLoc, &parser.Diags};
       int roundTripResult = swift_parser_consistencyCheck(
           bufferRange.str().data(), bufferRange.getByteLength(),
-          SF->getFilename().str().c_str(), flags);
+          SF->getFilename().str().c_str(), flags, static_cast<void *>(&context),
+          [](ptrdiff_t off, const char *text, void *ctx) {
+            auto *context = static_cast<ParserContext *>(ctx);
+            SourceLoc loc = context->startLoc.getAdvancedLoc(off);
+            context->engine->diagnose(loc, diag::foreign_diagnostic,
+                                      StringRef(text));
+          });
 
       if (roundTripResult)
         ctx.Diags.diagnose(SourceLoc(), diag::new_parser_failure);
