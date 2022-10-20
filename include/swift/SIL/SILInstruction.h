@@ -2789,7 +2789,7 @@ public:
 
   Optional<SILResultInfo> getSingleResult() const {
     auto SubstCallee = getSubstCalleeType();
-    if (SubstCallee->getNumAllResults() != 1)
+    if (SubstCallee->getNumResults() != 1)
       return None;
     return SubstCallee->getSingleResult();
   }

@@ -66,6 +66,14 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
     collectedEffects.addEffectsForEcapingArgument(argument: argument)
   }
 
+  // Don't modify the effects if they didn't change. This avoids sending a change notification
+  // which can trigger unnecessary other invalidations.
+  if let existingEffects = function.effects.sideEffects,
+     existingEffects.arguments == collectedEffects.argumentEffects,
+     existingEffects.global == collectedEffects.globalEffects {
+    return
+  }
+
   // Finally replace the function's side effects.
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
     effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
@@ -160,6 +168,11 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
+    case is BeginCOWMutationInst, is IsUniqueInst, is IsEscapingClosureInst:
+      // Model reference count reading as "destroy" for now. Although we could intoduce a "read-refcount"
+      // effect, it would not give any significant benefit in any of our current optimizations.
+      addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+
     default:
       if inst.mayRelease {
         globalEffects = .worstEffects
@@ -195,7 +208,8 @@ private struct CollectedEffects {
 
     if escapeWalker.hasUnknownUses(argument: argument) {
       // Worst case: we don't know anything about how the argument escapes.
-      addEffects(globalEffects.restrictedTo(argument: argument, withConvention: argument.convention), to: argument)
+      addEffects(globalEffects.restrictedTo(argument: argument.at(SmallProjectionPath(.anything)),
+                                            withConvention: argument.convention), to: argument)
 
     } else if escapeWalker.foundTakingLoad {
       // In most cases we can just ignore loads. But if the load is actually "taking" the
@@ -203,7 +217,8 @@ private struct CollectedEffects {
       // know what's happening with the loaded value. If there is any destroying instruction in the
       // function, it might be the destroy of the loaded value.
       let effects = SideEffects.GlobalEffects(ownership: globalEffects.ownership)
-      addEffects(effects.restrictedTo(argument: argument, withConvention: argument.convention), to: argument)
+      addEffects(effects.restrictedTo(argument: argument.at(SmallProjectionPath(.anything)),
+                                      withConvention: argument.convention), to: argument)
 
     } else if escapeWalker.foundConsumingPartialApply && globalEffects.ownership.destroy {
       // Similar situation with apply instructions which consume the callee closure.
@@ -228,7 +243,7 @@ private struct CollectedEffects {
       } else {
         // The callee doesn't have any computed effects. At least we can do better
         // if it has any defined effect attribute (like e.g. `[readnone]`).
-        globalEffects.merge(with: callee.definedSideEffects)
+        globalEffects.merge(with: callee.definedGlobalEffects)
       }
     }
 
@@ -244,15 +259,12 @@ private struct CollectedEffects {
           if let calleePath = calleeEffect.copy    { addEffects(.copy,    to: argument, fromInitialPath: calleePath) }
           if let calleePath = calleeEffect.destroy { addEffects(.destroy, to: argument, fromInitialPath: calleePath) }
         } else {
-          var calleeEffects = callee.definedSideEffects
-
           let convention = callee.getArgumentConvention(for: calleeArgIdx)
-          if convention.isIndirectIn {
-            calleeEffects.memory.read = true
-          } else if convention == .indirectOut {
-            calleeEffects.memory.write = true
-          }
-          addEffects(calleeEffects.restrictedTo(argument: argument, withConvention: convention), to: argument)
+          let wholeArgument = argument.at(SmallProjectionPath(.anything))
+          let calleeEffects = callee.getSideEffects(forArgument: wholeArgument,
+                                                    atIndex: calleeArgIdx,
+                                                    withConvention: convention)
+          addEffects(calleeEffects.restrictedTo(argument: wholeArgument, withConvention: convention), to: argument)
         }
       }
     }
@@ -266,7 +278,7 @@ private struct CollectedEffects {
     // deallocates an object.
     if let destructors = calleeAnalysis.getDestructors(of: addressOrValue.type) {
       for destructor in destructors {
-        globalEffects.merge(with: destructor.effects.accumulatedSideEffects)
+        globalEffects.merge(with: destructor.getSideEffects())
       }
     } else {
       globalEffects = .worstEffects
@@ -368,7 +380,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
   mutating func hasUnknownUses(argument: FunctionArgument) -> Bool {
     if argument.type.isAddress {
       return walkDownUses(ofAddress: argument, path: UnusedWalkingPath()) == .abortWalk
-    } else if argument.type.isTrivial(in: argument.function) {
+    } else if argument.hasTrivialType {
       return false
     } else {
       return walkDownUses(ofValue: argument, path: UnusedWalkingPath()) == .abortWalk
@@ -407,14 +419,14 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     switch inst {
     case let copy as CopyAddrInst:
       if address == copy.sourceOperand &&
-          !address.value.type.isTrivial(in: inst.function) &&
+          !address.value.hasTrivialType &&
           (!function.hasOwnership || copy.isTakeOfSrc) {
         foundTakingLoad = true
       }
       return .continueWalk
  
     case let load as LoadInst:
-      if !address.value.type.isTrivial(in: function) &&
+      if !address.value.hasTrivialType &&
           // In non-ossa SIL we don't know if a load is taking.
           (!function.hasOwnership || load.ownership == .take) {
         foundTakingLoad = true
@@ -422,7 +434,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     case is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
-      if !function.hasOwnership && !address.value.type.isTrivial(in: function) {
+      if !function.hasOwnership && !address.value.hasTrivialType {
         foundTakingLoad = true
       }
       return .continueWalk

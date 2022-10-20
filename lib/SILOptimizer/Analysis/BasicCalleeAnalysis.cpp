@@ -367,10 +367,24 @@ BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
 }
 
 static InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFunction;
+static CalleeAnalysisGetMemBehvaiorFn getMemBehvaiorFunction = nullptr;
 
 void CalleeAnalysis_register(
-    InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFn) {
+    InstructionIsDeinitBarrierFn instructionIsDeinitBarrierFn,
+    CalleeAnalysisGetMemBehvaiorFn getMemBehvaiorFn) {
   instructionIsDeinitBarrierFunction = instructionIsDeinitBarrierFn;
+  getMemBehvaiorFunction = getMemBehvaiorFn;
+}
+
+SILInstruction::MemoryBehavior BasicCalleeAnalysis::
+getMemoryBehavior(ApplySite as, bool observeRetains) {
+  if (getMemBehvaiorFunction) {
+    auto b = getMemBehvaiorFunction({pm->getSwiftPassInvocation()},
+                                    {as.getInstruction()->asSILNode()},
+                                    observeRetains);
+    return (SILInstruction::MemoryBehavior)b;
+  }
+  return SILInstruction::MemoryBehavior::MayHaveSideEffects;
 }
 
 /// Implementation of mayBeDeinitBarrierNotConsideringSideEffects for use only

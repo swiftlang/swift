@@ -28,15 +28,14 @@ import SIL
 let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
   (function: Function, context: PassContext) in
 
-  var newEffects = Stack<EscapeEffects.ArgumentEffect>(context)
-  defer { newEffects.deinitialize() }
+  var newEffects = function.effects.escapeEffects.arguments.filter {!$0.isDerived }
 
   let returnInst = function.returnInstruction
   let argsWithDefinedEffects = getArgIndicesWithDefinedEscapingEffects(of: function)
 
   for arg in function.arguments {
     // We are not interested in arguments with trivial types.
-    if !arg.type.isNonTrivialOrContainsRawPointer(in: function) { continue }
+    if arg.hasTrivialNonPointerType { continue }
     
     // Also, we don't want to override defined effects.
     if argsWithDefinedEffects.contains(arg.index) { continue }
@@ -52,7 +51,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
                                                     context) {
       let effect = EscapeEffects.ArgumentEffect(.notEscaping, argumentIndex: arg.index,
                                                 pathPattern: SmallProjectionPath(.anything))
-      newEffects.push(effect)
+      newEffects.append(effect)
       continue
     }
   
@@ -65,9 +64,14 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
     }
   }
 
+  // Don't modify the effects if they didn't change. This avoids sending a change notification
+  // which can trigger unnecessary other invalidations.
+  if newEffects == function.effects.escapeEffects.arguments {
+    return
+  }
+
   context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.escapeEffects.arguments = effects.escapeEffects.arguments.filter { !$0.isDerived }
-    effects.escapeEffects.arguments.append(contentsOf: newEffects)
+    effects.escapeEffects.arguments = newEffects
   }
 })
 
@@ -75,7 +79,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects", {
 /// Returns true if an argument effect was added.
 private
 func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
-                   to newEffects: inout Stack<EscapeEffects.ArgumentEffect>,
+                   to newEffects: inout [EscapeEffects.ArgumentEffect],
                    _ returnInst: ReturnInst?, _ context: PassContext) -> Bool {
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
@@ -159,7 +163,7 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
     effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
                                           argumentIndex: arg.index, pathPattern: argPath)
   }
-  newEffects.push(effect)
+  newEffects.append(effect)
   return true
 }
 

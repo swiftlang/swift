@@ -1305,3 +1305,17 @@ bb0:
   return %11 : $()
 }
 
+// CHECK-LABEL: Escape information for test_debug_value:
+// CHECK:  -    :   %0 = alloc_ref $Y
+// CHECK:  -    :   %1 = alloc_ref $Z
+// CHECK: End function test_debug_value
+sil @test_debug_value : $@convention(thin) () -> () {
+  %0 = alloc_ref $Y
+  %1 = alloc_ref $Z
+  %2 = ref_element_addr %1 : $Z, #Z.y
+  store %0 to %2 : $*Y
+  debug_value %0 : $Y
+  debug_value %2 : $*Y
+  %11 = tuple ()
+  return %11 : $()
+}

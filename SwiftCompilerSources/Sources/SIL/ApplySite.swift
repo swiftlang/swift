@@ -133,4 +133,11 @@ extension FullApplySite {
     }
     return nil
   }
+
+  /// The number of indirect out arguments.
+  ///
+  /// 0 if the callee has a direct or no return value and 1, if it has an indirect return value.
+  public var numIndirectResultArguments: Int {
+    return FullApplySite_numIndirectResultArguments(bridged)
+  }
 }

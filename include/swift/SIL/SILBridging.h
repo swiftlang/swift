@@ -34,7 +34,7 @@ enum ChangeNotificationKind {
   instructionsChanged,
   callsChanged,
   branchesChanged,
-  functionDataChanged
+  effectsChanged
 };
 
 typedef struct {
@@ -244,12 +244,14 @@ typedef BridgedParsingError (*_Nonnull FunctionParseFn)(BridgedFunction,
 typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
                                                     BridgedFunction);
 typedef BridgedEffectInfo (* _Nonnull FunctionGetEffectInfoFn)(BridgedFunction, SwiftInt);
+typedef BridgedMemoryBehavior (* _Nonnull FunctionGetMemBehviorFn)(BridgedFunction, bool);
 
 void Function_register(SwiftMetatype metatype,
             FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
             FunctionWriteFn writeFn, FunctionParseFn parseFn,
             FunctionCopyEffectsFn copyEffectsFn,
-            FunctionGetEffectInfoFn effectInfoFn);
+            FunctionGetEffectInfoFn effectInfoFn,
+            FunctionGetMemBehviorFn memBehaviorFn);
 
 SwiftInt PassContext_continueWithNextSubpassRun(BridgedPassContext passContext,
                                                 OptionalBridgedInstruction inst);
@@ -428,6 +430,7 @@ swift::SubstitutionMap ApplySite_getSubstitutionMap(BridgedInstruction inst);
 BridgedArgumentConvention
 ApplySite_getArgumentConvention(BridgedInstruction inst, SwiftInt calleeArgIdx);
 SwiftInt ApplySite_getNumArguments(BridgedInstruction inst);
+SwiftInt FullApplySite_numIndirectResultArguments(BridgedInstruction inst);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedBuilder builder, llvm::StringRef name,

@@ -893,7 +893,7 @@ void EagerSpecializerTransform::run() {
   // Invalidate everything since we delete calls as well as add new
   // calls and branches.
   if (Changed) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
   // As specializations are created, the non-exported attributes should be
