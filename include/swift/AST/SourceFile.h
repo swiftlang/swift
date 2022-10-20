@@ -316,6 +316,10 @@ public:
   /// this source file.
   llvm::SmallVector<Located<StringRef>, 0> VirtualFilePaths;
 
+  /// The \c ExportedSourceFile instance produced by ASTGen, which includes
+  /// the SourceFileSyntax node corresponding to this source file.
+  void *exportedSourceFile = nullptr;
+
   /// Returns information about the file paths used for diagnostics and magic
   /// identifiers in this source file, including virtual filenames introduced by
   /// \c #sourceLocation(file:) declarations.

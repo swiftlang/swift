@@ -17,7 +17,8 @@ extension UnsafePointer {
   }
 }
 
-/// Little utility wrapper that lets us
+/// Little utility wrapper that lets us have some mutable state within
+/// immutable structs, and is therefore pretty evil.
 @propertyWrapper
 class Boxed<Value> {
   var wrappedValue: Value
@@ -29,7 +30,7 @@ class Boxed<Value> {
 
 struct ASTGenVisitor: SyntaxTransformVisitor {
   let ctx: UnsafeMutableRawPointer
-  let base: UnsafePointer<CChar>
+  let base: UnsafePointer<UInt8>
 
   @Boxed var declContext: UnsafeMutableRawPointer
 
@@ -68,15 +69,65 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
   }
 }
 
-@_cdecl("parseTopLevelSwift")
-public func parseTopLevelSwift(
-    buffer: UnsafePointer<CChar>, dc: UnsafeMutableRawPointer,
-    ctx: UnsafeMutableRawPointer,
-    outputContext: UnsafeMutableRawPointer,
-    callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
+/// Describes a source file that has been "exported" to the C++ part of the
+/// compiler, with enough information to interface with the C++ layer.
+struct ExportedSourceFile {
+  /// The underlying buffer within the C++ SourceManager, which is used
+  /// for computations of source locations.
+  let buffer: UnsafeBufferPointer<UInt8>
+
+  /// The name of the enclosing module.
+  let moduleName: String
+
+  /// The name of the source file being parsed.
+  let fileName: String
+
+  /// The syntax tree for the complete source file.
+  let syntax: SourceFileSyntax
+}
+
+/// Parses the given source file and produces a pointer to a new
+/// ExportedSourceFile instance.
+@_cdecl("swift_ASTGen_parseSourceFile")
+public func parseSourceFile(
+  buffer: UnsafePointer<UInt8>, bufferLength: Int,
+  moduleName: UnsafePointer<UInt8>, filename: UnsafePointer<UInt8>
+) -> UnsafeRawPointer {
+  let buffer = UnsafeBufferPointer(start: buffer, count: bufferLength)
+  let sourceFile = Parser.parse(source: buffer)
+
+  let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
+  exportedPtr.initialize(to: .init(
+    buffer: buffer, moduleName: String(cString: moduleName),
+    fileName: String(cString: filename), syntax: sourceFile)
+  )
+
+  return UnsafeRawPointer(exportedPtr)
+}
+
+/// Deallocate a parsed source file.
+@_cdecl("swift_ASTGen_destroySourceFile")
+public func destroySourceFile(
+  sourceFilePtr: UnsafeMutableRawPointer
 ) {
-  let syntax = try! Parser.parse(source: String(cString: buffer))
-  ASTGenVisitor(ctx: ctx, base: buffer, declContext: dc)
-    .visit(syntax)
-    .forEach { callback($0, outputContext) }
+  sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
+    sourceFile.deinitialize(count: 1)
+    sourceFile.deallocate()
+  }
+}
+
+/// Generate AST nodes for all top-level entities in the given source file.
+@_cdecl("swift_ASTGen_buildTopLevelASTNodes")
+public func buildTopLevelASTNodes(
+  sourceFilePtr: UnsafeRawPointer,
+  dc: UnsafeMutableRawPointer,
+  ctx: UnsafeMutableRawPointer,
+  outputContext: UnsafeMutableRawPointer,
+  callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
+) {
+  sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
+    ASTGenVisitor(ctx: ctx, base: sourceFile.pointee.buffer.baseAddress!, declContext: dc)
+      .visit(sourceFile.pointee.syntax)
+      .forEach { callback($0, outputContext) }
+  }
 }
