@@ -608,9 +608,28 @@ cmake ^
 cmake --build %BuildRoot%\15 || (exit /b)
 cmake --build %BuildRoot%\15 --target install || (exit /b)
 
-:: Build SourceKit-LSP
+:: Build swift-syntax
 cmake ^
   -B %BuildRoot%\16 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-syntax || (exit /b)
+cmake --build %BuildRoot%\16 || (exit /b)
+cmake --build %BuildRoot%\16 --target install || (exit /b)
+
+:: Build SourceKit-LSP
+cmake ^
+  -B %BuildRoot%\17 ^
 
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
@@ -635,11 +654,12 @@ cmake ^
   -D SwiftPM_DIR=%BuildRoot%\14\cmake\modules ^
   -D IndexStoreDB_DIR=%BuildRoot%\15\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
+  -D SwiftSyntax_DIR=%BuildRoot%\16\cmake\modules ^
 
   -G Ninja ^
   -S %SourceRoot%\sourcekit-lsp || (exit /b)
-cmake --build %BuildRoot%\16 || (exit /b)
-cmake --build %BuildRoot%\16 --target install || (exit /b)
+cmake --build %BuildRoot%\17 || (exit /b)
+cmake --build %BuildRoot%\17 --target install || (exit /b)
 
 :: Create Configuration Files
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > %SDKInstallRoot%\SDKSettings.plist
