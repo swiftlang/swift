@@ -1264,6 +1264,9 @@ static llvm::AttributeList
 fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
                                         llvm::AttributeList attrList) {
   auto &context = fnType->getContext();
+  if (!context.supportsTypedPointers())
+    return attrList;
+
   for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
     auto paramTy = fnType->getParamType(i);
     auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
