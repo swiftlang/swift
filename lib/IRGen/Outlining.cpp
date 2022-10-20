@@ -210,6 +210,12 @@ static bool canUseValueWitnessForValueOp(IRGenModule &IGM, SILType T) {
   if (!IGM.getSILModule().isTypeMetadataForLayoutAccessible(T))
     return false;
 
+  // It is not a good code size trade-off to instantiate a metatype for
+  // existentials, and also does not back-deploy gracefully in the case of
+  // constrained protocols.
+  if (T.getASTType()->isExistentialType())
+    return false;
+
   if (needsSpecialOwnershipHandling(T))
     return false;
   if (T.getASTType()->hasDynamicSelfType())

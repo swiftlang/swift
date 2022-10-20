@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -disable-objc-interop -O | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: CPU=x86_64
 
@@ -99,3 +100,39 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   return undef : $()
 }
+
+protocol Constrained<T> {
+  associatedtype T
+}
+
+sil @keep_alive : $@convention(thin)(@inout any Constrained<Int>) -> ()
+sil @constrained_protocol : $@convention(thin) (@inout any Constrained<Int>) -> () {
+entry(%arg : $*any Constrained<Int>):
+
+  %dst = alloc_stack $any Constrained<Int>
+
+  copy_addr %arg to [initialization] %dst : $*any Constrained<Int>
+
+  %fn = function_ref @keep_alive : $@convention(thin)(@inout any Constrained<Int>) -> ()
+  apply %fn(%dst) : $@convention(thin)(@inout any Constrained<Int>) -> ()
+
+  destroy_addr %dst : $*any Constrained<Int>
+
+  dealloc_stack  %dst : $*any Constrained<Int>
+  %t = tuple ()
+  return %t : $()
+}
+
+// Make sure we don't instantiate metadata for constrained existentials. Metadata
+// instatiation is not supported on older runtimes.
+
+// OPT: define{{.*}} void @constrained_protocol(
+// OPT: call {{.*}} @"$s12existentials11Constrained_pSi1TAaBPRts_XPWOc"
+
+// OPT: define{{.*}} @"$s12existentials11Constrained_pSi1TAaBPRts_XPWOc"
+// OPT-NOT: call {{.*}} instantiate
+// OPT-NOT: ret
+// OPT: load
+// OPT: store
+// OPT:  call
+// OPT: ret
