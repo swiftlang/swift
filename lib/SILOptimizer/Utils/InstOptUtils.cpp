@@ -640,22 +640,6 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     auto *noneBB = builder->getFunction().createBasicBlockAfter(someBB);
 
     auto *phi = contBB->createPhiArgument(destTy, value->getOwnershipKind());
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      auto createEndBorrow = [&](SILBasicBlock::iterator insertPt) {
-        builder->setInsertionPoint(insertPt);
-        builder->createEndBorrow(loc, phi);
-      };
-      for (SILInstruction *user : usePoints) {
-        if (isa<TermInst>(user)) {
-          assert(!isa<BranchInst>(user) && "no branch as guaranteed use point");
-          for (auto *succBB : user->getParent()->getSuccessorBlocks()) {
-            createEndBorrow(succBB->begin());
-          }
-          continue;
-        }
-        createEndBorrow(std::next(user->getIterator()));
-      }
-    }
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
     caseBBs.push_back(std::make_pair(someDecl, someBB));
@@ -681,17 +665,11 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     // rewrapped Optional.
     SILValue someValue =
         builder->createOptionalSome(loc, castedUnwrappedValue, destTy);
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-       someValue = builder->createBeginBorrow(loc, someValue);
-    }
     builder->createBranch(loc, contBB, {someValue});
 
     // Handle the None case.
     builder->setInsertionPoint(noneBB);
     SILValue noneValue = builder->createOptionalNone(loc, destTy);
-    if (phi->getOwnershipKind() == OwnershipKind::Guaranteed) {
-       noneValue = builder->createBeginBorrow(loc, noneValue);
-    }
     builder->createBranch(loc, contBB, {noneValue});
     builder->setInsertionPoint(contBB->begin());
 

@@ -275,7 +275,8 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 //===----------------------------------------------------------------------===//
 
 template <typename LivenessWithDefs>
-SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+SimpleLiveRangeSummary
+PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
   SimpleLiveRangeSummary summary;
   // Note: Uses with OperandOwnership::NonUse cannot be considered normal uses
   // for liveness. Otherwise, liveness would need to separately track non-uses
@@ -297,7 +298,7 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
     case OperandOwnership::InteriorPointer:
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
-    case OperandOwnership::ForwardingBorrow: {
+    case OperandOwnership::GuaranteedForwarding: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() != OwnershipKind::None) {
@@ -315,6 +316,10 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
         });
       }
       updateForUse(use->getUser(), /*lifetimeEnding*/false);
+      break;
+    }
+    case OperandOwnership::GuaranteedForwardingPhi: {
+      updateForDef(PhiOperand(use).getValue());
       break;
     }
     default:

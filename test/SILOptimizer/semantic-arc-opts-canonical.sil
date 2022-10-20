@@ -455,8 +455,7 @@ bb3:
 //
 // CHECK: bb1([[CAST:%.*]] : @guaranteed $Klass):
 // CHECK:   [[SOME:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[CAST]] : $Klass
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[SOME]] : $FakeOptional<Klass>
-// CHECK:   br bb3([[BORROW]] : $FakeOptional<Klass>)
+// CHECK:   br bb3([[SOME]] : $FakeOptional<Klass>)
 //
 // CHECK: bb2([[FAIL:%.*]] : @guaranteed $Klass):
 // CHECK-NEXT: [[NONE:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
@@ -466,11 +465,9 @@ bb3:
 // CHECK:   switch_enum [[PHI]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
 //
 // CHECK: bb4:
-// CHECK-NEXT: end_borrow [[PHI]] : $FakeOptional<Klass>
 // CHECK-NEXT: br bb6
 //
 // CHECK: bb5(%{{.*}} : @guaranteed $Klass):
-// CHECK-NEXT:   end_borrow [[PHI]] : $FakeOptional<Klass>
 // CHECK-NEXT:   br bb6
 // CHECK-LABEL: } // end sil function 'testTypeDependentCheckCast'
 sil [ossa] @testTypeDependentCheckCast : $@convention(thin) (@guaranteed Klass, @thick @dynamic_self Klass.Type) -> () {

@@ -324,9 +324,6 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     accessPath.getStorage().print(llvm::errs());
     return false;
   }
-  auto ownershipRoot = accessPath.getStorage().isReference()
-                           ? findOwnershipReferenceRoot(accessPathWithBase.base)
-                           : SILValue();
 
   BorrowedValue borrowedValue(lbi);
   MultiDefPrunedLiveness borrowLiveness(lbi->getFunction());
