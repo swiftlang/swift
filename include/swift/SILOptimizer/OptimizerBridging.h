@@ -40,6 +40,10 @@ typedef struct {
   void * _Nullable bca;
 } BridgedCalleeAnalysis;
 
+typedef bool (* _Nonnull InstructionIsDeinitBarrierFn)(BridgedInstruction, BridgedCalleeAnalysis bca);
+
+void CalleeAnalysis_register(InstructionIsDeinitBarrierFn isDeinitBarrierFn);
+
 typedef struct {
   void * _Nullable dea;
 } BridgedDeadEndBlocksAnalysis;

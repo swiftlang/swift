@@ -395,19 +395,29 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     /// are not observable form the outside and are therefore not considered.
     public var allocates: Bool
 
+    /// If true, destroys of lexical values may not be hoisted over applies of
+    /// the function.
+    ///
+    /// This is true when the function (or a callee, transitively) contains a
+    /// deinit barrier instruction.
+    public var isDeinitBarrier: Bool
+
     /// When called with default arguments, it creates an "effect-free" GlobalEffects.
     public init(memory: Memory = Memory(read: false, write: false),
                 ownership: Ownership = Ownership(copy: false, destroy: false),
-                allocates: Bool = false) {
+                allocates: Bool = false,
+                isDeinitBarrier: Bool = false) {
       self.memory = memory
       self.ownership = ownership
       self.allocates = allocates
+      self.isDeinitBarrier = isDeinitBarrier
     }
 
     public mutating func merge(with other: GlobalEffects) {
       memory.merge(with: other.memory)
       ownership.merge(with: other.ownership)
       allocates = allocates || other.allocates
+      isDeinitBarrier = isDeinitBarrier || other.isDeinitBarrier
     }
 
     /// Removes effects, which cannot occur for an `argument` value with a given `convention`.
@@ -444,12 +454,13 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     }
 
     public static var worstEffects: GlobalEffects {
-      GlobalEffects(memory: .worstEffects, ownership: .worstEffects, allocates: true)
+      GlobalEffects(memory: .worstEffects, ownership: .worstEffects, allocates: true, isDeinitBarrier: true)
     }
 
     public var description: String {
       var res: [String] = [memory.description, ownership.description].filter { !$0.isEmpty }
       if allocates { res += ["allocate"] }
+      if isDeinitBarrier { res += ["deinit_barrier"] }
       return res.joined(separator: ",")
     }
   }
@@ -652,6 +663,7 @@ extension StringParser {
       else if consume("copy")     { globalEffects.ownership.copy = true }
       else if consume("destroy")  { globalEffects.ownership.destroy = true }
       else if consume("allocate") { globalEffects.allocates = true }
+      else if consume("deinit_barrier") { globalEffects.isDeinitBarrier = true }
       else {
         break
       }

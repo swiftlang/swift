@@ -186,6 +186,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     SILFunction_needsStackProtection(bridged) != 0
   }
 
+  public var isDeinitBarrier: Bool {
+    effects.sideEffects?.global.isDeinitBarrier ?? true
+  }
+
   // Only to be called by PassContext
   public func _modifyEffects(_ body: (inout FunctionEffects) -> ()) {
     body(&effects)

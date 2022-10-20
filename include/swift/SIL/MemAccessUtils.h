@@ -232,11 +232,9 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
 
-/// Return true if \p instruction is a deinitialization barrier.
-///
-/// Deinitialization barriers constrain variable lifetimes. Lexical end_borrow,
-/// destroy_value, and destroy_addr cannot be hoisted above them.
-bool isDeinitBarrier(SILInstruction *instruction);
+/// Whether \p instruction accesses storage whose representation is unidentified
+/// such as by reading a pointer.
+bool mayAccessPointer(SILInstruction *instruction);
 
 } // end namespace swift
 

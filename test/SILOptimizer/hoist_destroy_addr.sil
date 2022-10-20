@@ -1,7 +1,9 @@
-// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -74,6 +76,12 @@ struct STXXITXXII {
 
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
+
+// This function is not a synchronization point.
+sil @empty : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
 
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
@@ -1063,4 +1071,17 @@ entry(%instance : @owned $AnyObject):
     destroy_addr %addr : $*AnyObject
     dealloc_stack %addr : $*AnyObject
     return %cast : $X
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {
+// CHECK:         destroy_addr
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_of_non_barrier_fn'
+sil [ossa] @hoist_over_apply_of_non_barrier_fn : $@convention(thin) (@in X) -> () {
+entry(%addr : $*X):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*X
+  %retval = tuple ()
+  return %retval : $()
 }

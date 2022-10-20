@@ -88,6 +88,7 @@ private struct CollectedEffects {
   }
 
   mutating func addInstructionEffects(_ inst: Instruction) {
+    var checkedIfDeinitBarrier = false
     switch inst {
     case is CopyValueInst, is RetainValueInst, is StrongRetainInst:
       addEffects(.copy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
@@ -131,12 +132,14 @@ private struct CollectedEffects {
         addDestroyEffects(of: calleeValue)
       }
       handleApply(apply)
+      checkedIfDeinitBarrier = true
 
     case let pa as PartialApplyInst:
       if pa.canBeAppliedInFunction(context) {
         // Only if the created closure can actually be called in the function
         // we have to consider side-effects within the closure.
         handleApply(pa)
+        checkedIfDeinitBarrier = true
       }
 
     case let fl as FixLifetimeInst:
@@ -177,6 +180,13 @@ private struct CollectedEffects {
          alloc.isEscaping(context) {
         globalEffects.allocates = true
       }
+    }
+    // If we didn't already, check whether the instruction could be a deinit
+    // barrier.  If it's an apply of some sort, that was already done in
+    // handleApply.
+    if !checkedIfDeinitBarrier,
+       inst.mayBeDeinitBarrierNotConsideringSideEffects {
+      globalEffects.isDeinitBarrier = true
     }
   }
   
