@@ -3950,6 +3950,8 @@ The following types of test arguments are supported:
             @function[uint] <-- function at index ``uint``
             @function[name] <-- function named ``name``
 - block: @block <-- the block containing the test_specification instruction
+         @block[+uint] <-- the block ``uint`` blocks after the containing block
+         @block[-uint] <-- the block ``uint`` blocks before the containing block
          @block[uint] <-- the block at index ``uint``
          @{function}.{block} <-- the indicated block in the indicated function
          Example: @function[foo].block[2]

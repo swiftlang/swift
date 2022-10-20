@@ -118,6 +118,23 @@ SILInstruction *getInstructionOffsetFrom(SILInstruction *base, long offset) {
   llvm_unreachable("never found instruction in its own function!?");
 }
 
+SILBasicBlock *getBlockOffsetFrom(SILBasicBlock *base, long offset) {
+  if (offset == 0)
+    return base;
+  if (offset < 0) {
+    auto iterator = base->getIterator();
+    for (auto counter = 0; counter > offset; --counter) {
+      iterator = std::prev(iterator);
+    }
+    return &*iterator;
+  }
+  auto iterator = base->getIterator();
+  for (auto counter = 0; counter < offset; ++counter) {
+    iterator = std::next(iterator);
+  }
+  return &*iterator;
+}
+
 SILBasicBlock *getBlock(SILFunction *function, unsigned long index) {
   auto iterator = function->begin();
   for (unsigned long i = 0; i < index; ++i) {
@@ -217,9 +234,28 @@ private:
     return retval;
   }
 
-  Optional<TaggedUnion<unsigned long long, StringRef>> parseSubscript() {
+  Optional<TaggedUnion<unsigned long long, long long, StringRef>>
+  parseSubscript() {
     if (!consumePrefix("["))
       return llvm::None;
+    if (peekPrefix("+") || peekPrefix("-")) {
+      bool positive = false;
+      if (consumePrefix("+")) {
+        positive = true;
+      } else {
+        bool consumed = consumePrefix("-");
+        assert(consumed && "peeked a +/- but can't consume one!?");
+        (void)consumed;
+        positive = false;
+      }
+      unsigned long long index = 0;
+      bool consumed =
+          llvm::consumeUnsignedInteger(specification, /*radix=*/10, index);
+      assert(!consumed && "didn't find uint after sign!?");
+      demandPrefix("]");
+      long long offset = positive ? index : -index;
+      return {offset};
+    }
     unsigned long long index = 0;
     if (!llvm::consumeUnsignedInteger(specification, /*radix=*/10, index)) {
       demandPrefix("]");
@@ -308,6 +344,13 @@ private:
       return getInstructionAtIndex(0, *within);
     }
     if (auto subscript = parseSubscript()) {
+      // If this is a bare @instruction[...] reference, it can refer either to
+      // an instruction counting from the beginning of the function or else to
+      // an instruction offset from the context of the test_specification.
+      if (!within && subscript->isa<long long>()) {
+        auto offset = subscript->get<long long>();
+        return getInstructionOffsetFrom(context, offset);
+      }
       auto index = subscript->get<unsigned long long>();
       return getInstructionAtIndex(index,
                                    within.getValueOr(context->getFunction()));
@@ -340,11 +383,15 @@ private:
       return block;
     }
     if (auto subscript = parseSubscript()) {
-      if (!within) {
-        within = context->getFunction();
+      // If this is a bare @block[...] reference, it can refer either to a block
+      // counting from the beginning of the function or else to a block offset
+      // from the block containing the context of the test_specification.
+      if (!within && subscript->isa<long long>()) {
+        return getBlockOffsetFrom(context->getParent(),
+                                  subscript->get<long long>());
       }
       auto index = subscript->get<unsigned long long>();
-      auto *block = getBlock(within, index);
+      auto *block = getBlock(within ? within : context->getFunction(), index);
       return block;
     }
     llvm_unreachable("bad suffix after 'block'!?");
