@@ -124,7 +124,7 @@ private struct StackProtectionOptimization {
                                 mustFixStackNesting: inout Bool, _ context: PassContext) {
 
     // `withUnsafeTemporaryAllocation(of:capacity:_:)` is compiled to a `builtin "stackAlloc"`.
-    if let bi = instruction as? BuiltinInst, bi.id == .stackAlloc {
+    if let bi = instruction as? BuiltinInst, bi.id == .StackAlloc {
       function.setNeedsStackProtection(context)
       return
     }
@@ -332,7 +332,7 @@ private struct StackProtectionOptimization {
   /// Moves the value of a `beginAccess` to a temporary stack location, if possible.
   private func moveToTemporary(scope beginAccess: BeginAccessInst, mustFixStackNesting: inout Bool,
                                _ context: PassContext) {
-    if beginAccess.accessKind != .modify {
+    if beginAccess.accessKind != .Modify {
       // We can only move from a `modify` access.
       // Also, read-only accesses shouldn't be subject to buffer overflows (because
       // no one should ever write to such a storage).
