@@ -79,6 +79,14 @@ if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
     target_compile_options(swiftSema PRIVATE -O3)
   endif()
 endif()
+
+if (SWIFT_SWIFT_PARSER)
+  target_compile_definitions(swiftSema
+    PRIVATE
+    SWIFT_SWIFT_PARSER
+  )
+endif()
+
 target_link_libraries(swiftSema PRIVATE
   swiftAST
   swiftParse
