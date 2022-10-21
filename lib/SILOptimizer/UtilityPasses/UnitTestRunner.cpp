@@ -13,7 +13,7 @@
 // TO ADD A NEW TEST, search in this file for [new_tests]
 //
 // Provides a mechanism for doing faux unit tests.  The idea is to emulate the
-// basic function of calling a function and validating its results/effects.
+// basic functionality of calling a function and validating its results/effects.
 //
 // This is done via the test_specification instruction.  Using one or more
 // instances of it in your function, you can specify which test (i.e. UnitTest
@@ -75,6 +75,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -281,6 +282,36 @@ struct IsDeinitBarrierTest : UnitTest {
   }
 };
 
+struct ShrinkBorrowScopeTest : UnitTest {
+  ShrinkBorrowScopeTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto instruction = arguments.takeValue();
+    auto expected = arguments.takeBool();
+    auto *bbi = cast<BeginBorrowInst>(instruction);
+    auto *analysis = getAnalysis<BasicCalleeAnalysis>();
+    SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+    InstructionDeleter deleter(
+        InstModCallbacks().onDelete([&](auto *instruction) {
+          llvm::errs() << "DELETED:\n";
+          instruction->dump();
+        }));
+    auto shrunk =
+        shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
+    unsigned index = 0;
+    for (auto *cvi : modifiedCopyValueInsts) {
+      auto expectedCopy = arguments.takeValue();
+      llvm::errs() << "rewritten copy " << index << ":\n";
+      llvm::errs() << "expected:\n";
+      expectedCopy->print(llvm::errs());
+      llvm::errs() << "got:\n";
+      cvi->dump();
+      assert(cvi == expectedCopy);
+      ++index;
+    }
+    assert(expected == shrunk && "didn't shrink expectedly!?");
+  }
+};
+
 /// [new_tests] Add the new UnitTest subclass above this line.
 
 class UnitTestRunner : public SILFunctionTransform {
@@ -321,6 +352,7 @@ class UnitTestRunner : public SILFunctionTransform {
     ADD_UNIT_TEST_SUBCLASS(
         "pruned-liveness-boundary-with-list-of-last-users-insertion-points",
         PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
+    ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
 
