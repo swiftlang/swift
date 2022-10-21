@@ -383,6 +383,15 @@ bool Rewriter::run() {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
       for (auto *successor : successors) {
+        // If a terminator is a barrier, it must not branch to a merge point.
+        // Doing so would require one of the following:
+        // - the terminator was passed a phi--which is handled by barriers.phis
+        // - the terminator had a result--which can't happen thanks to the lack
+        //   of critical edges
+        // - the terminator was a BranchInst which was passed no arguments but
+        //   which was nonetheless identified as a barrier--which is illegal
+        assert(successor->getSinglePredecessorBlock() ==
+               terminator->getParentBlock());
         madeChange |= createEndBorrow(&successor->front());
       }
     } else {
