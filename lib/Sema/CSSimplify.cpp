@@ -6360,7 +6360,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
-    case TypeKind::PackArchetype: {
+    case TypeKind::PackArchetype:
+    case TypeKind::ElementArchetype: {
       // Give `repairFailures` a chance to fix the problem.
       if (shouldAttemptFixes())
         break;
@@ -7244,6 +7245,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::ParameterizedProtocol:

@@ -7064,6 +7064,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
     if (!cast<ArchetypeType>(desugaredFromType)->requiresClass())
       break;
     LLVM_FALLTHROUGH;
@@ -7387,6 +7388,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::Function:

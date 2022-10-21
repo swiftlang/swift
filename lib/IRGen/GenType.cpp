@@ -2165,6 +2165,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:

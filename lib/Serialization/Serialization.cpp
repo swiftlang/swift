@@ -1500,13 +1500,38 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
 
   assert(GenericEnvironmentsToSerialize.hasRef(genericEnv));
 
-  auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
-  auto parentSig = genericEnv->getOpenedExistentialParentSignature();
-  auto parentSigID = addGenericSignatureRef(parentSig);
+  switch (genericEnv->getKind()) {
+  case GenericEnvironment::Kind::OpenedExistential: {
+    auto kind = GenericEnvironmentKind::OpenedExistential;
+    auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
+    auto parentSig = genericEnv->getOpenedExistentialParentSignature();
+    auto parentSigID = addGenericSignatureRef(parentSig);
 
-  auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
-  GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
-                                       existentialTypeID, parentSigID);
+    auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
+    GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
+                                         unsigned(kind), existentialTypeID,
+                                         parentSigID);
+    return;
+  }
+
+  case GenericEnvironment::Kind::OpenedElement: {
+    auto kind = GenericEnvironmentKind::OpenedElement;
+    auto parentSig = genericEnv->getGenericSignature();
+    auto parentSigID = addGenericSignatureRef(parentSig);
+
+    auto genericEnvAbbrCode = DeclTypeAbbrCodes[GenericEnvironmentLayout::Code];
+    GenericEnvironmentLayout::emitRecord(Out, ScratchRecord, genericEnvAbbrCode,
+                                         unsigned(kind), /*existentialTypeID=*/0,
+                                         parentSigID);
+    return;
+  }
+
+  case GenericEnvironment::Kind::Primary:
+  case GenericEnvironment::Kind::Opaque:
+    break;
+  }
+
+  llvm_unreachable("Bad generic environment kind");
 }
 
 void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
@@ -4694,6 +4719,16 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[PackArchetypeTypeLayout::Code];
     PackArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                         sigID, interfaceTypeID);
+  }
+
+  void visitElementArchetypeType(const ElementArchetypeType *archetypeTy) {
+    using namespace decls_block;
+    auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
+    auto genericEnvID = S.addGenericEnvironmentRef(
+        archetypeTy->getGenericEnvironment());
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ElementArchetypeTypeLayout::Code];
+    ElementArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           interfaceTypeID, genericEnvID);
   }
 
   void visitGenericTypeParamType(const GenericTypeParamType *genericParam) {

@@ -1554,6 +1554,7 @@ private:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
+    case TypeKind::ElementArchetype:
     case TypeKind::PackArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;

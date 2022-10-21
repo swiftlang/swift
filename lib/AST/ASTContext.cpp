@@ -495,6 +495,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedExistentialEnvironments;
+  llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
@@ -4928,11 +4929,30 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
-                                  OpenedGenericEnvironmentData, Type>(
+  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+                                  OpenedExistentialEnvironmentData,
+                                  OpenedElementEnvironmentData, Type>(
       0, 0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature);
+}
+
+/// Create a new generic environment for an opaque type with the given set of
+/// outer substitutions.
+GenericEnvironment *GenericEnvironment::forOpaqueType(
+    OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena) {
+  auto &ctx = opaque->getASTContext();
+
+  // Allocate and construct the new environment.
+  auto signature = opaque->getOpaqueInterfaceGenericSignature();
+  unsigned numGenericParams = signature.getGenericParams().size();
+  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+                                  OpenedExistentialEnvironmentData,
+                                  OpenedElementEnvironmentData, Type>(
+      1, 0, 0, numGenericParams);
+  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
+  auto env = new (mem) GenericEnvironment(signature, opaque, subs);
+  return env;
 }
 
 /// Create a new generic environment for an opened archetype.
@@ -4969,9 +4989,10 @@ GenericEnvironment::forOpenedExistential(
 
   // Allocate and construct the new environment.
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
-                                  OpenedGenericEnvironmentData, Type>(
-      0, 0, 1, numGenericParams);
+  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+                                  OpenedExistentialEnvironmentData,
+                                  OpenedElementEnvironmentData, Type>(
+      0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
       new (mem) GenericEnvironment(signature, existential, parentSig, uuid);
@@ -4981,21 +5002,35 @@ GenericEnvironment::forOpenedExistential(
   return genericEnv;
 }
 
-/// Create a new generic environment for an opaque type with the given set of
-/// outer substitutions.
-GenericEnvironment *GenericEnvironment::forOpaqueType(
-    OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena) {
-  auto &ctx = opaque->getASTContext();
+/// Create a new generic environment for an element archetype.
+GenericEnvironment *
+GenericEnvironment::forOpenedElement(GenericSignature signature, UUID uuid) {
+  auto &ctx = signature->getASTContext();
+
+  auto &openedElementEnvironments =
+      ctx.getImpl().OpenedElementEnvironments;
+  auto found = openedElementEnvironments.find(uuid);
+
+  if (found != openedElementEnvironments.end()) {
+    auto *existingEnv = found->second;
+    assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
+    assert(existingEnv->getOpenedElementUUID() == uuid);
+
+    return existingEnv;
+  }
 
   // Allocate and construct the new environment.
-  auto signature = opaque->getOpaqueInterfaceGenericSignature();
   unsigned numGenericParams = signature.getGenericParams().size();
-  size_t bytes = totalSizeToAlloc<OpaqueTypeDecl *, SubstitutionMap,
-                                  OpenedGenericEnvironmentData, Type>(
-      1, 1, 0, numGenericParams);
-  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
-  auto env = new (mem) GenericEnvironment(signature, opaque, subs);
-  return env;
+  size_t bytes = totalSizeToAlloc<OpaqueEnvironmentData,
+                                  OpenedExistentialEnvironmentData,
+                                  OpenedElementEnvironmentData, Type>(
+      0, 0, 1, numGenericParams);
+  void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
+  auto *genericEnv = new (mem) GenericEnvironment(signature, uuid);
+
+  openedElementEnvironments[uuid] = genericEnv;
+
+  return genericEnv;
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

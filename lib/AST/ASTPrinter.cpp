@@ -6370,6 +6370,19 @@ public:
     }
   }
 
+  void visitElementArchetypeType(ElementArchetypeType *T) {
+    if (Options.PrintForSIL) {
+      Printer << "@element(\"" << T->getOpenedElementID() << ") ";
+      visit(T->getGenericEnvironment()->getOpenedExistentialType());
+      Printer << ") ";
+
+      auto interfaceTy = T->getInterfaceType();
+      visit(interfaceTy);
+    } else {
+      visit(T->getInterfaceType());
+    }
+  }
+
   void printDependentMember(DependentMemberType *T) {
     if (auto *const Assoc = T->getAssocType()) {
       if (Options.ProtocolQualifiedDependentMemberTypes) {

@@ -1220,9 +1220,10 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   if (recordID != GENERIC_ENVIRONMENT)
     fatal(llvm::make_error<InvalidRecordKindError>(recordID));
 
+  unsigned kind;
   GenericSignatureID parentSigID;
   TypeID existentialID;
-  GenericEnvironmentLayout::readRecord(scratch, existentialID, parentSigID);
+  GenericEnvironmentLayout::readRecord(scratch, kind, existentialID, parentSigID);
 
   auto existentialTypeOrError = getTypeChecked(existentialID);
   if (!existentialTypeOrError)
@@ -1232,8 +1233,18 @@ ModuleFile::getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID)
   if (!parentSigOrError)
     return parentSigOrError.takeError();
 
-  auto *genericEnv = GenericEnvironment::forOpenedExistential(
-      existentialTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+  GenericEnvironment *genericEnv = nullptr;
+  switch (GenericEnvironmentKind(kind)) {
+  case GenericEnvironmentKind::OpenedExistential:
+    genericEnv = GenericEnvironment::forOpenedExistential(
+        existentialTypeOrError.get(), parentSigOrError.get(), UUID::fromTime());
+    break;
+
+  case GenericEnvironmentKind::OpenedElement:
+    genericEnv = GenericEnvironment::forOpenedElement(
+        parentSigOrError.get(), UUID::fromTime());
+  }
+
   envOffset = genericEnv;
 
   return genericEnv;
@@ -5912,6 +5923,26 @@ Expected<Type> DESERIALIZE_TYPE(PACK_ARCHETYPE_TYPE)(
     MF.fatal();
 
   return contextType;
+}
+
+Expected<Type> DESERIALIZE_TYPE(ELEMENT_ARCHETYPE_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID interfaceID;
+  GenericEnvironmentID genericEnvID;
+
+  decls_block::ElementArchetypeTypeLayout::readRecord(scratch,
+                                                      interfaceID,
+                                                      genericEnvID);
+
+  auto interfaceTypeOrError = MF.getTypeChecked(interfaceID);
+  if (!interfaceTypeOrError)
+    return interfaceTypeOrError.takeError();
+
+  auto envOrError = MF.getGenericEnvironmentChecked(genericEnvID);
+  if (!envOrError)
+    return envOrError.takeError();
+
+  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
 }
 
 Expected<Type>
