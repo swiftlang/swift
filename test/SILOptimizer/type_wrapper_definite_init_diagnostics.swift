@@ -88,4 +88,19 @@ do {
       self.a = 0
     }
   }
+
+  @Wrapper
+  struct ImmutableReassignmentTest {
+    let x: Int = 42
+
+    init(x: Int) {
+      self.x = x // expected-error {{immutable value 'self.x' may only be initialized once}}
+    }
+
+    init(optX: Int?) {
+      if let x = optX {
+        self.x = x // expected-error {{immutable value 'self.x' may only be initialized once}}
+      }
+    }
+  }
 }

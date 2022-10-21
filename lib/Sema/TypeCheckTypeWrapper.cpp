@@ -227,6 +227,13 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
   auto *storage = wrappedType->getTypeWrapperStorageDecl();
   assert(storage);
 
+  // Type wrapper variables are never initialized directly,
+  // initialization expression (if any) becomes an default
+  // argument of the initializer synthesized by the type wrapper.
+  if (auto *PBD = property->getParentPatternBinding()) {
+    PBD->setInitializerSubsumed(/*index=*/0);
+  }
+
   return injectProperty(storage, property->getName(),
                         property->getValueInterfaceType(),
                         property->getIntroducer(), AccessLevel::Internal);
