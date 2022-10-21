@@ -414,3 +414,34 @@ struct TypeWithLetProperties<T> {
     }
   }
 }
+
+@Wrapper
+struct TypeWithDefaultedProperties<T> {
+  let a: [String]
+  let b: T? = nil
+  var c: Int = 42
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test27TypeWithDefaultedPropertiesV1aACyxGSaySSG_tcfC
+  // --> Defaults handling
+  // CHECK: [[LOCAL_STORAGE:%.*]] = alloc_stack [lexical] $(a: Array<String>, b: Optional<T>, c: Int), var, name "_storage", implicit
+  // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int), 0
+  // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int), 1
+  // CHECK-NEXT: [[C_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int), 2
+  // CHECK-NEXT: inject_enum_addr [[B_REF]] : $*Optional<T>, #Optional.none!enumelt
+  // CHECK-NEXT: [[C_DEFAULT_VAL:%.*]] = integer_literal $Builtin.IntLiteral, 42
+  // CHECK: [[INT_INIT_REF:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  // CHECK-NEXT: [[C_VAL:%.*]] = apply [[INT_INIT_REF]]([[C_DEFAULT_VAL]], {{.*}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  // CHECK-NEXT: store [[C_VAL:%.*]] to [trivial] [[C_REF]] : $*Int
+  // --> Assignment to `let a`
+  // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int)
+  // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: Array<String>, b: Optional<T>, c: Int), 0
+  // CHECK-NEXT: assign [[A_ARG:%.*]] to [init] %18 : $*Array<String>
+  // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]]
+  // --> Assignment to `var c`, note that the assignment is done to a wrapped value
+  // CHECK: [[C_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Array<String>, b: Optional<T>, c: Int), 2
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $Int to [assign_wrapped_value] [[C_REF]] : $*Int, set {{.*}}
+  init(a: [String]) {
+    self.a = a
+    self.c = 0
+  }
+}

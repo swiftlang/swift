@@ -214,20 +214,6 @@ static void maybeAddTypeWrapperDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!initExpr)
     return;
 
-  // Type wrapper variables are never initialized directly,
-  // initialization expression (if any) becomes an default
-  // argument of the initializer synthesized by the type wrapper.
-  {
-    // Since type wrapper is applied to backing property, that's
-    // the the initializer it subsumes.
-    if (var->hasAttachedPropertyWrapper()) {
-      auto *backingVar = var->getPropertyWrapperBackingProperty();
-      PBD = backingVar->getParentPatternBinding();
-    }
-
-    PBD->setInitializerSubsumed(/*index=*/0);
-  }
-
   arg->setDefaultExpr(initExpr, PBD->isInitializerChecked(/*index=*/0));
   arg->setDefaultArgumentKind(DefaultArgumentKind::Normal);
 }
