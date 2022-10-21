@@ -4,6 +4,7 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/Decls.swift
     Sources/ASTGen/Exprs.swift
     Sources/ASTGen/Literals.swift
+    Sources/ASTGen/Macros.swift
     Sources/ASTGen/Misc.swift
     Sources/ASTGen/SourceFile.swift
     Sources/ASTGen/Stmts.swift

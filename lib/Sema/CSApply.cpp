@@ -33,6 +33,7 @@
 #include "swift/AST/OperatorNameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
@@ -52,6 +53,9 @@
 
 using namespace swift;
 using namespace constraints;
+
+extern "C" ptrdiff_t swift_ASTGen_printMacroResult(
+    void *sourceFile, const void *sourceLocation);
 
 bool Solution::hasFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -2969,6 +2973,18 @@ namespace {
     }
 
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+#if SWIFT_SWIFT_PARSER
+      auto &ctx = cs.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
+        if (auto sf = dc->getParentSourceFile()) {
+          if (auto astGenSF = sf->exportedSourceFile) {
+            swift_ASTGen_printMacroResult(
+                astGenSF, expr->getStartLoc().getOpaquePointerValue());
+          }
+        }
+      }
+#endif
+
       switch (expr->getKind()) {
 #define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
       case MagicIdentifierLiteralExpr::NAME: \

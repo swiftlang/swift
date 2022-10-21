@@ -25,7 +25,8 @@ let package = Package(
             name: "swiftASTGen",
             dependencies: [
               .product(name: "SwiftSyntax", package: "swift-syntax"),
-              .product(name: "SwiftParser", package: "swift-syntax")
+              .product(name: "SwiftParser", package: "swift-syntax"),
+              .product(name: "_SwiftSyntaxMacros", package: "swift-syntax")
             ],
             path: ".",
             exclude: ["CMakeLists.txt"],
