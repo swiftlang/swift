@@ -498,6 +498,9 @@ public:
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override;
 
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override;
+
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
 

@@ -1881,6 +1881,20 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   return true;
 }
 
+void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                                  DeclVisibilityKind Reason) {
+
+  // Remember the decl name to
+  SmallString<32> buffer;
+  llvm::raw_svector_ostream OS(buffer);
+  PrintOptions PS = PrintOptions::printDocInterface();
+  PS.FullyQualifiedTypes = true;
+  NTD->getDeclaredType()->print(OS, PS);
+  NullTerminatedStringRef qualifiedName(
+      buffer, *CompletionContext->getResultSink().Allocator);
+  CompletionContext->LookedupNominalTypeNames.push_back(qualifiedName);
+}
+
 void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                                  DynamicLookupInfo dynamicLookupInfo) {
   assert(Reason !=
