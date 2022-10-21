@@ -22,7 +22,6 @@
 #include <cstdint>
 #include <stdlib.h>
 #include <cstdint>
-#include <optional>
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
@@ -198,8 +197,6 @@ extern "C" void swift_errorRelease(void *_Nonnull swiftError) noexcept;
 
 extern "C" int $ss5ErrorMp; // external global %swift.protocol, align 4
 
-extern "C" int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
-
 extern "C"
     const void * _Nullable
     swift_getTypeByMangledNameInContext(
@@ -222,6 +219,7 @@ struct SymbolicP {
 
 inline const void *_Nullable testErrorCall() {
   static swift::SymbolicP errorSymbol;
+  static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
   errorSymbol._1 = 2;
   errorSymbol._2 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&got_ss5ErrorMp) - reinterpret_cast<uintptr_t>(&errorSymbol._2));
   errorSymbol._3[0] = '_';
@@ -255,9 +253,10 @@ public:
     opaqueValue = other.opaqueValue;
   }
 
+  // FIXME: Return a Swift::Optional instead.
   template<class T>
-  std::optional<T> as() {
-    char *ptr = (char*)malloc(100);
+  T as() {
+    alignas(alignof(T)) char buffer[sizeof(T)];
     const void *em = testErrorCall();
     void *ep = getPointerToOpaquePointer();
     auto metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
@@ -265,17 +264,16 @@ public:
     // Dynamic cast will release the error, so we need to retain it.
     swift::swift_errorRetain(ep);
     bool dynamicCast =
-        swift::swift_dynamicCast(ptr, &ep, em, metadata,
+        swift::swift_dynamicCast(buffer, &ep, em, metadata,
                                  /*take on success  destroy on failure*/ 6);
 
     if (dynamicCast) {
-      auto result =
-          swift::_impl::implClassFor<T>::type::returnNewValue([&](char *dest) {
-            swift::_impl::implClassFor<T>::type::initializeWithTake(dest, ptr);
+      return swift::_impl::implClassFor<T>::type::returnNewValue([&](char *dest) {
+            swift::_impl::implClassFor<T>::type::initializeWithTake(dest, buffer);
           });
-      return std::optional(result);
     }
-    return std::nullopt;
+    abort();
+    // FIXME: return nil.
   }
 
 private:
