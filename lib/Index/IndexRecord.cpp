@@ -530,6 +530,12 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     }
   }
 
+  if (module->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
+    diags.diagnose(SourceLoc(),
+                   diag::remark_indexing_system_module,
+                   filename, skipIndexingModule);
+  }
+
   // FIXME: Would be useful for testing if swift had clang's -Rremark system so
   // we could output a remark here that we are going to create index data for
   // a module file.

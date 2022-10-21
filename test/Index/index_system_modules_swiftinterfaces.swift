@@ -42,6 +42,7 @@
 // RUN: %empty-directory(%t/idx)
 // RUN: %empty-directory(%t/modulecache)
 // RUN: echo "breaking_the_swifinterface" >> %t/SDK/Frameworks/SystemModule.framework/Modules/SystemModule.swiftmodule/%module-target-triple.swiftinterface
+
 // RUN: %target-swift-frontend -typecheck -parse-stdlib \
 // RUN:     -index-system-modules \
 // RUN:     -index-store-path %t/idx \
@@ -49,10 +50,12 @@
 // RUN:     -sdk %t/SDK \
 // RUN:     -Fsystem %t/SDK/Frameworks \
 // RUN:     -module-cache-path %t/modulecache \
+// RUN:     -Rindexing-system-module \
 // RUN:     %t/Client.swift \
-// RUN:     2>&1 | %FileCheck -check-prefix=BROKEN-BUILD --allow-empty %s
+// RUN:     2>&1 | %FileCheck -check-prefix=BROKEN-BUILD %s
 
 /// We don't expect so see the swiftinterface error for indexing
+// BROKEN-BUILD: indexing system module {{.*}} skipping
 // BROKEN-BUILD-NOT: error
 // BROKEN-BUILD-NOT: breaking_the_swifinterface
 
@@ -62,6 +65,18 @@
 // BROKEN-UNIT-NOT: Record | system | SystemModule |
 // RUN: c-index-test core -print-record %t/idx | %FileCheck -check-prefix=BROKEN-RECORD %s
 // BROKEN-RECORD-NOT: function/Swift | systemFunc()
+
+// RUN: %target-swift-frontend -typecheck -parse-stdlib \
+// RUN:     -index-system-modules \
+// RUN:     -index-store-path %t/idx \
+// RUN:     -index-ignore-stdlib \
+// RUN:     -sdk %t/SDK \
+// RUN:     -Fsystem %t/SDK/Frameworks \
+// RUN:     -module-cache-path %t/modulecache \
+// RUN:     -Rindexing-system-module \
+// RUN:     %t/Client.swift \
+// RUN:     2>&1 | %FileCheck -check-prefix=BROKEN-BUILD-2 --allow-empty %s
+// BROKEN-BUILD-2-NOT: indexing system module
 
 //--- SecretModule.swift
 public struct SecretType {}
