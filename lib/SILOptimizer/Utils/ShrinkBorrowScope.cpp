@@ -399,10 +399,11 @@ bool Rewriter::run() {
   // don't have multiple predecessors) whose end was not reachable (because
   // reachability was not able to make it to the top of some other successor).
   //
-  // In other words, a control flow boundary is the target edge from a block B
-  // to its single predecessor P not all of whose successors S in succ(P) had
-  // reachable beginnings.  We witness that fact about P's successors by way of
-  // P not having a reachable end--see BackwardReachability::meetOverSuccessors.
+  // In other words, a control flow boundary is the target block of the edge
+  // to a block B from its single predecessor P not all of whose successors S
+  // in succ(P) had reachable beginnings.  We witness that fact about P's
+  // successors by way of P not having a reachable end--see
+  // IterativeBackwardReachability::meetOverSuccessors.
   //
   // control-flow-boundary(B) := beginning-reachable(B) && !end-reachable(P)
   for (auto *block : barriers.blocks) {
