@@ -5552,8 +5552,14 @@ public:
               unowned->getType().castTo<UnmanagedStorageType>().getReferentType());
     auto owned = SGF.B.createUnmanagedToRef(loc, unowned, strongType);
     auto ownedMV = SGF.emitManagedRetain(loc, owned);
-    
-    // Reassign the +1 storage with it.
+
+    // Then create a mark dependence in between the base and the ownedMV. This
+    // is important to ensure that the destroy of the assign is not hoisted
+    // above the retain. We are doing unmanaged things here so we need to be
+    // extra careful.
+    ownedMV = SGF.B.createMarkDependence(loc, ownedMV, base);
+
+    // Then reassign the mark dependence into the +1 storage.
     ownedMV.assignInto(SGF, loc, base.getUnmanagedValue());
   }
   
