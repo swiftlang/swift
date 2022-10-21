@@ -345,7 +345,7 @@ bb3(%res : $Builtin.Int32):
 // CHECK:   [[INCAST:%.*]] = unchecked_ref_cast %0 : $Optional<B> to $Optional<AAA>
 // CHECK:   [[INTUP:%.*]] = tuple ([[INCAST]] : $Optional<AAA>, %1 : $E)
 // CHECK:  ([[EXTR0:%.*]], [[EXTR1:%.*]]) = destructure_tuple [[INTUP]] : $(Optional<AAA>, E)
-// CHECK:   switch_enum [[EXTR0]] : $Optional<AAA>, case #Optional.some!enumelt: bb1, default bb2
+// CHECK:   switch_enum [[EXTR0]] : $Optional<AAA>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 // CHECK: bb1([[UNWRAP:%.*]] : @guaranteed $AAA):
 // CHECK:   [[ACAST:%.*]] = unchecked_ref_cast [[UNWRAP]] : $AAA to $B
 // CHECK:   [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
@@ -382,7 +382,7 @@ bb2(%8 : @owned $Error):
 // CHECK:  [[INCAST:%.*]] = unchecked_ref_cast %0 : $Optional<B> to $Optional<AAA>
 // CHECK:  [[INTUP:%.*]] = tuple ([[INCAST]] : $Optional<AAA>, %1 : $E)
 // CHECK:  ([[EXTR0:%.*]], [[EXTR1:%.*]]) = destructure_tuple [[INTUP]] : $(Optional<AAA>, E)
-// CHECK:  switch_enum [[EXTR0]] : $Optional<AAA>, case #Optional.some!enumelt: bb1, default bb2
+// CHECK:  switch_enum [[EXTR0]] : $Optional<AAA>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 // CHECK: bb1([[UNWRAP:%.*]] : @owned $AAA):
 // CHECK:  [[ACAST:%.*]] = unchecked_ref_cast [[UNWRAP]] : $AAA to $B
 // CHECK:  [[SOME:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[ACAST]] : $B
