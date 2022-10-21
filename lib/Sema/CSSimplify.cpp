@@ -3659,6 +3659,19 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     return getTypeMatchFailure(locator);
   }
 
+  // ConformsTo constraints are generated when opening a generic
+  // signature with a RequirementKind::Conformance requirement, so
+  // we must handle pack types on the left by splitting up into
+  // smaller constraints.
+  if (auto *packType = type1->getAs<PackType>()) {
+    for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
+      addConstraint(kind, packType->getElementType(i), type2,
+                    locator.withPathElement(LocatorPathElt::PackElement(i)));
+    }
+
+    return getTypeMatchSuccess();
+  }
+
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   // Handle existential metatypes.
@@ -7521,7 +7534,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     return SolutionKind::Solved;
   }
-
 
   auto *loc = getConstraintLocator(locator);
 

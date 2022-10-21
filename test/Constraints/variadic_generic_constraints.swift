@@ -3,6 +3,8 @@
 // Test instantiation of constraint solver constraints from generic requirements
 // involving type pack parameters
 
+// Conformance requirements
+
 protocol P {}
 
 func takesP<T...: P>(_: T...) {}  // expected-note {{where 'T' = 'DoesNotConformToP'}}
@@ -13,8 +15,9 @@ struct DoesNotConformToP {}
 takesP()  // ok
 takesP(ConformsToP(), ConformsToP(), ConformsToP())  // ok
 
-// FIXME: Bad diagnostic
 takesP(ConformsToP(), DoesNotConformToP(), ConformsToP()) // expected-error {{global function 'takesP' requires that 'DoesNotConformToP' conform to 'P'}}
+
+// Superclass requirements
 
 class C {}
 
@@ -27,6 +30,20 @@ takesC()  // ok
 takesC(SubclassOfC(), SubclassOfC(), SubclassOfC())  // ok
 
 takesC(SubclassOfC(), NotSubclassOfC(), SubclassOfC())  // expected-error {{global function 'takesC' requires that 'NotSubclassOfC' inherit from 'C'}}
+
+// Layout requirements
+
+struct S {}
+
+func takesAnyObject<T...: AnyObject>(_: T...) {}
+
+takesAnyObject()
+takesAnyObject(C(), C(), C())
+
+// FIXME: Bad diagnostic
+takesAnyObject(C(), S(), C())  // expected-error {{type of expression is ambiguous without more context}}
+
+// Same-type requirements
 
 func takesParallelSequences<T..., U...>(t: T..., u: U...) where T: Sequence, U: Sequence, T.Element == U.Element {}
 // expected-note@-1 {{where 'T.Element' = 'String', 'U.Element' = 'Int'}}
