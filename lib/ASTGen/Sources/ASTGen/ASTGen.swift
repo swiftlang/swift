@@ -17,7 +17,8 @@ extension UnsafePointer {
   }
 }
 
-/// Little utility wrapper that lets us
+/// Little utility wrapper that lets us have some mutable state within
+/// immutable structs, and is therefore pretty evil.
 @propertyWrapper
 class Boxed<Value> {
   var wrappedValue: Value
@@ -29,7 +30,7 @@ class Boxed<Value> {
 
 struct ASTGenVisitor: SyntaxTransformVisitor {
   let ctx: UnsafeMutableRawPointer
-  let base: UnsafePointer<CChar>
+  let base: UnsafePointer<UInt8>
 
   @Boxed var declContext: UnsafeMutableRawPointer
 
@@ -68,15 +69,18 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
   }
 }
 
-@_cdecl("parseTopLevelSwift")
-public func parseTopLevelSwift(
-    buffer: UnsafePointer<CChar>, dc: UnsafeMutableRawPointer,
-    ctx: UnsafeMutableRawPointer,
-    outputContext: UnsafeMutableRawPointer,
-    callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
+/// Generate AST nodes for all top-level entities in the given source file.
+@_cdecl("swift_ASTGen_buildTopLevelASTNodes")
+public func buildTopLevelASTNodes(
+  sourceFilePtr: UnsafePointer<UInt8>,
+  dc: UnsafeMutableRawPointer,
+  ctx: UnsafeMutableRawPointer,
+  outputContext: UnsafeMutableRawPointer,
+  callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
-  let syntax = try! Parser.parse(source: String(cString: buffer))
-  ASTGenVisitor(ctx: ctx, base: buffer, declContext: dc)
-    .visit(syntax)
-    .forEach { callback($0, outputContext) }
+  sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
+    ASTGenVisitor(ctx: ctx, base: sourceFile.pointee.buffer.baseAddress!, declContext: dc)
+      .visit(sourceFile.pointee.syntax)
+      .forEach { callback($0, outputContext) }
+  }
 }
