@@ -29,6 +29,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SILLayout.h"
@@ -4365,10 +4366,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Retrieve the member type with the given name.
 
-  // Tuples don't have member types.
-  if (substBase->is<TupleType>())
-    return failed();
-
   // If we know the associated type, look in the witness table.
   if (assocType) {
     auto proto = assocType->getProtocol();
@@ -4377,30 +4374,37 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     if (conformance.isInvalid())
       return failed();
-    if (!conformance.isConcrete())
-      return failed();
+
+    Type witnessTy;
 
     // Retrieve the type witness.
-    auto witness =
-        conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
+    if (conformance.isPack()) {
+      auto *packConformance = conformance.getPack();
 
-    auto witnessTy = witness.getWitnessType();
-    if (!witnessTy || witnessTy->hasError())
-      return failed();
+      witnessTy = packConformance->getAssociatedType(
+          assocType->getDeclaredInterfaceType());
+    } else if (conformance.isConcrete()) {
+      auto witness =
+          conformance.getConcrete()->getTypeWitnessAndDecl(assocType, options);
 
-    // This is a hacky feature allowing code completion to migrate to
-    // using Type::subst() without changing output.
-    if (options & SubstFlags::DesugarMemberTypes) {
-      if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
-        witnessTy = aliasType->getSinglyDesugaredType();
+      witnessTy = witness.getWitnessType();
+      if (!witnessTy || witnessTy->hasError())
+        return failed();
 
-      // Another hack. If the type witness is a opaque result type. They can
-      // only be referred using the name of the associated type.
-      if (witnessTy->is<OpaqueTypeArchetypeType>())
-        witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+      // This is a hacky feature allowing code completion to migrate to
+      // using Type::subst() without changing output.
+      if (options & SubstFlags::DesugarMemberTypes) {
+        if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+          witnessTy = aliasType->getSinglyDesugaredType();
+
+        // Another hack. If the type witness is a opaque result type. They can
+        // only be referred using the name of the associated type.
+        if (witnessTy->is<OpaqueTypeArchetypeType>())
+          witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+      }
     }
 
-    if (witnessTy->is<ErrorType>())
+    if (!witnessTy || witnessTy->is<ErrorType>())
       return failed();
 
     return witnessTy;
