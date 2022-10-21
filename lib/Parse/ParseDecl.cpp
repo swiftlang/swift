@@ -4898,6 +4898,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
       consumeToken(tok::code_complete);
       DeclResult = makeParserCodeCompletionResult<Decl>();
       break;
+    } else if (Context.LangOpts.hasFeature(Feature::Macros)) {
+      DeclParsingContext.setCreateSyntax(SyntaxKind::MacroExpansionDecl);
+      DeclResult = parseDeclMacroExpansion(Flags, Attributes);
+      break;
     }
     LLVM_FALLTHROUGH;
 
@@ -9187,4 +9191,41 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   if (hasCodeCompletion)
     return makeParserCodeCompletionResult(result);
   return makeParserResult(result);
+}
+
+ParserResult<MacroExpansionDecl>
+Parser::parseDeclMacroExpansion(ParseDeclOptions flags,
+                                DeclAttributes &attributes) {
+  SourceLoc poundLoc = consumeToken(tok::pound);
+  DeclNameLoc macroNameLoc;
+  DeclNameRef macroNameRef = parseDeclNameRef(
+      macroNameLoc, diag::macro_expansion_decl_expected_macro_identifier,
+      DeclNameOptions());
+  if (!macroNameRef)
+    return makeParserError();
+
+  ArgumentList *argList = nullptr;
+  if (Tok.isFollowingLParen()) {
+    auto result = parseArgumentList(tok::l_paren, tok::r_paren,
+                                    /*isExprBasic*/ false,
+                                    /*allowTrailingClosure*/ true);
+    if (result.hasCodeCompletion())
+      return makeParserCodeCompletionResult<MacroExpansionDecl>();
+    if (result.isParseError())
+      return makeParserError();
+    argList = result.get();
+  } else if (Tok.is(tok::l_brace)) {
+    SmallVector<Argument, 2> trailingClosures;
+    auto status = parseTrailingClosures(/*isExprBasic*/ false,
+                                        macroNameLoc.getSourceRange(),
+                                        trailingClosures);
+    if (status.isError() || trailingClosures.empty())
+      return makeParserError();
+    argList = ArgumentList::createParsed(Context, SourceLoc(),
+                                         trailingClosures, SourceLoc(),
+                                         /*trailingClosureIdx*/ 0);
+  }
+
+  return makeParserResult(new (Context) MacroExpansionDecl(
+      CurDeclContext, poundLoc, macroNameRef, macroNameLoc, argList));
 }

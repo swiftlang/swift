@@ -1306,6 +1306,9 @@ public:
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
+  ParserResult<MacroExpansionDecl>
+  parseDeclMacroExpansion(ParseDeclOptions flags, DeclAttributes &attributes);
+
   ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
 
   /// Get the location for a type error.
@@ -1809,6 +1812,7 @@ public:
                                             bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
+  ParserResult<Expr> parseExprMacroExpansion(bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);

@@ -5952,6 +5952,41 @@ public:
   }
 };
 
+class MacroExpansionExpr final : public Expr {
+private:
+  Expr *Macro;
+  Expr *Rewritten;
+  ArgumentList *ArgList;
+  SourceLoc PoundLoc;
+
+public:
+  explicit MacroExpansionExpr(SourceLoc poundLoc, Expr *macro,
+                              ArgumentList *argList, bool isImplicit = false,
+                              Type ty = Type())
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty), Macro(macro),
+        Rewritten(nullptr), ArgList(argList), PoundLoc(poundLoc) {}
+
+  Expr *getMacro() const { return Macro; }
+  void setMacro(Expr *macro) { Macro = macro; }
+
+  Expr *getRewritten() const { return Rewritten; }
+  void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
+
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
+
+  SourceLoc getLoc() const { return PoundLoc; }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(
+        PoundLoc, ArgList ? ArgList->getEndLoc() : Macro->getEndLoc());
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MacroExpansion;
+  }
+};
+
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<TernaryExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);

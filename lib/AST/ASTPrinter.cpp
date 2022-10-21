@@ -2733,6 +2733,10 @@ static bool usesFeatureActors(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureMacros(Decl *decl) {
+  return isa<MacroExpansionDecl>(decl);
+}
+
 static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
@@ -4429,6 +4433,24 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
   Printer << " */";
 }
 
+void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
+  Printer << '#' << decl->getMacro();
+  if (decl->getArgs()) {
+    Printer << '(';
+    auto args = decl->getArgs()->getOriginalArgs();
+    bool isFirst = true;
+    // FIXME: handle trailing closures.
+    for (auto arg : *args) {
+      if (!isFirst) {
+        Printer << ", ";
+      }
+      printArgument(arg);
+      isFirst = false;
+    }
+    Printer << ')';
+  }
+}
+
 void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
   Printer << expr->getDigitsText();
 }
@@ -4909,6 +4931,9 @@ void PrintAST::visitPropertyWrapperValuePlaceholderExpr(swift::PropertyWrapperVa
 }
 
 void PrintAST::visitDifferentiableFunctionExtractOriginalExpr(swift::DifferentiableFunctionExtractOriginalExpr *expr) {
+}
+
+void PrintAST::visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {

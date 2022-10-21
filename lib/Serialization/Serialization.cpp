@@ -1796,6 +1796,7 @@ static bool shouldSerializeMember(Decl *D) {
     return false;
 
   case DeclKind::EnumCase:
+  case DeclKind::MacroExpansion:
     return false;
 
   case DeclKind::OpaqueType:
@@ -4286,6 +4287,10 @@ public:
 
   void visitMissingMemberDecl(const MissingMemberDecl *) {
     llvm_unreachable("member placeholders shouldn't be serialized");
+  }
+
+  void visitMacroExpansionDecl(const MacroExpansionDecl *) {
+    llvm_unreachable("macro expansion decls shouldn't be serialized");
   }
 
   void visitBuiltinTupleDecl(const BuiltinTupleDecl *) {

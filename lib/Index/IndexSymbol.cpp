@@ -243,6 +243,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::Module:
     case DeclKind::OpaqueType:
     case DeclKind::BuiltinTuple:
+    case DeclKind::MacroExpansion:
       break;
   }
 
