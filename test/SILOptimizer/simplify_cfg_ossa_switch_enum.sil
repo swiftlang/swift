@@ -82,3 +82,147 @@ bb3:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum1 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum1'
+sil [ossa] @test_simplify_switch_enum1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum2 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum2'
+sil [ossa] @test_simplify_switch_enum2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum3 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum3'
+sil [ossa] @test_simplify_switch_enum3 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[2]"
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum4 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum4'
+sil [ossa] @test_simplify_switch_enum4 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[3]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  %f = function_ref @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  %c = apply %f(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum5 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum5'
+sil [ossa] @test_simplify_switch_enum5 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[4]"
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  %f = function_ref @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  %c = apply %f(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum6 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum6'
+sil [ossa] @test_simplify_switch_enum6 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2:
+  %4 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  br bb3(%4 : $FakeOptional<Klass>)
+
+bb3(%6 :@owned  $FakeOptional<Klass>):
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[7]"
+  switch_enum %6 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb5
+
+bb4(%8 : @owned $Klass):
+  destroy_value %8 : $Klass
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %t = tuple ()
+  return %t : $()
+}
+
