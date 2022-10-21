@@ -3975,8 +3975,9 @@ The following types of test arguments are supported:
 
 * Not counting instructions that are deleted when processing functions for tests.
   The following instructions currently are deleted:
-    test_specification
-    debug_value [trace]
+
+      test_specification
+      debug_value [trace]
 
 
 Profiling
