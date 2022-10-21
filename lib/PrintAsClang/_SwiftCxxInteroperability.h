@@ -217,7 +217,7 @@ struct SymbolicP {
   uint8_t _4;
 } __attribute__((packed));
 
-inline const void *_Nullable testErrorCall() {
+inline const void *_Nullable getErrorMetadata() {
   static swift::SymbolicP errorSymbol;
   static int *_Nonnull got_ss5ErrorMp = &$ss5ErrorMp;
   errorSymbol._1 = 2;
@@ -257,7 +257,7 @@ public:
   template<class T>
   T as() {
     alignas(alignof(T)) char buffer[sizeof(T)];
-    const void *em = testErrorCall();
+    const void *em = getErrorMetadata();
     void *ep = getPointerToOpaquePointer();
     auto metadata = swift::TypeMetadataTrait<T>::getTypeMetadata();
 
