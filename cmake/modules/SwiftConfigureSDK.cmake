@@ -374,7 +374,7 @@ macro(configure_sdk_unix name architectures)
           message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
         endif()
 
-        if(CMAKE_HOST_SYSTEM_NAME NOT STREQUAL FreeBSD)
+        if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL FreeBSD)
           message(WARNING "CMAKE_SYSTEM_VERSION will not match target")
         endif()
 
