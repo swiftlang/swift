@@ -172,6 +172,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
+  TRIVIAL_KIND(MacroExpansion);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -351,6 +352,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Requirement, "requirement");
   ENTRY(OpaqueResultType, "result");
   ENTRY(OpaqueVarType, "type");
+  ENTRY(MacroExpansion, "pound literal");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -1186,6 +1188,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -2633,6 +2636,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::MissingMember:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -9608,3 +9612,8 @@ bool ActorIsolation::isDistributedActor() const {
 BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
     : NominalTypeDecl(DeclKind::BuiltinTuple, Parent, Name, SourceLoc(),
                       ArrayRef<InheritedEntry>(), nullptr) {}
+
+SourceRange MacroExpansionDecl::getSourceRange() const {
+  return SourceRange(PoundLoc,
+                     ArgList ? ArgList->getEndLoc() : MacroLoc.getEndLoc());
+}

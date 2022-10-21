@@ -1219,6 +1219,12 @@ public:
       visitFuncDecl(accessor);
     });
   }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    auto *rewritten = med->getRewritten();
+    assert(rewritten && "Macro must have been rewritten in SILGen");
+    visit(rewritten);
+  }
 };
 
 } // end anonymous namespace
@@ -1382,6 +1388,12 @@ public:
     asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    auto *rewritten = med->getRewritten();
+    assert(rewritten && "Macro must have been rewritten in SILGen");
+    visit(rewritten);
   }
 };
 

@@ -1072,6 +1072,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::MacroExpansion:
     return false;
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");

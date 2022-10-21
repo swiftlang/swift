@@ -550,6 +550,7 @@ namespace {
     RValue visitLinearToDifferentiableFunctionExpr(
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
     RValue visitMoveExpr(MoveExpr *E, SGFContext C);
+    RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5941,6 +5942,13 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
   SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
   optTemp->finishInitialization(SGF);
   return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+}
+
+RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
+                                              SGFContext C) {
+  auto *rewritten = E->getRewritten();
+  assert(rewritten && "Macro should have been rewritten by SILGen");
+  return visit(rewritten, C);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

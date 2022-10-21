@@ -401,6 +401,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    if (MED->getArgs() && doIt(MED->getArgs()))
+      return true;
+    if (MED->getRewritten() && doIt(MED->getRewritten()))
+      return true;
+    return false;
+  }
+
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
@@ -1235,6 +1243,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
+    return E;
+  }
+
+  Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
+    auto *macro = doIt(E->getMacro());
+    if (!macro) return nullptr;
+    Expr *rewritten = nullptr;
+    if (E->getRewritten()) {
+      rewritten = doIt(E->getRewritten());
+      if (!rewritten) return nullptr;
+    }
+    ArgumentList *args = nullptr;
+    if (E->getArgs()) {
+      args = doIt(E->getArgs());
+      if (!args) return nullptr;
+    }
+    E->setMacro(macro);
+    E->setRewritten(rewritten);
+    E->setArgs(args);
     return E;
   }
 

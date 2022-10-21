@@ -1998,5 +1998,14 @@ ERROR(expected_multiple_closures_block_rbrace,none,
 ERROR(foreign_diagnostic,none,
       "%0", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: macro expansion
+//------------------------------------------------------------------------------
+
+ERROR(macro_expansion_expr_expected_macro_identifier,none,
+      "expected a macro identifier for a pound literal expression", ())
+ERROR(macro_expansion_decl_expected_macro_identifier,none,
+      "expected a macro identifier for a pound literal declaration", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1769,6 +1769,12 @@ void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
   llvm_unreachable("top-level subscript?");
 }
 
+void SILGenModule::visitMacroExpansionDecl(MacroExpansionDecl *d) {
+  auto *rewritten = d->getRewritten();
+  assert(rewritten && "Macro must have been rewritten in SILGen");
+  visit(rewritten);
+}
+
 bool
 SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                                   ResilienceExpansion expansion) {
