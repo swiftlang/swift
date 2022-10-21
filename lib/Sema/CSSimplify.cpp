@@ -2412,17 +2412,16 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
                                  ConstraintKind kind, TypeMatchOptions flags,
                                  ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-  if (pack1->getNumElements() != pack2->getNumElements())
+
+  PackMatcher matcher(pack1->getElementTypes(), pack2->getElementTypes(),
+                      getASTContext());
+  if (matcher.match())
     return getTypeMatchFailure(locator);
 
-  for (unsigned i = 0, n = pack1->getNumElements(); i != n; ++i) {
-    Type ty1 = pack1->getElementType(i);
-    Type ty2 = pack2->getElementType(i);
-
-    // Compare the element types.
-    auto result =
-        matchTypes(ty1, ty2, kind, subflags,
-                   locator.withPathElement(LocatorPathElt::PackElement(i)));
+  for (auto pair : matcher.pairs) {
+    auto result = matchTypes(pair.lhs, pair.rhs, kind, subflags,
+                             locator.withPathElement(
+                                 LocatorPathElt::PackElement(pair.idx)));
     if (result.isFailure())
       return result;
   }
