@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -c %t/use-cxx-types.swift -disable-availability-checking  -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 
-// RUN: %target-swift-frontend -c %t/use-cxx-types.swift -disable-availability-checking  -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTyExposeOnly.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTyExposeOnly.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr
 
 // RUN: %FileCheck %s < %t/UseCxxTyExposeOnly.h
 
@@ -39,7 +39,6 @@ namespace ns {
         ~NonTrivialTemplate() {}
     };
 
-    using NonTrivialTemplateCInt = NonTrivialTemplate<int>;
     using TypeAlias = NonTrivialTemplate<TrivialinNS>;
 
     struct NonTrivialImplicitMove {
@@ -90,8 +89,13 @@ public func retImmortalTemplate() -> ns.ImmortalCInt {
 }
 
 @_expose(Cxx)
-public func retNonTrivial() -> ns.NonTrivialTemplateCInt {
+public func retNonTrivial() -> ns.NonTrivialTemplate<CInt> {
     return ns.NonTrivialTemplate<CInt>()
+}
+
+@_expose(Cxx)
+public func retNonTrivial2() -> ns.NonTrivialTemplate<ns.TrivialinNS> {
+    return ns.NonTrivialTemplate<ns.TrivialinNS>()
 }
 
 @_expose(Cxx)
@@ -118,7 +122,7 @@ public func takeImmortalTemplate(_ x: ns.ImmortalCInt) {
 }
 
 @_expose(Cxx)
-public func takeNonTrivial2(_ x: ns.TypeAlias) {
+public func takeNonTrivial2(_ x: ns.NonTrivialTemplate<ns.TrivialinNS>) {
 }
 
 @_expose(Cxx)
@@ -149,6 +153,36 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: return _impl::$s8UseCxxTy19retImmortalTemplateSo2nsO02__bf10InstN2ns16eF4IiEEVyF();
 // CHECK-NEXT: }
 
+// CHECK: } // end namespace
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace swift {
+// CHECK-NEXT: namespace _impl {
+// CHECK-EMPTY:
+// CHECK-NEXT: // Type metadata accessor for __CxxTemplateInstN2ns18NonTrivialTemplateIiEE
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC4IiEEVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-EMPTY:
+// CHECK-EMPTY:
+// CHECK-NEXT: } // namespace _impl
+// CHECK-EMPTY:
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<ns::NonTrivialTemplate<int>> = true;
+// CHECK-NEXT: template<>
+// CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplate<int>> {
+// CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:     return _impl::$sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC4IiEEVMa(0)._0;
+// CHECK-NEXT:   }
+// CHECK-NEXT: };
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: template<>
+// CHECK-NEXT: static inline const constexpr bool isSwiftBridgedCxxRecord<ns::NonTrivialTemplate<int>> = true;
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace UseCxxTy {
+
 // CHECK: inline ns::NonTrivialTemplate<int> retNonTrivial() noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<int>)) char storage[sizeof(ns::NonTrivialTemplate<int>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<int> *>(storage);
@@ -163,8 +197,8 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: namespace swift {
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
-// CHECK-NEXT: // Type metadata accessor for NonTrivialImplicitMove
-// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO22NonTrivialImplicitMoveVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: // Type metadata accessor for __CxxTemplateInstN2ns18NonTrivialTemplateINS_11TrivialinNSEEE
+// CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC20INS_11TrivialinNSEEEVMa(swift::_impl::MetadataRequestTy) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace _impl
@@ -172,21 +206,31 @@ public func takeTrivialInout(_ x: inout Trivial) {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<ns::NonTrivialImplicitMove> = true;
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<ns::NonTrivialTemplate<ns::TrivialinNS>> = true;
 // CHECK-NEXT: template<>
-// CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialImplicitMove> {
+// CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplate<ns::TrivialinNS>> {
 // CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return _impl::$sSo2nsO22NonTrivialImplicitMoveVMa(0)._0;
+// CHECK-NEXT:     return _impl::$sSo2nsO033__CxxTemplateInstN2ns18NonTrivialC20INS_11TrivialinNSEEEVMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isSwiftBridgedCxxRecord<ns::NonTrivialImplicitMove> = true;
+// CHECK-NEXT: static inline const constexpr bool isSwiftBridgedCxxRecord<ns::NonTrivialTemplate<ns::TrivialinNS>> = true;
 // CHECK-NEXT: } // namespace
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
+// CHECK-EMPTY:
+// CHECK-NEXT: namespace UseCxxTy {
+// CHECK-EMPTY:
+// CHECK-NEXT: inline ns::NonTrivialTemplate<ns::TrivialinNS> retNonTrivial2() noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];
+// CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<ns::TrivialinNS> *>(storage);
+// CHECK-NEXT: _impl::$s8UseCxxTy14retNonTrivial2So2nsO02__b18TemplateInstN2ns18e7TrivialH20INS_11TrivialinNSEEEVyF(storage);
+// CHECK-NEXT: ns::NonTrivialTemplate<ns::TrivialinNS> result(static_cast<ns::NonTrivialTemplate<ns::TrivialinNS> &&>(*storageObjectPtr));
+// CHECK-NEXT: storageObjectPtr->~NonTrivialTemplate();
+// CHECK-NEXT: return result;
+// CHECK-NEXT: }
 
-// CHECK: namespace UseCxxTy {
 // CHECK: inline ns::NonTrivialImplicitMove retNonTrivialImplicitMove() noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialImplicitMove)) char storage[sizeof(ns::NonTrivialImplicitMove)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialImplicitMove *>(storage);
