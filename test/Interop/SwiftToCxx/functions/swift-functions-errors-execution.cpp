@@ -28,10 +28,8 @@ int main() {
     Functions::throwFunction();
   } catch (swift::Error& e) {
       auto errorVal = e.as<Functions::NaiveErrors>();
-      if (errorVal) {
-        assert(errorVal == Functions::NaiveErrors::throwError);
-        errorVal->getMessage();
-      }
+      assert(errorVal == Functions::NaiveErrors::throwError);
+      errorVal.getMessage();
   }
   try {
     Functions::throwFunctionWithReturn();
