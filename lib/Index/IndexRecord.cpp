@@ -515,6 +515,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
 
   // Reload resilient modules from swiftinterface to avoid indexing
   // internal details.
+  bool skipIndexingModule = false;
   if (module->getResilienceStrategy() == ResilienceStrategy::Resilient) {
     module->getASTContext().setIgnoreAdjacentModules(true);
 
@@ -525,7 +526,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       module = reloadedModule;
     } else {
       // If we can't rebuild from the swiftinterface, don't index this module.
-      return true;
+      skipIndexingModule = true;
     }
   }
 
@@ -536,7 +537,10 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // Pairs of (recordFile, groupName).
   std::vector<std::pair<std::string, std::string>> records;
 
-  if (!module->isStdlibModule()) {
+  if (skipIndexingModule) {
+    // Don't add anything to records but keep going so we still mark the module
+    // as indexed to avoid rebuilds of broken swiftinterfaces.
+  } else if (!module->isStdlibModule()) {
     std::string recordFile;
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),
