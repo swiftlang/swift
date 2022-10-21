@@ -13,8 +13,6 @@
 
 // CHECK: }
 
-// XFAIL: *
-
 @_expose(Cxx)
 public enum NaiveErrors : Error {
     case returnError
