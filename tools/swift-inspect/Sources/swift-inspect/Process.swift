@@ -81,6 +81,12 @@ internal func process(matching: String) -> ProcessIdentifier? {
 
   return matches.first?.0
 }
+#elseif os(Linux)
+internal typealias ProcessIdentifier = Linux64RemoteProcess.ProcessIdentifier
+
+internal func process(matching: String) -> ProcessIdentifier? {
+  Int32(matching, radix: 10)
+}
 #else
 #error("Unsupported platform")
 #endif

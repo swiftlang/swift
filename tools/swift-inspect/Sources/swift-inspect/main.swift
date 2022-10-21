@@ -61,6 +61,11 @@ internal func inspect(options: UniversalOptions,
     print("Failed to create inspector for process id \(processId)")
     return
   }
+#elseif os(Linux)
+  guard let process = Linux64RemoteProcess(processId: processId) else {
+    print("Failed to create inspector for process id \(processId)")
+    return
+  }
 #else
 #error("Unsupported platform")
 #endif

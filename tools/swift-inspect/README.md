@@ -1,3 +1,21 @@
+# disclaimer
+This is **work in progress** version of `swift-inpect` which depends on [mikolasstuchlik/memtool](https://github.com/mikolasstuchlik/memtool). I hesistate to (and probably never will) include this package in the SPM manifest of `swift-inspect`.
+Check out this package and build it - then link the products manually via the helper script.
+
+```bash
+# Example
+python3 build_script_helper.py --package-path . \
+                               --build-path .build \
+                               --toolchain /usr/local/bin/swift/ \
+                               --configuration debug \
+                               --memtool-product /home/mikolas/Developer/ptrace/memtool/.build/x86_64-unknown-linux-gnu/debug \
+                               --swift-repo /home/mikolas/Developer/swift5.7/swift
+```
+
+The helper script provided with this WIP version works on linux only and requires `--memtool-product` path to the directory containing `.swiftmodule` and `.so` of `MemtoolCore` and other dependencies. The `--swift-repo` path should lead to a checkout of the `apple/swift` repository.
+
+In the default configuration, log of each method execution is printed on stdout. If you don't wish to see it, remove the `-Xswiftc -DDIAGNOSTIC`.
+
 # swift-inspect
 
 swift-inspect is a debugging tool which allows you to inspect a live Swift process to gain insight into the runtime interactions of the application.
