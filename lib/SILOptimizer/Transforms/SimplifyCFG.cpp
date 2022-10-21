@@ -2076,12 +2076,6 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *LiveBlock = SEI->getCaseDestination(EnumCase.get());
   auto *ThisBB = SEI->getParent();
 
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    // TODO: OSSA; cleanup terminator results.
-    if (!SEI->getOperand()->getType().isTrivial(Fn))
-      return false;
-  }
-
   bool DroppedLiveBlock = false;
   // Copy the successors into a vector, dropping one entry for the liveblock.
   SmallVector<SILBasicBlock*, 4> Dests;
@@ -2096,6 +2090,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   LLVM_DEBUG(llvm::dbgs() << "fold switch " << *SEI);
 
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
+  auto loc = SEI->getLoc();
   SILBuilderWithScope Builder(SEI);
   if (!LiveBlock->args_empty()) {
     SILValue PayLoad;
@@ -2103,22 +2098,19 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
       assert(Fn.hasOwnership() && "Only OSSA default case has an argument");
       PayLoad = SEI->getOperand();
     } else {
-      if (EI) {
-        PayLoad = EI->getOperand();
-      } else {
-        PayLoad = Builder.createUncheckedEnumData(SEI->getLoc(),
-                                                  SEI->getOperand(),
-                                                  EnumCase.get());
-      }
+      PayLoad = Builder.createUncheckedEnumData(loc, SEI->getOperand(),
+                                                EnumCase.get());
     }
-    Builder.createBranch(SEI->getLoc(), LiveBlock, PayLoad);
+    Builder.createBranch(loc, LiveBlock, PayLoad);
   } else {
-    Builder.createBranch(SEI->getLoc(), LiveBlock);
+    Builder.createBranch(loc, LiveBlock);
   }
+
   SEI->eraseFromParent();
-  // TODO: also remove this EnumInst in OSSA default case when the only
-  // remaining uses are destroys, and incidental uses.
-  if (EI && EI->use_empty()) EI->eraseFromParent();
+  if (EI && isInstructionTriviallyDead(EI)) {
+    EI->replaceAllUsesOfAllResultsWithUndef();
+    EI->eraseFromParent();
+  }
 
   addToWorklist(ThisBB);
 
