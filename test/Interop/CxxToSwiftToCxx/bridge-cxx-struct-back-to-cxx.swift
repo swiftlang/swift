@@ -1,3 +1,6 @@
+// rdar://101431096
+// XFAIL: *
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
