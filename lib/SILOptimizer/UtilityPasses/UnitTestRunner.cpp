@@ -13,7 +13,7 @@
 // TO ADD A NEW TEST, search in this file for [new_tests]
 //
 // Provides a mechanism for doing faux unit tests.  The idea is to emulate the
-// basic function of calling a function and validating its results/effects.
+// basic functionality of calling a function and validating its results/effects.
 //
 // This is done via the test_specification instruction.  Using one or more
 // instances of it in your function, you can specify which test (i.e. UnitTest
