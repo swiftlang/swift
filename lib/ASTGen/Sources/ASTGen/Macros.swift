@@ -20,11 +20,17 @@ extension SyntaxProtocol {
   }
 }
 
-@_cdecl("swift_ASTGen_printMacroResult")
-public func printMacroResult(
-  sourceFilePtr: UnsafeRawPointer,
-  sourceLocationPtr: UnsafePointer<UInt8>?
+@_cdecl("swift_ASTGen_evaluateMacro")
+public func evaluateMacro(
+  sourceFilePtr: UnsafePointer<UInt8>,
+  sourceLocationPtr: UnsafePointer<UInt8>?,
+  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  expandedSourceLength: UnsafeMutablePointer<Int>
 ) -> Int {
+  // We didn't expand anything so far.
+  expandedSourcePointer.pointee = nil
+  expandedSourceLength.pointee = 0
+
   guard let sourceLocationPtr = sourceLocationPtr else {
     print("NULL source location")
     return -1
@@ -68,7 +74,17 @@ public func printMacroResult(
       /* TODO: Report errors */
     }
 
-    print("Macro rewrite: \(parentSyntax.withoutTrivia()) --> \(evaluatedSyntax.withoutTrivia())")
+    var evaluatedSyntaxStr = evaluatedSyntax.withoutTrivia().description
+    evaluatedSyntaxStr.withUTF8 { utf8 in
+      let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
+      if let baseAddress = utf8.baseAddress {
+        evaluatedResultPtr.initialize(from: baseAddress, count: utf8.count)
+      }
+      evaluatedResultPtr[utf8.count] = 0
+
+      expandedSourcePointer.pointee = UnsafePointer(evaluatedResultPtr)
+      expandedSourceLength.pointee = utf8.count + 1
+    }
 
     return 0
   }

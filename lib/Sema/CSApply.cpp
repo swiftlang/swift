@@ -54,8 +54,9 @@
 using namespace swift;
 using namespace constraints;
 
-extern "C" ptrdiff_t swift_ASTGen_printMacroResult(
-    void *sourceFile, const void *sourceLocation);
+extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
+    void *sourceFile, const void *sourceLocation,
+    const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 bool Solution::hasFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -2978,8 +2979,18 @@ namespace {
       if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
         if (auto sf = dc->getParentSourceFile()) {
           if (auto astGenSF = sf->exportedSourceFile) {
-            swift_ASTGen_printMacroResult(
-                astGenSF, expr->getStartLoc().getOpaquePointerValue());
+            const char *evaluatedSource;
+            ptrdiff_t evaluatedSourceLength;
+            swift_ASTGen_evaluateMacro(
+                astGenSF, expr->getStartLoc().getOpaquePointerValue(),
+                &evaluatedSource, &evaluatedSourceLength);
+            if (evaluatedSource) {
+              llvm::outs() << "Macro rewrite: "
+                << MagicIdentifierLiteralExpr::getKindString(expr->getKind())
+                << " --> " << StringRef(evaluatedSource, evaluatedSourceLength)
+                << "\n";
+              free((void*)evaluatedSource);
+            }
           }
         }
       }
