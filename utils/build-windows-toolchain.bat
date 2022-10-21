@@ -726,13 +726,10 @@ setlocal enableextensions enabledelayedexpansion
 git config --global core.symlink true
 
 :: FIXME(compnerd) avoid the fresh clone
-rd /s /q zlib libxml2 sqlite icu curl
+rd /s /q sqlite icu
 
-git clone --quiet --no-tags --depth 1 --branch v1.2.11 https://github.com/madler/zlib
-git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/libxml2
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
 git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
-git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
 
 goto :eof
 endlocal
