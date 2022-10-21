@@ -527,6 +527,9 @@ public:
                        })) {
         return Kind::Invalid;
       }
+      if (isGuaranteedForwardingPhi(value)) {
+        return Kind::Invalid;
+      }
       return Kind::Phi;
     }
     }
