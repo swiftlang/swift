@@ -18,6 +18,7 @@
 #define SWIFT_SIL_PARSETESTSPECIFICATION
 
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/StringRef.h"
@@ -31,6 +32,7 @@ using llvm::StringRef;
 namespace swift {
 
 class SILFunction;
+class SILArgument;
 
 namespace test {
 
@@ -42,6 +44,7 @@ struct Argument {
     Value,
     Operand,
     Instruction,
+    BlockArgument,
     Block,
     Function,
   };
@@ -51,6 +54,7 @@ struct Argument {
                             SILValue,           // ValueArgument
                             Operand *,          // OperandArgument
                             SILInstruction *,   // InstructionArgument
+                            SILArgument *,      // BlockArgumentArgument
                             SILBasicBlock *,    // BlockArgument
                             SILFunction *       // FunctionArgument
                             >;
@@ -87,6 +91,11 @@ struct OperandArgument : ConcreteArgument<Operand *, Argument::Kind::Operand> {
 struct InstructionArgument
     : ConcreteArgument<SILInstruction *, Argument::Kind::Instruction> {
   InstructionArgument(SILInstruction *stored) : Super(stored) {}
+};
+
+struct BlockArgumentArgument
+    : ConcreteArgument<SILArgument *, Argument::Kind::BlockArgument> {
+  BlockArgumentArgument(SILArgument *stored) : Super(stored) {}
 };
 
 struct BlockArgument
@@ -146,6 +155,9 @@ struct Arguments {
       auto *instruction = cast<InstructionArgument>(argument).getValue();
       auto *svi = cast<SingleValueInstruction>(instruction);
       return svi;
+    } else if (isa<BlockArgumentArgument>(argument)) {
+      auto *arg = cast<BlockArgumentArgument>(argument).getValue();
+      return arg;
     }
     return cast<ValueArgument>(argument).getValue();
   }
@@ -154,6 +166,9 @@ struct Arguments {
   }
   SILInstruction *takeInstruction() {
     return cast<InstructionArgument>(takeArgument()).getValue();
+  }
+  SILArgument *takeBlockArgument() {
+    return cast<BlockArgumentArgument>(takeArgument()).getValue();
   }
   SILBasicBlock *takeBlock() {
     return cast<BlockArgument>(takeArgument()).getValue();

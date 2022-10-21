@@ -133,6 +133,23 @@ exit:
   return %retval : $()
 }
 
+struct X {}
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_arg_arg_parsing: test-specification-parsing
+// CHECK: argument:
+// CHECK: %0 = argument of bb0 : $X
+// CHECK: argument:
+// CHECK: %0 = argument of bb0 : $X
+// CHECK: argument:
+// CHECK: %0 = argument of bb0 : $X
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_arg_parsing: test-specification-parsing
+sil [ossa] @test_arg_arg_parsing : $(X) -> () {
+entry(%instance : $X):
+  test_specification "test-specification-parsing AAA @argument @block.argument @function.argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
 class C {}
 
 sil [ossa] @getC : $@convention(thin) () -> @owned C

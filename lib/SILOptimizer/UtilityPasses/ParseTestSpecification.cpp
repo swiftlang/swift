@@ -342,6 +342,31 @@ private:
     return OperandArgument{operand};
   }
 
+  SILArgument *parseBlockArgumentComponent(SILBasicBlock *block) {
+    if (!consumePrefix("argument"))
+      return nullptr;
+    // If this is a bare @argument reference, it refers to the first argument
+    // of the block containing the test_specification.
+    if (!block) {
+      block = context->getParent();
+    }
+    if (empty()) {
+      return block->getArgument(0);
+    }
+    if (auto subscript = parseSubscript()) {
+      auto index = subscript->get<unsigned long long>();
+      return block->getArgument(index);
+    }
+    llvm_unreachable("bad suffix after 'argument'!?");
+  }
+
+  Optional<Argument> parseBlockArgumentReference(SILBasicBlock *block) {
+    auto *argument = parseBlockArgumentComponent(block);
+    if (!argument)
+      return llvm::None;
+    return BlockArgumentArgument{argument};
+  }
+
   using InstructionContext = TaggedUnion<SILFunction *, SILBasicBlock *>;
 
   SILInstruction *
@@ -424,8 +449,10 @@ private:
       return llvm::None;
     if (!consumePrefix("."))
       return BlockArgument{block};
-    if (auto arg = parseInstructionReference({block}))
+    if (auto arg = parseBlockArgumentReference(block))
       return *arg;
+    if (auto inst = parseInstructionReference({block}))
+      return *inst;
     llvm_unreachable("unhandled suffix after 'block'!?");
   }
 
@@ -465,6 +492,8 @@ private:
       return llvm::None;
     if (!consumePrefix("."))
       return FunctionArgument{function};
+    if (auto arg = parseBlockArgumentReference(function->getEntryBlock()))
+      return *arg;
     if (auto arg = parseInstructionReference({function}))
       return *arg;
     if (auto arg = parseTraceReference(function))
@@ -481,6 +510,8 @@ private:
       return *arg;
     if (auto arg =
             parseOperandReference(getInstruction(context->getFunction(), 0)))
+      return *arg;
+    if (auto arg = parseBlockArgumentReference(nullptr))
       return *arg;
     if (auto arg = parseInstructionReference(llvm::None))
       return *arg;
