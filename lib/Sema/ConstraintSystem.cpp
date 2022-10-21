@@ -6708,7 +6708,17 @@ SourceRange constraints::getSourceRange(ASTNode anchor) {
 
 static Optional<Requirement> getRequirement(ConstraintSystem &cs,
                                             ConstraintLocator *reqLocator) {
-  auto reqLoc = reqLocator->getLastElementAs<LocatorPathElt::AnyRequirement>();
+  ArrayRef<LocatorPathElt> path = reqLocator->getPath();
+
+  // If we have something like ... -> type req # -> pack element #, we're
+  // solving a requirement of the form T : P where T is a type parameter pack
+  if (!path.empty() && path.back().is<LocatorPathElt::PackElement>())
+    path = path.drop_back();
+
+  if (path.empty())
+    return None;
+
+  auto reqLoc = path.back().getAs<LocatorPathElt::AnyRequirement>();
   if (!reqLoc)
     return None;
 
