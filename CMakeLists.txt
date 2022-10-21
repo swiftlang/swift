@@ -321,6 +321,10 @@ if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
   add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
 endif()
 
+set(SWIFT_TOOLS_INSTALL_DIR "bin" CACHE PATH
+  "Path for binary subdirectory to use during installation.
+  Used by add_swift_tool_symlink in AddSwift.cmake so that llvm_install_symlink generates the installation script properly.")
+
 #
 # User-configurable Swift Standard Library specific options.
 #
