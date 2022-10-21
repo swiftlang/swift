@@ -10,7 +10,7 @@ public struct Wrapper<W, S> {
   public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
                       storageKeyPath storagePath: KeyPath<S, V>) -> V {
     get {
-      print("in read-only getter storage: \(storagePath), property: \(propertyPath)")
+      print("in read-only getter storage: \(storagePath)")
       return underlying[keyPath: storagePath]
     }
   }
@@ -18,7 +18,7 @@ public struct Wrapper<W, S> {
   public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
                       storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
     get {
-      print("in getter storage: \(storagePath), property: \(propertyPath)")
+      print("in getter storage: \(storagePath)")
       return underlying[keyPath: storagePath]
     }
     set {
@@ -31,7 +31,7 @@ public struct Wrapper<W, S> {
                       propertyKeyPath propertyPath: KeyPath<W, V>,
                       storageKeyPath storagePath: KeyPath<S, V>) -> V {
     get {
-      print("in (reference type) let getter storage: \(storagePath), property: \(propertyPath)")
+      print("in (reference type) let getter storage: \(storagePath)")
       return underlying[keyPath: storagePath]
     }
   }
@@ -40,7 +40,7 @@ public struct Wrapper<W, S> {
                       propertyKeyPath propertyPath: KeyPath<W, V>,
                       storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
     get {
-      print("in (reference type) getter storage: \(storagePath), property: \(propertyPath)")
+      print("in (reference type) getter storage: \(storagePath)")
       return underlying[keyPath: storagePath]
     }
     set {
