@@ -40,7 +40,7 @@ public func parseSourceFile(
 /// Deallocate a parsed source file.
 @_cdecl("swift_ASTGen_destroySourceFile")
 public func destroySourceFile(
-  sourceFilePtr: UnsafeMutableRawPointer
+  sourceFilePtr: UnsafeMutablePointer<UInt8>
 ) {
   sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
     sourceFile.deinitialize(count: 1)

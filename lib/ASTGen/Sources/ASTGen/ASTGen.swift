@@ -72,7 +72,7 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,
   ctx: UnsafeMutableRawPointer,
   outputContext: UnsafeMutableRawPointer,
