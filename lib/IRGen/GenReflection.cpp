@@ -1558,6 +1558,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
       needsOpaqueDescriptor = true;
   }
 
+  if (auto *CD = dyn_cast<ClassDecl>(D)) {
+    if (CD->getObjCImplementationDecl())
+      needsFieldDescriptor = false;
+  }
+
   // If the type has custom @_alignment, emit a fixed record with the
   // alignment since remote mirrors will need to treat the type as opaque.
   //

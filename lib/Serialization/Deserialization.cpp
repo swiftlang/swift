@@ -5091,6 +5091,20 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::ObjCImplementation_DECL_ATTR: {
+        bool isImplicit;
+        bool isCategoryNameInvalid;
+        uint64_t categoryNameID;
+        serialization::decls_block::ObjCImplementationDeclAttrLayout::
+            readRecord(scratch, isImplicit, isCategoryNameInvalid,
+                       categoryNameID);
+        Identifier categoryName = MF.getIdentifier(categoryNameID);
+        Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
+                                                SourceRange(), isImplicit,
+                                                isCategoryNameInvalid);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

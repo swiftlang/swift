@@ -1492,6 +1492,42 @@ ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
 
+ERROR(attr_objc_implementation_must_be_unconditional,none,
+      "only unconditional extensions can implement an Objective-C '@interface'",
+      ())
+ERROR(attr_objc_implementation_must_extend_class,none,
+      "cannot mark extension of %0 %1 with '@_objcImplementation'; it is not "
+      "an imported Objective-C class",
+      (DescriptiveDeclKind, ValueDecl *))
+ERROR(attr_objc_implementation_must_be_imported,none,
+      "'@_objcImplementation' cannot be used to extend %0 %1 because it was "
+      "defined by a Swift 'class' declaration, not an imported Objective-C "
+      "'@interface' declaration",
+      (DescriptiveDeclKind, ValueDecl *))
+ERROR(attr_objc_implementation_category_not_found,none,
+      "could not find category %0 on Objective-C class %1; make sure your "
+      "umbrella or bridging header imports the header that declares it",
+      (Identifier, ValueDecl*))
+NOTE(attr_objc_implementation_fixit_remove_category_name,none,
+     "remove arguments to implement the main '@interface' for this class",
+     ())
+ERROR(attr_objc_implementation_no_objc_final,none,
+      "%0 %1 cannot be 'final' because Objective-C subclasses of %2 can "
+      "override it",
+      (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
+
+ERROR(member_of_objc_implementation_not_objc_or_final,none,
+      "%0 %1 does not match any %0 declared in the headers for %2; did you use "
+      "the %0's Swift name?",
+      (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
+NOTE(fixit_add_objc_for_objc_implementation,none,
+     "add '@objc' to define an Objective-C-compatible %0 not declared in "
+     "the header",
+     (DescriptiveDeclKind))
+NOTE(fixit_add_final_for_objc_implementation,none,
+     "add 'final' to define a Swift %0 that cannot be overridden",
+     (DescriptiveDeclKind))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,

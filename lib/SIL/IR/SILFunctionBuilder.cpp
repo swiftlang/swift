@@ -309,7 +309,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
-    if (constant.isForeign && decl->hasClangNode())
+    if (constant.isForeign && decl->hasClangNode() &&
+        !decl->getObjCImplementationDecl())
       F->setClangNodeOwner(decl);
 
     if (auto availability = constant.getAvailabilityForLinkage())

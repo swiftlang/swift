@@ -1351,6 +1351,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
+  case DAK_ObjCImplementation:
+    return "_objcImplementation";
   case DAK_MainType:
     return "main";
   case DAK_DynamicReplacement:

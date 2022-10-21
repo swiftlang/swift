@@ -723,6 +723,13 @@ protected:
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
 
+  /// The imported Clang declaration representing the \c @_objcInterface for
+  /// this declaration (or vice versa), or \c nullptr if there is none.
+  ///
+  /// If \c this (an otherwise nonsensical value), the value has not yet been
+  /// computed.
+  Decl *CachedObjCImplementationDecl;
+
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
@@ -740,7 +747,7 @@ private:
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
-    : Context(context) {
+    : Context(context), CachedObjCImplementationDecl(this) {
     Bits.OpaqueBits = 0;
     Bits.Decl.Kind = unsigned(kind);
     Bits.Decl.Invalid = false;
@@ -973,6 +980,32 @@ public:
       return nullptr;
 
     return getClangNodeImpl().getAsMacro();
+  }
+
+  /// If this is the Swift implementation of a declaration imported from ObjC,
+  /// returns the imported declaration. Otherwise return \c nullptr.
+  ///
+  /// \seeAlso ExtensionDecl::isObjCInterface()
+  Decl *getImplementedObjCDecl() const;
+
+  /// If this is the ObjC interface of a declaration implemented in Swift,
+  /// returns the implementating declaration. Otherwise return \c nullptr.
+  ///
+  /// \seeAlso ExtensionDecl::isObjCInterface()
+  Decl *getObjCImplementationDecl() const;
+
+  Optional<Decl *> getCachedObjCImplementationDecl() const {
+    if (CachedObjCImplementationDecl == this)
+      return None;
+    return CachedObjCImplementationDecl;
+  }
+
+  void setCachedObjCImplementationDecl(Decl *decl) {
+    assert((CachedObjCImplementationDecl == this
+              || CachedObjCImplementationDecl == decl)
+               && "can't change CachedObjCInterfaceDecl once it's computed");
+    assert(decl != this && "can't form circular reference");
+    CachedObjCImplementationDecl = decl;
   }
 
   /// Return the GenericContext if the Decl has one.
@@ -1495,6 +1528,16 @@ public:
   /// extension mangling, because an extension method implementation could be
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
+
+  /// True if this extension provides an implementation for an imported
+  /// Objective-C \c \@interface. This implies various restrictions and special
+  /// behaviors for its members.
+  bool isObjCImplementation() const;
+
+  /// Returns the name of the category specified by the \c \@_objcImplementation
+  /// attribute, or \c None if the name is invalid. Do not call unless
+  /// \c isObjCImplementation() returns \c true.
+  Optional<Identifier> getCategoryNameForObjCImplementation() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4459,6 +4502,12 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Return the imported declaration for the category with the given name; this
+  /// will always be an Objective-C-backed \c ExtensionDecl or, if \p name is
+  /// empty, \c ClassDecl. Returns \c nullptr if the class was not imported from
+  /// Objective-C or does not have an imported category by that name.
+  IterableDeclContext *getImportedObjCCategory(Identifier name) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
