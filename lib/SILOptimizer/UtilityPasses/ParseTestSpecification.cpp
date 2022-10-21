@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/ParseTestSpecification.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILSuccessor.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -84,55 +85,75 @@ SILInstruction *getInstruction(SILBasicBlock *block, unsigned long index) {
   llvm_unreachable("bad index!?");
 }
 
+SILBasicBlock *getNextBlock(SILBasicBlock *block) {
+  auto next = std::next(block->getIterator());
+  if (next == block->getFunction()->end())
+    return nullptr;
+  return &*next;
+}
+
+SILBasicBlock *getPreviousBlock(SILBasicBlock *block) {
+  auto iterator = block->getIterator();
+  if (iterator == block->getFunction()->begin())
+    return nullptr;
+  return &*std::prev(iterator);
+}
+
+SILInstruction *getNextInstructionIgnoringBlocks(SILInstruction *instruction) {
+  if (auto *nextInstruction = instruction->getNextInstruction())
+    return nextInstruction;
+  if (auto *nextBlock = getNextBlock(instruction->getParent()))
+    return &nextBlock->front();
+  return nullptr;
+}
+
+SILInstruction *
+getPreviousInstructionIgnoringBlocks(SILInstruction *instruction) {
+  if (auto *previousInstruction = instruction->getPreviousInstruction())
+    return previousInstruction;
+  if (auto *previousBlock = getPreviousBlock(instruction->getParent()))
+    return &previousBlock->back();
+  return nullptr;
+}
+
 SILInstruction *getInstructionOffsetFrom(SILInstruction *base, long offset) {
   if (offset == 0) {
     return base;
   }
+  auto *instruction = base;
   if (offset > 0) {
-    Optional<unsigned long> baseIndex;
-    unsigned long index = 0;
-    for (auto &block : *base->getFunction()) {
-      for (auto &other : block) {
-        if (baseIndex && index == (*baseIndex + offset)) {
-          return &other;
-        }
-        if (&other == base) {
-          baseIndex = index;
-        }
-        ++index;
-      }
+    for (auto index = 0; index < offset; ++index) {
+      instruction = getNextInstructionIgnoringBlocks(instruction);
+      assert(instruction && "too large an offset!?");
     }
-    llvm_unreachable("positive offset outside of function!?");
+    return instruction;
   }
-  SmallVector<SILInstruction *, 64> instructions;
-  unsigned long index = 0;
-  for (auto &block : *base->getFunction()) {
-    for (auto &other : block) {
-      instructions.push_back(&other);
-      if (&other == base) {
-        return instructions[index + offset];
-      }
-      ++index;
-    }
+  // offset < 0
+  for (auto index = 0; index > offset; --index) {
+    instruction = getPreviousInstructionIgnoringBlocks(instruction);
+    assert(instruction && "too negative an offset!?");
   }
-  llvm_unreachable("never found instruction in its own function!?");
+  return instruction;
 }
 
 SILBasicBlock *getBlockOffsetFrom(SILBasicBlock *base, long offset) {
   if (offset == 0)
     return base;
-  if (offset < 0) {
-    auto iterator = base->getIterator();
-    for (auto counter = 0; counter > offset; --counter) {
-      iterator = std::prev(iterator);
+  if (offset > 0) {
+    auto *block = base;
+    for (auto counter = 0; counter < offset; ++counter) {
+      block = getNextBlock(block);
+      assert(block && "too large an offset!?");
     }
-    return &*iterator;
+    return block;
   }
-  auto iterator = base->getIterator();
-  for (auto counter = 0; counter < offset; ++counter) {
-    iterator = std::next(iterator);
+  // offset < 0
+  auto *block = base;
+  for (auto counter = 0; counter > offset; --counter) {
+    block = getPreviousBlock(block);
+    assert(block && "too negative an offset!?");
   }
-  return &*iterator;
+  return block;
 }
 
 SILBasicBlock *getBlock(SILFunction *function, unsigned long index) {
