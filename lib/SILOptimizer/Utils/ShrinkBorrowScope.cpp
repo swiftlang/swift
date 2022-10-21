@@ -347,6 +347,7 @@ public:
   bool run();
 
 private:
+  EndBorrowInst *findPreexistingEndBorrow(SILInstruction *instruction);
   bool createEndBorrow(SILInstruction *insertionPoint);
 };
 
@@ -422,12 +423,31 @@ bool Rewriter::run() {
   return madeChange;
 }
 
-bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
-  if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
-    if (llvm::find(uses.ends, insertionPoint) != uses.ends.end()) {
-      reusedEndBorrowInsts.insert(insertionPoint);
-      return false;
+EndBorrowInst *
+Rewriter::findPreexistingEndBorrow(SILInstruction *insertionPoint) {
+  for (auto *instruction = insertionPoint; instruction;
+       instruction = instruction->getNextInstruction()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(instruction)) {
+      if (llvm::find(uses.ends, ebi) != uses.ends.end())
+        return ebi;
     }
+    if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+      if (llvm::is_contained(barriers.copies, cvi)) {
+        continue;
+      }
+    }
+    /// Otherwise, this is an "interesting" instruction.  We want to record that
+    /// we were able to hoist the end of the borrow scope over it, so we stop
+    /// looking for the preexisting end_borrow.
+    return nullptr;
+  }
+  return nullptr;
+}
+
+bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
+  if (auto *ebi = findPreexistingEndBorrow(insertionPoint)) {
+    reusedEndBorrowInsts.insert(ebi);
+    return false;
   }
   auto builder = SILBuilderWithScope(insertionPoint);
   builder.createEndBorrow(

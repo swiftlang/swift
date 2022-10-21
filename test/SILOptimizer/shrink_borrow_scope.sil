@@ -804,12 +804,12 @@ entry(%instance : @owned $C):
   %_ = apply %callee_guaranteed(%lifetime_1) : $@convention(thin) (@guaranteed C) -> ()
   %synchronized = apply %synchronization_point() : $@convention(thin) () -> ()
   %copy_2 = copy_value %copy_1 : $C
+  %result = tuple ()
   end_borrow %lifetime_1 : $C
   %0 = apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
   %1 = apply %callee_owned(%copy_1) : $@convention(thin) (@owned C) -> ()
   %2 = apply %callee_owned(%copy_2) : $@convention(thin) (@owned C) -> ()
 
-  %result = tuple ()
   return %result : $()
 }
 
@@ -1120,6 +1120,54 @@ entry:
   destroy_value %c : $C
   %retval = tuple ()
   return %retval : $()
+}
+
+// Don't hoist over a copy_value that is rewritten.
+//
+// The borrowee's lifetime will be canonicalized again regardless.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_over_rewritten_copy : {{.*}} { 
+// CHECK:       [[INSTANCE:%[^,]+]] = apply
+// CHECK:       [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:       [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:       end_borrow [[LIFETIME]]
+// CHECK:       tuple ([[COPY]] : $C, [[INSTANCE]] : $C)
+// CHECK-LABEL: } // end sil function 'nohoist_over_rewritten_copy'
+sil [ossa] @nohoist_over_rewritten_copy : $@convention(thin) () -> (@owned C, @owned C) {
+  %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
+  %lifetime = begin_borrow [lexical] %instance : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %copy = copy_value %lifetime : $C
+  end_borrow %lifetime : $C
+  %retval = tuple (%copy : $C, %instance : $C)
+  return %retval : $(C, C)
+}
+
+// Don't hoist over multiple copy_values that are rewritten.
+//
+// The borrowee's lifetime will be canonicalized again regardless.
+//
+// CHECK-LABEL: sil [ossa] @nohoist_over_rewritten_copy_multiple : {{.*}} { 
+// CHECK:       [[INSTANCE:%[^,]+]] = apply
+// CHECK:       [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:       [[COPY1:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:       [[COPY2:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:       end_borrow [[LIFETIME]]
+// CHECK:       tuple ([[COPY2]] : $C, [[COPY1]] : $C, [[INSTANCE]] : $C)
+// CHECK-LABEL: } // end sil function 'nohoist_over_rewritten_copy_multiple'
+sil [ossa] @nohoist_over_rewritten_copy_multiple : $@convention(thin) () -> (@owned C, @owned C, @owned C) {
+  %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
+  %lifetime = begin_borrow [lexical] %instance : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %copy1 = copy_value %lifetime : $C
+  %copy2 = copy_value %lifetime : $C
+  end_borrow %lifetime : $C
+  %retval = tuple (%copy2 : $C, %copy1 : $C, %instance : $C)
+  return %retval : $(C, C, C)
 }
 
 // =============================================================================

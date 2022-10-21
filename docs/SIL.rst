@@ -3959,6 +3959,10 @@ The following types of test arguments are supported:
          @trace[uint] <-- the ``debug_value [trace]`` at index ``uint``
          @{function}.{trace} <-- the indicated trace in the indicated function
          Example: @function[bar].trace
+- argument: @argument <-_ the first argument of the current block
+            @argument[uint] <-- the argument at index ``uint`` of the current block
+            @{block}.{argument} <-- the indicated argument in the indicated block
+            @{function}.{argument} <-- the indicated argument in the entry block of the indicated function
 - instruction: @instruction <-- the instruction after* the test_specification instruction
                @instruction[+uint] <-- the instruction ``uint`` instructions after* the test_specification instruction
                @instruction[-uint] <-- the instruction ``uint`` instructions before* the test_specification instruction
