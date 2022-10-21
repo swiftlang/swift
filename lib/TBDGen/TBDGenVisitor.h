@@ -127,6 +127,8 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   void addAsyncFunctionPointerSymbol(SILDeclRef declRef);
 
   void addSymbol(LinkEntity entity);
+  
+  bool addClassMetadata(ClassDecl *CD);
 
   void addConformances(const IterableDeclContext *IDC);
 

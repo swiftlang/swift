@@ -810,6 +810,7 @@ public:
 
   static LinkEntity forTypeMetadata(CanType concreteType,
                                     TypeMetadataAddress addr) {
+    assert(!isObjCImplementation(concreteType));
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadata, concreteType);
     entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));
@@ -872,12 +873,14 @@ public:
   }
 
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
+    assert(!isObjCImplementation(decl));
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
     return entity;
   }
 
   static LinkEntity forNominalTypeDescriptorRecord(NominalTypeDecl *decl) {
+    assert(!isObjCImplementation(decl));
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptorRecord, decl);
     return entity;
@@ -1553,6 +1556,16 @@ public:
   bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
+
+private:
+  static bool isObjCImplementation(NominalTypeDecl *NTD) {
+    if (NTD)
+      return NTD->getObjCImplementationDecl();
+    return false;
+  }
+  static bool isObjCImplementation(CanType ty) {
+    return isObjCImplementation(ty->getClassOrBoundGenericClass());
+  }
 };
 
 struct IRLinkage {

@@ -2888,6 +2888,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     Attributes.add(attr);
     break;
   }
+  case DAK_ObjCImplementation: {
+    SourceRange range;
+    auto name = parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK,
+                                                /*allowOmitted=*/true);
+    if (!name)
+      return false;
+
+    Attributes.add(new (Context) ObjCImplementationAttr(*name, AtLoc, range));
+    break;
+  }
   case DAK_ObjCRuntimeName: {
     SourceRange range;
     auto name =

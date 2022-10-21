@@ -644,10 +644,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::Identifier:
-    assert(Modifier.empty() && "Improper modifier for identifier argument");
-    Out << FormatOpts.OpeningQuotationMark;
-    Arg.getAsIdentifier().printPretty(Out);
-    Out << FormatOpts.ClosingQuotationMark;
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              Arg.getAsIdentifier() ? 1 : 0, FormatOpts,
+                              Out);
+    } else {
+      assert(Modifier.empty() && "Improper modifier for identifier argument");
+      Out << FormatOpts.OpeningQuotationMark;
+      Arg.getAsIdentifier().printPretty(Out);
+      Out << FormatOpts.ClosingQuotationMark;
+    }
     break;
 
   case DiagnosticArgumentKind::ObjCSelector:

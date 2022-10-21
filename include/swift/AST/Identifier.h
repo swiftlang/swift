@@ -94,7 +94,9 @@ public:
   
   bool empty() const { return Pointer == nullptr; }
 
-  bool is(StringRef string) const { return str().equals(string); }
+  LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
+    return str().equals(string);
+  }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.

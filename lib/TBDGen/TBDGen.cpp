@@ -874,12 +874,14 @@ void TBDGenVisitor::visitSubscriptDecl(SubscriptDecl *SD) {
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
-  addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
+  if (!NTD->getObjCImplementationDecl()) {
+    addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
 
-  // Generic types do not get metadata directly, only through the function.
-  if (!NTD->isGenericContext()) {
-    addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                          TypeMetadataAddress::AddressPoint));
+    // Generic types do not get metadata directly, only through the function.
+    if (!NTD->isGenericContext()) {
+      addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                            TypeMetadataAddress::AddressPoint));
+    }
   }
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
@@ -890,11 +892,11 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
     visit(member);
 }
 
-void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
+bool TBDGenVisitor::addClassMetadata(ClassDecl *CD) {
   if (Opts.PublicSymbolsOnly &&
       getDeclLinkage(CD) != FormalLinkage::PublicUnique)
-    return;
-
+    return false;
+  
   auto &ctxt = CD->getASTContext();
   auto isGeneric = CD->isGenericContext();
   auto objCCompatible = ctxt.LangOpts.EnableObjCInterop && !isGeneric;
@@ -945,7 +947,14 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
           CD, TypeMetadataAddress::AddressPoint));
     }
   }
+  
+  return true;
+}
 
+void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
+  if (!addClassMetadata(CD))
+    return;
+  
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
     TBDGenVisitor &TBD;
@@ -1017,6 +1026,11 @@ void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
+  if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+    // @_objcImplementation extensions generate the class metadata symbols.
+    (void)addClassMetadata(CD);
+  }
+
   if (!isa<ProtocolDecl>(ED->getExtendedNominal())) {
     addConformances(ED);
   }

@@ -420,6 +420,13 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     if (fn->hasForcedStaticDispatch())
       return Limit::OnDemand;
   }
+  
+  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+    // The destructor of a class implemented with @_objcImplementation is only
+    // ever called by its ObjC thunk, so it should not be public.
+    if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
+      return Limit::OnDemand;
+  }
 
   switch (constant.kind) {
   case Kind::Func:
@@ -565,7 +572,8 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // Stored property initializers have linkage based on the access level of
   // their nominal.
   if (isStoredPropertyInitializer())
-    decl = cast<NominalTypeDecl>(decl->getDeclContext());
+    decl = cast<NominalTypeDecl>(
+               decl->getDeclContext()->getImplementedObjCContext());
 
   // Compute the effective access level, taking e.g testable into consideration.
   auto effectiveAccess = decl->getEffectiveAccess();
@@ -791,7 +799,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
+    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
