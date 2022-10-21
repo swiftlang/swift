@@ -108,6 +108,7 @@ public:
 
 // Arguments:
 // - string: list of characters, each of which specifies subsequent arguments
+//           - A: (block) argument
 //           - F: function
 //           - B: block
 //           - I: instruction
@@ -129,6 +130,12 @@ struct TestSpecificationTest : UnitTest {
     auto expectedFields = arguments.takeString();
     for (auto expectedField : expectedFields) {
       switch (expectedField) {
+      case 'A': {
+        auto *argument = arguments.takeBlockArgument();
+        llvm::errs() << "argument:\n";
+        argument->dump();
+        break;
+      }
       case 'F': {
         auto *function = arguments.takeFunction();
         llvm::errs() << "function: " << function->getName() << "\n";
