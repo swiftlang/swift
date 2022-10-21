@@ -1,17 +1,17 @@
 // RUN: rm -rf %t
-// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp -enable-objc-interop
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp -enable-objc-interop
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefixes=FILE1,FILE1-PCM
 
 // If the module cache already exists, the pcm gets indexed.
 // RUN: rm -rf %t/idx
-// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp -enable-objc-interop
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp -enable-objc-interop
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefixes=FILE1,FILE1-PCM
 
 // FIXME: index the bridging header!
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'import ClangModuleA' > %t/s2.swift
-// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp -enable-objc-interop
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -index-store-path %t/idx %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp -enable-objc-interop
 // RUN: c-index-test core -print-unit %t/idx > %t/both.txt
 // RUN: %FileCheck %s -check-prefixes=FILE1,FILE1-PCM < %t/both.txt
 // RUN: %FileCheck %s -check-prefixes=FILE2,FILE2-PCM < %t/both.txt
@@ -21,7 +21,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'import ClangModuleA' > %t/s2.swift
-// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -index-store-path %t/idx -index-ignore-clang-modules %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp -enable-objc-interop
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -index-store-path %t/idx -index-ignore-clang-modules %s %t/s2.swift -o %t/s1.o -o %t/s2.o -I %S/Inputs -c -emit-module -module-name main -emit-module-path %t/main.swiftmodule -module-cache-path %t/mcp -enable-objc-interop
 // RUN: c-index-test core -print-unit %t/idx > %t/both.txt
 // RUN: %FileCheck %s -check-prefixes=FILE1,FILE1-IGNORE < %t/both.txt --dump-input-filter all
 // RUN: %FileCheck %s -check-prefixes=FILE2,FILE2-IGNORE < %t/both.txt

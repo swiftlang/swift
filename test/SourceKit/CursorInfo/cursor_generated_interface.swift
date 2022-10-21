@@ -6,7 +6,7 @@
 
 // RUN: %target-swift-frontend -module-name LibB -emit-module -emit-module-path %t/mods/LibB.swiftmodule -emit-module-source-info-path %t/mods/LibB.swiftsourceinfo %t/libB.swift
 // RUN: %target-swift-frontend -module-name LibC -emit-module -emit-module-path %t/mods/LibC.swiftmodule %t/libC.swift
-// RUN: %target-swift-frontend -module-name LibA -emit-module -emit-module-path %t/frameworks/LibA.framework/Modules/LibA.swiftmodule/%target-swiftmodule-name -import-underlying-module -disable-implicit-concurrency-module-import -F %t/frameworks -I %t/mods %t/libA.swift
+// RUN: %target-swift-frontend -module-name LibA -emit-module -emit-module-path %t/frameworks/LibA.framework/Modules/LibA.swiftmodule/%target-swiftmodule-name -import-underlying-module -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -F %t/frameworks -I %t/mods %t/libA.swift
 // RUN: %swift-ide-test -print-module -print-interface -source-filename dummy -module-to-print LibA -F %t/frameworks -target %target-triple &> %t/generated.swift
 
 // Check that we always include module name, regardless of whether we have

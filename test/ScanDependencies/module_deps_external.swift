@@ -57,6 +57,9 @@ import SomeExternalModule
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "_Concurrency"
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT: "swift": "_StringProcessing"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 
