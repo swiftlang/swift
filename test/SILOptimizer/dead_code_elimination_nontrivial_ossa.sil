@@ -1055,6 +1055,32 @@ bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_forwarded_phi3 :
+// CHECK: end_borrow
+// CHECK: br bb3
+// CHECK-LABEL: } // end sil function 'test_forwarded_phi3'
+sil [ossa] @test_forwarded_phi3 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1
+
+bb1:
+  br bb2(%outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper1):
+  %ex1 = struct_extract %phi1 : $Wrapper1, #Wrapper1.val1 // user: %4
+  %ex2 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%ex2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3(%ex2 : $Klass, %phi1 : $Wrapper1)
+
+bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
+  end_borrow %phi3 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_loadborrow_dep :
 // CHECK: br bb3
 // CHECK: end_borrow
