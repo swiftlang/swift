@@ -3618,7 +3618,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
-      if (lookupBaseType->mayHaveMembers()) {
+      if (lookupBaseType->mayHaveMembers() ||
+          lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
@@ -3642,9 +3643,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           return memberTy;
         }
 
-        auto subs = SubstitutionMap::getProtocolSubstitutions(
-            proto, lookupBaseType, conformance);
-        auto result = assocType->getDeclaredInterfaceType().subst(subs);
+        auto result = conformance.getAssociatedType(
+            lookupBaseType, assocType->getDeclaredInterfaceType());
         if (!result->hasError())
           return result;
       }
