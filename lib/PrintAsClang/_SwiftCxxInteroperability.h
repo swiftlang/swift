@@ -21,7 +21,6 @@
 
 #include <cstdint>
 #include <stdlib.h>
-#include <cstdint>
 #if defined(_WIN32)
 #include <malloc.h>
 #endif

@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/functions.h
 
-// RUN: %target-interop-build-clangxx -std=c++17 -x objective-c++ -c %s -I %t -o %t/swift-functions-errors-execution.o
+// RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-errors-execution.o
 // RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
 
 // RUN: %target-codesign %t/swift-functions-errors-execution
