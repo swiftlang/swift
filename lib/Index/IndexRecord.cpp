@@ -536,10 +536,6 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                    filename, skipIndexingModule);
   }
 
-  // FIXME: Would be useful for testing if swift had clang's -Rremark system so
-  // we could output a remark here that we are going to create index data for
-  // a module file.
-
   // Pairs of (recordFile, groupName).
   std::vector<std::pair<std::string, std::string>> records;
 
