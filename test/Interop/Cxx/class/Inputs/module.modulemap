@@ -23,6 +23,11 @@ module Destructors {
   requires cplusplus
 }
 
+module DestructorsWithTemporaryValues {
+  header "destructors-with-temporary-values.h"
+  requires cplusplus
+}
+
 module Extensions {
   header "extensions.h"
   requires cplusplus
