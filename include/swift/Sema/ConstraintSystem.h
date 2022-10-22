@@ -5423,6 +5423,15 @@ private:
                                               FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
+  /// Attempt to simplify the given superclass constraint.
+  ///
+  /// \param type The type being tested.
+  /// \param classType The class type which the type should be a subclass of.
+  /// \param locator Locator describing where this constraint occurred.
+  SolutionKind simplifySubclassOfConstraint(Type type, Type classType,
+                                            ConstraintLocatorBuilder locator,
+                                            TypeMatchOptions flags);
+
   /// Attempt to simplify the given conformance constraint.
   ///
   /// \param type The type being tested.
