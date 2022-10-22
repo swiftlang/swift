@@ -1423,10 +1423,14 @@ public:
 
   void intoPackTypes(llvm::function_ref<void(TypeVariableType *, Type)> fn) && {
     if (argIdx == -1) {
-      (void)patternTy.transform(*this);
-      for (auto &entry : PackElementCache) {
-        entry.second.clear();
-      }
+      // No arguments. Each pack in the pattern will have no elements.
+      patternTy.visit([&](Type type) {
+        auto *typeVar = type->getAs<TypeVariableType>();
+        if (!typeVar || !typeVar->getImpl().getGenericParameter()->isParameterPack())
+          return;
+
+        this->PackElementCache[typeVar].clear();
+      });
     }
 
     for (const auto &entry : PackElementCache) {

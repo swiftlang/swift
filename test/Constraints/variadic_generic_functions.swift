@@ -26,20 +26,16 @@ func invalidPacks() {
 
 func call() {
   func multipleParameters<T...>(xs: T..., ys: T...) -> (T...) { return (_: xs) }
-  // expected-note@-1 {{in call to function 'multipleParameters(xs:ys:)'}}
-  _ = multipleParameters()
-  // expected-error@-1 2 {{generic parameter 'T' could not be inferred}}
+  multipleParameters()
+
   let x: (_: String) = multipleParameters(xs: "", ys: "")
   let (one, two) = multipleParameters(xs: "", 5.0, ys: "", 5.0)
   multipleParameters(xs: "", 5.0, ys: 5.0, "") // expected-error {{type of expression is ambiguous without more context}}
 
   func multipleSequences<T..., U...>(xs: T..., ys: U...) -> (T...) { return (_: ys) }
-  // expected-note@-1 {{in call to function 'multipleSequences(xs:ys:)'}}
-  // expected-error@-2 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
+  // expected-error@-1 {{cannot convert return expression of type '(U...)' to return type '(T...)'}}
 
-  _ = multipleSequences()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  // expected-error@-2 {{generic parameter 'U' could not be inferred}}
+  multipleSequences()
   _ = multipleSequences(xs: "", ys: "")
   _ = multipleSequences(xs: "", 5.0, ys: 5.0, "")
 }
