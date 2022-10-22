@@ -24,10 +24,11 @@
 using namespace swift;
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<OpaqueTypeDecl *>) const {
+    OverloadToken<OpaqueEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::OpenedExistential:
+  case Kind::OpenedElement:
     return 0;
 
   case Kind::Opaque:
@@ -36,25 +37,27 @@ size_t GenericEnvironment::numTrailingObjects(
 }
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<SubstitutionMap>) const {
+    OverloadToken<OpenedExistentialEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
-  case Kind::OpenedExistential:
+  case Kind::Opaque:
+  case Kind::OpenedElement:
     return 0;
 
-  case Kind::Opaque:
+  case Kind::OpenedExistential:
     return 1;
   }
 }
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<OpenedGenericEnvironmentData>) const {
+    OverloadToken<OpenedElementEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::Opaque:
+  case Kind::OpenedExistential:
     return 0;
 
-  case Kind::OpenedExistential:
+  case Kind::OpenedElement:
     return 1;
   }
 }
@@ -86,28 +89,33 @@ GenericEnvironment::getGenericParams() const {
 
 OpaqueTypeDecl *GenericEnvironment::getOpaqueTypeDecl() const {
   assert(getKind() == Kind::Opaque);
-  return *getTrailingObjects<OpaqueTypeDecl *>();
+  return getTrailingObjects<OpaqueEnvironmentData>()->decl;
 }
 
 SubstitutionMap GenericEnvironment::getOpaqueSubstitutions() const {
   assert(getKind() == Kind::Opaque);
-  return *getTrailingObjects<SubstitutionMap>();
+  return getTrailingObjects<OpaqueEnvironmentData>()->subMap;
 }
 
 Type GenericEnvironment::getOpenedExistentialType() const {
   assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedGenericEnvironmentData>()->existential;
+  return getTrailingObjects<OpenedExistentialEnvironmentData>()->existential;
 }
 
 UUID GenericEnvironment::getOpenedExistentialUUID() const {
   assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedGenericEnvironmentData>()->uuid;
+  return getTrailingObjects<OpenedExistentialEnvironmentData>()->uuid;
 }
 
 GenericSignature
 GenericEnvironment::getOpenedExistentialParentSignature() const {
   assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedGenericEnvironmentData>()->parentSig;
+  return getTrailingObjects<OpenedExistentialEnvironmentData>()->parentSig;
+}
+
+UUID GenericEnvironment::getOpenedElementUUID() const {
+  assert(getKind() == Kind::OpenedElement);
+  return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature signature)
@@ -123,8 +131,8 @@ GenericEnvironment::GenericEnvironment(
     Type existential, GenericSignature parentSig, UUID uuid)
   : SignatureAndKind(signature, Kind::OpenedExistential)
 {
-  new (getTrailingObjects<OpenedGenericEnvironmentData>())
-    OpenedGenericEnvironmentData{ existential, parentSig, uuid };
+  new (getTrailingObjects<OpenedExistentialEnvironmentData>())
+    OpenedExistentialEnvironmentData{ existential, parentSig, uuid };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -135,8 +143,20 @@ GenericEnvironment::GenericEnvironment(
       GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs)
   : SignatureAndKind(signature, Kind::Opaque)
 {
-  *getTrailingObjects<OpaqueTypeDecl *>() = opaque;
-  new (getTrailingObjects<SubstitutionMap>()) SubstitutionMap(subs);
+  new (getTrailingObjects<OpaqueEnvironmentData>())
+    OpaqueEnvironmentData{opaque, subs};
+
+  // Clear out the memory that holds the context types.
+  std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
+                          Type());
+}
+
+GenericEnvironment::GenericEnvironment(
+      GenericSignature signature, UUID uuid)
+  : SignatureAndKind(signature, Kind::OpenedElement)
+{
+  new (getTrailingObjects<OpenedElementEnvironmentData>())
+    OpenedElementEnvironmentData{uuid};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -218,6 +238,7 @@ Type GenericEnvironment::maybeApplyOpaqueTypeSubstitutions(Type type) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::OpenedExistential:
+  case Kind::OpenedElement:
     return type;
 
   case Kind::Opaque: {
@@ -292,6 +313,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     switch (getKind()) {
     case Kind::Primary:
     case Kind::OpenedExistential:
+    case Kind::OpenedElement:
       if (type->hasTypeParameter()) {
         return mapTypeIntoContext(type, conformanceLookupFn);
       } else {
@@ -353,6 +375,23 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
                                             requirements.layout);
       break;
 
+    case Kind::Opaque: {
+      // If the anchor type isn't rooted in a generic parameter that
+      // represents an opaque declaration, then apply the outer substitutions.
+      // It would be incorrect to build an opaque type archetype here.
+      unsigned opaqueDepth =
+          getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
+      if (rootGP->getDepth() < opaqueDepth) {
+        result = maybeApplyOpaqueTypeSubstitutions(requirements.anchor);
+        break;
+      }
+
+      result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
+                                               requirements.protos, superclass,
+                                               requirements.layout);
+      break;
+    }
+
     case Kind::OpenedExistential: {
       // FIXME: The existential layout's protocols might differ from the
       // canonicalized set of protocols determined by the generic signature.
@@ -379,22 +418,10 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       break;
     }
 
-    case Kind::Opaque: {
-      // If the anchor type isn't rooted in a generic parameter that
-      // represents an opaque declaration, then apply the outer substitutions.
-      // It would be incorrect to build an opaque type archetype here.
-      unsigned opaqueDepth =
-          getOpaqueTypeDecl()->getOpaqueGenericParams().front()->getDepth();
-      if (rootGP->getDepth() < opaqueDepth) {
-        result = maybeApplyOpaqueTypeSubstitutions(requirements.anchor);
-        break;
-      }
-
-      result = OpaqueTypeArchetypeType::getNew(this, requirements.anchor,
-                                               requirements.protos, superclass,
-                                               requirements.layout);
-      break;
-    }
+    case Kind::OpenedElement:
+      result = ElementArchetypeType::getNew(this, requirements.anchor,
+                                            requirements.protos, superclass,
+                                            requirements.layout);
     }
   }
 

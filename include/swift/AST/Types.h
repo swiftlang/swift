@@ -125,8 +125,8 @@ public:
     HasTypeVariable      = 0x01,
 
     /// This type expression contains a context-dependent archetype, either a
-    /// \c PrimaryArchetypeType, \c OpenedArchetypeType, or
-    /// \c PackArchetype.
+    /// \c PrimaryArchetypeType, \c OpenedArchetypeType,
+    /// \c ElementArchetypeType, or \c PackArchetype.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -6040,6 +6040,52 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 
+/// An archetype that represents the element type of a pack archetype.
+class ElementArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<ElementArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  friend GenericEnvironment;
+
+  UUID ID;
+
+  /// Create a new element archetype in the given environment representing
+  /// the interface type.
+  ///
+  /// This is only invoked by the generic environment when mapping the
+  /// interface type into context.
+  static CanTypeWrapper<ElementArchetypeType>
+  getNew(GenericEnvironment *environment, Type interfaceType,
+         ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+         LayoutConstraint layout);
+
+public:
+  /// Retrieve the ID number of this opened element.
+  UUID getOpenedElementID() const;
+
+  /// Return the archetype that represents the root generic parameter of its
+  /// interface type.
+  ElementArchetypeType *getRoot() const {
+    return cast<ElementArchetypeType>(ArchetypeType::getRoot());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ElementArchetype;
+  }
+  
+private:
+  ElementArchetypeType(const ASTContext &ctx,
+                       GenericEnvironment *environment, Type interfaceType,
+                       ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
+                       LayoutConstraint layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(ElementArchetypeType, ArchetypeType)
+  CanElementArchetypeType getRoot() const {
+    return CanElementArchetypeType(getPointer()->getRoot());
+  }
+END_CAN_TYPE_WRAPPER(ElementArchetypeType, ArchetypeType)
+
 template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
@@ -6052,6 +6098,9 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
     return openedTy->getTrailingObjects<Type>();
   }
   if (auto childTy = dyn_cast<PackArchetypeType>(this)) {
+    return childTy->getTrailingObjects<Type>();
+  }
+  if (auto childTy = dyn_cast<ElementArchetypeType>(this)) {
     return childTy->getTrailingObjects<Type>();
   }
   llvm_unreachable("unhandled ArchetypeType subclass?");
