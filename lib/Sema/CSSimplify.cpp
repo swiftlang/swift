@@ -1407,18 +1407,37 @@ class OpenParameterPackElements {
   ConstraintSystem &CS;
   int64_t argIdx;
   Type patternTy;
+
   // A map that relates a type variable opened for a reference to a parameter
   // pack to an array of parallel type variables, one for each argument.
   llvm::MapVector<TypeVariableType *, SmallVector<TypeVariableType *, 2>> PackElementCache;
+
+  // A map from argument index to the corresponding shape type for pack
+  // expansion arguments. When the parameter pack is expanded by a
+  // pack expansion argument, the corresponding pattern type is also
+  // wrapped in a pack expansion. Each pack reference in the pattern
+  // type will be bound to a pack expansion in the aggregated pack type
+  // created in 'intoPackTypes'.
+  llvm::SmallDenseMap<int64_t, Type> Expansions;
 
 public:
   OpenParameterPackElements(ConstraintSystem &CS, PackExpansionType *PET)
       : CS(CS), argIdx(-1), patternTy(PET->getPatternType()) {}
 
 public:
-  Type expandParameter() {
+  Type expandParameter(Type argType) {
     argIdx += 1;
-    return patternTy.transform(*this);
+    auto pattern = patternTy.transform(*this);
+
+    // If the argument that invoked expansion is itself a pack
+    // expansion, wrap the pattern type in a pack expansion type
+    // of the same shape.
+    if (auto expansion = argType->getAs<PackExpansionType>()) {
+      Expansions[argIdx] = expansion->getCountType();
+      pattern = PackExpansionType::get(pattern, expansion->getCountType());
+    }
+
+    return pattern;
   }
 
   void intoPackTypes(llvm::function_ref<void(TypeVariableType *, Type)> fn) && {
@@ -1435,9 +1454,21 @@ public:
 
     for (const auto &entry : PackElementCache) {
       SmallVector<Type, 8> elements;
-      llvm::transform(entry.second, std::back_inserter(elements), [](Type t) {
-        return t;
-      });
+      for (int64_t i = 0; i < (int64_t)entry.second.size(); ++i) {
+        auto *typeVar = entry.second[i];
+
+        // If this argument is a pack expansion, wrap the corresponding
+        // type variable in a pack expansion to distinguish it from
+        // a scalar type argument. The type variable itself represents
+        // the argument pattern.
+        if (auto shape = Expansions[i]) {
+          elements.push_back(PackExpansionType::get(typeVar, shape));
+          continue;
+        }
+
+        elements.push_back(typeVar);
+      }
+
       auto packType = PackType::get(CS.getASTContext(), elements);
       fn(entry.first, packType);
     }
@@ -1833,9 +1864,11 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         const auto &argument = argsWithLabels[argIdx];
         auto argTy = argument.getPlainType();
 
-        // First, re-open the parameter type so we bind the elements of the type
-        // sequence into their proper positions.
-        auto substParamTy = openParameterPack.expandParameter();
+        // First, expand the opened parameter pack for this argument.
+        // This will open a new type variable for each pack reference
+        // in the pattern type of the parameter, and substitute the type
+        // variables into the pattern type.
+        auto substParamTy = openParameterPack.expandParameter(argTy);
 
         cs.addConstraint(
             subKind, argTy, substParamTy, loc, /*isFavored=*/false);

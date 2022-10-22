@@ -24,9 +24,23 @@
 
 using namespace swift;
 
-static PackType *gatherTupleElements(ArrayRef<TupleTypeElt> &elts,
-                                     Identifier name,
-                                     ASTContext &ctx) {
+static Type createPackBinding(ASTContext &ctx, ArrayRef<Type> types) {
+  // If there is only one element and it's a pack expansion type,
+  // return the pattern type directly. Because PackType can only appear
+  // inside a PackExpansion, PackType(PackExpansionType()) will always
+  // simplify to the pattern type.
+  if (types.size() == 1) {
+    if (auto *expansion = types.front()->getAs<PackExpansionType>()) {
+      return expansion->getPatternType();
+    }
+  }
+
+  return PackType::get(ctx, types);
+}
+
+static Type gatherTupleElements(ArrayRef<TupleTypeElt> &elts,
+                                Identifier name,
+                                ASTContext &ctx) {
   SmallVector<Type, 2> types;
 
   if (!elts.empty() && elts.front().getName() == name) {
@@ -36,7 +50,7 @@ static PackType *gatherTupleElements(ArrayRef<TupleTypeElt> &elts,
     } while (!elts.empty() && !elts.front().hasName());
   }
 
-  return PackType::get(ctx, types);
+  return createPackBinding(ctx, types);
 }
 
 TuplePackMatcher::TuplePackMatcher(TupleType *lhsTuple, TupleType *rhsTuple)
@@ -69,7 +83,7 @@ bool TuplePackMatcher::match() {
              "Tuple element with pack expansion type cannot be followed "
              "by an unlabeled element");
 
-      auto *rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
+      auto rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
       pairs.emplace_back(lhsExpansionType->getPatternType(), rhs, idx++);
       continue;
     }
@@ -89,7 +103,7 @@ bool TuplePackMatcher::match() {
              "Tuple element with pack expansion type cannot be followed "
              "by an unlabeled element");
 
-      auto *lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
+      auto lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
       pairs.emplace_back(lhs, rhsExpansionType->getPatternType(), idx++);
       continue;
     }

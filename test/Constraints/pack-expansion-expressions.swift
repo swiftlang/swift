@@ -15,3 +15,11 @@ func concatenate<T..., U...>(_ first: T..., with second: U...) -> ((T, U)...) {
 func zip<T..., U...>(_ first: T..., with second: U...) -> ((T, U)...) {
   return ((first, second)...)
 }
+
+func forward<U...>(_ u: U...) -> (U...) {
+  return tuplify(u...)
+}
+
+func forwardAndMap<U..., V...>(us u: U..., vs v: V...) -> ([(U, V)]...) {
+  return tuplify([(u, v)]...)
+}
