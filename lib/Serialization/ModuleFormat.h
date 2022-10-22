@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 717; // @_objcImplementation
+const uint16_t SWIFTMODULE_VERSION_MINOR = 718;  // element archetype
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -598,6 +598,11 @@ enum class ClangDeclPathComponentKind : uint8_t {
   TypedefAnonDecl,
   ObjCInterface,
   ObjCProtocol,
+};
+
+enum class GenericEnvironmentKind : uint8_t {
+  OpenedExistential,
+  OpenedElement
 };
 
 // Encodes a VersionTuple:
@@ -1141,6 +1146,12 @@ namespace decls_block {
     PACK_ARCHETYPE_TYPE,
     GenericSignatureIDField, // generic environment
     TypeIDField              // interface type
+  );
+
+  TYPE_LAYOUT(ElementArchetypeTypeLayout,
+    ELEMENT_ARCHETYPE_TYPE,
+    TypeIDField,              // the interface type
+    GenericEnvironmentIDField // generic environment ID
   );
 
   TYPE_LAYOUT(DynamicSelfTypeLayout,
@@ -1696,6 +1707,7 @@ namespace decls_block {
 
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
+    BCFixed<1>,                  // GenericEnvironmentKind
     TypeIDField,                 // existential type
     GenericSignatureIDField      // parent signature
   >;

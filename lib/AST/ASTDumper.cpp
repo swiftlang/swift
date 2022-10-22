@@ -3913,6 +3913,11 @@ namespace {
       OS << "\n";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+    void visitElementArchetypeType(ElementArchetypeType *T, StringRef label) {
+      printArchetypeCommon(T, "element_archetype_type", label);
+      printField("opened_element_id", T->getOpenedElementID());
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void visitGenericTypeParamType(GenericTypeParamType *T, StringRef label) {
       printCommon(label, "generic_type_param_type");

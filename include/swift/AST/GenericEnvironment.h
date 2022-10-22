@@ -51,10 +51,21 @@ public:
   Type operator()(SubstitutableType *type) const;
 };
 
+/// Extra data in a generic environment for an opaque type.
+struct OpaqueEnvironmentData {
+  OpaqueTypeDecl *decl;
+  SubstitutionMap subMap;
+};
+
 /// Extra data in a generic environment for an opened existential.
-struct OpenedGenericEnvironmentData {
+struct OpenedExistentialEnvironmentData {
   Type existential;
   GenericSignature parentSig;
+  UUID uuid;
+};
+
+/// Extra data in a generic environment for an opened element.
+struct OpenedElementEnvironmentData {
   UUID uuid;
 };
 
@@ -68,17 +79,23 @@ struct OpenedGenericEnvironmentData {
 ///
 class alignas(1 << DeclAlignInBits) GenericEnvironment final
     : private llvm::TrailingObjects<
-        GenericEnvironment, OpaqueTypeDecl *, SubstitutionMap,
-        OpenedGenericEnvironmentData, Type> {
+        GenericEnvironment,
+        OpaqueEnvironmentData,
+        OpenedExistentialEnvironmentData,
+        OpenedElementEnvironmentData,
+        Type> {
 public:
   enum class Kind {
     /// A normal generic environment, determined only by its generic
     /// signature.
     Primary,
-    /// A generic environment describing an opened existential archetype.
-    OpenedExistential,
     /// A generic environment describing an opaque type archetype.
     Opaque,
+    /// A generic environment describing an opened existential archetype.
+    OpenedExistential,
+    /// A generic environment describing an opened element type of a
+    /// pack archetype inside a pack expansion expression.
+    OpenedElement,
   };
 
   class NestedTypeStorage;
@@ -91,10 +108,10 @@ private:
   friend TrailingObjects;
   friend OpaqueTypeArchetypeType;
 
-  size_t numTrailingObjects(OverloadToken<OpaqueTypeDecl *>) const;
-  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const;
+  size_t numTrailingObjects(OverloadToken<OpaqueEnvironmentData>) const;
+  size_t numTrailingObjects(OverloadToken<OpenedExistentialEnvironmentData>) const;
+  size_t numTrailingObjects(OverloadToken<OpenedElementEnvironmentData>) const;
   size_t numTrailingObjects(OverloadToken<Type>) const;
-  size_t numTrailingObjects(OverloadToken<OpenedGenericEnvironmentData>) const;
 
   /// Retrieve the array containing the context types associated with the
   /// generic parameters, stored in parallel with the generic parameters of the
@@ -109,12 +126,20 @@ private:
   /// Get the nested type storage, allocating it if required.
   NestedTypeStorage &getOrCreateNestedTypeStorage();
 
+  /// Private constructor for primary environments.
   explicit GenericEnvironment(GenericSignature signature);
+
+  /// Private constructor for opaque type environments.
+  explicit GenericEnvironment(
+      GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs);
+
+  /// Private constructor for opened existential environments.
   explicit GenericEnvironment(
       GenericSignature signature,
       Type existential, GenericSignature parentSig, UUID uuid);
-  explicit GenericEnvironment(
-      GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs);
+
+  /// Private constructor for opened element environments.
+  explicit GenericEnvironment(GenericSignature signature, UUID uuid);
 
   friend ArchetypeType;
   friend QueryInterfaceTypeSubstitutions;
@@ -156,8 +181,16 @@ public:
   /// create a generic environment.
   SubstitutionMap getOpaqueSubstitutions() const;
 
+  /// Retrieve the UUID for an opened element environment.
+  UUID getOpenedElementUUID() const;
+
   /// Create a new, primary generic environment.
   static GenericEnvironment *forPrimary(GenericSignature signature);
+
+  /// Create a new generic environment for an opaque type with the given set of
+  /// outer substitutions.
+  static GenericEnvironment *forOpaqueType(
+      OpaqueTypeDecl *opaque, SubstitutionMap subs);
 
   /// Create a new generic environment for an opened existential.
   ///
@@ -167,10 +200,14 @@ public:
   static GenericEnvironment *
   forOpenedExistential(Type existential, GenericSignature parentSig, UUID uuid);
 
-  /// Create a new generic environment for an opaque type with the given set of
-  /// outer substitutions.
-  static GenericEnvironment *forOpaqueType(
-      OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena);
+  /// Create a new generic environment for an opened element.
+  ///
+  /// \param signature The opened element signature, which is the same as the
+  /// signature of the context whose element type is being opened, but with
+  /// the pack parameter bit erased from one or more generic parameters
+  /// \param uuid The unique identifier for this opened element
+  static GenericEnvironment *
+  forOpenedElement(GenericSignature signature, UUID uuid);
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
