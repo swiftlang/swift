@@ -42,6 +42,7 @@ class PerformanceTestResult(object):
     It supports  log formats emitted by the test driver.
     """
 
+    # TODO: Delete after December 2023
     @classmethod
     def fromOldFormat(cls, header, line):
         """Original format with statistics for normal distribution (MEAN, SD):
@@ -101,6 +102,7 @@ class PerformanceTestResult(object):
 
         return PerformanceTestResult(json_data)
 
+    # TODO: Delete after December 2023
     @classmethod
     def fromQuantileFormat(cls, header, line):
         """Quantiles format with variable number of columns depending on the
@@ -229,9 +231,14 @@ class PerformanceTestResult(object):
         # drop any lingering pre-computed statistics
         # (It's better for downstream consumers to just
         # compute whatever statistics they need from scratch.)
+
+        # After December 2023, uncomment the next line:
+        # assert len(self.samples) == self.num_samples
         if len(self.samples) == self.num_samples:
             data["samples"] = self.samples
             data.pop("num_samples", None)
+            # TODO: Delete min/max/mean/sd/q1/median/q3/quantiles
+            # after December 2023
             data.pop("min", None)
             data.pop("max", None)
             data.pop("mean", None)
@@ -450,10 +457,11 @@ class ResultComparison(object):
         ratio = (new.min_value + 0.001) / (old.min_value + 0.001)
         self.delta = (ratio - 1) * 100
 
-
         # If we have full samples for both old and new...
-        if (len(old.samples) == old.num_samples
-            and len(new.samples) == new.num_samples):
+        if (
+                len(old.samples) == old.num_samples
+                and len(new.samples) == new.num_samples
+        ):
             # TODO: Use a T-Test or U-Test to determine whether
             # one set of samples should be considered reliably better than
             # the other.
@@ -461,6 +469,9 @@ class ResultComparison(object):
 
         # If we do not have full samples, we'll use the
         # legacy calculation for compatibility.
+        # TODO: After Dec 2023, we should always be using full samples
+        # everywhere and can delete the following entirely.
+        #
         # Indication of dubious changes: when result's MIN falls inside the
         # (MIN, MAX) interval of result they are being compared with.
         self.is_dubious = (
