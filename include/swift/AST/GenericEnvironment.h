@@ -190,7 +190,7 @@ public:
   /// Create a new generic environment for an opaque type with the given set of
   /// outer substitutions.
   static GenericEnvironment *forOpaqueType(
-      OpaqueTypeDecl *opaque, SubstitutionMap subs, AllocationArena arena);
+      OpaqueTypeDecl *opaque, SubstitutionMap subs);
 
   /// Create a new generic environment for an opened existential.
   ///
