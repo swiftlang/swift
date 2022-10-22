@@ -22,6 +22,22 @@
 #include <mutex>
 #endif
 
+#if defined(__ELF__)
+# if defined(__FreeBSD__) && !defined(_GNU_SOURCE)
+// In order to access _Unwind_Backtrace() from (the non-LLVM, non-GCC)
+// <unwind.h> in FreeBSD, define _GNU_SOURCE around the include.  Do this
+// before including other headers which may in turn include <unwind.h>, which
+// has a header guard.
+#  define _GNU_SOURCE
+#  define _SHOULD_UNDEFINE_GNU_SOURCE
+# endif
+# include <unwind.h>
+# ifdef _SHOULD_UNDEFINE_GNU_SOURCE
+#  undef _GNU_SOURCE
+#  undef _SHOULD_UNDEFINE_GNU_SOURCE
+# endif
+#endif
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -54,10 +70,6 @@
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
-#endif
-
-#if defined(__ELF__)
-#include <unwind.h>
 #endif
 
 #include <inttypes.h>
