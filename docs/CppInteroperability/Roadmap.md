@@ -78,63 +78,32 @@ As per our goal’s specification, this method of importing reference types allo
 
 Because iterators and ranges follow some specific API semantics, the Swift compiler can map them to a safe, ergonomic, native interface which Egor Zhdan will describe here :)
 
+### Other projections
+
+Value types that own memory through custom lifetime operations do not natively exist in Swift today. Any value types that own memory in Swift do so transatively through reference types that have long, stable lifetimes. Because Swift was not built around this kind of value type with short lifetimes and deep copies, dealing with projections of these owned types can be dangerious. This pattern is, up until now, foreign to Swift, so there are no existing tools that allow users to control this behavior or improve saftey. The best model for handling these potentially unsafe APIs is unclear; maybe most projects can be represented using generalized accessors, maybe most projects can be represented as iterators, maybe some projections should not be projections at all (and rather imported as values that are copied), most likely the answer is some combination of these. The best approach for handling projections will be revealed over time as evolution posts propose potential solutions, such as the iterator bridging described above, and as users of interop provide feedback. 
+
+Besides the dissonant semantic models for representing projections, the bredth of ways to define projections in C++ will prove a challenege for importing this API pattern. 
+
+Consider the following API which returns a vector of pointers:
+```
+std::vector<int *> OwnedType::projectsInternalStorage(); 
+```
+
+Or this API which fills in a pointer that has two levels of indirection:
+```
+void VectorLike::begin(int **out) { *out = data(); }
+```
+
+Or even this global function that projects one of it's parameters:
+```
+int *begin(std::vector<int> *v) { return v->data(); }
+```
+
+It may be convient for Swift to assume that all projects follow one, unique pattern: a method of an owned type that returns a pointer. However, that is certainly not the only way in which a projection can be created. This is but one of the many places where Swift will need to decide between expressiveness and safety. Allowing the above APIs to be imported would allow interop to be more usable by default. Taking the first example, most of the time, when a vector holds pointers, those pointers do not point to storage with a short lifetime. Making this API unavailable would ensure 100% safety on the pain usability in the 99% case, when this API is safe. The tradeoffs here are an open question for the Swift evolution process to eventually determine. In any case, it is essential that C++ interoperability makes certain assumptions about the APIs Swift imports. There will always be an edge case that cannot be covered or does not make sense to accomidate. Interop as a whole should not become unusable so that these edge cases can be accomidated, or worse yet, so that that neither safe nor unsafe APIs are available in Swift. 
+
 ### Generic APIs
 
 C++ provides a couple of tools for writing generic APIs: templates, concepts, virtual classes (inheritance), and various combinations and permutations of these. Templates are likely the most common tool for creating generic APIs. Unfortunately, as outlined in [this forum post](https://forums.swift.org/t/bridging-c-templates-with-interop/55003) (Bridging C++ Templates with Interop), C++ templates do not map cleanly to Swift generics, making interoperability between these generic APIs extremely difficult. Despite this, the linked forum post proposes various strategies for importing C++ templates derived from goals similar to the ones outlines in this roadmap. These proposals should probably be factored into this section of the roadmap at some point in the future.
-
-## Assumptions
-
-C++ and Swift interoperability assumes that projections only appear in the form of a pointer type being returnred from a method. While this is not the only way to create such a projection, it is by far the most common. In order to maintain C and Objective-C interoperability and allow Swift programmers to use C++ APIs, these edge cases must still be imported even if they could result in a less safe program (API authors already have tools to mark these APIs as unavailable in Swift, which they are encouraged to use). These are two of the most prominent edge cases:
-
-```
-int *begin(std::vector<int> *v) { return v->data(); }
-
-struct VectorLike {
-  // ...
-  void begin(int **out) { *out = data(); }
-};
-```
-
-This assumption is in line with other assumptions the Swift compiler makes when importing C++ APIs (such as methods on trivial types will not return stack pointers and passing to a const reference will not mutate the pointee object).
-
-
-## Lifetime and safety of owned types
-
-Value types that own memory do not natively exist in Swift today. Because Swift was not built around this kind of value type, Swift handles the lifetime of value types in a subtly different way from C++. This subtle difference makes a naive mapping of C++ value types that own memory to native Swift value types extremely dangerous, especially when dealing with projections of owned storage. Let’s look at an example Swift program that naively imports some owned type and returns a projections of it:
-
-```
-var v = vector(1)
-let start = v.begin()
-doSomething(start)
-fixLifetime(v)
-```
-
-To understand the problem with this code, the following snippet highlights where an implicit copy is created and destroyed:
-
-```
-var v = vector(1)
-let copy = copy(v)
-let start = copy.begin()
-destroy(copy)
-doSomething(start)
-fixLifetime(v)
-```
-
-Here, because Swift copies `v` into a temporary with a tight lifetime before the call to `begin`, `v` projects a dangling reference. This is an example of how subtly different lifetime models make using C++ types from Swift hard, if their semantics aren’t understood by the compiler.
-
-To make these APIs safe and usable, Swift cannot import unsafe projections of types that own memory, because they don’t fit the Swift model. Instead, the Swift compiler can try to infer what, semantically, the API is trying to do, or the library author can provide this information via annotations. In this case, the Swift compiler can infer that begin returns an iterator, which Swift can represent through the existing, safe Swift iterator interface. In the example above, “start” is a pointer type. Using this pointer returned by the “begin” method is unsafe, but the type of start itself is not unsafe. In other words, safety restrictions need not be applied to pointer types themselves but rather their unsafe uses.
-
-C++ often projects the storage of owned types. C++ is able to tie the lifetime of the projection to the source using lexcal scopes. Because there is a well-defined, lexical point in which objects are destroyed, C++ users can reason about projection’s lifetimes. While these safety properties are less formal than Swift, they are safety properties none-the-less, and form a model that works in C++.
-
-This model cannot be adopted in Swift, however, because the the same lexical lifetime model does not exist. Further, projections of owned types are completely foreign concept in Swift, meaning users aren’t familiar with programming in terms of this lexical model, and may not be aware of the added (implicit) constraints (that is, when objects are destroyed). Swift’s language model is such that returning projections from a copied value, even in smaller lexical scope, should be safe. In order to allow projections of owned types, this assumption must be broken, or C++ interoperability must take advantage of Swift ownership features to associate the lifetime of the projection to the source.
-
-The following example highlights the case described above:
-
-```
-func getCString(str: std.string) -> UnsafePointer<CChar> { str.c_str() }
-```
-
-The above function returns a dangling reference to `str`‘s inner storage. In C++, it is assumed that the programmer understands this is a bug, and generally would be expected to take `str` by reference. This is not the case in Swift. To represent this idiomatically in Swift, the lifetimes must be associated through a projection. Using the tools provided in the ownership manifesto this would mean yielding the value returned by `c_str` out of a [generalized accessor](https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md#generalized-accessors)(resulting in an error when the pointer is returned).
 
 ## Evolution process
 
@@ -262,3 +231,42 @@ Iterators are also projections:
 ```
 
 Because `string` is an owned type, the Swift compiler cannot represent a projection of its storage, so the `begin`, `end`, and `c_str` APIs are not imported. A projection is only valid as long as the storage it points to is valid. Projections of reference types are usually safe because reference types have storage with long, stable lifetimes, but projections of owned types are more dangerous because the storage associated with a specific copy usually has a much shorter lifetime (therefore most of these projections of owned storage cannot yet be imported).
+
+
+## Lifetime and safety of self-contained types and projections 
+
+The following section will go further into depth on the issues with using projections of self contained types in Swift, rather than proposing a solution on how to import them. Let’s start with an example Swift program that naively imports some self-contained type and returns a projections of it:
+
+```
+var v = vector(1)
+let start = v.begin()
+doSomething(start)
+fixLifetime(v)
+```
+
+To understand the problem with this code, the following snippet highlights where an implicit copy is created and destroyed:
+
+```
+var v = vector(1)
+let copy = copy(v)
+let start = copy.begin()
+destroy(copy)
+doSomething(start)
+fixLifetime(v)
+```
+
+Here, because Swift copies `v` into a temporary with a tight lifetime before the call to `begin`, `v` projects a dangling reference. This is an example of how subtly different lifetime models make using C++ types from Swift hard, if their semantics aren’t understood by the compiler.
+
+To make these APIs safe and usable, Swift cannot import unsafe projections of types that own memory, because they don’t fit the Swift model. Instead, the Swift compiler can try to infer what, semantically, the API is trying to do, or the library author can provide this information via annotations. In this case, the Swift compiler can infer that begin returns an iterator, which Swift can represent through the existing, safe Swift iterator interface. In the example above, “start” is a pointer type. Using this pointer returned by the “begin” method is unsafe, but the type of start itself is not unsafe. In other words, safety restrictions need not be applied to pointer types themselves but rather their unsafe uses.
+
+C++ often projects the storage of owned types. C++ is able to tie the lifetime of the projection to the source using lexcal scopes. Because there is a well-defined, lexical point in which objects are destroyed, C++ users can reason about projection’s lifetimes. While these safety properties are less formal than Swift, they are safety properties none-the-less, and form a model that works in C++.
+
+This model cannot be adopted in Swift, however, because the the same lexical lifetime model does not exist. Further, projections of self-contained types are completely foreign concept in Swift, meaning users aren’t familiar with programming in terms of this lexical model, and may not be aware of the added (implicit) constraints (that is, when objects are destroyed). Swift’s language model is such that returning projections from a copied value, even in smaller lexical scope, should be safe. In order to allow projections of self-contained types, this assumption must be broken, or C++ interoperability must take advantage of Swift ownership features to associate the lifetime of the projection to the source.
+
+The following example highlights the case described above:
+
+```
+func getCString(str: std.string) -> UnsafePointer<CChar> { str.c_str() }
+```
+
+The above function returns a dangling reference to `str`‘s inner storage. In C++, it is assumed that the programmer understands this is a bug, and generally would be expected to take `str` by reference. This is not the case in Swift. To represent this idiomatically in Swift, the lifetimes must be associated through a projection. Using the tools provided in the ownership manifesto this would mean yielding the value returned by `c_str` out of a [generalized accessor](https://github.com/apple/swift/blob/main/docs/OwnershipManifesto.md#generalized-accessors)(resulting in an error when the pointer is returned).
