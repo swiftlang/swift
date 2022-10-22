@@ -17,16 +17,12 @@
 #define SWIFT_TBDGEN_TBDGENVISITOR_H
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRSymbolVisitor.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILWitnessTable.h"
-#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/TextAPI/InterfaceFile.h"
@@ -87,7 +83,7 @@ private:
   SymbolCallbackFn func;
 };
 
-class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
+class TBDGenVisitor : public IRSymbolVisitor {
 #ifndef NDEBUG
   /// Tracks the symbols emitted to ensure we don't emit any duplicates.
   llvm::StringSet<> DuplicateSymbolChecker;
@@ -103,14 +99,6 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 
   using SymbolKind = llvm::MachO::SymbolKind;
 
-  /// A set of original function and derivative configuration pairs for which
-  /// derivative symbols have been emitted.
-  ///
-  /// Used to deduplicate derivative symbol emission for `@differentiable` and
-  /// `@derivative` attributes.
-  llvm::DenseSet<std::pair<AbstractFunctionDecl *, AutoDiffConfig>>
-      AddedDerivatives;
-
   std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
@@ -123,53 +111,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   void addSymbol(StringRef name, SymbolSource source,
                  SymbolKind kind = SymbolKind::GlobalSymbol);
 
-  void addSymbol(SILDeclRef declRef);
-  void addAsyncFunctionPointerSymbol(SILDeclRef declRef);
-
   void addSymbol(LinkEntity entity);
   
   bool addClassMetadata(ClassDecl *CD);
-
-  void addConformances(const IterableDeclContext *IDC);
-
-  void addDispatchThunk(SILDeclRef declRef);
-
-  void addMethodDescriptor(SILDeclRef declRef);
-
-  void addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto);
-  void addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType);
-  void addAssociatedConformanceDescriptor(AssociatedConformance conformance);
-  void addBaseConformanceDescriptor(BaseConformance conformance);
-
-  /// Adds the symbol for the linear map function of the given kind associated
-  /// with the given original function and derivative function configuration.
-  void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
-                                    const AutoDiffConfig &config,
-                                    AutoDiffLinearMapKind kind);
-
-  /// Adds the symbol for the autodiff function of the given kind associated
-  /// with the given original function, parameter indices, and derivative
-  /// generic signature.
-  void
-  addAutoDiffDerivativeFunction(AbstractFunctionDecl *original,
-                                IndexSubset *parameterIndices,
-                                GenericSignature derivativeGenericSignature,
-                                AutoDiffDerivativeFunctionKind kind);
-
-  /// Adds the symbol for the differentiability witness associated with the
-  /// given original function, AST parameter indices, result indices, and
-  /// derivative generic signature.
-  void addDifferentiabilityWitness(AbstractFunctionDecl *original,
-                                   DifferentiabilityKind kind,
-                                   IndexSubset *astParameterIndices,
-                                   IndexSubset *resultIndices,
-                                   GenericSignature derivativeGenericSignature);
-
-  /// Adds symbols associated with the given original function and
-  /// derivative function configuration.
-  void addDerivativeConfiguration(DifferentiabilityKind diffKind,
-                                  AbstractFunctionDecl *original,
-                                  const AutoDiffConfig &config);
 
 public:
   TBDGenVisitor(const llvm::Triple &target, const StringRef dataLayoutString,
@@ -187,51 +131,25 @@ public:
 
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
 
-  /// Add the main symbol.
-  void addMainIfNecessary(FileUnit *file);
-
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
-  void visitDefaultArguments(ValueDecl *VD, ParameterList *PL);
-
-  void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
-
-  void visitAccessorDecl(AccessorDecl *AD);
-
-  void visitNominalTypeDecl(NominalTypeDecl *NTD);
-
-  void visitClassDecl(ClassDecl *CD);
-
-  void visitConstructorDecl(ConstructorDecl *CD);
-
-  void visitDestructorDecl(DestructorDecl *DD);
-
-  void visitExtensionDecl(ExtensionDecl *ED);
-  
-  void visitFuncDecl(FuncDecl *FD);
-
-  void visitProtocolDecl(ProtocolDecl *PD);
-
-  void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
-
-  void visitVarDecl(VarDecl *VD);
-
-  void visitSubscriptDecl(SubscriptDecl *SD);
-
-  void visitEnumDecl(EnumDecl *ED);
-
-  void visitEnumElementDecl(EnumElementDecl *EED);
-
-  void visitDecl(Decl *D) {}
-
-  void visit(Decl *D);
-
-  /// Visit the symbols in a given file unit.
-  void visitFile(FileUnit *file);
-
   /// Visit the files specified by a given TBDGenDescriptor.
   void visit(const TBDGenDescriptor &desc);
+
+  // --- IRSymbolVisitor ---
+
+  void willVisitDecl(Decl *D) override;
+  void didVisitDecl(Decl *D) override;
+
+  void addFunction(SILDeclRef declRef) override;
+  void addFunction(StringRef name, SILDeclRef declRef) override;
+  void addGlobalVar(VarDecl *VD) override;
+  void addLinkEntity(LinkEntity entity) override;
+  void addObjCInterface(ClassDecl *CD) override;
+  void addObjCMethod(AbstractFunctionDecl *AFD) override;
+  void addProtocolWitnessThunk(RootProtocolConformance *C,
+                               ValueDecl *requirementDecl) override;
 };
 } // end namespace tbdgen
 } // end namespace swift
