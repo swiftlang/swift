@@ -1,4 +1,4 @@
-#import <Foundation/Foundation.h>
+#import "FakeFoundation.h"
 
 @interface Data
 @end

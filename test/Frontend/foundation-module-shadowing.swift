@@ -1,3 +1,4 @@
+// REQUIRES: objc_interop
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/ShadowFoundation.swiftmodule -module-name ShadowFoundation %S/Inputs/ShadowFoundation.swift -disable-availability-checking
 // RUN: %target-typecheck-verify-swift -I %t -disable-availability-checking
