@@ -167,6 +167,10 @@ bool ParamPackMatcher::match() {
   lhsParams = lhsParams.drop_front(prefixLength).drop_back(suffixLength);
   rhsParams = rhsParams.drop_front(prefixLength).drop_back(suffixLength);
 
+  // If nothing remains, we're done.
+  if (lhsParams.empty() && rhsParams.empty())
+    return false;
+
   // If the left hand side is a single pack expansion type, bind it
   // to what remains of the right hand side.
   if (lhsParams.size() == 1) {
@@ -198,7 +202,92 @@ bool ParamPackMatcher::match() {
       auto lhs = PackType::get(ctx, lhsTypes);
 
       // FIXME: Check rhs flags
-      pairs.emplace_back(lhs, rhsParams[0].getPlainType(), prefixLength);
+      pairs.emplace_back(lhs, rhsType, prefixLength);
+      return false;
+    }
+  }
+
+  // Otherwise, all remaining possibilities are invalid:
+  // - Neither side has any pack expansions, and they have different lengths.
+  // - One side has a pack expansion but the other side is too short, eg
+  //   {Int, T..., Float} vs {Int}.
+  // - The prefix and suffix are mismatched, so we're left with something
+  //   like {T..., Int} vs {Float, U...}.
+  return true;
+}
+
+PackMatcher::PackMatcher(
+    ArrayRef<Type> lhsTypes,
+    ArrayRef<Type> rhsTypes,
+    ASTContext &ctx)
+  : lhsTypes(lhsTypes), rhsTypes(rhsTypes), ctx(ctx) {}
+
+bool PackMatcher::match() {
+  unsigned minLength = std::min(lhsTypes.size(), rhsTypes.size());
+
+  // Consume the longest possible prefix where neither type in
+  // the pair is a pack expansion type.
+  unsigned prefixLength = 0;
+  for (unsigned i = 0; i < minLength; ++i) {
+    auto lhsType = lhsTypes[i];
+    auto rhsType = rhsTypes[i];
+
+    if (lhsType->is<PackExpansionType>() ||
+        rhsType->is<PackExpansionType>()) {
+      break;
+    }
+
+    pairs.emplace_back(lhsType, rhsType, i);
+    ++prefixLength;
+  }
+
+  // Consume the longest possible suffix where neither type in
+  // the pair is a pack expansion type.
+  unsigned suffixLength = 0;
+  for (unsigned i = 0; i < minLength - prefixLength; ++i) {
+    auto lhsType = lhsTypes[lhsTypes.size() - i - 1];
+    auto rhsType = rhsTypes[rhsTypes.size() - i - 1];
+
+    if (lhsType->is<PackExpansionType>() ||
+        rhsType->is<PackExpansionType>()) {
+      break;
+    }
+
+    pairs.emplace_back(lhsType, rhsType, i);
+    ++suffixLength;
+  }
+
+  assert(prefixLength + suffixLength <= lhsTypes.size());
+  assert(prefixLength + suffixLength <= rhsTypes.size());
+
+  // Drop the consumed prefix and suffix from each list of types.
+  lhsTypes = lhsTypes.drop_front(prefixLength).drop_back(suffixLength);
+  rhsTypes = rhsTypes.drop_front(prefixLength).drop_back(suffixLength);
+
+  // If nothing remains, we're done.
+  if (lhsTypes.empty() && rhsTypes.empty())
+    return false;
+
+  // If the left hand side is a single pack expansion type, bind it
+  // to what remains of the right hand side.
+  if (lhsTypes.size() == 1) {
+    auto lhsType = lhsTypes[0];
+    if (auto *lhsExpansionType = lhsType->getAs<PackExpansionType>()) {
+      auto rhs = PackType::get(ctx, rhsTypes);
+
+      pairs.emplace_back(lhsExpansionType->getPatternType(), rhs, prefixLength);
+      return false;
+    }
+  }
+
+  // If the right hand side is a single pack expansion type, bind it
+  // to what remains of the left hand side.
+  if (rhsTypes.size() == 1) {
+    auto rhsType = rhsTypes[0];
+    if (auto *rhsExpansionType = rhsType->getAs<PackExpansionType>()) {
+      auto lhs = PackType::get(ctx, lhsTypes);
+
+      pairs.emplace_back(lhs, rhsType, prefixLength);
       return false;
     }
   }
