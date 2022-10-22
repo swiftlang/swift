@@ -49,6 +49,7 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenSILPasses.cpp
   IRGenRequests.cpp
   IRGenSIL.cpp
+  IRSymbolVisitor.cpp
   Linking.cpp
   LoadableByAddress.cpp
   LocalTypeData.cpp
