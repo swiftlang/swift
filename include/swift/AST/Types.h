@@ -6009,11 +6009,17 @@ BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
   }
 END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
 
+/// A wrapper around a shape type to use in ArchetypeTrailingObjects
+/// for PackArchetypeType.
+struct PackShape {
+  Type shapeType;
+};
+
 /// An archetype that represents an opaque element of a type
 /// parameter pack in context.
 class PackArchetypeType final
     : public ArchetypeType,
-      private ArchetypeTrailingObjects<PackArchetypeType> {
+      private ArchetypeTrailingObjects<PackArchetypeType, PackShape> {
   friend TrailingObjects;
   friend ArchetypeType;
 
@@ -6024,9 +6030,14 @@ public:
   /// by this routine.
   static CanTypeWrapper<PackArchetypeType>
   get(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
-      Type InterfaceType,
+      Type InterfaceType, Type ShapeType,
       SmallVectorImpl<ProtocolDecl *> &ConformsTo, Type Superclass,
       LayoutConstraint Layout);
+
+  // Returns the reduced shape type for this pack archetype.
+  Type getShape() const {
+    return getTrailingObjects<PackShape>()->shapeType;
+  }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PackArchetype;
@@ -6035,7 +6046,7 @@ public:
 private:
   PackArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
                     Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
-                    Type Superclass, LayoutConstraint Layout);
+                    Type Superclass, LayoutConstraint Layout, PackShape Shape);
 };
 BEGIN_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PackArchetypeType, ArchetypeType)

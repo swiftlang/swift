@@ -365,6 +365,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   if (rootGP->isParameterPack()) {
     assert(getKind() == Kind::Primary);
     result = PackArchetypeType::get(ctx, this, requirements.anchor,
+                                    requirements.packShape,
                                     requirements.protos, superclass,
                                     requirements.layout);
   } else {
