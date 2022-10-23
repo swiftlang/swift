@@ -51,6 +51,7 @@ if (SWIFT_SWIFT_PARSER)
     PRIVATE
     $<TARGET_OBJECTS:SwiftSyntax::SwiftBasicFormat>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftParser>
+    $<TARGET_OBJECTS:SwiftSyntax::SwiftParserDiagnostics>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftDiagnostics>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftSyntax>
     $<TARGET_OBJECTS:SwiftSyntax::SwiftOperators>
@@ -63,6 +64,7 @@ if (SWIFT_SWIFT_PARSER)
   add_dependencies(swiftParse
     SwiftSyntax::SwiftBasicFormat
     SwiftSyntax::SwiftParser
+    SwiftSyntax::SwiftParserDiagnostics
     SwiftSyntax::SwiftDiagnostics
     SwiftSyntax::SwiftSyntax
     SwiftSyntax::SwiftOperators
