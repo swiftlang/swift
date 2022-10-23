@@ -2977,8 +2977,14 @@ namespace {
         auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
             .drop_front();
         auto expandedType = solution.simplifyType(solution.getType(expr));
-        if (auto newExpr = expandMacroExpr(dc, expr, kind, expandedType))
-          return newExpr;
+        if (auto newExpr = expandMacroExpr(dc, expr, kind, expandedType)) {
+          auto expansion = new (ctx) MacroExpansionExpr(
+              expr->getStartLoc(), expr, nullptr, /*isImplicit=*/true,
+              expandedType);
+          expansion->setRewritten(newExpr);
+          cs.cacheExprTypes(expansion);
+          return expansion;
+        }
 
         // Fall through to use old implementation.
       }

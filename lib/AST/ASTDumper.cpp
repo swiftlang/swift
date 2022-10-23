@@ -2982,6 +2982,10 @@ public:
       OS << '\n';
       printArgumentList(E->getArgs());
     }
+    if (auto rewritten = E->getRewritten()) {
+      OS << '\n';
+      printRec(rewritten);
+    }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };

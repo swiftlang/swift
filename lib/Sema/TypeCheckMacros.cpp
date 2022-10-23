@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckMacros.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/Parser.h"
 
 using namespace swift;
 
@@ -74,7 +76,7 @@ Expr *swift::expandMacroExpr(
       std::tie(endLine, endColumn) =
           sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
 
-      out << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
+      out << " in " << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
           << startLine << ":" << startColumn
           << "-" << endLine << ":" << endColumn;
     }
@@ -86,13 +88,39 @@ Expr *swift::expandMacroExpr(
           StringRef(evaluatedSource, evaluatedSourceLength), bufferName);
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
 
-  // FIXME: Debug output.
-  llvm::outs() << "Macro rewrite: "
-    << "#" << macroName
-    << " --> " << sourceMgr.getEntireTextForBuffer(macroBufferID)
-    << "\n";
+  // Create a source file to hold the macro buffer.
+  // FIXME: Seems like we should record this somewhere?
+  auto macroSourceFile = new (ctx) SourceFile(
+      *dc->getParentModule(), SourceFileKind::Library, macroBufferID);
 
-  return nullptr;
+  // Parse the expression.
+  Parser parser(macroBufferID, *macroSourceFile, &ctx.Diags, nullptr, nullptr);
+  parser.consumeTokenWithoutFeedingReceiver();
+  auto parsedResult = parser.parseExpr(diag::expected_macro_expansion_expr);
+  if (parsedResult.isParseError() || parsedResult.isNull()) {
+    // Tack on a note to say where we expanded the macro from?
+    return nullptr;
+  }
+
+  // Type-check the expanded expression.
+  // FIXME: Would like to pass through type checking options like "discarded"
+  // that are captured by TypeCheckExprOptions.
+  Expr *expandedExpr = parsedResult.get();
+  constraints::ContextualTypeInfo contextualType {
+    TypeLoc::withoutLoc(expandedType),
+    // FIXME: Add a contextual type purpose for macro expansion.
+    ContextualTypePurpose::CTP_CoerceOperand
+  };
+
+  Type realExpandedType = TypeChecker::typeCheckExpression(
+      expandedExpr, dc, contextualType);
+  if (!realExpandedType)
+    return nullptr;
+
+  assert((expandedType->isEqual(realExpandedType) ||
+          realExpandedType->hasError()) &&
+         "Type checking changed the result type?");
+  return expandedExpr;
 }
 
 #endif // SWIFT_SWIFT_PARSER
