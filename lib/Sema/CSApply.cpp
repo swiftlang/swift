@@ -20,6 +20,7 @@
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
@@ -53,10 +54,6 @@
 
 using namespace swift;
 using namespace constraints;
-
-extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
-    void *sourceFile, const void *sourceLocation,
-    const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 bool Solution::hasFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -2977,22 +2974,13 @@ namespace {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = cs.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
-        if (auto sf = dc->getParentSourceFile()) {
-          if (auto astGenSF = sf->exportedSourceFile) {
-            const char *evaluatedSource;
-            ptrdiff_t evaluatedSourceLength;
-            swift_ASTGen_evaluateMacro(
-                astGenSF, expr->getStartLoc().getOpaquePointerValue(),
-                &evaluatedSource, &evaluatedSourceLength);
-            if (evaluatedSource) {
-              llvm::outs() << "Macro rewrite: "
-                << MagicIdentifierLiteralExpr::getKindString(expr->getKind())
-                << " --> " << StringRef(evaluatedSource, evaluatedSourceLength)
-                << "\n";
-              free((void*)evaluatedSource);
-            }
-          }
-        }
+        auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
+            .drop_front();
+        auto expandedType = solution.simplifyType(solution.getType(expr));
+        if (auto newExpr = expandMacroExpr(dc, expr, kind, expandedType))
+          return newExpr;
+
+        // Fall through to use old implementation.
       }
 #endif
 
