@@ -349,6 +349,9 @@ BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
 bool SILInstruction_mayRelease(BridgedInstruction inst);
 bool SILInstruction_hasUnspecifiedSideEffects(BridgedInstruction inst);
 bool swift_mayAccessPointer(BridgedInstruction inst);
+bool swift_mayLoadWeakOrUnowned(BridgedInstruction inst);
+bool swift_maySynchronizeNotConsideringSideEffects(BridgedInstruction inst);
+bool swift_mayBeDeinitBarrierNotConsideringSideEffects(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
 SwiftInt MultiValueInstResult_getIndex(BridgedMultiValueResult result);

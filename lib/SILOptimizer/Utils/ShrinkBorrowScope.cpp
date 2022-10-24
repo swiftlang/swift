@@ -384,6 +384,15 @@ bool Rewriter::run() {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
       for (auto *successor : successors) {
+        // If a terminator is a barrier, it must not branch to a merge point.
+        // Doing so would require one of the following:
+        // - the terminator was passed a phi--which is handled by barriers.phis
+        // - the terminator had a result--which can't happen thanks to the lack
+        //   of critical edges
+        // - the terminator was a BranchInst which was passed no arguments but
+        //   which was nonetheless identified as a barrier--which is illegal
+        assert(successor->getSinglePredecessorBlock() ==
+               terminator->getParentBlock());
         madeChange |= createEndBorrow(&successor->front());
       }
     } else {
@@ -400,10 +409,11 @@ bool Rewriter::run() {
   // don't have multiple predecessors) whose end was not reachable (because
   // reachability was not able to make it to the top of some other successor).
   //
-  // In other words, a control flow boundary is the target edge from a block B
-  // to its single predecessor P not all of whose successors S in succ(P) had
-  // reachable beginnings.  We witness that fact about P's successors by way of
-  // P not having a reachable end--see BackwardReachability::meetOverSuccessors.
+  // In other words, a control flow boundary is the target block of the edge
+  // to a block B from its single predecessor P not all of whose successors S
+  // in succ(P) had reachable beginnings.  We witness that fact about P's
+  // successors by way of P not having a reachable end--see
+  // IterativeBackwardReachability::meetOverSuccessors.
   //
   // control-flow-boundary(B) := beginning-reachable(B) && !end-reachable(P)
   for (auto *block : barriers.blocks) {
