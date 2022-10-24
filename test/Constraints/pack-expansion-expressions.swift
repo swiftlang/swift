@@ -23,3 +23,7 @@ func forward<U...>(_ u: U...) -> (U...) {
 func forwardAndMap<U..., V...>(us u: U..., vs v: V...) -> ([(U, V)]...) {
   return tuplify([(u, v)]...)
 }
+
+func variadicMap<T..., Result...>(_ t: T..., transform: ((T) -> Result)...) -> (Result...) {
+  return (transform(t)...)
+}

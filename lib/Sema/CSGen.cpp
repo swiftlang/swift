@@ -2889,9 +2889,17 @@ namespace {
       auto patternTy = CS.getType(expr->getPatternExpr());
 
       // FIXME: Use a ShapeOf constraint here.
-      auto *declRef = dyn_cast<DeclRefExpr>(expr->getBindings().front());
-      auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
-      auto shapeType = decl->getType()->getAs<PackExpansionType>()->getCountType();
+      Type shapeType;
+      auto *binding = expr->getBindings().front();
+      auto type = CS.simplifyType(CS.getType(binding));
+      type.visit([&](Type type) {
+        if (shapeType)
+          return;
+
+        if (auto archetype = type->getAs<PackArchetypeType>()) {
+          shapeType = CS.DC->mapTypeIntoContext(archetype->getShape());
+        }
+      });
 
       return PackExpansionType::get(patternTy, shapeType);
     }

@@ -4240,6 +4240,12 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
   }
 
+  if (resolution.getStage() == TypeResolutionStage::Interface) {
+    auto genericSig = resolution.getGenericSignature();
+    auto shapeType = genericSig->getReducedShape(pair.second);
+    return PackExpansionType::get(pair.first, shapeType);
+  }
+
   return PackExpansionType::get(pair.first, pair.second);
 }
 
