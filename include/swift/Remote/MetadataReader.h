@@ -506,6 +506,20 @@ public:
     return result;
   }
 
+  /// Demangle a mangled name from a potentially temporary std::string. The
+  /// demangler may produce pointers into the string data, so this copies the
+  /// string into the demangler's allocation first.
+  Demangle::NodePointer demangle(uint64_t remoteAddress,
+                                 const std::string &mangledName,
+                                 MangledNameKind kind,
+                                 Demangler &dem) {
+    size_t stringSize = mangledName.size() + 1; // + 1 for terminating NUL.
+
+    char *copiedString = dem.Allocate<char>(stringSize);
+    memcpy(copiedString, mangledName.data(), stringSize);
+    return demangle(RemoteRef<char>(remoteAddress, copiedString), kind, dem);
+  }
+
   /// Given a demangle tree, attempt to turn it into a type.
   TypeLookupErrorOr<typename BuilderType::BuiltType>
   decodeMangledType(NodePointer Node) {
@@ -2344,10 +2358,7 @@ private:
       // We're done.
       break;
     }
-
-    return demangle(RemoteRef<char>(address.getAddressData(),
-                                    mangledName.data()),
-                    kind, dem);
+    return demangle(address.getAddressData(), mangledName, kind, dem);
   }
 
   /// Read and demangle the name of an anonymous context.
