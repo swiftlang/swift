@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature BuiltinMacros -dump-ast %s -module-name MacrosTest 2>&1 | %FileCheck %s
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 // CHECK: macro_expansion_expr implicit type='String'
 // CHECK-NEXT: magic_identifier_literal_expr{{.*}}kind=#function
