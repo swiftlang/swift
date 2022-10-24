@@ -188,7 +188,8 @@ struct UnparsedSpecification {
   /// The next non-debug instruction.
   ///
   /// Provides an "anchor" for the specification.  Contextual arguments
-  /// (@instruction, @block, @function) can be parsed in terms of this anchor.
+  /// (@{instruction|block|function}) can be parsed in terms of this
+  /// anchor.
   SILInstruction *context;
 };
 
