@@ -15,7 +15,7 @@ func f(a: Int, b: Int) {
 
   // CHECK: macro_expansion_expr implicit type='Int'
   // CHECK-NEXT: magic_identifier_literal_expr{{.*}}kind=#line
-  // CHECK-NEXT: integer_literal_expr{{.*}}Macro expansion of #line in{{.*}}value=10
+  // CHECK-NEXT: integer_literal_expr{{.*}}Macro expansion of #line in{{.*}}value=11
 
   // CHECK: macro_expansion_expr implicit type='Int'
   // CHECK-NEXT: magic_identifier_literal_expr{{.*}}kind=#column
