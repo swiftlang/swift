@@ -6666,5 +6666,12 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
       " -enable-experimental-feature LayoutPrespecialization to swift to enable "
       " the usage of this language feature", ())
 
+
+//------------------------------------------------------------------------------
+// MARK: Macros
+//------------------------------------------------------------------------------
+ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
+      "expected macro expansion to produce an expression", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
