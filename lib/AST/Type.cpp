@@ -3992,6 +3992,11 @@ PackArchetypeType::get(const ASTContext &Ctx,
       {ShapeType}));
 }
 
+Type PackArchetypeType::getShape() const {
+  auto shapeType = getTrailingObjects<PackShape>()->shapeType;
+  return getGenericEnvironment()->mapTypeIntoContext(shapeType);
+}
+
 ElementArchetypeType::ElementArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,

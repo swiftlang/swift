@@ -6035,9 +6035,7 @@ public:
       LayoutConstraint Layout);
 
   // Returns the reduced shape type for this pack archetype.
-  Type getShape() const {
-    return getTrailingObjects<PackShape>()->shapeType;
-  }
+  Type getShape() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::PackArchetype;

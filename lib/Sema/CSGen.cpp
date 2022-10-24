@@ -2897,7 +2897,7 @@ namespace {
           return;
 
         if (auto archetype = type->getAs<PackArchetypeType>()) {
-          shapeType = CS.DC->mapTypeIntoContext(archetype->getShape());
+          shapeType = archetype->getShape();
         }
       });
 
