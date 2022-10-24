@@ -3753,7 +3753,7 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
                                             offset: offset)
     checkSizeConsistency()
     structOffset = instantiateVisitor.structOffset
-    isPureStruct = instantiateVisitor.isPureStruct
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
   }
   mutating func visitComputedComponent(mutating: Bool,
                                    idKind: KeyPathComputedIDKind,
@@ -3782,32 +3782,41 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
                                        setter: setter,
                                        arguments: arguments,
                                        externalArgs: externalArgs)
+    // Note: For this function and the ones below, modification of structOffset
+    // is omitted since these types of KeyPaths won't have a pureStruct
+    // offset anyway.
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     checkSizeConsistency()
   }
   mutating func visitOptionalChainComponent() {
     sizeVisitor.visitOptionalChainComponent()
     instantiateVisitor.visitOptionalChainComponent()
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     checkSizeConsistency()
   }
   mutating func visitOptionalWrapComponent() {
     sizeVisitor.visitOptionalWrapComponent()
     instantiateVisitor.visitOptionalWrapComponent()
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     checkSizeConsistency()
   }
   mutating func visitOptionalForceComponent() {
     sizeVisitor.visitOptionalForceComponent()
     instantiateVisitor.visitOptionalForceComponent()
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     checkSizeConsistency()
   }
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
     sizeVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
     instantiateVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     checkSizeConsistency()
   }
 
   mutating func finish() {
     sizeVisitor.finish()
     instantiateVisitor.finish()
+    isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     checkSizeConsistency()
   }
 
@@ -3885,14 +3894,6 @@ internal func _instantiateKeyPathBuffer(
     isPureStruct = isPureStruct && value
   }
 
-  // Disable the optimization in the general case of 0 components.
-  // Note that a KeyPath such as \SomeStruct.self would still technically
-  // have a valid offset of 0.
-  // TODO: Add the logic to distinguish pure struct
-  // 0-component KeyPaths (tuples too?) from others.
-  if walker.isPureStruct.count == 0 {
-    isPureStruct = false
-  }
   if isPureStruct {
       offset = walker.structOffset
   }
