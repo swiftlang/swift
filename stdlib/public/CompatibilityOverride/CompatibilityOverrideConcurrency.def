@@ -77,6 +77,11 @@
 #  define OVERRIDE_TASK_GROUP OVERRIDE
 #  define OVERRIDE_TASK_LOCAL OVERRIDE
 #  define OVERRIDE_TASK_STATUS OVERRIDE
+#ifndef OVERRIDE_TASK_NORETURN
+# define OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace, typedArgs, \
+                                namedArgs) \
+  OVERRIDE(name, void, attrs, ccAttrs, namespace, typedArgs, namedArgs)
+#endif
 #else
 #  ifndef OVERRIDE_ACTOR
 #    define OVERRIDE_ACTOR(...)
@@ -95,6 +100,9 @@
 #  endif
 #  ifndef OVERRIDE_TASK_STATUS
 #    define OVERRIDE_TASK_STATUS(...)
+#  endif
+#  ifndef OVERRIDE_TASK_NORETURN
+#    define OVERRIDE_TASK_NORETURN(...)
 #  endif
 #endif
 
@@ -181,7 +189,7 @@ OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
               (size_t priority,
                AsyncTask *continuation), (priority, continuation))
 
-OVERRIDE_TASK(task_asyncMainDrainQueue, void,
+OVERRIDE_TASK_NORETURN(task_asyncMainDrainQueue,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
 
@@ -380,3 +388,4 @@ OVERRIDE_TASK_STATUS(task_escalate, JobPriority,
 #undef OVERRIDE_TASK_GROUP
 #undef OVERRIDE_TASK_LOCAL
 #undef OVERRIDE_TASK_STATUS
+#undef OVERRIDE_TASK_NORETURN

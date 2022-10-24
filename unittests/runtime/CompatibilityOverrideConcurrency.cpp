@@ -44,6 +44,15 @@ ExecutorRef getEmptyValue() {
     Ran = true;                                                                \
     return getEmptyValue<ret>();                                               \
   }
+#define OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace, typedArgs,     \
+                               namedArgs)                                      \
+  static ccAttrs void name##Override(COMPATIBILITY_UNPAREN_WITH_COMMA(         \
+      typedArgs) Original_##name originalImpl) {                               \
+    if (!EnableOverride)                                                       \
+      originalImpl COMPATIBILITY_PAREN(namedArgs);                             \
+    Ran = true;                                                                \
+  }
+
 #include "../../stdlib/public/CompatibilityOverride/CompatibilityOverrideConcurrency.def"
 
 struct OverrideSection {

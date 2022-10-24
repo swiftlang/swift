@@ -1590,4 +1590,33 @@ static void swift_task_asyncMainDrainQueueImpl() {
 }
 
 #define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
+
+#ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+/// The original COMPATIBILITY_OVERRIDE defined in CompatibilityOverride.h
+/// returns the result of the impl function and override function. This results
+/// in a warning emitted for noreturn functions. Overriding the override macro
+/// to not return.
+#define OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace, typedArgs,     \
+                               namedArgs)                                      \
+  attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
+    static Override_##name Override;                                           \
+    static swift_once_t Predicate;                                             \
+    swift_once(                                                                \
+        &Predicate, [](void *) { Override = getOverride_##name(); }, nullptr); \
+    if (Override != nullptr)                                                   \
+      Override(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)                     \
+                   swift_##name##Impl);                                        \
+    swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                         \
+  }
+
+#else // ifndef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+// Call directly through to the original implementation when we don't support
+// overrides.
+#define OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace, typedArgs,     \
+                               namedArgs)                                      \
+  attrs ccAttrs void namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {   \
+      swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                       \
+    }
+#endif // #else SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
+
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
