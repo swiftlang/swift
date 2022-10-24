@@ -5602,8 +5602,8 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
 
   auto eraseParameterPack = [&](GenericTypeParamType *paramType) {
     return GenericTypeParamType::get(
-        paramType->getDepth(), paramType->getIndex(),
-        /*isParameterPack=*/false, *this);
+        /*isParameterPack=*/false, paramType->getDepth(),
+        paramType->getIndex(), *this);
   };
 
   for (auto paramType : baseGenericSig.getGenericParams()) {
