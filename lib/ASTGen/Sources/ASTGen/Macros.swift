@@ -83,7 +83,7 @@ public func evaluateMacro(
       evaluatedResultPtr[utf8.count] = 0
 
       expandedSourcePointer.pointee = UnsafePointer(evaluatedResultPtr)
-      expandedSourceLength.pointee = utf8.count + 1
+      expandedSourceLength.pointee = utf8.count
     }
 
     return 0
