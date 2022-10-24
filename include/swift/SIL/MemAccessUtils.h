@@ -236,6 +236,21 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 /// such as by reading a pointer.
 bool mayAccessPointer(SILInstruction *instruction);
 
+/// Whether this instruction loads or copies a value whose storage does not
+/// increment the stored value's reference count.
+bool mayLoadWeakOrUnowned(SILInstruction* instruction);
+
+/// Conservatively, whether this instruction could involve a synchronization
+/// point like a memory barrier, lock or syscall.
+bool maySynchronizeNotConsideringSideEffects(SILInstruction* instruction);
+
+/// Conservatively, whether this instruction could be a barrier to hoisting
+/// destroys.
+///
+/// Does not consider function so effects, so every apply is treated as a
+/// barrier.
+bool mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction);
+
 } // end namespace swift
 
 //===----------------------------------------------------------------------===//

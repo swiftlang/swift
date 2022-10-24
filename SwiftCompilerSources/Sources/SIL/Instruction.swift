@@ -112,35 +112,16 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return swift_mayAccessPointer(bridged)
   }
 
-  /// Whether this instruction loads or copies a value whose storage does not
-  /// increment the stored value's reference count.
   public final var mayLoadWeakOrUnowned: Bool {
-    switch self {
-    case is LoadWeakInst, is LoadUnownedInst, is StrongCopyUnownedValueInst, is StrongCopyUnmanagedValueInst:
-      return true
-    default:
-      return false
-    }
+    return swift_mayLoadWeakOrUnowned(bridged)
   }
 
-  /// Conservatively, whether this instruction could involve a synchronization
-  /// point like a memory barrier, lock or syscall.
   public final var maySynchronizeNotConsideringSideEffects: Bool {
-    switch self {
-    case is FullApplySite, is EndApplyInst, is AbortApplyInst:
-      return true
-    default:
-      return false
-    }
+    return swift_maySynchronizeNotConsideringSideEffects(bridged)
   }
 
-  /// Conservatively, whether this instruction could be a barrier to hoisting
-  /// destroys.
-  ///
-  /// Does not consider function so effects, so every apply is treated as a
-  /// barrier.
   public final var mayBeDeinitBarrierNotConsideringSideEffects: Bool {
-    return mayAccessPointer || mayLoadWeakOrUnowned || maySynchronizeNotConsideringSideEffects
+    return swift_mayBeDeinitBarrierNotConsideringSideEffects(bridged)
   }
 
   public func visitReferencedFunctions(_ cl: (Function) -> ()) {
