@@ -291,6 +291,13 @@ class Product(object):
         return target
 
     def generate_darwin_toolchain_file(self, platform, arch):
+        """
+        Generates a new CMake tolchain file that specifies Darwin as a target
+        plaftorm.
+
+            Returns: path on the filesystem to the newly generated toolchain file.
+        """
+
         shell.makedirs(self.build_dir)
         toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
 
@@ -359,6 +366,13 @@ class Product(object):
         return '{}-unknown-linux-{}'.format(sysroot_arch, abi)
 
     def generate_linux_toolchain_file(self, platform, arch):
+        """
+        Generates a new CMake tolchain file that specifies Linux as a target
+        plaftorm.
+
+            Returns: path on the filesystem to the newly generated toolchain file.
+        """
+
         shell.makedirs(self.build_dir)
         toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
 
@@ -394,6 +408,31 @@ class Product(object):
                 f.writelines("set({} {})\n".format(k, v) for k, v in data)
         else:
             print("DRY_RUN! Writing Toolchain file to path: {}".format(toolchain_file))
+
+        return toolchain_file
+
+    def generate_toolchain_file(self, host_target):
+        """
+        Checks `host_target` platform and generates a new CMake tolchain file
+        appropriate for that target plaftorm. Defines `CMAKE_C_FLAGS` and
+        `CMAKE_CXX_FLAGS` as CMake options. Also defines `CMAKE_TOOLCHAIN_FILE`
+        with the path of the generated toolchain file as a CMake option.
+
+            Returns: path to the newly generated toolchain file on the filesystem.
+        """
+
+        (platform, arch) = host_target.split('-')
+        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
+        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
+        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
+
+        toolchain_file = None
+        if self.is_darwin_host(host_target):
+            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
+            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+        elif platform == "linux":
+            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
+            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
 
         return toolchain_file
 
