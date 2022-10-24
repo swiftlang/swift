@@ -27,3 +27,9 @@ func forwardAndMap<U..., V...>(us u: U..., vs v: V...) -> ([(U, V)]...) {
 func variadicMap<T..., Result...>(_ t: T..., transform: ((T) -> Result)...) -> (Result...) {
   return (transform(t)...)
 }
+
+func coerceExpansion<T...>(_ value: T...) {
+  func promoteToOptional<Wrapped...>(_: Wrapped?...) {}
+
+  promoteToOptional(value...)
+}

@@ -7087,9 +7087,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                             /*isImplicit*/ true));
   }
 
-  case TypeKind::Pack:
-  case TypeKind::PackExpansion: {
+  case TypeKind::Pack: {
     llvm_unreachable("Unimplemented!");
+  }
+
+  case TypeKind::PackExpansion: {
+    auto toExpansionType = toType->getAs<PackExpansionType>();
+    auto *expansion = dyn_cast<PackExpansionExpr>(expr);
+
+    auto *pattern = coerceToType(expansion->getPatternExpr(),
+                                 toExpansionType->getPatternType(),
+                                 locator);
+    auto patternType = cs.getType(pattern);
+    auto shapeType = toExpansionType->getCountType();
+    auto expansionTy = PackExpansionType::get(patternType, shapeType);
+
+    return cs.cacheType(PackExpansionExpr::create(ctx, pattern,
+        expansion->getOpaqueValues(), expansion->getBindings(),
+        expansion->getEndLoc(), expansion->isImplicit(), expansionTy));
   }
 
   case TypeKind::BuiltinTuple:
