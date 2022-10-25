@@ -79,18 +79,14 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
   }
 
   func findInvalidRange(from startOfInvalid: Int) -> Range<Int> {
-    let remaining = buf[startOfInvalid...]
-    var endIndex = remaining.startIndex
-    var iter = remaining.makeIterator()
-    _ = iter.next()
-    while let cu = iter.next(), UTF8.isContinuation(cu) {
-      endIndex += 1
+    _internalInvariant(startOfInvalid < buf.endIndex, "startOfInvalid must be a valid index")
+    var endOfInvalid = startOfInvalid &+ 1
+    while endOfInvalid < buf.endIndex, UTF8.isContinuation(buf[endOfInvalid]) {
+      endOfInvalid &+= 1
     }
-    let illegalRange = Range(remaining.startIndex...endIndex)
-    _internalInvariant(illegalRange.clamped(to: (remaining.startIndex..<buf.endIndex)) == illegalRange,
-           "illegal range out of full range")
+    let illegalRange = Range(uncheckedBounds: (startOfInvalid, endOfInvalid))
     // FIXME: Remove the call to `_legacyNarrowIllegalRange` and return `illegalRange` directly
-    return _legacyNarrowIllegalRange(buf: remaining[illegalRange])
+    return _legacyNarrowIllegalRange(buf: buf[illegalRange])
   }
 
   if _allASCII(buf) {
