@@ -986,6 +986,10 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
 
+  // If we are asked to stop optimizing before lowering ownership, do so now.
+  if (P.Options.StopOptimizationBeforeLoweringOwnership)
+    return P;
+
   // Now strip any transparent functions that still have ownership.
   P.addOwnershipModelEliminator();
 
