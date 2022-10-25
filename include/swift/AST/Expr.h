@@ -3531,14 +3531,16 @@ class PackExpansionExpr final : public Expr,
 
   Expr *PatternExpr;
   SourceLoc DotsLoc;
+  GenericEnvironment *Environment;
 
   PackExpansionExpr(Expr *patternExpr,
                     ArrayRef<OpaqueValueExpr *> opaqueValues,
                     ArrayRef<Expr *> bindings,
                     SourceLoc dotsLoc,
+                    GenericEnvironment *environment,
                     bool implicit, Type type)
     : Expr(ExprKind::PackExpansion, implicit, type),
-      PatternExpr(patternExpr), DotsLoc(dotsLoc) {
+      PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
     assert(opaqueValues.size() == bindings.size());
     Bits.PackExpansionExpr.NumBindings = opaqueValues.size();
 
@@ -3569,6 +3571,7 @@ public:
                                    ArrayRef<OpaqueValueExpr *> opaqueValues,
                                    ArrayRef<Expr *> bindings,
                                    SourceLoc dotsLoc,
+                                   GenericEnvironment *environment,
                                    bool implicit = false,
                                    Type type = Type());
 
@@ -3592,6 +3595,10 @@ public:
 
   void setBinding(unsigned i, Expr *e) {
     getMutableBindings()[i] = e;
+  }
+
+  GenericEnvironment *getGenericEnvironment() {
+    return Environment;
   }
 
   SourceLoc getStartLoc() const {

@@ -2886,7 +2886,21 @@ namespace {
         CS.setType(binding, type);
       }
 
-      auto patternTy = CS.getType(expr->getPatternExpr());
+      // Replace opened element archetypes with pack archetypes
+      // for the resulting type of the pack expansion.
+      auto elementResultType = CS.getType(expr->getPatternExpr());
+      auto patternTy = elementResultType.transform([&](Type type) -> Type {
+        auto *element = type->getAs<ElementArchetypeType>();
+        if (!element)
+          return type;
+
+        auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
+        auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
+                                               elementParam->getDepth(),
+                                               elementParam->getIndex(),
+                                               CS.getASTContext());
+        return CS.DC->mapTypeIntoContext(pack);
+      });
 
       // FIXME: Use a ShapeOf constraint here.
       Type shapeType;

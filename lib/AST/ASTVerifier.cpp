@@ -824,12 +824,23 @@ public:
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
+      Generics.push_back(expr->getGenericEnvironment()->getGenericSignature());
+
       for (auto *placeholder : expr->getOpaqueValues()) {
         assert(!OpaqueValues.count(placeholder));
         OpaqueValues[placeholder] = 0;
       }
 
       return true;
+    }
+
+    void verifyCheckedAlways(PackExpansionExpr *E) {
+      // Remove the element generic environment before verifying
+      // the pack expansion type, which contains pack archetypes.
+      assert(Generics.back().get<GenericSignature>().getPointer() ==
+             E->getGenericEnvironment()->getGenericSignature().getPointer());
+      Generics.pop_back();
+      verifyCheckedAlwaysBase(E);
     }
 
     void cleanup(PackExpansionExpr *expr) {

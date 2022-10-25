@@ -1240,15 +1240,15 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 PackExpansionExpr *
 PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
                           ArrayRef<OpaqueValueExpr *> opaqueValues,
-                          ArrayRef<Expr *> bindings,
-                          SourceLoc dotsLoc, bool implicit,
-                          Type type) {
+                          ArrayRef<Expr *> bindings, SourceLoc dotsLoc,
+                          GenericEnvironment *environment,
+                          bool implicit, Type type) {
   size_t size =
       totalSizeToAlloc<OpaqueValueExpr *, Expr *>(opaqueValues.size(),
                                                   bindings.size());
   void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
   return ::new (mem) PackExpansionExpr(patternExpr, opaqueValues,
-                                       bindings, dotsLoc,
+                                       bindings, dotsLoc, environment,
                                        implicit, type);
 }
 
