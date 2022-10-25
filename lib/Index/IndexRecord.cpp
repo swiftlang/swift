@@ -516,7 +516,8 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // Reload resilient modules from swiftinterface to avoid indexing
   // internal details.
   bool skipIndexingModule = false;
-  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient) {
+  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+      !module->isStdlibModule()) {
     module->getASTContext().setIgnoreAdjacentModules(true);
 
     ImportPath::Module::Builder builder(module->getName());
