@@ -100,28 +100,78 @@ For example, to have `build-script` spawn only one link job at a time, we can in
 build-script --llvm-cmake-options=-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
 ```
 
-## Using ninja with Xcode
+## Using Ninja with Xcode
 
-Although it's possible to build the swift compiler entirely with Xcode (`--xcode`), often it's better to build with _ninja_ and use Xcode for editing and debugging.
-This is very convenient because you get the benefits of the ninja build system and all the benefits of the Xcode IDE, like code completion, refactoring, debugging, etc.
+Although it's possible to build the toolchain entirely with Xcode via `--xcode`,
+a more efficient and robust option is to integrate a Ninja build with Xcode.
+This is also convenient in that you can navigate, build, run, edit, and debug in
+Xcode while retaining the option of using Ninja on the command line.
 
-To setup this environment a few steps are necessary:
-* Create a new workspace.
-* Create Xcode projects for LLVM and Swift with `utils/build-script --skip-build --xcode --skip-early-swift-driver`. Beside configuring, this needs to build a few LLVM files which are needed to configure the swift project.
-* Add the generated LLVM and Swift projects to your workspace. They can be found in the build directories `build/Xcode-DebugAssert/llvm-macosx-x86_64/LLVM.xcodeproj` and `build/Xcode-DebugAssert/swift-macosx-x86_64/Swift.xcodeproj`.
-* Add the `swift/SwiftCompilerSources` package to the workspace.
-* Create a new empty project `build-targets` (or however you want to name it) in the workspace, using the "External Build System" template.
-* For each compiler tool you want to build (`swift-frontend`, `sil-opt`, etc.), add an "External Build System" target to the `build-targets` project.
-* In the "Info" section of the target configuration, set:
-    * the _Build Tool_ to the full path of the `ninja` command
-    * the _Argument_ to the tool name (e.g. `swift-frontend`)
-    * the _Directory_ to the ninja swift build directory, e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64`. For debugging to work, this has to be a debug build of course.
-* For each target, create a new scheme:
-    * In the _Build_ section add the corresponding build target that you created before.
-    * In the _Run/Info_ section select the built _Executable_ in the build directory (e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-frontend`).
-    * In the _Run/Arguments_ section you can set the command line arguments with which you want to run the compiler tool.
-    * In the _Run/Options_ section you can set the working directory for debugging.
+Assuming that you have already [built the toolchain via Ninja](#the-actual-build),
+several more steps are necessary to set up this environment:
+* Generate Xcode projects with `utils/build-script --skip-build --xcode --skip-early-swift-driver`.
+  This will first build a few LLVM files that are needed to configure the
+  projects.
+* Create a new Xcode workspace.
+* Add the generated Xcode projects or Swift packages that are relevant to your
+  tasks to your workspace. All the Xcode projects can be found among the
+  build artifacts in `build/Xcode-DebugAssert`. For example:
+  * If you are aiming for the compiler, add `build/Xcode-DebugAssert/swift-macosx-*/Swift.xcodeproj`.
+    This project also includes the standard library and runtime sources. If you
+    need the parts of the compiler that are implemented in Swift itself, add the
+    `swift/SwiftCompilerSources/Package.swift` package as well.
+  * If you are aiming for just the standard library or runtime, add
+    `build/Xcode-DebugAssert/swift-macosx-*/stdlib/Swift-stdlib.xcodeproj`.
+  <!-- FIXME: Without this "hard" line break, the note doesn’t get properly spaced from the bullet -->
+  <br />
 
-Now you are all set. You can build and debug like with a native Xcode project.
+  > **Warning**  
+  > Adding both `Swift.xcodeproj` and `LLVM.xcodeproj` *might* slow down the IDE
+    and is not recommended unless you know what you're doing.
 
-If the project structure changes, e.g. new source files are added or deleted, you just have to re-create the LLVM and Swift projects with `utils/build-script --skip-build --xcode --skip-early-swift-driver`.
+  In general, we encourage you to add only what you need. Keep in mind that none
+  of the generated Xcode projects are required to build or run with this setup
+  because we are using Ninja—an *external* build system; rather, they should be
+  viewed as a means of leveraging the navigation, editing and debugging features
+  of the IDE in relation to the source code they wrap.
+
+* Create an empty Xcode project in the workspace, using the
+  _External Build System_ template.
+* For a Ninja target that you want to build (e.g. `swift-frontend`), add a
+  target to the empty project, using the _External Build System_ template.
+* In the _Info_ pane of the target settings, set
+  * _Build Tool_ to the path of the `ninja` executable (the output of
+    `which ninja` on the command line)
+  * _Arguments_ to the Ninja target name (e.g. `swift-frontend`)
+  * _Directory_ to the path of the build directory associated with the Ninja
+    target. For Swift targets, including the standard library and runtime, you
+    want `path/to/swift-project/build/Ninja-*/swift-macosx-*`
+* Add a scheme for the target. Be sure not to select a target from one the
+  generated Xcode projects.
+* > **Note**  
+  > Ignore this step if the target associates to a non-executable Ninja target
+    like `swift-stdlib`.
+
+  Adjust the _Run_ action settings of the scheme:
+  * In the _Info_ pane, select the _Executable_ built by the Ninja target from
+    the appropriate `bin` directory (e.g. `build/Ninja-*/swift-macosx-*/bin/swift-frontend`).
+  * In the _Arguments_ pane, add the command line arguments that you want to
+    pass to the executable on launch (e.g. `path/to/file.swift -typecheck` for
+    `swift-frontend`).
+  * You can optionally set the working directory for debugging in the
+    _Options_ pane.
+* Configure as many more target-scheme pairs as you need.
+
+Now you are all set! You can build, run and debug as with a native Xcode
+project. If an `update-checkout` routine or a structural change—such as when
+source files are added or deleted—happens to impact your editing experience,
+simply regenerate the Xcode projects.
+
+> **Note**  
+> * For debugging to *fully* work for a given component—say, the compiler—the
+    `build-script` invocation for the Ninja build must be arranged to
+    [build a debug variant of that component](#debugging-issues).
+> * Xcode's indexing can occasionally start slipping after switching to and back
+    from a distant branch, resulting in a noticeable slowdown. To sort things
+    out, close the workspace and delete the _Index_ directory from the
+    workspace's derived data before reopening.
