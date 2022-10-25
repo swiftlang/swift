@@ -558,7 +558,7 @@ public:
   template <unsigned Index = 0,
             typename = typename std::enable_if<(Index < NumValues)>::type>
   uint64_t getValue() const {
-    // We pack values into 16 bit components of the storage, with value0
+    // We pack values into equally-sized components of the storage, with value0
     // being stored in the upper bits, valueN in the lower bits. Therefore we
     // need to shift out any extra values in the lower bits.
     auto extraValues = NumValues - Index - 1;
