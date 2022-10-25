@@ -4881,6 +4881,17 @@ public:
   }
 
   void checkBranchInst(BranchInst *BI) {
+    for (auto arg : BI->getArgs()) {
+      auto *borrow = dyn_cast<BeginBorrowInst>(arg);
+      if (!borrow) {
+        continue;
+      }
+      auto op = borrow->getOperand();
+      if (op->getOwnershipKind() != OwnershipKind::Guaranteed) {
+        continue;
+      }
+      assert(!isGuaranteedForwarding(op));
+    }
     require(BI->getArgs().size() == BI->getDestBB()->args_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),

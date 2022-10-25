@@ -310,7 +310,16 @@ void OwnershipLiveRange::convertJoinedLiveRangePhiToGuaranteed(
     InstModCallbacks callbacks) && {
 
   // First convert the phi value itself to be guaranteed.
-  convertIntroducerToGuaranteed(introducer);
+  SILValue phiValue = convertIntroducerToGuaranteed(introducer);
+
+  // Then insert end_borrows at each of our destroys if we are consuming. We
+  // have to convert the phi to guaranteed first since otherwise, the ownership
+  // check when we create the end_borrows will trigger.
+  if (auto *phi = dyn_cast<SILPhiArgument>(phiValue)) {
+    if (!isGuaranteedForwardingPhi(phi)) {
+      insertEndBorrowsAtDestroys(phiValue, deadEndBlocks, scratch);
+    }
+  }
 
   // Then eliminate all of the destroys...
   while (!destroyingUses.empty()) {

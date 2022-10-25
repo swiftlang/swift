@@ -71,8 +71,10 @@ bb6:
   return %r : $()
 }
 
+// Currently, this is not optimized away because enum has @guaranteed function
+// argument, which  will need a borrow scope before being forwarded.
 // CHECK-LABEL: sil [ossa] @simple_forwarding2 :
-// CHECK-NOT: switch_enum
+// CHECK: switch_enum
 // CHECK-LABEL: } // end sil function 'simple_forwarding2'
 sil [ossa] @simple_forwarding2 : $@convention(thin) (Builtin.Int1, @guaranteed Klass) -> () {
 bb0(%0 : $Builtin.Int1, %1 : @guaranteed $Klass):
@@ -183,7 +185,6 @@ bb6:
 
 // CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding2 : 
 // CHECK: switch_enum
-// CHECK-NOT: switch_enum
 // CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding2'
 sil [ossa] @simple_switch_enum_forwarding2 : $@convention(thin) (@guaranteed E3) -> () {
 bb0(%0 : @guaranteed $E3):
