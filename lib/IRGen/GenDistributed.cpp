@@ -681,14 +681,17 @@ void DistributedAccessor::emit() {
     // We need this to determine the expected number of witness tables
     // to load from the buffer provided by the caller.
     llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
-    expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
+    auto numDirectGenericArgs =
+        expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
 
     // Generic arguments associated with the distributed thunk directly
     // e.g. `distributed func echo<T, U>(...)`
-    auto numDirectGenericArgs =
-        llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
-          return type == IGM.TypeMetadataPtrTy;
-        });
+    assert(
+        !IGM.getLLVMContext().supportsTypedPointers() ||
+        numDirectGenericArgs ==
+            llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
+              return type == IGM.TypeMetadataPtrTy;
+            }));
 
     auto expectedWitnessTables =
         targetGenericArguments.size() - numDirectGenericArgs;
