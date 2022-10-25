@@ -570,10 +570,21 @@ public:
                                              SILValue value, bool wasPlusOne) {
     // If we have none...
     if (value->getOwnershipKind() == OwnershipKind::None) {
-      // ... and we don't have a no implicit copy trivial type, just return
-      // value.
-      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly) ||
-          !vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
+      // If we don't have move only features enabled, just return, we are done.
+      if (!SGF.getASTContext().LangOpts.Features.count(Feature::MoveOnly))
+        return value;
+
+      // Then check if we have a pure move only type. In that case, we need to
+      // insert a no implicit copy
+      if (value->getType().isPureMoveOnly()) {
+        value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
+        return SGF.B.createMarkMustCheckInst(
+            PrologueLoc, value, MarkMustCheckInst::CheckKind::NoImplicitCopy);
+      }
+
+      // Otherwise, if we don't have a no implicit copy trivial type, just
+      // return value.
+      if (!vd->isNoImplicitCopy() || !value->getType().isTrivial(SGF.F))
         return value;
 
       // Otherwise, we have a no implicit copy trivial type, so wrap it in the
