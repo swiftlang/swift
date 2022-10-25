@@ -6394,6 +6394,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (desugar1->isEqual(desugar2))
         return getTypeMatchSuccess();
 
+      if (shouldAttemptFixes()) {
+        if (!desugar1->hasTypeVariable() && !desugar2->hasTypeVariable()) {
+          auto *loc = getConstraintLocator(locator);
+
+          auto *fix =
+              loc->isLastElement<LocatorPathElt::TypeParameterRequirement>()
+                  ? fixRequirementFailure(*this, type1, type2, loc->getAnchor(),
+                                          loc->getPath())
+                  : ContextualMismatch::create(*this, type1, type2, loc);
+
+          if (!fix || recordFix(fix))
+            return getTypeMatchFailure(locator);
+
+          return getTypeMatchSuccess();
+        }
+      }
+
       // If one of the dependent member types has no type variables,
       // this comparison is effectively illformed, because dependent
       // member couldn't be simplified down to the actual type, and

@@ -3456,12 +3456,15 @@ void irgen::bindGenericRequirement(IRGenFunction &IGF,
 namespace {
   /// A class for expanding a polymorphic signature.
   class ExpandPolymorphicSignature : public PolymorphicConvention {
+    unsigned numTypeMetadataPtrs = 0;
+
   public:
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
       : PolymorphicConvention(IGM, fn) {}
 
-    void expand(SmallVectorImpl<llvm::Type *> &out,
-                SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
+    unsigned
+    expand(SmallVectorImpl<llvm::Type *> &out,
+           SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *reqs) {
       auto outStartSize = out.size();
       (void)outStartSize;
       for (auto &source : getSources())
@@ -3472,9 +3475,13 @@ namespace {
           reqs->push_back(reqt);
         out.push_back(reqt.Protocol ? IGM.WitnessTablePtrTy
                                     : IGM.TypeMetadataPtrTy);
+
+        if (!reqt.Protocol)
+          ++numTypeMetadataPtrs;
       });
       assert((!reqs || reqs->size() == (out.size() - outStartSize)) &&
              "missing type source for type");
+      return numTypeMetadataPtrs;
     }
 
   private:
@@ -3488,6 +3495,7 @@ namespace {
       case MetadataSource::Kind::GenericLValueMetadata:
         if (reqs)
           reqs->push_back(source);
+        ++numTypeMetadataPtrs;
         return out.push_back(IGM.TypeMetadataPtrTy);
       case MetadataSource::Kind::SelfMetadata:
       case MetadataSource::Kind::SelfWitnessTable:
@@ -3501,11 +3509,11 @@ namespace {
 } // end anonymous namespace
 
 /// Given a generic signature, add the argument types required in order to call it.
-void irgen::expandPolymorphicSignature(
+unsigned irgen::expandPolymorphicSignature(
     IRGenModule &IGM, CanSILFunctionType polyFn,
     SmallVectorImpl<llvm::Type *> &out,
     SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs) {
-  ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
+  return ExpandPolymorphicSignature(IGM, polyFn).expand(out, outReqs);
 }
 
 void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
