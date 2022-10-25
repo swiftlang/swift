@@ -465,6 +465,18 @@ SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) SkipSameTypeRequirement(cs, lhs, rhs, locator);
 }
 
+bool SkipSameShapeRequirement::diagnose(const Solution &solution,
+                                       bool asNote) const {
+  SameShapeRequirementFailure failure(solution, LHS, RHS, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SkipSameShapeRequirement *
+SkipSameShapeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SkipSameShapeRequirement(cs, lhs, rhs, locator);
+}
+
 bool SkipSuperclassRequirement::diagnose(const Solution &solution,
                                          bool asNote) const {
   SuperclassRequirementFailure failure(solution, LHS, RHS, getLocator());

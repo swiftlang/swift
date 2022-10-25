@@ -2425,6 +2425,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::ShapeOf:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2597,6 +2598,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::ShapeOf:
     return true;
   }
 
@@ -3013,6 +3015,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::ShapeOf:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -4219,16 +4222,14 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
   switch (req.getRequirementKind()) {
-  case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
-
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
-  }
 
-  case RequirementKind::Superclass: {
+  case RequirementKind::SameShape:
+    return SkipSameShapeRequirement::create(cs, type1, type2, reqLoc);
+
+  case RequirementKind::Superclass:
     return SkipSuperclassRequirement::create(cs, type1, type2, reqLoc);
-  }
 
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
@@ -6366,6 +6367,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::SyntacticElement:
     case ConstraintKind::BindTupleOfFunctionParams:
     case ConstraintKind::PackElementOf:
+    case ConstraintKind::ShapeOf:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -7442,17 +7444,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
     return SolutionKind::Solved;
   }
 
-  auto formUnsolved = [&](bool activate = false) {
+  auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
-      auto *conformance = Constraint::create(
+      auto *subclassOf = Constraint::create(
           *this, ConstraintKind::SubclassOf, type, classType,
           getConstraintLocator(locator));
 
-      addUnsolvedConstraint(conformance);
-      if (activate)
-        activateConstraint(conformance);
-
+      addUnsolvedConstraint(subclassOf);
       return SolutionKind::Solved;
     }
 
@@ -12510,6 +12509,74 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
+static Type getReducedShape(Type type) {
+  // Pack archetypes know their reduced shape
+  if (auto *packArchetype = type->getAs<PackArchetypeType>())
+    return packArchetype->getShape();
+
+  // Reduced shape of pack is computed recursively
+  if (auto *packType = type->getAs<PackType>()) {
+    auto &ctx = type->getASTContext();
+    SmallVector<Type, 2> elts;
+
+    for (auto elt : packType->getElementTypes()) {
+      // T... => shape(T)...
+      if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
+        auto shapeType = getReducedShape(packExpansionType->getCountType());
+        assert(shapeType && "Should not end up here if pack type's shape "
+                            "is still potentially unknown");
+        elts.push_back(PackExpansionType::get(shapeType, shapeType));
+      }
+
+      // Use () as a placeholder for scalar shape
+      elts.push_back(ctx.TheEmptyTupleType);
+    }
+
+    return PackType::get(ctx, elts);
+  }
+
+  // Getting the shape of any other type is an error.
+  return Type();
+}
+
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  // Recursively replace all type variables with fixed bindings if
+  // possible.
+  type1 = simplifyType(type1, flags);
+
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *shapeOf = Constraint::create(
+          *this, ConstraintKind::ShapeOf, type1, type2,
+          getConstraintLocator(locator));
+
+      addUnsolvedConstraint(shapeOf);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  // We can't compute a reduced shape if the input type still
+  // contains type variables that might bind to pack archetypes.
+  SmallPtrSet<TypeVariableType *, 2> typeVars;
+  type1->getTypeVariables(typeVars);
+  for (auto *typeVar : typeVars) {
+    if (typeVar->getImpl().canBindToPack())
+      return formUnsolved();
+  }
+
+  if (Type shape = getReducedShape(type1)) {
+    addConstraint(ConstraintKind::Bind, shape, type2, locator);
+    return SolutionKind::Solved;
+  }
+
+  return SolutionKind::Error;
+}
+
 static llvm::PointerIntPair<Type, 3, unsigned>
 getBaseTypeForPointer(TypeBase *type) {
   unsigned unwrapCount = 0;
@@ -13573,6 +13640,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::AddConformance:
   case FixKind::SkipSameTypeRequirement:
+  case FixKind::SkipSameShapeRequirement:
   case FixKind::SkipSuperclassRequirement: {
     return recordFix(fix, assessRequirementFailureImpact(*this, type1,
                                                          fix->getLocator()))
@@ -13847,6 +13915,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::PackElementOf:
     return simplifyPackElementOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ShapeOf:
+    return simplifyShapeOfConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -14010,8 +14081,18 @@ void ConstraintSystem::addConstraint(Requirement req,
   bool conformsToAnyObject = false;
   Optional<ConstraintKind> kind;
   switch (req.getKind()) {
-  case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
+  case RequirementKind::SameShape: {
+    auto type1 = req.getFirstType();
+    auto type2 = req.getSecondType();
+
+    // FIXME: Locator for diagnostics
+    auto typeVar = createTypeVariable(getConstraintLocator(locator),
+                                      TVO_CanBindToPack);
+
+    addConstraint(ConstraintKind::ShapeOf, type1, typeVar, locator);
+    addConstraint(ConstraintKind::ShapeOf, type2, typeVar, locator);
+    return;
+  }
 
   case RequirementKind::Conformance:
     kind = ConstraintKind::ConformsTo;
@@ -14420,6 +14501,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::PackElementOf:
     return simplifyPackElementOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/None,
+        constraint.getLocator());
+
+  case ConstraintKind::ShapeOf:
+    return simplifyShapeOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
         constraint.getLocator());
   }
 

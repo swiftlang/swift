@@ -910,6 +910,13 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
     missingType = requirementFix->rhsType();
     break;
   }
+  case FixKind::SkipSameShapeRequirement: {
+    requirementKind = RequirementKind::SameShape;
+    auto requirementFix = (SkipSameShapeRequirement *)fix;
+    type = requirementFix->lhsType();
+    missingType = requirementFix->rhsType();
+    break;
+  }
   case FixKind::SkipSuperclassRequirement: {
     requirementKind = RequirementKind::Superclass;
     auto requirementFix = (SkipSuperclassRequirement *)fix;
