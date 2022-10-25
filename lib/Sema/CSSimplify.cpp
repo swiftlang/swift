@@ -4222,16 +4222,14 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
   switch (req.getRequirementKind()) {
-  case RequirementKind::SameShape:
-    llvm_unreachable("Same-shape requirement not supported here");
-
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
-  }
 
-  case RequirementKind::Superclass: {
+  case RequirementKind::SameShape:
+    return SkipSameShapeRequirement::create(cs, type1, type2, reqLoc);
+
+  case RequirementKind::Superclass:
     return SkipSuperclassRequirement::create(cs, type1, type2, reqLoc);
-  }
 
   case RequirementKind::Layout:
   case RequirementKind::Conformance:
@@ -13642,6 +13640,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::AddConformance:
   case FixKind::SkipSameTypeRequirement:
+  case FixKind::SkipSameShapeRequirement:
   case FixKind::SkipSuperclassRequirement: {
     return recordFix(fix, assessRequirementFailureImpact(*this, type1,
                                                          fix->getLocator()))
