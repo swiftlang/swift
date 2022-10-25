@@ -31,12 +31,12 @@ extension UTF8ValidationResult: Equatable {}
 
 internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationResult {
 
-  @inline(__always) func guaranteeIn(_ iter: inout UnsafeBufferPointer<UInt8>.Iterator, _ f: (UInt8) -> Bool) -> Bool {
+  @inline(__always) func checkNext(_ iter: inout UnsafeBufferPointer<UInt8>.Iterator, _ f: (UInt8) -> Bool) -> Bool {
     guard let cu = iter.next(), f(cu) else { return false }
     return true
   }
-  @inline(__always) func guaranteeContinuation(_ iter: inout UnsafeBufferPointer<UInt8>.Iterator) -> Bool {
-    guaranteeIn(&iter, UTF8.isContinuation)
+  @inline(__always) func checkNextIsContinuation(_ iter: inout UnsafeBufferPointer<UInt8>.Iterator) -> Bool {
+    checkNext(&iter, UTF8.isContinuation)
   }
 
   func _legacyInvalidLengthCalculation(_ _buffer: (_storage: UInt32, ())) -> Int {
@@ -97,57 +97,57 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     return .success(UTF8ExtraInfo(isASCII: true))
   }
 
+  var firstUnvalidated = buf.startIndex
   var iter = buf.makeIterator()
-  var lastValidIndex = buf.startIndex
   while let cu = iter.next() {
     if UTF8.isASCII(cu) {
-      lastValidIndex &+= 1
+      firstUnvalidated &+= 1
       continue
     }
     if _slowPath(!_isUTF8MultiByteLeading(cu)) {
-      return .error(toBeReplaced: findInvalidRange(from: lastValidIndex))
+      return .error(toBeReplaced: findInvalidRange(from: firstUnvalidated))
     }
-    let success: Bool
+    let isValid: Bool
     switch cu {
     case 0xC2...0xDF:
-      success = guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 2 }
+      isValid = checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 2 }
     case 0xE0:
-      success = guaranteeIn(&iter, _isNotOverlong_E0)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 3 }
+      isValid = checkNext(&iter, _isNotOverlong_E0)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 3 }
     case 0xE1...0xEC:
-      success = guaranteeContinuation(&iter)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 3 }
+      isValid = checkNextIsContinuation(&iter)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 3 }
     case 0xED:
-      success = guaranteeIn(&iter, _isNotOverlong_ED)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 3 }
+      isValid = checkNext(&iter, _isNotOverlong_ED)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 3 }
     case 0xEE...0xEF:
-      success = guaranteeContinuation(&iter)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 3 }
+      isValid = checkNextIsContinuation(&iter)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 3 }
     case 0xF0:
-      success = guaranteeIn(&iter, _isNotOverlong_F0)
-             && guaranteeContinuation(&iter)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 4 }
+      isValid = checkNext(&iter, _isNotOverlong_F0)
+             && checkNextIsContinuation(&iter)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 4 }
     case 0xF1...0xF3:
-      success = guaranteeContinuation(&iter)
-             && guaranteeContinuation(&iter)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 4 }
+      isValid = checkNextIsContinuation(&iter)
+             && checkNextIsContinuation(&iter)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 4 }
     case 0xF4:
-      success = guaranteeIn(&iter, _isNotOverlong_F4)
-             && guaranteeContinuation(&iter)
-             && guaranteeContinuation(&iter)
-      if success { lastValidIndex &+= 4 }
+      isValid = checkNext(&iter, _isNotOverlong_F4)
+             && checkNextIsContinuation(&iter)
+             && checkNextIsContinuation(&iter)
+      if isValid { firstUnvalidated &+= 4 }
     default:
       Builtin.unreachable()
     }
-    if !success {
-      return .error(toBeReplaced: findInvalidRange(from: lastValidIndex))
+    if !isValid {
+      return .error(toBeReplaced: findInvalidRange(from: firstUnvalidated))
     }
   }
   return .success(UTF8ExtraInfo(isASCII: false))
