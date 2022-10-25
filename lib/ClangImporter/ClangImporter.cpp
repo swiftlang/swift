@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
+#include "CFTypeInfo.h"
 #include "ClangDerivedConformances.h"
 #include "ClangDiagnosticConsumer.h"
 #include "ClangIncludePaths.h"
@@ -400,6 +401,10 @@ ClangImporter::createDependencyCollector(
     std::shared_ptr<llvm::FileCollectorBase> FileCollector) {
   return std::make_shared<ClangImporterDependencyCollector>(Mode,
                                                             FileCollector);
+}
+
+bool ClangImporter::isKnownCFTypeName(llvm::StringRef name) {
+  return CFPointeeInfo::isKnownCFTypeName(name);
 }
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
