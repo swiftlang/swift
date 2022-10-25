@@ -4,8 +4,9 @@
 
 % num_elements = 65537
 
-public let largeIntArray = [
+let v = 0
+let _ : [Int] = [
 % for i in range(num_elements):
-  0,
+  v,
 % end
 ]
