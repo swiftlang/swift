@@ -97,7 +97,7 @@ By default, `build-script` will spawn as many parallel compile / link jobs as th
 For example, to have `build-script` spawn only one link job at a time, we can invoke it as:
 
 ```
-build-script --llvm-cmake-options==-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
+build-script --llvm-cmake-options=-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
 ```
 
 ## Using ninja with Xcode
