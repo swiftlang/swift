@@ -84,6 +84,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     while endOfInvalid < buf.endIndex, UTF8.isContinuation(buf[endOfInvalid]) {
       endOfInvalid &+= 1
     }
+    endOfInvalid &+= 1
     let illegalRange = Range(uncheckedBounds: (startOfInvalid, endOfInvalid))
     // FIXME: Remove the call to `_legacyNarrowIllegalRange` and return `illegalRange` directly
     return _legacyNarrowIllegalRange(buf: buf[illegalRange])
