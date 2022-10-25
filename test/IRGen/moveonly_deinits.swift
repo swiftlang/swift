@@ -61,7 +61,7 @@ var value: Bool { false }
 // Struct Tests //
 //////////////////
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits24testIntPairWithoutDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits24testIntPairWithoutDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -81,7 +81,7 @@ public func testIntPairWithoutDeinit() {
     }
 }
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits21testIntPairWithDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits21testIntPairWithDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -102,7 +102,7 @@ public func testIntPairWithDeinit() {
     }
 }
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits26testKlassPairWithoutDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits26testKlassPairWithoutDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -124,7 +124,7 @@ public func testKlassPairWithoutDeinit() {
     }
 }
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits23testKlassPairWithDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits23testKlassPairWithDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -190,7 +190,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // Enum Tests //
 ////////////////
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits28testIntEnumPairWithoutDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -210,7 +210,7 @@ public func testIntEnumPairWithoutDeinit() {
     }
 }
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits25testIntEnumPairWithDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits25testIntEnumPairWithDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -231,7 +231,7 @@ public func testIntEnumPairWithDeinit() {
     }
 }
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits30testKlassEnumPairWithoutDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
@@ -290,7 +290,7 @@ public func testKlassEnumPairWithoutDeinit() {
 // SIL-NOT: release_value
 // SIL: } // end sil function '$s16moveonly_deinits27testKlassEnumPairWithDeinityyF'
 
-// IR-LABEL: define swiftcc void @"$s16moveonly_deinits27testKlassEnumPairWithDeinityyF"()
+// IR-LABEL: define {{.*}}swiftcc void @"$s16moveonly_deinits27testKlassEnumPairWithDeinityyF"()
 // IR: br i1 {{%.*}}, label %[[BB1:[0-9]+]], label %[[BB2:[0-9]+]]
 //
 // IR: [[BB1]]:
