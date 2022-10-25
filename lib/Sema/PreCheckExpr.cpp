@@ -1378,7 +1378,8 @@ namespace {
       // references to PackExpansionExpr.
       if (auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(expr)) {
         auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn());
-        if (op && op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
+        if (op && Ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+            op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
           auto *operand = postfixExpr->getOperand();
           if (auto *expansion = getPackExpansion(DC, operand, op->getLoc())) {
             return Action::Continue(expansion);
