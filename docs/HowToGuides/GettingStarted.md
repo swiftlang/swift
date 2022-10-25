@@ -271,21 +271,6 @@ In the following sections, for simplicity, we will assume that you are using a
 unless explicitly mentioned otherwise. You will need to slightly tweak the paths
 for other build configurations.
 
-### Using both Ninja and Xcode
-
-Some contributors find it more convenient to use both Ninja and Xcode.
-Typically this configuration consists of:
-
-1. A Ninja build created with `--release-debuginfo`.
-2. An Xcode build created with `--release-debuginfo --debug-swift`.
-
-The Ninja build can be used for fast incremental compilation and running tests
-quickly. The Xcode build can be used for debugging with high fidelity.
-
-The additional flexibility comes with two issues: (1) consuming much more disk
-space and (2) you need to maintain the two builds in sync, which needs extra
-care when moving across branches.
-
 ### Troubleshooting build issues
 
 - Double-check that all projects are checked out at the right branches.
