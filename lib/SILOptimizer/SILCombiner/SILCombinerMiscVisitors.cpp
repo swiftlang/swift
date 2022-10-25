@@ -2326,39 +2326,15 @@ static bool checkGlobalValueUsers(SILValue val,
   return true;
 }
 
-// Simplify `differentiable_function_extract` of `differentiable_function`.
-//
-// Before:
-// %diff_func = differentiable_function(%orig, %jvp, %vjp)
-// %orig' = differentiable_function_extract [original] %diff_func
-// %jvp'  = differentiable_function_extract [jvp]      %diff_func
-// %vjp'  = differentiable_function_extract [vjp]      %diff_func
-//
-// After:
-// %orig' = %orig
-// %jvp' = %jvp
-// %vjp' = %vjp
 SILInstruction *
-SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI) {
-  auto *DFI = dyn_cast<DifferentiableFunctionInst>(DFEI->getOperand());
-  if (!DFI)
+SILCombiner::legacyVisitGlobalValueInst(GlobalValueInst *globalValue) {
+  // Delete all reference count instructions on a global_value if the only other
+  // users are projections (ref_element_addr and ref_tail_addr).
+  SmallVector<SILInstruction *, 8> toDelete;
+  if (!checkGlobalValueUsers(globalValue, toDelete))
     return nullptr;
-
-  if (!DFI->hasExtractee(DFEI->getExtractee()))
-    return nullptr;
-
-  SILValue newValue = DFI->getExtractee(DFEI->getExtractee());
-
-  // If the type of the `differentiable_function` operand does not precisely
-  // match the type of the original `differentiable_function_extract`,
-  // create a `convert_function`.
-  if (newValue->getType() != DFEI->getType()) {
-    std::tie(newValue, std::ignore) =
-      castValueToABICompatibleType(&Builder, DFEI->getLoc(),
-                                   newValue,
-                                   newValue->getType(), DFEI->getType(), {});
+  for (SILInstruction *inst : toDelete) {
+    eraseInstFromFunction(*inst);
   }
-
-  replaceInstUsesWith(*DFEI, newValue);
-  return eraseInstFromFunction(*DFEI);
+  return nullptr;
 }
