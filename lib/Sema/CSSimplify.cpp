@@ -2424,6 +2424,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2595,6 +2596,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
     return true;
   }
 
@@ -3010,6 +3012,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6362,6 +6365,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::PropertyWrapper:
     case ConstraintKind::SyntacticElement:
     case ConstraintKind::BindTupleOfFunctionParams:
+    case ConstraintKind::PackElementOf:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -8421,6 +8425,43 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
     if (recordFix(fix, /*impact=*/unwrapCount))
       return SolutionKind::Error;
   }
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
+                                                  TypeMatchOptions flags,
+                                                  ConstraintLocatorBuilder locator) {
+  auto elementType = simplifyType(first, flags);
+  auto *loc = getConstraintLocator(locator);
+
+  if (elementType->hasTypeVariable()) {
+    if (!flags.contains(TMF_GenerateConstraints))
+      return SolutionKind::Unsolved;
+
+    addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::PackElementOf,
+                           first, second, loc));
+
+    return SolutionKind::Solved;
+  }
+
+  // Replace opened element archetypes with pack archetypes
+  // for the resulting type of the pack expansion.
+  auto patternType = elementType.transform([&](Type type) -> Type {
+    auto *element = type->getAs<ElementArchetypeType>();
+    if (!element)
+      return type;
+
+    auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
+    auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
+                                           elementParam->getDepth(),
+                                           elementParam->getIndex(),
+                                           this->getASTContext());
+    return this->DC->mapTypeIntoContext(pack);
+  });
+
+  addConstraint(ConstraintKind::Bind, second, patternType, locator);
   return SolutionKind::Solved;
 }
 
@@ -13786,6 +13827,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyBindTupleOfFunctionParamsConstraint(first, second, subflags,
                                                        locator);
 
+  case ConstraintKind::PackElementOf:
+    return simplifyPackElementOfConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -14354,6 +14398,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::BindTupleOfFunctionParams:
     return simplifyBindTupleOfFunctionParamsConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
+        constraint.getLocator());
+
+  case ConstraintKind::PackElementOf:
+    return simplifyPackElementOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), /*flags*/None,
         constraint.getLocator());
   }
 

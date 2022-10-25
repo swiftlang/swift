@@ -20,14 +20,9 @@ func forward<U...>(_ u: U...) -> (U...) {
   return tuplify(u...)
 }
 
-// FIXME: This fails with opened element types. Add an ElementOf constraint to
-// handle cases where the pattern type is resolved after constraint generation
-// and mapped to pack archetypes in the solver.
-/*
 func forwardAndMap<U..., V...>(us u: U..., vs v: V...) -> ([(U, V)]...) {
   return tuplify([(u, v)]...)
 }
-*/
 
 func variadicMap<T..., Result...>(_ t: T..., transform: ((T) -> Result)...) -> (Result...) {
   return (transform(t)...)
