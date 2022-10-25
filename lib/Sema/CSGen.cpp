@@ -1770,6 +1770,13 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
+      // If the ParenExpr contains a pack expansion, generate a tuple
+      // type containing the pack expansion type.
+      if (CS.getType(expr->getSubExpr())->getAs<PackExpansionType>()) {
+        return TupleType::get({CS.getType(expr->getSubExpr())},
+                              CS.getASTContext());
+      }
+
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
@@ -2874,7 +2881,31 @@ namespace {
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
-      llvm_unreachable("not implemented for PackExpansionExpr");
+      for (auto *binding : expr->getBindings()) {
+        auto type = visit(binding);
+        CS.setType(binding, type);
+      }
+
+      auto elementResultType = CS.getType(expr->getPatternExpr());
+      auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                             TVO_CanBindToHole);
+      CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
+                       patternTy, CS.getConstraintLocator(expr));
+
+      // FIXME: Use a ShapeOf constraint here.
+      Type shapeType;
+      auto *binding = expr->getBindings().front();
+      auto type = CS.simplifyType(CS.getType(binding));
+      type.visit([&](Type type) {
+        if (shapeType)
+          return;
+
+        if (auto archetype = type->getAs<PackArchetypeType>()) {
+          shapeType = archetype->getShape();
+        }
+      });
+
+      return PackExpansionType::get(patternTy, shapeType);
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -2887,7 +2918,6 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type checked");
       return expr->getType();
     }
 

@@ -179,6 +179,8 @@ public:
 
     RequiredProtocols protos;
     LayoutConstraint layout;
+
+    Type packShape;
   };
 
 private:

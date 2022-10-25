@@ -3959,17 +3959,18 @@ UUID OpenedArchetypeType::getOpenedExistentialID() const {
 PackArchetypeType::PackArchetypeType(
     const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
-    LayoutConstraint Layout)
+    LayoutConstraint Layout, PackShape Shape)
     : ArchetypeType(TypeKind::PackArchetype, Ctx,
                     RecursiveTypeProperties::HasArchetype, InterfaceType,
                     ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
+  *getTrailingObjects<PackShape>() = Shape;
 }
 
 CanPackArchetypeType
 PackArchetypeType::get(const ASTContext &Ctx,
                        GenericEnvironment *GenericEnv,
-                       Type InterfaceType,
+                       Type InterfaceType, Type ShapeType,
                        SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                        Type Superclass, LayoutConstraint Layout) {
   assert(!Superclass || Superclass->getClassOrBoundGenericClass());
@@ -3981,12 +3982,19 @@ PackArchetypeType::get(const ASTContext &Ctx,
   auto arena = AllocationArena::Permanent;
   void *mem =
       Ctx.Allocate(PackArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type,
-                                                       LayoutConstraint>(
-                       ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+                                                       LayoutConstraint, PackShape>(
+                       ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0,
+                       /*shapeSize*/1),
                    alignof(PackArchetypeType), arena);
 
   return CanPackArchetypeType(::new (mem) PackArchetypeType(
-      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout,
+      {ShapeType}));
+}
+
+Type PackArchetypeType::getShape() const {
+  auto shapeType = getTrailingObjects<PackShape>()->shapeType;
+  return getGenericEnvironment()->mapTypeIntoContext(shapeType);
 }
 
 ElementArchetypeType::ElementArchetypeType(

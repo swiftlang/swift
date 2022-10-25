@@ -648,8 +648,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           typeRepr = specifier->getBase();
 
         if (auto *packExpansion = dyn_cast<PackExpansionTypeRepr>(typeRepr)) {
-          typeRepr = packExpansion->getPatternType();
-
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
         } else {
           paramOptions.setContext(TypeResolverContext::FunctionInput);

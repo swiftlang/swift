@@ -4228,11 +4228,22 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
   }
 
-  // The pattern type must contain at least one variadic generic parameter.
   if (!pair.second) {
+    // Non-pack variadic parameters parse as PackExpansionTypeReprs. These
+    // can only appear in variadic function parameter types.
+    if (options.getContext() == TypeResolverContext::VariadicFunctionInput)
+      return pair.first;
+
+    // Otherwise, the pattern type must contain at least one pack reference.
     diagnose(repr->getLoc(), diag::expansion_not_variadic, pair.first)
       .highlight(repr->getSourceRange());
     return ErrorType::get(ctx);
+  }
+
+  if (resolution.getStage() == TypeResolutionStage::Interface) {
+    auto genericSig = resolution.getGenericSignature();
+    auto shapeType = genericSig->getReducedShape(pair.second);
+    return PackExpansionType::get(pair.first, shapeType);
   }
 
   return PackExpansionType::get(pair.first, pair.second);

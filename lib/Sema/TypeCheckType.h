@@ -314,6 +314,7 @@ public:
   bool isPackExpansionSupported() const {
     switch (context) {
     case Context::FunctionInput:
+    case Context::VariadicFunctionInput:
     case Context::TupleElement:
     case Context::GenericArgument:
       return true;
@@ -335,7 +336,6 @@ public:
     case Context::PatternBindingDecl:
     case Context::EditorPlaceholderExpr:
     case Context::ClosureExpr:
-    case Context::VariadicFunctionInput:
     case Context::InoutFunctionInput:
     case Context::FunctionResult:
     case Context::SubscriptDecl:

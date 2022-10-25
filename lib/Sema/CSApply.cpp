@@ -3592,7 +3592,23 @@ namespace {
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
-      return simplifyExprType(expr);
+      Expr *result = expr;
+      auto type = simplifyType(cs.getType(expr));
+
+      // A ParenExpr can end up with a tuple type if it contains
+      // a pack expansion. Rewrite it to a TupleExpr.
+      if (dyn_cast<PackExpansionExpr>(expr->getSubExpr())) {
+        auto &ctx = cs.getASTContext();
+        result = TupleExpr::create(ctx, expr->getLParenLoc(),
+                                   {expr->getSubExpr()},
+                                   /*elementNames=*/{},
+                                   /*elementNameLocs=*/{},
+                                   expr->getRParenLoc(),
+                                   expr->isImplicit());
+      }
+
+      cs.setType(result, type);
+      return result;
     }
 
     Expr *visitUnresolvedMemberChainResultExpr(
@@ -3796,7 +3812,13 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
-      llvm_unreachable("not implemented for PackExpansionExpr");
+      for (unsigned i = 0; i < expr->getNumBindings(); ++i) {
+        auto *binding = expr->getBindings()[i];
+        expr->setBinding(i, visit(binding));
+      }
+
+      simplifyExprType(expr);
+      return expr;
     }
 
     Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
@@ -3808,7 +3830,6 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type-checked");
       return expr;
     }
 
@@ -7060,9 +7081,52 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                             /*isImplicit*/ true));
   }
 
-  case TypeKind::Pack:
-  case TypeKind::PackExpansion: {
+  case TypeKind::Pack: {
     llvm_unreachable("Unimplemented!");
+  }
+
+  case TypeKind::PackExpansion: {
+    auto toExpansionType = toType->getAs<PackExpansionType>();
+    auto *expansion = dyn_cast<PackExpansionExpr>(expr);
+
+    // FIXME: Duplicated code from `PackReferenceFinder` in PreCheckExpr.
+    auto toElementType = toExpansionType->getPatternType();
+    toElementType =
+        toElementType->mapTypeOutOfContext().transform([&](Type type) -> Type {
+          auto *genericParam = type->getAs<GenericTypeParamType>();
+          if (!genericParam || !genericParam->isParameterPack())
+            return type;
+
+          auto param = GenericTypeParamType::get(/*isParameterPack*/false,
+                                                 genericParam->getDepth(),
+                                                 genericParam->getIndex(), ctx);
+          return expansion->getGenericEnvironment()->mapTypeIntoContext(param);
+        });
+
+    auto *pattern = coerceToType(expansion->getPatternExpr(),
+                                 toElementType, locator);
+
+    // FIXME: Duplicated code from `visitPackExpansionExpr` in CSGen.
+    auto patternType =
+        cs.getType(pattern).transform([&](Type type) -> Type {
+          auto *element = type->getAs<ElementArchetypeType>();
+          if (!element)
+            return type;
+
+          auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
+          auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
+                                                 elementParam->getDepth(),
+                                                 elementParam->getIndex(),
+                                                 ctx);
+          return cs.DC->mapTypeIntoContext(pack);
+        });
+    auto shapeType = toExpansionType->getCountType();
+    auto expansionTy = PackExpansionType::get(patternType, shapeType);
+
+    return cs.cacheType(PackExpansionExpr::create(ctx, pattern,
+        expansion->getOpaqueValues(), expansion->getBindings(),
+        expansion->getEndLoc(), expansion->getGenericEnvironment(),
+        expansion->isImplicit(), expansionTy));
   }
 
   case TypeKind::BuiltinTuple:

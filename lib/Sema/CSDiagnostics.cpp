@@ -7059,6 +7059,7 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     }
   }
 
+  anchor.dump();
   auto diagnostic =
       emitDiagnostic(diag::cannot_call_non_function_value, getType(anchor));
   removeParensFixIt(diagnostic);
