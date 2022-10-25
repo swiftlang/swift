@@ -223,7 +223,9 @@ enum class ConstraintKind : char {
   ///
   /// Binds the RHS type to a tuple of the params of a function typed LHS. Note
   /// this discards function parameter flags.
-  BindTupleOfFunctionParams
+  BindTupleOfFunctionParams,
+  /// The first type is a type pack, and the second type is its reduced shape.
+  ShapeOf,
 };
 
 /// Classification of the different kinds of constraints.
@@ -705,6 +707,7 @@ public:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
     case ConstraintKind::BindTupleOfFunctionParams:
+    case ConstraintKind::ShapeOf:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
