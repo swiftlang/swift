@@ -63,6 +63,11 @@ module MutabilityAnnotations {
   requires cplusplus
 }
 
+module NoDiscard {
+ header "nodiscard.h"
+ requires cplusplus  
+}
+
 module ProtocolConformance {
   header "protocol-conformance.h"
   requires cplusplus
