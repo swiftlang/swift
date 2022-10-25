@@ -4248,6 +4248,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
       uncurriedLoc, std::move(payload),
       SGF.getLoweredType(formalResultType),
       element, uncurriedContext);
+
   return RValue(SGF, uncurriedLoc, formalResultType, resultMV);
 }
 
