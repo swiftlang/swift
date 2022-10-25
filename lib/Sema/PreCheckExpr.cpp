@@ -445,9 +445,7 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
                 if (!genericParam || !genericParam->isParameterPack())
                   return type;
 
-                return GenericTypeParamType::get(/*isParameterPack*/false,
-                                                 genericParam->getDepth(),
-                                                 genericParam->getIndex(), ctx);
+                return genericParam->asScalar(ctx);
               });
 
           // Map the element interface type into the context of the opened

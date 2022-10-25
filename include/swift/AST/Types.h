@@ -6172,6 +6172,14 @@ public:
   /// \endcode
   bool isParameterPack() const;
 
+  /// Returns a new GenericTypeParamType with the same depth and index
+  /// as this one, with the type parameter pack bit set.
+  GenericTypeParamType *asParameterPack(ASTContext &ctx) const;
+
+  /// Returns a new GenericTypeParamType with the same depth and index
+  /// as this one, removing the type parameter pack bit.
+  GenericTypeParamType *asScalar(ASTContext &ctx) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::GenericTypeParam;

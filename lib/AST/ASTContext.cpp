@@ -5600,20 +5600,14 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
   SmallVector<GenericTypeParamType *, 2> genericParams;
   SmallVector<Requirement, 2> requirements;
 
-  auto eraseParameterPack = [&](GenericTypeParamType *paramType) {
-    return GenericTypeParamType::get(
-        /*isParameterPack=*/false, paramType->getDepth(),
-        paramType->getIndex(), *this);
-  };
-
   for (auto paramType : baseGenericSig.getGenericParams()) {
-    genericParams.push_back(eraseParameterPack(paramType));
+    genericParams.push_back(paramType->asScalar(*this));
   }
 
   auto eraseParameterPackRec = [&](Type type) -> Type {
     return type.transformRec([&](Type t) -> Optional<Type> {
       if (auto *paramType = t->getAs<GenericTypeParamType>())
-        return Type(eraseParameterPack(paramType));
+        return Type(paramType->asScalar(*this));
       return None;
     });
   };

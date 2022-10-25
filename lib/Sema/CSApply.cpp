@@ -7103,9 +7103,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           if (!genericParam || !genericParam->isParameterPack())
             return type;
 
-          auto param = GenericTypeParamType::get(/*isParameterPack*/false,
-                                                 genericParam->getDepth(),
-                                                 genericParam->getIndex(), ctx);
+          auto param = genericParam->asScalar(ctx);
           return expansion->getGenericEnvironment()->mapTypeIntoContext(param);
         });
 
@@ -7120,10 +7118,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             return type;
 
           auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
-          auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
-                                                 elementParam->getDepth(),
-                                                 elementParam->getIndex(),
-                                                 ctx);
+          auto *pack = elementParam->asParameterPack(ctx);;
           return cs.DC->mapTypeIntoContext(pack);
         });
     auto shapeType = toExpansionType->getCountType();

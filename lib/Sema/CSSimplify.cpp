@@ -8432,6 +8432,7 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
                                                   ConstraintLocatorBuilder locator) {
+  ASTContext &ctx = getASTContext();
   auto elementType = simplifyType(first, flags);
   auto *loc = getConstraintLocator(locator);
 
@@ -8454,10 +8455,7 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
       return type;
 
     auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
-    auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
-                                           elementParam->getDepth(),
-                                           elementParam->getIndex(),
-                                           this->getASTContext());
+    auto *pack = elementParam->asParameterPack(ctx);
     return this->DC->mapTypeIntoContext(pack);
   });
 
