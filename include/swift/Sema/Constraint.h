@@ -215,6 +215,9 @@ enum class ConstraintKind : char {
   /// Represents an AST node contained in a body of a function/closure.
   /// It only has an AST node to generate constraints and infer the type for.
   SyntacticElement,
+  /// The first type is the opened pack element type of the second type, which
+  /// is the pattern of a pack expansion type.
+  PackElementOf,
   /// Do not add new uses of this, it only exists to retain compatibility for
   /// rdar://85263844.
   ///
@@ -686,6 +689,7 @@ public:
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
+    case ConstraintKind::PackElementOf:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

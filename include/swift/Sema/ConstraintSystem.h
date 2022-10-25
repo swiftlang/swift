@@ -5501,6 +5501,18 @@ private:
                                               TypeMatchOptions flags,
                                               ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify a PackElementOf constraint.
+  ///
+  /// Solving this constraint is delayed until the element type is fully
+  /// resolved with no type variables. The element type is then mapped out
+  /// of the opened element context and into the context of the surrounding
+  /// function, effecively substituting opened element archetypes with their
+  /// corresponding pack archetypes, and bound to the second type.
+  SolutionKind
+  simplifyPackElementOfConstraint(Type first, Type second,
+                                  TypeMatchOptions flags,
+                                  ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
       Type type1, Type type2,

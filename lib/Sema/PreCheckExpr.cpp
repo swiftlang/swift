@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -412,6 +413,73 @@ static bool exprLooksLikeAType(Expr *expr) {
       (isa<DictionaryExpr>(expr) &&
        cast<DictionaryExpr>(expr)->getElements().size() == 1) ||
       getCompositionExpr(expr);
+}
+
+static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
+  struct PackReferenceFinder : public ASTWalker {
+    DeclContext *dc;
+    llvm::SmallVector<OpaqueValueExpr *, 2> opaqueValues;
+    llvm::SmallVector<Expr *, 2> bindings;
+    GenericEnvironment *environment;
+
+    PackReferenceFinder(DeclContext *dc)
+      : dc(dc), environment(nullptr) {}
+
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto &ctx = dc->getASTContext();
+
+      if (auto *declRef = dyn_cast<DeclRefExpr>(E)) {
+        auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
+        if (!decl)
+          return Action::Continue(E);
+
+        if (auto expansionType = decl->getType()->getAs<PackExpansionType>()) {
+          auto sourceRange = declRef->getSourceRange();
+
+          // Map the pattern interface type to the element interface type
+          // by making all type parameter packs scalar type parameters.
+          auto patternType = expansionType->getPatternType();
+          auto elementInterfaceType =
+              patternType->mapTypeOutOfContext().transform([&](Type type) -> Type {
+                auto *genericParam = type->getAs<GenericTypeParamType>();
+                if (!genericParam || !genericParam->isParameterPack())
+                  return type;
+
+                return GenericTypeParamType::get(/*isParameterPack*/false,
+                                                 genericParam->getDepth(),
+                                                 genericParam->getIndex(), ctx);
+              });
+
+          // Map the element interface type into the context of the opened
+          // element signature.
+          if (!environment) {
+            auto sig = ctx.getOpenedElementSignature(
+                dc->getGenericSignatureOfContext().getCanonicalSignature());
+            environment = GenericEnvironment::forOpenedElement(sig, UUID::fromTime());
+          }
+          auto elementType = environment->mapTypeIntoContext(elementInterfaceType);
+
+          auto *opaqueValue = new (ctx) OpaqueValueExpr(sourceRange, elementType);
+          opaqueValues.push_back(opaqueValue);
+          bindings.push_back(declRef);
+          return Action::Continue(opaqueValue);
+        }
+      }
+
+      return Action::Continue(E);
+    }
+  } packReferenceFinder(dc);
+
+  auto *pattern = expr->walk(packReferenceFinder);
+
+  if (!packReferenceFinder.bindings.empty()) {
+    return PackExpansionExpr::create(dc->getASTContext(), pattern,
+                                     packReferenceFinder.opaqueValues,
+                                     packReferenceFinder.bindings,
+                                     opLoc, packReferenceFinder.environment);
+  }
+
+  return nullptr;
 }
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
@@ -1304,6 +1372,19 @@ namespace {
           return Action::Stop();
 
         return Action::Continue(result);
+      }
+
+      // Rewrite postfix unary '...' expressions containing pack
+      // references to PackExpansionExpr.
+      if (auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(expr)) {
+        auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn());
+        if (op && Ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+            op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
+          auto *operand = postfixExpr->getOperand();
+          if (auto *expansion = getPackExpansion(DC, operand, op->getLoc())) {
+            return Action::Continue(expansion);
+          }
+        }
       }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.

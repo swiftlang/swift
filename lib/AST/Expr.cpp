@@ -1239,10 +1239,17 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 
 PackExpansionExpr *
 PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          SourceLoc dotsLoc, bool implicit,
-                          Type type) {
-  return new (ctx) PackExpansionExpr(patternExpr, dotsLoc,
-                                     implicit, type);
+                          ArrayRef<OpaqueValueExpr *> opaqueValues,
+                          ArrayRef<Expr *> bindings, SourceLoc dotsLoc,
+                          GenericEnvironment *environment,
+                          bool implicit, Type type) {
+  size_t size =
+      totalSizeToAlloc<OpaqueValueExpr *, Expr *>(opaqueValues.size(),
+                                                  bindings.size());
+  void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
+  return ::new (mem) PackExpansionExpr(patternExpr, opaqueValues,
+                                       bindings, dotsLoc, environment,
+                                       implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {

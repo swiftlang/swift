@@ -59,3 +59,9 @@ struct Ts<T...> {
     }
   }
 }
+
+// CHECK-LABEL: expandedParameters(_:transform:)
+// CHECK-NEXT: Generic signature: <T..., Result... where T.shape == Result.shape>
+func expandedParameters<T..., Result...>(_ t: T..., transform: ((T) -> Result)...) -> (Result...) {
+  fatalError()
+}

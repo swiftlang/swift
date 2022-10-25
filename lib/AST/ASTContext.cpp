@@ -3136,15 +3136,6 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     properties |= eltTy->getRecursiveProperties();
   }
 
-  // Enforce an invariant.
-  for (unsigned i = 0, e = Fields.size(); i < e; ++i) {
-    if (Fields[i].getType()->is<PackExpansionType>()) {
-      assert(i == e - 1 || Fields[i + 1].hasName() &&
-             "Tuple element with pack expansion type cannot be followed "
-             "by an unlabeled element");
-    }
-  }
-
   auto arena = getArena(properties);
 
   void *InsertPos = nullptr;
@@ -5611,8 +5602,8 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig) {
 
   auto eraseParameterPack = [&](GenericTypeParamType *paramType) {
     return GenericTypeParamType::get(
-        paramType->getDepth(), paramType->getIndex(),
-        /*isParameterPack=*/false, *this);
+        /*isParameterPack=*/false, paramType->getDepth(),
+        paramType->getIndex(), *this);
   };
 
   for (auto paramType : baseGenericSig.getGenericParams()) {

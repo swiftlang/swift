@@ -1407,18 +1407,37 @@ class OpenParameterPackElements {
   ConstraintSystem &CS;
   int64_t argIdx;
   Type patternTy;
+
   // A map that relates a type variable opened for a reference to a parameter
   // pack to an array of parallel type variables, one for each argument.
   llvm::MapVector<TypeVariableType *, SmallVector<TypeVariableType *, 2>> PackElementCache;
+
+  // A map from argument index to the corresponding shape type for pack
+  // expansion arguments. When the parameter pack is expanded by a
+  // pack expansion argument, the corresponding pattern type is also
+  // wrapped in a pack expansion. Each pack reference in the pattern
+  // type will be bound to a pack expansion in the aggregated pack type
+  // created in 'intoPackTypes'.
+  llvm::SmallDenseMap<int64_t, Type> Expansions;
 
 public:
   OpenParameterPackElements(ConstraintSystem &CS, PackExpansionType *PET)
       : CS(CS), argIdx(-1), patternTy(PET->getPatternType()) {}
 
 public:
-  Type expandParameter() {
+  Type expandParameter(Type argType) {
     argIdx += 1;
-    return patternTy.transform(*this);
+    auto pattern = patternTy.transform(*this);
+
+    // If the argument that invoked expansion is itself a pack
+    // expansion, wrap the pattern type in a pack expansion type
+    // of the same shape.
+    if (auto expansion = argType->getAs<PackExpansionType>()) {
+      Expansions[argIdx] = expansion->getCountType();
+      pattern = PackExpansionType::get(pattern, expansion->getCountType());
+    }
+
+    return pattern;
   }
 
   void intoPackTypes(llvm::function_ref<void(TypeVariableType *, Type)> fn) && {
@@ -1435,9 +1454,21 @@ public:
 
     for (const auto &entry : PackElementCache) {
       SmallVector<Type, 8> elements;
-      llvm::transform(entry.second, std::back_inserter(elements), [](Type t) {
-        return t;
-      });
+      for (int64_t i = 0; i < (int64_t)entry.second.size(); ++i) {
+        auto *typeVar = entry.second[i];
+
+        // If this argument is a pack expansion, wrap the corresponding
+        // type variable in a pack expansion to distinguish it from
+        // a scalar type argument. The type variable itself represents
+        // the argument pattern.
+        if (auto shape = Expansions[i]) {
+          elements.push_back(PackExpansionType::get(typeVar, shape));
+          continue;
+        }
+
+        elements.push_back(typeVar);
+      }
+
       auto packType = PackType::get(CS.getASTContext(), elements);
       fn(entry.first, packType);
     }
@@ -1833,9 +1864,11 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         const auto &argument = argsWithLabels[argIdx];
         auto argTy = argument.getPlainType();
 
-        // First, re-open the parameter type so we bind the elements of the type
-        // sequence into their proper positions.
-        auto substParamTy = openParameterPack.expandParameter();
+        // First, expand the opened parameter pack for this argument.
+        // This will open a new type variable for each pack reference
+        // in the pattern type of the parameter, and substitute the type
+        // variables into the pattern type.
+        auto substParamTy = openParameterPack.expandParameter(argTy);
 
         cs.addConstraint(
             subKind, argTy, substParamTy, loc, /*isFavored=*/false);
@@ -2391,6 +2424,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2562,6 +2596,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
     return true;
   }
 
@@ -2977,6 +3012,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
+  case ConstraintKind::PackElementOf:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6329,6 +6365,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::PropertyWrapper:
     case ConstraintKind::SyntacticElement:
     case ConstraintKind::BindTupleOfFunctionParams:
+    case ConstraintKind::PackElementOf:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -8405,6 +8442,43 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
     if (recordFix(fix, /*impact=*/unwrapCount))
       return SolutionKind::Error;
   }
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
+                                                  TypeMatchOptions flags,
+                                                  ConstraintLocatorBuilder locator) {
+  auto elementType = simplifyType(first, flags);
+  auto *loc = getConstraintLocator(locator);
+
+  if (elementType->hasTypeVariable()) {
+    if (!flags.contains(TMF_GenerateConstraints))
+      return SolutionKind::Unsolved;
+
+    addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::PackElementOf,
+                           first, second, loc));
+
+    return SolutionKind::Solved;
+  }
+
+  // Replace opened element archetypes with pack archetypes
+  // for the resulting type of the pack expansion.
+  auto patternType = elementType.transform([&](Type type) -> Type {
+    auto *element = type->getAs<ElementArchetypeType>();
+    if (!element)
+      return type;
+
+    auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
+    auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
+                                           elementParam->getDepth(),
+                                           elementParam->getIndex(),
+                                           this->getASTContext());
+    return this->DC->mapTypeIntoContext(pack);
+  });
+
+  addConstraint(ConstraintKind::Bind, second, patternType, locator);
   return SolutionKind::Solved;
 }
 
@@ -13770,6 +13844,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyBindTupleOfFunctionParamsConstraint(first, second, subflags,
                                                        locator);
 
+  case ConstraintKind::PackElementOf:
+    return simplifyPackElementOfConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -14338,6 +14415,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::BindTupleOfFunctionParams:
     return simplifyBindTupleOfFunctionParamsConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
+        constraint.getLocator());
+
+  case ConstraintKind::PackElementOf:
+    return simplifyPackElementOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), /*flags*/None,
         constraint.getLocator());
   }
 
