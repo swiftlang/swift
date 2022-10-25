@@ -2192,10 +2192,6 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
 }
 
 void ASTContext::setIgnoreAdjacentModules(bool value) {
-  // Clear the cache if we expect a different view on the same modules.
-  if (IgnoreAdjacentModules != value)
-    getImpl().LoadedModules.clear();
-
   IgnoreAdjacentModules = value;
 }
 
@@ -2449,11 +2445,12 @@ bool ASTContext::canImportModule(ImportPath::Module ModuleName,
 }
 
 ModuleDecl *
-ASTContext::getModule(ImportPath::Module ModulePath) {
+ASTContext::getModule(ImportPath::Module ModulePath, bool AllowMemoryCached) {
   assert(!ModulePath.empty());
 
-  if (auto *M = getLoadedModule(ModulePath))
-    return M;
+  if (AllowMemoryCached)
+    if (auto *M = getLoadedModule(ModulePath))
+      return M;
 
   auto moduleID = ModulePath[0];
   if (PreModuleImportCallback)

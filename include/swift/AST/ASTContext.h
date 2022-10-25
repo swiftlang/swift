@@ -1140,9 +1140,12 @@ public:
   ///
   /// \param ModulePath The module's \c ImportPath which describes
   /// the name of the module being loaded, possibly including submodules.
-
+  /// \param AllowMemoryCached Should we allow reuse of an already loaded
+  /// module or force reloading from disk, defaults to true.
+  ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ImportPath::Module ModulePath);
+  ModuleDecl *
+  getModule(ImportPath::Module ModulePath, bool AllowMemoryCached = true);
 
   /// Attempts to load the matching overlay module for the given clang
   /// module into this ASTContext.
@@ -1170,7 +1173,7 @@ public:
   void addLoadedModule(ModuleDecl *M);
 
   /// Change the behavior of all loaders to ignore swiftmodules next to
-  /// swiftinterfaces and clear the in-memory cache on a change of value.
+  /// swiftinterfaces.
   void setIgnoreAdjacentModules(bool value);
 
   /// Retrieve the current generation number, which reflects the

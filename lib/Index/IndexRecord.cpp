@@ -520,7 +520,9 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     module->getASTContext().setIgnoreAdjacentModules(true);
 
     ImportPath::Module::Builder builder(module->getName());
-    auto reloadedModule = module->getASTContext().getModule(builder.get());
+    ASTContext &ctx = module->getASTContext();
+    auto reloadedModule = ctx.getModule(builder.get(),
+                                        /*AllowMemoryCached=*/false);
 
     if (reloadedModule) {
       module = reloadedModule;
