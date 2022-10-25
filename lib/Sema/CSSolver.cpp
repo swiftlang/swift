@@ -2421,6 +2421,27 @@ bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
     for (auto *typeVar : referencedVars)
       cs.addTypeVariable(typeVar);
   }
+  // Let's try calling precheck again even if that means modifying the AST twice
+  bool hadErrors = false;
+
+  auto locator = getLocator();
+  auto node = locator->getLastElementAs<LocatorPathElt::SyntacticElement>();
+
+  if (node) {
+    if (auto *expr = node->getElement().dyn_cast<Expr *>()) {
+      if (cs.isDebugMode()) {
+        auto &log = llvm::errs();
+        log.indent(cs.solverState->getCurrentIndent())
+            << "(Precheck conjunction element syntactic element)";
+        log << " \n";
+      }
+      // Even if precheck fails, we will still simplify the Constraint
+      hadErrors |= ConstraintSystem::preCheckExpression(
+          expr, cs.DC,
+          /*replaceInvalidRefsWithErrors=*/true,
+          /*leaveClosureBodiesUnchecked=*/false);
+    }
+  }
 
   auto result = cs.simplifyConstraint(*Element);
   return result != ConstraintSystem::SolutionKind::Error;

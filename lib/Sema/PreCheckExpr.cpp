@@ -475,9 +475,8 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
 Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                       DeclContext *DC,
                                       bool replaceInvalidRefsWithErrors) {
-
-  DeclNameRef Name;
-  Name = UDRE->getName();
+  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
+  DeclNameRef Name = UDRE->getName();
 
   SourceLoc Loc = UDRE->getLoc();
 
