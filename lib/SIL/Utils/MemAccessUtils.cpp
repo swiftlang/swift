@@ -418,6 +418,41 @@ bool swift_mayAccessPointer(BridgedInstruction inst) {
   return mayAccessPointer(castToInst(inst));
 }
 
+bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  return isa<LoadWeakInst>(instruction) 
+      || isa<LoadUnownedInst>(instruction) 
+      || isa<StrongCopyUnownedValueInst>(instruction)
+      || isa<StrongCopyUnmanagedValueInst>(instruction);
+}
+
+bool swift_mayLoadWeakOrUnowned(BridgedInstruction inst) {
+  return mayLoadWeakOrUnowned(castToInst(inst));
+}
+
+/// Conservatively, whether this instruction could involve a synchronization
+/// point like a memory barrier, lock or syscall.
+bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
+  return FullApplySite::isa(instruction) 
+      || isa<EndApplyInst>(instruction)
+      || isa<AbortApplyInst>(instruction);
+}
+
+bool swift_maySynchronizeNotConsideringSideEffects(BridgedInstruction inst) {
+  return maySynchronizeNotConsideringSideEffects(castToInst(inst));
+}
+
+bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
+  bool retval = mayAccessPointer(instruction)
+             || mayLoadWeakOrUnowned(instruction)
+             || maySynchronizeNotConsideringSideEffects(instruction);
+  assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
+  return retval;
+}
+
+bool swift_mayBeDeinitBarrierNotConsideringSideEffects(BridgedInstruction inst) {
+  return mayBeDeinitBarrierNotConsideringSideEffects(castToInst(inst));
+}
+
 //===----------------------------------------------------------------------===//
 //                         MARK: AccessRepresentation
 //===----------------------------------------------------------------------===//

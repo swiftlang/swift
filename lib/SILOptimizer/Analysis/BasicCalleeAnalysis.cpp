@@ -387,30 +387,10 @@ getMemoryBehavior(ApplySite as, bool observeRetains) {
   return SILInstruction::MemoryBehavior::MayHaveSideEffects;
 }
 
-/// Implementation of mayBeDeinitBarrierNotConsideringSideEffects for use only
-/// during bootstrapping or in compilers that lack Swift sources.
-///
-/// TODO: Remove.
-static bool
-isDeinitBarrierWithoutEffectsCpp(SILInstruction *const instruction) {
-  auto mayLoadWeakOrUnowned = [](SILInstruction *const instruction) {
-    return isa<LoadWeakInst>(instruction) ||
-           isa<LoadUnownedInst>(instruction) ||
-           isa<StrongCopyUnownedValueInst>(instruction) ||
-           isa<StrongCopyUnmanagedValueInst>(instruction);
-  };
-  auto maySynchronize = [](SILInstruction *const instruction) {
-    return isa<FullApplySite>(instruction) || isa<EndApplyInst>(instruction) ||
-           isa<AbortApplyInst>(instruction);
-  };
-  return mayAccessPointer(instruction) || mayLoadWeakOrUnowned(instruction) ||
-         maySynchronize(instruction);
-}
-
 bool swift::isDeinitBarrier(SILInstruction *const instruction,
                             BasicCalleeAnalysis *bca) {
   if (!instructionIsDeinitBarrierFunction) {
-    return isDeinitBarrierWithoutEffectsCpp(instruction);
+    return mayBeDeinitBarrierNotConsideringSideEffects(instruction);
   }
   BridgedInstruction inst = {
       cast<SILNode>(const_cast<SILInstruction *>(instruction))};
