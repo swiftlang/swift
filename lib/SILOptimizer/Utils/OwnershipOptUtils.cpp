@@ -1464,8 +1464,13 @@ OwnershipRAUWHelper::perform(SILValue replacementValue) {
   // Make sure to always clear our context after we transform.
   SWIFT_DEFER { ctx->clear(); };
 
-  auto *svi = dyn_cast<SingleValueInstruction>(oldValue);
-  return replaceAllUsesAndErase(svi, replacementValue, ctx->callbacks);
+  if (auto *svi = dyn_cast<SingleValueInstruction>(oldValue))
+    return replaceAllUsesAndErase(svi, replacementValue, ctx->callbacks);
+
+  // The caller must rewrite the terminator after RAUW.
+  auto *term = cast<SILPhiArgument>(oldValue)->getTerminatorForResult();
+  auto nextII = term->getParent()->end();
+  return replaceAllUses(oldValue, replacementValue, nextII, ctx->callbacks);
 }
 
 //===----------------------------------------------------------------------===//
