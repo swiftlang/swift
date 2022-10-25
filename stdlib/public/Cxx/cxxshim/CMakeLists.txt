@@ -30,10 +30,6 @@ foreach(sdk ${SWIFT_SDKS})
         list(APPEND outputs "${module_dir_static}/${source}")
       endif()
     endforeach()
-    list(APPEND outputs ${module_dir})
-    if(SWIFT_BUILD_STATIC_STDLIB)
-      list(APPEND outputs ${module_dir_static})
-    endif()
 
     add_custom_target(cxxshim-${sdk}-${arch} ALL
                       DEPENDS ${outputs}
