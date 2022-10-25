@@ -347,6 +347,10 @@ private:
     /// Discriminator for resilience strategy.
     unsigned ResilienceStrategy : 2;
 
+    /// Whether the module was rebuilt from a module interface instead of being
+    /// build from the full source.
+    unsigned IsBuiltFromInterface: 1;
+
     /// Whether this module is compiled with implicit dynamic.
     unsigned IsImplicitDynamicEnabled: 1;
 
@@ -357,7 +361,7 @@ private:
     unsigned IsConcurrencyChecked: 1;
 
     // Explicitly pad out to the next word boundary.
-    unsigned : 5;
+    unsigned : 4;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 

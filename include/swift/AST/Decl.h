@@ -617,7 +617,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -631,6 +631,10 @@ protected:
     ///
     /// \sa ResilienceStrategy
     RawResilienceStrategy : 1,
+
+    /// Whether the module was rebuilt from a module interface instead of being
+    /// build from the full source.
+    IsBuiltFromInterface : 1,
 
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,

@@ -517,6 +517,10 @@ public:
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
   }
 
+  bool isBuiltFromInterface() const {
+    return Core->Bits.IsBuiltFromInterface;
+  }
+
   /// Whether this module is compiled with implicit dynamic.
   bool isImplicitDynamicEnabled() const {
     return Core->Bits.IsImplicitDynamicEnabled;

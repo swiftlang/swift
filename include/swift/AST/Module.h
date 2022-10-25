@@ -544,6 +544,15 @@ public:
     Bits.ModuleDecl.IsSystemModule = flag;
   }
 
+  /// Returns true if the module was rebuilt from a module interface instead
+  /// of being build from the full source.
+  bool isBuiltFromInterface() const {
+    return Bits.ModuleDecl.IsBuiltFromInterface;
+  }
+  void setIsBuiltFromInterface(bool flag = true) {
+    Bits.ModuleDecl.IsBuiltFromInterface = flag;
+  }
+
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
   ///

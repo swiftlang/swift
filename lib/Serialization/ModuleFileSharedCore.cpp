@@ -151,6 +151,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
       extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
       break;
+    case options_block::IS_BUILT_FROM_INTERFACE:
+      extendedInfo.setIsBuiltFromInterface(true);
+      break;
     case options_block::IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED:
       extendedInfo.setAllowModuleWithCompilerErrorsEnabled(true);
       break;
@@ -1319,6 +1322,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
+      Bits.IsBuiltFromInterface = extInfo.isBuiltFromInterface();
       Bits.IsAllowModuleWithCompilerErrorsEnabled =
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
