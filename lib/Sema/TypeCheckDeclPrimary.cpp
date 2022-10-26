@@ -1923,6 +1923,9 @@ public:
   
   void visitImportDecl(ImportDecl *ID) {
     TypeChecker::checkDeclAttributes(ID);
+    ModuleDecl *importTarget = ID->getModule();
+    if (!importTarget)
+      return;
 
     // Force the lookup of decls referenced by a scoped import in case it emits
     // diagnostics.
@@ -1930,17 +1933,16 @@ public:
 
     // Report the public import of a private module.
     if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
-      auto target = ID->getModule();
       auto importer = ID->getModuleContext();
-      if (target &&
+      if (importTarget &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
           !ID->getAttrs().hasAttribute<SPIOnlyAttr>() &&
-          target->getLibraryLevel() == LibraryLevel::SPI) {
+          importTarget->getLibraryLevel() == LibraryLevel::SPI) {
 
         auto &diags = ID->getASTContext().Diags;
         InFlightDiagnostic inFlight =
             diags.diagnose(ID, diag::error_public_import_of_private_module,
-                           target->getName(), importer->getName());
+                           importTarget->getName(), importer->getName());
         if (ID->getAttrs().isEmpty()) {
            inFlight.fixItInsert(ID->getStartLoc(),
                               "@_implementationOnly ");
@@ -1952,7 +1954,8 @@ public:
         static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
 #endif
 
-        bool isImportOfUnderlying = importer->getName() == target->getName();
+        bool isImportOfUnderlying = importer->getName() ==
+                                    importTarget->getName();
         auto *SF = ID->getDeclContext()->getParentSourceFile();
         bool treatAsError = enableTreatAsError &&
                             !isImportOfUnderlying &&
@@ -1960,6 +1963,21 @@ public:
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
+    }
+
+    // Report imports of non-resilient modules built from a module interface.
+    if (importTarget->isBuiltFromInterface() &&
+        importTarget->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+      auto &diags = ID->getASTContext().Diags;
+      auto inFlight =
+        diags.diagnose(ID,
+                       diag::import_not_compiled_with_library_evolution_but_rebuilt,
+                       importTarget->getName());
+
+      static const char* acceptNonResilientInterfaes =
+        ::getenv("SWIFT_ACCEPT_NON_RESILIENT_INTERFACES");
+      if (acceptNonResilientInterfaes)
+        inFlight.limitBehavior(DiagnosticBehavior::Warning);
     }
   }
 
