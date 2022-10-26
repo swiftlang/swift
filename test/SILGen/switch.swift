@@ -337,7 +337,7 @@ struct Z : P { func p() {} }
 // CHECK-LABEL: sil hidden [ossa] @$s6switch10test_isa_11pyAA1P_p_tF
 func test_isa_1(p: P) {
   // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $any P
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*any P
+  // CHECK-NEXT: copy_addr %0 to [init] [[PTMPBUF]] : $*any P
   switch p {
     // CHECK: [[TMPBUF:%[0-9]+]] = alloc_stack $X
   // CHECK:   checked_cast_addr_br copy_on_success any P in [[P:%.*]] : $*any P to X in [[TMPBUF]] : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
@@ -1125,7 +1125,7 @@ func testUninhabitedSwitchScrutinee() {
 // CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
 // CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
 // CHECK: store {{%.*}} to [trivial] [[INIT_TUP_0]]
-// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: copy_addr [take] {{%.*}} to [init] [[INIT_TUP_1]]
 // CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
 // CHECK: [[TUP_0_VAL:%.*]] = load [trivial] [[TUP_0]]
 // CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
@@ -1146,7 +1146,7 @@ func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any)
 // CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
 // CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
 // CHECK: store {{%.*}} to [init] [[INIT_TUP_0]]
-// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: copy_addr [take] {{%.*}} to [init] [[INIT_TUP_1]]
 // CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
 // CHECK: [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
@@ -1178,12 +1178,12 @@ func address_only_with_nontrivial_subtype(_ a: NonTrivialSingleCaseEnum, _ value
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : $*Optional<Any>):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[ARG1_COPY]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[ARG1_COPY]]
 // CHECK:   [[TUP:%.*]] = alloc_stack $(Klass, Optional<Any>)
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
 // CHECK:   store [[ARG0_COPY]] to [init] [[TUP_0]]
-// CHECK:   copy_addr [take] [[ARG1_COPY]] to [initialization] [[TUP_1]]
+// CHECK:   copy_addr [take] [[ARG1_COPY]] to [init] [[TUP_1]]
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
@@ -1210,12 +1210,12 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : $*Optional<Any>):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[ARG1_COPY:%.*]] = alloc_stack $Optional<Any>
-// CHECK:   copy_addr [[ARG1]] to [initialization] [[ARG1_COPY]]
+// CHECK:   copy_addr [[ARG1]] to [init] [[ARG1_COPY]]
 // CHECK:   [[TUP:%.*]] = alloc_stack $(Klass, Optional<Any>)
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
 // CHECK:   store [[ARG0_COPY]] to [init] [[TUP_0]]
-// CHECK:   copy_addr [take] [[ARG1_COPY]] to [initialization] [[TUP_1]]
+// CHECK:   copy_addr [take] [[ARG1_COPY]] to [init] [[TUP_1]]
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
@@ -1235,7 +1235,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 //
 // CHECK: [[HAS_TUP_1_BB]]:
 // CHECK-NEXT: [[OPT_ANY_ADDR:%.*]] = alloc_stack $Optional<Any>
-// CHECK-NEXT: copy_addr [[TUP_1]] to [initialization] [[OPT_ANY_ADDR]]
+// CHECK-NEXT: copy_addr [[TUP_1]] to [init] [[OPT_ANY_ADDR]]
 // CHECK-NEXT: [[SOME_ANY_ADDR:%.*]] = unchecked_take_enum_data_addr [[OPT_ANY_ADDR]]
 // CHECK-NEXT: [[ANYOBJECT_ADDR:%.*]] = alloc_stack $AnyObject
 // CHECK-NEXT: checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to AnyObject in {{%.*}} : $*AnyObject, [[IS_ANY_BB:bb[0-9]+]], [[ISNOT_ANY_BB:bb[0-9]+]]
@@ -1335,54 +1335,54 @@ func testVoidType() {
 // CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T, let, name "x"
 // CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T, let, name "x"
 // CHECK:   [[SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
-// CHECK:   copy_addr [[ARG]] to [initialization] [[SWITCH_ENUM_ARG]]
+// CHECK:   copy_addr [[ARG]] to [init] [[SWITCH_ENUM_ARG]]
 // CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
 //
 // CHECK: [[BB_A]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack [lexical] $T, let, name "x"
-// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_A]]
-// CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [initialization] [[AB_PHI]]
+// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_A]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [init] [[AB_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_A]]
 // CHECK:   br [[BB_AB:bb[0-9]+]]
 //
 // CHECK: [[BB_B]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack [lexical] $T, let, name "x"
-// CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_B]]
+// CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B]]
 // CHECK:   [[FUNC_CMP:%.*]] = function_ref @$sSzsE2eeoiySbx_qd__tSzRd__lFZ :
 // CHECK:   [[GUARD_RESULT:%.*]] = apply [[FUNC_CMP]]<T, Int>([[CASE_BODY_VAR_B]], {{%.*}}, {{%.*}})
 // CHECK:   [[GUARD_RESULT_EXT:%.*]] = struct_extract [[GUARD_RESULT]]
 // CHECK:   cond_br [[GUARD_RESULT_EXT]], [[BB_B_GUARD_SUCC:bb[0-9]+]], [[BB_B_GUARD_FAIL:bb[0-9]+]]
 //
 // CHECK: [[BB_B_GUARD_SUCC]]:
-// CHECK:   copy_addr [[CASE_BODY_VAR_B]] to [initialization] [[AB_PHI]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_B]] to [init] [[AB_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_B]]
 // CHECK:   destroy_addr [[SWITCH_ENUM_ARG_PROJ]]
 // CHECK:   br [[BB_AB]]
 //
 // CHECK: [[BB_AB]]:
-// CHECK:   copy_addr [[AB_PHI]] to [initialization] [[ABB_PHI]]
+// CHECK:   copy_addr [[AB_PHI]] to [init] [[ABB_PHI]]
 // CHECK:   destroy_addr [[AB_PHI]]
 // CHECK:   br [[BB_AB_CONT:bb[0-9]+]]
 //
 // CHECK: [[BB_AB_CONT]]:
-// CHECK:   copy_addr [[ABB_PHI]] to [initialization] [[ABBC_PHI]]
+// CHECK:   copy_addr [[ABB_PHI]] to [init] [[ABBC_PHI]]
 // CHECK:   destroy_addr [[ABB_PHI]]
 // CHECK:   br [[BB_FINAL_CONT:bb[0-9]+]]
 //
 // CHECK: [[BB_B_GUARD_FAIL]]:
 // CHECK:   destroy_addr [[CASE_BODY_VAR_B]]
 // CHECK:   [[CASE_BODY_VAR_B_2:%.*]] = alloc_stack [lexical] $T, let, name "x"
-// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_B_2]]
-// CHECK:   copy_addr [[CASE_BODY_VAR_B_2]] to [initialization] [[ABB_PHI]]
+// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B_2]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_B_2]] to [init] [[ABB_PHI]]
 // CHECK:   br [[BB_AB_CONT]]
 //
 // CHECK: [[BB_C]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
 // CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack [lexical] $T, let, name "x"
-// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [initialization] [[CASE_BODY_VAR_C]]
-// CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [initialization] [[ABBC_PHI]]
+// CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_C]]
+// CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [init] [[ABBC_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_C]]
 // CHECK:   br [[BB_FINAL_CONT]]
 //

@@ -285,9 +285,9 @@ sil @address_closure_out_result : $@convention(thin) (@in Q, @inout_aliasable Q,
 bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q, %3 : $*Q):
   %7 = function_ref @address_closure_body_out_result : $@convention(thin) (@in Q, @in Q) -> @out Q
   %8 = alloc_stack $Q
-  copy_addr %2 to [initialization] %8 : $*Q
+  copy_addr %2 to [init] %8 : $*Q
   %10 = alloc_stack $Q
-  copy_addr %3 to [initialization] %10 : $*Q
+  copy_addr %3 to [init] %10 : $*Q
   %12 = apply %7(%0, %8, %10) : $@convention(thin) (@in Q, @in Q) -> @out Q
   dealloc_stack %10 : $*Q
   dealloc_stack %8 : $*Q
@@ -352,7 +352,7 @@ bb0(%0 : $*Q, %1 : $*Q, %2 : $*Q):
 sil @address_caller_existential : $@convention(thin) (@in P, @in P, Int32) -> @out P {
 bb0(%0 : $*P, %1 : $*P, %2 : $*P, %3 : $Int32):
   %7 = alloc_stack $P
-  copy_addr %1 to [initialization] %7 : $*P
+  copy_addr %1 to [init] %7 : $*P
   %9 = function_ref @address_closure_existential : $@convention(thin) (@inout_aliasable P) -> ()
   %10 = partial_apply %9(%7) : $@convention(thin) (@inout_aliasable P) -> ()
   %10b = convert_escape_to_noescape %10 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
@@ -368,14 +368,14 @@ bb0(%0 : $*P, %1 : $*P, %2 : $*P, %3 : $Int32):
 
 bb1:
   destroy_addr %2 : $*P
-  copy_addr %1 to [initialization] %0 : $*P
+  copy_addr %1 to [init] %0 : $*P
   destroy_addr %1 : $*P
   strong_release %10 : $@callee_owned () -> ()
   br bb3
 
 bb2:
   destroy_addr %1 : $*P
-  copy_addr %2 to [initialization] %0 : $*P
+  copy_addr %2 to [init] %0 : $*P
   destroy_addr %2 : $*P
   strong_release %10 : $@callee_owned () -> ()
   br bb3

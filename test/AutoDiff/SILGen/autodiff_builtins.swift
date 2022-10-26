@@ -81,7 +81,7 @@ func applyDerivative_f1_vjp<T: AdditiveArithmetic & Differentiable>(t0: T) -> (T
 // CHECK: [[D_RESULT_BUFFER_0_FOR_LOAD:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 0
 // CHECK: [[D_RESULT_BUFFER_1_FOR_LOAD:%.*]] = tuple_element_addr [[D_RESULT_BUFFER]] : ${{.*}}, 1
 // CHECK: [[PULLBACK:%.*]] = load [take] [[D_RESULT_BUFFER_1_FOR_LOAD]]
-// CHECK: copy_addr [take] [[D_RESULT_BUFFER_0_FOR_LOAD]] to [initialization] [[ORIG_RESULT_OUT_PARAM]]
+// CHECK: copy_addr [take] [[D_RESULT_BUFFER_0_FOR_LOAD]] to [init] [[ORIG_RESULT_OUT_PARAM]]
 // CHECK: return [[PULLBACK]]
 
 struct ExamplePullbackStruct<T: Differentiable> {

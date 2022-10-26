@@ -33,7 +33,7 @@ func address_only_return(_ x: Unloadable, y: Int) -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*any Unloadable, [[XARG:%[0-9]+]] : $*any Unloadable, [[YARG:%[0-9]+]] : $Builtin.Int64):
   // CHECK-NEXT: debug_value [[XARG]] : $*any Unloadable, let, name "x", {{.*}} expr op_deref
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
-  // CHECK-NEXT: copy_addr [[XARG]] to [initialization] [[RET]]
+  // CHECK-NEXT: copy_addr [[XARG]] to [init] [[RET]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
   return x
@@ -51,7 +51,7 @@ func address_only_conditional_missing_return(_ x: Unloadable) -> Unloadable {
   switch Bool.true_ {
   case .true_:
   // CHECK: [[TRUE]]:
-    // CHECK:   copy_addr %1 to [initialization] %0 : $*any Unloadable
+    // CHECK:   copy_addr %1 to [init] %0 : $*any Unloadable
   // CHECK:   return
     return x
   case .false_:
@@ -168,11 +168,11 @@ func address_only_assignment_from_lv(_ dest: inout Unloadable, v: Unloadable) {
   // CHECK: [[VBOX:%.*]] = alloc_box ${ var any Unloadable }
   // CHECK: [[V_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VBOX]]
   // CHECK: [[PBOX:%[0-9]+]] = project_box [[V_LIFETIME]]
-  // CHECK: copy_addr [[VARG]] to [initialization] [[PBOX]] : $*any Unloadable
+  // CHECK: copy_addr [[VARG]] to [init] [[PBOX]] : $*any Unloadable
   dest = v
   // CHECK: [[READBOX:%.*]] = begin_access [read] [unknown] [[PBOX]] :
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $any Unloadable
-  // CHECK: copy_addr [[READBOX]] to [initialization] [[TEMP]] :
+  // CHECK: copy_addr [[READBOX]] to [init] [[TEMP]] :
   // CHECK: [[RET:%.*]] = begin_access [modify] [unknown] %0 :
   // CHECK: copy_addr [take] [[TEMP]] to [[RET]] :
   // CHECK: destroy_value [[VBOX]]
@@ -200,7 +200,7 @@ func address_only_assignment_from_lv_to_property(_ v: Unloadable) {
   // CHECK: bb0([[VARG:%[0-9]+]] : $*any Unloadable):
   // CHECK: debug_value [[VARG]] : $*any Unloadable, {{.*}} expr op_deref
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $any Unloadable
-  // CHECK: copy_addr [[VARG]] to [initialization] [[TEMP]]
+  // CHECK: copy_addr [[VARG]] to [init] [[TEMP]]
   // CHECK: [[SETTER:%[0-9]+]] = function_ref @$s18address_only_types11global_propAA10Unloadable_pvs
   // CHECK: apply [[SETTER]]([[TEMP]])
   // CHECK: dealloc_stack [[TEMP]]
@@ -217,7 +217,7 @@ func address_only_var() -> Unloadable {
   // CHECK: apply {{%.*}}([[XPB]])
   return x
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XPB]] :
-  // CHECK: copy_addr [[ACCESS]] to [initialization] %0
+  // CHECK: copy_addr [[ACCESS]] to [init] %0
   // CHECK: destroy_value [[XBOX]]
   // CHECK: return
 }

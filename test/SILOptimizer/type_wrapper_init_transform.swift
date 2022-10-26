@@ -42,7 +42,7 @@ struct TrivialStruct {
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TrivialStruct, TrivialStruct.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF]]<TrivialStruct, TrivialStruct.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE_INST]], [[WRAPPER_METATYPE]])
   // CHECK: [[STORAGE_VAR_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_VAR_REF]] : $*Wrapper<TrivialStruct, TrivialStruct.$Storage>
-  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_VAR_ACCESS]] : $*Wrapper<TrivialStruct, TrivialStruct.$Storage>
+  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_VAR_ACCESS]] : $*Wrapper<TrivialStruct, TrivialStruct.$Storage>
   // CHECK: end_access [[STORAGE_VAR_ACCESS]] : $*Wrapper<TrivialStruct, TrivialStruct.$Storage>
   // CHECK: end_access [[SELF_ACCESS]] : $*TrivialStruct
   // CHECK: dealloc_stack [[WRAPPER_INST]] : $*Wrapper<TrivialStruct, TrivialStruct.$Storage>
@@ -59,13 +59,13 @@ struct GenericStruct<T: Collection> {
   // CHECK: [[SELF:%.*]] = alloc_stack [lexical] $GenericStruct<T>, var, name "self", implicit
   // CHECK: [[LOCAL_STORAGE:%.*]] = alloc_stack [lexical] $(test: T), var, name "_storage", implicit
   // CHECK: [[TEST_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(test: T), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, [[FIELD_VALUE:%.*]] : $*T to [initialization] [[TEST_PROP]] : $*T, set {{.*}}
+  // CHECK: assign_by_wrapper origin type_wrapper, [[FIELD_VALUE:%.*]] : $*T to [init] [[TEST_PROP]] : $*T, set {{.*}}
   // CHECK-NEXT: [[STORAGE_INST:%.*]] = alloc_stack $GenericStruct<T>.$Storage
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test13GenericStructV8$StorageVAaEyx_Gx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0, @thin GenericStruct<τ_0_0>.$Storage.Type) -> @out GenericStruct<τ_0_0>.$Storage
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE]] : $*(test: T)
   // CHECK: [[T_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(test: T), 0
   // CHECK: [[T_VAL:%.*]] = alloc_stack $T
-  // CHECK: copy_addr [[T_REF]] to [initialization] [[T_VAL]] : $*T
+  // CHECK: copy_addr [[T_REF]] to [init] [[T_VAL]] : $*T
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(test: T)
   // CHECK: [[STORAGE_METATYPE:%.*]] = metatype $@thin GenericStruct<T>.$Storage.Type
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST]], [[T_VAL]], [[STORAGE_METATYPE]]) : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@in τ_0_0, @thin GenericStruct<τ_0_0>.$Storage.Type) -> @out GenericStruct<τ_0_0>.$Storage
@@ -77,7 +77,7 @@ struct GenericStruct<T: Collection> {
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<GenericStruct<T>, GenericStruct<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF]]<GenericStruct<T>, GenericStruct<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE_INST]], [[WRAPPER_METATYPE]])
   // CHECK: [[STORAGE_VAR_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_VAR]] : $*Wrapper<GenericStruct<T>, GenericStruct<T>.$Storage>
-  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_VAR_ACCESS]] : $*Wrapper<GenericStruct<T>, GenericStruct<T>.$Storage>
+  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_VAR_ACCESS]] : $*Wrapper<GenericStruct<T>, GenericStruct<T>.$Storage>
   // CHECK: end_access [[STORAGE_VAR_ACCESS]] : $*Wrapper<GenericStruct<T>, GenericStruct<T>.$Storage>
   init(v: T) {
     self.test = v
@@ -92,13 +92,13 @@ class GenericClass<T: Collection> {
   // CHECK-LABEL: sil hidden [ossa] @$s4test12GenericClassC1vACyxGx_tcfc : $@convention(method) <T where T : Collection> (@in T, @owned GenericClass<T>) -> @owned GenericClass<T>
   // CHECK: [[LOCAL_STORAGE:%.*]] = alloc_stack [lexical] $(test: T), var, name "_storage", implicit
   // CHECK: [[TEST_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(test: T), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, [[TEST_VAL:%.*]] : $*T to [initialization] [[TEST_PROP]] : $*T, set {{.*}}
+  // CHECK: assign_by_wrapper origin type_wrapper, [[TEST_VAL:%.*]] : $*T to [init] [[TEST_PROP]] : $*T, set {{.*}}
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $GenericClass<T>
   // CHECK-NEXT: [[STORAGE_VAR_REF:%.*]] = ref_element_addr [[SELF_ACCESS]] : $GenericClass<T>, #GenericClass.$storage
   // CHECK: [[WRAPPED_METATYPE:%.*]] = metatype $@thick GenericClass<T>.Type
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<GenericClass<T>, GenericClass<T>.$Storage>([[WRAPPER_INST:%.*]], [[WRAPPED_METATYPE]], [[STORAGE_INST:%.*]], {{.*}})
   // CHECK: [[STORAGE_VAR_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_VAR_REF]] : $*Wrapper<GenericClass<T>, GenericClass<T>.$Storage>
-  // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_VAR_ACCESS]] : $*Wrapper<GenericClass<T>, GenericClass<T>.$Storage>
+  // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_VAR_ACCESS]] : $*Wrapper<GenericClass<T>, GenericClass<T>.$Storage>
   // CHECK-NEXT: end_access [[STORAGE_VAR_ACCESS]]
   // CHECK-NEXT: end_borrow [[SELF_ACCESS]]
   init(v: T) {
@@ -119,13 +119,13 @@ struct TupleFlatteningTest<K: Collection & Hashable, V> {
   // CHECK-LABEL: sil hidden [ossa] @$s4test19TupleFlatteningTestV1a1b1c1dACyxq_GSi_SS_Si_xttSDyxq_Gq_SgtcfC
   // CHECK: [[LOCAL_STORAGE:%.*]] = alloc_stack [lexical] $(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), var, name "_storage", implicit
   // CHECK: [[A_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $Int to [initialization] [[A_PROP]] : $*Int, set {{.*}} : $@callee_guaranteed (Int) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $Int to [init] [[A_PROP]] : $*Int, set {{.*}} : $@callee_guaranteed (Int) -> ()
   // CHECK: [[B_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 1
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*(String, (Int, K)) to [initialization] [[B_PROP]] : $*(String, (Int, K)), set {{.*}} : $@callee_guaranteed (@owned String, Int, @in K) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*(String, (Int, K)) to [init] [[B_PROP]] : $*(String, (Int, K)), set {{.*}} : $@callee_guaranteed (@owned String, Int, @in K) -> ()
   // CHECK: [[C_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 2
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $Dictionary<K, V> to [initialization] [[C_PROP]] : $*Dictionary<K, V>, set {{.*}} : $@callee_guaranteed (@owned Dictionary<K, V>) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $Dictionary<K, V> to [init] [[C_PROP]] : $*Dictionary<K, V>, set {{.*}} : $@callee_guaranteed (@owned Dictionary<K, V>) -> ()
   // CHECK: [[D_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 3
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<V> to [initialization] [[D_PROP]] : $*Optional<V>, set {{.*}} : $@callee_guaranteed (@in Optional<V>) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<V> to [init] [[D_PROP]] : $*Optional<V>, set {{.*}} : $@callee_guaranteed (@in Optional<V>) -> ()
   // CHECK: [[STORAGE_VAR:%.*]] = alloc_stack $TupleFlatteningTest<K, V>.$Storage
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test19TupleFlatteningTestV8$StorageV1a1b1c1dAEyxq__GSi_SS_Si_xttSDyxq_Gq_SgtcfC
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE:%.*]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>)
@@ -139,12 +139,12 @@ struct TupleFlatteningTest<K: Collection & Hashable, V> {
   // CHECK: [[B_ELT_1_0_VAL:%.*]] = load [trivial] [[B_ELT_1_0_REF]] : $*Int
   // CHECK: [[B_ELT_1_1_REF:%.*]] = tuple_element_addr [[B_ELT_1_REF]] : $*(Int, K), 1
   // CHECK: [[K:%.*]] = alloc_stack $K
-  // CHECK: copy_addr [[B_ELT_1_1_REF]] to [initialization] [[K]] : $*K
+  // CHECK: copy_addr [[B_ELT_1_1_REF]] to [init] [[K]] : $*K
   // CHECK: [[C_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 2
   // CHECK: [[C_VAL:%.*]] = load [copy] [[C_REF]] : $*Dictionary<K, V>
   // CHECK: [[D_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>), 3
   // CHECK: [[D_VAL:%.*]] = alloc_stack $Optional<V>
-  // CHECK: copy_addr [[D_REF]] to [initialization] [[D_VAL]] : $*Optional<V>
+  // CHECK: copy_addr [[D_REF]] to [init] [[D_VAL]] : $*Optional<V>
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: Int, b: (String, (Int, K)), c: Dictionary<K, V>, d: Optional<V>)
   // CHECK: [[STORAGE_METATYPE:%.*]] = metatype $@thin TupleFlatteningTest<K, V>.$Storage.Type
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<K, V>([[STORAGE_INST:%.*]], [[A]], [[B_ELT_0_VAL]], [[B_ELT_1_0_VAL]], [[K]], [[C_VAL]], [[D_VAL]], [[STORAGE_METATYPE]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Collection, τ_0_0 : Hashable> (Int, @owned String, Int, @in τ_0_0, @owned Dictionary<τ_0_0, τ_0_1>, @in Optional<τ_0_1>, @thin TupleFlatteningTest<τ_0_0, τ_0_1>.$Storage.Type) -> @out TupleFlatteningTest<τ_0_0, τ_0_1>.$Storage
@@ -172,7 +172,7 @@ class TestConditionalInjection<T> {
   // CHECK-NEXT: cond_br [[COND]], [[COND_TRUE:bb[0-9]+]], [[COND_FALSE:bb[0-9]+]]
 
   // CHECK: [[COND_TRUE]]:
-  // CHECK: copy_addr [[V_ARG:%.*]] to [initialization] [[V:%.*]] : $*Optional<T>
+  // CHECK: copy_addr [[V_ARG:%.*]] to [init] [[V:%.*]] : $*Optional<T>
   // CHECK: switch_enum_addr [[V]] : $*Optional<T>, case #Optional.some!enumelt: [[V_SOME:bb[0-9]+]], case #Optional.none!enumelt: [[V_NONE:bb[0-9]+]]
 
   // CHECK: [[V_NONE]]:
@@ -183,17 +183,17 @@ class TestConditionalInjection<T> {
 
   // CHECK: [[V_SOME]]:
   // CHECK: [[V_VAL:%.*]] = unchecked_take_enum_data_addr [[V]] : $*Optional<T>, #Optional.some!enumelt
-  // CHECK: copy_addr [take] [[V_VAL:%.*]] to [initialization] [[T:%.*]] : $*T
+  // CHECK: copy_addr [take] [[V_VAL:%.*]] to [init] [[T:%.*]] : $*T
   // CHECK: br [[STORAGE_INIT_SOME:bb[0-9]+]]
 
   // CHECK: [[STORAGE_INIT_SOME]]:
   // CHECK: [[B_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(b: Optional<T>), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [initialization] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [init] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test24TestConditionalInjectionC8$StorageV1bAEyx_GxSg_tcfC
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE:%.*]] : $*(b: Optional<T>)
   // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>), 0
   // CHECK: [[B_VAL:%.*]] = alloc_stack $Optional<T>
-  // CHECK: copy_addr [[B_REF]] to [initialization] [[B_VAL]] : $*Optional<T>
+  // CHECK: copy_addr [[B_REF]] to [init] [[B_VAL]] : $*Optional<T>
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
@@ -202,7 +202,7 @@ class TestConditionalInjection<T> {
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE_INST]], {{.*}})
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]]
-  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]]
+  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_PROP_ACCESS]]
   // CHECK: end_access [[STORAGE_PROP_ACCESS]]
   // CHECK: end_borrow [[SELF_ACCESS]]
   // CHECK: dealloc_stack [[B_VAL]]
@@ -210,12 +210,12 @@ class TestConditionalInjection<T> {
 
   // CHECK: [[STORAGE_INIT_NIL]]:
   // CHECK: [[B_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(b: Optional<T>), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [initialization] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [init] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test24TestConditionalInjectionC8$StorageV1bAEyx_GxSg_tcfC
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE:%.*]] : $*(b: Optional<T>)
   // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>), 0
   // CHECK: [[B_VAL:%.*]] = alloc_stack $Optional<T>
-  // CHECK: copy_addr [[B_REF]] to [initialization] [[B_VAL]] : $*Optional<T>
+  // CHECK: copy_addr [[B_REF]] to [init] [[B_VAL]] : $*Optional<T>
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
@@ -224,7 +224,7 @@ class TestConditionalInjection<T> {
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE_INST]], {{.*}})
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]]
-  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]]
+  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_PROP_ACCESS]]
   // CHECK: end_access [[STORAGE_PROP_ACCESS]]
   // CHECK: end_borrow [[SELF_ACCESS]]
   // CHECK: dealloc_stack [[B_VAL]]
@@ -244,17 +244,17 @@ class TestConditionalInjection<T> {
 
   // CHECK: [[V_SOME]]:
   // CHECK: [[V_VAL:%.*]] = unchecked_take_enum_data_addr [[V]] : $*Optional<T>, #Optional.some!enumelt
-  // CHECK: copy_addr [take] [[V_VAL:%.*]] to [initialization] [[T:%.*]] : $*T
+  // CHECK: copy_addr [take] [[V_VAL:%.*]] to [init] [[T:%.*]] : $*T
   // CHECK: br [[STORAGE_INIT_SOME:bb[0-9]+]]
 
   // CHECK: [[STORAGE_INIT_SOME]]:
   // CHECK: [[B_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(b: Optional<T>), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [initialization] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [init] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test24TestConditionalInjectionC8$StorageV1bAEyx_GxSg_tcfC
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE:%.*]] : $*(b: Optional<T>)
   // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>), 0
   // CHECK: [[B_VAL:%.*]] = alloc_stack $Optional<T>
-  // CHECK: copy_addr [[B_REF]] to [initialization] [[B_VAL]] : $*Optional<T>
+  // CHECK: copy_addr [[B_REF]] to [init] [[B_VAL]] : $*Optional<T>
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
@@ -263,7 +263,7 @@ class TestConditionalInjection<T> {
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE_INST]], {{.*}})
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]]
-  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]]
+  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_PROP_ACCESS]]
   // CHECK: end_access [[STORAGE_PROP_ACCESS]]
   // CHECK: end_borrow [[SELF_ACCESS]]
   // CHECK: dealloc_stack [[B_VAL]]
@@ -271,12 +271,12 @@ class TestConditionalInjection<T> {
 
   // CHECK: [[STORAGE_INIT_NIL]]:
   // CHECK: [[B_PROP:%.*]] = tuple_element_addr [[LOCAL_STORAGE]] : $*(b: Optional<T>), 0
-  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [initialization] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
+  // CHECK: assign_by_wrapper origin type_wrapper, {{.*}} : $*Optional<T> to [init] [[B_PROP]] : $*Optional<T>, set {{.*}} : $@callee_guaranteed (@in Optional<T>) -> ()
   // CHECK: [[STORAGE_INIT_REF:%.*]] = function_ref @$s4test24TestConditionalInjectionC8$StorageV1bAEyx_GxSg_tcfC
   // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE:%.*]] : $*(b: Optional<T>)
   // CHECK: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>), 0
   // CHECK: [[B_VAL:%.*]] = alloc_stack $Optional<T>
-  // CHECK: copy_addr [[B_REF]] to [initialization] [[B_VAL]] : $*Optional<T>
+  // CHECK: copy_addr [[B_REF]] to [init] [[B_VAL]] : $*Optional<T>
   // CHECK: end_access [[LOCAL_STORAGE_ACCESS]] : $*(b: Optional<T>)
   // CHECK: {{.*}} = apply [[STORAGE_INIT_REF]]<T>([[STORAGE_INST:%.*]], [[B_VAL]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, @thin TestConditionalInjection<τ_0_0>.$Storage.Type) -> @out TestConditionalInjection<τ_0_0>.$Storage
   // CHECK: [[SELF_ACCESS:%.*]] = begin_borrow [[SELF:%.*]] : $TestConditionalInjection<T>
@@ -285,7 +285,7 @@ class TestConditionalInjection<T> {
   // CHECK: [[WRAPPER_INST:%.*]] = alloc_stack $Wrapper<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>
   // CHECK: {{.*}} = apply [[WRAPPER_INIT_REF:%.*]]<TestConditionalInjection<T>, TestConditionalInjection<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE_INST]], {{.*}})
   // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]]
-  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]]
+  // CHECK: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_PROP_ACCESS]]
   // CHECK: end_access [[STORAGE_PROP_ACCESS]]
   // CHECK: dealloc_stack [[B_VAL]]
   // CHECK: dealloc_stack [[STORAGE_INST]]
@@ -354,7 +354,7 @@ struct TypeWithLetProperties<T> {
   public init(a: T, b: Int? = nil, onSet: (() -> Void)? = nil) {
     // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [modify] [static] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
     // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
-    // CHECK-NEXT: copy_addr [take] %11 to [initialization] [[A_REF]] : $*T
+    // CHECK-NEXT: copy_addr [take] %11 to [init] [[A_REF]] : $*T
     // CHECK-NOT: {{.*}} = assign_by_wrapper {{.*}}
     // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]]
     self.a = a
@@ -371,7 +371,7 @@ struct TypeWithLetProperties<T> {
       // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
       // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
       // CHECK-NEXT: [[T:%.*]] = alloc_stack $T
-      // CHECK-NEXT: copy_addr [[A_REF]] to [initialization] [[T]] : $*T
+      // CHECK-NEXT: copy_addr [[A_REF]] to [init] [[T]] : $*T
       // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 1
       // CHECK-NEXT: [[B_VAL:%.*]] = load [trivial] [[B_REF]] : $*Int
       // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int)
@@ -386,7 +386,7 @@ struct TypeWithLetProperties<T> {
       // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>, TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
 
       // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]]
-      // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]]
+      // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_PROP_ACCESS]]
       // CHECK-NEXT: end_access [[STORAGE_PROP_ACCESS]]
       self.b = b
     } else {
@@ -402,7 +402,7 @@ struct TypeWithLetProperties<T> {
       // CHECK: [[LOCAL_STORAGE_ACCESS:%.*]] = begin_access [read] [unsafe] [[LOCAL_STORAGE]] : $*(a: T, b: Int)
       // CHECK-NEXT: [[A_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 0
       // CHECK-NEXT: [[T:%.*]] = alloc_stack $T
-      // CHECK-NEXT: copy_addr [[A_REF]] to [initialization] [[T]] : $*T
+      // CHECK-NEXT: copy_addr [[A_REF]] to [init] [[T]] : $*T
       // CHECK-NEXT: [[B_REF:%.*]] = tuple_element_addr [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int), 1
       // CHECK-NEXT: [[B_VAL:%.*]] = load [trivial] [[B_REF]] : $*Int
       // CHECK-NEXT: end_access [[LOCAL_STORAGE_ACCESS]] : $*(a: T, b: Int)
@@ -417,7 +417,7 @@ struct TypeWithLetProperties<T> {
       // CHECK-NEXT: {{.*}} = apply [[WRAPPER_INIT_REF]]<TypeWithLetProperties<T>, TypeWithLetProperties<T>.$Storage>([[WRAPPER_INST]], [[WRAPPED_METATYPE]], [[STORAGE]], [[WRAPPER_METATYPE:%.*]])
 
       // CHECK: [[STORAGE_PROP_ACCESS:%.*]] = begin_access [modify] [dynamic] [[STORAGE_PROP]]
-      // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [initialization] [[STORAGE_PROP_ACCESS]]
+      // CHECK-NEXT: copy_addr [take] [[WRAPPER_INST]] to [init] [[STORAGE_PROP_ACCESS]]
       // CHECK-NEXT: end_access [[STORAGE_PROP_ACCESS]]
       self.b = 0
     }

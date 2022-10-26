@@ -537,7 +537,7 @@ bb0(%0 : $*OtherExistential):
 sil @test_initWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
   %s = alloc_stack $Existential
-  copy_addr [take] %0 to [initialization] %s : $*Existential
+  copy_addr [take] %0 to [init] %s : $*Existential
   dealloc_stack %s : $*Existential
 	%t = tuple()
   return %t : $()
@@ -546,7 +546,7 @@ bb0(%0 : $*Existential):
 sil @test_initWithTake_other_existential_addr : $@convention(thin) (@in OtherExistential) -> () {
 bb0(%0 : $*OtherExistential):
   %s = alloc_stack $OtherExistential
-  copy_addr [take] %0 to [initialization] %s : $*OtherExistential
+  copy_addr [take] %0 to [init] %s : $*OtherExistential
   dealloc_stack %s : $*OtherExistential
 	%t = tuple()
   return %t : $()
@@ -577,7 +577,7 @@ bb0(%0 : $*OtherExistential):
 sil @test_initWithCopy_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
   %s = alloc_stack $Existential
-  copy_addr %0 to [initialization] %s : $*Existential
+  copy_addr %0 to [init] %s : $*Existential
   dealloc_stack %s : $*Existential
 	%t = tuple()
   return %t : $()
@@ -586,7 +586,7 @@ bb0(%0 : $*Existential):
 sil @test_initWithCopy_other_existential_addr : $@convention(thin) (@in OtherExistential) -> () {
 bb0(%0 : $*OtherExistential):
   %s = alloc_stack $OtherExistential
-  copy_addr %0 to [initialization] %s : $*OtherExistential
+  copy_addr %0 to [init] %s : $*OtherExistential
   dealloc_stack %s : $*OtherExistential
 	%t = tuple()
   return %t : $()

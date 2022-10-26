@@ -252,13 +252,13 @@ bb0(%0 : $Array<Int64>):
   %6 = alloc_stack $Int64, var, name "length"
   release_value %0 : $Array<Int64>
   %8 = alloc_stack $Int64
-  copy_addr %6 to [initialization] %8 : $*Int64
+  copy_addr %6 to [init] %8 : $*Int64
   destroy_addr %8 : $*Int64
   dealloc_stack %8 : $*Int64
   %12 = alloc_stack $Int64
-  copy_addr %6 to [initialization] %12 : $*Int64
+  copy_addr %6 to [init] %12 : $*Int64
   %14 = struct_element_addr %1 : $*Poly, #Poly.length
-  copy_addr [take] %12 to [initialization] %14 : $*Int64
+  copy_addr [take] %12 to [init] %14 : $*Int64
   dealloc_stack %12 : $*Int64
   destroy_addr %6 : $*Int64
   dealloc_stack %6 : $*Int64
@@ -487,12 +487,12 @@ bb1:
 
 bb2:
   %160 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.variable
-  copy_addr [take] %1 to [initialization] %160 : $*ASTNode
+  copy_addr [take] %1 to [init] %160 : $*ASTNode
   %162 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.value
   %164 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.range
   %166 = struct_element_addr %6 : $*AssignmentNode, #AssignmentNode.documentation
   store %4 to %166 : $*Optional<String>
-  copy_addr [take] %6 to [initialization] %0 : $*AssignmentNode
+  copy_addr [take] %6 to [init] %0 : $*AssignmentNode
   dealloc_stack %6 : $*AssignmentNode
   %171 = tuple ()
   return %171 : $()
@@ -531,7 +531,7 @@ bb12:
 bb13(%125 : $()):
   dealloc_stack %115 : $*ASTNode
   %128 = init_existential_addr %0 : $*ASTNode, $AssignmentNode
-  copy_addr %113 to [initialization] %128 : $*AssignmentNode
+  copy_addr %113 to [init] %128 : $*AssignmentNode
   destroy_addr %113 : $*AssignmentNode
   dealloc_stack %113 : $*AssignmentNode
   release_value %1 : $VariableNode

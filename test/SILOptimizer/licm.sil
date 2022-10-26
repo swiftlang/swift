@@ -271,7 +271,7 @@ bb0(%0 : $*P):
   br bb1
 
 bb1:
-  copy_addr %0 to [initialization] %1 : $*P
+  copy_addr %0 to [init] %1 : $*P
   %2 = existential_metatype $@thick P.Type, %1 : $*P
   cond_br undef, bb1, bb2
 

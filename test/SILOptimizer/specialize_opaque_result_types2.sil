@@ -29,7 +29,7 @@ bb0(%0 : $*T):
   %2 = function_ref @getGenericClosure_closure : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  copy_addr %0 to [init] %3a : $*T     // id: %4
   %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned () -> @out T       // id: %7

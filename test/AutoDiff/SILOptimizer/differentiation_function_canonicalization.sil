@@ -84,9 +84,9 @@ bb0(%0 : $*T):
 // CHECK: bb0([[ARG:%.*]] : $*T):
 // CHECK:  [[ORIG_FN:%.*]] = witness_method $T, #Protocol.method
 // CHECK:  [[ARGCOPY1:%.*]] = alloc_stack $T
-// CHECK:  copy_addr [[ARG]] to [initialization] [[ARGCOPY1]] : $*T
+// CHECK:  copy_addr [[ARG]] to [init] [[ARGCOPY1]] : $*T
 // CHECK:  [[ARGCOPY2:%.*]] = alloc_stack $T
-// CHECK:  copy_addr [[ARG]] to [initialization] [[ARGCOPY2]] : $*T
+// CHECK:  copy_addr [[ARG]] to [init] [[ARGCOPY2]] : $*T
 // CHECK:  [[ORIG_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[ORIG_FN]]<T>([[ARG]])
 // CHECK:  [[JVP_FN:%.*]] = witness_method $T, #Protocol.method!jvp.SU
 // CHECK:  [[JVP_FN_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[JVP_FN]]<T>([[ARGCOPY1]])

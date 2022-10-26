@@ -11,12 +11,12 @@ enum Enum {
 // CHECK-LABEL: sil hidden [ossa] @$s14switch_default33testAddressOnlySubjectDefaultCaseyyAA4EnumOSgF : $@convention(thin) (@in_guaranteed Optional<Enum>) -> () {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK:   [[STACK:%.*]] = alloc_stack $Optional<Enum>
-// CHECK:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK:   copy_addr [[ARG]] to [init] [[STACK]]
 // CHECK:   switch_enum_addr [[STACK]] : $*Optional<Enum>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]*]], default [[DEFAULT_BB:bb[0-9]*]]
 //
 // CHECK: [[SOME_BB]]:
 // CHECK:    [[STACK_1:%.*]] = alloc_stack $Optional<Enum>
-// CHECK:    copy_addr [[STACK]] to [initialization] [[STACK_1]]
+// CHECK:    copy_addr [[STACK]] to [init] [[STACK_1]]
 // CHECK:    [[TAKEN_ADDR:%.*]] = unchecked_take_enum_data_addr [[STACK_1]]
 // CHECK:    switch_enum_addr [[TAKEN_ADDR]] : $*Enum, case #Enum.value2!enumelt: [[VALUE2_BB:bb[0-9]*]], default [[DEFAULT_BB_2:bb[0-9]*]]
 //

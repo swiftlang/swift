@@ -163,12 +163,12 @@ class H: G {
 // CHECK-LABEL: sil private [thunk] [ossa] @$s13vtable_thunks1DC1g{{[_0-9a-zA-Z]*}}FTV
 // TODO: extra copies here
 // CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
-// CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[WRAPPED_X_ADDR]]
 // CHECK:         inject_enum_addr [[WRAP_X_ADDR]]
 // CHECK:         [[RES_ADDR:%.*]] = alloc_stack
 // CHECK:         apply {{%.*}}([[RES_ADDR]], [[WRAP_X_ADDR]], %2, %3)
 // CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
-// CHECK:         copy_addr [take] [[RES_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK:         copy_addr [take] [[RES_ADDR]] to [init] [[DEST_ADDR]]
 // CHECK:         inject_enum_addr %0
 
 class ThrowVariance {

@@ -334,7 +334,7 @@ bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
   store %0 to %1 : $*Int
   %2 = alloc_stack $Int
 
-  copy_addr %1 to [initialization] %2 : $*Int
+  copy_addr %1 to [init] %2 : $*Int
 
   %3 = load %2 : $*Int
 
@@ -351,7 +351,7 @@ bb0(%0 : $Bool):  // CHECK: bb0(%0 :
   %1 = alloc_stack $Bool
   store %0 to %1 : $*Bool
   %3 = alloc_stack $Bool
-  copy_addr %1 to [initialization] %3 : $*Bool
+  copy_addr %1 to [init] %3 : $*Bool
   %5 = load %3 : $*Bool
   copy_addr %3 to %1 : $*Bool
   %12 = load %1 : $*Bool
@@ -497,7 +497,7 @@ sil @dead_allocation_1 : $@convention(thin) (Optional<AnyObject>) -> () {
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to %2 : $*Optional<AnyObject>
 // CHECK-NOT: copy_addr
-  copy_addr %2 to [initialization] %1 : $*Optional<AnyObject>
+  copy_addr %2 to [init] %1 : $*Optional<AnyObject>
   dealloc_stack %2 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   %3 = tuple ()
@@ -513,7 +513,7 @@ sil @dead_allocation_2 : $@convention(thin) (Optional<AnyObject>) -> () {
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to %1 : $*Optional<AnyObject>
 // CHECK-NOT: copy_addr
-  copy_addr %1 to [initialization] %2 : $*Optional<AnyObject>
+  copy_addr %1 to [init] %2 : $*Optional<AnyObject>
   dealloc_stack %2 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   %3 = tuple ()

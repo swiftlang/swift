@@ -31,7 +31,7 @@ bb0:
   apply %get_range_out(%range_addr) : $@convention(thin) () -> @out Twople<Size>
   %range_upperBound_addr = struct_element_addr %range_addr : $*Twople<Size>, #Twople.upperBound
   %date_addr = alloc_stack $Size
-  copy_addr %range_upperBound_addr to [initialization] %date_addr : $*Size
+  copy_addr %range_upperBound_addr to [init] %date_addr : $*Size
   destroy_addr %range_addr : $*Twople<Size>
   destroy_addr %date_addr : $*Size
   dealloc_stack %date_addr : $*Size
@@ -58,8 +58,8 @@ bb0:
   %range_lowerBound_addr = struct_element_addr %range_addr : $*Twople<Size>, #Twople.lowerBound
   %date_addr_1 = alloc_stack $Size
   %date_addr_2 = alloc_stack $Size
-  copy_addr %range_upperBound_addr to [initialization] %date_addr_1 : $*Size
-  copy_addr %range_lowerBound_addr to [initialization] %date_addr_2 : $*Size
+  copy_addr %range_upperBound_addr to [init] %date_addr_1 : $*Size
+  copy_addr %range_lowerBound_addr to [init] %date_addr_2 : $*Size
   destroy_addr %range_addr : $*Twople<Size>
   destroy_addr %date_addr_1 : $*Size
   destroy_addr %date_addr_2 : $*Size

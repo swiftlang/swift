@@ -16,7 +16,7 @@
 
 // CHECK-LABEL: sil hidden [ossa] @$s24enum_resilience_testable15resilientSwitchyy0d1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[BOX]]
 // CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt: bb3, case #Medium.Postcard!enumelt: bb4, default bb5
 // CHECK:       bb1:

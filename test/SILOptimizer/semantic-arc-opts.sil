@@ -1210,7 +1210,7 @@ bb3(%14 : @owned $FakeOptional<Klass>):
 bb4(%16 : @owned $Klass):
   %17 = begin_borrow %16 : $Klass
   %18 = ref_element_addr %17 : $Klass, #Klass.base
-  copy_addr %18 to [initialization] %3 : $*Klass
+  copy_addr %18 to [init] %3 : $*Klass
   end_borrow %17 : $Klass
   destroy_value %16 : $Klass
   inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt

@@ -2992,7 +2992,7 @@ bb3(%11 : $Int):
 // CHECK:   store %0 to [[SRC]]
 // CHECK:   [[DST:%.*]] = alloc_stack $String
 // CHECK:   [[TEMP:%.*]] = alloc_stack $String
-// CHECK:   copy_addr [[SRC]] to [initialization] [[TEMP]]
+// CHECK:   copy_addr [[SRC]] to [init] [[TEMP]]
 // CHECK:   [[LD1:%.*]] = load [[TEMP]]
 // CHECK:   store [[LD1]] to [[DST]]
 // CHECK:   [[LD2:%.*]] = load [[DST]]

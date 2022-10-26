@@ -199,7 +199,7 @@ public struct S : P {
 // CHECK: [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout any P) -> ()
 // CHECK: [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*any P to $*@opened([[TY:".*"]], any P) Self
 // CHECK: [[ALLOC:%.*]] = alloc_stack $@opened([[TY]], any P) Self
-// CHECK: copy_addr [[ADR]] to [initialization] [[ALLOC]] : $*@opened([[TY]], any P) Self
+// CHECK: copy_addr [[ADR]] to [init] [[ALLOC]] : $*@opened([[TY]], any P) Self
 // CHECK: apply [[F]]<@opened("{{.*}}", any P) Self>([[ALLOC]], %1) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @inout any P) -> ()
 // CHECK: destroy_addr %0 : $*any P
 // CHECK: dealloc_stack [[ALLOC]] : $*@opened([[TY]], any P) Self
@@ -212,9 +212,9 @@ public struct S : P {
 // CHECK: bb0(%0 : $*τ_0_0, %1 : $*any P):
 // CHECK:   [[ALLOC:%.*]] = alloc_stack $any P
 // CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOC]] : $*any P, $τ_0_0
-// CHECK:   copy_addr [take] %0 to [initialization] [[IEA]] : $*τ_0_0
+// CHECK:   copy_addr [take] %0 to [init] [[IEA]] : $*τ_0_0
 // CHECK-NOT: destroy
-// CHECK:   copy_addr [[ALLOC]] to [initialization] %1 : $*any P
+// CHECK:   copy_addr [[ALLOC]] to [init] %1 : $*any P
 // CHECK-NOT: destroy
 // CHECK:   destroy_addr [[ALLOC]] : $*any P
 // CHECK-NOT: destroy
@@ -226,16 +226,16 @@ public struct S : P {
 // CHECK:   [[ALLOCS:%.*]] = alloc_stack $S
 // CHECK:   [[ALLOCP:%.*]] = alloc_stack $any P
 // CHECK:   [[IEA:%.*]] = init_existential_addr [[ALLOCP]] : $*any P, $S
-// CHECK:   copy_addr [take] [[ALLOCS]] to [initialization] [[IEA]] : $*S
+// CHECK:   copy_addr [take] [[ALLOCS]] to [init] [[IEA]] : $*S
 // CHECK-NOT: destroy
-// CHECK:   copy_addr [[ALLOCP]] to [initialization] %1 : $*any P
+// CHECK:   copy_addr [[ALLOCP]] to [init] %1 : $*any P
 // CHECK:   destroy_addr [[ALLOCP]] : $*any P
 // CHECK:   dealloc_stack [[ALLOCP]]
 // CHECK:   dealloc_stack [[ALLOCS]]
 // CHECK-LABEL: } // end sil function '$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5'
 sil hidden [noinline] @$s6test2_6storePyyAA1P_p_AaC_pztF : $@convention(thin) (@in P, @inout P) -> () {
 bb0(%0 : $*P, %1 : $*P):
-  copy_addr %0 to [initialization] %1 : $*P
+  copy_addr %0 to [init] %1 : $*P
   destroy_addr %0 : $*P
   %5 = tuple ()
   return %5 : $()
@@ -246,7 +246,7 @@ bb0(%0 : $*P, %1 : $*P):
 // CHECK:   [[ALLOCS1:%.*]] = alloc_stack $S
 // CHECK:   store %0 to [[ALLOCS1]] : $*S
 // CHECK:   [[ALLOCS2:%.*]] = alloc_stack $S
-// CHECK:   copy_addr [[ALLOCS1]] to [initialization] [[ALLOCS2]] : $*S
+// CHECK:   copy_addr [[ALLOCS1]] to [init] [[ALLOCS2]] : $*S
 // CHECK:   [[F:%.*]] = function_ref @$s6test2_6storePyyAA1P_p_AaC_pztFTf4en_n4main1SV_Tg5 : $@convention(thin) (@owned S, @inout any P) -> ()
 // CHECK:   [[S:%.*]] = load [[ALLOCS2]] : $*S
 // CHECK:   apply [[F]]([[S]], %1) : $@convention(thin) (@owned S, @inout any P) -> ()
@@ -289,9 +289,9 @@ sil_witness_table S: P module test {}
 // CHECK: bb0(%0 : $*τ_0_0, %1 : $*any P):
 // CHECK:   [[ALLOCP1:%.*]] = alloc_stack $any P
 // CHECK:   [[ADR:%.*]] = init_existential_addr [[ALLOCP1]] : $*any P, $τ_0_0
-// CHECK:   copy_addr %0 to [initialization] [[ADR]] : $*τ_0_0
+// CHECK:   copy_addr %0 to [init] [[ADR]] : $*τ_0_0
 // CHECK:   [[ALLOCP2:%.*]] = alloc_stack $any P
-// CHECK:   copy_addr [[ALLOCP1]] to [initialization] [[ALLOCP2]] : $*any P
+// CHECK:   copy_addr [[ALLOCP1]] to [init] [[ALLOCP2]] : $*any P
 // CHECK:   copy_addr [take] [[ALLOCP2]] to %1 : $*any P
 // CHECK:   destroy_addr [[ALLOCP1]] : $*any P
 // CHECK:   dealloc_stack [[ALLOCP1]] : $*any P
@@ -299,7 +299,7 @@ sil_witness_table S: P module test {}
 sil hidden @$s6test3_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@in_guaranteed P, @inout P) -> () {
 bb0(%0 : $*P, %1 : $*P):
   %5 = alloc_stack $P
-  copy_addr %0 to [initialization] %5 : $*P
+  copy_addr %0 to [init] %5 : $*P
   copy_addr [take] %5 to %1 : $*P
   dealloc_stack %5 : $*P
   %12 = tuple ()
@@ -312,9 +312,9 @@ bb0(%0 : $*P, %1 : $*P):
 // CHECK: store %0 to [[ALLOC1]] : $*S
 // CHECK: [[ALLOC2:%.*]] = alloc_stack $any P
 // CHECK: [[ADR:%.*]] = init_existential_addr [[ALLOC2]] : $*any P, $S
-// CHECK: copy_addr [[ALLOC1]] to [initialization] [[ADR]] : $*S
+// CHECK: copy_addr [[ALLOC1]] to [init] [[ADR]] : $*S
 // CHECK: [[ALLOC3:%.*]] = alloc_stack $any P
-// CHECK: copy_addr [[ALLOC2]] to [initialization] [[ALLOC3]] : $*any P
+// CHECK: copy_addr [[ALLOC2]] to [init] [[ALLOC3]] : $*any P
 // CHECK: copy_addr [take] [[ALLOC3]] to %1 : $*any P
 // CHECK: dealloc_stack [[ALLOC3]] : $*any P
 // CHECK: destroy_addr [[ALLOC2]] : $*any P
@@ -342,14 +342,14 @@ bb0(%0 : $S, %1 : $*P):
 // CHECK-LABEL: sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout any P, @inout any P) -> () {
 // CHECK: bb0(%0 : $*any P, %1 : $*any P):
 // CHECK: [[ALLOC:%.*]] = alloc_stack $any P
-// CHECK:   copy_addr %0 to [initialization] [[ALLOC]] : $*any P
+// CHECK:   copy_addr %0 to [init] [[ALLOC]] : $*any P
 // CHECK:   copy_addr [take] [[ALLOC]] to %1 : $*any P
 // CHECK:   dealloc_stack [[ALLOC]] : $*any P
 // CHECK-LABEL: } // end sil function '$s6test4_6storePyyAA1P_pz_AaC_pztF'
 sil hidden @$s6test4_6storePyyAA1P_pz_AaC_pztF : $@convention(thin) (@inout P, @inout P) -> () {
 bb0(%0 : $*P, %1 : $*P):
   %5 = alloc_stack $P
-  copy_addr %0 to [initialization] %5 : $*P
+  copy_addr %0 to [init] %5 : $*P
   copy_addr [take] %5 to %1 : $*P
   dealloc_stack %5 : $*P
   %12 = tuple ()
@@ -363,7 +363,7 @@ bb0(%0 : $*P, %1 : $*P):
 // CHECK:   [[ADR1:%.*]] = init_existential_addr [[ALLOC]] : $*any P, $S
 // CHECK:   store %0 to [[ADR1]] : $*S
 // CHECK:   [[ALLOC2:%.*]] = alloc_stack $any P
-// CHECK:   copy_addr %2 to [initialization] %5 : $*any P
+// CHECK:   copy_addr %2 to [init] %5 : $*any P
 // CHECK:   copy_addr [take] %5 to %1 : $*any P
 // CHECK:   destroy_addr [[ALLOC]] : $*any P
 // CHECK:   dealloc_stack [[ALLOC]] : $*any P

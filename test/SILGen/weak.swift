@@ -34,7 +34,7 @@ func test0(c c: C) {
 // CHECK-NEXT: [[TMP:%.*]] = load [copy] [[READ]] : $*C
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt, [[TMP]] : $C
-// CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[PBX]] : $*@sil_weak Optional<C>
+// CHECK-NEXT: store_weak [[OPTVAL]] to [init] [[PBX]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: destroy_value [[OPTVAL]] : $Optional<C>
 
   a.x = c

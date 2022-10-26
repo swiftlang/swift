@@ -72,8 +72,8 @@ public func callOverflowInoutPointer() {
 }
 
 // CHECK-LABEL: sil [stack_protection] @$s4test22inoutWithUnknownCalleryySizF
-// CHECK:         copy_addr [take] {{.*}} to [initialization]
-// CHECK:         copy_addr [take] {{.*}} to [initialization]
+// CHECK:         copy_addr [take] {{.*}} to [init]
+// CHECK:         copy_addr [take] {{.*}} to [init]
 // CHECK:       } // end sil function '$s4test22inoutWithUnknownCalleryySizF'
 public func inoutWithUnknownCaller(_ x: inout Int) {
   withUnsafeMutablePointer(to: &x) {
