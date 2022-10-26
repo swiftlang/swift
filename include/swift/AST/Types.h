@@ -4683,17 +4683,6 @@ public:
   /// differentiability from all parameters.
   CanSILFunctionType getWithoutDifferentiability();
 
-  /// Given that `this` is a `@differentiable` function type, returns the type
-  /// of the given `@differentiable` function type component.
-  CanSILFunctionType getDifferentiableComponentType(
-      NormalDifferentiableFunctionTypeComponent component, SILModule &module);
-
-  /// Given that `this` is a `@differentiable(linear)` function type, returns
-  /// the type of the given `@differentiable(linear)` function type component.
-  CanSILFunctionType
-  getLinearComponentType(LinearDifferentiableFunctionTypeComponent component,
-                         SILModule &module);
-
   /// Returns the type of the derivative function for the given parameter
   /// indices, result indices, derivative function kind, derivative function
   /// generic signature (optional), and other auxiliary parameters.

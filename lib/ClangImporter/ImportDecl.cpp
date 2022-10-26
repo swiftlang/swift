@@ -3497,6 +3497,13 @@ namespace {
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
         decl, AccessLevel::Public, loc, name, loc, None, genericParamList, dc);
+
+      auto attr = AvailableAttr::createPlatformAgnostic(
+          Impl.SwiftContext, "Un-specialized class templates are not currently "
+                             "supported. Please use a specialization of this "
+                             "type.");
+      structDecl->getAttrs().add(attr);
+
       return structDecl;
     }
 
