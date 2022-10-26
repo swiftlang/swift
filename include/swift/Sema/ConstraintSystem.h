@@ -3681,19 +3681,6 @@ public:
     return TypeVariables.count(typeVar) > 0;
   }
 
-  /// New function to perform namelookup using the ResultBuilderContext
-  /// for the lookup. Binding will be defered to CSApply.
-  ///
-  /// This differs from the original function where we bind an
-  /// UnresolvedDeclRefExpr by performing name lookup, returning the resultant
-  /// expression and using  context was the DeclContext used for the lookup.
-  ///
-  /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
-  /// to replace any discovered invalid member references with `ErrorExpr`.
-  static Expr *resolveDeclRefExprNew(Expr *expr, UnresolvedDeclRefExpr *UDRE,
-                                     DeclContext *Context,
-                                     bool replaceInvalidRefsWithErrors);
-
   /// Whether the given ASTNode's source range contains the code
   /// completion location.
   bool containsCodeCompletionLoc(ASTNode node) const;

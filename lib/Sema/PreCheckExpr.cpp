@@ -477,7 +477,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                       bool replaceInvalidRefsWithErrors) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclNameRef Name = UDRE->getName();
-
   SourceLoc Loc = UDRE->getLoc();
 
   DeclNameRef LookupName = Name;
@@ -1550,10 +1549,9 @@ namespace {
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
-  if (!closure->hasSingleExpressionBody()) {
-    if (LeaveClosureBodiesUnchecked)
-      return false;
-  }
+  // We want to skip checking the body for multi-statement closures
+  if (!closure->hasSingleExpressionBody())
+    return false;
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
@@ -2244,9 +2242,6 @@ bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
                                           bool leaveClosureBodiesUnchecked) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
-
-  // We need to forbid from walking into anything besides closures in
-  // PreCheckExpression walker
 
   PreCheckExpression preCheck(dc, expr,
                               replaceInvalidRefsWithErrors,

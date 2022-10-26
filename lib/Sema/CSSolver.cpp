@@ -2421,7 +2421,7 @@ bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
     for (auto *typeVar : referencedVars)
       cs.addTypeVariable(typeVar);
   }
-  // Let's try calling precheck again even if that means modifying the AST twice
+
   bool hadErrors = false;
 
   auto locator = getLocator();
