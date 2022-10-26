@@ -3,6 +3,7 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/ASTGen.swift
     Sources/ASTGen/Decls.swift
     Sources/ASTGen/Exprs.swift
+    Sources/ASTGen/Generics.swift
     Sources/ASTGen/Literals.swift
     Sources/ASTGen/Macros.swift
     Sources/ASTGen/Misc.swift

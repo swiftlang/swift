@@ -4,6 +4,7 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ParameterList.h"
@@ -268,12 +269,13 @@ void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
 }
 
 DeclContextAndDecl StructDecl_create(
-    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc) {
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *out = new (Context) StructDecl(getSourceLocFromPointer(loc),
                                        Identifier::getFromOpaquePointer(name),
                                        getSourceLocFromPointer(nameLoc),
-                                       {}, nullptr,
+                                       {},
+                                       (GenericParamList *)genericParams,
                                        (DeclContext *)dc);
   out->setImplicit(); // TODO: remove this.
   return {(DeclContext *)out, (NominalTypeDecl *)out, (Decl *)out};
@@ -389,8 +391,71 @@ void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy) {
   return new (Context) ExistentialTypeRepr(getSourceLocFromPointer(anyLoc), (TypeRepr *)baseTy);
 }
 
+void *GenericParamList_create(void *ctx, void *lAngleLoc, BridgedArrayRef params, void *_Nullable whereLoc, BridgedArrayRef reqs, void *rAngleLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SmallVector<RequirementRepr> requirements;
+  for (auto req : getArrayRef<BridgedRequirementRepr>(reqs)) {
+    switch (req.Kind) {
+    case BridgedRequirementReprKindTypeConstraint:
+        requirements.push_back(
+            RequirementRepr::getTypeConstraint((TypeRepr *)req.FirstType,
+                                               getSourceLocFromPointer(req.SeparatorLoc),
+                                               (TypeRepr *)req.SecondType));
+        break;
+    case BridgedRequirementReprKindSameType:
+        requirements.push_back(
+            RequirementRepr::getSameType((TypeRepr *)req.FirstType,
+                                         getSourceLocFromPointer(req.SeparatorLoc),
+                                         (TypeRepr *)req.SecondType));
+        break;
+    case BridgedRequirementReprKindLayoutConstraint:
+        llvm_unreachable("cannot handle layout constraints!");
+    }
+  }
+  return GenericParamList::create(Context,
+                                  getSourceLocFromPointer(lAngleLoc),
+                                  getArrayRef<GenericTypeParamDecl *>(params),
+                                  getSourceLocFromPointer(whereLoc),
+                                  requirements,
+                                  getSourceLocFromPointer(rAngleLoc));
+}
+
+void *GenericTypeParamDecl_create(void *ctx, void *declContext, BridgedIdentifier name, void *nameLoc, void *_Nullable ellipsisLoc, long index, bool isParameterPack) {
+  return GenericTypeParamDecl::createParsed(static_cast<DeclContext *>(declContext),
+                                            Identifier::getFromOpaquePointer(name),
+                                            getSourceLocFromPointer(nameLoc),
+                                            getSourceLocFromPointer(ellipsisLoc),
+                                             /*index*/ index,
+                                            isParameterPack);
+}
+
+void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto entries = Context.AllocateCopy(ArrayRef<InheritedEntry>{
+    InheritedEntry{(TypeRepr *)ty}
+  });
+  ((GenericTypeParamDecl *)Param)->setInherited(entries);
+}
+
+
+DeclContextAndDecl TypeAliasDecl_create(void *ctx, void *declContext, void *aliasLoc, void *equalLoc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto *out = new (Context) TypeAliasDecl(getSourceLocFromPointer(aliasLoc),
+                                          getSourceLocFromPointer(equalLoc),
+                                          Identifier::getFromOpaquePointer(name),
+                                          getSourceLocFromPointer(nameLoc),
+                                          (GenericParamList *)genericParams,
+                                          (DeclContext *)declContext);
+  return {(DeclContext *)out, (TypeAliasDecl *)out, (Decl *)out};
+}
+
+void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType) {
+  ((TypeAliasDecl *)decl)->setUnderlyingTypeRepr((TypeRepr *)underlyingType);
+}
+
 void TopLevelCodeDecl_dump(void *decl) { ((TopLevelCodeDecl *)decl)->dump(llvm::errs()); }
 
 void Expr_dump(void *expr) { ((Expr *)expr)->dump(llvm::errs()); }
 void Decl_dump(void *expr) { ((Decl *)expr)->dump(llvm::errs()); }
 void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(llvm::errs()); }
+void TypeRepr_dump(void *repr) { ((TypeRepr *)repr)->dump(); }
