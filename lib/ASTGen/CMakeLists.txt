@@ -8,6 +8,7 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/Misc.swift
     Sources/ASTGen/SourceFile.swift
     Sources/ASTGen/Stmts.swift
+    Sources/ASTGen/Types.swift
   )
 
   # Set the appropriate target triple.
