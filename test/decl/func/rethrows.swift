@@ -650,3 +650,12 @@ func callsOptionalRethrowsDefaultArg2() throws {
   optionalRethrowsDefaultArg2(nil)
   try optionalRethrowsDefaultArg2 { throw SomeError.Badness }
 }
+
+protocol P1 {
+  var id: Int { get }
+  func test(_: some Sequence) -> [any P1]
+}
+
+func open(p: any P1, s: any Sequence) throws {
+  _ = p.test(s).map(\.id)
+}
