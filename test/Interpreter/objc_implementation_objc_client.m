@@ -1,5 +1,3 @@
-// REQUIRES: rdar101497120
-
 //
 // Build objc_implementation.framework
 //
@@ -16,14 +14,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang %s -isysroot %sdk -F %t-frameworks -lobjc -fmodules -fobjc-arc -o %t/objc_implementation_objc_client
 // RUN: %target-codesign %t/objc_implementation_objc_client
-// RUN: %target-run %t/objc_implementation_objc_client 2>&1 | %FileCheck %s
+// RUN: %target-run %t/objc_implementation_objc_client 2>&1 >%t.txt
+// RUN: echo "*****"; cat %t.txt; echo "*****"
+// RUN: %FileCheck --input-file %t.txt %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-
-// FIXME: This test fails in Swift CI simulators, but I have not been able to
-//        reproduce this locally.
-// REQUIRES: OS=macosx
 
 #import <Foundation/Foundation.h>
 #import <objc_implementation/objc_implementation.h>
