@@ -1,3 +1,5 @@
+// REQUIRES: rdar101420862
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi -F %clang-importer-sdk-path/frameworks %s -import-objc-header %S/Inputs/objc_implementation.h -emit-ir > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
 // RUN: %FileCheck --input-file %t.ir --check-prefix NEGATIVE %s

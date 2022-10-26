@@ -1,3 +1,5 @@
+// REQUIRES: rdar101543397
+
 //
 // Build objc_implementation.framework
 //
