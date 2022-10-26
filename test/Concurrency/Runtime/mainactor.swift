@@ -9,6 +9,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: single_threaded_concurrency
 
+// Temporarily disable for back deployment (rdar://101425802)
+// UNSUPPORTED: back_deploy_concurrency
+
 import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.

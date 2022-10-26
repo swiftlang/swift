@@ -7,6 +7,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// Temporarily disable for back deployment (rdar://101425802)
+// UNSUPPORTED: back_deploy_concurrency
+
 import _Concurrency
 // FIXME: should not depend on Dispatch
 import Dispatch

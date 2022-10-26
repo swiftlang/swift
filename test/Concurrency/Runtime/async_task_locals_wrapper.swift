@@ -7,6 +7,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// Temporarily disable for back deployment (rdar://101425802)
+// UNSUPPORTED: back_deploy_concurrency
+
 @available(SwiftStdlib 5.1, *)
 enum TL {
   @TaskLocal
