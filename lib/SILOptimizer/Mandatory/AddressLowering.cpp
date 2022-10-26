@@ -925,7 +925,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (EnumDecl *enumDecl = userValue->getType().getEnumOrBoundGenericEnum()) {
+  if (userValue->getType().getEnumOrBoundGenericEnum()) {
     storage.initializesEnum = true;
   }
   assert(!storage.isPhiProjection());
