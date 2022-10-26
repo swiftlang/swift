@@ -25,11 +25,41 @@
 
 using namespace swift;
 
+extern "C" void *swift_ASTGen_lookupMacro(const char *macroName);
+
+extern "C" void swift_ASTGen_destroyMacro(void *macro);
+
+extern "C" void swift_ASTGen_getMacroTypeSignature(
+    void *sourceFile, void *declContext, void *astContext, void *macro,
+    void **genericSignature,
+    void **signature);
+
 extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
     void *sourceFile, const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 #if SWIFT_SWIFT_PARSER
+
+llvm::Optional<ASTGenMacroRAII> ASTGenMacroRAII::lookup(StringRef macroName,
+                                              void *sourceFile,
+                                              DeclContext *DC,
+                                              ASTContext &ctx) {
+  auto *macro = swift_ASTGen_lookupMacro(macroName.str().c_str());
+  if (!macro)
+    return None;
+
+  void *genericParamList = nullptr;
+  void *signatureAST = nullptr;
+  swift_ASTGen_getMacroTypeSignature(sourceFile, (void *)DC, (void *)&ctx,
+                                     macro, &genericParamList,
+                                     &signatureAST);
+
+  return ASTGenMacroRAII{macro, (TypeRepr *)signatureAST,
+    (GenericParamList *)genericParamList};
+}
+
+ASTGenMacroRAII::~ASTGenMacroRAII() { /*swift_ASTGen_destroyMacro(opaqueMacro);*/ }
+
 Expr *swift::expandMacroExpr(
     DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType
 ) {
