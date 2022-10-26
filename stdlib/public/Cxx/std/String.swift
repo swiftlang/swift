@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// MARK: Initializing C++ string from a Swift String
-
 extension std.string {
   public init(_ string: String) {
     self.init()
@@ -21,30 +19,11 @@ extension std.string {
   }
 }
 
-extension std.u16string {
-  public init(_ string: String) {
-    self.init()
-    for char in string.utf16 {
-      self.push_back(char)
-    }
-  }
-}
-
-// MARK: Initializing C++ string from a Swift String literal
-
 extension std.string: ExpressibleByStringLiteral {
   public init(stringLiteral value: String) {
     self.init(value)
   }
 }
-
-extension std.u16string: ExpressibleByStringLiteral {
-  public init(stringLiteral value: String) {
-    self.init(value)
-  }
-}
-
-// MARK: Initializing Swift String from a C++ string
 
 extension String {
   public init(cxxString: std.string) {
@@ -55,13 +34,5 @@ extension String {
       String(decoding: $0, as: UTF8.self)
     }
     withExtendedLifetime(cxxString) {}
-  }
-
-  public init(cxxU16String: std.u16string) {
-    let buffer = UnsafeBufferPointer<UInt16>(
-      start: cxxU16String.__dataUnsafe(),
-      count: cxxU16String.size())
-    self = String(decoding: buffer, as: UTF16.self)
-    withExtendedLifetime(cxxU16String) {}
   }
 }
