@@ -17,11 +17,39 @@
 #define SWIFT_SEMA_TYPECHECKMACROS_H
 
 #include "swift/AST/Type.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
 class Expr;
-  
+class TypeRepr;
+
+#if SWIFT_SWIFT_PARSER
+
+struct ASTGenMacroRAII {
+private:
+  void *opaqueMacro;
+  TypeRepr *signature;
+  GenericParamList *genericSignature;
+
+  ASTGenMacroRAII(void *macro, TypeRepr *sig, GenericParamList *genericSig)
+  : opaqueMacro(macro), signature(sig),
+    genericSignature(genericSig) {}
+
+public:
+  static llvm::Optional<ASTGenMacroRAII> lookup(StringRef macroName,
+                                                void *sourceFile,
+                                                DeclContext *DC,
+                                                ASTContext &ctx);
+
+  TypeRepr *getSignature() const { return signature; }
+  GenericParamList *getGenericSignature() const { return genericSignature; }
+
+  ~ASTGenMacroRAII();
+};
+
+#endif
+
 /// Expands the given macro expression and type-check the result with
 /// the given expanded type.
 ///
