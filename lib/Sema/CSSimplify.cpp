@@ -8432,7 +8432,6 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
                                                   ConstraintLocatorBuilder locator) {
-  ASTContext &ctx = getASTContext();
   auto elementType = simplifyType(first, flags);
   auto *loc = getConstraintLocator(locator);
 
@@ -8449,17 +8448,11 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
 
   // Replace opened element archetypes with pack archetypes
   // for the resulting type of the pack expansion.
-  auto patternType = elementType.transform([&](Type type) -> Type {
-    auto *element = type->getAs<ElementArchetypeType>();
-    if (!element)
-      return type;
-
-    auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
-    auto *pack = elementParam->asParameterPack(ctx);
-    return this->DC->mapTypeIntoContext(pack);
-  });
-
+  auto *environment = DC->getGenericEnvironmentOfContext();
+  auto patternType = environment->mapElementTypeIntoPackContext(
+      elementType->mapTypeOutOfContext());
   addConstraint(ConstraintKind::Bind, second, patternType, locator);
+
   return SolutionKind::Solved;
 }
 

@@ -436,26 +436,15 @@ static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
         if (auto expansionType = decl->getType()->getAs<PackExpansionType>()) {
           auto sourceRange = declRef->getSourceRange();
 
-          // Map the pattern interface type to the element interface type
-          // by making all type parameter packs scalar type parameters.
-          auto patternType = expansionType->getPatternType();
-          auto elementInterfaceType =
-              patternType->mapTypeOutOfContext().transform([&](Type type) -> Type {
-                auto *genericParam = type->getAs<GenericTypeParamType>();
-                if (!genericParam || !genericParam->isParameterPack())
-                  return type;
-
-                return genericParam->asScalar(ctx);
-              });
-
-          // Map the element interface type into the context of the opened
+          // Map the pattern interface type into the context of the opened
           // element signature.
           if (!environment) {
             auto sig = ctx.getOpenedElementSignature(
                 dc->getGenericSignatureOfContext().getCanonicalSignature());
             environment = GenericEnvironment::forOpenedElement(sig, UUID::fromTime());
           }
-          auto elementType = environment->mapTypeIntoContext(elementInterfaceType);
+          auto elementType = environment->mapPackTypeIntoElementContext(
+              expansionType->getPatternType()->mapTypeOutOfContext());
 
           auto *opaqueValue = new (ctx) OpaqueValueExpr(sourceRange, elementType);
           opaqueValues.push_back(opaqueValue);
