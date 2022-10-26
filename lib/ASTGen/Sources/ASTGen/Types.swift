@@ -35,7 +35,15 @@ extension ASTGenVisitor {
       }
       let nameLoc = self.base.advanced(by: pathElement.position.utf8Offset).raw
 
+      if let generics = generics {
+        let lAngle = self.base.advanced(by: generics.leftAngleBracket.position.utf8Offset).raw
+        let rAngle = self.base.advanced(by: generics.rightAngleBracket.position.utf8Offset).raw
+        elements.append(generics.arguments.map({ self.visit($0.argumentType) }).withBridgedArrayRef { genericArgs in
+          GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
+        })
+      } else {
         elements.append(SimpleIdentTypeRepr_create(self.ctx, nameLoc, name))
+      }
     }
 
     return elements.withBridgedArrayRef { elements in

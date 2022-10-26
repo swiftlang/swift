@@ -4,14 +4,36 @@ import SwiftSyntax
 import CASTBridging
 
 extension ASTGenVisitor {
+  public func visit(_ node: TypealiasDeclSyntax) -> UnsafeMutableRawPointer {
+    let aliasLoc = self.base.advanced(by: node.typealiasKeyword.position.utf8Offset).raw
+    let equalLoc = self.base.advanced(by: node.initializer.equal.position.utf8Offset).raw
+    var nameText = node.identifier.text
+    let name = nameText.withUTF8 { buf in
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+    }
+    let nameLoc = self.base.advanced(by: node.identifier.position.utf8Offset).raw
+    let genericParams = node.genericParameterClause.map(self.visit)
+    let out = TypeAliasDecl_create(self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, genericParams)
+
+    let oldDeclContext = declContext
+    declContext = out.declContext
+    defer { declContext = oldDeclContext }
+
+    let underlying = self.visit(node.initializer.value)
+    TypeAliasDecl_setUnderlyingTypeRepr(out.nominalDecl, underlying)
+
+    return out.decl
+  }
+
   public func visit(_ node: StructDeclSyntax) -> UnsafeMutableRawPointer {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
     }
-    
-    let out = StructDecl_create(ctx, loc, name, loc, declContext)
+
+    let genericParams = node.genericParameterClause.map(self.visit)
+    let out = StructDecl_create(ctx, loc, name, loc, genericParams, declContext)
     let oldDeclContext = declContext
     declContext = out.declContext
     defer { declContext = oldDeclContext }

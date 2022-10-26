@@ -58,6 +58,33 @@ typedef struct {
   void *Type;
   void *_Nullable TrailingCommaLoc;
 } BridgedTupleTypeElement;
+
+typedef enum __attribute__((enum_extensibility(open))) BridgedRequirementReprKind : long {
+  /// A type bound T : P, where T is a type that depends on a generic
+  /// parameter and P is some type that should bound T, either as a concrete
+  /// supertype or a protocol to which T must conform.
+  BridgedRequirementReprKindTypeConstraint,
+
+  /// A same-type requirement T == U, where T and U are types that shall be
+  /// equivalent.
+  BridgedRequirementReprKindSameType,
+
+  /// A layout bound T : L, where T is a type that depends on a generic
+  /// parameter and L is some layout specification that should bound T.
+  BridgedRequirementReprKindLayoutConstraint,
+
+  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
+  // when adding enumerators.
+} BridgedRequirementReprKind;
+
+typedef struct {
+  void *_Nullable SeparatorLoc;
+  BridgedRequirementReprKind Kind;
+  void *FirstType;
+  void *SecondType;
+  // FIXME: Handle Layout Requirements
+} BridgedRequirementRepr;
+
 #ifdef __cplusplus
 extern "C" {
 
@@ -133,7 +160,7 @@ struct DeclContextAndDecl {
 };
 
 struct DeclContextAndDecl StructDecl_create(
-    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams, void *dc);
 struct DeclContextAndDecl ClassDecl_create(
     void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
 
@@ -152,11 +179,19 @@ void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc,
 void *NamedOpaqueReturnTypeRepr_create(void *ctx, void *baseTy);
 void *OpaqueReturnTypeRepr_create(void *ctx, void *opaqueLoc, void *baseTy);
 void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy);
+void *GenericParamList_create(void *ctx, void *lAngleLoc, BridgedArrayRef params, void *_Nullable whereLoc, BridgedArrayRef reqs, void *rAngleLoc);
+void *GenericTypeParamDecl_create(void *ctx, void *declContext, BridgedIdentifier name, void *nameLoc, void *_Nullable ellipsisLoc, long index, _Bool isParameterPack);
+void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty);
+
+struct DeclContextAndDecl TypeAliasDecl_create(void *ctx, void *declContext, void *aliasLoc, void *equalLoc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams);
+void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType);
+
 
 void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);
 void Decl_dump(void *);
 void Stmt_dump(void *);
+void TypeRepr_dump(void *);
 
 #ifdef __cplusplus
 }
