@@ -1208,7 +1208,8 @@ bool MemoryBufferSerializedModuleLoader::canImportModule(
 
 ModuleDecl *
 SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
-                                       ImportPath::Module path) {
+                                       ImportPath::Module path,
+                                       bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -1233,7 +1234,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.Item, Ctx);
   M->setIsSystemModule(isSystemModule);
-  Ctx.addLoadedModule(M);
+  if (AllowMemoryCache)
+    Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   llvm::sys::path::native(moduleInterfacePath);
@@ -1264,7 +1266,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
 ModuleDecl *
 MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
-                                               ImportPath::Module path) {
+                                               ImportPath::Module path,
+                                               bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -1300,7 +1303,8 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   if (BypassResilience)
     M->setBypassResilience();
   M->addFile(*file);
-  Ctx.addLoadedModule(M);
+  if (AllowMemoryCache)
+    Ctx.addLoadedModule(M);
   return M;
 }
 

@@ -2456,7 +2456,8 @@ ASTContext::getModule(ImportPath::Module ModulePath, bool AllowMemoryCached) {
   if (PreModuleImportCallback)
     PreModuleImportCallback(moduleID.Item.str(), false /*=IsOverlay*/);
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath)) {
+    if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath,
+                                             AllowMemoryCached)) {
       if (LangOpts.EnableModuleLoadingRemarks) {
         Diags.diagnose(ModulePath.getSourceRange().Start,
                        diag::module_loaded,
