@@ -622,6 +622,9 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
 
+  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+
   -G Ninja ^
   -S %SourceRoot%\swift-syntax || (exit /b)
 cmake --build %BuildRoot%\16 || (exit /b)
