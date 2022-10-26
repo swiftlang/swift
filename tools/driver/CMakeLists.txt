@@ -111,6 +111,13 @@ swift_create_post_build_symlink(swift-frontend
   DESTINATION "swift-api-digester${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
+# This is needed to be able to use the LLVM functions
+# to create symlinks to swift-frontend
+add_llvm_install_targets(install-swift-frontend
+  DEPENDS swift-frontend)
+add_dependencies(install-compiler install-swift-frontend)
+add_dependencies(install-compiler-stripped install-swift-frontend-stripped)
+
 add_swift_tool_symlink(swift swift-frontend compiler)
 add_swift_tool_symlink(swiftc swift-frontend compiler)
 add_swift_tool_symlink(swift-symbolgraph-extract swift-frontend compiler)

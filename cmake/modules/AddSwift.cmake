@@ -958,7 +958,7 @@ endfunction()
 
 macro(add_swift_tool_symlink name dest component)
   llvm_add_tool_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE)
-  llvm_install_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+  llvm_install_symlink(SWIFT ${name} ${dest} COMPONENT ${component})
 endmacro()
 
 # Declare that files in this library are built with LLVM's support
