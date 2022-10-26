@@ -62,6 +62,9 @@ public protocol Comparable {
   static func < (lhs: Self, rhs: Self) -> Bool
 }
 
+sil [ossa] @unknown : $@convention(thin) () -> ()
+sil [ossa] @getT : $@convention(thin) <T> () -> @out T
+sil [ossa] @getPair : $@convention(thin) <T> () -> @out Pair<T>
 sil [ossa] @takeGuaranteedObject : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil [ossa] @takeIndirectClass : $@convention(thin) (@in_guaranteed C) -> ()
 sil [ossa] @takeTuple : $@convention(thin) <τ_0_0> (@in_guaranteed (τ_0_0, C)) -> ()
@@ -1225,6 +1228,51 @@ bb2(%9 : $Error):
   throw %9 : $Error
 }
 
+// CHECK-LABEL: sil [ossa] @lexical_borrow_struct_extract {{.*}} {
+// CHECK:         [[PAIR_ADDR:%[^,]+]] = alloc_stack [lexical]
+// CHECK:         [[X_ADDR:%[^,]+]] = struct_element_addr [[PAIR_ADDR]]
+// CHECK:         apply {{%[^,]+}}<T>([[X_ADDR]])
+// CHECK:         destroy_addr [[PAIR_ADDR]]
+// CHECK:         dealloc_stack [[PAIR_ADDR]]
+// CHECK-LABEL: } // end sil function 'lexical_borrow_struct_extract'
+sil [ossa] @lexical_borrow_struct_extract : $@convention(thin) <T> () -> () {
+  %getPair = function_ref @getPair : $@convention(thin) <Tee> () -> @out Pair<Tee>
+  %instance = apply %getPair<T>() : $@convention(thin) <Tee> () -> @out Pair<Tee>
+  %scope = begin_borrow %instance : $Pair<T>
+  %x = struct_extract %scope : $Pair<T>, #Pair.x
+  %lifetime = begin_borrow [lexical] %x : $T
+  %takeInGuaranteed = function_ref @takeInGuaranteed : $@convention(thin) <Tee> (@in_guaranteed Tee) -> ()
+  apply %takeInGuaranteed<T>(%lifetime) : $@convention(thin) <Tee> (@in_guaranteed Tee) -> ()
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  end_borrow %lifetime : $T
+  end_borrow %scope : $Pair<T>
+  destroy_value %instance : $Pair<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @lexical_borrow_struct_extract_arg {{.*}} {
+// CHECK:         [[X_ADDR:%[^,]+]] = struct_element_addr [[PAIR_ADDR]]
+// CHECK:         apply {{%[^,]+}}<T>([[X_ADDR]])
+// CHECK:         destroy_addr [[PAIR_ADDR]]
+// CHECK-LABEL: } // end sil function 'lexical_borrow_struct_extract_arg'
+sil [ossa] @lexical_borrow_struct_extract_arg : $@convention(thin) <T> (@in Pair<T>) -> () {
+entry(%instance : @owned $Pair<T>):
+  %scope = begin_borrow %instance : $Pair<T>
+  %x = struct_extract %scope : $Pair<T>, #Pair.x
+  %lifetime = begin_borrow [lexical] %x : $T
+  %takeInGuaranteed = function_ref @takeInGuaranteed : $@convention(thin) <Tee> (@in_guaranteed Tee) -> ()
+  apply %takeInGuaranteed<T>(%lifetime) : $@convention(thin) <Tee> (@in_guaranteed Tee) -> ()
+  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  apply %unknown() : $@convention(thin) () -> ()
+  end_borrow %lifetime : $T
+  end_borrow %scope : $Pair<T>
+  destroy_value %instance : $Pair<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
 sil hidden [ossa] @testBeginApplyDeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
   %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1493,4 +1541,3 @@ bb0(%0 : @guaranteed $T):
   destroy_value %3 : $U
   return %6 : $U
 }
-
