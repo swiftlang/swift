@@ -584,12 +584,17 @@ void ModuleFileSharedCore::fatal(llvm::Error error) const {
 }
 
 void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
-  os << "module '" << Name << "' with full misc version '" << MiscVersion
-      << "'";
+  bool resilient = ResilienceStrategy(Bits.ResilienceStrategy) ==
+                   ResilienceStrategy::Resilient;
+  os << "module '" << Name
+     << "', builder version '" << MiscVersion
+     << "', built from "
+     << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
+     << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
-    os << " (built with -experimental-allow-module-with-compiler-errors)";
+    os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
-    os << " at '" << ModuleInputBuffer->getBufferIdentifier() << "'";
+    os << ", loaded from '" << ModuleInputBuffer->getBufferIdentifier() << "'";
 }
 
 ModuleFileSharedCore::~ModuleFileSharedCore() { }
