@@ -956,16 +956,9 @@ function(add_swift_fuzzer_host_tool executable)
   target_link_libraries(${executable} PRIVATE "-fsanitize=fuzzer")
 endfunction()
 
-macro(add_swift_tool_symlink name dest component install_dir)
-  # This is used by llvm_install_symlink to determine where
-  # to put the target link
-  # we decide to define this "locally" to the macro instead of the
-  # main CMakeLists.txt so to align with how we configure installation
-  # across our scripts (i.e. granular control for each program in a component)
-  set(SWIFT_TOOLS_INSTALL_DIR ${install_dir})
+macro(add_swift_tool_symlink name dest component)
   llvm_add_tool_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE)
   llvm_install_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
-  unset(SWIFT_TOOLS_INSTALL_DIR)
 endmacro()
 
 # Declare that files in this library are built with LLVM's support
