@@ -517,6 +517,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   // internal details.
   bool skipIndexingModule = false;
   if (module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+      !module->isBuiltFromInterface() &&
       !module->isStdlibModule()) {
     module->getASTContext().setIgnoreAdjacentModules(true);
 
