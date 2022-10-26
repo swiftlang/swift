@@ -8519,7 +8519,17 @@ namespace {
         for (const auto &tuple : TapsToTypeCheck) {
           auto tap = std::get<0>(tuple);
           auto tapDC = std::get<1>(tuple);
-          hadError |= TypeChecker::typeCheckTapBody(tap, tapDC);
+
+          hadError |= cs.applySolutionToBody(
+              solution, tap, tapDC, [&](SolutionApplicationTarget target) {
+                auto resultTarget = rewriteTarget(target);
+                if (resultTarget) {
+                  if (auto expr = resultTarget->getAsExpr())
+                    solution.setExprTypes(expr);
+                }
+
+                return resultTarget;
+              });
         }
         TapsToTypeCheck.clear();
       }

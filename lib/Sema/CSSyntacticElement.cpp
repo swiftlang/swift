@@ -351,6 +351,17 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
+  if (locator->directlyAt<TapExpr>()) {
+    auto *tap = castToExpr<TapExpr>(locator->getAnchor());
+    auto *tapDC = tap->getVar()->getDeclContext();
+
+    referencedVars.push_back(cs.getType(tap)->castTo<TypeVariableType>());
+
+    if (auto *closure = dyn_cast<ClosureExpr>(tapDC)) {
+      referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
+    }
+  }
+
   UnresolvedVarCollector paramCollector(cs);
 
   for (const auto &entry : elements) {
@@ -1331,6 +1342,22 @@ private:
     return false;
   }
 };
+}
+
+bool ConstraintSystem::generateConstraints(TapExpr *tap) {
+  SyntacticElementConstraintGenerator generator(
+      *this, SyntacticElementContext::forTapExpr(tap),
+      getConstraintLocator(tap));
+
+  auto *body = tap->getBody();
+
+  if (!body) {
+    assert(tap->getSubExpr());
+    return false;
+  }
+
+  generator.visit(tap->getBody());
+  return generator.hadError;
 }
 
 bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
@@ -2476,8 +2503,23 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   return false;
 }
 
+bool ConstraintSystem::applySolutionToBody(Solution &solution, TapExpr *tapExpr,
+                                           DeclContext *&currentDC,
+                                           RewriteTargetFn rewriteTarget) {
+  SyntacticElementSolutionApplication application(
+      solution, SyntacticElementContext::forTapExpr(tapExpr), rewriteTarget);
+
+  auto body = application.apply();
+
+  if (!body || application.hadError)
+    return true;
+
+  tapExpr->setBody(castToStmt<BraceStmt>(body));
+  return false;
+}
+
 bool ConjunctionElement::mightContainCodeCompletionToken(
-    const ConstraintSystem &cs) const {
+  const ConstraintSystem &cs) const {
   if (Element->getKind() == ConstraintKind::SyntacticElement) {
     if (Element->getSyntacticElement().getSourceRange().isInvalid()) {
       return true;

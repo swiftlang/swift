@@ -1199,15 +1199,34 @@ namespace {
           return nullptr;
         }
 
-        auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
+        auto interpolationTV =
+            CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+        auto interpolationType =
+            DependentMemberType::get(tv, associatedTypeDecl);
+
+        CS.addConstraint(ConstraintKind::Equal, interpolationTV,
+                         interpolationType, locator);
 
         auto appendingExprType = CS.getType(appendingExpr);
         auto appendingLocator = CS.getConstraintLocator(appendingExpr);
 
-        // Must be Conversion; if it's Equal, then in semi-rare cases, the 
+        SmallVector<TypeVariableType *, 2> referencedVars;
+
+        // If tap expression is located in a closure, let's connect them
+        // because interpolation could use parameters.
+        if (auto *tap = getAsExpr<TapExpr>(appendingExpr)) {
+          auto *tapDC = tap->getVar()->getDeclContext();
+          if (auto *closure = dyn_cast<ClosureExpr>(tapDC)) {
+            referencedVars.push_back(
+                CS.getType(closure)->castTo<TypeVariableType>());
+          }
+        }
+
+        // Must be Conversion; if it's Equal, then in semi-rare cases, the
         // interpolation temporary variable cannot be @lvalue.
-        CS.addConstraint(ConstraintKind::Conversion, appendingExprType,
-                         interpolationTV, appendingLocator);
+        CS.addUnsolvedConstraint(Constraint::create(
+            CS, ConstraintKind::Conversion, appendingExprType, interpolationTV,
+            appendingLocator, referencedVars));
       }
 
       return tv;

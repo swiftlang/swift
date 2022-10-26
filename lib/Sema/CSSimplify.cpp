@@ -4379,6 +4379,12 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isTapType()) {
+    return resolveTapBody(typeVar, type, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -11220,6 +11226,23 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
   // Generate constraints from the body of this closure.
   return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
+}
+
+bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+  auto *tapLoc = typeVar->getImpl().getLocator();
+  auto *tapExpr = castToExpr<TapExpr>(tapLoc->getAnchor());
+
+  // Assign a type to tap expression itself.
+  assignFixedType(typeVar, contextualType, getConstraintLocator(locator));
+  // Set type to `$interpolation` variable declared in the body of tap
+  // expression.
+  setType(tapExpr->getVar(), contextualType);
+
+  // With all of the contextual information recorded in the constraint system,
+  // it's time to generate constraints for the body of this tap expression.
+  return !generateConstraints(tapExpr);
 }
 
 ConstraintSystem::SolutionKind

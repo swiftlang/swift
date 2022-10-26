@@ -466,6 +466,9 @@ public:
   /// Determine whether this type variable represents a closure type.
   bool isClosureType() const;
 
+  /// Determine whether this type variable represents a type of tap expression.
+  bool isTapType() const;
+
   /// Determine whether this type variable represents one of the
   /// parameter types associated with a closure.
   bool isClosureParameterType() const;
@@ -3865,6 +3868,20 @@ public:
   bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
+  /// Bind tap expression to the given contextual type and generate
+  /// constraints for its body.
+  ///
+  /// \param typeVar The type variable representing the tap expression.
+  /// \param contextualType The contextual type this tap expression
+  /// would be bound to.
+  /// \param locator The locator associated with contextual type.
+  ///
+  /// \returns `true` if it was possible to generate constraints for
+  /// the body and assign fixed type to the tap expression, `false`
+  /// otherwise.
+  bool resolveTapBody(TypeVariableType *typeVar, Type contextualType,
+                      ConstraintLocatorBuilder locator);
+
   /// Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.
@@ -4258,6 +4275,14 @@ public:
   generateConstraints(SyntacticElementTarget &target,
                       FreeTypeVariableBinding allowFreeTypeVariables =
                           FreeTypeVariableBinding::Disallow);
+
+  /// Generate constraints for the body of the given tap expression.
+  ///
+  /// \param tap the tap expression
+  ///
+  /// \returns \c true if constraint generation failed, \c false otherwise
+  LLVM_NODISCARD
+  bool generateConstraints(TapExpr *tap);
 
   /// Generate constraints for the body of the given function or closure.
   ///
@@ -5171,6 +5196,21 @@ public:
   /// \returns true if solution cannot be applied.
   bool applySolutionToSingleValueStmt(
       Solution &solution, SingleValueStmtExpr *SVE, DeclContext *DC,
+      std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
+          rewriteTarget);
+
+  /// Apply the given solution to the given tap expression.
+  ///
+  /// \param solution The solution to apply.
+  /// \param tapExpr The tap expression to which the solution is being applied.
+  /// \param currentDC The declaration context in which transformations
+  /// will be applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  /// \returns true if solution cannot be applied.
+  bool applySolutionToBody(
+      Solution &solution, TapExpr *tapExpr, DeclContext *&currentDC,
       std::function<Optional<SyntacticElementTarget>(SyntacticElementTarget)>
           rewriteTarget);
 
