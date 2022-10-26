@@ -11,9 +11,6 @@ var CxxCollectionTestSuite = TestSuite("CxxCollection")
 
 // === SimpleCollectionNoSubscript ===
 
-extension SimpleCollectionNoSubscript.iterator : UnsafeCxxRandomAccessIterator {
-  public typealias Distance = difference_type
-}
 extension SimpleCollectionNoSubscript : CxxRandomAccessCollection {
 }
 
@@ -25,9 +22,6 @@ CxxCollectionTestSuite.test("SimpleCollectionNoSubscript as Swift.Collection") {
 
 // === SimpleCollectionReadOnly ===
 
-extension SimpleCollectionReadOnly.iterator : UnsafeCxxRandomAccessIterator {
-  public typealias Distance = difference_type
-}
 extension SimpleCollectionReadOnly : CxxRandomAccessCollection {
 }
 

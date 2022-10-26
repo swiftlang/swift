@@ -240,6 +240,25 @@ struct HasCustomIteratorTag {
   }
 };
 
+struct HasCustomRACIteratorTag {
+  struct CustomTag : public std::random_access_iterator_tag {};
+
+  int value;
+  using iterator_category = CustomTag;
+  const int &operator*() const { return value; }
+  HasCustomRACIteratorTag &operator++() {
+    value++;
+    return *this;
+  }
+  void operator+=(int x) { value += x; }
+  int operator-(const HasCustomRACIteratorTag &x) const {
+    return value - x.value;
+  }
+  bool operator==(const HasCustomRACIteratorTag &other) const {
+    return value == other.value;
+  }
+};
+
 struct HasCustomIteratorTagInline {
   struct iterator_category : public std::input_iterator_tag {};
 
