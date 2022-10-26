@@ -315,10 +315,10 @@ enum class CxxRecordSemanticsKind {
 };
 
 struct CxxRecordSemanticsDescriptor final {
-  const clang::CXXRecordDecl *decl;
+  const clang::RecordDecl *decl;
   ASTContext &ctx;
 
-  CxxRecordSemanticsDescriptor(const clang::CXXRecordDecl *decl,
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
                                ASTContext &ctx)
       : decl(decl), ctx(ctx) {}
 

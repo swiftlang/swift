@@ -1945,14 +1945,10 @@ namespace {
     }
 
     bool recordHasReferenceSemantics(const clang::RecordDecl *decl) {
-      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
-        auto semanticsKind = evaluateOrDefault(
-            Impl.SwiftContext.evaluator,
-            CxxRecordSemantics({cxxRecord, Impl.SwiftContext}), {});
-        return semanticsKind == CxxRecordSemanticsKind::Reference;
-      }
-
-      return false;
+      auto semanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+      return semanticsKind == CxxRecordSemanticsKind::Reference;
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
