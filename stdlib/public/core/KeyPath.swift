@@ -2377,23 +2377,17 @@ internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
         let typedRoot = unsafeDowncast(root, to: KeyPath<Root, Value>.self)
         let typedLeaf = unsafeDowncast(leaf,
                                        to: KeyPath<Value, AppendedValue>.self)
-        let result = _appendingKeyPaths(root: typedRoot, leaf: typedLeaf)
+        var result:AnyKeyPath = _appendingKeyPaths(root: typedRoot,
+                                                   leaf: typedLeaf)
+        _processOffsetForAppendedKeyPath(appendedKeyPath: &result,
+          root: root, leaf: leaf)
         return unsafeDowncast(result, to: Result.self)
       }
       return _openExistential(leafValue, do: open3)
     }
     return _openExistential(rootValue, do: open2)
   }
-  var returnValue: AnyKeyPath = _openExistential(rootRoot, do: open)
-  _processOffsetForAppendedKeyPath(
-    appendedKeyPath: &returnValue,
-    root: root,
-    leaf: leaf
-  )
-  if let returnValue = returnValue as? Result {
-    return returnValue
-  }
-  return nil
+  return _openExistential(rootRoot, do: open)
 }
 
 @usableFromInline
@@ -3490,7 +3484,6 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
              break
         }
       case .outOfLine(let offset):
-        isPureStruct.append(false)
         let header = RawKeyPathComponent.Header(storedWithOutOfLineOffset: kind,
                                                 mutable: mutable)
         pushDest(header)
@@ -3515,7 +3508,6 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
         pushDest(header)
         pushDest(offset)
       case .unresolvedIndirectOffset(let pointerToOffset):
-        isPureStruct.append(false)
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
         _internalInvariant(pointerToOffset.pointee <= UInt32.max)
