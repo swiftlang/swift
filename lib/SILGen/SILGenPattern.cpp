@@ -2041,6 +2041,11 @@ void PatternMatchEmission::emitEnumElementDispatch(
     // be passed take_on_success if src is an address only type.
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
+    if (src.getType().isAddressOnly(SGF.F) &&
+        src.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      // If it's an opaque value with guaranteed ownership, we need to copy.
+      src = src.copy(SGF, PatternMatchStmt);
+    }
 
     // Finally perform the enum element dispatch.
     return emitEnumElementObjectDispatch(rows, src, handleCase, outerFailure,
