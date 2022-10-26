@@ -1140,7 +1140,7 @@ bool OpaqueStorageAllocation::checkStorageDominates(
     }
     // Handle both phis and terminator results.
     auto *bbArg = cast<SILPhiArgument>(incomingValue);
-    // The storage block must strictly dominate the phi.
+    // The storage block must strictly dominate the argument block.
     if (!pass.domInfo->properlyDominates(allocInst->getParent(),
                                          bbArg->getParent())) {
       return false;
