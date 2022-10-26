@@ -8451,15 +8451,11 @@ namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
-    SmallVector<std::pair<TapExpr *, DeclContext *>, 4> TapsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    ~ExprWalker() {
-      assert(ClosuresToTypeCheck.empty());
-      assert(TapsToTypeCheck.empty());
-    }
+    ~ExprWalker() { assert(ClosuresToTypeCheck.empty()); }
 
     bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
       // Property wrapper placeholder underlying values are filled in
@@ -8468,9 +8464,7 @@ namespace {
     }
 
     /// Check if there are any closures or tap expressions left to process separately.
-    bool hasDelayedTasks() {
-      return !ClosuresToTypeCheck.empty() || !TapsToTypeCheck.empty();
-    }
+    bool hasDelayedTasks() { return !ClosuresToTypeCheck.empty(); }
 
     /// Process delayed closure bodies and `Tap` expressions.
     ///
@@ -8513,27 +8507,6 @@ namespace {
         hadError |= TypeChecker::typeCheckClosureBody(closure);
       }
 
-      // Tap expressions too; they should or should not be
-      // type-checked under the same conditions as closure bodies.
-      {
-        for (const auto &tuple : TapsToTypeCheck) {
-          auto tap = std::get<0>(tuple);
-          auto tapDC = std::get<1>(tuple);
-
-          hadError |= cs.applySolutionToBody(
-              solution, tap, tapDC, [&](SolutionApplicationTarget target) {
-                auto resultTarget = rewriteTarget(target);
-                if (resultTarget) {
-                  if (auto expr = resultTarget->getAsExpr())
-                    solution.setExprTypes(expr);
-                }
-
-                return resultTarget;
-              });
-        }
-        TapsToTypeCheck.clear();
-      }
-
       return hadError;
     }
 
@@ -8558,10 +8531,9 @@ namespace {
         return Action::SkipChildren(SVE);
       }
 
-      if (auto tap = dyn_cast<TapExpr>(expr)) {
-        // We remember the DeclContext because the code to handle
-        // single-expression-body closures above changes it.
-        TapsToTypeCheck.push_back(std::make_pair(tap, Rewriter.dc));
+      if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
+        rewriteTapExpr(tap);
+        return Action::SkipChildren(tap);
       }
 
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
@@ -8703,6 +8675,26 @@ namespace {
 
             if (auto expr = resultTarget->getAsExpr())
               solution.setExprTypes(expr);
+
+            return resultTarget;
+         });
+    }
+
+    void rewriteTapExpr(TapExpr *tap) {
+      auto &solution = Rewriter.solution;
+
+      // First, let's visit the tap expression itself
+      // and set all of the inferred types.
+      Rewriter.visitTapExpr(tap);
+
+      // Now, let's apply solution to the body
+      (void)Rewriter.cs.applySolutionToBody(
+          solution, tap, Rewriter.dc, [&](SyntacticElementTarget target) {
+            auto resultTarget = rewriteTarget(target);
+            if (resultTarget) {
+              if (auto expr = resultTarget->getAsExpr())
+                solution.setExprTypes(expr);
+            }
 
             return resultTarget;
           });
