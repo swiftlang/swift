@@ -521,8 +521,8 @@ class StoredIntegerElement: public LocatorPathElt {
 
   template <unsigned Index = 0,
             typename = typename std::enable_if<(Index < NumValues)>::type>
-  static uint64_t packValue(unsigned value) {
-    return uint64_t(value) << (valueWidth() * (NumValues - Index - 1));
+  static uint64_t packValue(uint64_t value) {
+    return value << (valueWidth() * (NumValues - Index - 1));
   }
 
   static constexpr uint64_t valueMask =
@@ -531,28 +531,20 @@ class StoredIntegerElement: public LocatorPathElt {
 public:
   template <unsigned NumNumericInputs = NumValues,
             typename = typename std::enable_if<NumNumericInputs == 1>::type>
-  StoredIntegerElement(ConstraintLocator::PathElementKind kind, unsigned value)
-    : LocatorPathElt(kind, value) {
-    assert(value == getValue<0>() && "value truncated");
-  }
+  StoredIntegerElement(ConstraintLocator::PathElementKind kind, uint64_t value)
+    : LocatorPathElt(kind, value) { }
 
   template <unsigned NumNumericInputs = NumValues,
             typename = typename std::enable_if<NumNumericInputs == 2>::type>
-  StoredIntegerElement(ConstraintLocator::PathElementKind kind, unsigned value0, unsigned value1)
-    : LocatorPathElt(kind, packValue<0>(value0) | packValue<1>(value1)) {
-    assert(value0 == getValue<0>() && "value0 truncated");
-    assert(value1 == getValue<1>() && "value1 truncated");
-  }
+  StoredIntegerElement(ConstraintLocator::PathElementKind kind, uint32_t value0, uint32_t value1)
+    : LocatorPathElt(kind, packValue<0>(value0) | packValue<1>(value1)) { }
 
   template <unsigned NumNumericInputs = NumValues,
             typename = typename std::enable_if<NumNumericInputs == 3>::type>
-  StoredIntegerElement(ConstraintLocator::PathElementKind kind, unsigned value0,
-                       unsigned value1, unsigned value2)
-    : LocatorPathElt(kind, packValue<0>(value0) | packValue<1>(value1) | packValue<2>(value2)) {
-    assert(value0 == getValue<0>() && "value0 truncated");
-    assert(value1 == getValue<1>() && "value1 truncated");
-    assert(value2 == getValue<2>() && "value2 truncated");
-  }
+  StoredIntegerElement(ConstraintLocator::PathElementKind kind,
+                       uint16_t value0, uint16_t value1, uint16_t value2)
+    : LocatorPathElt(kind,
+                     packValue<0>(value0) | packValue<1>(value1) | packValue<2>(value2)) { }
 
   /// Retrieve a value associated with the path element.
   template <unsigned Index = 0,
@@ -588,7 +580,7 @@ public:
 
 class LocatorPathElt::ApplyArgToParam final : public StoredIntegerElement<3> {
 public:
-  ApplyArgToParam(unsigned argIdx, unsigned paramIdx, ParameterTypeFlags flags)
+  ApplyArgToParam(uint16_t argIdx, uint16_t paramIdx, ParameterTypeFlags flags)
       : StoredIntegerElement(ConstraintLocator::ApplyArgToParam, argIdx, paramIdx, flags.toRaw()) {}
 
   unsigned getArgIdx() const { return getValue<0>(); }
