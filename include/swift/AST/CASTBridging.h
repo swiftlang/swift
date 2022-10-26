@@ -48,6 +48,16 @@ typedef struct {
 
 typedef void *BridgedIdentifier;
 
+typedef struct {
+  BridgedIdentifier _Nullable Name;
+  void *_Nullable NameLoc;
+  BridgedIdentifier _Nullable SecondName;
+  void *_Nullable SecondNameLoc;
+  void *_Nullable UnderscoreLoc;
+  void *_Nullable ColonLoc;
+  void *Type;
+  void *_Nullable TrailingCommaLoc;
+} BridgedTupleTypeElement;
 #ifdef __cplusplus
 extern "C" {
 
@@ -126,6 +136,22 @@ struct DeclContextAndDecl StructDecl_create(
     void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
 struct DeclContextAndDecl ClassDecl_create(
     void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
+
+void *ArrayTypeRepr_create(void *ctx, void *base, void *lsquareLoc, void *rsquareLoc);
+void *DictionaryTypeRepr_create(void *ctx, void *keyType, void *valueType, void *lsquareLoc, void *colonloc, void *rsquareLoc);
+void *OptionalTypeRepr_create(void *ctx, void *base, void *questionLoc);
+void *ImplicitlyUnwrappedOptionalTypeRepr_create(void *ctx, void *base, void *exclamationLoc);
+void *MetatypeTypeRepr_create(void *ctx, void *baseType, void *typeLoc);
+void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc);
+void *PackExpansionTypeRepr_create(void *ctx, void *base, void *ellipsisLoc);
+void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc, void *rParenLoc);
+void *IdentTypeRepr_create(void *ctx, BridgedArrayRef components);
+void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name, void *nameLoc, BridgedArrayRef genericArgs, void *lAngle, void *rAngle);
+void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types, void *firstTypeLoc);
+void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc, void *_Nullable throwsLoc, void *arrowLoc, void *returnType);
+void *NamedOpaqueReturnTypeRepr_create(void *ctx, void *baseTy);
+void *OpaqueReturnTypeRepr_create(void *ctx, void *opaqueLoc, void *baseTy);
+void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy);
 
 void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);

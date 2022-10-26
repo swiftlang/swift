@@ -225,6 +225,16 @@ void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id) {
       DeclNameRef(Identifier::getFromOpaquePointer(id)));
 }
 
+
+void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name, void *nameLoc, BridgedArrayRef genericArgs, void *lAngle, void *rAngle) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto Loc = DeclNameLoc(getSourceLocFromPointer(nameLoc));
+  auto Name = DeclNameRef(Identifier::getFromOpaquePointer(name));
+  SourceLoc lAngleLoc = getSourceLocFromPointer(lAngle);
+  SourceLoc rAngleLoc = getSourceLocFromPointer(rAngle);
+  return GenericIdentTypeRepr::create(Context, Loc, Name, getArrayRef<TypeRepr *>(genericArgs), SourceRange{lAngleLoc, rAngleLoc});
+}
+
 void *UnresolvedDotExpr_create(
     void *ctx, void *base, void *dotLoc,  BridgedIdentifier name,
     void *nameLoc) {
@@ -279,6 +289,104 @@ DeclContextAndDecl ClassDecl_create(
                                       (DeclContext *)dc, false);
   out->setImplicit(); // TODO: remove this.
   return {(DeclContext *)out, (NominalTypeDecl *)out, (Decl *)out};
+}
+
+void *OptionalTypeRepr_create(void *ctx, void *base, void *questionLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) OptionalTypeRepr((TypeRepr *)base, getSourceLocFromPointer(questionLoc));
+}
+
+void *ImplicitlyUnwrappedOptionalTypeRepr_create(void *ctx, void *base, void *exclamationLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) ImplicitlyUnwrappedOptionalTypeRepr((TypeRepr *)base, getSourceLocFromPointer(exclamationLoc));
+}
+
+void *ArrayTypeRepr_create(void *ctx, void *base, void *lsquareLoc, void *rsquareLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc lSquareLoc = getSourceLocFromPointer(lsquareLoc);
+  SourceLoc rSquareLoc = getSourceLocFromPointer(rsquareLoc);
+  return new (Context) ArrayTypeRepr((TypeRepr *)base, SourceRange{lSquareLoc, rSquareLoc});
+}
+
+void *DictionaryTypeRepr_create(void *ctx, void *keyType, void *valueType, void *lsquareLoc, void *colonloc, void *rsquareLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc lSquareLoc = getSourceLocFromPointer(lsquareLoc);
+  SourceLoc colonLoc = getSourceLocFromPointer(colonloc);
+  SourceLoc rSquareLoc = getSourceLocFromPointer(rsquareLoc);
+  return new (Context) DictionaryTypeRepr((TypeRepr *)keyType, (TypeRepr *)valueType, colonLoc, SourceRange{lSquareLoc, rSquareLoc});
+}
+
+void *MetatypeTypeRepr_create(void *ctx, void *baseType, void *typeLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc tyLoc = getSourceLocFromPointer(typeLoc);
+  return new (Context) MetatypeTypeRepr((TypeRepr *)baseType, tyLoc);
+}
+
+void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc protocolLoc = getSourceLocFromPointer(protoLoc);
+  return new (Context) ProtocolTypeRepr((TypeRepr *)baseType, protocolLoc);
+}
+
+void *PackExpansionTypeRepr_create(void *ctx, void *base, void *ellipsisLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) PackExpansionTypeRepr((TypeRepr *)base, getSourceLocFromPointer(ellipsisLoc));
+}
+
+void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc, void *rParenLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc lParen = getSourceLocFromPointer(lParenLoc);
+  SourceLoc rParen = getSourceLocFromPointer(rParenLoc);
+  SmallVector<TupleTypeReprElement, 8> tupleElements;
+  for (auto element : getArrayRef<BridgedTupleTypeElement>(elements)) {
+    TupleTypeReprElement elementRepr;
+    elementRepr.Name = Identifier::getFromOpaquePointer(element.Name);
+    elementRepr.NameLoc = getSourceLocFromPointer(element.NameLoc);
+    elementRepr.SecondName = Identifier::getFromOpaquePointer(element.SecondName);
+    elementRepr.SecondNameLoc = getSourceLocFromPointer(element.SecondNameLoc);
+    elementRepr.UnderscoreLoc = getSourceLocFromPointer(element.UnderscoreLoc);
+    elementRepr.ColonLoc = getSourceLocFromPointer(element.ColonLoc);
+    elementRepr.Type = (TypeRepr *)element.Type;
+    elementRepr.TrailingCommaLoc = getSourceLocFromPointer(element.TrailingCommaLoc);
+    tupleElements.emplace_back(elementRepr);
+  }
+  
+  return TupleTypeRepr::create(Context, tupleElements, SourceRange{lParen, rParen});
+}
+
+void *IdentTypeRepr_create(void *ctx, BridgedArrayRef components) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return IdentTypeRepr::create(Context, getArrayRef<ComponentIdentTypeRepr *>(components));
+}
+
+void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types, void *firstTypeLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  SourceLoc firstType = getSourceLocFromPointer(firstTypeLoc);
+  return CompositionTypeRepr::create(Context, getArrayRef<TypeRepr *>(types), firstType, SourceRange{});
+}
+
+void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc, void *_Nullable throwsLoc, void *arrowLoc, void *returnType) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) FunctionTypeRepr(nullptr,
+                                        (TupleTypeRepr *)argsTy,
+                                        getSourceLocFromPointer(asyncLoc),
+                                        getSourceLocFromPointer(throwsLoc),
+                                        getSourceLocFromPointer(arrowLoc),
+                                        (TypeRepr *)returnType);
+}
+
+void *NamedOpaqueReturnTypeRepr_create(void *ctx, void *baseTy) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) NamedOpaqueReturnTypeRepr((TypeRepr *)baseTy, nullptr);
+}
+
+void *OpaqueReturnTypeRepr_create(void *ctx, void *opaqueLoc, void *baseTy) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) OpaqueReturnTypeRepr(getSourceLocFromPointer(opaqueLoc), (TypeRepr *)baseTy);
+}
+void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) ExistentialTypeRepr(getSourceLocFromPointer(anyLoc), (TypeRepr *)baseTy);
 }
 
 void TopLevelCodeDecl_dump(void *decl) { ((TopLevelCodeDecl *)decl)->dump(llvm::errs()); }
