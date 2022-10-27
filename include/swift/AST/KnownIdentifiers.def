@@ -311,9 +311,11 @@ IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
 // Type wrappers
 IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
-IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$_storage")
+IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$storage")
 IDENTIFIER(storageKeyPath)
-IDENTIFIER(memberwise)
+IDENTIFIER(propertyKeyPath)
+IDENTIFIER(wrappedSelf)
+IDENTIFIER(storageWrapper)
 IDENTIFIER_WITH_NAME(localStorageVar, "_storage")
 
 // Attribute options

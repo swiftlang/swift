@@ -459,7 +459,7 @@ namespace {
     /// corresponds to `self`.
     void injectActorHops();
 
-    /// Injects `self.$storage = .init(memberwise: $Storage(...))`
+    /// Injects `self.$storage = .init(storage: $Storage(...))`
     /// assignment instructions into the function after each point
     /// where `_storage` becomes fully initialized via `assign_by_wrapper`.
     /// This is only necessary only for user-defined initializers of a
@@ -1117,7 +1117,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
       auto storageType = F.getLoweredType(
           ctor->mapTypeIntoContext(storageDecl->getDeclaredInterfaceType()));
 
-      // Argument value to use in call to <TypeWrapper>.init(memberwise:)
+      // Argument value to use in call to <TypeWrapper>.init(storage:)
       SILValue storageObj = allocStack(storageType);
 
       // let storageObj = $Storage(<destructured _storage tuple>)
@@ -1253,7 +1253,7 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
                                  StoreOwnershipQualifier::Init);
       }
 
-      // self.$storage = <TypeWrapper>(memberwise: storageObj))
+      // self.$storage = <TypeWrapper>(storage: storageObj))
       {
         bool isClass = isa<ClassDecl>(parentType);
 
@@ -1291,6 +1291,11 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
               loc, selfRef, parentType->getTypeWrapperProperty());
         }
 
+        auto wrappedType = MetatypeType::get(self->getType().getASTType(),
+                                             MetatypeRepresentation::Thick);
+        auto wrappedMetatype =
+            b.createMetatype(loc, F.getLoweredType(wrappedType));
+
         auto typeWrapperType =
             b.createMetatype(loc, F.getLoweredType(MetatypeType::get(
                                       storagePropRef->getType().getASTType())));
@@ -1305,14 +1310,17 @@ void LifetimeChecker::injectTypeWrapperStorageInitalization() {
           wrapperInitArgs.push_back(*localWrapperObj);
         }
 
+        wrapperInitArgs.push_back(wrappedMetatype);
         wrapperInitArgs.push_back(storageObj);
         wrapperInitArgs.push_back(typeWrapperType);
 
-        // <wrapper-var> = <TypeWrapper>.init(memberwise: tmpStorage)
+        // <wrapper-var> = <TypeWrapper>.init(storage: tmpStorage)
         auto wrapperInitResult = b.createApply(
             loc, typeWrapperInitRef,
             SubstitutionMap::get(typeWrapperInit->getGenericSignature(),
-                                 /*substitutions=*/{storageType.getASTType()},
+                                 /*substitutions=*/
+                                 {wrappedType->getMetatypeInstanceType(),
+                                  storageType.getASTType()},
                                  /*conformances=*/{}),
             wrapperInitArgs);
 

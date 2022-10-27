@@ -3588,7 +3588,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Inject or get `$_storage` property which is used to route accesses through
+/// Inject or get `$storage` property which is used to route accesses through
 /// to all stored properties of a type that has a type wrapper.
 class GetTypeWrapperProperty
     : public SimpleRequest<GetTypeWrapperProperty, VarDecl *(NominalTypeDecl *),
@@ -3689,9 +3689,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class SynthesizeTypeWrappedTypeMemberwiseInitializerBody
-    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
-                           BraceStmt *(ConstructorDecl *),
+class SynthesizeTypeWrappedTypeStorageWrapperInitializer
+    : public SimpleRequest<SynthesizeTypeWrappedTypeStorageWrapperInitializer,
+                           ConstructorDecl *(NominalTypeDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3699,7 +3699,7 @@ public:
 private:
   friend SimpleRequest;
 
-  BraceStmt *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
