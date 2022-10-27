@@ -4223,7 +4223,7 @@ NeverNullType TypeResolver::resolvePackExpansionType(PackExpansionTypeRepr *repr
     return ErrorType::get(ctx);
 
   // We might not allow variadic expansions here at all.
-  if (!options.isPackExpansionSupported()) {
+  if (!options.isPackExpansionSupported(getDeclContext())) {
     diagnose(repr->getLoc(), diag::expansion_not_allowed, pair.first);
     return ErrorType::get(ctx);
   }

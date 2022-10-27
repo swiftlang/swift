@@ -3549,6 +3549,16 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
     return markStoredOrInOutExpr(OEE->getSubExpr(), Flags);
   }
+
+  // Bind pack references in pack expansions.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    for (unsigned i = 0; i < expansion->getNumBindings(); ++i) {
+      auto *opaqueValue = expansion->getOpaqueValues()[i];
+      auto *packReference = expansion->getBindings()[i];
+      OpaqueValueMap[opaqueValue] = packReference;
+    }
+    return markStoredOrInOutExpr(expansion->getPatternExpr(), Flags);
+  }
   
   // If this is an OpaqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
@@ -3624,6 +3634,15 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
     oee->getSubExpr()->walk(*this);
     return Action::SkipChildren(E);
+  }
+
+  // If we see a PackExpansionExpr, record its pack reference bindings.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    for (unsigned i = 0; i < expansion->getNumBindings(); ++i) {
+      auto *opaqueValue = expansion->getOpaqueValues()[i];
+      auto *packReference = expansion->getBindings()[i];
+      OpaqueValueMap[opaqueValue] = packReference;
+    }
   }
 
   // Visit bindings.

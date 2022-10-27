@@ -431,8 +431,8 @@ SWIFT_REQUEST(TypeChecker, IsPropertyAccessedViaTypeWrapper,
 SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeMemberwiseInitializer,
               ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeMemberwiseInitializerBody,
-              BraceStmt *(ConstructorDecl *),
+SWIFT_REQUEST(TypeChecker, SynthesizeTypeWrappedTypeStorageWrapperInitializer,
+              ConstructorDecl *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeLocalVariableForTypeWrapperStorage,
               VarDecl *(ConstructorDecl *),
