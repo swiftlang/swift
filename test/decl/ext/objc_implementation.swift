@@ -136,6 +136,10 @@
       // OK
     }
   }
+
+  override public init(fromSuperclass _: CInt) {
+    // OK
+  }
 }
 
 // FIXME: Should complain about categoryMethodFromHeader4:

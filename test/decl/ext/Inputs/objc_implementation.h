@@ -1,5 +1,10 @@
 @interface ObjCBaseClass
 
+
+// Need two initializers to reproduce certain conflict bugs.
+- (instancetype)initFromSuperclass:(int)param  __attribute__((objc_designated_initializer));
+- (instancetype)initFromSuperclass2:(int)param  __attribute__((objc_designated_initializer));
+
 - (void)superclassMethod:(int)param;
 @property (assign) int superclassProperty;
 

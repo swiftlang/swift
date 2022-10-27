@@ -2042,8 +2042,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
 
     // Record the method in the type, if it's a member of one.
     if (auto tyDecl = D->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (!method->isObjCMemberImplementation())
-        tyDecl->recordObjCMethod(method, selector);
+      tyDecl->recordObjCMethod(method, selector);
     }
 
     // Record the method in the source file.
