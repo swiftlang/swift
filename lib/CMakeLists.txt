@@ -54,6 +54,5 @@ add_subdirectory(StaticMirror)
 add_subdirectory(SymbolGraphGen)
 add_subdirectory(Syntax)
 add_subdirectory(SyntaxParse)
-add_subdirectory(TBDGen)
 add_subdirectory(Threading)
 

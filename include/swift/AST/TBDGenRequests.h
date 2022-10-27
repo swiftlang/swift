@@ -20,8 +20,8 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/TBDGen/TBDGen.h"
 
 namespace llvm {
 
