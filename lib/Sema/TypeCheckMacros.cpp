@@ -29,36 +29,66 @@ extern "C" void *swift_ASTGen_lookupMacro(const char *macroName);
 
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
-extern "C" void swift_ASTGen_getMacroTypeSignature(
-    void *sourceFile, void *declContext, void *astContext, void *macro,
-    void **genericSignature,
-    void **signature);
+extern "C" void
+swift_ASTGen_getMacroEvaluationContext(const void *sourceFile,
+                                       void *declContext, void *astContext,
+                                       void *macro, void **evaluationContext);
 
 extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
     void *sourceFile, const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
+extern "C" void
+swift_ASTGen_getMacroTypeSignature(void *macro, const char **genericSignature,
+                                   ptrdiff_t *genericSignatureLength);
+
 #if SWIFT_SWIFT_PARSER
 
-llvm::Optional<ASTGenMacroRAII> ASTGenMacroRAII::lookup(StringRef macroName,
-                                              void *sourceFile,
-                                              DeclContext *DC,
-                                              ASTContext &ctx) {
-  auto *macro = swift_ASTGen_lookupMacro(macroName.str().c_str());
-  if (!macro)
-    return None;
+StructDecl *
+swift::macro_context::lookup(StringRef macroName, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
 
-  void *genericParamList = nullptr;
-  void *signatureAST = nullptr;
-  swift_ASTGen_getMacroTypeSignature(sourceFile, (void *)DC, (void *)&ctx,
-                                     macro, &genericParamList,
-                                     &signatureAST);
+  return ctx.getOrCreateASTGenMacroContext(
+      macroName, [&](StringRef macroName) -> StructDecl * {
+        auto *macro = swift_ASTGen_lookupMacro(macroName.str().c_str());
+        if (!macro)
+          return nullptr;
 
-  return ASTGenMacroRAII{macro, (TypeRepr *)signatureAST,
-    (GenericParamList *)genericParamList};
+        const char *evaluatedSource;
+        ptrdiff_t evaluatedSourceLength;
+        swift_ASTGen_getMacroTypeSignature(macro, &evaluatedSource,
+                                           &evaluatedSourceLength);
+
+        // Create a new source buffer with the contents of the macro's
+        // signature.
+        SourceManager &sourceMgr = ctx.SourceMgr;
+        std::string bufferName;
+        {
+          llvm::raw_string_ostream out(bufferName);
+          out << "Macro signature of #" << macroName;
+        }
+        auto macroBuffer = llvm::MemoryBuffer::getMemBuffer(
+            StringRef(evaluatedSource, evaluatedSourceLength), bufferName);
+        unsigned macroBufferID =
+            sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+        auto macroSourceFile = new (ctx) SourceFile(
+            *DC->getParentModule(), SourceFileKind::Library, macroBufferID);
+        // Make sure implicit imports are resolved in this file.
+        performImportResolution(*macroSourceFile);
+
+        auto *start = sourceMgr.getLocForBufferStart(macroBufferID)
+                          .getOpaquePointerValue();
+        void *context = nullptr;
+        swift_ASTGen_getMacroEvaluationContext(
+            (const void *)start, (void *)(DeclContext *)macroSourceFile,
+            (void *)&ctx, macro, &context);
+
+        ctx.addCleanup([macro]() { swift_ASTGen_destroyMacro(macro); });
+        return dyn_cast<StructDecl>((Decl *)context);
+      });
 }
 
-ASTGenMacroRAII::~ASTGenMacroRAII() { /*swift_ASTGen_destroyMacro(opaqueMacro);*/ }
+#endif // SWIFT_SWIFT_PARSER
 
 Expr *swift::expandMacroExpr(
     DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType
@@ -152,5 +182,3 @@ Expr *swift::expandMacroExpr(
          "Type checking changed the result type?");
   return expandedExpr;
 }
-
-#endif // SWIFT_SWIFT_PARSER
