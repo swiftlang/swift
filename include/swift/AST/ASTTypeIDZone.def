@@ -48,6 +48,7 @@ SWIFT_TYPEID_NAMED(CodeCompletionCallbacksFactory *,
                    CodeCompletionCallbacksFactory)
 SWIFT_TYPEID_NAMED(ConstructorDecl *, ConstructorDecl)
 SWIFT_TYPEID_NAMED(CustomAttr *, CustomAttr)
+SWIFT_TYPEID_NAMED(ConstValueTypeInfo *, ConstValueTypeInfo)
 SWIFT_TYPEID_NAMED(Decl *, Decl)
 SWIFT_TYPEID_NAMED(EnumDecl *, EnumDecl)
 SWIFT_TYPEID_NAMED(FuncDecl *, FuncDecl)
