@@ -394,6 +394,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // We will only inline if *ALL* dynamic accesses are
   // known and have no nested conflict
   bool AllAccessesBeneficialToInline = true;
+  bool returnsAllocation = false;
 
   // Calculate the inlining cost of the callee.
   int CalleeCost = 0;
@@ -510,6 +511,18 @@ bool SILPerformanceInliner::isProfitableToInline(
             AllAccessesBeneficialToInline = false;
           }
         }
+      } else if (auto ri = dyn_cast<ReturnInst>(&I)) {
+        SILValue retVal = ri->getOperand();
+        if (auto *uci = dyn_cast<UpcastInst>(retVal))
+          retVal = uci->getOperand();
+
+        // Inlining functions which return an allocated object or partial_apply
+        // most likely has a benefit in the caller, because e.g. it can enable
+        // de-virtualization.
+        if (isa<AllocationInst>(retVal) || isa<PartialApplyInst>(retVal)) {
+          BlockW.updateBenefit(Benefit, RemovedCallBenefit + 10);
+          returnsAllocation = true;
+        }
       }
     }
     // Don't count costs in blocks which are dead after inlining.
@@ -577,6 +590,8 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   if (isClassMethodAtOsize && Benefit > OSizeClassMethodBenefit) {
     Benefit = OSizeClassMethodBenefit;
+    if (returnsAllocation)
+      Benefit += 10;
   }
 
   // This is the final inlining decision.
