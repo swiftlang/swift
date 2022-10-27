@@ -1444,6 +1444,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
+  Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
                                        options::OPT_no_warnings_as_errors,
                                        false);

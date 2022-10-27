@@ -1405,7 +1405,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-    RequireOSSAModules_t RequireOSSAModules) {
+    bool suppressRemarks, RequireOSSAModules_t RequireOSSAModules) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1458,9 +1458,14 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   }
 
   // Inhibit warnings from the genericSubInvocation since we are assuming the user
-  // is not in a position to fix them.
+  // is not in a position to address them.
   genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
   GenericArgs.push_back("-suppress-warnings");
+  // Inherit the parent invocation's setting on whether to suppress remarks
+  if (suppressRemarks) {
+    genericSubInvocation.getDiagnosticOptions().SuppressRemarks = true;
+    GenericArgs.push_back("-suppress-remarks");
+  }
 
   // Inherit this setting down so that it can affect error diagnostics (mostly
   // by making them non-fatal).
@@ -1538,6 +1543,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(searchPathOpts, langOpts,
+                                     Diags->getSuppressRemarks(),
                                      requireOSSAModules);
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();

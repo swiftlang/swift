@@ -1027,6 +1027,11 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
   }
+  
+  if (lvl == DiagnosticBehavior::Remark) {
+    if (suppressRemarks)
+      lvl = DiagnosticBehavior::Ignore;
+  }
 
   //   5) Update current state for use during the next diagnostic
   if (lvl == DiagnosticBehavior::Fatal) {

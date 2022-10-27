@@ -54,6 +54,9 @@ public:
 
   /// Suppress all warnings
   bool SuppressWarnings = false;
+  
+  /// Suppress all remarks
+  bool SuppressRemarks = false;
 
   /// Treat all warnings as errors
   bool WarningsAsErrors = false;

@@ -657,6 +657,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
 def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Don't treat warnings as errors">;
+  
+def suppress_remarks : Flag<["-"], "suppress-remarks">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all remarks">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,

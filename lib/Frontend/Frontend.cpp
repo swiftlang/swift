@@ -454,6 +454,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().SuppressWarnings) {
     Diagnostics.setSuppressWarnings(true);
   }
+  if (Invocation.getDiagnosticOptions().SuppressRemarks) {
+    Diagnostics.setSuppressRemarks(true);
+  }
   if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
     Diagnostics.setWarningsAsErrors(true);
   }
