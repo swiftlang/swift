@@ -3630,7 +3630,7 @@ namespace {
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = CS.getASTContext();
-      if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
+      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
         auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(expr->getMacro());
         if (!UDRE)
           return Type();

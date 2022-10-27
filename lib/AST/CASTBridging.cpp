@@ -226,8 +226,9 @@ void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id) {
       DeclNameRef(Identifier::getFromOpaquePointer(id)));
 }
 
-
-void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name, void *nameLoc, BridgedArrayRef genericArgs, void *lAngle, void *rAngle) {
+void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name,
+                                  void *nameLoc, BridgedArrayRef genericArgs,
+                                  void *lAngle, void *rAngle) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto Loc = DeclNameLoc(getSourceLocFromPointer(nameLoc));
   auto Name = DeclNameRef(Identifier::getFromOpaquePointer(name));
@@ -268,8 +269,9 @@ void NominalTypeDecl_setMembers(void *decl, BridgedArrayRef members) {
     ((NominalTypeDecl *)decl)->addMember(m);
 }
 
-DeclContextAndDecl StructDecl_create(
-    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams, void *dc) {
+DeclContextAndDecl StructDecl_create(void *ctx, void *loc,
+                                     BridgedIdentifier name, void *nameLoc,
+                                     void *_Nullable genericParams, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *out = new (Context) StructDecl(getSourceLocFromPointer(loc),
                                        Identifier::getFromOpaquePointer(name),
@@ -310,7 +312,9 @@ void *ArrayTypeRepr_create(void *ctx, void *base, void *lsquareLoc, void *rsquar
   return new (Context) ArrayTypeRepr((TypeRepr *)base, SourceRange{lSquareLoc, rSquareLoc});
 }
 
-void *DictionaryTypeRepr_create(void *ctx, void *keyType, void *valueType, void *lsquareLoc, void *colonloc, void *rsquareLoc) {
+void *DictionaryTypeRepr_create(void *ctx, void *keyType, void *valueType,
+                                void *lsquareLoc, void *colonloc,
+                                void *rsquareLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   SourceLoc lSquareLoc = getSourceLocFromPointer(lsquareLoc);
   SourceLoc colonLoc = getSourceLocFromPointer(colonloc);
@@ -367,7 +371,9 @@ void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types, void *firstTy
   return CompositionTypeRepr::create(Context, getArrayRef<TypeRepr *>(types), firstType, SourceRange{});
 }
 
-void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc, void *_Nullable throwsLoc, void *arrowLoc, void *returnType) {
+void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc,
+                              void *_Nullable throwsLoc, void *arrowLoc,
+                              void *returnType) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context) FunctionTypeRepr(nullptr,
                                         (TupleTypeRepr *)argsTy,
@@ -391,25 +397,27 @@ void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy) {
   return new (Context) ExistentialTypeRepr(getSourceLocFromPointer(anyLoc), (TypeRepr *)baseTy);
 }
 
-void *GenericParamList_create(void *ctx, void *lAngleLoc, BridgedArrayRef params, void *_Nullable whereLoc, BridgedArrayRef reqs, void *rAngleLoc) {
+void *GenericParamList_create(void *ctx, void *lAngleLoc,
+                              BridgedArrayRef params, void *_Nullable whereLoc,
+                              BridgedArrayRef reqs, void *rAngleLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   SmallVector<RequirementRepr> requirements;
   for (auto req : getArrayRef<BridgedRequirementRepr>(reqs)) {
     switch (req.Kind) {
     case BridgedRequirementReprKindTypeConstraint:
-        requirements.push_back(
-            RequirementRepr::getTypeConstraint((TypeRepr *)req.FirstType,
-                                               getSourceLocFromPointer(req.SeparatorLoc),
-                                               (TypeRepr *)req.SecondType));
-        break;
+      requirements.push_back(
+          RequirementRepr::getTypeConstraint((TypeRepr *)req.FirstType,
+                                             getSourceLocFromPointer(req.SeparatorLoc),
+                                             (TypeRepr *)req.SecondType));
+      break;
     case BridgedRequirementReprKindSameType:
-        requirements.push_back(
-            RequirementRepr::getSameType((TypeRepr *)req.FirstType,
-                                         getSourceLocFromPointer(req.SeparatorLoc),
-                                         (TypeRepr *)req.SecondType));
-        break;
+      requirements.push_back(
+          RequirementRepr::getSameType((TypeRepr *)req.FirstType,
+                                       getSourceLocFromPointer(req.SeparatorLoc),
+                                       (TypeRepr *)req.SecondType));
+      break;
     case BridgedRequirementReprKindLayoutConstraint:
-        llvm_unreachable("cannot handle layout constraints!");
+      llvm_unreachable("cannot handle layout constraints!");
     }
   }
   return GenericParamList::create(Context,
@@ -420,7 +428,10 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc, BridgedArrayRef params
                                   getSourceLocFromPointer(rAngleLoc));
 }
 
-void *GenericTypeParamDecl_create(void *ctx, void *declContext, BridgedIdentifier name, void *nameLoc, void *_Nullable ellipsisLoc, long index, bool isParameterPack) {
+void *GenericTypeParamDecl_create(void *ctx, void *declContext,
+                                  BridgedIdentifier name, void *nameLoc,
+                                  void *_Nullable ellipsisLoc, long index,
+                                  bool isParameterPack) {
   return GenericTypeParamDecl::createParsed(static_cast<DeclContext *>(declContext),
                                             Identifier::getFromOpaquePointer(name),
                                             getSourceLocFromPointer(nameLoc),
@@ -437,8 +448,10 @@ void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty) {
   ((GenericTypeParamDecl *)Param)->setInherited(entries);
 }
 
-
-DeclContextAndDecl TypeAliasDecl_create(void *ctx, void *declContext, void *aliasLoc, void *equalLoc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams) {
+DeclContextAndDecl TypeAliasDecl_create(void *ctx, void *declContext,
+                                        void *aliasLoc, void *equalLoc,
+                                        BridgedIdentifier name, void *nameLoc,
+                                        void *_Nullable genericParams) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto *out = new (Context) TypeAliasDecl(getSourceLocFromPointer(aliasLoc),
                                           getSourceLocFromPointer(equalLoc),
