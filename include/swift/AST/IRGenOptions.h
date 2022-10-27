@@ -535,6 +535,12 @@ public:
     return OptMode == OptimizationMode::ForSize;
   }
 
+  bool shouldEmitReflectionMetadata(bool isTypeReflectable) const {
+    bool debuggingEnabled = (DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes || DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes);
+    bool optInEnabledAndReflectable = isTypeReflectable && ReflectionMetadata == ReflectionMetadataMode::OptIn;
+    return ReflectionMetadata == ReflectionMetadataMode::Runtime || debuggingEnabled || optInEnabledAndReflectable;
+  }
+
   std::string getDebugFlags(StringRef PrivateDiscriminator) const {
     std::string Flags = DebugFlags;
     if (!PrivateDiscriminator.empty()) {
