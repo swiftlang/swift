@@ -1556,8 +1556,7 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      if (IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable()) || 
-          IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::DebuggerOnly) {
+      if (!IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable())) {
         B.addInt32(0);
         return;
       }
@@ -1635,10 +1634,7 @@ namespace {
     void maybeAddResilientSuperclass() { }
 
     void addReflectionFieldDescriptor() {
-      bool shouldSupressReflectionForOptIn = !getType()->isReflectable() && IGM.IRGen.Opts.shouldOptimize();
-      if (IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::None ||
-          IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::DebuggerOnly ||
-          (IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::OptIn && shouldSupressReflectionForOptIn)) {
+      if (!IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable())) {
         B.addInt32(0);
         return;
       }
@@ -1792,9 +1788,7 @@ namespace {
     }
 
     void addReflectionFieldDescriptor() {
-      if (IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable()) ||
-          IGM.IRGen.Opts.ReflectionMetadata == ReflectionMetadataMode::DebuggerOnly ||
-          getType()->isForeign()) {
+      if (!IGM.IRGen.Opts.shouldEmitReflectionMetadata(getType()->isReflectable()) || getType()->isForeign()) {
         B.addInt32(0);
         return;
       }

@@ -1524,7 +1524,7 @@ void IRGenerator::emitBuiltinReflectionMetadata() {
 }
 
 void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
-  if (IRGen.Opts.shouldEmitReflectionMetadata(D->isReflectable()))
+  if (!IRGen.Opts.shouldEmitReflectionMetadata(D->isReflectable()))
       return;
 
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();
