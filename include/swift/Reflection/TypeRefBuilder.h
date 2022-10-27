@@ -558,9 +558,7 @@ public:
     auto kind = node->getKind();
     // Kinds who have a "BoundGeneric..." variant.
     if (kind != Node::Kind::Class && kind != Node::Kind::Structure &&
-        kind != Node::Kind::Enum && kind != Node::Kind::Protocol &&
-        kind != Node::Kind::OtherNominalType && kind != Node::Kind::TypeAlias &&
-        kind != Node::Kind::Function)
+        kind != Node::Kind::Enum)
       return nullptr;
     auto mangling = Demangle::mangleNode(node);
     if (!mangling.isSuccess())
@@ -572,9 +570,23 @@ public:
         args.end() - argsIndex - numGenericArgs, args.end() - argsIndex);
 
     const BoundGenericTypeRef *parent = nullptr;
-    if (node->hasChildren())
-     parent = createBoundGenericTypeReconstructingParent(
-        node->getFirstChild(), decl, --shapeIndex, args, argsIndex + numGenericArgs);
+    if (node->hasChildren()) {
+      // Skip over nodes that are not of type class, enum or struct
+      auto parentNode = node->getFirstChild();
+      while (parentNode->getKind() != Node::Kind::Class &&
+             parentNode->getKind() != Node::Kind::Structure &&
+             parentNode->getKind() != Node::Kind::Enum) {
+        if (parentNode->hasChildren()) {
+          parentNode = parentNode->getFirstChild();
+        } else {
+          parentNode = nullptr;
+          break;
+        }
+      }
+      if (parentNode)
+        parent = createBoundGenericTypeReconstructingParent(
+            parentNode, decl, --shapeIndex, args, argsIndex + numGenericArgs);
+    }
 
     return BoundGenericTypeRef::create(*this, mangling.result(), genericParams,
                                        parent);
