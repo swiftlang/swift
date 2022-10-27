@@ -925,7 +925,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (EnumDecl *enumDecl = userValue->getType().getEnumOrBoundGenericEnum()) {
+  if (userValue->getType().getEnumOrBoundGenericEnum()) {
     storage.initializesEnum = true;
   }
   assert(!storage.isPhiProjection());
@@ -1140,7 +1140,7 @@ bool OpaqueStorageAllocation::checkStorageDominates(
     }
     // Handle both phis and terminator results.
     auto *bbArg = cast<SILPhiArgument>(incomingValue);
-    // The storage block must strictly dominate the phi.
+    // The storage block must strictly dominate the argument block.
     if (!pass.domInfo->properlyDominates(allocInst->getParent(),
                                          bbArg->getParent())) {
       return false;
@@ -2772,13 +2772,15 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 
   // Borrows are irrelevant unless they are marked lexical.
   if (borrow->isLexical()) {
-    if (auto *allocStack = dyn_cast<AllocStackInst>(address)) {
-      allocStack->setIsLexical();
-      return;
+    if (auto base = getAccessBase(address)) {
+      if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
+        allocStack->setIsLexical();
+        return;
+      }
+      // Function arguments are inherently lexical.
+      if (isa<SILFunctionArgument>(base))
+        return;
     }
-    // Function arguments are inherently lexical.
-    if (isa<SILFunctionArgument>(address))
-      return;
 
     SWIFT_ASSERT_ONLY(address->dump());
     llvm_unreachable("^^^ unknown lexical address producer");

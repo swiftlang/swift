@@ -2884,6 +2884,9 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
 
 bool OwnershipForwardingMixin::hasSameRepresentation(SILInstruction *inst) {
   switch (inst->getKind()) {
+  // Explicitly list instructions which definitely involve a representation
+  // change.
+  case SILInstructionKind::SwitchEnumInst:
   default:
     // Conservatively assume that a conversion changes representation.
     // Operations can be added as needed to participate in SIL opaque values.
