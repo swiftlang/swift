@@ -6333,37 +6333,41 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
     return CxxRecordSemanticsKind::Reference;
   }
 
-  if (!hasRequiredValueTypeOperations(decl)) {
-    if (hasUnsafeAPIAttr(decl))
+  auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
+  if (!cxxDecl)
+    return CxxRecordSemanticsKind::Trivial;
+
+  if (!hasRequiredValueTypeOperations(cxxDecl)) {
+    if (hasUnsafeAPIAttr(cxxDecl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                               "import_unsafe", decl->getNameAsString());
-    if (hasOwnedValueAttr(decl))
+    if (hasOwnedValueAttr(cxxDecl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                               "import_owned", decl->getNameAsString());
-    if (hasIteratorAPIAttr(decl))
+    if (hasIteratorAPIAttr(cxxDecl))
       desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
                               "import_iterator", decl->getNameAsString());
 
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }
 
-  if (hasUnsafeAPIAttr(decl)) {
+  if (hasUnsafeAPIAttr(cxxDecl)) {
     return CxxRecordSemanticsKind::ExplicitlyUnsafe;
   }
 
-  if (hasOwnedValueAttr(decl)) {
+  if (hasOwnedValueAttr(cxxDecl)) {
     return CxxRecordSemanticsKind::Owned;
   }
 
-  if (hasIteratorAPIAttr(decl) || isIterator(decl)) {
+  if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 
-  if (hasPointerInSubobjects(decl)) {
+  if (hasPointerInSubobjects(cxxDecl)) {
     return CxxRecordSemanticsKind::UnsafePointerMember;
   }
 
-  if (isSufficientlyTrivial(decl)) {
+  if (isSufficientlyTrivial(cxxDecl)) {
     return CxxRecordSemanticsKind::Trivial;
   }
 

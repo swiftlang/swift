@@ -9,10 +9,7 @@ protocol CP : class { }
 }
 
 func fP<T : P>(_ t: T?) { }
-// expected-note@-1 {{required by global function 'fP' where 'T' = 'any P'}}
-// expected-note@-2 {{required by global function 'fP' where 'T' = 'any OP & P'}}
 func fOP<T : OP>(_ t: T?) { }
-// expected-note@-1 {{required by global function 'fOP' where 'T' = 'any OP & P'}}
 func fOPE(_ t: OP) { }
 func fSP<T : SP>(_ t: T?) { }
 func fAO<T : AnyObject>(_ t: T?) { }
@@ -23,7 +20,7 @@ func fAOE(_ t: AnyObject) { }
 func fT<T>(_ t: T) { }
 
 func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
-  fP(p) // expected-error{{type 'any P' cannot conform to 'P'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+  fP(p)
   fAO(p) // expected-error{{global function 'fAO' requires that 'any P' be a class type}}
   fAOE(p) // expected-error{{argument type 'any P' expected to be an instance of a class or class-constrained type}}
   fT(p)
@@ -37,14 +34,14 @@ func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, 
   fAOE(cp)
   fT(cp)
 
-  fP(opp) // expected-error{{type 'any OP & P' cannot conform to 'P'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
-  fOP(opp) // expected-error{{type 'any OP & P' cannot conform to 'OP'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+  fP(opp)
+  fOP(opp)
   fAO(opp) // expected-error{{global function 'fAO' requires that 'any OP & P' be a class type}}
   fAOE(opp)
   fT(opp)
 
   fOP(sp)
-  fSP(sp) // expected-error{{'any SP' cannot be used as a type conforming to protocol 'SP' because 'SP' has static requirements}}
+  fSP(sp)
   fAO(sp)
   fAOE(sp)
   fT(sp)
