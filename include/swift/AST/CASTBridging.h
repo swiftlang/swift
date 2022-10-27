@@ -14,6 +14,7 @@
 #define SWIFT_C_AST_ASTBRIDGING_H
 
 #include <inttypes.h>
+#include "swift/Basic/Compiler.h"
 
 #if __clang__
 // Provide macros to temporarily suppress warning about the use of
@@ -59,7 +60,7 @@ typedef struct {
   void *_Nullable TrailingCommaLoc;
 } BridgedTupleTypeElement;
 
-typedef enum __attribute__((enum_extensibility(open))) BridgedRequirementReprKind : long {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : long {
   /// A type bound T : P, where T is a type that depends on a generic
   /// parameter and P is some type that should bound T, either as a concrete
   /// supertype or a protocol to which T must conform.
