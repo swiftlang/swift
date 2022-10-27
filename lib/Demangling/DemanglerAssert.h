@@ -47,13 +47,6 @@
 
 #endif
 
-// DEMANGLER_ALWAYS_ASSERT() *always* fails the program, even in the runtime
-#define DEMANGLER_ALWAYS_ASSERT(expr, node)                                    \
-  do {                                                                         \
-    if (!(expr))                                                               \
-      swift::Demangle::failAssert(__FILE__, __LINE__, node, #expr);            \
-  } while (0)
-
 namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE

@@ -343,7 +343,7 @@ Node::iterator Node::end() const {
 }
 
 void Node::addChild(NodePointer Child, NodeFactory &Factory) {
-  DEMANGLER_ALWAYS_ASSERT(Child, this);
+  assert(Child);
   switch (NodePayloadKind) {
     case PayloadKind::None:
       InlineChildren[0] = Child;
