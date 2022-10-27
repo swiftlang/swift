@@ -239,6 +239,14 @@ public:
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
+  /// Map a type containing parameter packs to a contextual type
+  /// in the opened element generic context.
+  Type mapPackTypeIntoElementContext(Type type) const;
+
+  /// Map a type containing pack element type parameters to a contextual
+  /// type in the pack generic context.
+  Type mapElementTypeIntoPackContext(Type type) const;
+
   /// Map the given SIL interface type to a contextual type.
   ///
   /// This operation will also reabstract dependent types according to the

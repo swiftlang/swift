@@ -8464,20 +8464,11 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
 
   // Replace opened element archetypes with pack archetypes
   // for the resulting type of the pack expansion.
-  auto patternType = elementType.transform([&](Type type) -> Type {
-    auto *element = type->getAs<ElementArchetypeType>();
-    if (!element)
-      return type;
-
-    auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
-    auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
-                                           elementParam->getDepth(),
-                                           elementParam->getIndex(),
-                                           this->getASTContext());
-    return this->DC->mapTypeIntoContext(pack);
-  });
-
+  auto *environment = DC->getGenericEnvironmentOfContext();
+  auto patternType = environment->mapElementTypeIntoPackContext(
+      elementType->mapTypeOutOfContext());
   addConstraint(ConstraintKind::Bind, second, patternType, locator);
+
   return SolutionKind::Solved;
 }
 

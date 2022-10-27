@@ -7089,37 +7089,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toExpansionType = toType->getAs<PackExpansionType>();
     auto *expansion = dyn_cast<PackExpansionExpr>(expr);
 
-    // FIXME: Duplicated code from `PackReferenceFinder` in PreCheckExpr.
-    auto toElementType = toExpansionType->getPatternType();
-    toElementType =
-        toElementType->mapTypeOutOfContext().transform([&](Type type) -> Type {
-          auto *genericParam = type->getAs<GenericTypeParamType>();
-          if (!genericParam || !genericParam->isParameterPack())
-            return type;
-
-          auto param = GenericTypeParamType::get(/*isParameterPack*/false,
-                                                 genericParam->getDepth(),
-                                                 genericParam->getIndex(), ctx);
-          return expansion->getGenericEnvironment()->mapTypeIntoContext(param);
-        });
+    auto *elementEnv = expansion->getGenericEnvironment();
+    auto toElementType = elementEnv->mapPackTypeIntoElementContext(
+        toExpansionType->getPatternType()->mapTypeOutOfContext());
 
     auto *pattern = coerceToType(expansion->getPatternExpr(),
                                  toElementType, locator);
-
-    // FIXME: Duplicated code from `visitPackExpansionExpr` in CSGen.
-    auto patternType =
-        cs.getType(pattern).transform([&](Type type) -> Type {
-          auto *element = type->getAs<ElementArchetypeType>();
-          if (!element)
-            return type;
-
-          auto *elementParam = element->mapTypeOutOfContext()->getAs<GenericTypeParamType>();
-          auto *pack = GenericTypeParamType::get(/*isParameterPack*/true,
-                                                 elementParam->getDepth(),
-                                                 elementParam->getIndex(),
-                                                 ctx);
-          return cs.DC->mapTypeIntoContext(pack);
-        });
+    auto *packEnv = cs.DC->getGenericEnvironmentOfContext();
+    auto patternType = packEnv->mapElementTypeIntoPackContext(
+        toElementType->mapTypeOutOfContext());
     auto shapeType = toExpansionType->getCountType();
     auto expansionTy = PackExpansionType::get(patternType, shapeType);
 

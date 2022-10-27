@@ -494,6 +494,48 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   return result;
 }
 
+Type
+GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
+  assert(getKind() == Kind::OpenedElement);
+  assert(!type->hasArchetype());
+
+  auto sig = getGenericSignature();
+  ASTContext &ctx = sig->getASTContext();
+  QueryInterfaceTypeSubstitutions substitutions(this);
+
+  // Map the interface type to the element type by stripping
+  // away the isParameterPack bit before mapping type parameters
+  // to archetypes.
+  return type.subst([&](SubstitutableType *type) {
+    auto *genericParam = type->getAs<GenericTypeParamType>();
+    if (!genericParam)
+      return Type();
+
+    return substitutions(genericParam->asScalar(ctx));
+  }, LookUpConformanceInSignature(sig.getPointer()));
+}
+
+Type
+GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
+  assert(getKind() == Kind::Primary);
+  assert(!type->hasArchetype());
+
+  auto sig = getGenericSignature();
+  ASTContext &ctx = sig->getASTContext();
+  QueryInterfaceTypeSubstitutions substitutions(this);
+
+  // Map element archetypes to the pack archetypes by converting
+  // element types to interface types and adding the isParameterPack
+  // bit. Then, map type parameters to archetypes.
+  return type.subst([&](SubstitutableType *type) {
+    auto *genericParam = type->getAs<GenericTypeParamType>();
+    if (!genericParam)
+      return Type();
+
+    return substitutions(genericParam->asParameterPack(ctx));
+  }, LookUpConformanceInSignature(sig.getPointer()));
+}
+
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,

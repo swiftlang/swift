@@ -55,6 +55,20 @@ bool GenericTypeParamType::isParameterPack() const {
          GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
+GenericTypeParamType *
+GenericTypeParamType::asParameterPack(ASTContext &ctx) const {
+  return GenericTypeParamType::get(/*isParameterPack*/true,
+                                   getDepth(), getIndex(),
+                                   ctx);
+}
+
+GenericTypeParamType *
+GenericTypeParamType::asScalar(ASTContext &ctx) const {
+  return GenericTypeParamType::get(/*isParameterPack*/false,
+                                   getDepth(), getIndex(),
+                                   ctx);
+}
+
 /// G<{X1, ..., Xn}, {Y1, ..., Yn}>... => {G<X1, Y1>, ..., G<Xn, Yn>}...
 PackExpansionType *PackExpansionType::expand() {
   auto countType = getCountType();
