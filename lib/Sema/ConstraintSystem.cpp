@@ -2427,8 +2427,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Adjust the opened type for concurrency.
   Type origOpenedType = openedType;
-  if ((isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) &&
-      !isRequirementOrWitness(locator)) {
+  if (isRequirementOrWitness(locator)) {
+    // Don't adjust when doing witness matching, because that can cause cycles.
+  } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     unsigned numApplies = getNumApplications(
         value, hasAppliedSelf, functionRefKind);
     openedType = adjustFunctionTypeForConcurrency(
