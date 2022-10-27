@@ -17,7 +17,6 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftDemangling
     swiftDependencyScan
     swiftFrontend
-    swiftIDE
     swiftImmediate
     swiftIndex
     swiftIRGen

@@ -73,7 +73,6 @@ target_link_libraries(swiftIRGen PRIVATE
   swiftLLVMPasses
   swiftSIL
   swiftSILGen
-  swiftSILOptimizer
-  swiftTBDGen)
+  swiftSILOptimizer)
 
 set_swift_llvm_is_available(swiftIRGen)
