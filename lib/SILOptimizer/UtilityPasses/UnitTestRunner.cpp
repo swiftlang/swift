@@ -13,7 +13,7 @@
 // TO ADD A NEW TEST, search in this file for [new_tests]
 //
 // Provides a mechanism for doing faux unit tests.  The idea is to emulate the
-// basic function of calling a function and validating its results/effects.
+// basic functionality of calling a function and validating its results/effects.
 //
 // This is done via the test_specification instruction.  Using one or more
 // instances of it in your function, you can specify which test (i.e. UnitTest
@@ -56,23 +56,31 @@
 // [new_tests] TESTING MORE FUNCTIONALITY:
 //
 // 1) Add a new UnitTest subclass.
+//    - In the section "Unit Tests Subclasses" section ordered alphabetically.
 //    - Add a constructor: NewTest(UnitTestRunner *pass) : UnitTest(pass) {}
 //    - Implement invoke: void invoke(test::Arguments &arguments) override {...}
 //    - Call the take{TYPE} methods to get the arguments you need.
 //    - Call your function with those arguments.
 // 2) Add a new ADD_UNIT_TEST_SUBCLASS line.
+//    - Ordered alphabetically.
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/TaggedUnion.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/ParseTestSpecification.h"
 #include "llvm/ADT/StringRef.h"
@@ -102,8 +110,182 @@ public:
   virtual void invoke(Arguments &arguments) = 0;
 };
 
+class UnitTestRunner : public SILFunctionTransform {
+  void printTestLifetime(bool begin, unsigned testIndex, unsigned testCount,
+                         StringRef name, ArrayRef<StringRef> components) {
+    StringRef word = begin ? "begin" : "end";
+    llvm::errs() << word << " running test " << testIndex + 1 << " of "
+                 << testCount << " on " << getFunction()->getName() << ": "
+                 << name << " with: ";
+    for (unsigned long index = 0, size = components.size(); index < size;
+         ++index) {
+      llvm::errs() << components[index];
+      if (index != size - 1) {
+        llvm::errs() << ", ";
+      }
+    }
+    llvm::errs() << "\n";
+  }
+
+  template <typename Doit>
+  void withTest(StringRef name, Doit doit);
+
+  void runTest(StringRef name, Arguments &arguments) {
+    withTest(name, [&](auto *test) { test->invoke(arguments); });
+  }
+
+  void run() override {
+    llvm::SmallVector<UnparsedSpecification, 2> testSpecifications;
+    getTestSpecifications(getFunction(), testSpecifications);
+    Arguments arguments;
+    SmallVector<StringRef, 4> components;
+    for (unsigned long index = 0, size = testSpecifications.size();
+         index < size; ++index) {
+      components.clear();
+      arguments.clear();
+      auto testSpecification = testSpecifications[index];
+      test::parseTestArgumentsFromSpecification(
+          getFunction(), testSpecification, arguments, components);
+      auto name = arguments.takeString();
+      ArrayRef<StringRef> argumentStrings = components;
+      argumentStrings = argumentStrings.drop_front();
+      printTestLifetime(/*begin=*/true, /*index=*/index, /*size=*/size, name,
+                        argumentStrings);
+      runTest(name, arguments);
+      printTestLifetime(/*begin=*/false, /*index=*/index, /*size=*/size, name,
+                        argumentStrings);
+    }
+  }
+  friend class UnitTest;
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: Unit Test Subclasses                                                 {{
+//===----------------------------------------------------------------------===//
+
+// Arguments:
+// - bool: pruneDebug
+// - bool: maximizeLifetimes
+// - SILValue: value to canonicalize
+// Dumps:
+// - function after value canonicalization
+struct CanonicalizeOSSALifetimeTest : UnitTest {
+  CanonicalizeOSSALifetimeTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
+    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
+    auto pruneDebug = arguments.takeBool();
+    auto maximizeLifetimes = arguments.takeBool();
+    InstructionDeleter deleter;
+    CanonicalizeOSSALifetime canonicalizer(pruneDebug, maximizeLifetimes, accessBlockAnalysis,
+                                           domTree, deleter);
+    auto value = arguments.takeValue();
+    canonicalizer.canonicalizeValueLifetime(value);
+    getFunction()->dump();
+  }
+};
+
+// Arguments: NONE
+// Dumps:
+// - the function
+struct DumpFunction : UnitTest {
+  DumpFunction(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override { getFunction()->dump(); }
+};
+
+// Arguments: NONE
+// Dumps: the index of the self argument of the current function
+struct FunctionGetSelfArgumentIndex : UnitTest {
+  FunctionGetSelfArgumentIndex(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto index =
+        SILFunction_getSelfArgumentIndex(BridgedFunction{getFunction()});
+    llvm::errs() << "self argument index = " << index << "\n";
+  }
+};
+
+// Arguments:
+// - instruction
+// Dumps:
+// - instruction
+// - whether it's a deinit barrier
+struct IsDeinitBarrierTest : UnitTest {
+  IsDeinitBarrierTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *instruction = arguments.takeInstruction();
+    auto *analysis = getAnalysis<BasicCalleeAnalysis>();
+    auto isBarrier = isDeinitBarrier(instruction, analysis);
+    instruction->dump();
+    auto *boolString = isBarrier ? "true" : "false";
+    llvm::errs() << boolString << "\n";
+  }
+};
+
+// Arguments:
+// - variadic list of - instruction: a last user
+// Dumps:
+// - the insertion points
+struct PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest : UnitTest {
+  PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest(
+      UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    PrunedLivenessBoundary boundary;
+    while (arguments.hasUntaken()) {
+      boundary.lastUsers.push_back(arguments.takeInstruction());
+    }
+    boundary.visitInsertionPoints(
+        [](SILBasicBlock::iterator point) { point->dump(); });
+  }
+};
+
+struct ShrinkBorrowScopeTest : UnitTest {
+  ShrinkBorrowScopeTest(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto instruction = arguments.takeValue();
+    auto expected = arguments.takeBool();
+    auto *bbi = cast<BeginBorrowInst>(instruction);
+    auto *analysis = getAnalysis<BasicCalleeAnalysis>();
+    SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+    InstructionDeleter deleter(
+        InstModCallbacks().onDelete([&](auto *instruction) {
+          llvm::errs() << "DELETED:\n";
+          instruction->dump();
+        }));
+    auto shrunk =
+        shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
+    unsigned index = 0;
+    for (auto *cvi : modifiedCopyValueInsts) {
+      auto expectedCopy = arguments.takeValue();
+      llvm::errs() << "rewritten copy " << index << ":\n";
+      llvm::errs() << "expected:\n";
+      expectedCopy->print(llvm::errs());
+      llvm::errs() << "got:\n";
+      cvi->dump();
+      assert(cvi == expectedCopy);
+      ++index;
+    }
+    assert(expected == shrunk && "didn't shrink expectedly!?");
+  }
+};
+
+struct SimplifyCFGCanonicalizeSwitchEnum : UnitTest {
+  SimplifyCFGCanonicalizeSwitchEnum(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .canonicalizeSwitchEnums();
+  }
+};
+
+
 // Arguments:
 // - string: list of characters, each of which specifies subsequent arguments
+//           - A: (block) argument
 //           - F: function
 //           - B: block
 //           - I: instruction
@@ -125,6 +307,12 @@ struct TestSpecificationTest : UnitTest {
     auto expectedFields = arguments.takeString();
     for (auto expectedField : expectedFields) {
       switch (expectedField) {
+      case 'A': {
+        auto *argument = arguments.takeBlockArgument();
+        llvm::errs() << "argument:\n";
+        argument->dump();
+        break;
+      }
       case 'F': {
         auto *function = arguments.takeFunction();
         llvm::errs() << "function: " << function->getName() << "\n";
@@ -177,29 +365,6 @@ struct TestSpecificationTest : UnitTest {
 };
 
 // Arguments:
-// - bool: pruneDebug
-// - bool: maximizeLifetimes
-// - SILValue: value to canonicalize
-// Dumps:
-// - function after value canonicalization
-struct CanonicalizeOSSALifetimeTest : UnitTest {
-  CanonicalizeOSSALifetimeTest(UnitTestRunner *pass) : UnitTest(pass) {}
-  void invoke(Arguments &arguments) override {
-    auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
-    auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
-    DominanceInfo *domTree = dominanceAnalysis->get(getFunction());
-    auto pruneDebug = arguments.takeBool();
-    auto maximizeLifetimes = arguments.takeBool();
-    InstructionDeleter deleter;
-    CanonicalizeOSSALifetime canonicalizer(pruneDebug, maximizeLifetimes, accessBlockAnalysis,
-                                           domTree, deleter);
-    auto value = arguments.takeValue();
-    canonicalizer.canonicalizeValueLifetime(value);
-    getFunction()->dump();
-  }
-};
-
-// Arguments:
 // - SILValue: phi
 // Dumps:
 // - function
@@ -216,28 +381,15 @@ struct VisitAdjacentReborrowsOfPhiTest : UnitTest {
   }
 };
 
-/// [new_tests] Add the new UnitTest subclass above this line.
+/// [new_tests] Add the new UnitTest subclass above this line. 
+///             Please sort alphabetically by to help reduce merge conflicts.
 
-class UnitTestRunner : public SILFunctionTransform {
-  void printTestLifetime(bool begin, unsigned testIndex, unsigned testCount,
-                         StringRef name, ArrayRef<StringRef> components) {
-    StringRef word = begin ? "begin" : "end";
-    llvm::errs() << word << " running test " << testIndex + 1 << " of "
-                 << testCount << " on " << getFunction()->getName() << ": "
-                 << name << " with: ";
-    for (unsigned long index = 0, size = components.size(); index < size;
-         ++index) {
-      llvm::errs() << components[index];
-      if (index != size - 1) {
-        llvm::errs() << ", ";
-      } else {
-        llvm::errs() << "\n";
-      }
-    }
-  }
+//===----------------------------------------------------------------------===//
+// MARK: Unit Test Subclasses                                                 }}
+//===----------------------------------------------------------------------===//
 
-  template <typename Doit>
-  void withTest(StringRef name, Doit doit) {
+template <typename Doit>
+void UnitTestRunner::withTest(StringRef name, Doit doit) {
 #define ADD_UNIT_TEST_SUBCLASS(STRING, SUBCLASS)                               \
   if (name == STRING) {                                                        \
     SUBCLASS it{this};                                                         \
@@ -245,44 +397,22 @@ class UnitTestRunner : public SILFunctionTransform {
     return;                                                                    \
   }
 
+    ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime", CanonicalizeOSSALifetimeTest)
+    ADD_UNIT_TEST_SUBCLASS("dump-function", DumpFunction)
+    ADD_UNIT_TEST_SUBCLASS("function-get-self-argument-index", FunctionGetSelfArgumentIndex)
+    ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
+    ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
+    ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum", SimplifyCFGCanonicalizeSwitchEnum)
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
-    ADD_UNIT_TEST_SUBCLASS("canonicalize-ossa-lifetime",
-                           CanonicalizeOSSALifetimeTest)
-    ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi",
-                           VisitAdjacentReborrowsOfPhiTest)
+    ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
     /// [new_tests] Add the new mapping from string to subclass above this line.
+    ///             Please sort alphabetically by name to help reduce merge
+    ///             conflicts.
 
 #undef ADD_UNIT_TEST_SUBCLASS
   }
 
-  void runTest(StringRef name, Arguments &arguments) {
-    withTest(name, [&](auto *test) { test->invoke(arguments); });
-  }
-
-  void run() override {
-    llvm::SmallVector<std::string, 2> testSpecifications;
-    getTestSpecifications(getFunction(), testSpecifications);
-    Arguments arguments;
-    SmallVector<StringRef, 4> components;
-    for (unsigned long index = 0, size = testSpecifications.size();
-         index < size; ++index) {
-      components.clear();
-      arguments.clear();
-      auto testSpecification = testSpecifications[index];
-      test::parseTestArgumentsFromSpecification(
-          getFunction(), testSpecification, arguments, components);
-      auto name = arguments.takeString();
-      ArrayRef<StringRef> argumentStrings = components;
-      argumentStrings = argumentStrings.drop_front();
-      printTestLifetime(/*begin=*/true, /*index=*/index, /*size=*/size, name,
-                        argumentStrings);
-      runTest(name, arguments);
-      printTestLifetime(/*begin=*/false, /*index=*/index, /*size=*/size, name,
-                        argumentStrings);
-    }
-  }
-  friend class UnitTest;
-};
 
 template <typename Analysis>
 Analysis *UnitTest::getAnalysis() {

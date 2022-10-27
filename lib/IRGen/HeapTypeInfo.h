@@ -234,9 +234,10 @@ public:
 
   LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                               Address addr) const override {
+    auto style = asDerived().getReferenceCounting();
     llvm::Value *ptr =
-      IGF.emitLoadRefcountedPtr(addr, asDerived().getReferenceCounting());
-    return LoadedRef(ptr, true);
+      IGF.emitLoadRefcountedPtr(addr, style);
+    return LoadedRef(ptr, true, style);
   }
 
   ReferenceCounting getReferenceCountingType() const override {

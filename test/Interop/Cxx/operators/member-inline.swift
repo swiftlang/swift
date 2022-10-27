@@ -85,6 +85,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
+OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
+  let lhs = TemplatedWithFriendOperatorSpec()
+  let rhs = TemplatedWithFriendOperatorSpec()
+
+  let result = lhs == rhs
+
+  expectTrue(result)
+}
+
 #if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   var wrapper = LoadableBoolWrapper(value: true)

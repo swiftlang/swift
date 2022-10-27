@@ -461,8 +461,8 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
-  NO_REFERENCE(Pack);
   NO_REFERENCE(TypeJoin);
+  NO_REFERENCE(MacroExpansion);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -810,11 +810,13 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
-  case ExprKind::Pack:
   case ExprKind::TypeJoin:
     return false;
 
   case ExprKind::Tap:
+    return true;
+
+  case ExprKind::MacroExpansion:
     return true;
   }
 
@@ -981,8 +983,8 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::KeyPathDot:
   case ExprKind::OneWay:
   case ExprKind::Tap:
-  case ExprKind::Pack:
   case ExprKind::TypeJoin:
+  case ExprKind::MacroExpansion:
     return false;
   }
 
@@ -1237,10 +1239,17 @@ VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, 
 
 PackExpansionExpr *
 PackExpansionExpr::create(ASTContext &ctx, Expr *patternExpr,
-                          SourceLoc dotsLoc, bool implicit,
-                          Type type) {
-  return new (ctx) PackExpansionExpr(patternExpr, dotsLoc,
-                                     implicit, type);
+                          ArrayRef<OpaqueValueExpr *> opaqueValues,
+                          ArrayRef<Expr *> bindings, SourceLoc dotsLoc,
+                          GenericEnvironment *environment,
+                          bool implicit, Type type) {
+  size_t size =
+      totalSizeToAlloc<OpaqueValueExpr *, Expr *>(opaqueValues.size(),
+                                                  bindings.size());
+  void *mem = ctx.Allocate(size, alignof(PackExpansionExpr));
+  return ::new (mem) PackExpansionExpr(patternExpr, opaqueValues,
+                                       bindings, dotsLoc, environment,
+                                       implicit, type);
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -1784,6 +1793,13 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
     if (auto injectIntoOptionalExpr
         = dyn_cast<InjectIntoOptionalExpr>(candidate)) {
       candidate = injectIntoOptionalExpr->getSubExpr();
+      continue;
+    }
+
+    // Look through open existential expressions
+    if (auto openExistentialExpr
+        = dyn_cast<OpenExistentialExpr>(candidate)) {
+      candidate = openExistentialExpr->getSubExpr();
       continue;
     }
     break;
@@ -2429,30 +2445,6 @@ RegexLiteralExpr::createParsed(ASTContext &ctx, SourceLoc loc,
                                ArrayRef<uint8_t> serializedCaps) {
   return new (ctx) RegexLiteralExpr(loc, regexText, version, serializedCaps,
                                     /*implicit*/ false);
-}
-
-PackExpr::PackExpr(ArrayRef<Expr *> SubExprs, Type Ty)
-  : Expr(ExprKind::Pack, /*implicit*/ true, Ty) {
-  Bits.PackExpr.NumElements = SubExprs.size();
-
-  // Copy elements.
-  std::uninitialized_copy(SubExprs.begin(), SubExprs.end(),
-                          getTrailingObjects<Expr *>());
-}
-
-PackExpr *PackExpr::create(ASTContext &ctx,
-                           ArrayRef<Expr *> SubExprs,
-                           Type Ty) {
-  assert(Ty->castTo<PackType>());
-
-  size_t size =
-      totalSizeToAlloc<Expr *>(SubExprs.size());
-  void *mem = ctx.Allocate(size, alignof(PackExpr));
-  return new (mem) PackExpr(SubExprs, Ty);
-}
-
-PackExpr *PackExpr::createEmpty(ASTContext &ctx) {
-  return create(ctx, {}, PackType::getEmpty(ctx));
 }
 
 TypeJoinExpr::TypeJoinExpr(DeclRefExpr *varRef, ArrayRef<Expr *> elements)

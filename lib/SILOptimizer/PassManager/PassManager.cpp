@@ -1409,8 +1409,8 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
   case branchesChanged:
     inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     break;
-  case functionDataChanged:
-    inv->notifyChanges(SILAnalysis::InvalidationKind::FunctionData);
+  case effectsChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::Effects);
     break;
   }
 }

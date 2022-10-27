@@ -108,6 +108,7 @@ PROTOCOL(DistributedTargetInvocationResultHandler)
 // C++ Standard Library Overlay:
 PROTOCOL(CxxSequence)
 PROTOCOL(UnsafeCxxInputIterator)
+PROTOCOL(UnsafeCxxRandomAccessIterator)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)

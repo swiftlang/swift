@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 import Swift
 import Builtin
 

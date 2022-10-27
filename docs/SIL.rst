@@ -2444,10 +2444,10 @@ required.
 Deinit Barriers
 ```````````````
 
-Deinit barriers (see swift::isDeinitBarrier) are instructions which would be
-affected by the side effects of deinitializers.  To maintain the order of
-effects that is visible to the programmer, destroys of lexical values cannot be
-reordered with respect to them.  There are three kinds:
+Deinit barriers (see Instruction.isDeinitBarrier(_:)) are instructions which
+would be affected by the side effects of deinitializers.  To maintain the order
+of effects that is visible to the programmer, destroys of lexical values cannot
+be reordered with respect to them.  There are three kinds:
 
 1. synchronization points (locks, memory barriers, syscalls, etc.)
 2. loads of weak or unowned values
@@ -3949,7 +3949,9 @@ The following types of test arguments are supported:
 - function: @function <-- the current function
             @function[uint] <-- function at index ``uint``
             @function[name] <-- function named ``name``
-- block: @block <-- the first block
+- block: @block <-- the block containing the test_specification instruction
+         @block[+uint] <-- the block ``uint`` blocks after the containing block
+         @block[-uint] <-- the block ``uint`` blocks before the containing block
          @block[uint] <-- the block at index ``uint``
          @{function}.{block} <-- the indicated block in the indicated function
          Example: @function[foo].block[2]
@@ -3957,7 +3959,13 @@ The following types of test arguments are supported:
          @trace[uint] <-- the ``debug_value [trace]`` at index ``uint``
          @{function}.{trace} <-- the indicated trace in the indicated function
          Example: @function[bar].trace
-- instruction: @instruction <-- the first instruction
+- argument: @argument <-_ the first argument of the current block
+            @argument[uint] <-- the argument at index ``uint`` of the current block
+            @{block}.{argument} <-- the indicated argument in the indicated block
+            @{function}.{argument} <-- the indicated argument in the entry block of the indicated function
+- instruction: @instruction <-- the instruction after* the test_specification instruction
+               @instruction[+uint] <-- the instruction ``uint`` instructions after* the test_specification instruction
+               @instruction[-uint] <-- the instruction ``uint`` instructions before* the test_specification instruction
                @instruction[uint] <-- the instruction at index ``uint``
                @{function}.{instruction} <-- the indicated instruction in the indicated function
                Example: @function[baz].instruction[19]
@@ -3968,6 +3976,12 @@ The following types of test arguments are supported:
            @{instruction}.{operand} <-- the indicated operand of the indicated instruction
            Example: @block[19].instruction[2].operand[3]
            Example: @function[2].instruction.operand
+
+* Not counting instructions that are deleted when processing functions for tests.
+  The following instructions currently are deleted:
+
+      test_specification
+      debug_value [trace]
 
 
 Profiling

@@ -108,6 +108,22 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return SILInstruction_hasUnspecifiedSideEffects(bridged)
   }
 
+  public final var mayAccessPointer: Bool {
+    return swift_mayAccessPointer(bridged)
+  }
+
+  public final var mayLoadWeakOrUnowned: Bool {
+    return swift_mayLoadWeakOrUnowned(bridged)
+  }
+
+  public final var maySynchronizeNotConsideringSideEffects: Bool {
+    return swift_maySynchronizeNotConsideringSideEffects(bridged)
+  }
+
+  public final var mayBeDeinitBarrierNotConsideringSideEffects: Bool {
+    return swift_mayBeDeinitBarrierNotConsideringSideEffects(bridged)
+  }
+
   public func visitReferencedFunctions(_ cl: (Function) -> ()) {
   }
 
@@ -334,19 +350,10 @@ final public class LoadUnownedInst : SingleValueInstruction, UnaryInstruction {}
 final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
-  // TODO: find a way to directly reuse the BuiltinValueKind enum
-  public enum ID  {
-    case none
-    case destroyArray
-    case stackAlloc
-  }
+  public typealias ID = swift.BuiltinValueKind
 
   public var id: ID {
-    switch BuiltinInst_getID(bridged) {
-      case DestroyArrayBuiltin: return .destroyArray
-      case StackAllocBuiltin: return .stackAlloc
-      default: return .none
-    }
+    return BuiltinInst_getID(bridged)
   }
 }
 
@@ -557,34 +564,12 @@ final public class BridgeObjectToRefInst : SingleValueInstruction,
 final public class BridgeObjectToWordInst : SingleValueInstruction,
                                            UnaryInstruction {}
 
-public enum AccessKind {
-  case initialize
-  case read
-  case modify
-  case deinitialize
-}
-
-extension BridgedAccessKind {
-  var kind: AccessKind {
-    switch self {
-    case AccessKind_Init:
-      return .initialize
-    case AccessKind_Read:
-      return .read
-    case AccessKind_Modify:
-      return .modify
-    case AccessKind_Deinit:
-      return .deinitialize
-    default:
-      fatalError("unsupported access kind")
-    }
-  }
-}
+public typealias AccessKind = swift.SILAccessKind
 
 
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
+  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged) }
 
   public var isStatic: Bool { BeginAccessInst_isStatic(bridged) != 0 }
 }
@@ -617,6 +602,10 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class StrongCopyUnownedValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class StrongCopyUnmanagedValueInst : SingleValueInstruction, UnaryInstruction  {}
 
 final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {}
 

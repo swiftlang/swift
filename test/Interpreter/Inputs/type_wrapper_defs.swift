@@ -282,7 +282,11 @@ public class UserDefinedInitWithConditionalTest<T> {
 @Wrapper
 public class ClassWithConvenienceInit<T> {
   public var a: T?
-  public var b: String
+  public var b: String = ""
+
+  public init(aWithoutB: T?) {
+    self.a = aWithoutB
+  }
 
   init(a: T?, b: String) {
     // Just to test that conditionals work properly
@@ -336,5 +340,33 @@ public struct TypeWithLetProperties<T> {
       print(self.a)
       print(self.b)
     }
+  }
+}
+
+@Wrapper
+public class TypeWithDefaultedLetProperties<T> {
+  let a: T? = nil
+  let b: Int = 0
+
+  public init() {
+    print(self.a)
+    print(self.b)
+  }
+}
+
+@Wrapper
+public class TypeWithSomeDefaultedLetProperties<T> {
+  let a: T
+  let b: Int? = 0
+  @PropWrapper var c: String = "<default>"
+  @PropWrapperWithoutInit(value: [1, ""]) var d: [Any]
+
+  public init(a: T) {
+    self.a = a
+    self.c = "a"
+
+    print(self.a)
+    print(self.b)
+    print(self.c)
   }
 }

@@ -5,6 +5,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 
 // Test needs to be updated for 32bit.
 // rdar://74810823

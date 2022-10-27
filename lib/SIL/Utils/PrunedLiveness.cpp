@@ -229,17 +229,12 @@ void PrunedLivenessBoundary::dump() const {
   print(llvm::dbgs());
 }
 
-// TODO: with guaranteed phis, it will be possible to hit this assert:
-//   assert(succ->getSinglePredecessorBlock() == predBB);
-//
-// Once it's possible to test dead guaranteed phis, replace the assert with a
-// set to avoid multiple insertions at a merge point:
-//   // Control flow merge blocks used as insertion points.
-//   BasicBlockSet mergeBlocks;
-//
 void PrunedLivenessBoundary::visitInsertionPoints(
     llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
     DeadEndBlocks *deBlocks) {
+  // Control flow merge blocks used as insertion points.
+  SmallPtrSet<SILBasicBlock *, 4> mergeBlocks;
+
   for (SILInstruction *user : lastUsers) {
     if (!isa<TermInst>(user)) {
       visitor(std::next(user->getIterator()));
@@ -247,10 +242,17 @@ void PrunedLivenessBoundary::visitInsertionPoints(
     }
     auto *predBB = user->getParent();
     for (SILBasicBlock *succ : predBB->getSuccessors()) {
+      if (!succ->getSinglePredecessorBlock()) {
+        assert(predBB->getSingleSuccessorBlock() == succ);
+        if (!mergeBlocks.insert(succ).second) {
+          continue;
+        }
+      } else {
+        assert(succ->getSinglePredecessorBlock() == predBB);
+      }
       if (deBlocks && deBlocks->isDeadEnd(succ))
         continue;
 
-      assert(succ->getSinglePredecessorBlock() == predBB);
       visitor(succ->begin());
     }
   }
@@ -273,7 +275,8 @@ void PrunedLivenessBoundary::visitInsertionPoints(
 //===----------------------------------------------------------------------===//
 
 template <typename LivenessWithDefs>
-SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
+SimpleLiveRangeSummary
+PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue def) {
   SimpleLiveRangeSummary summary;
   // Note: Uses with OperandOwnership::NonUse cannot be considered normal uses
   // for liveness. Otherwise, liveness would need to separately track non-uses
@@ -295,7 +298,7 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
     case OperandOwnership::InteriorPointer:
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
-    case OperandOwnership::ForwardingBorrow: {
+    case OperandOwnership::GuaranteedForwarding: {
       ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
         // Do not include transitive uses with 'none' ownership
         if (result->getOwnershipKind() != OwnershipKind::None) {
@@ -313,6 +316,10 @@ SimpleLiveRangeSummary PrunedLiveRange<LivenessWithDefs>::updateForDef(SILValue 
         });
       }
       updateForUse(use->getUser(), /*lifetimeEnding*/false);
+      break;
+    }
+    case OperandOwnership::GuaranteedForwardingPhi: {
+      updateForDef(PhiOperand(use).getValue());
       break;
     }
     default:

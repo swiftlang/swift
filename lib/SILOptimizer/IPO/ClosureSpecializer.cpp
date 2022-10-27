@@ -1003,7 +1003,7 @@ void SILClosureSpecializerTransform::run() {
 
   // Invalidate everything since we delete calls as well as add new
   // calls and branches.
-  invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+  invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 }
 
 static void markReabstractionPartialApplyAsUsed(

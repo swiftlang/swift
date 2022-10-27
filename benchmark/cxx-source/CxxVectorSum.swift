@@ -14,6 +14,18 @@
 // as compared to the C++ implementation of such sum.
 
 import TestsUtils
+
+public let benchmarks: [BenchmarkInfo] = []
+#if FIX_61472
+
+import std
+
+// FIXME: remove workaround for: https://github.com/apple/swift/issues/61472
+public func __workaround_std_import() {
+    let s = std.string()
+    blackHole(s.size())
+}
+
 import CxxStdlibPerformance
 import Cxx
 
@@ -126,4 +138,5 @@ public func run_CxxVectorOfU32_Sum_Swift_Reduce(_ n: Int) {
 extension VectorOfU32.const_iterator : Equatable, UnsafeCxxInputIterator { }
 
 extension VectorOfU32: CxxSequence {}
+#endif
 #endif

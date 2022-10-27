@@ -1250,60 +1250,6 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::legacyVisitStrongRetainInst(StrongRetainInst *SRI) {
-  assert(!SRI->getFunction()->hasOwnership());
-
-  // Retain of ThinToThickFunction is a no-op.
-  SILValue funcOper = SRI->getOperand();
-  if (auto *CFI = dyn_cast<ConvertFunctionInst>(funcOper))
-    funcOper = CFI->getOperand();
-
-  if (isa<ThinToThickFunctionInst>(funcOper))
-    return eraseInstFromFunction(*SRI);
-
-  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
-      isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
-    return eraseInstFromFunction(*SRI);
-
-  // Retain and Release of tagged strings is a no-op.
-  // The builtin code pattern to find tagged strings is:
-  // builtin "stringObjectOr_Int64" (or to tag the string)
-  // value_to_bridge_object (cast the UInt to bridge object)
-  if (isa<ValueToBridgeObjectInst>(SRI->getOperand())) {
-    return eraseInstFromFunction(*SRI);
-  }
-
-  // Sometimes in the stdlib due to hand offs, we will see code like:
-  //
-  // strong_release %0
-  // strong_retain %0
-  //
-  // with the matching strong_retain to the strong_release in a predecessor
-  // basic block and the matching strong_release for the strong_retain in a
-  // successor basic block.
-  //
-  // Due to the matching pairs being in different basic blocks, the ARC
-  // Optimizer (which is currently local to one basic block does not handle
-  // it). But that does not mean that we cannot eliminate this pair with a
-  // peephole.
-
-  // If we are not the first instruction in this basic block...
-  if (SRI != &*SRI->getParent()->begin()) {
-    auto Pred = std::prev(SRI->getIterator());
-
-    // ...and the predecessor instruction is a strong_release on the same value
-    // as our strong_retain...
-    if (auto *Release = dyn_cast<StrongReleaseInst>(&*Pred))
-      // Remove them...
-      if (Release->getOperand() == SRI->getOperand()) {
-        eraseInstFromFunction(*Release);
-        return eraseInstFromFunction(*SRI);
-      }
-  }
-
-  return nullptr;
-}
-
 /// Create a value from stores to an address.
 ///
 /// If there are only stores to \p addr, return the stored value. Also, if there
@@ -1858,37 +1804,6 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   return eraseInstFromFunction(*tedai);
 }
 
-SILInstruction *SILCombiner::legacyVisitStrongReleaseInst(StrongReleaseInst *SRI) {
-  assert(!SRI->getFunction()->hasOwnership());
-
-  // Release of ThinToThickFunction is a no-op.
-  if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
-    return eraseInstFromFunction(*SRI);
-
-  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
-      isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
-    return eraseInstFromFunction(*SRI);
-
-  // Retain and Release of tagged strings is a no-op.
-  // The builtin code pattern to find tagged strings is:
-  // builtin "stringObjectOr_Int64" (or to tag the string)
-  // value_to_bridge_object (cast the UInt to bridge object)
-  if (isa<ValueToBridgeObjectInst>(SRI->getOperand())) {
-    return eraseInstFromFunction(*SRI);
-  }
-
-  // Release of a classbound existential converted from a class is just a
-  // release of the class, squish the conversion.
-  if (auto ier = dyn_cast<InitExistentialRefInst>(SRI->getOperand()))
-    if (ier->hasOneUse()) {
-      SRI->setOperand(ier->getOperand());
-      eraseInstFromFunction(*ier);
-      return SRI;
-    }
-  
-  return nullptr;
-}
-
 SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
   // NOTE: All of the following optimizations do invalidates branches by
   // replacing the branches, but do not modify the underlying CFG properties
@@ -2422,42 +2337,4 @@ SILCombiner::legacyVisitGlobalValueInst(GlobalValueInst *globalValue) {
     eraseInstFromFunction(*inst);
   }
   return nullptr;
-
-}
-
-// Simplify `differentiable_function_extract` of `differentiable_function`.
-//
-// Before:
-// %diff_func = differentiable_function(%orig, %jvp, %vjp)
-// %orig' = differentiable_function_extract [original] %diff_func
-// %jvp'  = differentiable_function_extract [jvp]      %diff_func
-// %vjp'  = differentiable_function_extract [vjp]      %diff_func
-//
-// After:
-// %orig' = %orig
-// %jvp' = %jvp
-// %vjp' = %vjp
-SILInstruction *
-SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI) {
-  auto *DFI = dyn_cast<DifferentiableFunctionInst>(DFEI->getOperand());
-  if (!DFI)
-    return nullptr;
-
-  if (!DFI->hasExtractee(DFEI->getExtractee()))
-    return nullptr;
-
-  SILValue newValue = DFI->getExtractee(DFEI->getExtractee());
-
-  // If the type of the `differentiable_function` operand does not precisely
-  // match the type of the original `differentiable_function_extract`,
-  // create a `convert_function`.
-  if (newValue->getType() != DFEI->getType()) {
-    std::tie(newValue, std::ignore) =
-      castValueToABICompatibleType(&Builder, DFEI->getLoc(),
-                                   newValue,
-                                   newValue->getType(), DFEI->getType(), {});
-  }
-
-  replaceInstUsesWith(*DFEI, newValue);
-  return eraseInstFromFunction(*DFEI);
 }

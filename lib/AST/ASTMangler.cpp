@@ -294,7 +294,17 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      appendType(sub->mapTypeOutOfContext()->getCanonicalType(), signature);
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> Optional<Type> {
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return None;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
     }
   }
   appendOperator("TK");
@@ -318,7 +328,17 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      appendType(sub->mapTypeOutOfContext()->getCanonicalType(), signature);
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> Optional<Type> {
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return None;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
     }
   }
   appendOperator("Tk");
@@ -1391,14 +1411,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype:
+    case TypeKind::ElementArchetype:
+    case TypeKind::OpenedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
-
-    case TypeKind::OpenedArchetype: {
-      // Opened archetypes have always been mangled via their interface type,
-      // although those manglings aren't used in any stable manner.
-      auto openedType = cast<OpenedArchetypeType>(tybase);
-      return appendType(openedType->getInterfaceType(), sig, forDecl);
-    }
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);

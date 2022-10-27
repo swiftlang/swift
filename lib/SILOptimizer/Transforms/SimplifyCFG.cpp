@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "sil-simplify-cfg"
 
 #include "swift/AST/Module.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -39,28 +40,22 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
-#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-using namespace swift;
 
 // This is temporarily used for testing until Swift 5.5 branches to reduce risk.
 llvm::cl::opt<bool> EnableOSSASimplifyCFG(
@@ -100,178 +95,6 @@ STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
 /// iterations encountered when compiling the stdlib on April 2 2015.
 ///
 static unsigned MaxIterationsOfDominatorBasedSimplify = 10;
-
-namespace {
-
-struct ThreadInfo;
-
-class SimplifyCFG {
-  SILOptFunctionBuilder FuncBuilder;
-  SILFunction &Fn;
-  SILFunctionTransform &transform;
-  SILPassManager *PM;
-
-  // DeadEndBlocks remains conservatively valid across updates that rewrite
-  // branches and remove edges. Any transformation that adds a block must call
-  // updateForReachableBlock(). Removing a block causes a dangling pointer
-  // within DeadEndBlocks, but this pointer can't be accessed by queries.
-  DeadEndBlocks *deBlocks = nullptr;
-
-  // WorklistList is the actual list that we iterate over (for determinism).
-  // Slots may be null, which should be ignored.
-  SmallVector<SILBasicBlock *, 32> WorklistList;
-  // WorklistMap keeps track of which slot a BB is in, allowing efficient
-  // containment query, and allows efficient removal.
-  llvm::SmallDenseMap<SILBasicBlock *, unsigned, 32> WorklistMap;
-  // Keep track of loop headers - we don't want to jump-thread through them.
-  SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
-  // The set of cloned loop headers to avoid infinite loop peeling. Blocks in
-  // this set may or may not still be LoopHeaders.
-  // (ultimately this can be used to eliminate findLoopHeaders)
-  SmallPtrSet<SILBasicBlock *, 4> ClonedLoopHeaders;
-  // The cost (~ number of copied instructions) of jump threading per basic
-  // block. Used to prevent infinite jump threading loops.
-  llvm::SmallDenseMap<SILBasicBlock *, int, 8> JumpThreadingCost;
-
-  // Dominance and post-dominance info for the current function
-  DominanceInfo *DT = nullptr;
-
-  ConstantFolder ConstFolder;
-
-  // True if the function has a large amount of blocks. In this case we turn off
-  // some expensive optimizations.
-  bool isVeryLargeFunction = false;
-
-  void constFoldingCallback(SILInstruction *I) {
-    // If a terminal instruction gets constant folded (like cond_br), it
-    // enables further simplify-CFG optimizations.
-    if (isa<TermInst>(I))
-      addToWorklist(I->getParent());
-  }
-
-  bool ShouldVerify;
-  bool EnableJumpThread;
-
-public:
-  SimplifyCFG(SILFunction &Fn, SILFunctionTransform &T, bool Verify,
-              bool EnableJumpThread)
-      : FuncBuilder(T), Fn(Fn), transform(T), PM(T.getPassManager()),
-        ConstFolder(FuncBuilder, PM->getOptions().AssertConfig,
-                    /* EnableDiagnostics */ false,
-                    [&](SILInstruction *I) { constFoldingCallback(I); }),
-        ShouldVerify(Verify), EnableJumpThread(EnableJumpThread) {}
-
-  bool run();
-
-  bool simplifyBlockArgs() {
-    auto *DA = PM->getAnalysis<DominanceAnalysis>();
-
-    DT = DA->get(&Fn);
-    bool Changed = false;
-    for (SILBasicBlock &BB : Fn) {
-      Changed |= simplifyArgs(&BB);
-    }
-    DT = nullptr;
-    return Changed;
-  }
-
-private:
-  // Called when \p newBlock inherits the former predecessors of \p
-  // oldBlock. e.g. if \p oldBlock was a loop header, then newBlock is now a
-  // loop header.
-  void substitutedBlockPreds(SILBasicBlock *oldBlock, SILBasicBlock *newBlock) {
-    if (LoopHeaders.count(oldBlock))
-      LoopHeaders.insert(newBlock);
-    if (ClonedLoopHeaders.count(oldBlock))
-      ClonedLoopHeaders.insert(newBlock);
-  }
-
-  void clearWorklist() {
-    WorklistMap.clear();
-    WorklistList.clear();
-  }
-
-  /// popWorklist - Return the next basic block to look at, or null if the
-  /// worklist is empty.  This handles skipping over null entries in the
-  /// worklist.
-  SILBasicBlock *popWorklist() {
-    while (!WorklistList.empty())
-      if (auto *BB = WorklistList.pop_back_val()) {
-        WorklistMap.erase(BB);
-        return BB;
-      }
-
-    return nullptr;
-  }
-
-  /// addToWorklist - Add the specified block to the work list if it isn't
-  /// already present.
-  void addToWorklist(SILBasicBlock *BB) {
-    unsigned &Entry = WorklistMap[BB];
-    if (Entry != 0)
-      return;
-    WorklistList.push_back(BB);
-    Entry = WorklistList.size();
-  }
-
-  /// removeFromWorklist - Remove the specified block from the worklist if
-  /// present.
-  void removeFromWorklist(SILBasicBlock *BB) {
-    assert(BB && "Cannot add null pointer to the worklist");
-    auto It = WorklistMap.find(BB);
-    if (It == WorklistMap.end())
-      return;
-
-    // If the BB is in the worklist, null out its entry.
-    if (It->second) {
-      assert(WorklistList[It->second - 1] == BB && "Consistency error");
-      WorklistList[It->second - 1] = nullptr;
-    }
-
-    // Remove it from the map as well.
-    WorklistMap.erase(It);
-
-    if (LoopHeaders.count(BB)) {
-      LoopHeaders.erase(BB);
-      ClonedLoopHeaders.erase(BB);
-    }
-  }
-
-  bool simplifyBlocks();
-  bool canonicalizeSwitchEnums();
-  bool simplifyThreadedTerminators();
-  bool dominatorBasedSimplifications(SILFunction &Fn, DominanceInfo *DT);
-  bool dominatorBasedSimplify(DominanceAnalysis *DA);
-  bool threadEdge(const ThreadInfo &ti);
-
-  /// Remove the basic block if it has no predecessors. Returns true
-  /// If the block was removed.
-  bool removeIfDead(SILBasicBlock *BB);
-
-  bool tryJumpThreading(BranchInst *BI);
-  bool tailDuplicateObjCMethodCallSuccessorBlocks();
-  bool simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
-  bool addToWorklistAfterSplittingEdges(SILBasicBlock *BB);
-
-  bool simplifyBranchOperands(OperandValueArrayRef Operands);
-  bool simplifyBranchBlock(BranchInst *BI);
-  bool simplifyCondBrBlock(CondBranchInst *BI);
-  bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
-  bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
-  bool simplifyTryApplyBlock(TryApplyInst *TAI);
-  bool simplifySwitchValueBlock(SwitchValueInst *SVI);
-  bool simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB);
-  bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
-  bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
-  bool simplifyUnreachableBlock(UnreachableInst *UI);
-  bool simplifyProgramTerminationBlock(SILBasicBlock *BB);
-  bool simplifyArgument(SILBasicBlock *BB, unsigned i);
-  bool simplifyArgs(SILBasicBlock *BB);
-  void findLoopHeaders();
-  bool simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI);
-};
-
-} // end anonymous namespace
 
 static SILValue getTerminatorCondition(TermInst *Term) {
   if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
@@ -313,8 +136,6 @@ static bool isThreadableBlock(SILBasicBlock *BB,
   return true;
 }
 
-namespace {
-
 /// A description of an edge leading to a conditionally branching (or switching)
 /// block and the successor block to thread to.
 ///
@@ -345,8 +166,6 @@ struct ThreadInfo {
 
   ThreadInfo() = default;
 };
-
-} // end anonymous namespace
 
 // FIXME: It would be far more efficient to clone the jump-threaded region using
 // a single invocation of the RegionCloner (see ArrayPropertyOpt) instead of a
@@ -2929,9 +2748,6 @@ bool SimplifyCFG::simplifyBlocks() {
 /// Canonicalize all switch_enum and switch_enum_addr instructions.
 /// If possible, replace the default with the corresponding unique case.
 bool SimplifyCFG::canonicalizeSwitchEnums() {
-  if (!EnableOSSASimplifyCFG && Fn.hasOwnership()) {
-    return false;
-  }
   bool Changed = false;
   for (auto &BB : Fn) {
     TermInst *TI = BB.getTerminator();
@@ -2949,13 +2765,7 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     NullablePtr<EnumElementDecl> defaultDecl = SWI.getUniqueCaseForDefault();
     if (!defaultDecl)
       continue;
-    
-    if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-      if (!SWI.getOperand()->getType().isTrivial(Fn)) {
-        // TODO: Test and enable this case.
-        continue;
-      }
-    }
+
     LLVM_DEBUG(llvm::dbgs() << "simplify canonical switch_enum\n");
 
     // Construct a new instruction by copying all the case entries.
@@ -3387,7 +3197,7 @@ bool SimplifyCFG::run() {
     // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
     // but avoids excess dangling pointers in deBlocks.
     deBlocksAnalysis->invalidate(&Fn,
-                                 SILAnalysis::InvalidationKind::Everything);
+                                 SILAnalysis::InvalidationKind::FunctionBody);
   }
   deBlocks = deBlocksAnalysis->get(&Fn);
 
@@ -3410,11 +3220,11 @@ bool SimplifyCFG::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
   if (Changed) {
     // Force dominator recomputation since we modified the cfg.
-    DA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
+    DA->invalidate(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
     // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
     // but avoids excess dangling pointers in deBlocks.
     deBlocksAnalysis->invalidate(&Fn,
-                                 SILAnalysis::InvalidationKind::Everything);
+                                 SILAnalysis::InvalidationKind::FunctionBody);
   }
   deBlocks = deBlocksAnalysis->get(&Fn);
 
@@ -3955,6 +3765,18 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
   LLVM_DEBUG(llvm::dbgs() << "convert if-structure to " << *SelectInst);
 
   return true;
+}
+
+bool SimplifyCFG::simplifyBlockArgs() {
+  auto *DA = PM->getAnalysis<DominanceAnalysis>();
+
+  DT = DA->get(&Fn);
+  bool Changed = false;
+  for (SILBasicBlock &BB : Fn) {
+    Changed |= simplifyArgs(&BB);
+  }
+  DT = nullptr;
+  return Changed;
 }
 
 // Attempt to simplify the ith argument of BB.  We simplify cases

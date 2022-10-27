@@ -649,12 +649,6 @@ public:
   /// Can this instruction abort the program in some manner?
   bool mayTrap() const;
 
-  /// Involves a synchronization point like a memory barrier, lock or syscall.
-  ///
-  /// TODO: We need side-effect analysis and library annotation for this to be
-  ///       a reasonable API.  For now, this is just a placeholder.
-  bool maySynchronize() const;
-
   /// Returns true if the given instruction is completely identical to RHS.
   bool isIdenticalTo(const SILInstruction *RHS) const {
     return isIdenticalTo(RHS,
@@ -2795,7 +2789,7 @@ public:
 
   Optional<SILResultInfo> getSingleResult() const {
     auto SubstCallee = getSubstCalleeType();
-    if (SubstCallee->getNumAllResults() != 1)
+    if (SubstCallee->getNumResults() != 1)
       return None;
     return SubstCallee->getSingleResult();
   }
@@ -9634,34 +9628,6 @@ public:
     }
     llvm_unreachable("invalid derivative kind");
   }
-
-  
-  /// Returns true iff the operand corresponding to the given extractee kind
-  /// exists.
-  bool hasExtractee(NormalDifferentiableFunctionTypeComponent extractee) const {
-    switch (extractee) {
-    case NormalDifferentiableFunctionTypeComponent::Original:
-      return true;
-    case NormalDifferentiableFunctionTypeComponent::JVP:
-    case NormalDifferentiableFunctionTypeComponent::VJP:
-      return hasDerivativeFunctions();
-    }
-    llvm_unreachable("invalid extractee kind");
-  }
-
-  /// Returns the operand corresponding to the given extractee kind.
-  SILValue
-  getExtractee(NormalDifferentiableFunctionTypeComponent extractee) const {
-    switch (extractee) {
-    case NormalDifferentiableFunctionTypeComponent::Original:
-      return getOriginalFunction();
-    case NormalDifferentiableFunctionTypeComponent::JVP:
-      return getJVPFunction();
-    case NormalDifferentiableFunctionTypeComponent::VJP:
-      return getVJPFunction();
-    }
-    llvm_unreachable("invalid extractee kind");
-  }
 };
 
 /// LinearFunctionInst - given a function, its derivative and transpose functions,
@@ -9701,31 +9667,6 @@ public:
   SILValue getTransposeFunction() const {
     assert(HasTransposeFunction);
     return getOperand(1);
-  }
-
-  
-  /// Returns true iff the operand corresponding to the given extractee kind
-  /// exists.
-  bool hasExtractee(LinearDifferentiableFunctionTypeComponent extractee) const {
-    switch (extractee) {
-    case LinearDifferentiableFunctionTypeComponent::Original:
-      return true;
-    case LinearDifferentiableFunctionTypeComponent::Transpose:
-      return hasTransposeFunction();
-    }
-    llvm_unreachable("invalid extractee kind");
-  }
-
-  /// Returns the operand corresponding to the given extractee kind.
-  SILValue
-  getExtractee(LinearDifferentiableFunctionTypeComponent extractee) const {
-    switch (extractee) {
-    case LinearDifferentiableFunctionTypeComponent::Original:
-      return getOriginalFunction();
-    case LinearDifferentiableFunctionTypeComponent::Transpose:
-      return getTransposeFunction();
-    }
-    llvm_unreachable("invalid extractee kind");
   }
 };
 

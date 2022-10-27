@@ -37,6 +37,8 @@
 
 namespace swift {
 
+class BasicCalleeAnalysis;
+
 //===----------------------------------------------------------------------===//
 //                       MARK: CanonicalizeBorrowScope
 //===----------------------------------------------------------------------===//
@@ -149,6 +151,7 @@ protected:
 
 bool shrinkBorrowScope(
     BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    BasicCalleeAnalysis *calleeAnalysis,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts);
 
 MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
@@ -157,7 +160,8 @@ MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
 
 bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
                                       SILFunction &function,
-                                      InstructionDeleter &deleter);
+                                      InstructionDeleter &deleter,
+                                      BasicCalleeAnalysis *calleeAnalysis);
 
 } // namespace swift
 

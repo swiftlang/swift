@@ -31,15 +31,6 @@ public struct FunctionEffects : CustomStringConvertible, NoReflectionChildren {
     self.sideEffects = nil
   }
 
-  /// The "accumulated" side-effects of the function, which includes the global effects and
-  /// all argument effects.
-  public var accumulatedSideEffects: SideEffects.GlobalEffects {
-    if let sideEffects = sideEffects {
-      return sideEffects.accumulatedEffects
-    }
-    return .worstEffects
-  }
-
   public var description: String {
     var numArgEffects = escapeEffects.arguments.reduce(0, { max($0, $1.argumentIndex) }) + 1
     if let sideEffects = sideEffects {
@@ -70,14 +61,77 @@ public struct FunctionEffects : CustomStringConvertible, NoReflectionChildren {
 
 extension Function {
   
-  /// The global side effects of the function which are defined by attributes.
+  /// Returns the global side effects of the function.
+  public func getSideEffects() -> SideEffects.GlobalEffects {
+    if let sideEffects = effects.sideEffects {
+      /// There are computed side effects.
+      return sideEffects.accumulatedEffects
+    } else {
+      
+      var effects = definedGlobalEffects
+
+      // Even a `[readnone]` function can read from indirect arguments.
+      if (0..<numArguments).contains(where: {getArgumentConvention(for: $0).isIndirectIn}) {
+        effects.memory.read = true
+      }
+      // Even `[readnone]` and `[readonly]` functions write to indirect results.
+      if numIndirectResultArguments > 0 {
+        effects.memory.write = true
+      }
+      return effects
+    }
+  }
+
+  /// Returns the side effects for a function argument.
   ///
-  /// This API should be used if there are no derived side-effects available, i.e. `effects.sideEffects` is nil.
-  /// It returns "worstEffects" unless an effect attribute (e.g. `[readnone]`) is set for the function.
-  public var definedSideEffects: SideEffects.GlobalEffects {
+  /// The `argument` can be a function argument in this function or an apply argument in a caller.
+  public func getSideEffects(forArgument argument: ProjectedValue,
+                             atIndex argumentIndex: Int,
+                             withConvention convention: ArgumentConvention) -> SideEffects.GlobalEffects {
+    if let sideEffects = effects.sideEffects {
+      /// There are computed side effects.
+      var result = SideEffects.GlobalEffects()
+      let argEffect = sideEffects.getArgumentEffects(for: argumentIndex)
+      if let effectPath = argEffect.read, effectPath.mayOverlap(with: argument.path) {
+        result.memory.read = true
+      }
+      if let effectPath = argEffect.write, effectPath.mayOverlap(with: argument.path) {
+        result.memory.write = true
+      }
+      if let effectPath = argEffect.copy, effectPath.mayOverlap(with: argument.path) {
+        result.ownership.copy = true
+      }
+      if let effectPath = argEffect.destroy, effectPath.mayOverlap(with: argument.path) {
+        result.ownership.destroy = true
+      }
+      return result
+    } else {
+      /// Even for defined effects, there might be additional effects due to the argument conventions.
+      var result = definedGlobalEffects
+      if convention.isIndirectIn {
+        // Even a `[readnone]` function can read from an indirect argument.
+        result.memory.read = true
+      } else if convention == .indirectOut {
+        // Even `[readnone]` and `[readonly]` functions write to indirect results.
+        result.memory.write = true
+      }
+      return result.restrictedTo(argument: argument, withConvention: convention)
+    }
+  }
+
+  /// Global effect of the function, defined by effect attributes.
+  public var definedGlobalEffects: SideEffects.GlobalEffects {
+    switch name {
+    case "_swift_stdlib_malloc_size", "_swift_stdlib_has_malloc_size":
+      // These C runtime functions, which are used in the array implementation, have defined effects.
+      return SideEffects.GlobalEffects(memory: SideEffects.Memory(read: true))
+    default:
+      break
+    }
     var result = SideEffects.GlobalEffects.worstEffects
     switch effectAttribute {
     case .none:
+      // The common case: there is no effect attribute, so we have to assume the worst effects.
       break
     case .readNone:
       result.memory.read = false
@@ -134,9 +188,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
   }
 
   /// An escape effect on a function argument.
-  public struct ArgumentEffect : CustomStringConvertible, NoReflectionChildren {
+  public struct ArgumentEffect : Equatable, CustomStringConvertible, NoReflectionChildren {
 
-    public enum Kind {
+    public enum Kind : Equatable {
       /// The argument value does not escape.
       ///
       /// Syntax examples:
@@ -395,25 +449,35 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     /// are not observable form the outside and are therefore not considered.
     public var allocates: Bool
 
+    /// If true, destroys of lexical values may not be hoisted over applies of
+    /// the function.
+    ///
+    /// This is true when the function (or a callee, transitively) contains a
+    /// deinit barrier instruction.
+    public var isDeinitBarrier: Bool
+
     /// When called with default arguments, it creates an "effect-free" GlobalEffects.
     public init(memory: Memory = Memory(read: false, write: false),
                 ownership: Ownership = Ownership(copy: false, destroy: false),
-                allocates: Bool = false) {
+                allocates: Bool = false,
+                isDeinitBarrier: Bool = false) {
       self.memory = memory
       self.ownership = ownership
       self.allocates = allocates
+      self.isDeinitBarrier = isDeinitBarrier
     }
 
     public mutating func merge(with other: GlobalEffects) {
       memory.merge(with: other.memory)
       ownership.merge(with: other.ownership)
       allocates = allocates || other.allocates
+      isDeinitBarrier = isDeinitBarrier || other.isDeinitBarrier
     }
 
     /// Removes effects, which cannot occur for an `argument` value with a given `convention`.
-    public func restrictedTo(argument: Value, withConvention convention: ArgumentConvention) -> GlobalEffects {
+    public func restrictedTo(argument: ProjectedValue, withConvention convention: ArgumentConvention) -> GlobalEffects {
       var result = self
-      let isTrivial = argument.type.isTrivial(in: argument.function)
+      let isTrivial = argument.value.hasTrivialNonPointerType
       if isTrivial {
         // There cannot be any ownership effects on trivial arguments.
         result.ownership = SideEffects.Ownership()
@@ -429,14 +493,19 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
         result.ownership.copy = false
         result.ownership.destroy = false
 
-      // Note that `directGuaranteed` still has a "destroy" effect, because an object stored in
-      // a class property could be destroyed.
-      case .directOwned, .directUnowned, .directGuaranteed:
+      case .directGuaranteed:
+        // Note that `directGuaranteed` still has a "destroy" effect, because an object stored in
+        // a class property could be destroyed.
+        if argument.path.hasNoClassProjection {
+          result.ownership.destroy = false
+        }
+        fallthrough
+      case .directOwned, .directUnowned:
         if isTrivial {
           // Trivial direct arguments cannot have class properties which could be loaded from/stored to.
           result.memory = SideEffects.Memory()
         }
-        break
+
       case .indirectInout, .indirectInoutAliasable:
         break
       }
@@ -444,12 +513,13 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     }
 
     public static var worstEffects: GlobalEffects {
-      GlobalEffects(memory: .worstEffects, ownership: .worstEffects, allocates: true)
+      GlobalEffects(memory: .worstEffects, ownership: .worstEffects, allocates: true, isDeinitBarrier: true)
     }
 
     public var description: String {
       var res: [String] = [memory.description, ownership.description].filter { !$0.isEmpty }
       if allocates { res += ["allocate"] }
+      if isDeinitBarrier { res += ["deinit_barrier"] }
       return res.joined(separator: ",")
     }
   }
@@ -652,6 +722,7 @@ extension StringParser {
       else if consume("copy")     { globalEffects.ownership.copy = true }
       else if consume("destroy")  { globalEffects.ownership.destroy = true }
       else if consume("allocate") { globalEffects.allocates = true }
+      else if consume("deinit_barrier") { globalEffects.isDeinitBarrier = true }
       else {
         break
       }

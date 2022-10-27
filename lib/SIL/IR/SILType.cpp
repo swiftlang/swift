@@ -948,3 +948,10 @@ bool SILType::isMoveOnlyType() const {
       return true;
   return false;
 }
+
+bool SILType::isPureMoveOnly() const {
+  if (auto *nom = getNominalOrBoundGenericNominal())
+    if (nom->isMoveOnly())
+      return true;
+  return false;
+}

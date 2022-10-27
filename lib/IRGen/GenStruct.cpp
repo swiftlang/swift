@@ -480,10 +480,12 @@ namespace {
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
-      dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
-                             IGF.IGM.DataLayout);
-      src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
-                            IGF.IGM.DataLayout);
+      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+        dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
+                               IGF.IGM.DataLayout);
+        src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
+                              IGF.IGM.DataLayout);
+      }
       IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
     }
 
@@ -532,9 +534,11 @@ namespace {
               destructorGlobalDecl, NotForDefinition));
 
       SmallVector<llvm::Value *, 2> args;
-      auto *thisArg = IGF.coerceValue(address.getAddress(),
-                                      destructorFnAddr->getArg(0)->getType(),
-                                      IGF.IGM.DataLayout);
+      auto *thisArg = address.getAddress();
+      if (IGF.IGM.getLLVMContext().supportsTypedPointers())
+        thisArg = IGF.coerceValue(address.getAddress(),
+                                  destructorFnAddr->getArg(0)->getType(),
+                                  IGF.IGM.DataLayout);
       args.push_back(thisArg);
       llvm::Value *implicitParam =
           clang::CodeGen::getCXXDestructorImplicitParam(

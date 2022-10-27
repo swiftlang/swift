@@ -73,6 +73,13 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       break;
     }
 
+    // Parse the ellipsis for a type parameter pack  'T...'.
+    SourceLoc EllipsisLoc;
+    if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+        startsWithEllipsis(Tok)) {
+      EllipsisLoc = consumeStartingEllipsis();
+    }
+
     // Parse the ':' followed by a type.
     SmallVector<InheritedEntry, 1> Inherited;
     if (Tok.is(tok::colon)) {
@@ -100,15 +107,10 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    // We always create generic type parameters with an invalid depth.
-    // Semantic analysis fills in the depth when it processes the generic
-    // parameter list.
-    const bool isParameterPack =
-        attributes.getAttribute<TypeSequenceAttr>() != nullptr;
-    auto Param = GenericTypeParamDecl::create(
-        CurDeclContext, Name, NameLoc, isParameterPack,
-        GenericTypeParamDecl::InvalidDepth, GenericParams.size(),
-        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+    const bool isParameterPack = EllipsisLoc.isValid();
+    auto *Param = GenericTypeParamDecl::createParsed(
+        CurDeclContext, Name, NameLoc, EllipsisLoc,
+        /*index*/ GenericParams.size(), isParameterPack);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);

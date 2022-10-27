@@ -488,9 +488,12 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
 
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
+  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
+                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
-      if (isDerived && resilience == ResilienceStrategy::Resilient)
+      if (isDerived && !serializeDerivedEffects)
         return;
       numAttrs++;
     });
@@ -520,7 +523,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
-      if (isDerived && resilience == ResilienceStrategy::Resilient)
+      if (isDerived && !serializeDerivedEffects)
         return;
 
       llvm::SmallString<64> buffer;

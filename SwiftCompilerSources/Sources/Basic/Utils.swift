@@ -24,7 +24,6 @@ import std
 public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
                    file: StaticString = #fileID, line: UInt = #line) {
   if !condition {
-    print("### basic")
     fatalError(message(), file: file, line: line)
   }
 }
@@ -77,6 +76,8 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   }
   
   public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+
+  public static func ~=(pattern: StaticString, value: StringRef) -> Bool { value == pattern }
 }
 
 //===----------------------------------------------------------------------===//

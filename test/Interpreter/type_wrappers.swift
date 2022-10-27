@@ -563,6 +563,9 @@ do {
   // CHECK-NEXT: in getter
   // CHECK-NEXT: <modified>
 
+  let test2 = ClassWithConvenienceInit(aWithoutB: [1, ""])
+  // CHECK: Wrapper.init($Storage(a: Optional([1, ""]), b: ""))
+
   func test<T>(_ v: T) {
     let test1 = ClassWithConvenienceInit<(Int, String, T)>()
     test1.a = (-1, "ultimate question", v)
@@ -622,4 +625,22 @@ do {
   // CHECK-NEXT: Optional([1, 2, 3])
   // CHECK-NEXT: in read-only getter
   // CHECK-NEXT: 0
+
+  let test3 = TypeWithDefaultedLetProperties<[String]>()
+  // CHECK: Wrapper.init($Storage(a: nil, b: 0))
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: nil
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: 0
+
+  let test4 = TypeWithSomeDefaultedLetProperties(a: ["", 1.0])
+  // CHECK: Wrapper.init($Storage(a: ["", 1.0], b: Optional(0), _c: type_wrapper_defs.PropWrapper<Swift.String>(value: "<default>"), _d: type_wrapper_defs.PropWrapperWithoutInit<Swift.Array<Any>>(value: [1, ""])))
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: in setter => PropWrapper<String>(value: "a")
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: ["", 1.0]
+  // CHECK-NEXT: in read-only getter
+  // CHECK-NEXT: Optional(0)
+  // CHECK-NEXT: in getter
+  // CHECK-NEXT: a
 }

@@ -160,7 +160,7 @@ bool CheckerLivenessInfo::compute() {
         }
         break;
       }
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
         // A forwarding borrow is validated as part of its parent borrow. So
         // just mark it as extending liveness and look through it.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
@@ -191,6 +191,7 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::EndBorrow:
         // Don't care about this use.
         break;
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::Reborrow:
         // Reborrows do not occur this early in the pipeline.
         llvm_unreachable(

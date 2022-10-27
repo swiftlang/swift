@@ -1219,6 +1219,12 @@ public:
       visitFuncDecl(accessor);
     });
   }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    auto *rewritten = med->getRewritten();
+    assert(rewritten && "Macro must have been rewritten in SILGen");
+    visit(rewritten);
+  }
 };
 
 } // end anonymous namespace
@@ -1238,8 +1244,20 @@ public:
 
   /// Emit SIL functions for all the members of the extension.
   void emitExtension(ExtensionDecl *e) {
+    // Arguably, we should divert to SILGenType::emitType() here if it's an
+    // @_objcImplementation extension, but we don't actually need to do any of
+    // the stuff that it currently does.
+
     for (Decl *member : e->getABIMembers())
       visit(member);
+    
+    // If this is a main-interface @_objcImplementation extension and the class
+    // has a synthesized destructor, emit it now.
+    if (auto cd = dyn_cast_or_null<ClassDecl>(e->getImplementedObjCDecl())) {
+      auto dd = cd->getDestructor();
+      if (dd->getDeclContext() == cd)
+        visit(dd);
+    }
 
     if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
       // Emit witness tables for protocol conformances introduced by the
@@ -1298,14 +1316,18 @@ public:
       SGM.emitObjCConstructorThunk(cd);
   }
   void visitDestructorDecl(DestructorDecl *dd) {
+    auto contextInterface = dd->getDeclContext()->getImplementedObjCContext();
+    if (auto cd = dyn_cast<ClassDecl>(contextInterface)) {
+      SGM.emitDestructor(cd, dd);
+      return;
+    }
     llvm_unreachable("destructor in extension?!");
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (auto i : range(pd->getNumPatternEntries())) {
-      if (pd->getExecutableInit(i)) {
-        assert(pd->isStatic() && "stored property in extension?!");
+      if (pd->getExecutableInit(i) && pd->isStatic()) {
         SGM.emitGlobalInitialization(pd, i);
       }
     }
@@ -1313,6 +1335,17 @@ public:
 
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasStorage()) {
+      if (!vd->isStatic()) {
+        // Is this a stored property of an @_objcImplementation extension?
+        auto ed = cast<ExtensionDecl>(vd->getDeclContext());
+        if (auto cd =
+                dyn_cast_or_null<ClassDecl>(ed->getImplementedObjCDecl())) {
+          // Act as though we declared it on the class.
+          SILGenType(SGM, cd).visitVarDecl(vd);
+          return;
+        }
+      }
+
       bool hasDidSetOrWillSetDynamicReplacement =
           vd->hasDidSetOrWillSetDynamicReplacement();
       assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&
@@ -1355,6 +1388,12 @@ public:
     asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visitFuncDecl(accessor);
     });
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    auto *rewritten = med->getRewritten();
+    assert(rewritten && "Macro must have been rewritten in SILGen");
+    visit(rewritten);
   }
 };
 

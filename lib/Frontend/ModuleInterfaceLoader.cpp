@@ -202,10 +202,10 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK) {
-  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
-                                                 requiresOSSAModules,
-                                                 requiredSDK);
+                                    StringRef requiredSDK,
+                                    bool requiresRevisionMatch) {
+  auto VI = serialization::validateSerializedAST(
+      buf.getBuffer(), requiresOSSAModules, requiredSDK, requiresRevisionMatch);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -406,6 +406,7 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
+        !ctx.LangOpts.DebuggerSupport,
         /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
@@ -564,7 +565,8 @@ class ModuleInterfaceLoaderImpl {
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get(), requiresOSSAModules,
-                                                           ctx.LangOpts.SDKName))
+                                            ctx.LangOpts.SDKName,
+                                            !ctx.LangOpts.DebuggerSupport))
       return false;
 
     // Next, check the dependencies in the forwarding file.

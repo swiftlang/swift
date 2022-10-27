@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift
@@ -7,6 +9,7 @@ import Swift
 // = DECLARATIONS                                                             {{
 // =============================================================================
 
+class X {}
 class C {
     weak var d: D?
 }
@@ -36,6 +39,14 @@ sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Option
 sil [ossa] @synchronization_point : $@convention(thin) () -> ()
 sil [ossa] @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
 sil [ossa] @barrier : $@convention(thin) () -> ()
+sil @use_C : $@convention(thin) (@guaranteed C) -> ()
+sil @use_CDCase : $@convention(thin) (@guaranteed CDCase) -> ()
+
+// This function is not a synchronization point.
+sil [ossa] @empty : $@convention(thin) () -> () {
+  %retval = tuple ()
+  return %retval : $()
+}
 
 
 // =============================================================================
@@ -471,6 +482,20 @@ bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
   return %copy : $Optional<@callee_guaranteed () -> ()>
 }
 
+// Hoist over applies of non-barrier fns.
+// CHECK-LABEL: sil [ossa] @hoist_over_apply_of_non_barrier_fn : {{.*}} {
+// CHECK:         destroy_value
+// CHECK:         apply
+// CHECK-LABEL: } // end sil function 'hoist_over_apply_of_non_barrier_fn'
+sil [ossa] @hoist_over_apply_of_non_barrier_fn : $@convention(thin) (@owned X) -> () {
+entry(%instance : @owned $X):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_value %instance : $X
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // =============================================================================
 // instruction tests                                                          }}
 // =============================================================================
@@ -534,6 +559,65 @@ right:
 exit:
     %retval = tuple ()
     return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_guaranteedforwardingphi1 : 
+// bb1:
+// end_borrow
+// destroy_value
+// br bb2
+// CHECK-LABEL: } // end sil function 'hoist_guaranteedforwardingphi1'
+sil [ossa] @hoist_guaranteedforwardingphi1 : $@convention(thin) (@owned CDCase) -> () {
+bb0(%instance_c : @owned $CDCase):
+  %lifetime_c_0 = begin_borrow %instance_c : $CDCase
+  %ex = struct_extract %lifetime_c_0 : $CDCase, #CDCase.c
+  br bb1(%ex : $C)
+
+bb1(%phi1 : @guaranteed $C):
+  %f1 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %f1(%phi1) : $@convention(thin) (@guaranteed C) -> ()
+  br bb2
+
+bb2:
+  end_borrow %lifetime_c_0 : $CDCase
+  destroy_value %instance_c : $CDCase
+  %retval = tuple ()
+  return %retval : $()
+}
+ 
+// CHECK-LABEL: sil [ossa] @nohoist_guaranteedforwardingphi2 :
+// CHECK: bb3({{.*}}):
+// CHECK: end_borrow
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'nohoist_guaranteedforwardingphi2'
+sil [ossa] @nohoist_guaranteedforwardingphi2 : $@convention(thin) (@owned CDCase, @owned CDCase) -> () {
+bb0(%instance_c1 : @owned $CDCase, %instance_c2 : @owned $CDCase):
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %instance_c2 : $CDCase
+  %lifetime_c_1 = begin_borrow %instance_c1 : $CDCase
+  %ex1 = struct_extract %lifetime_c_1 : $CDCase, #CDCase.c
+  br bb3(%ex1 : $C, %lifetime_c_1 : $CDCase, %instance_c1 : $CDCase)
+
+bb2:
+  destroy_value %instance_c1 : $CDCase
+  %lifetime_c_2 = begin_borrow %instance_c2 : $CDCase
+  %ex2 = struct_extract %lifetime_c_2 : $CDCase, #CDCase.c
+  br bb3(%ex2 : $C, %lifetime_c_2 : $CDCase, %instance_c2 : $CDCase)
+
+bb3(%phi1 : @guaranteed $C, %phi2 : @guaranteed $CDCase, %phi3 : @owned $CDCase):
+  %f1 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %f1(%phi1) : $@convention(thin) (@guaranteed C) -> ()
+  %f2 = function_ref @empty : $@convention(thin) () -> ()
+  apply %f2() : $@convention(thin) () -> ()
+  br bb4
+
+bb4:
+  end_borrow %phi2 : $CDCase
+  destroy_value %phi3 : $CDCase
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // =============================================================================

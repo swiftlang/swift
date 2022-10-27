@@ -274,8 +274,12 @@ struct ValueOwnershipKind {
   bool operator==(ValueOwnershipKind other) const {
     return value == other.value;
   }
+  bool operator!=(ValueOwnershipKind other) const {
+    return !(value == other.value);
+  }
 
   bool operator==(innerty other) const { return value == other; }
+  bool operator!=(innerty other) const { return !(value == other); }
 
   /// We merge by moving down the lattice.
   ValueOwnershipKind merge(ValueOwnershipKind rhs) const {
@@ -828,7 +832,9 @@ struct OperandOwnership {
     /// Forwarded Borrow. Propagates the guaranteed value within the base's
     /// borrow scope.
     /// (tuple_extract, struct_extract, cast, switch)
-    ForwardingBorrow,
+    GuaranteedForwarding,
+    /// A GuaranteedForwarding value passed as a phi operand.
+    GuaranteedForwardingPhi,
     /// End Borrow. End the borrow scope opened directly by the operand.
     /// The operand must be a begin_borrow, begin_apply, or function argument.
     /// (end_borrow, end_apply)
@@ -882,10 +888,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 ///
 /// Forwarding instructions that produce Owned or Guaranteed values always
 /// forward an operand of the same ownership kind. Each case has a distinct
-/// OperandOwnership (ForwardingConsume and ForwardingBorrow), which enforces a
-/// specific constraint on the operand's ownership. Forwarding instructions that
-/// produce an Unowned value, however, may forward an operand of any
-/// ownership. Therefore, ForwardingUnowned is mapped to OwnershipKind::Any.
+/// OperandOwnership (ForwardingConsume and GuaranteedForwarding), which
+/// enforces a specific constraint on the operand's ownership. Forwarding
+/// instructions that produce an Unowned value, however, may forward an operand
+/// of any ownership. Therefore, ForwardingUnowned is mapped to
+/// OwnershipKind::Any.
 ///
 /// This design yields the following advantages:
 ///
@@ -919,7 +926,8 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::ForwardingConsume:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
   case OperandOwnership::InteriorPointer:
-  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::GuaranteedForwarding:
+  case OperandOwnership::GuaranteedForwardingPhi:
     return {OwnershipKind::Guaranteed,
             UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::EndBorrow:
@@ -947,7 +955,8 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::InteriorPointer:
-  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::GuaranteedForwarding:
+  case OperandOwnership::GuaranteedForwardingPhi:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
     return false;
@@ -986,7 +995,7 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;
   case OwnershipKind::Guaranteed:
-    return OperandOwnership::ForwardingBorrow;
+    return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::Owned:
     return OperandOwnership::ForwardingConsume;
   }

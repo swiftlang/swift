@@ -366,7 +366,8 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffset(VarDecl *field) {
-      assert(IsInTargetFields == (field->getDeclContext() == Target));
+      assert(IsInTargetFields ==
+              (field->getDeclContext()->getImplementedObjCContext() == Target));
       if (IsInTargetFields) {
         ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
@@ -382,7 +383,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      if (placeholder->getDeclContext() == Target) {
+      if (placeholder->getDeclContext()->getImplementedObjCContext() == Target) {
         Layout.NumImmediateMembers +=
           placeholder->getNumberOfFieldOffsetVectorEntries();
       }

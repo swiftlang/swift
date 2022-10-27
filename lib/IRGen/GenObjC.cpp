@@ -664,7 +664,8 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
 
   auto fn =
       FunctionPointer::forDirect(FunctionPointer::Kind::Function, messenger,
-                                 /*secondaryValue*/ nullptr, sig);
+                                 /*secondaryValue*/ nullptr, sig,
+                                 /*useSignature*/ true);
   return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
 

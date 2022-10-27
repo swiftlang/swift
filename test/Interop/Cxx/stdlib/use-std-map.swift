@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
 //
 // REQUIRES: executable_test
 //
@@ -7,6 +7,8 @@
 
 import StdlibUnittest
 import StdMap
+import std
+import Cxx
 
 var StdMapTestSuite = TestSuite("StdMap")
 
@@ -24,6 +26,17 @@ StdMapTestSuite.test("subscript") {
   expectEqual(at1, 3)
   expectEqual(m[2], 2)
   expectEqual(m[3], 3)
+}
+
+extension Map.const_iterator : UnsafeCxxInputIterator { }
+extension Map : CxxSequence { }
+
+StdMapTestSuite.test("first(where:)") {
+    let m = initMap()
+    let found = m.first(where: { $0.first > 1 })
+
+    expectEqual(found!.first, 2)
+    expectEqual(found!.second, 2)
 }
 
 runAllTests()

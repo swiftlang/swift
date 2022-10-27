@@ -793,27 +793,6 @@ enum EnumWithB {
   func testit() -> Int
 }
 
-// Test propagation of guaranteed phi arguments. The nested end_borrow should
-// not be removed since guaranteed phis propagate now.
-//
-// CHECK-LABEL: sil hidden [ossa] @testEliminatePropagateGuaranteedPhiAfterSwitch : $@convention(method) (@guaranteed EnumWithB) -> () {
-// CHECK: bb1([[PHI:%.*]] : @guaranteed $B):
-// CHECK: end_borrow
-// CHECK-LABEL: } // end sil function 'testEliminatePropagateGuaranteedPhiAfterSwitch'
-sil hidden [ossa] @testEliminatePropagateGuaranteedPhiAfterSwitch : $@convention(method) (@guaranteed EnumWithB) -> () {
-bb0(%0 : @guaranteed $EnumWithB):
-  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt: bb1
-
-bb1(%2 : @guaranteed $B):
-  %2a = begin_borrow %2 : $B
-  br bb3(%2a : $B)
-
-bb3(%4 : @guaranteed $B):
-  %99 = tuple ()
-  end_borrow %4 : $B
-  return %99 : $()
-}
-
 // CHECK-LABEL: sil hidden [ossa] @testEliminatePropagateBeginBorrowGuaranteedPhiAfterSwitch : $@convention(method) (@owned B) -> () {
 // CHECK: [[BORROW:%.*]] = begin_borrow
 // CHECK:  bb1:

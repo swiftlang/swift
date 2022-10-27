@@ -93,6 +93,10 @@ enum class FixKind : uint8_t {
   /// and assume that types are equal.
   SkipSameTypeRequirement,
 
+  /// Skip same-shape generic requirement constraint,
+  /// and assume that pack types have the same shape.
+  SkipSameShapeRequirement,
+
   /// Skip superclass generic requirement constraint,
   /// and assume that types are related.
   SkipSuperclassRequirement,
@@ -652,6 +656,34 @@ public:
 
   static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::SkipSameTypeRequirement;
+  }
+};
+
+/// Skip same-shape generic requirement constraint,
+/// and assume that types are equal.
+class SkipSameShapeRequirement final : public ConstraintFix {
+  Type LHS, RHS;
+
+  SkipSameShapeRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
+                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SkipSameShapeRequirement, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  std::string getName() const override {
+    return "skip same-shape generic requirement";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  Type lhsType() { return LHS; }
+  Type rhsType() { return RHS; }
+
+  static SkipSameShapeRequirement *create(ConstraintSystem &cs, Type lhs,
+                                          Type rhs, ConstraintLocator *locator);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::SkipSameTypeRequirement;

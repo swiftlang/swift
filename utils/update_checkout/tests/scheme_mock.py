@@ -28,7 +28,7 @@ MOCK_REMOTE = {
         ('A.txt', 'a'),
     ],
     'repo2': [
-        # This is a series of changes to repo1. (File, NewContents)
+        # This is a series of changes to repo2. (File, NewContents)
         ('X.txt', 'X'),
         ('Y.txt', 'Y'),
         ('X.txt', 'z'),
@@ -97,7 +97,7 @@ def get_config_path(base_dir):
     return os.path.join(base_dir, 'test-config.json')
 
 
-def setup_mock_remote(base_dir):
+def setup_mock_remote(base_dir, base_config):
     create_dir(base_dir)
 
     # We use local as a workspace for creating commits.
@@ -130,7 +130,6 @@ def setup_mock_remote(base_dir):
             call_quietly(['git', 'push', 'origin', 'main'],
                          cwd=local_repo_path)
 
-    base_config = MOCK_CONFIG
     https_clone_pattern = os.path.join('file://%s' % REMOTE_PATH, '%s')
     base_config['https-clone-pattern'] = https_clone_pattern
 
@@ -153,6 +152,7 @@ class SchemeMockTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(SchemeMockTestCase, self).__init__(*args, **kwargs)
 
+        self.config = MOCK_CONFIG.copy()
         self.workspace = os.getenv(BASEDIR_ENV_VAR)
         if self.workspace is None:
             raise RuntimeError('Misconfigured test suite! Environment '
@@ -167,7 +167,9 @@ class SchemeMockTestCase(unittest.TestCase):
 
     def setUp(self):
         create_dir(self.source_root)
-        (self.local_path, self.remote_path) = setup_mock_remote(self.workspace)
+        (self.local_path, self.remote_path) = setup_mock_remote(
+            self.workspace, self.config
+        )
 
     def tearDown(self):
         teardown_mock_remote(self.workspace)
@@ -175,3 +177,9 @@ class SchemeMockTestCase(unittest.TestCase):
     def call(self, *args, **kwargs):
         kwargs['cwd'] = self.source_root
         call_quietly(*args, **kwargs)
+
+    def get_all_repos(self):
+        return list(self.config["repos"].keys())
+
+    def add_branch_scheme(self, name, scheme):
+        self.config["branch-schemes"][name] = scheme

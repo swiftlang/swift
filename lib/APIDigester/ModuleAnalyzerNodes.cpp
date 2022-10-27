@@ -2,7 +2,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SIL/SILDeclRef.h"
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -1491,7 +1490,7 @@ static bool isProtocolRequirement(ValueDecl *VD) {
 
 static bool requireWitnessTableEntry(ValueDecl *VD) {
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return SILDeclRef::requiresNewWitnessTableEntry(FD);
+    return FD->requiresNewWitnessTableEntry();
   }
   return false;
 }

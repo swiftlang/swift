@@ -217,6 +217,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
   case DeclKind::Module:
+  case DeclKind::MacroExpansion:
     return "";
   }
 

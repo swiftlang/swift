@@ -50,6 +50,16 @@ struct LoadableBoolWrapper {
   }
 };
 
+template<class T>
+struct TemplatedWithFriendOperator {
+  friend bool operator==(const TemplatedWithFriendOperator &lhs,
+                         const TemplatedWithFriendOperator &rhs) {
+    return true;
+  }
+};
+
+using TemplatedWithFriendOperatorSpec = TemplatedWithFriendOperator<int>;
+
 struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {
   int value;
 

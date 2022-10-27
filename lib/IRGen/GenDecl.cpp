@@ -147,6 +147,12 @@ public:
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    auto *rewritten = med->getRewritten();
+    assert(rewritten && "Macro should have already been rewritten by IRGen");
+    visit(rewritten);
+  }
   
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
@@ -347,6 +353,12 @@ public:
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
+  void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+    auto *rewritten = med->getRewritten();
+    assert(rewritten && "Macro should have already been rewritten by IRGen");
+    visit(rewritten);
+  }
+
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     if (isa<AccessorDecl>(method)) {
       // Accessors are handled as part of their AbstractStorageDecls.
@@ -474,6 +486,10 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
       this->addLinkLibrary(LinkLibrary("c++", LibraryKind::Library));
     else if (Context.LangOpts.Target.isOSLinux())
       this->addLinkLibrary(LinkLibrary("stdc++", LibraryKind::Library));
+
+    // Do not try to link Cxx with itself.
+    if (!getSwiftModule()->getName().is("Cxx"))
+      this->addLinkLibrary(LinkLibrary("swiftCxx", LibraryKind::Library));
   }
 
   // FIXME: It'd be better to have the driver invocation or build system that
@@ -2504,6 +2520,12 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     // TODO: Eventually we'll need to emit descriptors to access the opaque
     // type's metadata.
     return;
+
+  case DeclKind::MacroExpansion: {
+    auto *rewritten = cast<MacroExpansionDecl>(D)->getRewritten();
+    assert(rewritten && "Macro should have already been expanded by IRGen");
+    emitGlobalDecl(rewritten);
+  }
   }
 
   llvm_unreachable("bad decl kind!");
@@ -4731,8 +4753,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries) {
   assert(init);
 
-  auto isPrespecialized = concreteType->getAnyGeneric() &&
-                          concreteType->getAnyGeneric()->isGenericContext();
+  auto concreteTypeDecl = concreteType->getAnyGeneric();
+  auto isPrespecialized = concreteTypeDecl &&
+                          concreteTypeDecl->isGenericContext();
+  bool isObjCImpl = concreteTypeDecl &&
+                    concreteTypeDecl->getObjCImplementationDecl();
 
   if (isPattern) {
     assert(isConstant && "Type metadata patterns must be constant");
@@ -4748,8 +4773,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
            *this, concreteType))
           ? LinkEntity::forNoncanonicalSpecializedGenericTypeMetadata(
                 concreteType)
-          : LinkEntity::forTypeMetadata(concreteType,
-                                        TypeMetadataAddress::FullMetadata);
+          : (isObjCImpl
+                ? LinkEntity::forObjCClass(
+                      concreteType->getClassOrBoundGenericClass())
+                : LinkEntity::forTypeMetadata(
+                      concreteType, TypeMetadataAddress::FullMetadata));
 
   auto DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
     entity.getDefaultDeclarationType(*this)->getPointerTo(),
@@ -4777,12 +4805,14 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   unsigned adjustmentIndex = MetadataAdjustmentIndex::ValueType;
 
   if (auto nominal = concreteType->getAnyNominal()) {
-    // Keep type metadata around for all types.
-    addRuntimeResolvableType(nominal);
+    // Keep type metadata around for all types (except @_objcImplementation,
+    // since we're using ObjC metadata for that).
+    if (!isObjCImpl)
+      addRuntimeResolvableType(nominal);
 
-    // Don't define the alias for foreign type metadata or prespecialized
-    // generic metadata, since neither is ABI.
-    if (requiresForeignTypeMetadata(nominal) || isPrespecialized)
+    // Don't define the alias for foreign type metadata, prespecialized
+    // generic metadata, or @_objcImplementation classes, since they're not ABI.
+    if (requiresForeignTypeMetadata(nominal) || isPrespecialized || isObjCImpl)
       return var;
 
     // Native Swift class metadata has a destructor before the address point.
@@ -4842,9 +4872,12 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   } else if (nominal) {
     // The symbol for native non-generic nominal type metadata is generated at
     // the aliased address point (see defineTypeMetadata() above).
-    assert(!nominal->hasClangNode());
-
-    defaultVarTy = TypeMetadataStructTy;
+    if (nominal->getObjCImplementationDecl()) {
+      defaultVarTy = ObjCClassStructTy;
+    } else {
+      assert(!nominal->hasClangNode());
+      defaultVarTy = TypeMetadataStructTy;
+    }
     adjustmentIndex = 0;
   } else {
     // FIXME: Non-nominal metadata provided by the C++ runtime is exported
@@ -4874,11 +4907,17 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   DebugTypeInfo DbgTy;
 
   switch (canonicality) {
-  case TypeMetadataCanonicality::Canonical:
-    entity = LinkEntity::forTypeMetadata(
-        concreteType, fullMetadata ? TypeMetadataAddress::FullMetadata
-                                   : TypeMetadataAddress::AddressPoint);
+  case TypeMetadataCanonicality::Canonical: {
+    auto classDecl = concreteType->getClassOrBoundGenericClass();
+    if (classDecl && classDecl->getObjCImplementationDecl()) {
+      entity = LinkEntity::forObjCClass(classDecl);
+    } else {
+      entity = LinkEntity::forTypeMetadata(
+          concreteType, fullMetadata ? TypeMetadataAddress::FullMetadata
+                                     : TypeMetadataAddress::AddressPoint);
+    }
     break;
+  }
   case TypeMetadataCanonicality::Noncanonical:
     entity =
         LinkEntity::forNoncanonicalSpecializedGenericTypeMetadata(concreteType);
@@ -5296,6 +5335,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType made it to IRGen");
 
+    case DeclKind::MacroExpansion:
+      llvm_unreachable("FIXME: MacroExpansion made it to IRGen");
+
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
       continue;
@@ -5340,6 +5382,11 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 }
 
 static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
+  if (ext->isObjCImplementation()) {
+    assert(ext->getCategoryNameForObjCImplementation() != Identifier());
+    return true;
+  }
+
   for (auto conformance : ext->getLocalConformances()) {
     if (conformance->getProtocol()->isObjC())
       return true;
@@ -5376,7 +5423,12 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  if (shouldEmitCategory(*this, ext)) {
+  if (ext->isObjCImplementation()
+        && ext->getCategoryNameForObjCImplementation() == Identifier()) {
+    // This is the @_objcImplementation for the class--generate its class
+    // metadata.
+    emitClassDecl(origClass);
+  } else if (shouldEmitCategory(*this, ext)) {
     assert(origClass && !origClass->isForeign() &&
            "foreign types cannot have categories emitted");
     llvm::Constant *category = emitCategoryData(*this, ext);

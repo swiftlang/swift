@@ -1,0 +1,30 @@
+// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+
+import Builtin
+import Swift
+
+class C {}
+
+sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
+sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on nohoist_over_rewritten_copy
+// CHECK-NOT: DELETED:
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on nohoist_over_rewritten_copy
+sil [ossa] @nohoist_over_rewritten_copy : $@convention(thin) () -> (@owned C, @owned C) {
+entry:
+  test_specification "shrink-borrow-scope @trace true @trace[1]"
+  %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
+  %lifetime = begin_borrow [lexical] %instance : $C
+  debug_value [trace] %lifetime : $C
+  %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+  %copy = copy_value %lifetime : $C
+  debug_value [trace] %copy : $C
+  end_borrow %lifetime : $C
+  %retval = tuple (%copy : $C, %instance : $C)
+  return %retval : $(C, C)
+}
+

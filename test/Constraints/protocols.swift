@@ -533,3 +533,16 @@ func f1_58231(x: Int) -> P_58231 {
 func f2_58231(x: Int) -> P_58231? {
   return S_58231() // expected-error{{return expression of type 'S_58231' does not conform to 'P_58231'}}
 }
+
+// https://github.com/apple/swift/issues/61517
+
+protocol P_61517 {
+  init()
+  init(_: Bool)
+}
+
+_ = P_61517() // expected-error{{type 'any P_61517' cannot be instantiated}}
+_ = P_61517(false) // expected-error{{type 'any P_61517' cannot be instantiated}}
+
+_ = P_61517.init() // expected-error{{type 'any P_61517' cannot be instantiated}}
+_ = P_61517.init(false) // expected-error{{type 'any P_61517' cannot be instantiated}}

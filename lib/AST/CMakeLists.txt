@@ -71,6 +71,8 @@ add_swift_host_library(swiftAST STATIC
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
   PackConformance.cpp
+  PackExpansionMatcher.cpp
+  ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
@@ -177,7 +179,7 @@ endif()
 # where intrinsics and attributes are declared. swiftAST depends on these
 # headers.
 # For more information see the comment at the top of lib/CMakeLists.txt.
-add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
+add_dependencies(swift-ast-generated-headers intrinsics_gen clang-tablegen-targets)
 add_dependencies(swiftAST swift-ast-generated-headers)
 
 set_swift_llvm_is_available(swiftAST)

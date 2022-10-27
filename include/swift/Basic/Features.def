@@ -147,6 +147,13 @@ EXPERIMENTAL_FEATURE(ImplicitSome)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(ParserASTGen)
 
+/// Enable the experimental macros feature.
+EXPERIMENTAL_FEATURE(Macros)
+
+/// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
+/// corresponding syntax tree.
+EXPERIMENTAL_FEATURE(BuiltinMacros)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE

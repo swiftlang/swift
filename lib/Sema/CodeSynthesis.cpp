@@ -214,20 +214,6 @@ static void maybeAddTypeWrapperDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!initExpr)
     return;
 
-  // Type wrapper variables are never initialized directly,
-  // initialization expression (if any) becomes an default
-  // argument of the initializer synthesized by the type wrapper.
-  {
-    // Since type wrapper is applied to backing property, that's
-    // the the initializer it subsumes.
-    if (var->hasAttachedPropertyWrapper()) {
-      auto *backingVar = var->getPropertyWrapperBackingProperty();
-      PBD = backingVar->getParentPatternBinding();
-    }
-
-    PBD->setInitializerSubsumed(/*index=*/0);
-  }
-
   arg->setDefaultExpr(initExpr, PBD->isInitializerChecked(/*index=*/0));
   arg->setDefaultArgumentKind(DefaultArgumentKind::Normal);
 }
@@ -585,10 +571,9 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
 
   SmallVector<GenericTypeParamDecl *, 4> newParams;
   for (auto *param : genericParams->getParams()) {
-    auto *newParam = GenericTypeParamDecl::create(
-        classDecl, param->getName(), SourceLoc(), param->isParameterPack(),
-        depth, param->getIndex(), param->isOpaqueType(),
-        /*opaqueTypeRepr=*/nullptr);
+    auto *newParam = GenericTypeParamDecl::createImplicit(
+        classDecl, param->getName(), depth, param->getIndex(),
+        param->isParameterPack(), param->isOpaqueType());
     newParams.push_back(newParam);
   }
 

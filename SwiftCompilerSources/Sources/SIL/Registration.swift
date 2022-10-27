@@ -60,6 +60,8 @@ public func registerSILClasses() {
   register(ReleaseValueInst.self)
   register(DestroyValueInst.self)
   register(DestroyAddrInst.self)
+  register(StrongCopyUnownedValueInst.self)
+  register(StrongCopyUnmanagedValueInst.self)
   register(InjectEnumAddrInst.self)
   register(LoadInst.self)
   register(LoadWeakInst.self)
