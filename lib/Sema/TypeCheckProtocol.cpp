@@ -910,6 +910,13 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
     missingType = requirementFix->rhsType();
     break;
   }
+  case FixKind::SkipSameShapeRequirement: {
+    requirementKind = RequirementKind::SameShape;
+    auto requirementFix = (SkipSameShapeRequirement *)fix;
+    type = requirementFix->lhsType();
+    missingType = requirementFix->rhsType();
+    break;
+  }
   case FixKind::SkipSuperclassRequirement: {
     requirementKind = RequirementKind::Superclass;
     auto requirementFix = (SkipSuperclassRequirement *)fix;
@@ -4895,8 +4902,8 @@ hasInvariantSelfRequirement(const ProtocolDecl *proto,
 
   for (auto req : reqSig) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     case RequirementKind::SameType:
       if (req.getSecondType()->isTypeParameter()) {
@@ -4929,8 +4936,8 @@ static void diagnoseInvariantSelfRequirement(
   unsigned kind = 0;
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirement not supported here");
 
   case RequirementKind::SameType:
   if (req.getSecondType()->isTypeParameter()) {

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 /// Shrink borrow scopes by hoisting end_borrows up to deinit barriers.  After
-/// this is done, CanonicalOSSALifetime is free to hoist the destroys of the
+/// this is done, CanonicalizeOSSALifetime is free to hoist the destroys of the
 /// owned value up to the end_borrow.  In this way, the lexical lifetime of
 /// guaranteed values is preserved.
 //===----------------------------------------------------------------------===//
@@ -20,6 +20,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
@@ -61,13 +62,16 @@ struct Context final {
 
   InstructionDeleter &deleter;
 
+  BasicCalleeAnalysis *calleeAnalysis;
+
   Context(BeginBorrowInst const &introducer,
           SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts,
-          InstructionDeleter &deleter)
+          InstructionDeleter &deleter, BasicCalleeAnalysis *calleeAnalysis)
       : introducer(introducer), borrowedValue(BorrowedValue(&introducer)),
         borrowee(introducer.getOperand()), defBlock(introducer.getParent()),
         function(*introducer.getFunction()),
-        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter) {}
+        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter),
+        calleeAnalysis(calleeAnalysis) {}
   Context(Context const &) = delete;
   Context &operator=(Context const &) = delete;
 };
@@ -244,7 +248,7 @@ Dataflow::classifyInstruction(SILInstruction *instruction) {
                ? Classification::Barrier
                : Classification::Other;
   }
-  if (isDeinitBarrier(instruction)) {
+  if (isDeinitBarrier(instruction, context.calleeAnalysis)) {
     return Classification::Barrier;
   }
   return Classification::Other;
@@ -343,6 +347,7 @@ public:
   bool run();
 
 private:
+  EndBorrowInst *findPreexistingEndBorrow(SILInstruction *instruction);
   bool createEndBorrow(SILInstruction *insertionPoint);
 };
 
@@ -379,6 +384,15 @@ bool Rewriter::run() {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
       for (auto *successor : successors) {
+        // If a terminator is a barrier, it must not branch to a merge point.
+        // Doing so would require one of the following:
+        // - the terminator was passed a phi--which is handled by barriers.phis
+        // - the terminator had a result--which can't happen thanks to the lack
+        //   of critical edges
+        // - the terminator was a BranchInst which was passed no arguments but
+        //   which was nonetheless identified as a barrier--which is illegal
+        assert(successor->getSinglePredecessorBlock() ==
+               terminator->getParentBlock());
         madeChange |= createEndBorrow(&successor->front());
       }
     } else {
@@ -395,10 +409,11 @@ bool Rewriter::run() {
   // don't have multiple predecessors) whose end was not reachable (because
   // reachability was not able to make it to the top of some other successor).
   //
-  // In other words, a control flow boundary is the target edge from a block B
-  // to its single predecessor P not all of whose successors S in succ(P) had
-  // reachable beginnings.  We witness that fact about P's successors by way of
-  // P not having a reachable end--see BackwardReachability::meetOverSuccessors.
+  // In other words, a control flow boundary is the target block of the edge
+  // to a block B from its single predecessor P not all of whose successors S
+  // in succ(P) had reachable beginnings.  We witness that fact about P's
+  // successors by way of P not having a reachable end--see
+  // IterativeBackwardReachability::meetOverSuccessors.
   //
   // control-flow-boundary(B) := beginning-reachable(B) && !end-reachable(P)
   for (auto *block : barriers.blocks) {
@@ -418,12 +433,31 @@ bool Rewriter::run() {
   return madeChange;
 }
 
-bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
-  if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
-    if (llvm::find(uses.ends, insertionPoint) != uses.ends.end()) {
-      reusedEndBorrowInsts.insert(insertionPoint);
-      return false;
+EndBorrowInst *
+Rewriter::findPreexistingEndBorrow(SILInstruction *insertionPoint) {
+  for (auto *instruction = insertionPoint; instruction;
+       instruction = instruction->getNextInstruction()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(instruction)) {
+      if (llvm::find(uses.ends, ebi) != uses.ends.end())
+        return ebi;
     }
+    if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+      if (llvm::is_contained(barriers.copies, cvi)) {
+        continue;
+      }
+    }
+    /// Otherwise, this is an "interesting" instruction.  We want to record that
+    /// we were able to hoist the end of the borrow scope over it, so we stop
+    /// looking for the preexisting end_borrow.
+    return nullptr;
+  }
+  return nullptr;
+}
+
+bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
+  if (auto *ebi = findPreexistingEndBorrow(insertionPoint)) {
+    reusedEndBorrowInsts.insert(ebi);
+    return false;
   }
   auto builder = SILBuilderWithScope(insertionPoint);
   builder.createEndBorrow(
@@ -449,7 +483,9 @@ bool run(Context &context) {
 
 bool swift::shrinkBorrowScope(
     BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    BasicCalleeAnalysis *calleeAnalysis,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts) {
-  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter);
+  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter,
+                                     calleeAnalysis);
   return ShrinkBorrowScope::run(context);
 }

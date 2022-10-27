@@ -204,6 +204,7 @@ KNOWN_SETTINGS=(
     swift-implicit-concurrency-import             "1"               "whether to implicitly import the Swift concurrency module"
     swift-stdlib-support-back-deployment          "1"               "whether to support back-deployment of built binaries to older OS versions"
     swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
+    swift-stdlib-reflection-metadata              "enabled"         "whether to build stdlib with runtime metadata (valid options are 'enabled', 'disabled' and 'debugger-only')"
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
@@ -1230,7 +1231,6 @@ LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
-LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
 # We cannot currently apply the normal rules of skipping here for LLVM. Even if
@@ -1819,6 +1819,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
+
                     -DLLVM_ENABLE_RUNTIMES="$(join ";" ${llvm_enable_runtimes[@]})"
                     -ULLVM_TOOL_COMPILER_RT_BUILD
                     -ULLVM_BUILD_EXTERNAL_COMPILER_RT
@@ -2006,6 +2007,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_TRAP_FUNCTION:STRING="${SWIFT_STDLIB_TRAP_FUNCTION}"
                     -DSWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK}")
                     -DSWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES:BOOL=$(true_false "${SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES}")
+                    -DSWIFT_STDLIB_REFLECTION_METADATA:STRING="${SWIFT_STDLIB_REFLECTION_METADATA}"
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"

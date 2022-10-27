@@ -684,8 +684,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.Features.insert(Feature::ForwardModeDifferentiation);
   if (Args.hasArg(OPT_enable_experimental_additive_arithmetic_derivation))
     Opts.Features.insert(Feature::AdditiveArithmeticDerivedConformances);
-  if (Args.hasArg(OPT_enable_experimental_layout_prespecialization))
-    Opts.Features.insert(Feature::LayoutPrespecialization);
   
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);
@@ -2636,7 +2634,8 @@ serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
   serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
+      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName,
+      !LangOpts.DebuggerSupport, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -2672,7 +2671,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      LangOpts.SDKName, &extendedInfo);
+      LangOpts.SDKName, !LangOpts.DebuggerSupport, &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

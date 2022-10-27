@@ -622,6 +622,10 @@ public:
   /// wrapped type.
   bool isMoveOnly() const;
 
+  /// Is this a type that is a first class move only type. This returns false
+  /// for a move only wrapped type.
+  bool isPureMoveOnly() const;
+
   /// Returns true if and only if this type is a first class move only
   /// type. NOTE: Returns false if the type is a move only wrapped type.
   bool isMoveOnlyType() const;

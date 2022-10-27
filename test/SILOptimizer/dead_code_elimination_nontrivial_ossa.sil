@@ -23,6 +23,14 @@ case none
 case some(T)
 }
 
+struct Wrapper1 {
+  var val1: Wrapper2
+}
+
+struct Wrapper2 {
+  var val2: Klass
+}
+
 sil [ossa] @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error any Error)
 sil [ossa] @$use_klass1 : $@convention(thin) (@owned Klass) -> ()
 sil [ossa] @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
@@ -728,17 +736,10 @@ bb3(%original : @owned $Klass, %lifetime : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @borrow_none : {{.*}} {
 // CHECK:       {{bb[0-9]+}}:
-// CHECK:         [[INSTANCE:%[^,]+]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
-// CHECK:         switch_enum [[INSTANCE]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: [[WORK:bb[0-9]+]], case #FakeOptional.none!enumelt: [[TO_EXIT:bb[0-9]+]], forwarding: @guaranteed
-// CHECK:       [[TO_EXIT]]:
-// CHECK:         br [[EXIT:bb[0-9]+]]
-// CHECK:       [[WORK]]([[PAYLOAD:%[^,]+]] : @guaranteed $Klass):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[PAYLOAD]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         br [[EXIT]]
+// CHECK-NEXT:    br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         return [[RETVAL]] : $()
+// CHECK-NEXT:    [[RETVAL:%[^,]+]] = tuple ()
+// CHECK-NEXT:    return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'borrow_none'
 sil [ossa] @borrow_none : $@convention(thin) () -> () {
 entry:
@@ -810,8 +811,6 @@ exit(%outer_lifetime_3 : @guaranteed $Klass, %inner_lifetime_2 : @guaranteed $Kl
 // CHECK:         [[BORROW_EITHER:%[^,]+]] = begin_borrow [[EITHER]]
 // CHECK:         switch_enum [[BORROW_EITHER]] : $EitherNoneOrAnyObject, case #EitherNoneOrAnyObject.none!enumelt: [[NONE_BLOCK:bb[0-9]+]], case #EitherNoneOrAnyObject.any!enumelt: [[SOME_BLOCK:bb[0-9]+]]
 // CHECK:       [[SOME_BLOCK]]([[PAYLOAD:%[^,]+]] : @guaranteed $AnyObject):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[PAYLOAD]]
-// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         end_borrow [[BORROW_EITHER]]
 // CHECK:         destroy_value [[EITHER]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -827,17 +826,37 @@ sil [ossa] @reborrow_guaranteed_phi2 : $@convention(thin) (@owned EitherNoneOrAn
 entry(%0 : @owned $EitherNoneOrAnyObject):
   %borrow_either = begin_borrow %0 : $EitherNoneOrAnyObject
   switch_enum %borrow_either : $EitherNoneOrAnyObject, case #EitherNoneOrAnyObject.none!enumelt: none_block, case #EitherNoneOrAnyObject.any!enumelt: any_block
+
 any_block(%borrow : @guaranteed $AnyObject):
   %2 = begin_borrow %borrow : $AnyObject
   end_borrow %2 : $AnyObject
   end_borrow %borrow_either : $EitherNoneOrAnyObject
   destroy_value %0 : $EitherNoneOrAnyObject
   br exit
+
 none_block:
   end_borrow %borrow_either : $EitherNoneOrAnyObject
   destroy_value %0 : $EitherNoneOrAnyObject
   br exit
+
 exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @reborrowed_guaranteed_phi3 :
+// CHECK: begin_borrow
+// CHECK-NOT: begin_borrow
+// CHECK-LABEL: } // end sil function 'reborrowed_guaranteed_phi3'
+sil [ossa] @reborrowed_guaranteed_phi3 : $@convention(thin) (@owned Klass) -> () {
+entry(%instance : @owned $Klass):
+  %outer_lifetime_1 = begin_borrow %instance : $Klass
+  %inner_lifetime_1 = begin_borrow %outer_lifetime_1 : $Klass
+  br exit(%inner_lifetime_1 : $Klass)
+exit(%inner_lifetime_2 : @guaranteed $Klass):
+  end_borrow %inner_lifetime_2 : $Klass
+  end_borrow %outer_lifetime_1 : $Klass
+  destroy_value %instance : $Klass
   %retval = tuple ()
   return %retval : $()
 }
@@ -887,13 +906,7 @@ bb1(%4 : @guaranteed $Klass, %5 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @borrow_guaranteed_tuple : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
-// CHECK:         [[LIFETIME_1_1:%[^,]+]] = begin_borrow [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2_1:%[^,]+]] = begin_borrow [[INSTANCE_2]]
-// CHECK:         br [[EXIT:bb[0-9]+]]([[LIFETIME_1_1]] : $Klass, [[LIFETIME_2_1]] : $Klass)
-// CHECK:       [[EXIT]]([[LIFETIME_1_2:%[^,]+]] : @guaranteed $Klass, [[LIFETIME_2_2:%[^,]+]] : @guaranteed $Klass):
-// CHECK:         end_borrow [[LIFETIME_2_2]]
 // CHECK:         destroy_value [[INSTANCE_2]]
-// CHECK:         end_borrow [[LIFETIME_1_2]]
 // CHECK:         destroy_value [[INSTANCE_1]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
@@ -903,10 +916,8 @@ entry(%instance_1 : @owned $Klass, %instance_2 : @owned $Klass):
   %lifetime_1_1 = begin_borrow %instance_1 : $Klass
   %lifetime_2_1 = begin_borrow %instance_2 : $Klass
   %tuple = tuple $(Klass, Klass) (%lifetime_1_1, %lifetime_2_1)
-  %tuple_lifetime_1 = begin_borrow %tuple : $(Klass, Klass)
-  br exit(%lifetime_1_1 : $Klass, %lifetime_2_1 : $Klass, %tuple_lifetime_1 : $(Klass, Klass))
-exit(%lifetime_1_2 : @guaranteed $Klass, %lifetime_2_2 : @guaranteed $Klass, %tuple_lifetime_2 : @guaranteed $(Klass, Klass)):
-  end_borrow %tuple_lifetime_2 : $(Klass, Klass)
+  br exit(%lifetime_1_1 : $Klass, %lifetime_2_1 : $Klass, %tuple : $(Klass, Klass))
+exit(%lifetime_1_2 : @guaranteed $Klass, %lifetime_2_2 : @guaranteed $Klass, %tuple_2 : @guaranteed $(Klass, Klass)):
   end_borrow %lifetime_2_2 : $Klass
   destroy_value %instance_2 : $Klass
   end_borrow %lifetime_1_2 : $Klass
@@ -917,10 +928,6 @@ exit(%lifetime_1_2 : @guaranteed $Klass, %lifetime_2_2 : @guaranteed $Klass, %tu
 
 // CHECK-LABEL: sil [ossa] @borrow_guaranteed_struct : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $Klass):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
-// CHECK:         br bb1([[LIFETIME]] : $Klass)
-// CHECK:       bb1([[LIFETIME_2:%[^,]+]] : @guaranteed $Klass):
-// CHECK:         end_borrow [[LIFETIME_2]]
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
@@ -929,10 +936,8 @@ sil [ossa] @borrow_guaranteed_struct : $@convention(thin) (@owned Klass) -> () {
 entry(%instance_1 : @owned $Klass):
   %lifetime_1 = begin_borrow %instance_1 : $Klass
   %struct = struct $NonTrivialStruct (%lifetime_1 : $Klass)
-  %struct_lifetime_1 = begin_borrow %struct : $NonTrivialStruct
-  br exit(%lifetime_1 : $Klass, %struct_lifetime_1 : $NonTrivialStruct)
-exit(%lifetime_2 : @guaranteed $Klass, %struct_lifetime_2 : @guaranteed $NonTrivialStruct):
-  end_borrow %struct_lifetime_2 : $NonTrivialStruct
+  br exit(%lifetime_1 : $Klass, %struct : $NonTrivialStruct)
+exit(%lifetime_2 : @guaranteed $Klass, %struct_2 : @guaranteed $NonTrivialStruct):
   end_borrow %lifetime_2 : $Klass
   destroy_value %instance_1 : $Klass
   %retval = tuple ()
@@ -995,3 +1000,110 @@ bb1(%21 : $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@callee_gua
   %28 = tuple ()
   return %28: $()
 }
+
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_forwarded_phi1 :
+// CHECK: br bb3
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'test_forwarded_phi1'
+sil [ossa] @test_forwarded_phi1 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1 
+
+bb1:
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass, %phi2 : $Wrapper1)
+
+bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi4 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_forwarded_phi2 :
+// CHECK: br bb3 
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'test_forwarded_phi2'
+sil [ossa] @test_forwarded_phi2 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1 
+
+bb1:
+  br bb2(%outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper1):
+  %ex1 = struct_extract %phi1 : $Wrapper1, #Wrapper1.val1 // user: %4
+  %ex2 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass, %phi1 : $Wrapper1)
+
+bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi3 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_forwarded_phi3 :
+// CHECK: end_borrow
+// CHECK: br bb3
+// CHECK-LABEL: } // end sil function 'test_forwarded_phi3'
+sil [ossa] @test_forwarded_phi3 : $@convention(thin) (@owned Wrapper1) -> () {
+bb0(%0 : @owned $Wrapper1):
+  %outer = begin_borrow %0 : $Wrapper1
+  br bb1
+
+bb1:
+  br bb2(%outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper1):
+  %ex1 = struct_extract %phi1 : $Wrapper1, #Wrapper1.val1 // user: %4
+  %ex2 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%ex2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3(%ex2 : $Klass, %phi1 : $Wrapper1)
+
+bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
+  end_borrow %phi3 : $Wrapper1
+  destroy_value %0 : $Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_loadborrow_dep :
+// CHECK: br bb3
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'test_loadborrow_dep'
+sil [ossa] @test_loadborrow_dep : $@convention(thin) (@in Wrapper1) -> () {
+bb0(%0 : $*Wrapper1):
+  %outer = load_borrow %0 : $*Wrapper1
+  br bb1 
+
+bb1:
+  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
+  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1)
+
+bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
+  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
+  br bb3(%ex2 : $Klass, %phi2 : $Wrapper1)
+
+bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %phi4 : $Wrapper1
+  destroy_addr %0 : $*Wrapper1
+  %9999 = tuple()
+  return %9999 : $()
+}
+

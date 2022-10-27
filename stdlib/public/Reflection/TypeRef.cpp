@@ -314,11 +314,11 @@ public:
   void visitTypeRefRequirement(const TypeRefRequirement &req) {
     printHeader("requirement ");
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
       printRec(req.getFirstType());
-      stream << ".count == ";
+      stream << ".shape == ";
       printRec(req.getSecondType());
-      stream << ".count";
+      stream << ".shape";
       break;
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
@@ -898,7 +898,7 @@ public:
 
   Demangle::NodePointer visitTypeRefRequirement(const TypeRefRequirement &req) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount: {
+    case RequirementKind::SameShape: {
       // Not implemented.
       return nullptr;
     }
@@ -1304,7 +1304,7 @@ public:
       return None;
 
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {

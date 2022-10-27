@@ -99,6 +99,15 @@ A set of utilities for analyzing memory accesses. It defines the following conce
 
 ## Control- and Dataflow
 
+#### `DeadEndBlocks`
+A utility for finding dead-end blocks.
+Dead-end blocks are blocks from which there is no path to the function exit (`return`, `throw` or unwind).
+These are blocks which end with an unreachable instruction and blocks from which all paths end in "unreachable" blocks.
+
+**Uses:** `BasicBlockWorklist`  
+**Related C++ utilities:** `DeadEndBlocks`  
+**Status:** done
+
 #### `BasicBlockRange`
 Defines a range from a dominating "begin" block to one or more "end" blocks. To be used for all kind of backward block reachability analysis.
 

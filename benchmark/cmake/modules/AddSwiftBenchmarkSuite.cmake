@@ -354,8 +354,9 @@ function (swift_benchmark_compile_archopts)
   set(common_options
       "-c"
       "-target" "${target}"
-      "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION}
-      "-Xfrontend" "-enable-experimental-layout-prespecialization")
+      "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
+      #"-Xfrontend" "-enable-experimental-feature"
+      #"-Xfrontend" "LayoutPrespecialization")
 
   if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
     list(APPEND common_options "-g")
@@ -483,6 +484,8 @@ function (swift_benchmark_compile_archopts)
       set(cxx_options "")
       if ("${module_name_path}" MATCHES ".*cxx-source/.*")
         list(APPEND cxx_options "-Xfrontend" "-enable-experimental-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
+        # FIXME: https://github.com/apple/swift/issues/61453
+        list(APPEND cxx_options "-Xfrontend" "-validate-tbd-against-ir=none")
       endif()
 
       if ("${bench_flags}" MATCHES "-whole-module.*")

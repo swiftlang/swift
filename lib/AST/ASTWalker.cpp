@@ -401,6 +401,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    if (MED->getArgs() && doIt(MED->getArgs()))
+      return true;
+    if (MED->getRewritten() && doIt(MED->getRewritten()))
+      return true;
+    return false;
+  }
+
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
@@ -625,16 +633,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     return E;
   }
-  Expr *visitPackExpr(PackExpr *E) {
-    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
-      if (E->getElement(i)) {
-        if (Expr *Elt = doIt(E->getElement(i)))
-          E->setElement(i, Elt);
-        else
-          return nullptr;
-      }
-    return E;
-  }
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);
@@ -824,6 +822,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitVarargExpansionExpr(VarargExpansionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
+  Expr *visitPackExpansionExpr(PackExpansionExpr *E) {
+    if (Expr *pattern = doIt(E->getPatternExpr())) {
+      E->setPatternExpr(pattern);
       return E;
     }
     return nullptr;
@@ -1237,6 +1243,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
 
+    return E;
+  }
+
+  Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
+    auto *macro = doIt(E->getMacro());
+    if (!macro) return nullptr;
+    Expr *rewritten = nullptr;
+    if (E->getRewritten()) {
+      rewritten = doIt(E->getRewritten());
+      if (!rewritten) return nullptr;
+    }
+    ArgumentList *args = nullptr;
+    if (E->getArgs()) {
+      args = doIt(E->getArgs());
+      if (!args) return nullptr;
+    }
+    E->setMacro(macro);
+    E->setRewritten(rewritten);
+    E->setArgs(args);
     return E;
   }
 

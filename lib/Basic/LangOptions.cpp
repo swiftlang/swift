@@ -33,6 +33,7 @@ LangOptions::LangOptions() {
   // Note: Introduce default-on language options here.
 #ifndef NDEBUG
   Features.insert(Feature::ParserRoundTrip);
+  Features.insert(Feature::ParserValidation);
 #endif
 }
 

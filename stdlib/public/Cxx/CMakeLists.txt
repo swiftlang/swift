@@ -1,4 +1,5 @@
 add_swift_target_library(swiftCxx ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    CxxRandomAccessCollection.swift
     CxxSequence.swift
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}

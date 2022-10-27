@@ -15,7 +15,7 @@ toolchain as a one-off, there are a couple of differences:
 - [Cloning the project](#cloning-the-project)
   - [Troubleshooting cloning issues](#troubleshooting-cloning-issues)
 - [Installing dependencies](#installing-dependencies)
-  - [macOS](#macOS)
+  - [macOS](#macos)
   - [Linux](#linux)
 - [Building the project for the first time](#building-the-project-for-the-first-time)
   - [Spot check dependencies](#spot-check-dependencies)
@@ -158,10 +158,22 @@ Double-check that running `pwd` prints a path ending with `swift`.
    * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
 
-2. To install sccache (optional):
+2. To install `sccache` (optional):
+  * If you're not building within a Docker container:
    ```
    sudo snap install sccache --candidate --classic
    ```
+   * If you're building within a Docker container, you'll have to install `sccache` manually, since [`snap`
+   is not available in environments without `systemd`](https://unix.stackexchange.com/questions/541230/do-snaps-require-systemd):
+
+   ```
+   SCCACHE_VERSION=v0.3.0
+   curl -L "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-$(uname -m)-unknown-linux-musl.tar.gz" -o sccache.tar.gz
+   tar xzpvf sccache.tar.gz
+   sudo cp "sccache-${SCCACHE_VERSION}-$(uname -m)-unknown-linux-musl/sccache" /usr/local/bin
+   sudo chmod +x /usr/local/bin/sccache
+   ```
+
    **Note:** LLDB currently requires at least `swig-1.3.40` but will
    successfully build with version 2 shipped with Ubuntu.
 
@@ -228,38 +240,30 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
    the tests.
-   macOS:
-   - Via Ninja:
+   - macOS:
+     - Via Ninja:
+       ```sh
+       utils/build-script --skip-build-benchmarks \
+         --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+         --sccache --release-debuginfo --swift-disable-dead-stripping
+       ```
+     - Via Xcode:
+       ```sh
+       utils/build-script --skip-build-benchmarks \
+         --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+         --sccache --release-debuginfo --swift-disable-dead-stripping \
+         --xcode
+       ```
+   - Linux (uses Ninja):
      ```sh
-     utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping --test
-     ```
-   - Via Xcode:
-     ```sh
-     utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping \
-       --xcode
-     ```
-     **Note:** Building `--xcode` together with `--test` is a common source of issues. So to run
-     tests is recommended to use `ninja` because is normally more stable. 
-   Linux (uses Ninja):
-     ```sh
-     utils/build-script --release-debuginfo --test --skip-early-swift-driver
+     utils/build-script --release-debuginfo --skip-early-swift-driver \
+       --skip-early-swiftsyntax
      ```
    This will create a directory
    `swift-project/build/Ninja-RelWithDebInfoAssert`
    (with `Xcode` instead of `Ninja` if you used `--xcode`)
    containing the Swift compiler and standard library and clang/LLVM build artifacts.
-   - If the build succeeds: Once the build is complete, the tests will run.
-     - If the tests are passing: Great! We can go to the next step.
-     - If some tests are failing:
-       - Consider [filing a bug report](https://swift.org/contributing/#reporting-bugs).
-       - Note down which tests are failing as a baseline. This baseline will be
-         handy later when you run the tests after making a change.
-   - If the build fails:
-     See [Troubleshooting build issues](#troubleshooting-build-issues).
+   If the build fails, see [Troubleshooting build issues](#troubleshooting-build-issues).
 
    If you would like to additionally build the Swift corelibs,
    ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
@@ -383,11 +387,12 @@ In project settings, locate `Build, Execution, Deployment > CMake`. You will nee
     - latest versions of the IDE suggest valid values here. Generally `RelWithDebInfoAssert` is a good one to work with
 - Toolchain: Default should be fine
 - Generator: Ninja
-- CMake options:
+- CMake options: You want to duplicate the essential CMake flags that `build-script` had used here, so CLion understands the build configuration. You can get the full list of CMake arguments from `build-script` by providing the `-n` dry-run flag; look for the last `cmake` command with a `-G Ninja`. Here is a minimal list of what you should provide to CLion here for this setting:
     - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -G Ninja -S .`
     - replace the `SOME_PATH` to the path where your `swift-project` directory is
     - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`
     - **Note**: If you're using an Intel machine to build swift, you'll need to replace the architecture in the options. (ex: `arm64` with `x86_64`)
+- Build Directory: change this to the Swift build directory corresponding to the `build-script` run you did earlier, for example, `SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/swift-macosx-arm64`.
 
 With this done, CLion should be able to successfully import the project and have full autocomplete and code navigation powers.
 
@@ -500,14 +505,13 @@ compiler. Then your changes will not be reflected when the test runs because the
 option, but it will lead to a longer feedback loop due to more things getting
 rebuilt.
 
+In the rare event that a local test failure happens to be unrelated to your
+changes (is not due to stale binaries and reproduces without your changes),
+there is a good chance that it has already been caught by our continuous
+integration infrastructure, and it may be ignored.
+
 If you want to rerun all the tests, you can either rebuild the whole project
 and use `lit.py` without `--filter` or use `run-test` to handle both aspects.
-
-Recall the baseline failures mentioned in
-[the build section](#the-actual-build). If your baseline had failing tests, make
-sure you compare the failures seen after your changes to the baseline. If some
-test failures look totally unrelated to your changes, there is a good chance
-that they were already failing as part of the baseline.
 
 For more details on running tests and understanding the various Swift-specific
 lit customizations, see [Testing.md](/docs/Testing.md). Also check out the

@@ -1008,7 +1008,7 @@ class MandatoryInlining : public SILModuleTransform {
     if (getOptions().DebugSerialization)
       return;
     for (auto *F : changedFunctions) {
-      invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 

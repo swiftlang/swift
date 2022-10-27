@@ -43,11 +43,12 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -306,7 +307,7 @@ static void findPreheadersOnControlEquivalentPath(
 /// Sink \p ownedForward to its uses.
 ///
 /// Owned forwarding instructions are identified by
-/// CanonicalOSSALifetime::isRewritableOSSAForward().
+/// CanonicalizeOSSALifetime::isRewritableOSSAForward().
 ///
 /// Assumes that the uses of ownedForward jointly postdominate it (valid OSSA).
 ///
@@ -373,9 +374,9 @@ static bool sinkOwnedForward(SILInstruction *ownedForward,
 namespace {
 
 class CopyPropagation : public SILFunctionTransform {
-  /// True if debug_value instructions should be pruned.
+  /// If true, debug_value instructions should be pruned.
   bool pruneDebug;
-  /// True if all values should be canonicalized.
+  /// If true, all values will be canonicalized.
   bool canonicalizeAll;
   /// If true, then borrow scopes will be canonicalized, allowing copies of
   /// guaranteed values to be optimized. Does *not* shrink the borrow scope.
@@ -437,8 +438,10 @@ void CopyPropagation::run() {
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
-  CanonicalizeOSSALifetime canonicalizer(pruneDebug, accessBlockAnalysis,
-                                         domTree, deleter);
+  CanonicalizeOSSALifetime canonicalizer(
+      pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
+      accessBlockAnalysis, domTree, deleter);
+  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
 
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
@@ -452,7 +455,8 @@ void CopyPropagation::run() {
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
-      auto shrunk = shrinkBorrowScope(*bbi, deleter, modifiedCopyValueInsts);
+      auto shrunk = shrinkBorrowScope(*bbi, deleter, calleeAnalysis,
+                                      modifiedCopyValueInsts);
       for (auto *cvi : modifiedCopyValueInsts)
         defWorklist.updateForCopy(cvi);
       changed |= shrunk;
@@ -472,7 +476,8 @@ void CopyPropagation::run() {
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
-      auto hoisted = hoistDestroysOfOwnedLexicalValue(folded, *f, deleter);
+      auto hoisted =
+          hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
       firstRun = false;
@@ -480,7 +485,7 @@ void CopyPropagation::run() {
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
-      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter);
+      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter, calleeAnalysis);
     }
   }
   deleter.cleanupDeadInstructions();

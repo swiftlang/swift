@@ -91,9 +91,6 @@ ERROR(forbidden_interpolated_string,none,
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
-ERROR(regex_literal_parsing_error,none,
-      "%0", (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -539,6 +536,8 @@ ERROR(expected_sil_profiler_counter_total,none,
       "expected profiler counter total", ())
 ERROR(expected_sil_profiler_counter_hash,none,
       "expected profiler counter hash", ())
+ERROR(expected_sil_test_specification_body,none,
+      "expected a string consisting of the space-separated test arguments", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -1963,6 +1962,19 @@ ERROR(attr_requires_concurrency, none,
       (StringRef, bool))
 
 //------------------------------------------------------------------------------
+// MARK: Variadics
+//------------------------------------------------------------------------------
+
+ERROR(associatedtype_cannot_be_variadic,none,
+      "associated types cannot be variadic", ())
+
+//------------------------------------------------------------------------------
+// MARK: Consistency diagnostics
+//------------------------------------------------------------------------------
+ERROR(new_parser_failure, none,
+      "new parser has failed consistency checking; please see errors above", ())
+
+//------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
@@ -1978,6 +1990,22 @@ ERROR(expected_closure_literal,none,
 
 ERROR(expected_multiple_closures_block_rbrace,none,
       "expected '}' at the end of a trailing closures block", ())
+
+//------------------------------------------------------------------------------
+// MARK: diagnostics emitted by Swift libraries
+//------------------------------------------------------------------------------
+
+ERROR(foreign_diagnostic,none,
+      "%0", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: macro expansion
+//------------------------------------------------------------------------------
+
+ERROR(macro_expansion_expr_expected_macro_identifier,none,
+      "expected a macro identifier for a pound literal expression", ())
+ERROR(macro_expansion_decl_expected_macro_identifier,none,
+      "expected a macro identifier for a pound literal declaration", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

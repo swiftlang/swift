@@ -4,7 +4,7 @@ protocol SomeP {}
 public enum SpecialEnum : SomeP {}
 
 // CHECK-LABEL: sil shared [noinline] @$s20existential_metatype17checkProtocolType0aE0Sbxm_tAA5SomePRzlFAA11SpecialEnumO_Tg5Tf4d_n : $@convention(thin) () -> Bool {
-// CHECK-NEXT: bb0:
+// CHECK:       bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:   %1 = struct $Bool (%0 : $Builtin.Int1)
 // CHECK-NEXT:   return %1 : $Bool

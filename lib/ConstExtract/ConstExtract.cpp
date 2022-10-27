@@ -98,7 +98,10 @@ parseProtocolListFromFile(StringRef protocolListFilePath,
           ParseFailed = true;
           break;
         }
-        protocols.insert(ScalarNode->getRawValue().str());
+        auto protocolNameStr = ScalarNode->getRawValue().str();
+        if (protocolNameStr.front() == '"' && protocolNameStr.back() == '"')
+          protocolNameStr = protocolNameStr.substr(1, protocolNameStr.size() - 2);
+        protocols.insert(protocolNameStr);
       }
     } else
       ParseFailed = true;

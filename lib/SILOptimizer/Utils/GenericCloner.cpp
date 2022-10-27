@@ -250,9 +250,13 @@ void GenericCloner::postFixUp(SILFunction *f) {
       continue;
     }
     discoveredBlocks.clear();
-    PrunedLiveness storeBorrowLiveness(&discoveredBlocks);
-    bool success = scopedAddress.computeLiveness(storeBorrowLiveness);
-    if (success) {
+    // FIXME: Call OSSA lifetime fixup on all values used within the unreachable
+    // code. This will recursively fixup nested scopes from the inside out so
+    // that transitive liveness is not required.
+    SSAPrunedLiveness storeBorrowLiveness(&discoveredBlocks);
+    AddressUseKind useKind =
+        scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
+    if (useKind == AddressUseKind::NonEscaping) {
       scopedAddress.endScopeAtLivenessBoundary(&storeBorrowLiveness);
       continue;
     }

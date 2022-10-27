@@ -54,7 +54,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
 
   // CHECK-objc:        [[ISA:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* %{{[0-9]+}})
   // CHECK-objc-NEXT:   [[OBJECT:%.*]] = bitcast %objc_object* %{{[0-9]+}} to i8*
-  // CHECK-native:      [[ISA_ADDR:%.*]] = getelementptr inbounds %swift.refcounted, %swift.refcounted* %1, i32 0, i32 0
+  // CHECK-native:      [[ISA_ADDR:%.*]] = bitcast %swift.refcounted* %1
   // CHECK-native-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
   // CHECK-native-NEXT: [[OBJECT:%.*]] = bitcast %swift.refcounted* %1 to i8*
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass17ProtoRefinesClassMp"
@@ -67,7 +67,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
 
   // CHECK-objc:        [[ISA:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* %{{[0-9]+}})
   // CHECK-objc-NEXT:   [[OBJECT:%.*]] = bitcast %objc_object* %{{[0-9]+}} to i8*
-  // CHECK-native:      [[ISA_ADDR:%.*]] = getelementptr inbounds %swift.refcounted, %swift.refcounted* %1, i32 0, i32 0
+  // CHECK-native:      [[ISA_ADDR:%.*]] = bitcast %swift.refcounted* %1
   // CHECK-native-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
   // CHECK-native-NEXT: [[OBJECT:%.*]] = bitcast %swift.refcounted* %1 to i8*
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass8SubProtoMp"

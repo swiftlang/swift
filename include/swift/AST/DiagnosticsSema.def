@@ -1492,6 +1492,42 @@ ERROR(swift_native_objc_runtime_base_not_on_root_class,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
 
+ERROR(attr_objc_implementation_must_be_unconditional,none,
+      "only unconditional extensions can implement an Objective-C '@interface'",
+      ())
+ERROR(attr_objc_implementation_must_extend_class,none,
+      "cannot mark extension of %0 %1 with '@_objcImplementation'; it is not "
+      "an imported Objective-C class",
+      (DescriptiveDeclKind, ValueDecl *))
+ERROR(attr_objc_implementation_must_be_imported,none,
+      "'@_objcImplementation' cannot be used to extend %0 %1 because it was "
+      "defined by a Swift 'class' declaration, not an imported Objective-C "
+      "'@interface' declaration",
+      (DescriptiveDeclKind, ValueDecl *))
+ERROR(attr_objc_implementation_category_not_found,none,
+      "could not find category %0 on Objective-C class %1; make sure your "
+      "umbrella or bridging header imports the header that declares it",
+      (Identifier, ValueDecl*))
+NOTE(attr_objc_implementation_fixit_remove_category_name,none,
+     "remove arguments to implement the main '@interface' for this class",
+     ())
+ERROR(attr_objc_implementation_no_objc_final,none,
+      "%0 %1 cannot be 'final' because Objective-C subclasses of %2 can "
+      "override it",
+      (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
+
+ERROR(member_of_objc_implementation_not_objc_or_final,none,
+      "%0 %1 does not match any %0 declared in the headers for %2; did you use "
+      "the %0's Swift name?",
+      (DescriptiveDeclKind, ValueDecl *, ValueDecl *))
+NOTE(fixit_add_objc_for_objc_implementation,none,
+     "add '@objc' to define an Objective-C-compatible %0 not declared in "
+     "the header",
+     (DescriptiveDeclKind))
+NOTE(fixit_add_final_for_objc_implementation,none,
+     "add 'final' to define a Swift %0 that cannot be overridden",
+     (DescriptiveDeclKind))
+
 ERROR(cdecl_not_at_top_level,none,
       "@_cdecl can only be applied to global functions", ())
 ERROR(cdecl_empty_name,none,
@@ -1506,6 +1542,8 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
+ERROR(expose_unsupported_actor_to_cxx,none,
+      "actor %0 can not be exposed to C++", (DeclName))
 
 ERROR(attr_methods_only,none,
       "only methods can be declared %0", (DeclAttribute))
@@ -2066,6 +2104,9 @@ NOTE(type_does_not_inherit_or_conform_requirement,none,
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+ERROR(types_not_same_shape,none,
+      "%0 requires the type packs %1 and %2 have the same shape",
+      (Type, Type, Type))
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
 ERROR(type_does_not_conform_in_decl_ref,none,
@@ -2095,6 +2136,12 @@ ERROR(types_not_equal_decl,none,
 ERROR(types_not_equal_in_decl_ref,none,
       "referencing %0 %1 on %2 requires the types %3 and %4 be equivalent",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(types_not_same_shape_decl,none,
+      "%0 %1 requires the type packs %2 and %3 have the same shape",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_same_shape_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires the type packs %3 and %4 have the same shape",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 ERROR(types_not_inherited_decl,none,
       "%0 %1 requires that %2 inherit from %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
@@ -2116,6 +2163,10 @@ NOTE(candidate_types_conformance_requirement,none,
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
      "(requirement specified as %2 == %3)",
+     (Type, Type, Type, Type))
+NOTE(candidate_types_same_shape_requirement,none,
+     "candidate requires that the type packs %0 and %1 have the same shape "
+     "(requirement specified as %2.shape == %3.shape)",
      (Type, Type, Type, Type))
 NOTE(candidate_types_inheritance_requirement,none,
      "candidate requires that %1 inherit from %2 "
@@ -2542,6 +2593,10 @@ ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
       (Type))
+
+ERROR(invalid_shape_requirement,none,
+      "invalid same-shape requirement between %0 and %1",
+      (Type, Type))
 
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
@@ -5947,6 +6002,9 @@ ERROR(availability_macro_in_inlinable, none,
       "availability macro cannot be used in " FRAGILE_FUNC_KIND "0",
       (unsigned))
 
+ERROR(has_symbol_condition_in_inlinable, none,
+      "'#_hasSymbol' cannot be used in " FRAGILE_FUNC_KIND "0", (unsigned))
+
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
@@ -6474,14 +6532,6 @@ ERROR(noimplicitcopy_attr_invalid_in_generic_context,
       none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 
 //------------------------------------------------------------------------------
-// MARK: variadics
-//------------------------------------------------------------------------------
-
-ERROR(type_sequence_on_non_generic_param, none,
-      "'@_typeSequence' must appear on a generic parameter",
-      ())
-
-//------------------------------------------------------------------------------
 // MARK: Type inference from default expressions
 //------------------------------------------------------------------------------
 
@@ -6554,29 +6604,53 @@ ERROR(type_wrapper_attribute_not_allowed_here,none,
       "type wrapper attribute %0 can only be applied to a class, struct",
       (Identifier))
 
-ERROR(type_wrapper_requires_a_single_generic_param,none,
-      "type wrapper has to declare a single generic parameter "
-      "for underlying storage type", ())
+ERROR(type_wrapper_requires_two_generic_params,none,
+      "type wrapper has to declare two generic parameters: "
+      "wrapped and storage types", ())
 
 ERROR(cannot_use_multiple_type_wrappers,none,
       "type %0 cannot use more than one type wrapper", ())
 
 ERROR(type_wrapper_requires_memberwise_init,none,
       "type wrapper type %0 does not contain a required initializer"
-      " - init(memberwise:)",
+      " - init(for:storage:)",
       (DeclName))
+
+ERROR(cannot_overload_type_wrapper_initializer,none,
+      "cannot overload type wrapper initializer 'init(for:storage:)'", ())
+
+ERROR(cannot_declare_type_wrapper_init_with_invalid_first_param,none,
+      "first parameter of type wrapper initializer should be wrapped type - %0", (Type))
+
+ERROR(cannot_declare_type_wrapper_init_with_invalid_second_param,none,
+      "second parameter of type wrapper initializer should be storage type - %0", (Type))
 
 ERROR(type_wrapper_requires_subscript,none,
       "type wrapper type %0 does not contain a required subscript"
-      " - subscript(storedKeyPath:)",
+      " - subscript(propertyKeyPath:storageKeyPath:)",
       (DeclName))
+
+ERROR(type_wrapper_requires_readonly_subscript,none,
+      "type wrapper type %0 does not contain a required ready-only subscript",
+      (DeclName))
+
+ERROR(type_wrapper_requires_writable_subscript,none,
+      "type wrapper type %0 does not contain a required writable subscript",
+      (DeclName))
+
+NOTE(add_type_wrapper_subscript_stub_note,none,
+     "do you want to add a stub?", ())
 
 ERROR(type_wrapper_failable_init,none,
       "type wrapper initializer %0 cannot be failable", (DeclName))
 
-ERROR(type_wrapper_invalid_subscript_param_type, none,
-      "type wrapper subscript expects a key path parameter type (got: %0)",
-      (Type))
+ERROR(type_wrapper_subscript_invalid_parameter_type,none,
+      "type wrapper subscript parameter %0 expects type %1 (got: %2)",
+      (Identifier, Type, Type))
+
+ERROR(type_wrapper_subscript_invalid_keypath_parameter,none,
+      "type wrapper subscript parameter %0 expects a key path (got: %1)",
+      (Identifier, Type))
 
 ERROR(type_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
@@ -6601,9 +6675,9 @@ WARNING(has_symbol_decl_must_be_weak,none,
         "%0 %1 is not a weakly linked declaration",
         (DescriptiveDeclKind, DeclName))
 ERROR(has_symbol_invalid_expr,none,
-      "#_hasSymbol condition must refer to a declaration", ())
-ERROR(has_symbol_unsupported_in_closures,none,
-      "#_hasSymbol is not supported in closures", ())
+      "'#_hasSymbol' condition must refer to a declaration", ())
+ERROR(has_symbol_unsupported_on_target,none,
+      "'#_hasSymbol' is unsupported on target '%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type erasure
@@ -6615,8 +6689,15 @@ ERROR(no_metadata_on_non_generic_param, none,
 ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
       none, "Can not use feature when experimental layout based"
       " pre-specializations are disabled! Pass the frontend flag"
-      " -enable-experimental-layout-prespecialization to swift to enable "
+      " -enable-experimental-feature LayoutPrespecialization to swift to enable "
       " the usage of this language feature", ())
+
+
+//------------------------------------------------------------------------------
+// MARK: Macros
+//------------------------------------------------------------------------------
+ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
+      "expected macro expansion to produce an expression", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

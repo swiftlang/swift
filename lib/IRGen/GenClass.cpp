@@ -16,6 +16,9 @@
 
 #include "GenClass.h"
 
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/RecordLayout.h"
 #include "swift/ABI/Class.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -28,6 +31,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
@@ -161,6 +165,9 @@ namespace {
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
 
+      if (theClass->getObjCImplementationDecl())
+        Options |= ClassMetadataFlags::ClassHasObjCImplementation;
+
       if (theClass->isGenericContext() && !theClass->hasClangNode())
         Options |= ClassMetadataFlags::ClassIsGeneric;
 
@@ -220,7 +227,8 @@ namespace {
                                bool superclass) {
       if (theClass->hasClangNode() && !theClass->isForeignReferenceType()) {
         Options |= ClassMetadataFlags::ClassHasObjCAncestry;
-        return;
+        if (!theClass->getObjCImplementationDecl())
+          return;
       }
 
       if (theClass->isNativeNSObjectSubclass()) {
@@ -281,6 +289,55 @@ namespace {
                                superclass);
     }
 
+    void maybeAddCxxRecordBases(ClassDecl *cd) {
+      auto cxxRecord = dyn_cast_or_null<clang::CXXRecordDecl>(cd->getClangDecl());
+      if (!cxxRecord)
+        return;
+
+      auto &layout = cxxRecord->getASTContext().getASTRecordLayout(cxxRecord);
+
+      for (auto base : cxxRecord->bases()) {
+        if (base.isVirtual())
+          continue;
+
+        auto baseType = base.getType().getCanonicalType();
+
+        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
+
+        if (baseCxxRecord->isEmpty())
+          continue;
+
+        auto offset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
+        auto size = Size(cxxRecord->getASTContext().getTypeSizeInChars(baseType).getQuantity());
+
+        if (offset != CurSize) {
+          assert(offset > CurSize);
+          auto paddingSize = offset - CurSize;
+          auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+          auto element = ElementLayout::getIncomplete(opaqueTI);
+          addField(element, LayoutStrategy::Universal);
+        }
+
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(size, Alignment(1));
+        auto element = ElementLayout::getIncomplete(opaqueTI);
+        addField(element, LayoutStrategy::Universal);
+      }
+    }
+
+    void addPaddingBeforeClangField(const clang::FieldDecl *fd) {
+      auto offset = Size(fd->getASTContext().toCharUnitsFromBits(
+          fd->getASTContext().getFieldOffset(fd)).getQuantity());
+
+      if (offset != CurSize) {
+        assert(offset > CurSize);
+        auto paddingSize = offset - CurSize;
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+        auto element = ElementLayout::getIncomplete(opaqueTI);
+        addField(element, LayoutStrategy::Universal);
+      }
+    }
+
     void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
                                   ClassDecl *theClass, SILType classType,
                                   bool superclass) {
@@ -290,7 +347,9 @@ namespace {
                                                ->getRecursiveProperties()
                                                .hasUnboundGeneric());
 
-      forEachField(IGM, theClass, [&](Field field) {
+      maybeAddCxxRecordBases(theClass);
+
+      auto fn = [&](Field field) {
         // Ignore missing properties here; we should have flagged these
         // with the classHasIncompleteLayout call above.
         if (!field.isConcrete()) {
@@ -325,7 +384,25 @@ namespace {
           AllStoredProperties.push_back(field);
           AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
-      });
+      };
+
+      auto classDecl = dyn_cast<ClassDecl>(theClass);
+      if (classDecl && classDecl->isRootDefaultActor()) {
+        fn(Field::DefaultActorStorage);
+      }
+
+      for (auto decl :
+           theClass->getStoredPropertiesAndMissingMemberPlaceholders()) {
+        if (decl->getClangDecl())
+          if (auto clangField = cast<clang::FieldDecl>(decl->getClangDecl()))
+            addPaddingBeforeClangField(clangField);
+
+        if (auto var = dyn_cast<VarDecl>(decl)) {
+          fn(var);
+        } else {
+          fn(cast<MissingMemberDecl>(decl));
+        }
+      }
 
       if (!superclass) {
         // If we're calculating the layout of a specialized generic class type,
@@ -415,8 +492,7 @@ ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
                                           bool completelyFragileLayout) const {
   ClassLayoutBuilder builder(IGM, classType, Refcount, completelyFragileLayout);
 
-  auto *classTy =
-      cast<llvm::StructType>(getStorageType()->getPointerElementType());
+  auto *classTy = classLayoutType;
 
   if (completelyFragileLayout) {
     // Create a name for the new llvm type.
@@ -442,11 +518,9 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
                              tailTypes);
 
   // Create a name for the new llvm type.
-  llvm::StructType *classTy =
-    cast<llvm::StructType>(getStorageType()->getPointerElementType());
   SmallString<32> typeName;
   llvm::raw_svector_ostream os(typeName);
-  os << classTy->getName() << "_tailelems" << IGM.TailElemTypeID++;
+  os << classLayoutType->getName() << "_tailelems" << IGM.TailElemTypeID++;
 
   // Create the llvm type.
   llvm::StructType *ResultTy = llvm::StructType::create(IGM.getLLVMContext(),
@@ -485,8 +559,7 @@ llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               const llvm::Twine &name) {
   assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
-  addr = Builder.CreateInBoundsGEP(
-      addr->getType()->getScalarType()->getPointerElementType(), addr, offset);
+  addr = Builder.CreateInBoundsGEP(IGM.Int8Ty, addr, offset);
   return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
 }
 
@@ -592,13 +665,13 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
   switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    Address baseAddr(base, classLayout.getAlignment());
+    Address baseAddr(base, classLayout.getType(), classLayout.getAlignment());
     auto element = fieldInfo.second;
     Address memberAddr = element.project(IGF, baseAddr, None);
     // We may need to bitcast the address if the field is of a generic type.
-    if (memberAddr.getType()->getPointerElementType() != fieldTI.getStorageType())
-      memberAddr = IGF.Builder.CreateBitCast(memberAddr,
-                                     fieldTI.getStorageType()->getPointerTo());
+    if (memberAddr.getElementType() != fieldTI.getStorageType())
+      memberAddr = IGF.Builder.CreateElementBitCast(memberAddr,
+                                                    fieldTI.getStorageType());
     return OwnedAddress(memberAddr, base);
   }
     
@@ -682,8 +755,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
   Offset = IGF.Builder.CreateAnd(Offset, InvertedMask);
 
-  llvm::Value *Addr = IGF.emitByteOffsetGEP(Base, Offset,
-                                            TailTI.getStorageType(), "tailaddr");
+  Address Addr = IGF.emitByteOffsetGEP(Base, Offset, TailTI, "tailaddr");
 
   if (auto *OffsetConst = dyn_cast<llvm::ConstantInt>(Offset)) {
     // Try to get an accurate alignment (only possible if the Offset is a
@@ -691,7 +763,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Size TotalOffset(OffsetConst->getZExtValue());
     Align = HeapObjAlign.alignmentAtOffset(TotalOffset);
   }
-  return Address(Addr, Align);
+  return Address(Addr.getAddress(), Addr.getElementType(), Align);
 }
 
 /// Try to stack promote a class instance with possible tail allocated arrays.
@@ -926,7 +998,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
     if (rootActorClass->isDefaultActor(IGF.IGM.getSwiftModule(),
                                        ResilienceExpansion::Maximal)) {
       selfValue = emitCastToHeapObject(IGF, selfValue);
-      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFn(),
+      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFunctionPointer(),
                              {selfValue});
       return;
     }
@@ -936,8 +1008,9 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
         rootActorClass->isResilient(IGF.IGM.getSwiftModule(),
                                     ResilienceExpansion::Maximal)) {
       selfValue = emitCastToHeapObject(IGF, selfValue);
-      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateResilientFn(),
-                             {selfValue});
+      IGF.Builder.CreateCall(
+          IGF.IGM.getDefaultActorDeallocateResilientFunctionPointer(),
+          {selfValue});
       return;
     }
 
@@ -1047,6 +1120,15 @@ namespace {
       return pair.second;
     }
 
+    Optional<StringRef> getObjCImplCategoryName() const {
+      if (!TheExtension || !TheExtension->isObjCImplementation())
+        return None;
+      if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
+        assert(!ident->empty());
+        return ident->str();
+      }
+      return None;
+    }
     bool isBuildingClass() const {
       return TheEntity.isa<ClassUnion>() && !TheExtension;
     }
@@ -1141,11 +1223,11 @@ namespace {
         const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
-      visitConformances(getClass());
+      visitConformances(getClass()->getImplementationContext());
 
       if (getClass()->isRootDefaultActor())
         Ivars.push_back(Field::DefaultActorStorage);
-      visitMembers(getClass());
+      visitImplementationMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
         addIVarInitializer();
@@ -1159,9 +1241,9 @@ namespace {
           FieldLayout(nullptr) {
       buildCategoryName(CategoryName);
 
-      visitConformances(theExtension);
+      visitConformances(theExtension->getImplementationContext());
 
-      for (Decl *member : TheExtension->getMembers())
+      for (Decl *member : TheExtension->getImplementationContext()->getMembers())
         visit(member);
     }
 
@@ -1310,6 +1392,12 @@ namespace {
   private:
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
+
+      if (auto implementationCategoryName = getObjCImplCategoryName()) {
+        os << *implementationCategoryName;
+        return;
+      }
+
       // Find the module the extension is declared in.
       ModuleDecl *TheModule = TheExtension->getParentModule();
 
@@ -1323,7 +1411,10 @@ namespace {
     llvm::Constant *getClassMetadataRef() {
       auto *theClass = getClass();
 
-      if (theClass->hasClangNode())
+      // If this is truly an imported ObjC class, with no @_objcImplementation,
+      // someone else will emit the ObjC metadata symbol and we simply want to
+      // use it.
+      if (theClass->hasClangNode() && !theClass->getObjCImplementationDecl())
         return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
       // Note that getClassMetadataStrategy() will return
@@ -1669,7 +1760,7 @@ namespace {
     /// Destructors need to be collected into the instance methods
     /// list 
     void visitDestructorDecl(DestructorDecl *destructor) {
-      auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
+      auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
           hasObjCDeallocDefinition(destructor)) {
         InstanceMethods.push_back(destructor);
@@ -1678,6 +1769,12 @@ namespace {
 
     void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
       llvm_unreachable("should not IRGen classes with missing members");
+    }
+
+    void visitMacroExpansionDecl(MacroExpansionDecl *med) {
+      auto *rewritten = med->getRewritten();
+      assert(rewritten && "Macro should have already been expanded by IRGen");
+      visit(rewritten);
     }
 
     void addIVarInitializer() {
@@ -2280,6 +2377,131 @@ namespace {
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
+    
+    SWIFT_DEBUG_DUMP {
+      dump(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    
+    void dump(llvm::raw_ostream &os) const {
+      os << "(class_data_builder";
+      
+      if (isBuildingClass())
+        os << " for_class";
+      if (isBuildingCategory())
+        os << " for_category";
+      if (isBuildingProtocol())
+        os << " for_protocol";
+      
+      if (auto cd = getClass()) {
+        os << " class=";
+        cd->dumpRef(os);
+      }
+      if (auto pd = getProtocol()) {
+        os << " protocol=";
+        pd->dumpRef(os);
+      }
+      if (auto ty = getSpecializedGenericType()) {
+        os << " specialized=";
+        ty->print(os);
+      }
+      if (TheExtension) {
+        os << " extension=";
+        TheExtension->getExtendedTypeRepr()->print(os);
+        os << "@";
+        TheExtension->getLoc().print(os, IGM.Context.SourceMgr);
+      }
+      if (auto name = getObjCImplCategoryName()) {
+        os << " objc_impl_category_name=" << *name;
+      }
+      
+      if (HasNonTrivialConstructor)
+        os << " has_non_trivial_constructor";
+      if (HasNonTrivialDestructor)
+        os << " has_non_trivial_destructor";
+      
+      if (!CategoryName.empty())
+        os << " category_name=" << CategoryName;
+      
+      os << "\n  (ivars";
+      for (auto field : Ivars) {
+        os << "\n    (";
+        switch (field.getKind()) {
+          case Field::Kind::Var:
+            os << "var ";
+            field.getVarDecl()->dumpRef(os);
+            break;
+          case Field::Kind::MissingMember:
+            os << "missing_member";
+            break;
+          case Field::Kind::DefaultActorStorage:
+            os << "default_actor_storage";
+            break;
+        }
+        os << ")";
+      }
+      os << ")";
+      
+      auto printMethodList =
+          [&](StringRef label,
+              const SmallVectorImpl<MethodDescriptor> &methods) {
+        if (methods.empty()) return;
+        
+        os << "\n  (" << label;
+        for (auto method : methods) {
+          os << "\n    (";
+          switch (method.getKind()) {
+            case MethodDescriptor::Kind::Method:
+              os << "method ";
+              method.getMethod()->dumpRef(os);
+              break;
+              
+            case MethodDescriptor::Kind::IVarInitializer:
+              os << "ivar_initializer";
+              method.getImpl()->printAsOperand(os);
+              break;
+              
+            case MethodDescriptor::Kind::IVarDestroyer:
+              os << "ivar_destroyer";
+              method.getImpl()->printAsOperand(os);
+              break;
+          }
+          os << ")";
+        }
+        os << ")";
+      };
+      
+      printMethodList("instance_methods", InstanceMethods);
+      printMethodList("class_methods", ClassMethods);
+      printMethodList("opt_instance_methods", OptInstanceMethods);
+      printMethodList("opt_class_methods", OptClassMethods);
+      
+      os << "\n  (protocols";
+      for (auto pd : Protocols) {
+        os << "\n    (protocol ";
+        pd->dumpRef(os);
+        os << ")";
+      }
+      os << ")";
+      
+      auto printPropertyList = [&](StringRef label,
+                                   const SmallVectorImpl<VarDecl *> &props) {
+        if (props.empty()) return;
+        
+        os << "\n  (" << label;
+        for (auto prop : props) {
+          os << "\n    (property ";
+          prop->dumpRef(os);
+          os << ")";
+        }
+        os << ")";
+      };
+      
+      printPropertyList("instance_properties", InstanceProperties);
+      printPropertyList("class_properties", ClassProperties);
+      
+      os << ")";
+    }
   };
 } // end anonymous namespace
 
@@ -2356,7 +2578,7 @@ llvm::Constant *IRGenModule::emitObjCResilientClassStub(
   if (isPublic) {
     entity = LinkEntity::forObjCResilientClassStub(
         D, TypeMetadataAddress::AddressPoint);
-    defineAlias(entity, objcStub);
+    defineAlias(entity, objcStub, ObjCResilientClassStubTy);
   }
 
   return objcStub;
@@ -2503,11 +2725,9 @@ TypeConverter::convertClassType(CanType type, ClassDecl *D) {
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
   else
     spareBits = IGM.getHeapObjectSpareBits();
-  
-  return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           std::move(spareBits),
-                           IGM.getPointerAlignment(),
-                           D, refcount);
+
+  return new ClassTypeInfo(irType, IGM.getPointerSize(), std::move(spareBits),
+                           IGM.getPointerAlignment(), D, refcount, ST);
 }
 
 /// Lazily declare a fake-looking class to represent an ObjC runtime base class.
@@ -2719,13 +2939,14 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                   llvm::Value *metadata) {
   auto &layout = IGF.IGM.getClassMetadataLayout(theClass);
 
-  Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
-                          IGF.IGM.getPointerAlignment());
+  Address metadataAsBytes(
+      IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy), IGF.IGM.Int8Ty,
+      IGF.IGM.getPointerAlignment());
 
   Address slot = IGF.Builder.CreateConstByteArrayGEP(
       metadataAsBytes,
       layout.getInstanceSizeOffset());
-  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int32Ty);
   llvm::Value *size = IGF.Builder.CreateLoad(slot);
   if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
     size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
@@ -2733,7 +2954,7 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   slot = IGF.Builder.CreateConstByteArrayGEP(
       metadataAsBytes,
       layout.getInstanceAlignMaskOffset());
-  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int16Ty);
   llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
   alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
 
@@ -2754,9 +2975,7 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
   if (IGF.IGM.getOptions().VirtualFunctionElimination) {
     // For LLVM IR VFE, emit a @llvm.type.checked.load with the type of the
     // method.
-    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
-    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto slotAsPointer = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int8Ty);
     auto typeId = typeIdForMethod(IGF.IGM, method);
 
     // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
@@ -2769,8 +2988,8 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad =
-        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::type_checked_load, args);
     auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);
     return IGF.Builder.CreateBitCast(fnPtr,
                                      signature.getType()->getPointerTo());
@@ -2804,7 +3023,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(methodType, fnPtr, authInfo, signature);
+    return FunctionPointer::createSigned(methodType, fnPtr, authInfo,
+                                         signature, true);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
@@ -2817,7 +3037,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
           IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
     }
     return FunctionPointer::forDirect(methodType, fnPtr, secondaryValue,
-                                      signature);
+                                      signature, true);
   }
   }
   llvm_unreachable("covered switch");

@@ -108,7 +108,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
     bool IsExprStmt;
-    unsigned ExprNestingDepth;
     bool HasReachedSemanticsProvidingExpr;
 
     ASTContext &Ctx;
@@ -116,8 +115,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
-        : IsExprStmt(isExprStmt), ExprNestingDepth(0),
-          HasReachedSemanticsProvidingExpr(false),
+        : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
           Ctx(DC->getASTContext()), DC(DC) {}
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
@@ -133,11 +131,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (isa<OpenExistentialExpr>(E)) {
-        // Don't increase ExprNestingDepth.
-        return Action::Continue(E);
-      }
-
       if (auto collection = dyn_cast<CollectionExpr>(E)) {
         if (collection->isTypeDefaulted()) {
           // Diagnose type defaulted collection literals in subexpressions as
@@ -282,11 +275,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       // Diagnose 'self.init' or 'super.init' nested in another expression
-      // or closure. The ExprNestingDepth thing is to allow this to be nested
-      // inside of an OpenExistentialExpr that is at the top level.
+      // or closure.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        if (ExprNestingDepth > 0 || !IsExprStmt ||
-            DC->getParent()->isLocalContext()) {
+        if (!Parent.isNull() || !IsExprStmt || DC->getParent()->isLocalContext()) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           Ctx.Diags.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -357,17 +348,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         HasReachedSemanticsProvidingExpr = true;
       }
 
-      ++ExprNestingDepth;
-
       return Action::Continue(E);
     }
 
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      if (isa<OpenExistentialExpr>(E))
-        return Action::Continue(E);
-
-      assert(ExprNestingDepth != 0);
-      --ExprNestingDepth;
       return Action::Continue(E);
     }
 
@@ -409,6 +393,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     void checkMoveExpr(MoveExpr *moveExpr) {
       // Make sure the MoveOnly feature is set. If not, error.
+      // This should not currently be reached because the parse should ignore
+      // the _move keyword unless the feature flag is set.
       if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
         auto error =
           diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
@@ -524,7 +510,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         return;
 
       // Get underlying params for both callee and caller, if declared.
-      auto *calleeParam = getParameterAt(callee.getDecl(), argIndex);
+      auto *calleeParam = getParameterAt(callee, argIndex);
       auto *callerParam = dyn_cast_or_null<ParamDecl>(
           arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
       );
@@ -1523,7 +1509,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   };
 
   DiagnoseWalker walker(var, fn);
-
   const_cast<Expr *>(E)->walk(walker);
 }
 
@@ -3564,6 +3549,16 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
     return markStoredOrInOutExpr(OEE->getSubExpr(), Flags);
   }
+
+  // Bind pack references in pack expansions.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    for (unsigned i = 0; i < expansion->getNumBindings(); ++i) {
+      auto *opaqueValue = expansion->getOpaqueValues()[i];
+      auto *packReference = expansion->getBindings()[i];
+      OpaqueValueMap[opaqueValue] = packReference;
+    }
+    return markStoredOrInOutExpr(expansion->getPatternExpr(), Flags);
+  }
   
   // If this is an OpaqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
@@ -3639,6 +3634,15 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
     oee->getSubExpr()->walk(*this);
     return Action::SkipChildren(E);
+  }
+
+  // If we see a PackExpansionExpr, record its pack reference bindings.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    for (unsigned i = 0; i < expansion->getNumBindings(); ++i) {
+      auto *opaqueValue = expansion->getOpaqueValues()[i];
+      auto *packReference = expansion->getBindings()[i];
+      OpaqueValueMap[opaqueValue] = packReference;
+    }
   }
 
   // Visit bindings.
@@ -4388,6 +4392,93 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
+/// Diagnoses a `if #available(...)` condition. Returns true if a diagnostic
+/// was emitted.
+static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
+                                          DeclContext *DC) {
+  // Reject inlinable code using availability macros. In order to lift this
+  // restriction, macros would need to either be expanded when printed in
+  // swiftinterfaces or be parsable as macros by module clients.
+  auto fragileKind = DC->getFragileFunctionKind();
+  if (fragileKind.kind != FragileFunctionKind::None) {
+    for (auto queries : info->getQueries()) {
+      if (auto availSpec =
+              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries)) {
+        if (availSpec->getMacroLoc().isValid()) {
+          DC->getASTContext().Diags.diagnose(
+              availSpec->getMacroLoc(),
+              swift::diag::availability_macro_in_inlinable,
+              fragileKind.getSelector());
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/// Diagnoses a `if #_hasSymbol(...)` condition. Returns true if a diagnostic
+/// was emitted.
+static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
+                                       DeclContext *DC) {
+  // If we have an invalid info, null expression, or expression without a type
+  // then type checking failed already for this condition.
+  if (info->isInvalid())
+    return false;
+
+  auto symbolExpr = info->getSymbolExpr();
+  if (!symbolExpr)
+    return false;
+
+  if (!symbolExpr->getType())
+    return false;
+
+  auto &ctx = DC->getASTContext();
+  if (!ctx.LangOpts.Target.isOSDarwin()) {
+    // SILGen for #_hasSymbol is currently implemented assuming the target OS
+    // is a Darwin platform.
+    ctx.Diags.diagnose(info->getStartLoc(),
+                       diag::has_symbol_unsupported_on_target,
+                       ctx.LangOpts.Target.str());
+    return true;
+  }
+
+  auto fragileKind = DC->getFragileFunctionKind();
+  if (fragileKind.kind != FragileFunctionKind::None) {
+    // #_hasSymbol cannot be used in inlinable code because of limitations of
+    // the current implementation strategy. It relies on recording the
+    // referenced ValueDecl, mangling a helper function name using that
+    // ValueDecl, and then passing the responsibility of generating the
+    // definition for that helper function to IRGen. In order to lift this
+    // restriction, we will need teach SIL to encode the ValueDecl, or take
+    // another approach entirely.
+    ctx.Diags.diagnose(info->getStartLoc(),
+                       diag::has_symbol_condition_in_inlinable,
+                       fragileKind.getSelector());
+    return true;
+  }
+
+  auto decl = info->getReferencedDecl().getDecl();
+  if (!decl) {
+    // Diagnose because we weren't able to interpret the expression as one
+    // that uniquely identifies a single declaration.
+    ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+    return true;
+  }
+
+  if (!decl->isWeakImported(DC->getParentModule())) {
+    // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
+    // and may indicate the developer has mis-identified the declaration
+    // they want to check (or forgot to import the module weakly).
+    ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_decl_must_be_weak,
+                       decl->getDescriptiveKind(), decl->getName());
+    return true;
+  }
+
+  return false;
+}
+
 /// Perform MiscDiagnostics for the conditions belonging to a \c
 /// LabeledConditionalStmt.
 static void checkLabeledStmtConditions(ASTContext &ctx,
@@ -4400,37 +4491,17 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_Boolean:
     case StmtConditionElement::CK_PatternBinding:
-    case StmtConditionElement::CK_Availability:
       break;
-
+    case StmtConditionElement::CK_Availability: {
+      auto info = elt.getAvailability();
+      (void)diagnoseAvailabilityCondition(info, DC);
+      break;
+    }
     case StmtConditionElement::CK_HasSymbol: {
       auto info = elt.getHasSymbolInfo();
-      if (info->isInvalid())
-        break;
-
-      auto symbolExpr = info->getSymbolExpr();
-      if (!symbolExpr)
-        break;
-
-      if (!symbolExpr->getType())
-        break;
-
-      if (auto decl = info->getReferencedDecl().getDecl()) {
-        // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
-        // and may indicate the developer has mis-identified the declaration
-        // they want to check (or forgot to import the module weakly).
-        if (!decl->isWeakImported(DC->getParentModule())) {
-          ctx.Diags.diagnose(symbolExpr->getLoc(),
-                             diag::has_symbol_decl_must_be_weak,
-                             decl->getDescriptiveKind(), decl->getName());
-          info->setInvalid();
-        }
-      } else {
-        // Diagnose because we weren't able to interpret the expression as one
-        // that uniquely identifies a single declaration.
-        ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+      if (diagnoseHasSymbolCondition(info, DC))
         info->setInvalid();
-      }
+
       break;
     }
     }

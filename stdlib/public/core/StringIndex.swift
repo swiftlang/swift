@@ -512,3 +512,54 @@ extension String.Index: Hashable {
     hasher.combine(orderingValue)
   }
 }
+
+extension String.Index {
+  @_alwaysEmitIntoClient
+  internal var _encodingDescription: String {
+    switch (_rawBits & Self.__utf8Bit != 0, _rawBits & Self.__utf16Bit != 0) {
+    case (false, false): return "unknown"
+    case (true, false): return "utf8"
+    case (false, true): return "utf16"
+    case (true, true): return "any"
+    }
+  }
+
+  // The definitions below are placeholders for potential future `String.Index`
+  // conformances to `CustomStringConvertible` and
+  // `CustomDebugStringConvertible`. They are supplied here to make working with
+  // string indices somewhat bearable while we're working on adding the actual
+  // conformances.
+
+  /// A textual representation of this instance.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  public var _description: String {
+    // 23[utf8]+1
+    var d = "\(_encodedOffset)[\(_encodingDescription)]"
+    if transcodedOffset != 0 {
+      d += "+\(transcodedOffset)"
+    }
+    return d
+  }
+
+  /// A textual representation of this instance, suitable for debugging.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  public var _debugDescription: String {
+    var d = "String.Index("
+    d += "offset: \(_encodedOffset)[\(_encodingDescription)]"
+    if transcodedOffset != 0 {
+      d += "+\(transcodedOffset)"
+    }
+    if _isCharacterAligned {
+      d += ", aligned: character"
+    } else if _isScalarAligned {
+      d += ", aligned: scalar"
+    }
+    if let stride = characterStride {
+      d += ", stride: \(stride)"
+    }
+    d += ")"
+    return d
+  }
+}

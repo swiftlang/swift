@@ -23,6 +23,7 @@ sil [ossa] @getOwnedB : $@convention(thin) () -> (@owned B)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @borrowB : $@convention(thin) (@guaranteed B) -> ()
 sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
 
 // -O hoists the destroy
@@ -185,6 +186,57 @@ bb3(%arg3 : @owned $C):
 
 bb4(%arg4 : @owned $C):
   return %arg4 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @debugValueAfterDestroy : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         debug_value [[INSTANCE]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'debugValueAfterDestroy'
+sil [ossa] @debugValueAfterDestroy : $@convention(thin) () -> () {
+  %getOwnedB = function_ref @getOwnedB : $@convention(thin) () -> (@owned B)
+  %dummy = function_ref @dummy : $@convention(thin) () -> ()
+  %borrowB = function_ref @borrowB : $@convention(thin) (@guaranteed B) -> ()
+  %b = apply %getOwnedB() : $@convention(thin) () -> (@owned B)
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %borrowB(%b) : $@convention(thin) (@guaranteed B) -> ()
+
+  debug_value %b : $B
+  destroy_value %b : $B
+
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @deadArgDef : {{.*}} {
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] :
+// CHECK-NEXT:    destroy_value [[INSTANCE]]
+// CHECK:         apply {{%[^,]+}}
+// CHECK:         apply {{%[^,]+}}
+// CHECK:         apply {{%[^,]+}}
+// CHECK-LABEL: } // end sil function 'deadArgDef'
+sil [ossa] @deadArgDef : $@convention(thin) () -> () {
+  %getOwnedB = function_ref @getOwnedB : $@convention(thin) () -> (@owned B)
+  %dummy = function_ref @dummy : $@convention(thin) () -> ()
+  %borrowB = function_ref @borrowB : $@convention(thin) (@guaranteed B) -> ()
+  %b = apply %getOwnedB() : $@convention(thin) () -> (@owned B)
+  apply %borrowB(%b) : $@convention(thin) (@guaranteed B) -> ()
+  br exit(%b : $B)
+
+exit(%b2 : @owned $B):
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  destroy_value %b2 : $B
+
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // -----------------------------------------------------------------------------
@@ -616,27 +668,13 @@ bb1:
 
 // Original Overlapping (unnecessarily extends pruned liveness):
 //
-// TODO: this copy could be avoided but is probably an unusual case,
-// and sinking the destroy outside the access scope might help to
-// optimize the access itself.
-//
-//     %def
-//     begin_access // access scope unrelated to def
-//     use %def     // pruned liveness ends here
-//     br bb1
-// bb1:
-//     destroy %def
-//     end_access
-//
 // CHECK-LABEL: sil [ossa] @testOriginalOverlapInDeadBlock : $@convention(thin) () -> () {
 // CHECK:   [[DEF:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned AnyObject
 // CHECK:   begin_access
-// CHECK:   [[COPY:%.*]] = copy_value [[DEF]] : $AnyObject
-// CHECK:   store [[COPY]] to [init] %{{.*}} : $*AnyObject
+// CHECK:   store [[DEF]] to [init] %{{.*}} : $*AnyObject
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   end_access
-// CHECK:   destroy_value [[DEF]] : $AnyObject
 // CHECK-LABEL: } // end sil function 'testOriginalOverlapInDeadBlock'
 sil [ossa] @testOriginalOverlapInDeadBlock : $@convention(thin) () -> () {
 bb0:
@@ -927,20 +965,4 @@ bb0:
   dealloc_stack %14 : $*Optional<@callee_guaranteed () -> ()>
   %99 = tuple ()
   return %99 : $()
-}
-
-// Lexical destroy hoisting cannot handle a PointerEscape.
-//
-// CHECK-LABEL: sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
-// CHECK: bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
-// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
-// CHECK:   [[COPY:%.*]] = copy_value [[CAST]] : $Optional<@callee_guaranteed () -> ()>
-// CHECK:   destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
-// CHECK-LABEL: } // end sil function 'testNoLexicalHoistEscape'
-sil [ossa] @testNoLexicalHoistEscape : $@convention(thin) (@owned Optional<@Sendable @callee_guaranteed () -> ()>) -> @owned Optional<@callee_guaranteed () -> ()> {
-bb0(%0 : @owned $Optional<@Sendable @callee_guaranteed () -> ()>):
-  %cast = unchecked_bitwise_cast %0 : $Optional<@Sendable @callee_guaranteed () -> ()> to $Optional<@callee_guaranteed () -> ()>
-  %copy = copy_value %cast : $Optional<@callee_guaranteed () -> ()>
-  destroy_value %0 : $Optional<@Sendable @callee_guaranteed () -> ()>
-  return %copy : $Optional<@callee_guaranteed () -> ()>
 }

@@ -308,7 +308,7 @@ foreach(SDK ${SWIFT_SDKS})
               "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
         else()
           list(APPEND test_dependencies
-              "swift-reflection-test${VARIANT_SUFFIX}_signed")
+              "swift-reflection-test${VARIANT_SUFFIX}")
         endif()
       endif()
 

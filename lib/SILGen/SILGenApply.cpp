@@ -4248,6 +4248,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
       uncurriedLoc, std::move(payload),
       SGF.getLoweredType(formalResultType),
       element, uncurriedContext);
+
   return RValue(SGF, uncurriedLoc, formalResultType, resultMV);
 }
 
@@ -5263,78 +5264,6 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   }
 
   return result;
-}
-
-/// Emit an application of the given method.
-RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
-                                       ArgumentSource &&self,
-                                       PreparedArguments &&args, SGFContext C) {
-  auto *call = cast<AbstractFunctionDecl>(declRef.getDecl());
-
-  // Form the reference to the method.
-  auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
-                     .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
-
-  if (auto distributedThunk = call->getDistributedThunk()) {
-    callRef = SILDeclRef(distributedThunk).asDistributed();
-  } else if (call->isBackDeployed()) {
-    callRef =
-        callRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
-  }
-
-  auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);
-  auto subs = declRef.getSubstitutions();
-  bool throws = false;
-  bool markedAsRethrows = call->getAttrs().hasAttribute<swift::RethrowsAttr>();
-  PolymorphicEffectKind rethrowingKind =
-      call->getPolymorphicEffectKind(EffectKind::Throws);
-  if (rethrowingKind == PolymorphicEffectKind::ByConformance) {
-    for (auto conformanceRef : subs.getConformances()) {
-      if (conformanceRef.hasEffect(EffectKind::Throws)) {
-        throws = true;
-        break;
-      }
-    }
-  } else if (markedAsRethrows && 
-             rethrowingKind == PolymorphicEffectKind::Always) {
-    throws = true;
-  }
-  
-  // Scope any further writeback just within this operation.
-  FormalEvaluationScope writebackScope(*this);
-
-  // Form the metatype argument.
-  ManagedValue selfMetaVal;
-  SILType selfMetaTy;
-  {
-    // Determine the self metatype type.
-    CanSILFunctionType substFnType =
-        declRefConstant.SILFnType->substGenericArgs(SGM.M, subs,
-                                                    getTypeExpansionContext());
-    SILType selfParamMetaTy =
-        getSILType(substFnType->getSelfParameter(), substFnType);
-    selfMetaTy = selfParamMetaTy;
-  }
-
-  // Form the callee.
-  Optional<Callee> callee;
-  if (isa<ProtocolDecl>(call->getDeclContext())) {
-    callee.emplace(Callee::forWitnessMethod(*this, selfMetaTy.getASTType(),
-                                            callRef, subs, loc));
-  } else if (getMethodDispatch(call) == MethodDispatch::Class) {
-    callee.emplace(Callee::forClassMethod(*this, callRef, subs, loc));
-  } else {
-    callee.emplace(Callee::forDirect(*this, callRef, subs, loc));
-  }
-
-  auto substFormalType = callee->getSubstFormalType();
-
-  // Form the call emission.
-  CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
-  emission.addSelfParam(loc, std::move(self), substFormalType.getParams()[0]);
-  emission.addCallSite(loc, std::move(args), !throws);
-
-  return emission.apply(C);
 }
 
 RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(

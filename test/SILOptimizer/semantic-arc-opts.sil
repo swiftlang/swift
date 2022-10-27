@@ -1630,3 +1630,30 @@ exit:
     %res = tuple ()
     return %res : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_owned_to_guaranteed_phi : 
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'test_owned_to_guaranteed_phi'
+sil [ossa] @test_owned_to_guaranteed_phi : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %some = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  %copysome = copy_value %some : $FakeOptional<Klass>
+  switch_enum %copysome : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb2, case #FakeOptional.none!enumelt: bb3
+
+bb2(%2 : @owned $Klass):
+  br bb4(%2 : $Klass)
+
+bb3:
+  %3 = copy_value %1 : $Klass
+  br bb4(%3 : $Klass)
+
+bb4(%4 : @owned $Klass):
+  %b = begin_borrow %4 : $Klass
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %4 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+

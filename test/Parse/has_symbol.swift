@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/Library.swiftmodule -parse-as-library %t/Library.swift -enable-library-evolution
 // RUN: %target-swift-frontend -typecheck -verify %t/Client.swift -I %t
 
-// UNSUPPORTED: OS=windows-msvc
+// REQUIRES: VENDOR=apple
 
 //--- Library.swift
 

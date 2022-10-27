@@ -63,6 +63,27 @@ StringRef
 getNameForCxx(const ValueDecl *VD,
               CustomNamesOnly_t customNamesOnly = objc_translation::Normal);
 
+enum RepresentationKind { Representable, Unsupported };
+
+enum RepresentationError { UnrepresentableActorClass };
+
+struct DeclRepresentation {
+  RepresentationKind kind;
+  llvm::Optional<RepresentationError> error;
+
+  /// Returns true if the given Swift node is unsupported in Clang in any
+  /// language mode.
+  bool isUnsupported() const { return kind == Unsupported; }
+};
+
+/// Returns the C++ representation info for the given declaration.
+DeclRepresentation getDeclRepresentation(const ValueDecl *VD);
+
+/// Returns true if the given value decl is exposable to C++.
+inline bool isExposableToCxx(const ValueDecl *VD) {
+  return !getDeclRepresentation(VD).isUnsupported();
+}
+
 /// Returns true if the given value decl D is visible to C++ of its
 /// own accord (i.e. without considering its context)
 bool isVisibleToCxx(const ValueDecl *VD, AccessLevel minRequiredAccess,

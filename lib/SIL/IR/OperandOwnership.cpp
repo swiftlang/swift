@@ -27,6 +27,9 @@ bool swift::checkOperandOwnershipInvariants(const Operand *operand,
     // Must be a valid BorrowingOperand.
     return bool(BorrowingOperand(const_cast<Operand *>(operand)));
   }
+  if (opOwnership == OperandOwnership::GuaranteedForwarding) {
+    return canOpcodeForwardGuaranteedValues(const_cast<Operand *>(operand));
+  }
   return true;
 }
 
@@ -120,6 +123,7 @@ SHOULD_NEVER_VISIT_INST(ReleaseValueAddr)
 SHOULD_NEVER_VISIT_INST(StrongRelease)
 SHOULD_NEVER_VISIT_INST(GetAsyncContinuation)
 SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
+SHOULD_NEVER_VISIT_INST(TestSpecification)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -239,7 +243,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 OPERAND_OWNERSHIP(PointerEscape, ConvertEscapeToNoEscape)
 
 // UncheckedBitwiseCast ownership behaves like RefToUnowned. It produces an
-// Unowned values from a non-trivial value, without consuming or borrowing the
+// Unowned value from a non-trivial value, without consuming or borrowing the
 // non-trivial value. Unlike RefToUnowned, a bitwise cast works on a compound
 // value and may truncate the value. The resulting value is still Unowned and
 // should be immediately copied to produce an owned value. These happen for two
@@ -296,14 +300,14 @@ OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
 OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
 // Instructions that propagate a value within a borrow scope.
-OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
-OPERAND_OWNERSHIP(ForwardingBorrow, StructExtract)
-OPERAND_OWNERSHIP(ForwardingBorrow, DifferentiableFunctionExtract)
-OPERAND_OWNERSHIP(ForwardingBorrow, LinearFunctionExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, TupleExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, StructExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, DifferentiableFunctionExtract)
+OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 // FIXME: OpenExistential[Box]Value should be able to take owned values too by
 // using getForwardingOperandOwnership.
-OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialValue)
-OPERAND_OWNERSHIP(ForwardingBorrow, OpenExistentialBoxValue)
+OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
+OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
@@ -334,7 +338,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 #undef OPERAND_OWNERSHIP
 
 // Forwarding operations are conditionally either ForwardingConsumes or
-// ForwardingBorrows, depending on the instruction's constant ownership
+// GuaranteedForwarding, depending on the instruction's constant ownership
 // attribute.
 #define FORWARDING_OWNERSHIP(INST)                                             \
   OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
@@ -375,7 +379,7 @@ FORWARDING_ANY_OWNERSHIP(CheckedCastBranch)
 // the meet of its operands' ownership. A destructured member has the same
 // ownership as its aggregate unless its type gives it None ownership.
 //
-// TODO: Aggregate operations should be Reborrows, not ForwardingBorrows,
+// TODO: Aggregate operations should be Reborrows, not GuaranteedForwarding,
 // because the borrowed value is different on either side of the operation and
 // the lifetimes of borrowed members could differ.
 #define AGGREGATE_OWNERSHIP(INST)                                              \
@@ -421,7 +425,7 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
 OperandOwnership
 OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
   if (getValue() == i->getDefaultResult())
-    return OperandOwnership::ForwardingBorrow;
+    return OperandOwnership::GuaranteedForwarding;
 
   for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
     SILValue casevalue;
@@ -429,7 +433,7 @@ OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
     std::tie(casevalue, result) = i->getCase(idx);
 
     if (getValue() == casevalue) {
-      return OperandOwnership::ForwardingBorrow;
+      return OperandOwnership::GuaranteedForwarding;
     }
   }
   return OperandOwnership::TrivialUse;
@@ -439,10 +443,10 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
   ValueOwnershipKind destBlockArgOwnershipKind =
       bi->getDestBB()->getArgument(getOperandIndex())->getOwnershipKind();
 
-  // FIXME: remove this special case once all aggregate operations behave just
-  // like phis.
   if (destBlockArgOwnershipKind == OwnershipKind::Guaranteed) {
-    return OperandOwnership::Reborrow;
+    return isGuaranteedForwardingPhi(getValue())
+               ? OperandOwnership::GuaranteedForwardingPhi
+               : OperandOwnership::Reborrow;
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
     /*allowUnowned*/true);

@@ -6,10 +6,11 @@ import Builtin
 import Swift
 import SwiftShims
 
-@typeWrapper class MyWrapper<S> {
+@typeWrapper class MyWrapper<W, S> {
   @_hasStorage var underlying: S { get set }
-  init(memberwise s: S)
-  subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V { get set }
+  init(for: W.Type, storage s: S)
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: KeyPath<S, V>) -> V { get }
+  subscript<V>(propertyKeyPath _: KeyPath<W, V>, storageKeyPath path: WritableKeyPath<S, V>) -> V { get set }
   deinit
 }
 

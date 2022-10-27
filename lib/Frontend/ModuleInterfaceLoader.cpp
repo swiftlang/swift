@@ -202,10 +202,10 @@ namespace path = llvm::sys::path;
 
 static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf,
                                     bool requiresOSSAModules,
-                                    StringRef requiredSDK) {
-  auto VI = serialization::validateSerializedAST(buf.getBuffer(),
-                                                 requiresOSSAModules,
-                                                 requiredSDK);
+                                    StringRef requiredSDK,
+                                    bool requiresRevisionMatch) {
+  auto VI = serialization::validateSerializedAST(
+      buf.getBuffer(), requiresOSSAModules, requiredSDK, requiresRevisionMatch);
   return VI.status == serialization::Status::Valid;
 }
 
@@ -406,6 +406,7 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), requiresOSSAModules, ctx.LangOpts.SDKName,
+        !ctx.LangOpts.DebuggerSupport,
         /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
     if (validationInfo.status != serialization::Status::Valid) {
@@ -564,7 +565,8 @@ class ModuleInterfaceLoaderImpl {
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get(), requiresOSSAModules,
-                                                           ctx.LangOpts.SDKName))
+                                            ctx.LangOpts.SDKName,
+                                            !ctx.LangOpts.DebuggerSupport))
       return false;
 
     // Next, check the dependencies in the forwarding file.
@@ -1489,6 +1491,11 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
       std::string pair = (llvm::Twine(lhs) + "=" + rhs).str();
       GenericArgs.push_back(ArgSaver.save(pair));
   });
+
+  if (LangOpts.hasFeature(Feature::LayoutPrespecialization)) {
+    genericSubInvocation.getLangOptions().Features.insert(
+      Feature::LayoutPrespecialization);
+  }
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
@@ -1558,6 +1565,11 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (LoaderOpts.disableImplicitSwiftModule) {
     genericSubInvocation.getFrontendOptions().DisableImplicitModules = true;
     GenericArgs.push_back("-disable-implicit-swift-modules");
+  }
+  // If building an application extension, make sure API use
+  // is restricted accordingly in downstream dependnecies.
+  if (langOpts.EnableAppExtensionRestrictions) {
+    GenericArgs.push_back("-application-extension");
   }
   // Save the parent invocation's Target Triple
   ParentInvocationTarget = langOpts.Target;

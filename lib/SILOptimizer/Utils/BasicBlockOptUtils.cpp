@@ -133,7 +133,7 @@ static bool canBorrowGuaranteedResult(SILValue guaranteedResult) {
 bool swift::canCloneTerminator(TermInst *termInst) {
   // TODO: this is an awkward way to check for guaranteed terminator results.
   for (Operand &oper : termInst->getAllOperands()) {
-    if (oper.getOperandOwnership() != OperandOwnership::ForwardingBorrow)
+    if (oper.getOperandOwnership() != OperandOwnership::GuaranteedForwarding)
       continue;
 
     if (!ForwardingOperand(&oper).visitForwardedValues(

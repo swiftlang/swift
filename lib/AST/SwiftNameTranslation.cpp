@@ -165,6 +165,16 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
   return VD->getBaseIdentifier().str();
 }
 
+swift::cxx_translation::DeclRepresentation
+swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
+  if (auto *CD = dyn_cast<ClassDecl>(VD)) {
+    // Actors are not exposable to C++.
+    if (CD->isAnyActor())
+      return {Unsupported, UnrepresentableActorClass};
+  }
+  return {Representable, llvm::None};
+}
+
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
                                             AccessLevel minRequiredAccess,
                                             bool checkParent) {

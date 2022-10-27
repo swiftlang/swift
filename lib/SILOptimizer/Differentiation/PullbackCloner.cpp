@@ -1495,7 +1495,7 @@ public:
   }
   void visitStoreBorrowInst(StoreBorrowInst *sbi) {
     visitStoreOperation(sbi->getParent(), sbi->getLoc(), sbi->getSrc(),
-                        sbi->getDest());
+                        sbi);
   }
 
   /// Handle `copy_addr` instruction.

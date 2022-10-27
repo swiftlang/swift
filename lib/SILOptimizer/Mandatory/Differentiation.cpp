@@ -62,6 +62,12 @@ using llvm::SmallSet;
 static llvm::cl::opt<bool> EnableExperimentalLinearMapTransposition(
     "enable-experimental-linear-map-transposition", llvm::cl::init(false));
 
+/// This flag is used to disable `differentiable_function_extract` instruction
+/// folding for SIL testing purposes.
+static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
+    "differentiation-skip-folding-differentiable-function-extraction",
+    llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -121,6 +127,17 @@ public:
   /// Process the given `linear_function` instruction, filling in the missing
   /// transpose function if necessary.
   bool processLinearFunctionInst(LinearFunctionInst *lfi);
+
+  /// Fold `differentiable_function_extract` users of the given
+  /// `differentiable_function` instruction, directly replacing them with
+  /// `differentiable_function` instruction operands. If the
+  /// `differentiable_function` instruction has no remaining uses, delete the
+  /// instruction itself after folding.
+  ///
+  /// Folding can be disabled by the
+  /// `SkipFoldingDifferentiableFunctionExtraction` flag for SIL testing
+  /// purposes.
+  void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 };
 
 } // end anonymous namespace
@@ -210,8 +227,8 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       }
     }
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     // Check layout requirements.
     case RequirementKind::Layout: {
@@ -1222,6 +1239,51 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   return newLinearFn;
 }
 
+/// Fold `differentiable_function_extract` users of the given
+/// `differentiable_function` instruction, directly replacing them with
+/// `differentiable_function` instruction operands. If the
+/// `differentiable_function` instruction has no remaining uses, delete the
+/// instruction itself after folding.
+///
+/// Folding can be disabled by the `SkipFoldingDifferentiableFunctionExtraction`
+/// flag for SIL testing purposes.
+// FIXME: This function is not correctly detecting the foldable pattern and
+// needs to be rewritten.
+void DifferentiationTransformer::foldDifferentiableFunctionExtraction(
+    DifferentiableFunctionInst *source) {
+  // Iterate through all `differentiable_function` instruction uses.
+  for (auto use : source->getUses()) {
+    auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(use->getUser());
+    // If user is not an `differentiable_function_extract` instruction, set flag
+    // to false.
+    if (!dfei)
+      continue;
+    // Fold original function extractors.
+    if (dfei->getExtractee() ==
+        NormalDifferentiableFunctionTypeComponent::Original) {
+      auto originalFnValue = source->getOriginalFunction();
+      dfei->replaceAllUsesWith(originalFnValue);
+      dfei->eraseFromParent();
+      continue;
+    }
+    // Fold derivative function extractors.
+    auto derivativeFnValue =
+        source->getDerivativeFunction(dfei->getDerivativeFunctionKind());
+    dfei->replaceAllUsesWith(derivativeFnValue);
+    dfei->eraseFromParent();
+  }
+  // If the `differentiable_function` instruction has no remaining uses, erase
+  // it.
+  if (isInstructionTriviallyDead(source)) {
+    SILBuilder builder(source);
+    builder.emitDestroyAddrAndFold(source->getLoc(), source->getJVPFunction());
+    builder.emitDestroyAddrAndFold(source->getLoc(), source->getVJPFunction());
+    source->eraseFromParent();
+  }
+  // Mark `source` as processed so that it won't be reprocessed after deletion.
+  context.markDifferentiableFunctionInstAsProcessed(source);
+}
+
 bool DifferentiationTransformer::processDifferentiableFunctionInst(
     DifferentiableFunctionInst *dfi) {
   PrettyStackTraceSILNode dfiTrace("canonicalizing `differentiable_function`",
@@ -1250,6 +1312,14 @@ bool DifferentiationTransformer::processDifferentiableFunctionInst(
   // Destroy the original operand.
   builder.emitDestroyValueOperation(loc, dfi->getOriginalFunction());
   dfi->eraseFromParent();
+  // If the promoted `@differentiable` function-typed value is an
+  // `differentiable_function` instruction, fold
+  // `differentiable_function_extract` instructions. If
+  // `differentiable_function_extract` folding is disabled, return.
+  if (!SkipFoldingDifferentiableFunctionExtraction)
+    if (auto *newDFI =
+            dyn_cast<DifferentiableFunctionInst>(differentiableFnValue))
+      foldDifferentiableFunctionExtraction(newDFI);
   transform.invalidateAnalysis(parent,
                                SILAnalysis::InvalidationKind::FunctionBody);
   return false;

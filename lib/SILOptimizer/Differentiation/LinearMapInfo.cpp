@@ -38,12 +38,10 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
                                                 CanGenericSignature sig) {
   SmallVector<GenericTypeParamDecl *, 2> clonedParams;
   for (auto paramType : sig.getGenericParams()) {
-    auto clonedParam = GenericTypeParamDecl::create(
-        dc, paramType->getName(), SourceLoc(), paramType->isTypeSequence(),
-        paramType->getDepth(), paramType->getIndex(),
-        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+    auto *clonedParam = GenericTypeParamDecl::createImplicit(
+        dc, paramType->getName(), paramType->getDepth(), paramType->getIndex(),
+        paramType->isParameterPack());
     clonedParam->setDeclContext(dc);
-    clonedParam->setImplicit(true);
     clonedParams.push_back(clonedParam);
   }
   return GenericParamList::create(ctx, SourceLoc(), clonedParams, SourceLoc());

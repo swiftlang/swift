@@ -31,7 +31,7 @@
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -401,8 +401,9 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   };
 
   CanonicalizeOSSALifetime canonicalizer(
-      false /*pruneDebugMode*/, accessBlockAnalysis, domTree, deleter,
-      foundConsumingUseNeedingCopy, foundConsumingUseNotNeedingCopy);
+      false /*pruneDebugMode*/, !fn->shouldOptimize() /*maximizeLifetime*/,
+      accessBlockAnalysis, domTree, deleter, foundConsumingUseNeedingCopy,
+      foundConsumingUseNotNeedingCopy);
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
   SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;

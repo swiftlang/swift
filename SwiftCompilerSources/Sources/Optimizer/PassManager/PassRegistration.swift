@@ -17,6 +17,7 @@ import Parse
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerSILClasses()
+  registerSwiftAnalyses()
   registerSwiftPasses()
   initializeSwiftParseModules()
 }
@@ -51,7 +52,8 @@ private func registerSwiftPasses() {
 
   // Function passes
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
-  registerPass(computeEffects, { computeEffects.run($0) })
+  registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
+  registerPass(computeSideEffects, { computeSideEffects.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
   registerPass(functionStackProtection, { functionStackProtection.run($0) })
@@ -70,6 +72,11 @@ private func registerSwiftPasses() {
   registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
   registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
   registerPass(accessDumper, { accessDumper.run($0) })
+  registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
   registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(runUnitTests, { runUnitTests.run($0) })
+}
+
+private func registerSwiftAnalyses() {
+  CalleeAnalysis.register()
 }

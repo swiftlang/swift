@@ -315,7 +315,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
 
     /// Generate new generic parameter.
     auto *NewGenericParam =
-        GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
+        GenericTypeParamType::get(/*isParameterPack*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                constraint);

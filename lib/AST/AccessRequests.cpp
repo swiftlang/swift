@@ -84,7 +84,14 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     if (D->hasInterfaceType() && D->isInvalid()) {
       return AccessLevel::Private;
     } else {
-      auto container = cast<NominalTypeDecl>(D->getDeclContext());
+      auto container = dyn_cast<NominalTypeDecl>(DC);
+      if (D->getKind() == DeclKind::Destructor && !container) {
+        // A destructor in an extension means @_objcImplementation. An
+        // @_objcImplementation class's deinit is only called by the ObjC thunk,
+        // if at all, so it is nonpublic.
+        return AccessLevel::Internal;
+      }
+
       return std::max(container->getFormalAccess(), AccessLevel::Internal);
     }
   }

@@ -743,13 +743,18 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     if (kind == SIL_ARG_EFFECTS_ATTR) {
       IdentifierID effectID;
       unsigned isDerived;
+      unsigned isGlobalSideEffects;
       unsigned argumentIndex;
-      SILArgEffectsAttrLayout::readRecord(scratch, effectID,
-                                          argumentIndex, isDerived);
+      SILArgEffectsAttrLayout::readRecord(scratch, effectID, argumentIndex,
+                                          isGlobalSideEffects, isDerived);
       if (shouldAddEffectAttrs) {
         StringRef effectStr = MF->getIdentifierText(effectID);
-        auto error = fn->parseEffects(effectStr, /*fromSIL*/ true,
-                                      argumentIndex, isDerived, {});
+        std::pair<const char *, int> error;
+        if (isGlobalSideEffects) {
+          error = fn->parseGlobalEffectsFromSIL(effectStr);
+        } else {
+          error = fn->parseArgumentEffectsFromSIL(effectStr, (int)argumentIndex);
+        }
         (void)error;
         assert(!error.first && "effects deserialization error");
       }
@@ -1283,6 +1288,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   SILInstruction *ResultInst;
   switch (OpCode) {
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::TestSpecificationInst:
     llvm_unreachable("not supported");
 
   case SILInstructionKind::AllocBoxInst:

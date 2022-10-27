@@ -90,7 +90,7 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (!isa<PrimaryArchetypeType>(A) && !isa<SequenceArchetypeType>(A))
+  if (!isa<PrimaryArchetypeType>(A) && !isa<PackArchetypeType>(A))
     return true;
   if (isa<OpenedArchetypeType>(A))
     return true;
@@ -985,6 +985,24 @@ public:
     return InstNumbers[a] < InstNumbers[b];
   }
 
+  // FIXME: For sanity, address-type phis should be prohibited at all SIL
+  // stages. However, the optimizer currently breaks the invariant in three
+  // places:
+  // 1. Normal Simplify CFG during conditional branch simplification
+  //    (sneaky jump threading).
+  // 2. Simplify CFG via Jump Threading.
+  // 3. Loop Rotation.
+  //
+  // BasicBlockCloner::canCloneInstruction and sinkAddressProjections is
+  // designed to avoid this issue, we just need to make sure all passes use it
+  // correctly.
+  //
+  // Minimally, we must prevent address-type phis as long as access markers are
+  // preserved. A goal is to preserve access markers in OSSA.
+  bool prohibitAddressPhis() {
+    return F.hasOwnership();
+  }
+
   void visitSILPhiArgument(SILPhiArgument *arg) {
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
@@ -1008,7 +1026,7 @@ public:
                 "All phi argument inputs must be from branches.");
       }
     }
-    if (arg->isPhi()) {
+    if (arg->isPhi() && prohibitAddressPhis()) {
       // As a property of well-formed SIL, we disallow address-type
       // phis. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
@@ -2260,7 +2278,7 @@ public:
   }
 
   bool checkScopedAddressUses(ScopedAddressValue scopedAddress,
-                              PrunedLiveness *scopedAddressLiveness,
+                              SSAPrunedLiveness *scopedAddressLiveness,
                               DeadEndBlocks *deadEndBlocks) {
     SmallVector<Operand *, 4> uses;
     findTransitiveUsesForAddress(scopedAddress.value, &uses);
@@ -2444,9 +2462,22 @@ public:
     require(isa<AllocStackInst>(SI->getDest()),
             "store_borrow destination can only be an alloc_stack");
 
-    PrunedLiveness scopedAddressLiveness;
+    SSAPrunedLiveness scopedAddressLiveness;
     ScopedAddressValue scopedAddress(SI);
-    bool success = scopedAddress.computeLiveness(scopedAddressLiveness);
+    // FIXME: Reenable @test_load_borrow_store_borrow_nested in
+    // store_borrow_verify_errors once computeLivess can successfully handle a
+    // store_borrow within a load_borrow. This can be fixed in two ways
+    //
+    // (1) With complete lifetimes, this no longer needs to perform transitive
+    // liveness at all.
+    //
+    // (2) findInnerTransitiveGuaranteedUses, which ends up being called on the
+    // load_borrow to compute liveness, can be taught to transitively process
+    // InteriorPointer uses instead of returning PointerEscape. We need to make
+    // sure all uses of the utility need to handle this first.
+    AddressUseKind useKind =
+        scopedAddress.computeTransitiveLiveness(scopedAddressLiveness);
+    bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(
                             scopedAddress, &scopedAddressLiveness, &DEBlocks),
@@ -3291,7 +3322,8 @@ public:
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
 
-    require(EI->getField()->getDeclContext() == cd,
+    require(EI->getField()->getDeclContext() ==
+                cd->getImplementationContext()->getAsGenericContext(),
             "ref_element_addr field must be a member of the class");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {

@@ -33,9 +33,9 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -350,8 +350,10 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   InstructionDeleter deleter(std::move(canonicalizeCallbacks));
 
   DominanceInfo *domTree = DA->get(&Builder.getFunction());
-  CanonicalizeOSSALifetime canonicalizer(false /*prune debug*/, NLABA, domTree,
-                                         deleter);
+  CanonicalizeOSSALifetime canonicalizer(
+      false /*prune debug*/,
+      !parentTransform->getFunction()->shouldOptimize() /*maximize lifetime*/,
+      NLABA, domTree, deleter);
   CanonicalizeBorrowScope borrowCanonicalizer(deleter);
 
   while (!defsToCanonicalize.empty()) {
@@ -571,9 +573,6 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
 
 #define SWIFT_INSTRUCTION_PASS(INST, TAG) \
   SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return nullptr; })
-
-#define SWIFT_INSTRUCTION_PASS_WITH_LEGACY(INST, TAG) \
-  SWIFT_INSTRUCTION_PASS_COMMON(INST, TAG, { return legacyVisit##INST(inst); })
 
 #include "swift/SILOptimizer/PassManager/Passes.def"
 

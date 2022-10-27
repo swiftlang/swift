@@ -468,19 +468,37 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
+  // If this is an element of a `_storage` tuple, we need to
+  // check the `$Storage` to determine whether underlying storage
+  // backing element is immutable.
+  if (auto *storageVar = getAsTypeWrapperLocalStorageVar()) {
+    auto *wrappedType = cast<NominalTypeDecl>(
+        storageVar->getDeclContext()->getInnermostTypeContext());
+    assert(wrappedType && "_storage reference without type wrapper");
+
+    auto storageVarType = storageVar->getInterfaceType()->getAs<TupleType>();
+    assert(Element < storageVarType->getNumElements());
+    auto propertyName = storageVarType->getElement(Element).getName();
+
+    auto *storageDecl = wrappedType->getTypeWrapperStorageDecl();
+    auto *property = storageDecl->lookupDirect(propertyName).front();
+    return cast<VarDecl>(property)->isLet();
+  }
+
   // If we aren't representing 'self' in a non-delegating initializer, then we
   // can't have 'let' properties.
   if (!isNonDelegatingInit())
     return IsLet;
 
-  auto &Module = MemoryInst->getModule();
+  auto NTD = MemorySILType.getNominalOrBoundGenericNominal();
 
-  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
   if (!NTD) {
     // Otherwise, we miscounted elements?
     assert(Element == 0 && "Element count problem");
     return false;
   }
+
+  auto &Module = MemoryInst->getModule();
 
   auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   for (auto *VD : NTD->getStoredProperties()) {

@@ -1635,8 +1635,8 @@ public:
     for (auto reqt : nomGenericSig.getRequirements()) {
       auto firstTy = reqt.getFirstType().subst(substGPMap);
       switch (auto kind = reqt.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
 
       case RequirementKind::SameType:
         // Skip same-type constraints that define away primary generic params,

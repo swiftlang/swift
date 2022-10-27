@@ -167,7 +167,7 @@ class SILFunction
     public SwiftObjectHeader {
     
 private:
-  void *libswiftSpecificData[1];
+  void *libswiftSpecificData[4];
 
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
@@ -576,9 +576,7 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root, SILDeclRef Ref);
-
-  void discardProfiler() { Profiler = nullptr; }
+  void createProfiler(SILDeclRef Ref);
 
   ProfileCounter getEntryCount() const { return EntryCount; }
 
@@ -1044,9 +1042,12 @@ public:
     EffectsKindAttr = unsigned(E);
   }
   
-  std::pair<const char *, int>  parseEffects(StringRef attrs, bool fromSIL,
-                                             int argumentIndex, bool isDerived,
-                                             ArrayRef<StringRef> paramNames);
+  std::pair<const char *, int>  parseArgumentEffectsFromSource(StringRef effectStr,
+                                                              ArrayRef<StringRef> paramNames);
+  std::pair<const char *, int>  parseArgumentEffectsFromSIL(StringRef effectStr,
+                                                           int argumentIndex);
+  std::pair<const char *, int>  parseGlobalEffectsFromSIL(StringRef effectStr);
+  std::pair<const char *, int>  parseMultipleEffectsFromSIL(StringRef effectStr);
   void writeEffect(llvm::raw_ostream &OS, int effectIdx) const;
   void writeEffects(llvm::raw_ostream &OS) const {
     writeEffect(OS, -1);
@@ -1054,6 +1055,7 @@ public:
   void copyEffects(SILFunction *from);
   bool hasArgumentEffects() const;
   void visitArgEffects(std::function<void(int, int, bool)> c) const;
+  SILInstruction::MemoryBehavior getMemoryBehavior(bool observeRetains);
 
   Purpose getSpecialPurpose() const { return specialPurpose; }
 

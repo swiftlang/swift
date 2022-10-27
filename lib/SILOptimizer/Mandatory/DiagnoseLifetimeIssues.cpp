@@ -64,7 +64,7 @@ class DiagnoseLifetimeIssues {
   static constexpr int maxCallDepth = 8;
 
   /// The liveness of the object in question, computed in visitUses.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
 
   /// All weak stores of the object, which are found in visitUses.
   llvm::SmallVector<SILInstruction *, 8> weakStores;
@@ -214,7 +214,8 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         if (updateLivenessAndWeakStores)
           liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::ForwardingConsume:
         // TermInst includes ReturnInst, which is generally an escape.
         // If this is called as part of getArgumentState, then it is not really
@@ -238,9 +239,11 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
           return CanEscape;
         break;
       case OperandOwnership::Borrow: {
-        if (updateLivenessAndWeakStores &&
-            !liveness.updateForBorrowingOperand(use))
+        if (updateLivenessAndWeakStores
+            && (liveness.updateForBorrowingOperand(use)
+                != InnerBorrowKind::Contained)) {
           return CanEscape;
+        }
         BorrowingOperand borrowOper(use);
         if (borrowOper.hasBorrowIntroducingUser()) {
           if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(user))
@@ -305,7 +308,7 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
 }
 
 /// Returns true if \p inst is outside the pruned \p liveness.
-static bool isOutOfLifetime(SILInstruction *inst, PrunedLiveness &liveness) {
+static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // Check if the lifetime of the stored object ends at the store_weak.
   //
   // A more sophisticated analysis would be to check if there are no
@@ -325,7 +328,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
   weakStores.clear();
 
   SILValue storedDef = cast<SingleValueInstruction>(allocationInst);
-  liveness.initializeDefBlock(storedDef->getParentBlock());
+  liveness.initializeDef(storedDef);
 
   // Compute the canonical lifetime of storedDef, like the copy-propagation pass
   // would do.

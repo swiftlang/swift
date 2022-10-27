@@ -49,7 +49,7 @@ class GatherWritesVisitor : public AccessUseVisitor {
 
 public:
   GatherWritesVisitor(SmallVectorImpl<Operand *> &writes)
-      : AccessUseVisitor(AccessUseType::Overlapping,
+      : AccessUseVisitor(AccessUseType::Exact,
                          NestedAccessType::StopAtAccessBegin),
         writeAccumulator(writes) {}
 
@@ -324,13 +324,10 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     accessPath.getStorage().print(llvm::errs());
     return false;
   }
-  auto ownershipRoot = accessPath.getStorage().isReference()
-                           ? findOwnershipReferenceRoot(accessPathWithBase.base)
-                           : SILValue();
 
   BorrowedValue borrowedValue(lbi);
-  PrunedLiveness borrowLiveness;
-  borrowedValue.computeLiveness(borrowLiveness);
+  MultiDefPrunedLiveness borrowLiveness(lbi->getFunction());
+  borrowedValue.computeTransitiveLiveness(borrowLiveness);
 
   // Then for each write...
   for (auto *op : *writes) {
@@ -339,14 +336,8 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     if (deadEndBlocks.isDeadEnd(write->getParent())) {
       continue;
     }
-    // A destroy_value will be a definite write only when the destroy is on the
-    // ownershipRoot
-    if (isa<DestroyValueInst>(write)) {
-      if (op->get() != ownershipRoot)
-        continue;
-    }
 
-    if (borrowLiveness.isWithinBoundaryOfDef(write, lbi)) {
+    if (borrowLiveness.isWithinBoundary(write)) {
       llvm::errs() << "Write: " << *write;
       return false;
     }

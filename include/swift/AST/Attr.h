@@ -172,6 +172,10 @@ protected:
       kind : NumKnownProtocolKindBits,
       isUnchecked : 1
     );
+
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
+      isCategoryNameInvalid : 1
+    );
   } Bits;
 
   DeclAttribute *Next = nullptr;
@@ -2190,20 +2194,6 @@ public:
   }
 };
 
-/// The @_typeSequence attribute, which treats a generic param decl as a variadic
-/// sequence of value/type pairs.
-class TypeSequenceAttr : public DeclAttribute {
-  TypeSequenceAttr(SourceLoc atLoc, SourceRange Range);
-
-public:
-  static TypeSequenceAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                  SourceRange Range);
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_TypeSequence;
-  }
-};
-
 /// The @_unavailableFromAsync attribute, used to make function declarations
 /// unavailable from async contexts.
 class UnavailableFromAsyncAttr : public DeclAttribute {
@@ -2286,6 +2276,31 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Documentation;
+  }
+};
+
+class ObjCImplementationAttr final : public DeclAttribute {
+public:
+  Identifier CategoryName;
+
+  ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
+                         SourceRange Range, bool Implicit = false,
+                         bool isCategoryNameInvalid = false)
+    : DeclAttribute(DAK_ObjCImplementation, AtLoc, Range, Implicit),
+      CategoryName(CategoryName) {
+    Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+  }
+
+  bool isCategoryNameInvalid() const {
+    return Bits.ObjCImplementationAttr.isCategoryNameInvalid;
+  }
+
+  void setCategoryNameInvalid(bool newValue = true) {
+    Bits.ObjCImplementationAttr.isCategoryNameInvalid = newValue;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ObjCImplementation;
   }
 };
 

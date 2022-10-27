@@ -179,6 +179,8 @@ public:
 
     RequiredProtocols protos;
     LayoutConstraint layout;
+
+    Type packShape;
   };
 
 private:
@@ -418,6 +420,17 @@ public:
 
   /// Lookup a nested type with the given name within this type parameter.
   TypeDecl *lookupNestedType(Type type, Identifier name) const;
+
+  /// Returns the shape equivalence class of the given type parameter.
+  ///
+  /// \param type The type parameter to compute the reduced shape for.
+  /// Only type parameter packs have a shape, including dependent members
+  /// whose root generic parameter is a pack.
+  Type getReducedShape(Type type) const;
+
+  /// Returns \c true if the given type parameter packs are in
+  /// the same shape equivalence class.
+  bool haveSameShape(Type type1, Type type2) const;
 
   /// Get the ordinal of a generic parameter in this generic signature.
   ///

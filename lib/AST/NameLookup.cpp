@@ -2870,11 +2870,9 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     for (auto repr : typeReprs) {
    
       // Allocate a new generic parameter to represent this opaque type.
-      auto gp = GenericTypeParamDecl::create(
-          dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
-          GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
-          repr);
-      gp->setImplicit();
+      auto *gp = GenericTypeParamDecl::createImplicit(
+          dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
+          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr);
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs
@@ -2902,10 +2900,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto &ctx = value->getASTContext();
 
     // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
-    auto *genericParam = GenericTypeParamDecl::create(
-        tupleDecl->getDeclContext(), ctx.Id_Elements, SourceLoc(),
-        /*isTypeSequence=*/true, /*depth=*/0, /*depth=*/0,
-        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+    auto *genericParam = GenericTypeParamDecl::createImplicit(
+        tupleDecl->getDeclContext(), ctx.Id_Elements, /*depth*/ 0, /*index*/ 0,
+        /*isParameterPack*/ true);
 
     return GenericParamList::create(ctx, SourceLoc(), genericParam,
                                     SourceLoc());
@@ -2945,10 +2942,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = GenericTypeParamDecl::create(
-        proto, selfId, SourceLoc(), /*type sequence=*/false,
-        /*depth=*/0, /*index=*/0, /*opaque type=*/false,
-        /*opaque type repr=*/nullptr);
+    auto selfDecl = GenericTypeParamDecl::createImplicit(
+        proto, selfId, /*depth*/ 0, /*index*/ 0);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
@@ -2959,6 +2954,20 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                            SourceLoc());
     return result;
+  }
+
+  // AccessorDecl generic parameter list is the same of its storage
+  // context.
+  if (auto *AD = dyn_cast<AccessorDecl>(value)) {
+    auto *GC = AD->getStorage()->getAsGenericContext();
+    if (!GC)
+      return nullptr;
+
+    auto *GP = GC->getGenericParams();
+    if (!GP)
+      return nullptr;
+
+    return GP->clone(AD->getDeclContext());
   }
 
   auto parsedGenericParams = value->getParsedGenericParams();

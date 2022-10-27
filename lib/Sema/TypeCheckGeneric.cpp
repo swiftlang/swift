@@ -161,7 +161,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+      auto *paramType = GenericTypeParamType::get(/*isParameterPack*/ false,
                                                   opaqueSignatureDepth, i, ctx);
       genericParamTypes.push_back(paramType);
     
@@ -364,7 +364,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     Type second;
 
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
       second = req.getSecondType();
@@ -648,8 +648,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           typeRepr = specifier->getBase();
 
         if (auto *packExpansion = dyn_cast<PackExpansionTypeRepr>(typeRepr)) {
-          typeRepr = packExpansion->getPatternType();
-
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
         } else {
           paramOptions.setContext(TypeResolverContext::FunctionInput);
@@ -801,8 +799,8 @@ void TypeChecker::diagnoseRequirementFailure(
 
   const auto reqKind = req.getKind();
   switch (reqKind) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirement not supported here");
 
   case RequirementKind::Conformance: {
     diagnoseConformanceFailure(substReq.getFirstType(),

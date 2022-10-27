@@ -51,7 +51,7 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
                                              /*forBackwardDeployment=*/false);
   llvm::Type *destType = classLayout.getType()->getPointerTo();
 
-  auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
+  auto fn = IGF.IGM.getDistributedActorInitializeRemoteFunctionPointer();
   actorMetatype =
       IGF.Builder.CreateBitCast(actorMetatype, IGF.IGM.TypeMetadataPtrTy);
 
@@ -215,7 +215,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
 
   // A generic parameter that represents instance of invocation decoder.
   auto *decoderType =
-      GenericTypeParamType::get(/*isTypeSequence=*/false,
+      GenericTypeParamType::get(/*isParameterPack=*/false,
                                 /*depth=*/1, /*index=*/0, Context);
 
   // decoder
@@ -490,8 +490,8 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned: {
     auto paramTy = param.getSILStorageInterfaceType();
-    Address eltPtr = IGF.Builder.CreateBitCast(
-        resultValue.getAddress(), IGM.getStoragePointerType(paramTy));
+    Address eltPtr = IGF.Builder.CreateElementBitCast(
+        resultValue.getAddress(), IGM.getStorageType(paramTy));
 
     cast<LoadableTypeInfo>(paramInfo).loadAsTake(IGF, eltPtr, arguments);
     break;
@@ -509,7 +509,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
 void DistributedAccessor::lookupWitnessTables(
     llvm::Value *value, ArrayRef<ProtocolDecl *> protocols,
     Explosion &witnessTables) {
-  auto conformsToProtocol = IGM.getConformsToProtocolFn();
+  auto conformsToProtocol = IGM.getConformsToProtocolFunctionPointer();
 
   for (auto *protocol : protocols) {
     auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
@@ -681,14 +681,17 @@ void DistributedAccessor::emit() {
     // We need this to determine the expected number of witness tables
     // to load from the buffer provided by the caller.
     llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
-    expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
+    auto numDirectGenericArgs =
+        expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
 
     // Generic arguments associated with the distributed thunk directly
     // e.g. `distributed func echo<T, U>(...)`
-    auto numDirectGenericArgs =
-        llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
-          return type == IGM.TypeMetadataPtrTy;
-        });
+    assert(
+        !IGM.getLLVMContext().supportsTypedPointers() ||
+        numDirectGenericArgs ==
+            llvm::count_if(targetGenericArguments, [&](const llvm::Type *type) {
+              return type == IGM.TypeMetadataPtrTy;
+            }));
 
     auto expectedWitnessTables =
         targetGenericArguments.size() - numDirectGenericArgs;
@@ -728,7 +731,7 @@ void DistributedAccessor::emit() {
     // indirect result (e.g. large struct) it result buffer would be passed
     // as an argument.
     {
-      Address resultAddr(typedResultBuffer,
+      Address resultAddr(typedResultBuffer, directResultTI.getStorageType(),
                          directResultTI.getBestKnownAlignment());
       emission->emitToMemory(resultAddr, cast<LoadableTypeInfo>(directResultTI),
                              /*isOutlined=*/false);
@@ -807,7 +810,9 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
 
     Explosion instance;
 
-    classTI.loadAsTake(IGF, {typedDecoderPtr, classTI.getBestKnownAlignment()},
+    classTI.loadAsTake(IGF,
+                       {typedDecoderPtr, classTI.getStorageType(),
+                        classTI.getBestKnownAlignment()},
                        instance);
 
     decoder = instance.claimNext();

@@ -290,9 +290,10 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
   void visitSubscriptDecl(SubscriptDecl *sd);
+  void visitMacroExpansionDecl(MacroExpansionDecl *d);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
-  
+
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and

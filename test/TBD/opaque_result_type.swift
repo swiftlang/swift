@@ -29,6 +29,15 @@ public var globalProp: some O {
   return 0
 }
 
+public dynamic var dynGlobalProp: some O {
+  return 1
+}
+
+@_dynamicReplacement(for: dynGlobalProp)
+public var dynReplacementProp: some O {
+  return 2
+}
+
 public class C: P, Q {
   public func poo() -> some O {
     return 0
@@ -59,9 +68,17 @@ public func baz<T: P & Q>(z: T) -> some P & Q {
   return z
 }
 
+public dynamic func dyn(x: String) -> some P {
+  return x
+}
+
+@_dynamicReplacement(for: dyn(x:))
+public func dynReplacement(x: String) -> some P {
+  return "replaced"
+}
+
 extension String: P {
   public func poo() -> some O {
     return 0
   }
 }
-

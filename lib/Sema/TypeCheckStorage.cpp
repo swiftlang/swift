@@ -93,24 +93,27 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-static bool hasStoredProperties(NominalTypeDecl *decl) {
+static bool hasStoredProperties(NominalTypeDecl *decl,
+                                IterableDeclContext *implDecl) {
   bool isForeignReferenceTy =
       isa<ClassDecl>(decl) && cast<ClassDecl>(decl)->isForeignReferenceType();
 
   return (isa<StructDecl>(decl) ||
           (isa<ClassDecl>(decl) &&
-           (!decl->hasClangNode() || isForeignReferenceTy)));
+           (!decl->hasClangNode() || isForeignReferenceTy
+                || (decl != implDecl))));
 }
 
-static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+static void computeLoweredStoredProperties(NominalTypeDecl *decl,
+                                           IterableDeclContext *implDecl) {
   // If declaration has a type wrapper, make sure that
-  // `$_storage` property is synthesized.
+  // `$storage` property is synthesized.
   if (decl->hasTypeWrapper())
     (void)decl->getTypeWrapperProperty();
 
   // Just walk over the members of the type, forcing backing storage
-  // for lazy properties, property and type wrappers to be synthesized.
-  for (auto *member : decl->getMembers()) {
+  // for lazy properties and property wrappers to be synthesized.
+  for (auto *member : implDecl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
       continue;
@@ -160,6 +163,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
 /// in a deterministic order.
 static void enumerateStoredPropertiesAndMissing(
     NominalTypeDecl *decl,
+    IterableDeclContext *implDecl,
     llvm::function_ref<void(VarDecl *)> addStoredProperty,
     llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
   // If we have a distributed actor, find the id and actorSystem
@@ -169,7 +173,7 @@ static void enumerateStoredPropertiesAndMissing(
   VarDecl *distributedActorSystem = nullptr;
   if (decl->isDistributedActor()) {
     ASTContext &ctx = decl->getASTContext();
-    for (auto *member : decl->getMembers()) {
+    for (auto *member : implDecl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
         if (!var->isStatic() && var->hasStorage()) {
           if (var->getName() == ctx.Id_id) {
@@ -190,7 +194,7 @@ static void enumerateStoredPropertiesAndMissing(
       addStoredProperty(distributedActorSystem);
   }
 
-  for (auto *member : decl->getMembers()) {
+  for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       if (!var->isStatic() && var->hasStorage()) {
         // Skip any properties that we already emitted explicitly
@@ -209,20 +213,29 @@ static void enumerateStoredPropertiesAndMissing(
   }
 }
 
+static bool isInSourceFile(IterableDeclContext *idc) {
+  const DeclContext *dc = idc->getAsGenericContext();
+  return isa<SourceFile>(dc->getModuleScopeContext());
+}
+
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
+  // If this is an imported class with an @_objcImplementation extension, get
+  // members from the extension instead.
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<VarDecl *>();
 
   SmallVector<VarDecl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
   // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
+  if (isInSourceFile(implDecl))
+    computeLoweredStoredProperties(decl, implDecl);
 
-  enumerateStoredPropertiesAndMissing(decl,
+  enumerateStoredPropertiesAndMissing(decl, implDecl,
     [&](VarDecl *var) {
       results.push_back(var);
     },
@@ -234,17 +247,21 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 ArrayRef<Decl *>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
+  // If this is an imported class with an @_objcImplementation extension, get
+  // members from the extension instead.
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<Decl *>();
 
   SmallVector<Decl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
   // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
+  if (isInSourceFile(implDecl))
+    computeLoweredStoredProperties(decl, implDecl);
 
-  enumerateStoredPropertiesAndMissing(decl,
+  enumerateStoredPropertiesAndMissing(decl, implDecl,
     [&](VarDecl *var) {
       results.push_back(var);
     },
@@ -615,20 +632,6 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   elements.append(prefix.begin(), prefix.end());
   elements.append(indices->begin(), indices->end());
   return ParameterList::create(context, elements);
-}
-
-/// Create the generic parameters needed for the given accessor, if any.
-static GenericParamList *createAccessorGenericParams(
-                                              AbstractStorageDecl *storage) {
-  // Accessors of generic subscripts get a copy of the subscript's
-  // generic parameter list, because they're not nested inside the
-  // subscript.
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
-    if (auto genericParams = subscript->getGenericParams())
-      return genericParams->clone(subscript->getDeclContext());
-  }
-
-  return nullptr;
 }
 
 static bool doesAccessorHaveBody(AccessorDecl *accessor) {
@@ -2044,8 +2047,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
     }
   }
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   // Add an index-forwarding clause.
   auto *getterParams = buildIndexForwardingParamList(storage, {}, ctx);
 
@@ -2054,14 +2055,10 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
     staticLoc = storage->getLoc();
 
   auto getter = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::Get, storage,
+      ctx, loc, /*AccessorKeywordLoc*/ loc, AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams,
-      getterParams,
-      Type(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), getterParams, Type(),
       storage->getDeclContext());
   getter->setSynthesized();
 
@@ -2144,8 +2141,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   bool isMutating = storage->isSetterMutating();
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   // Add a "(value : T, indices...)" argument list.
   auto *param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), loc,
@@ -2157,13 +2152,10 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   auto *params = buildIndexForwardingParamList(storage, param, ctx);
 
   auto setter = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::Set, storage,
+      ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(), AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params,
-      Type(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, Type(),
       storage->getDeclContext());
   setter->setSynthesized();
 
@@ -2238,15 +2230,11 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // Coroutine accessors always return ().
   const Type retTy = TupleType::getEmpty(ctx);
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   auto *accessor = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      kind, storage,
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params, retTy, dc);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, retTy, dc);
   accessor->setSynthesized();
 
   if (isMutating)
@@ -3306,7 +3294,8 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     } else if (var->hasAttachedPropertyWrapper()) {
       finishPropertyWrapperImplInfo(var, info);
     } else if (var->isAccessedViaTypeWrapper()) {
-      info = StorageImplInfo::getMutableComputed();
+      info = var->isLet() ? StorageImplInfo::getImmutableComputed()
+                          : StorageImplInfo::getMutableComputed();
     }
   }
 
@@ -3323,8 +3312,17 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     if (isa<EnumDecl>(dc)) {
       storage->diagnose(diag::enum_stored_property);
       info = StorageImplInfo::getMutableComputed();
-    } else if (isa<ExtensionDecl>(dc) &&
-              !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      // Extensions can dynamically replace a stored property.
+      if (storage->getAttrs().getAttribute<DynamicReplacementAttr>())
+        return;
+
+      // @_objcImplementation extensions on a non-category can declare stored
+      // properties; StoredPropertiesRequest knows to look for them there.
+      if (ext->isObjCImplementation() &&
+          ext->getCategoryNameForObjCImplementation() == Identifier())
+        return;
+
       storage->diagnose(diag::extension_stored_property);
 
       info = (info.supportsMutation()
