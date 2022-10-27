@@ -46,7 +46,7 @@ int main() {
 
 // CHECK: passEmptyThrowFunction
 // CHECK-NEXT: passThrowFunction
-// CHECK-NEXT: throwError!
+// CHECK-NEXT: throwError
 // CHECK-NEXT: passThrowFunctionWithReturn
 // CHECK-NEXT: Exception
 // CHECK-NEXT: Test destroyed
