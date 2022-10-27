@@ -7472,8 +7472,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
   // smaller constraints.
   if (auto *packType = type->getAs<PackType>()) {
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
-      addConstraint(ConstraintKind::SubclassOf, packType->getElementType(i),
-                    classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+      auto eltType = packType->getElementType(i);
+      if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
+        // FIXME: Locator element for pack expansion pattern
+        addConstraint(ConstraintKind::SubclassOf, packExpansionType->getPatternType(),
+                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+      } else {
+        addConstraint(ConstraintKind::SubclassOf, eltType,
+                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+      }
     }
 
     return SolutionKind::Solved;
@@ -7583,9 +7590,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // smaller constraints.
   if (auto *packType = type->getAs<PackType>()) {
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
-      addConstraint(ConstraintKind::ConformsTo, packType->getElementType(i),
-                    protocol->getDeclaredInterfaceType(),
-                    locator.withPathElement(LocatorPathElt::PackElement(i)));
+      auto eltType = packType->getElementType(i);
+      if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
+        // FIXME: Locator element for pack expansion pattern
+        addConstraint(ConstraintKind::ConformsTo,
+                      packExpansionType->getPatternType(),
+                      protocol->getDeclaredInterfaceType(),
+                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+      } else {
+        addConstraint(ConstraintKind::ConformsTo, eltType,
+                      protocol->getDeclaredInterfaceType(),
+                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+      }
     }
 
     return SolutionKind::Solved;
