@@ -88,8 +88,6 @@ swift::macro_context::lookup(StringRef macroName, DeclContext *DC) {
       });
 }
 
-#endif // SWIFT_SWIFT_PARSER
-
 Expr *swift::expandMacroExpr(
     DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType
 ) {
@@ -182,3 +180,5 @@ Expr *swift::expandMacroExpr(
          "Type checking changed the result type?");
   return expandedExpr;
 }
+
+#endif // SWIFT_SWIFT_PARSER

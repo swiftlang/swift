@@ -2471,6 +2471,7 @@ ConstraintSystem::getTypeOfMemberReference(
   return { origOpenedType, openedType, origType, type };
 }
 
+#if SWIFT_SWIFT_PARSER
 Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
                                                Expr *anchor) {
   auto macroCtx = swift::macro_context::lookup(macroName, DC);
@@ -2480,17 +2481,17 @@ Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
   auto *locator = getConstraintLocator(anchor);
   // Dig through to __MacroEvaluationContext.SignatureType
   auto sig = getASTContext().getIdentifier("SignatureType");
-  auto *signature = macroCtx->lookupDirect(sig).front();
-  auto type = cast<TypeAliasDecl>(signature)->getUnderlyingType();
+  auto *signature = cast<TypeAliasDecl>(macroCtx->lookupDirect(sig).front());
+  auto type = signature->getUnderlyingType();
 
-  // Open up the generic type.
+  // Open any the generic types.
   OpenedTypeMap replacements;
-  openGeneric(cast<TypeAliasDecl>(signature)->getParent(),
-              cast<TypeAliasDecl>(signature)->getGenericSignature(), locator,
-              replacements);
+  openGeneric(signature->getParent(), signature->getGenericSignature(),
+              locator, replacements);
 
   return openType(type, replacements);
 }
+#endif
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,

@@ -49,8 +49,6 @@ namespace macro_context {
 StructDecl *lookup(StringRef macroName, DeclContext *useDC);
 }
 
-#endif
-
 /// Expands the given macro expression and type-check the result with
 /// the given expanded type.
 ///
@@ -61,5 +59,6 @@ Expr *expandMacroExpr(
 
 } // end namespace swift
 
+#endif // SWIFT_SWIFT_PARSER
 #endif /* SWIFT_SEMA_TYPECHECKMACROS_H */
 
