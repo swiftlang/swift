@@ -31,6 +31,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftFrontend
   swiftClangImporter
   swiftIDE
+  swiftIDETool
   swiftAST
   swiftMarkup
   swiftParse

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/CompileInstance.h"
+#include "swift/IDETool/CompileInstance.h"
 
 #include "DependencyChecking.h"
 #include "swift/AST/ASTContext.h"
@@ -25,7 +25,6 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/FrontendTool/FrontendTool.h"
-#include "swift/IDE/Utils.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
