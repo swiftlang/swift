@@ -2943,7 +2943,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (func1->getGlobalActor() && func2->getGlobalActor()) {
       // If both have a global actor, match them.
       TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(), ConstraintKind::Equal, subflags, locator);
+      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(),
+                               ConstraintKind::Equal, subflags, locator);
       if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
