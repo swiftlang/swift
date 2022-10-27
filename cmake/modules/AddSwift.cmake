@@ -958,6 +958,11 @@ endfunction()
 
 macro(add_swift_tool_symlink name dest component)
   add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
+  # This relies on the value of LLVM_TOOLS_INSTALL_DIR
+  # which is exported by LLVM in LLVMConfig.cmake
+  # (and currently set to "bin")
+  # TODO: This will stop working when we will pick up
+  # an llvm branch that contains https://reviews.llvm.org/D117977
   llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
 endmacro()
 

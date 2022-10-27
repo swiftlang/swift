@@ -120,27 +120,6 @@ add_swift_tool_symlink(swift-indent swift-frontend editor-integration)
 add_swift_tool_symlink(swift-api-digester swift-frontend compiler)
 
 add_dependencies(compiler swift-frontend)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT compiler)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT compiler)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-symbolgraph-extract${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT compiler)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-extract${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT compiler)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-digester${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT compiler)
 add_dependencies(autolink-driver swift-frontend)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT autolink-driver)
 add_dependencies(editor-integration swift-frontend)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
-                           DESTINATION "bin"
-                           COMPONENT editor-integration)
 
