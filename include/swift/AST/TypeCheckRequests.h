@@ -3754,6 +3754,40 @@ public:
   bool isCached() const { return true; }
 };
 
+
+/// Retrieves the evaluation context of a macro with the given name.
+///
+/// The macro evaluation context is a user-defined generic signature and return
+/// type that serves as the "interface type" of references to the macro. The
+/// current implementation takes those pieces of syntax from the macro itself,
+/// then inserts them into a Swift struct that looks like
+///
+/// \code
+/// struct __MacroEvaluationContext\(macro.genericSignature) {
+///   typealias SignatureType = \(macro.signature)
+/// }
+/// \endcode
+///
+/// So that we can use all of Swift's native name lookup and type resolution
+/// facilities to map the parsed signature type back into a semantic \c Type
+/// AST and a set of requiremnets.
+class MacroContextRequest
+    : public SimpleRequest<MacroContextRequest,
+                           StructDecl *(std::string, ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  StructDecl *evaluate(Evaluator &evaluator,
+                       std::string macroName, ModuleDecl *mod) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
