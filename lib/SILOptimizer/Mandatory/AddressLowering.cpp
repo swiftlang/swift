@@ -1581,9 +1581,9 @@ namespace {
 //     br bb3(val0, val1)
 //   bb2:
 //     temp = alloc_stack
-//     copy_addr [take] addr0 to [initialization] temp
-//     copy_addr [take] addr1 to [initialization] addr0
-//     copy_addr [take] temp to [initialization] addr1
+//     copy_addr [take] addr0 to [init] temp
+//     copy_addr [take] addr1 to [init] addr0
+//     copy_addr [take] temp to [init] addr1
 //     dealloc_stack temp
 //     br bb3(val1, val1)
 //   bb3(phi0, phi1):

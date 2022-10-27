@@ -100,7 +100,7 @@ bb2:
 
 // CHECK-LABEL: sil @test_yield_and_retain
 // CHECK:   [[S:%[0-9]+]] = alloc_stack $BigStruct
-// CHECK:   copy_addr [take] %0 to [initialization] [[S]]
+// CHECK:   copy_addr [take] %0 to [init] [[S]]
 // CHECK:   retain_value_addr [[S]]
 // CHECK:   yield [[S]] : $*BigStruct
 // CHECK: // end sil function 'test_yield_and_retain'

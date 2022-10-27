@@ -1531,9 +1531,9 @@ ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
       // Try finding a writer among the users of `teai`. For example:
       //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
       //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr %114 to [initialization] %183 : $*Int32
+      //   copy_addr %114 to [init] %183 : $*Int32
       //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+      //   copy_addr [take] %191 to [init] %178 : $*Int32
       //
       // The workflow is: when const-evaluating %178, we const-evaluate %191,
       // which in turn triggers const-evaluating %179, thereby enter this

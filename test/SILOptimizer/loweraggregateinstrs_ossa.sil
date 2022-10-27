@@ -77,7 +77,7 @@ bb0(%0 : @owned $LargeStruct, %1 : $*LargeStruct):
   %0a = copy_value %0 : $LargeStruct
   destroy_value %0 : $LargeStruct
   %2 = alloc_stack $LargeStruct
-  copy_addr %1 to [initialization] %2 : $*LargeStruct
+  copy_addr %1 to [init] %2 : $*LargeStruct
   destroy_addr %1 : $*LargeStruct
   destroy_addr %2 : $*LargeStruct
   dealloc_stack %2 : $*LargeStruct
@@ -108,7 +108,7 @@ bb0(%0 : @guaranteed $S2, %1 : $*S2):
   %0a = copy_value %0 : $S2
   destroy_value %0a : $S2
   %2 = alloc_stack $S2
-  copy_addr %1 to [initialization] %2 : $*S2
+  copy_addr %1 to [init] %2 : $*S2
   destroy_addr %1 : $*S2
   destroy_addr %2 : $*S2
   dealloc_stack %2 : $*S2

@@ -101,7 +101,7 @@ struct Foo<T> {
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Foo<T>>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
-// CHECK: copy_addr %0 to [initialization] [[POINTER]] : $*Foo<T>
+// CHECK: copy_addr %0 to [init] [[POINTER]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
@@ -118,7 +118,7 @@ func returnsAddressOnlyElementArray<T>(t: Foo<T>) -> TakesArrayLiteral<Foo<T>> {
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Foo<T>>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
-// CHECK: copy_addr %0 to [initialization] [[POINTER]] : $*Foo<T>
+// CHECK: copy_addr %0 to [init] [[POINTER]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
 // CHECK: [[METATYPE:%.*]] = metatype $@thick TakesArrayLiteral<Foo<T>>.Type
@@ -138,7 +138,7 @@ extension Foo {
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Foo<T>
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[POINTER]] : $*Foo<T>
+// CHECK: copy_addr [[ACCESS]] to [init] [[POINTER]] : $*Foo<T>
 // CHECK: end_access [[ACCESS]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
@@ -226,7 +226,7 @@ protocol WrapsSelfInArray {}
 // CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Self
 // CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER]] : $*any WrapsSelfInArray, $Self
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[EXISTENTIAL]] : $*Self
+// CHECK: copy_addr [[ACCESS]] to [init] [[EXISTENTIAL]] : $*Self
 // CHECK: end_access [[ACCESS]] : $*Self
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<any WrapsSelfInArray>([[ARR]])

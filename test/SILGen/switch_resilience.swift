@@ -11,7 +11,7 @@ import resilient_struct
 // CHECK: bb1:
 // CHECK:   [[VALUE:%.*]] = unchecked_take_enum_data_addr [[STACK_SLOT]] : $*Enum
 // CHECK:   [[STACK_SLOT_COPY:%.*]] = alloc_stack [lexical] $(url: ResilientRef, void: ()), let, name "value"
-// CHECK:   copy_addr [[VALUE]] to [initialization] [[STACK_SLOT_COPY]]
+// CHECK:   copy_addr [[VALUE]] to [init] [[STACK_SLOT_COPY]]
 // CHECK:   cond_br {{%.*}}, bb2, bb3
 //
 // CHECK: bb2:

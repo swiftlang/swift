@@ -75,12 +75,12 @@ bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
   %3 = alloc_stack $XXX<T>, var, name "sf"           // users: %7, %11, %13
   debug_value %1 : $*T, let, name "t", expr op_deref // id: %4
   %5 = alloc_stack $T                             // users: %6, %8, %9
-  copy_addr %1 to [initialization] %5 : $*T     // id: %6
+  copy_addr %1 to [init] %5 : $*T     // id: %6
   %7 = struct_element_addr %3 : $*XXX<T>, #XXX.m_t // user: %8
-  copy_addr [take] %5 to [initialization] %7 : $*T // id: %8
+  copy_addr [take] %5 to [init] %7 : $*T // id: %8
   dealloc_stack %5 : $*T         // id: %9
   destroy_addr %1 : $*T                           // id: %10
-  copy_addr [take] %3 to [initialization] %0 : $*XXX<T> // id: %11
+  copy_addr [take] %3 to [init] %0 : $*XXX<T> // id: %11
   %12 = tuple ()                                  // user: %14
   dealloc_stack %3 : $*XXX<T>    // id: %13
   return %12 : $()                                // id: %14
@@ -91,7 +91,7 @@ sil [noinline] @XXX_foo : $@convention(method) <T> (@in T, @inout XXX<T>) -> Int
 bb0(%0 : $*T, %1 : $*XXX<T>):
   debug_value %0 : $*T, let, name "t", expr op_deref // id: %2
   %3 = alloc_stack $T                             // users: %4, %6, %7
-  copy_addr %0 to [initialization] %3 : $*T     // id: %4
+  copy_addr %0 to [init] %3 : $*T     // id: %4
   %5 = struct_element_addr %1 : $*XXX<T>, #XXX.m_t // user: %6
   copy_addr [take] %3 to %5 : $*T               // id: %6
   dealloc_stack %3 : $*T         // id: %7
@@ -195,7 +195,7 @@ bb0(%0 : $*T):
   %2 = function_ref @getGenericClosure_closure : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  copy_addr %0 to [init] %3a : $*T     // id: %4
   %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned () -> @out T       // id: %7
@@ -205,7 +205,7 @@ bb0(%0 : $*T):
 sil shared @getGenericClosure_closure : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
 bb0(%0 : $*T, %1 : $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %2 to [initialization] %0 : $*T       // id: %3
+  copy_addr %2 to [init] %0 : $*T       // id: %3
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <T>       // id: %4
   %5 = tuple ()                                   // user: %6
   return %5 : $()                                 // id: %6
@@ -339,7 +339,7 @@ bb0(%0 : $*U):
   %2 = function_ref @boo_closure : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <U>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <U>, 0
-  copy_addr %0 to [initialization] %3a : $*U     // id: %4
+  copy_addr %0 to [init] %3a : $*U     // id: %4
   %5 = partial_apply %2<U, T>(%3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %7
   destroy_addr %0 : $*U                           // id: %6
   return %5 : $@callee_owned (Int32, @in T) -> Int32 // id: %7
@@ -388,7 +388,7 @@ bb0(%0 : $*T, %1 : $*U):
   // function_ref test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
   %4 = function_ref @boo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %7
   %5 = alloc_stack $U                             // users: %6, %7, %10
-  copy_addr %1 to [initialization] %5 : $*U     // id: %6
+  copy_addr %1 to [init] %5 : $*U     // id: %6
   %7 = apply %4<U, Float>(%5) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %9
   // function_ref reabstraction thunk helper <T_0_0, T_0_1 where T_0_0: test4.P, T_0_1: test4.P> from @callee_owned (@unowned Swift.Int32, @in Swift.Float) -> (@unowned Swift.Int32) to @callee_owned (@unowned Swift.Int32, @unowned Swift.Float) -> (@unowned Swift.Int32)
   %8 = function_ref @_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__XFo_dS1_dSf_dS1__ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (Int32, Float, @owned @callee_owned (Int32, @in Float) -> Int32) -> Int32 // user: %9
@@ -417,7 +417,7 @@ bb0(%0 : $*T):
   %2 = function_ref @gen1_closure : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
-  copy_addr %0 to [initialization] %3a : $*T     // id: %4
+  copy_addr %0 to [init] %3a : $*T     // id: %4
   %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned (Int32) -> Int32     // id: %7
@@ -695,7 +695,7 @@ bb0(%0 : $*T):
 
 sil @id : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 :$*T):
-  copy_addr [take] %1 to [initialization] %0 : $*T
+  copy_addr [take] %1 to [init] %0 : $*T
   %t = tuple ()
   return %t : $()
 }

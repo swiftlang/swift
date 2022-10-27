@@ -23,7 +23,7 @@ let foo = Foo(value: "Hello")
 // CHECK: debug_value [[VALUE:%.*]] : $*T, let, name "value", argno {{[0-9+]}}, {{.*}} expr op_deref
 // CHECK-NEXT: debug_value [[SELF:%.*]] : $Foo<T>, let, name "self", argno {{[0-9+]}}
 // CHECK-NEXT: [[ALLOC_STACK:%.*]] = alloc_stack $T
-// CHECK-NEXT: copy_addr [[VALUE]] to [initialization] [[ALLOC_STACK]] : $*T
+// CHECK-NEXT: copy_addr [[VALUE]] to [init] [[ALLOC_STACK]] : $*T
 // CHECK-NEXT: [[REF_ADDR:%.*]] = ref_element_addr [[SELF]] : $Foo<T>, #Foo.value
 // CHECK-NEXT: [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ADDR]] : $*T
 // CHECK-NEXT: copy_addr [take] [[ALLOC_STACK]] to [[BEGIN_ACCESS]] : $*T

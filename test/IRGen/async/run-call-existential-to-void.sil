@@ -45,7 +45,7 @@ bb0(%existential : $*P):
   %existential_addr = open_existential_addr immutable_access %existential : $*P to $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
   %any = alloc_stack $Any
   %any_addr = init_existential_addr %any : $*Any, $@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
-  copy_addr %existential_addr to [initialization] %any_addr : $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
+  copy_addr %existential_addr to [init] %any_addr : $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
   %printAny = function_ref @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
   %result = apply %printAny(%any) : $@convention(thin) (@in_guaranteed Any) -> ()
   destroy_addr %any : $*Any

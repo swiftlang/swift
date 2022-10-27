@@ -185,9 +185,9 @@ sil [transparent] [ossa] @test_existential_metatype : $@convention(thin) (@in So
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box ${ var SomeProtocol }
   %1a = project_box %1 : ${ var SomeProtocol }, 0
-  copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
+  copy_addr [take] %0 to [init] %1a : $*SomeProtocol
   %4 = alloc_stack $SomeProtocol
-  copy_addr %1a to [initialization] %4 : $*SomeProtocol
+  copy_addr %1a to [init] %4 : $*SomeProtocol
   %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
   destroy_addr %4 : $*SomeProtocol
   dealloc_stack %4 : $*SomeProtocol
@@ -200,9 +200,9 @@ sil [ossa] @inline_test_existential_metatype : $@convention(thin) (@in SomeProto
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*any SomeProtocol):
   // CHECK: [[VAL1:%.*]] = alloc_box ${ var any SomeProtocol }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
-  // CHECK: copy_addr [take] %0 to [initialization] [[PB1]]
+  // CHECK: copy_addr [take] %0 to [init] [[PB1]]
   // CHECK: [[VAL4:%.*]] = alloc_stack $any SomeProtocol
-  // CHECK: copy_addr [[PB1]] to [initialization] [[VAL4]]
+  // CHECK: copy_addr [[PB1]] to [init] [[VAL4]]
   // CHECK: [[VAL6:%.*]] = existential_metatype $@thick any SomeProtocol.Type, [[VAL4]]
   // CHECK: destroy_addr [[VAL4]]
   // CHECK: dealloc_stack [[VAL4]]
@@ -781,7 +781,7 @@ sil [transparent] [ossa] @inner : $@convention(thin) <T1, T2> (@in T1, @in T2) -
 bb0(%0 : $*T2, %1 : $*T1, %2 : $*T2):
   debug_value %1 : $*T1, expr op_deref
   debug_value %2 : $*T2, expr op_deref
-  copy_addr [take] %2 to [initialization] %0 : $*T2
+  copy_addr [take] %2 to [init] %0 : $*T2
   destroy_addr %1 : $*T1
   %7 = tuple ()
   return %7 : $()
@@ -799,7 +799,7 @@ bb0(%0 : $*T, %1 : $Int, %2 : $*T):
   %6 = alloc_stack $Int
   store %1 to [trivial] %6 : $*Int
   %8 = alloc_stack $T
-  copy_addr %2 to [initialization] %8 : $*T
+  copy_addr %2 to [init] %8 : $*T
   // CHECK-NOT: apply
   %10 = apply %5<Int, T>(%0, %6, %8) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> @out τ_0_1
   dealloc_stack %8 : $*T
@@ -867,7 +867,7 @@ bb0(%0 : @owned $Foo):
 sil [transparent] [ossa] @identity : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   debug_value %1 : $*T, expr op_deref
-  copy_addr [take] %1 to [initialization] %0 : $*T
+  copy_addr [take] %1 to [init] %0 : $*T
   %4 = tuple ()
   // CHECK: return
   return %4 : $()
@@ -879,7 +879,7 @@ bb0(%0 : $*T, %1 : $*T):
   debug_value %1 : $*T, expr op_deref
   %3 = function_ref @identity : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %4 = alloc_stack $T
-  copy_addr %1 to [initialization] %4 : $*T
+  copy_addr %1 to [init] %4 : $*T
   // CHECK-NOT: apply
   %6 = apply %3<T>(%0, %4) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   dealloc_stack %4 : $*T
@@ -900,7 +900,7 @@ bb0(%0 : $*U, %1 : $*T, %2 : @owned $@callee_owned (@in T) -> @out U):
   debug_value %2 : $@callee_owned (@in T) -> @out U
   %2copy = copy_value %2 : $@callee_owned (@in T) -> @out U
   %6 = alloc_stack $T
-  copy_addr %1 to [initialization] %6 : $*T
+  copy_addr %1 to [init] %6 : $*T
   %8 = apply %2copy(%0, %6) : $@callee_owned (@in T) -> @out U
   dealloc_stack %6 : $*T
   destroy_value %2 : $@callee_owned (@in T) -> @out U
@@ -991,7 +991,7 @@ bb0(%0 : $Builtin.Int8):
 sil [transparent] [ossa] @P2_s : $@convention(method) <Self where Self : P2> (@in_guaranteed Self) -> Int32 {
 bb0(%0 : $*Self):
   %2 = alloc_stack $Self
-  copy_addr %0 to [initialization] %2 : $*Self
+  copy_addr %0 to [init] %2 : $*Self
   %4 = witness_method $Self, #P2.c!getter : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   %5 = apply %4<Self>(%2) : $@convention(witness_method: P2) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   destroy_addr %2 : $*Self
@@ -1017,7 +1017,7 @@ sil hidden [ossa] @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
 bb0(%0 : $*L):
   %2 = struct_element_addr %0 : $*L, #L.o
   %3 = alloc_stack $P2
-  copy_addr %2 to [initialization] %3 : $*P2
+  copy_addr %2 to [init] %3 : $*P2
   %5 = open_existential_addr immutable_access %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self
   %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
   %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60", P2) Self>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32

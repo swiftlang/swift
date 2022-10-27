@@ -156,9 +156,9 @@ bb0(%0 : $Int, %1 : $Range<Int>, %2 : $Range<Int>):
   debug_value %7 : $*Range<Int>, let, name "bounds", argno 2, expr op_deref
   debug_value %10 : $*Range<Int>, let, name "self", argno 3, implicit, expr op_deref
   %15 = alloc_stack $Range<Int>
-  copy_addr %7 to [initialization] %15 : $*Range<Int>
+  copy_addr %7 to [init] %15 : $*Range<Int>
   %17 = alloc_stack $Int
-  copy_addr %4 to [initialization] %17 : $*Int
+  copy_addr %4 to [init] %17 : $*Int
   %19 = string_literal utf8 "Index out of bounds"
   %20 = integer_literal $Builtin.Word, 19
   %21 = builtin "ptrtoint_Word"(%19 : $Builtin.RawPointer) : $Builtin.Word
@@ -192,15 +192,15 @@ bb5:
   %39 = metatype $@thick Int.Type
   %40 = struct_element_addr %15 : $*Range<Int>, #Range.lowerBound
   %41 = alloc_stack $Int
-  copy_addr %40 to [initialization] %41 : $*Int
+  copy_addr %40 to [init] %41 : $*Int
   %43 = witness_method $Int, #Comparable."<=" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %44 = apply %43<Int>(%41, %17, %39) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   destroy_addr %41 : $*Int
   dealloc_stack %41 : $*Int
   %47 = alloc_stack $Int
-  copy_addr %17 to [initialization] %47 : $*Int
+  copy_addr %17 to [init] %47 : $*Int
   %49 = alloc_stack $Range<Int>
-  copy_addr %15 to [initialization] %49 : $*Range<Int>
+  copy_addr %15 to [init] %49 : $*Range<Int>
   %51 = struct_extract %44 : $Bool, #Bool._value
   cond_br %51, bb7, bb8
 
@@ -214,7 +214,7 @@ bb7:
   %57 = metatype $@thick Int.Type
   %58 = struct_element_addr %49 : $*Range<Int>, #Range.upperBound
   %59 = alloc_stack $Int
-  copy_addr %58 to [initialization] %59 : $*Int
+  copy_addr %58 to [init] %59 : $*Int
   %61 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %62 = apply %61<Int>(%47, %59, %57) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   destroy_addr %59 : $*Int
@@ -289,15 +289,15 @@ bb18:
   %112 = metatype $@thick Int.Type
   %113 = struct_element_addr %15 : $*Range<Int>, #Range.lowerBound
   %114 = alloc_stack $Int
-  copy_addr %113 to [initialization] %114 : $*Int
+  copy_addr %113 to [init] %114 : $*Int
   %116 = witness_method $Int, #Comparable."<=" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %117 = apply %116<Int>(%114, %17, %112) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   destroy_addr %114 : $*Int
   dealloc_stack %114 : $*Int
   %120 = alloc_stack $Int
-  copy_addr [take] %17 to [initialization] %120 : $*Int
+  copy_addr [take] %17 to [init] %120 : $*Int
   %122 = alloc_stack $Range<Int>
-  copy_addr [take] %15 to [initialization] %122 : $*Range<Int>
+  copy_addr [take] %15 to [init] %122 : $*Range<Int>
   %124 = struct_extract %117 : $Bool, #Bool._value
   cond_br %124, bb20, bb21
 
@@ -310,7 +310,7 @@ bb20:
   %129 = metatype $@thick Int.Type
   %130 = struct_element_addr %122 : $*Range<Int>, #Range.upperBound
   %131 = alloc_stack $Int
-  copy_addr %130 to [initialization] %131 : $*Int
+  copy_addr %130 to [init] %131 : $*Int
   %133 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %134 = apply %133<Int>(%120, %131, %129) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   destroy_addr %131 : $*Int
@@ -537,7 +537,7 @@ bb25:
   %147 = metatype $@thin Int64.Type
   %148 = metatype $@thick Int64.Type
   %149 = alloc_stack $Int8
-  copy_addr %4 to [initialization] %149 : $*Int8
+  copy_addr %4 to [init] %149 : $*Int8
   %151 = function_ref @$ss17FixedWidthIntegerPsE18truncatingIfNeededxqd___tcSzRd__lufC : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %152 = apply %151<Int64, Int8>(%146, %149, %148) : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   dealloc_stack %149 : $*Int8
@@ -552,7 +552,7 @@ bb26:
   %160 = metatype $@thin UInt64.Type
   %161 = metatype $@thick UInt64.Type
   %162 = alloc_stack $Int8
-  copy_addr %4 to [initialization] %162 : $*Int8
+  copy_addr %4 to [init] %162 : $*Int8
   %164 = function_ref @$ss17FixedWidthIntegerPsE18truncatingIfNeededxqd___tcSzRd__lufC : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %165 = apply %164<UInt64, Int8>(%159, %162, %161) : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   dealloc_stack %162 : $*Int8
@@ -601,7 +601,7 @@ bb30:
   %203 = witness_method $Int8, #BinaryInteger.isSigned!getter : <Self where Self : BinaryInteger> (Self.Type) -> () -> Bool : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %204 = apply %203<Int8>(%202) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %205 = alloc_stack $Int8
-  copy_addr %4 to [initialization] %205 : $*Int8
+  copy_addr %4 to [init] %205 : $*Int8
   %207 = struct_extract %204 : $Bool, #Bool._value
   cond_br %207, bb31, bb32
 
@@ -647,14 +647,14 @@ bb33(%230 : $Bool):
 
 bb34:
   %245 = alloc_stack $UInt8
-  copy_addr %233 to [initialization] %245 : $*UInt8
+  copy_addr %233 to [init] %245 : $*UInt8
   %247 = integer_literal $Builtin.Int64, 0
   %248 = struct $Int (%247 : $Builtin.Int64)
   %249 = metatype $@thick UInt8.Type
   %250 = witness_method $UInt8, #BinaryInteger.isSigned!getter : <Self where Self : BinaryInteger> (Self.Type) -> () -> Bool : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %251 = apply %250<UInt8>(%249) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %252 = alloc_stack $UInt8
-  copy_addr %245 to [initialization] %252 : $*UInt8
+  copy_addr %245 to [init] %252 : $*UInt8
   %254 = struct_extract %251 : $Bool, #Bool._value
   cond_br %254, bb35, bb36
 
@@ -743,7 +743,7 @@ bb44:
   %322 = alloc_stack $UInt8, let, name "quotient"
   %323 = alloc_stack $UInt8, let, name "remainder"
   %324 = alloc_stack $UInt8
-  copy_addr %233 to [initialization] %324 : $*UInt8
+  copy_addr %233 to [init] %324 : $*UInt8
   %326 = function_ref @$sSzsE12_description5radix9uppercaseSSSi_SbtF21_quotientAndRemainderL_y9MagnitudeQz_AFtAFSzRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0.Magnitude, Bool, Int, @in_guaranteed τ_0_0.Magnitude) -> (@out τ_0_0.Magnitude, @out τ_0_0.Magnitude)
   %327 = apply %326<Int8>(%322, %323, %324, %188, %0, %190) : $@convention(thin) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0.Magnitude, Bool, Int, @in_guaranteed τ_0_0.Magnitude) -> (@out τ_0_0.Magnitude, @out τ_0_0.Magnitude)
   destroy_addr %324 : $*UInt8
@@ -752,7 +752,7 @@ bb44:
   %331 = metatype $@thin UInt8.Type
   %332 = metatype $@thick UInt8.Type
   %333 = alloc_stack $UInt8
-  copy_addr %323 to [initialization] %333 : $*UInt8
+  copy_addr %323 to [init] %333 : $*UInt8
   %335 = function_ref @$ss17FixedWidthIntegerPsE18truncatingIfNeededxqd___tcSzRd__lufC : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %336 = apply %335<UInt8, UInt8>(%330, %333, %332) : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   dealloc_stack %333 : $*UInt8
@@ -766,7 +766,7 @@ bb44:
   %345 = apply %344<UInt8>(%342, %236) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
   dealloc_stack %342 : $*UInt8
   destroy_addr %233 : $*UInt8
-  copy_addr %322 to [initialization] %233 : $*UInt8
+  copy_addr %322 to [init] %233 : $*UInt8
   destroy_addr %323 : $*UInt8
   dealloc_stack %323 : $*UInt8
   destroy_addr %322 : $*UInt8
@@ -837,7 +837,7 @@ bb51:
   %404 = alloc_stack $Int
   %405 = metatype $@thick Int.Type
   %406 = alloc_stack $UInt8
-  copy_addr %245 to [initialization] %406 : $*UInt8
+  copy_addr %245 to [init] %406 : $*UInt8
   %408 = function_ref @$ss17FixedWidthIntegerPsE18truncatingIfNeededxqd___tcSzRd__lufC : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %409 = apply %408<Int, UInt8>(%404, %406, %405) : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %410 = tuple ()
@@ -890,7 +890,7 @@ bb55:
   %449 = alloc_stack $Int
   %450 = metatype $@thick Int.Type
   %451 = alloc_stack $UInt8
-  copy_addr %245 to [initialization] %451 : $*UInt8
+  copy_addr %245 to [init] %451 : $*UInt8
   %453 = function_ref @$ss17FixedWidthIntegerPsE18truncatingIfNeededxqd___tcSzRd__lufC : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %454 = apply %453<Int, UInt8>(%449, %451, %450) : $@convention(method) <τ_0_0 where τ_0_0 : FixedWidthInteger><τ_1_0 where τ_1_0 : BinaryInteger> (@in τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   %455 = tuple ()
@@ -1174,7 +1174,7 @@ bb18:
   %149 = witness_method $T, #BinaryInteger.isSigned!getter : <Self where Self : BinaryInteger> (Self.Type) -> () -> Bool : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %150 = apply %149<T>(%148) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %151 = alloc_stack $T
-  copy_addr %0 to [initialization] %151 : $*T
+  copy_addr %0 to [init] %151 : $*T
   %153 = struct_extract %150 : $Bool, #Bool._value
   cond_br %153, bb19, bb20
 
@@ -1223,14 +1223,14 @@ bb21(%176 : $Bool):
 
 bb22:
   %198 = alloc_stack $T.Magnitude
-  copy_addr %179 to [initialization] %198 : $*T.Magnitude
+  copy_addr %179 to [init] %198 : $*T.Magnitude
   %200 = integer_literal $Builtin.Int64, 0
   %201 = struct $Int (%200 : $Builtin.Int64)
   %202 = metatype $@thick T.Magnitude.Type
   %203 = witness_method $T.Magnitude, #BinaryInteger.isSigned!getter : <Self where Self : BinaryInteger> (Self.Type) -> () -> Bool : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %204 = apply %203<T.Magnitude>(%202) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@thick τ_0_0.Type) -> Bool
   %205 = alloc_stack $T.Magnitude
-  copy_addr %198 to [initialization] %205 : $*T.Magnitude
+  copy_addr %198 to [init] %205 : $*T.Magnitude
   %207 = struct_extract %204 : $Bool, #Bool._value
   cond_br %207, bb23, bb24
 
@@ -1334,8 +1334,8 @@ bb31:
   destroy_addr %179 : $*T.Magnitude
   %296 = tuple_element_addr %254 : $*(T.Magnitude, T.Magnitude), 0
   %297 = tuple_element_addr %254 : $*(T.Magnitude, T.Magnitude), 1
-  copy_addr [take] %291 to [initialization] %296 : $*T.Magnitude
-  copy_addr [take] %292 to [initialization] %297 : $*T.Magnitude
+  copy_addr [take] %291 to [init] %296 : $*T.Magnitude
+  copy_addr [take] %292 to [init] %297 : $*T.Magnitude
   dealloc_stack %292 : $*T.Magnitude
   dealloc_stack %291 : $*T.Magnitude
   br bb32
@@ -1343,8 +1343,8 @@ bb31:
 bb32:
   %303 = tuple_element_addr %254 : $*(T.Magnitude, T.Magnitude), 0
   %304 = tuple_element_addr %254 : $*(T.Magnitude, T.Magnitude), 1
-  copy_addr [take] %303 to [initialization] %248 : $*T.Magnitude
-  copy_addr [take] %304 to [initialization] %249 : $*T.Magnitude
+  copy_addr [take] %303 to [init] %248 : $*T.Magnitude
+  copy_addr [take] %304 to [init] %249 : $*T.Magnitude
   dealloc_stack %254 : $*(T.Magnitude, T.Magnitude)
   %309 = witness_method $T.Magnitude, #BinaryInteger._lowWord!getter : <Self where Self : BinaryInteger> (Self) -> () -> UInt : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> UInt
   %310 = apply %309<T.Magnitude>(%249) : $@convention(witness_method: BinaryInteger) <τ_0_0 where τ_0_0 : BinaryInteger> (@in_guaranteed τ_0_0) -> UInt
@@ -1489,7 +1489,7 @@ bb47:
   %441 = apply %440(%435, %343, %182) : $@convention(method) (Int, UInt8, @inout Array<UInt8>) -> ()
   %442 = function_ref @$sSa12_endMutationyyFs5UInt8V_Tg5 : $@convention(method) (@inout Array<UInt8>) -> ()
   %443 = apply %442(%182) : $@convention(method) (@inout Array<UInt8>) -> ()
-  copy_addr [take] %248 to [initialization] %179 : $*T.Magnitude
+  copy_addr [take] %248 to [init] %179 : $*T.Magnitude
   dealloc_stack %249 : $*T.Magnitude
   dealloc_stack %248 : $*T.Magnitude
   br bb22
@@ -1820,9 +1820,9 @@ bb0(%0 : $*LazyPrefixWhileSequence<Base>.Index, %1 : $*Base, %2 : $@thin LazyPre
   inject_enum_addr %7 : $*LazyPrefixWhileSequence<Base>._IndexRepresentation, #LazyPrefixWhileSequence._IndexRepresentation.pastEnd!enumelt 
   %9 = struct_element_addr %4 : $*LazyPrefixWhileSequence<Base>.Index, #LazyPrefixWhileSequence.Index._value 
   destroy_addr %1 : $*Base                        
-  copy_addr [take] %7 to [initialization] %9 : $*LazyPrefixWhileSequence<Base>._IndexRepresentation 
+  copy_addr [take] %7 to [init] %9 : $*LazyPrefixWhileSequence<Base>._IndexRepresentation 
   dealloc_stack %7 : $*LazyPrefixWhileSequence<Base>._IndexRepresentation 
-  copy_addr [take] %4 to [initialization] %0 : $*LazyPrefixWhileSequence<Base>.Index 
+  copy_addr [take] %4 to [init] %0 : $*LazyPrefixWhileSequence<Base>.Index 
   dealloc_stack %4 : $*LazyPrefixWhileSequence<Base>.Index 
   %14 = tuple ()                                  
   return %14 : $()                                
@@ -1844,15 +1844,15 @@ bb0(%0 : $Range<Int>, %1 : $Int, %2 : $@noescape @callee_guaranteed @substituted
   debug_value %3 : $*Array<(scalar: Unicode.Scalar, normData: Unicode._NormData)>, var, name "self", argno 4, implicit, expr op_deref
   debug_value undef : $Error, var, name "$error", argno 5
   %15 = alloc_stack $Int, var, name "sortedEnd"
-  copy_addr %8 to [initialization] %15 : $*Int
+  copy_addr %8 to [init] %15 : $*Int
   br bb1
 
 bb1:
   %18 = alloc_stack $Int
-  copy_addr %15 to [initialization] %18 : $*Int
+  copy_addr %15 to [init] %18 : $*Int
   %20 = struct_element_addr %5 : $*Range<Int>, #Range.upperBound
   %21 = alloc_stack $Int
-  copy_addr %20 to [initialization] %21 : $*Int
+  copy_addr %20 to [init] %21 : $*Int
   %23 = metatype $@thick Int.Type
   %24 = witness_method $Int, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %25 = apply %24<Int>(%18, %21, %23) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
@@ -1867,7 +1867,7 @@ bb1:
 
 bb2:
   %34 = alloc_stack $Int, var, name "i"
-  copy_addr %15 to [initialization] %34 : $*Int
+  copy_addr %15 to [init] %34 : $*Int
   br bb4
 
 bb3:
@@ -1885,12 +1885,12 @@ bb4:
   %46 = witness_method $Array<(scalar: Unicode.Scalar, normData: Unicode._NormData)>, #Collection.subscript!read : <Self where Self : Collection> (Self) -> (Self.Index) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
   (%47, %48) = begin_apply %46<Array<(scalar: Unicode.Scalar, normData: Unicode._NormData)>>(%34, %3) : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
   %49 = alloc_stack $(scalar: Unicode.Scalar, normData: Unicode._NormData)
-  copy_addr %47 to [initialization] %49 : $*(scalar: Unicode.Scalar, normData: Unicode._NormData)
+  copy_addr %47 to [init] %49 : $*(scalar: Unicode.Scalar, normData: Unicode._NormData)
   end_apply %48
   %52 = witness_method $Array<(scalar: Unicode.Scalar, normData: Unicode._NormData)>, #Collection.subscript!read : <Self where Self : Collection> (Self) -> (Self.Index) -> () : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
   (%53, %54) = begin_apply %52<Array<(scalar: Unicode.Scalar, normData: Unicode._NormData)>>(%43, %3) : $@yield_once @convention(witness_method: Collection) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0.Index, @in_guaranteed τ_0_0) -> @yields @in_guaranteed τ_0_0.Element
   %55 = alloc_stack $(scalar: Unicode.Scalar, normData: Unicode._NormData)
-  copy_addr %53 to [initialization] %55 : $*(scalar: Unicode.Scalar, normData: Unicode._NormData)
+  copy_addr %53 to [init] %55 : $*(scalar: Unicode.Scalar, normData: Unicode._NormData)
   end_apply %54
   try_apply %2(%49, %55) : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <(scalar: Unicode.Scalar, normData: Unicode._NormData), (scalar: Unicode.Scalar, normData: Unicode._NormData)>, normal bb5, error bb6
 
@@ -1931,10 +1931,10 @@ bb8:
   destroy_addr %43 : $*Int
   dealloc_stack %43 : $*Int
   %90 = alloc_stack $Int
-  copy_addr %34 to [initialization] %90 : $*Int
+  copy_addr %34 to [init] %90 : $*Int
   %92 = struct_element_addr %5 : $*Range<Int>, #Range.lowerBound
   %93 = alloc_stack $Int
-  copy_addr %92 to [initialization] %93 : $*Int
+  copy_addr %92 to [init] %93 : $*Int
   %95 = metatype $@thick Int.Type
   %96 = witness_method $Int, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %97 = apply %96<Int>(%90, %93, %95) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool

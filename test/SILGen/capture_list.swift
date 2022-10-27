@@ -17,7 +17,7 @@ class Bar {
   // CHECK: [[PAYLOAD:%.*]] = project_box [[BOX]]
   // CHECK: [[COPY:%.*]] = copy_value %0
   // CHECK: [[OPTIONAL_COPY:%.*]] = enum $Optional<Bar>, #Optional.some!enumelt
-  // CHECK: store_weak [[OPTIONAL_COPY]] to [initialization] [[PAYLOAD]]
+  // CHECK: store_weak [[OPTIONAL_COPY]] to [init] [[PAYLOAD]]
   // CHECK: destroy_value [[OPTIONAL_COPY]]
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$s12capture_list3BarC4testyyFSiycfU_ : $@convention(thin) (@owned { var @sil_weak Optional<Bar> }) -> Int
   // CHECK: [[BOX_COPY:%.*]] = copy_value [[BOX]]

@@ -11,7 +11,7 @@ import resilient_enum
 
 // CHECK-LABEL: sil hidden [ossa] @$s15enum_resilience15resilientSwitchyy0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[BOX]]
 // CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt: bb3, case #Medium.Postcard!enumelt: bb4, default bb5
 // CHECK:       bb1:
@@ -124,7 +124,7 @@ public enum MyResilientEnum {
   // CHECK:       [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*MyResilientEnum
   // CHECK:       assign [[NEW_SELF]] to [[ACCESS]] : $*MyResilientEnum
   // CHECK:       end_access [[ACCESS]] : $*MyResilientEnum
-  // CHECK:       copy_addr [[SELF_ADDR]] to [initialization] %0 : $*MyResilientEnum
+  // CHECK:       copy_addr [[SELF_ADDR]] to [init] %0 : $*MyResilientEnum
   // CHECK:       destroy_value [[SELF_TMP]] : ${ var MyResilientEnum }
   // CHECK:       return
   init() {
@@ -157,7 +157,7 @@ public enum MoreHorses {
   // CHECK:       [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*MoreHorses
   // CHECK:       assign [[NEW_SELF]] to [[ACCESS]] : $*MoreHorses
   // CHECK:       end_access [[ACCESS]] : $*MoreHorses
-  // CHECK:       copy_addr [[SELF_ADDR]] to [initialization] %0 : $*MoreHorses
+  // CHECK:       copy_addr [[SELF_ADDR]] to [init] %0 : $*MoreHorses
   // CHECK:       destroy_value [[SELF_TMP]] : ${ var MoreHorses }
   // CHECK:       return
   init() {
@@ -197,7 +197,7 @@ public func resilientIfCase(_ e: MyResilientEnum) -> Bool {
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s15enum_resilience15inlinableSwitchyyAA15MyResilientEnumOF : $@convention(thin) (@in_guaranteed MyResilientEnum) -> ()
 // CHECK:      [[ENUM:%.*]] = alloc_stack $MyResilientEnum
-// CHECK:      copy_addr %0 to [initialization] [[ENUM]] : $*MyResilientEnum
+// CHECK:      copy_addr %0 to [init] [[ENUM]] : $*MyResilientEnum
 // CHECK:      switch_enum_addr [[ENUM]] : $*MyResilientEnum, case #MyResilientEnum.kevin!enumelt: bb1, case #MyResilientEnum.loki!enumelt: bb2, default bb3
 // CHECK:      return
 @inlinable public func inlinableSwitch(_ e: MyResilientEnum) {

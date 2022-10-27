@@ -2289,7 +2289,7 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
     //                                 #Optional.some!enumelt
     auto *enumAddr = builder.createInitEnumDataAddr(
         pbLoc, optArgBuf, someEltDecl, wrappedTanType.getAddressType());
-    // copy_addr %wrappedAdjoint to [initialization] %enumAddr
+    // copy_addr %wrappedAdjoint to [init] %enumAddr
     builder.createCopyAddr(pbLoc, wrappedAdjoint, enumAddr, IsNotTake,
                            IsInitialization);
     // inject_enum_addr %optArgBuf : $*Optional<T.TangentVector>,

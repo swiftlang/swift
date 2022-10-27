@@ -48,7 +48,7 @@ bb0:
   %5 = alloc_ref $SomeClass
   store %5 to [init] %4 : $*SomeClass
   %8 = alloc_stack $SomeProtocol
-  copy_addr %3 to [initialization] %8 : $*SomeProtocol
+  copy_addr %3 to [init] %8 : $*SomeProtocol
   %9 = open_existential_addr immutable_access %8 : $*SomeProtocol to $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self
   %10 = witness_method $@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   %11 = apply %10<@opened("1B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self>(%9) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
@@ -83,7 +83,7 @@ bb0:
   store %5 to [init] %4 : $*SomeClass
   %6 = init_existential_addr %3 : $*SomeProtocol, $SomeClass
   %8 = alloc_stack $SomeProtocol
-  copy_addr %3 to [initialization] %8 : $*SomeProtocol
+  copy_addr %3 to [init] %8 : $*SomeProtocol
   %9 = open_existential_addr immutable_access %8 : $*SomeProtocol to $*@opened("2B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self
   %10 = witness_method $@opened("2B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> Int, %9 : $*@opened("2B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
   %11 = apply %10<@opened("2B0A5B84-3441-11E8-AC03-DCA9048B1C6D", SomeProtocol) Self>(%9) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> Int
