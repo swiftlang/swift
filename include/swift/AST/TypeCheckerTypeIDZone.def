@@ -443,3 +443,6 @@ SWIFT_REQUEST(TypeChecker, GetTypeWrapperInitializer,
 SWIFT_REQUEST(TypeChecker, SynthesizeHasSymbolQueryRequest,
               FuncDecl *(ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, MacroContextRequest,
+              StructDecl *(std::string, ModuleDecl *),
+              Cached, NoLocationInfo)

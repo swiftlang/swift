@@ -2474,7 +2474,8 @@ ConstraintSystem::getTypeOfMemberReference(
 #if SWIFT_SWIFT_PARSER
 Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
                                                Expr *anchor) {
-  auto macroCtx = swift::macro_context::lookup(macroName, DC);
+  auto req = MacroContextRequest{macroName.str(), DC->getParentModule()};
+  auto *macroCtx = evaluateOrDefault(getASTContext().evaluator, req, nullptr);
   if (!macroCtx)
     return Type();
 

@@ -394,9 +394,6 @@ struct ASTContext::Implementation {
   /// is populated if the body is reparsed from other source buffers.
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
-  /// A mapping of all the registered ASTGen macros keyed by name.
-  llvm::StringMap<StructDecl *> ASTGenMacros;
-
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -6034,18 +6031,4 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
 
   return result;
-}
-
-StructDecl *ASTContext::getOrCreateASTGenMacroContext(
-    StringRef macroName,
-    llvm::function_ref<StructDecl *(StringRef)> createMacro) {
-  auto &impl = getImpl();
-  auto found = impl.ASTGenMacros.find(macroName);
-  if (found != impl.ASTGenMacros.end()) {
-    return found->second;
-  } else {
-    auto macroAndContext = createMacro(macroName);
-    impl.ASTGenMacros.insert({macroName, macroAndContext});
-    return macroAndContext;
-  }
 }
