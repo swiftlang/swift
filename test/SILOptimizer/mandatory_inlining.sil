@@ -1,5 +1,8 @@
 // RUN: env DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
+// guardmalloc is incompatible with ASAN
+// REQUIRES: no_asan
+
 import Builtin
 import Swift
 
