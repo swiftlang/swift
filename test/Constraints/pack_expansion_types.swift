@@ -8,13 +8,13 @@ func returnTupleLabel1<T...>() -> (x: T...) { fatalError() }
 
 func returnTupleLabel2<T...>() -> (Int, x: T...) { fatalError() }
 
-func returnTupleLabel3<T...>() -> (Int, T..., y: Float) { fatalError() } // expected-note {{in call to function 'returnTupleLabel3()'}}
+func returnTupleLabel3<T...>() -> (Int, T..., y: Float) { fatalError() }
 
-func returnTupleLabel4<T...>() -> (Int, x: T..., y: Float) { fatalError() }
+func returnTupleLabel4<T...>() -> (Int, x: T..., y: Float) { fatalError() } // expected-note {{in call to function 'returnTupleLabel4()'}}
 
-func returnTupleLabel5<T..., U...>() -> (Int, T..., y: U...) { fatalError() } // expected-note {{in call to function 'returnTupleLabel5()'}}
+func returnTupleLabel5<T..., U...>() -> (Int, T..., y: U...) { fatalError() }
 
-func returnTupleLabel6<T..., U...>() -> (Int, x: T..., y: U...) { fatalError() }
+func returnTupleLabel6<T..., U...>() -> (Int, x: T..., y: U...) { fatalError() } // expected-note {{in call to function 'returnTupleLabel6()'}}
 
 func concreteReturnTupleValid() {
   let _: () = returnTuple1()
@@ -103,20 +103,22 @@ func genericReturnTupleInvalid<T...>(_: T...) {
   let _: (x: T...) = returnTupleLabel2() // expected-error {{type of expression is ambiguous without more context}}
   let _: (Int, y: String, T...) = returnTupleLabel2() // expected-error {{type of expression is ambiguous without more context}}
 
-  let _: (T..., y: Float) = returnTupleLabel3() // expected-error {{'(Int, T..., y: Float)' is not convertible to '(T..., y: Float)', tuples have a different number of elements}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: (T..., y: Float) = returnTupleLabel3() // expected-error {{type of expression is ambiguous without more context}}
 
   let _: (Int, String, T..., x: Float) = returnTupleLabel3() // expected-error {{type of expression is ambiguous without more context}}
 
-  let _: (T..., y: Float) = returnTupleLabel4() // expected-error {{cannot convert value of type '(Int, y: Float)' to specified type '(T..., y: Float)'}}
+  let _: (T..., y: Float) = returnTupleLabel4() // expected-error {{'(Int, x: T..., y: Float)' is not convertible to '(T..., y: Float)', tuples have a different number of elements}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
   let _: (Int, x: String, y: T...) = returnTupleLabel4() // expected-error {{cannot convert value of type '(Int, x: String, y: Float)' to specified type '(Int, x: String, y: T...)'}}
 
   let _: (Int, T..., x: T...) = returnTupleLabel5() // expected-error {{type of expression is ambiguous without more context}}
 
-  let _: (T..., y: Float, T...) = returnTupleLabel5() // expected-error {{'(Int, T..., y: Float, T...)' is not convertible to '(T..., y: Float, T...)', tuples have a different number of elements}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  let _: (T..., y: Float, T...) = returnTupleLabel5() // expected-error {{type of expression is ambiguous without more context}}
 
-  let _: (T..., y: Int) = returnTupleLabel6() // expected-error {{cannot convert value of type '(Int, y: Int)' to specified type '(T..., y: Int)'}}
+  let _: (T..., y: Int) = returnTupleLabel6() // expected-error {{'(Int, x: T..., y: U...)' is not convertible to '(T..., y: Int)', tuples have a different number of elements}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'U' could not be inferred}}
 }
 
 func returnFunction1<T...>() -> (T...) -> () {}
