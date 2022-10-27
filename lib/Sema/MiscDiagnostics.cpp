@@ -1538,20 +1538,6 @@ static bool closureHasWeakSelfCapture(const AbstractClosureExpr *ACE) {
   return false;
 }
 
-/// Whether or not implicit self decls in this closure require manual
-/// lookup in order to perform diagnostics with the semantics described
-/// in SE-0365. This is necessary for closures that capture self weakly
-/// in Swift 5 language modes, since implicit self decls in weak self
-/// closures have different semantics in Swift 5 than in Swift 6.
-static bool
-closureRequiresManualLookupForImplicitSelf(const AbstractClosureExpr *ACE) {
-  if (ACE->getASTContext().LangOpts.isSwiftVersionAtLeast(6)) {
-    return false;
-  }
-
-  return closureHasWeakSelfCapture(ACE);
-}
-
 // Returns true if this is an implicit self expr
 static bool isImplicitSelf(const Expr *E) {
   auto *DRE = dyn_cast<DeclRefExpr>(E);
@@ -1561,27 +1547,6 @@ static bool isImplicitSelf(const Expr *E) {
 
   ASTContext &Ctx = DRE->getDecl()->getASTContext();
   return DRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
-}
-
-// When inside a closure that requires manual lookup for implicit self,
-// (any closure with a weak self capture, in Swift 5 mode),
-// we have to manually lookup what self refers to at the location
-// according to the semantics of Swift 6 in order to avoid confusing
-// 'variable self is unused' warnings in Swift 5 mode.
-static ValueDecl *lookupSelfDeclIfNecessary(const DeclRefExpr *DRE,
-                                            const AbstractClosureExpr *ACE) {
-  ASTContext &Ctx = DRE->getDecl()->getASTContext();
-
-  if (closureRequiresManualLookupForImplicitSelf(ACE) && isImplicitSelf(DRE)) {
-    auto lookupResult = ASTScope::lookupSingleLocalDecl(
-        ACE->getParentSourceFile(), DeclName(Ctx.Id_self), DRE->getLoc());
-
-    if (lookupResult) {
-      return lookupResult;
-    }
-  }
-
-  return DRE->getDecl();
 }
 
 /// Look for any property references in closures that lack a 'self.' qualifier.
@@ -1683,29 +1648,11 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     static bool
     implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE,
                                      const AbstractClosureExpr *inClosure) {
-      // Implicit self DREs have different semantics in Swift 5 language modes
-      // than they have in Swift 6 mode. Take this example:
-      //
-      //   doVoidStuff { [weak self] in
-      //     guard let self else { return }
-      //     method()
-      //   }
-      //
-      // In Swift 6, the implicit self DRE refers to the self decl
-      // defined in the guard statement. In Swift 5 mode, the implicit
-      // self DRE instead refers to closure's self `ParamDecl`.
-      //
-      // In order to perform these diagnostics according to the semantics
-      // defined in SE-0365, we need to know the decl that the DRE refers
-      // to in Swift 6. In Swift 5 mode, that requires performing a manual
-      // lookup of what implicit self refers to at this location (according
-      // to the semantics of Swift 6).
-      auto selfDecl = lookupSelfDeclIfNecessary(DRE, inClosure);
-      ASTContext &Ctx = selfDecl->getASTContext();
+      ASTContext &Ctx = DRE->getDecl()->getASTContext();
 
       // Check if the implicit self decl refers to a var in a conditional stmt
       LabeledConditionalStmt *conditionalStmt = nullptr;
-      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
         if (auto parentStmt = var->getParentPatternStmt()) {
           conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
         }
@@ -2656,10 +2603,6 @@ class VarDeclUsageChecker : public ASTWalker {
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
 
-  /// The stack of closure exprs for the current position in the AST.
-  /// The top item on the stack, if present, is the current closure scope.
-  SmallVector<AbstractClosureExpr *, 4> ClosureStack;
-
 #ifndef NDEBUG
   llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
 #endif
@@ -2724,44 +2667,6 @@ public:
     if (!vd) return;
 
     VarDecls[vd] |= Flag;
-  }
-
-  /// The `ValueDecl` to use when performing usage analysis of the given DRE.
-  /// When inside a closure that requires manual lookup for implcit self decls
-  /// (a closure that captures self weakly in Swift 5 language modes), we
-  /// look up the `ValueDecl` that implicit self refers to according to
-  /// Swift 6 semantics.
-  ValueDecl *getDeclForUsageAnalysis(DeclRefExpr *DRE) {
-    if (ClosureStack.size() == 0) {
-      return DRE->getDecl();
-    }
-
-    auto closure = ClosureStack[ClosureStack.size() - 1];
-    assert(closure);
-
-    if (isImplicitSelf(DRE)) {
-      // Implicit self DREs have different semantics in Swift 5 language modes
-      // than they have in Swift 6 mode. Take this example:
-      //
-      //   doVoidStuff { [weak self] in
-      //     guard let self else { return }
-      //     method()
-      //   }
-      //
-      // In Swift 6, the implicit self DRE refers to the self decl
-      // defined in the guard statement. In Swift 5 mode, the implicit
-      // self DRE instead refers to closure's self `ParamDecl`.
-      //
-      // If we perform usage analysis using Swift 5 semantics, we'd
-      // get a confusing "value 'self' was defined but never used;
-      // consider replacing with boolean test" warning. To suppress this
-      // warning, we instead perform usage analysis using Swift 6 semantics
-      // (by performing a manual lookup of what implicit self refers to
-      // at this location according to Swift 6 semantics).
-      return lookupSelfDeclIfNecessary(DRE, closure);
-    } else {
-      return DRE->getDecl();
-    }
   }
 
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
@@ -2862,7 +2767,6 @@ public:
 
   /// The heavy lifting happens when visiting expressions.
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
   /// handle #if directives.
   void handleIfConfig(IfConfigDecl *ICD);
@@ -3675,7 +3579,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   
   // If we found a decl that is being assigned to, then mark it.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(getDeclForUsageAnalysis(DRE), Flags);
+    addMark(DRE->getDecl(), Flags);
     return;
   }
   
@@ -3760,7 +3664,7 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    addMark(getDeclForUsageAnalysis(DRE), RK_Read);
+    addMark(DRE->getDecl(), RK_Read);
 
     // If the Expression is a read of a getter, track for diagnostics
     if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
@@ -3818,20 +3722,6 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   if (isa<ErrorExpr>(E))
     sawError = true;
 
-  // Track the current closure in `ClosureStack`
-  if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
-    ClosureStack.push_back(closure);
-  }
-
-  return Action::Continue(E);
-}
-
-ASTWalker::PostWalkResult<Expr *> VarDeclUsageChecker::walkToExprPost(Expr *E) {
-  if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
-    assert(ClosureStack.size() > 0);
-    ClosureStack.pop_back();
-  }
-
   return Action::Continue(E);
 }
 
@@ -3851,7 +3741,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
       // conservatively mark it read and written.  This will silence "variable
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(VDUC.getDeclForUsageAnalysis(DRE), RK_Read | RK_Written);
+        VDUC.addMark(DRE->getDecl(), RK_Read | RK_Written);
       else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
         auto name = declRef->getName();
         auto loc = declRef->getLoc();

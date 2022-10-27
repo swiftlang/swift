@@ -261,12 +261,12 @@ class ExplicitSelfRequiredTest {
   // because its `sawError` flag is set to true. To preserve the "capture 'y' was never used" warnings
   // above, we put these cases in their own method.
   func weakSelfError() {
-    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
   }
 }
 
@@ -775,7 +775,7 @@ public class TestImplicitSelfForWeakSelfCapture {
     }
     
     doVoidStuff { [weak self] in
-      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return }
+      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
     
@@ -811,7 +811,7 @@ public class TestImplicitSelfForWeakSelfCapture {
     }
     
     doVoidStuffNonEscaping { [weak self] in
-      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return }
+      guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
   }
