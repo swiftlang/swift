@@ -6908,6 +6908,11 @@ public:
   /// vtable.
   bool needsNewVTableEntry() const;
 
+  /// True if the decl is a method which introduces a new witness table entry.
+  bool requiresNewWitnessTableEntry() const {
+    return getOverriddenDecls().empty();
+  }
+
 public:
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;

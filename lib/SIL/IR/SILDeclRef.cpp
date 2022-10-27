@@ -1233,11 +1233,7 @@ bool SILDeclRef::requiresNewVTableEntry() const {
 }
 
 bool SILDeclRef::requiresNewWitnessTableEntry() const {
-  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-}
-
-bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
-  return func->getOverriddenDecls().empty();
+  return cast<AbstractFunctionDecl>(getDecl())->requiresNewWitnessTableEntry();
 }
 
 SILDeclRef SILDeclRef::getOverridden() const {
