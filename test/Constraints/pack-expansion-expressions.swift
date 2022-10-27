@@ -33,3 +33,10 @@ func coerceExpansion<T...>(_ value: T...) {
 
   promoteToOptional(value...)
 }
+
+func localValuePack<T...>(_ t: T...) -> (T..., T...) {
+  let local = t...
+  let localAnnotated: T... = t...
+
+  return (local..., localAnnotated...)
+}
