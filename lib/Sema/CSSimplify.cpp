@@ -4307,6 +4307,14 @@ ConstraintSystem::matchTypesBindTypeVar(
     }
   }
 
+  if (type->is<PackType>() || type->is<PackArchetypeType>()) {
+    if (!typeVar->getImpl().canBindToPack())
+      return getTypeMatchFailure(locator);
+  } else if (!type->is<PlaceholderType>()) {
+    if (typeVar->getImpl().canBindToPack())
+      return getTypeMatchFailure(locator);
+  }
+
   // We do not allow keypaths to go through AnyObject. Let's create a fix
   // so this can be diagnosed later.
   if (auto loc = typeVar->getImpl().getLocator()) {
@@ -6536,6 +6544,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // trivially solved.
         return getTypeMatchSuccess();
       }
+
+      // If exactly one of the type variables can bind to an pack, we
+      // can't merge these two type variables.
+      if (rep1->getImpl().canBindToPack()
+            != rep2->getImpl().canBindToPack())
+        return getTypeMatchFailure(locator);
     }
 
     switch (kind) {

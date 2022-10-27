@@ -202,6 +202,12 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
     return;
 
   if (!type->isTypeVariableOrMember()) {
+    if (type->is<PackType>() || type->is<PackArchetypeType>()) {
+      assert(typeVar->getImpl().canBindToPack());
+    } else if (!type->is<PlaceholderType>()) {
+      assert(!typeVar->getImpl().canBindToPack());
+    }
+
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     //
