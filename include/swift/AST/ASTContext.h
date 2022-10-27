@@ -124,6 +124,7 @@ namespace swift {
   class DiagnosticEngine;
   struct RawComment;
   class DocComment;
+  class StructDecl;
   class SILBoxType;
   class SILTransform;
   class TypeAliasDecl;
@@ -1434,6 +1435,14 @@ public:
 
   /// The declared interface type of Builtin.TheTupleType.
   BuiltinTupleType *getBuiltinTupleType();
+
+  /// Look up a macro's evaluation context by name.
+  ///
+  /// If no such macro or evaluation context is found under this name, this
+  /// method returns \c nullptr.
+  StructDecl *getOrCreateASTGenMacroContext(
+      StringRef macroName,
+      llvm::function_ref<StructDecl *(StringRef)> createMacro);
 
 private:
   friend Decl;

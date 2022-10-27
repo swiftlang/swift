@@ -191,7 +191,6 @@ void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);
 void Decl_dump(void *);
 void Stmt_dump(void *);
-void TypeRepr_dump(void *);
 
 #ifdef __cplusplus
 }

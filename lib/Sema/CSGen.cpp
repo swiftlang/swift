@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
-#include "TypeCheckType.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckRegex.h"
+#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1188,6 +1189,30 @@ namespace {
     }
 
     Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+#ifdef SWIFT_SWIFT_PARSER
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
+        auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
+                        .drop_front();
+
+        auto protocol =
+            TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
+        if (!protocol)
+          return Type();
+
+        auto openedType = CS.getTypeOfMacroReference(kind, expr);
+        if (!openedType)
+          return Type();
+
+        CS.addConstraint(ConstraintKind::LiteralConformsTo, openedType,
+                         protocol->getDeclaredInterfaceType(),
+                         CS.getConstraintLocator(expr));
+
+        return openedType;
+      }
+      // Fall through to use old implementation.
+#endif
+
       switch (expr->getKind()) {
       // Magic pointer identifiers are of type UnsafeMutableRawPointer.
 #define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -3603,7 +3628,17 @@ namespace {
     }
 
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
-      // FIXME: not implemented
+#if SWIFT_SWIFT_PARSER
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
+        auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(expr->getMacro());
+        if (!UDRE)
+          return Type();
+        
+        auto macroIdent = UDRE->getName().getBaseIdentifier();
+        return CS.getTypeOfMacroReference(macroIdent.str(), expr);
+      }
+#endif
       return Type();
     }
 

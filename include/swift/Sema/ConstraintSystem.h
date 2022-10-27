@@ -4906,6 +4906,12 @@ public:
                           ConstraintLocator *locator,
                           OpenedTypeMap *replacements = nullptr);
 
+  /// Retrieve the opened type of a macro with the given name.
+  ///
+  /// \returns The opened type of the macro with this name, or the null \c Type
+  /// if no such macro exists.
+  Type getTypeOfMacroReference(StringRef macro, Expr *anchor);
+
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
   ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {

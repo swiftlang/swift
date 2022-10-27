@@ -15,13 +15,15 @@
 // inference for expressions.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
-#include "swift/AST/Initializer.h"
+#include "TypeChecker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -29,7 +31,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -2467,6 +2468,27 @@ ConstraintSystem::getTypeOfMemberReference(
   recordOpenedTypes(locator, replacements);
 
   return { origOpenedType, openedType, origType, type };
+}
+
+Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
+                                               Expr *anchor) {
+  auto macroCtx = swift::macro_context::lookup(macroName, DC);
+  if (!macroCtx)
+    return Type();
+
+  auto *locator = getConstraintLocator(anchor);
+  // Dig through to __MacroEvaluationContext.SignatureType
+  auto sig = getASTContext().getIdentifier("SignatureType");
+  auto *signature = macroCtx->lookupDirect(sig).front();
+  auto type = cast<TypeAliasDecl>(signature)->getUnderlyingType();
+
+  // Open up the generic type.
+  OpenedTypeMap replacements;
+  openGeneric(cast<TypeAliasDecl>(signature)->getParent(),
+              cast<TypeAliasDecl>(signature)->getGenericSignature(), locator,
+              replacements);
+
+  return openType(type, replacements);
 }
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,

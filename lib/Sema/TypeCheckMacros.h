@@ -26,27 +26,28 @@ class TypeRepr;
 
 #if SWIFT_SWIFT_PARSER
 
-struct ASTGenMacroRAII {
-private:
-  void *opaqueMacro;
-  TypeRepr *signature;
-  GenericParamList *genericSignature;
-
-  ASTGenMacroRAII(void *macro, TypeRepr *sig, GenericParamList *genericSig)
-  : opaqueMacro(macro), signature(sig),
-    genericSignature(genericSig) {}
-
-public:
-  static llvm::Optional<ASTGenMacroRAII> lookup(StringRef macroName,
-                                                void *sourceFile,
-                                                DeclContext *DC,
-                                                ASTContext &ctx);
-
-  TypeRepr *getSignature() const { return signature; }
-  GenericParamList *getGenericSignature() const { return genericSignature; }
-
-  ~ASTGenMacroRAII();
-};
+namespace macro_context {
+/// Retrieves the evaluation context of a macro with the given name.
+///
+/// The macro evaluation context is a user-defined generic signature and return
+/// type that serves as the "interface type" of references to the macro. The
+/// current implementation takes those pieces of syntax from the macro itself,
+/// then inserts them into a Swift struct that looks like
+///
+/// \code
+/// struct __MacroEvaluationContext\(macro.genericSignature) {
+///   typealias SignatureType = \(macro.signature)
+/// }
+/// \endcode
+///
+/// So that we can use all of Swift's native name lookup and type resolution
+/// facilities to map the parsed signature type back into a semantic \c Type
+/// AST and a set of requiremnets.
+///
+/// \param macroName The name of the macro to look up.
+/// \param useDC The decl context of the use of this macro.
+StructDecl *lookup(StringRef macroName, DeclContext *useDC);
+}
 
 #endif
 
