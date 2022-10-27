@@ -1538,20 +1538,6 @@ static bool closureHasWeakSelfCapture(const AbstractClosureExpr *ACE) {
   return false;
 }
 
-/// Whether or not this closure with a `weak self` capture is permitted
-/// to use implicit self. We can't permit this for escaping closures in
-/// Swift 5 mode, because the implicit self AST in Swift 5 would cause
-/// self to be captured strongly instead of weakly.
-static bool
-allowsImplicitSelfForWeakSelfCapture(const AbstractClosureExpr *ACE) {
-  if (ACE->getASTContext().LangOpts.isSwiftVersionAtLeast(6)) {
-    return true;
-  }
-
-  return AnyFunctionRef(const_cast<AbstractClosureExpr *>(ACE))
-      .isKnownNoEscape();
-}
-
 /// Whether or not implicit self decls in this closure require manual
 /// lookup in order to perform diagnostics with the semantics described
 /// in SE-0365. This is necessary for closures that capture self weakly
@@ -1654,8 +1640,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // let self = .someOptionalVariable else { return }` or `let self =
       // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
       // an optional, we would have already hit an error elsewhere.
-      if (closureHasWeakSelfCapture(inClosure) &&
-          allowsImplicitSelfForWeakSelfCapture(inClosure)) {
+      if (closureHasWeakSelfCapture(inClosure)) {
         return !implicitWeakSelfReferenceIsValid(DRE, inClosure);
       }
 

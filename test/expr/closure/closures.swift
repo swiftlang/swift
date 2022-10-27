@@ -749,21 +749,21 @@ public class TestImplicitSelfForWeakSelfCapture {
     doVoidStuff { [weak self] in
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       guard let self = self else { return }
-      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      method()
     }
     
     doVoidStuff { [weak self] in
       guard let self else { return }
-      method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      method()
     }
     
     doVoidStuff { [weak self] in
       if let self = self {
-        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        method()
       }
 
       if let self {
-        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        method()
       }
     }
     
