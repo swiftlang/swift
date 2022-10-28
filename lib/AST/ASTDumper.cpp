@@ -2976,8 +2976,7 @@ public:
 
   void visitMacroExpansionExpr(MacroExpansionExpr *E) {
     printCommon(E, "macro_expansion_expr");
-    OS << '\n';
-    printRec(E->getMacro());
+    PrintWithColorRAII(OS, IdentifierColor) << " name=" << E->getMacroName();
     if (E->getArgs()) {
       OS << '\n';
       printArgumentList(E->getArgs());

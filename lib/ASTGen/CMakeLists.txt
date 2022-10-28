@@ -3,11 +3,13 @@ if (SWIFT_SWIFT_PARSER)
     Sources/ASTGen/ASTGen.swift
     Sources/ASTGen/Decls.swift
     Sources/ASTGen/Exprs.swift
+    Sources/ASTGen/Generics.swift
     Sources/ASTGen/Literals.swift
     Sources/ASTGen/Macros.swift
     Sources/ASTGen/Misc.swift
     Sources/ASTGen/SourceFile.swift
     Sources/ASTGen/Stmts.swift
+    Sources/ASTGen/Types.swift
   )
 
   # Set the appropriate target triple.

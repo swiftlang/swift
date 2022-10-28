@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
-#include "TypeCheckType.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckRegex.h"
+#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1188,6 +1189,30 @@ namespace {
     }
 
     Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+#ifdef SWIFT_SWIFT_PARSER
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
+        auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
+                        .drop_front();
+
+        auto protocol =
+            TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
+        if (!protocol)
+          return Type();
+
+        auto openedType = CS.getTypeOfMacroReference(kind, expr);
+        if (!openedType)
+          return Type();
+
+        CS.addConstraint(ConstraintKind::LiteralConformsTo, openedType,
+                         protocol->getDeclaredInterfaceType(),
+                         CS.getConstraintLocator(expr));
+
+        return openedType;
+      }
+      // Fall through to use old implementation.
+#endif
+
       switch (expr->getKind()) {
       // Magic pointer identifiers are of type UnsafeMutableRawPointer.
 #define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -3603,7 +3628,36 @@ namespace {
     }
 
     Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
-      // FIXME: not implemented
+#if SWIFT_SWIFT_PARSER
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
+        auto macroIdent = expr->getMacroName().getBaseIdentifier();
+        auto refType = CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        if (expr->getArgs()) {
+          CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
+          // FIXME: Do we have object-like vs. function-like macros?
+          if (auto fnType = dyn_cast<FunctionType>(refType.getPointer())) {
+            SmallVector<AnyFunctionType::Param, 8> params;
+            getMatchingParams(expr->getArgs(), params);
+
+            Type resultType = CS.createTypeVariable(
+                CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+                TVO_CanBindToNoEscape);
+
+            CS.addConstraint(
+                ConstraintKind::ApplicableFunction,
+                FunctionType::get(params, resultType),
+                fnType,
+                CS.getConstraintLocator(
+                  expr, ConstraintLocator::ApplyFunction));
+
+            return resultType;
+          }
+        }
+
+        return refType;
+      }
+#endif
       return Type();
     }
 

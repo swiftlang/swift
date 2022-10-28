@@ -6013,20 +6013,23 @@ public:
 
 class MacroExpansionExpr final : public Expr {
 private:
-  Expr *Macro;
-  Expr *Rewritten;
-  ArgumentList *ArgList;
   SourceLoc PoundLoc;
+  DeclNameRef MacroName;
+  DeclNameLoc MacroNameLoc;
+  ArgumentList *ArgList;
+  Expr *Rewritten;
 
 public:
-  explicit MacroExpansionExpr(SourceLoc poundLoc, Expr *macro,
+  explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
+                              DeclNameLoc macroNameLoc,
                               ArgumentList *argList, bool isImplicit = false,
                               Type ty = Type())
-      : Expr(ExprKind::MacroExpansion, isImplicit, ty), Macro(macro),
-        Rewritten(nullptr), ArgList(argList), PoundLoc(poundLoc) {}
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty), PoundLoc(poundLoc),
+        MacroName(macroName), MacroNameLoc(macroNameLoc), ArgList(argList),
+        Rewritten(nullptr) { }
 
-  Expr *getMacro() const { return Macro; }
-  void setMacro(Expr *macro) { Macro = macro; }
+  DeclNameRef getMacroName() const { return MacroName; }
+  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
 
   Expr *getRewritten() const { return Rewritten; }
   void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
@@ -6038,7 +6041,7 @@ public:
 
   SourceRange getSourceRange() const {
     return SourceRange(
-        PoundLoc, ArgList ? ArgList->getEndLoc() : Macro->getEndLoc());
+        PoundLoc, ArgList ? ArgList->getEndLoc() : MacroNameLoc.getEndLoc());
   }
 
   static bool classof(const Expr *E) {
