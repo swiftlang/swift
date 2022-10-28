@@ -1403,120 +1403,6 @@ public:
 };
 
 namespace {
-class OpenParameterPackElements {
-  ConstraintSystem &CS;
-  int64_t argIdx;
-  Type patternTy;
-
-  // A map that relates a type variable opened for a reference to a parameter
-  // pack to an array of parallel type variables, one for each argument.
-  llvm::MapVector<TypeVariableType *, SmallVector<TypeVariableType *, 2>> PackElementCache;
-
-  // A map from argument index to the corresponding shape type for pack
-  // expansion arguments. When the parameter pack is expanded by a
-  // pack expansion argument, the corresponding pattern type is also
-  // wrapped in a pack expansion. Each pack reference in the pattern
-  // type will be bound to a pack expansion in the aggregated pack type
-  // created in 'intoPackTypes'.
-  llvm::SmallDenseMap<int64_t, Type> Expansions;
-
-public:
-  OpenParameterPackElements(ConstraintSystem &CS, PackExpansionType *PET)
-      : CS(CS), argIdx(-1), patternTy(PET->getPatternType()) {}
-
-public:
-  Type expandParameter(Type argType) {
-    argIdx += 1;
-    auto pattern = patternTy.transform(*this);
-
-    // If the argument that invoked expansion is itself a pack
-    // expansion, wrap the pattern type in a pack expansion type
-    // of the same shape.
-    if (auto expansion = argType->getAs<PackExpansionType>()) {
-      Expansions[argIdx] = expansion->getCountType();
-      pattern = PackExpansionType::get(pattern, expansion->getCountType());
-    }
-
-    return pattern;
-  }
-
-  void intoPackTypes(llvm::function_ref<void(TypeVariableType *, Type)> fn) && {
-    if (argIdx == -1) {
-      // No arguments. Each pack in the pattern will have no elements.
-      patternTy.visit([&](Type type) {
-        auto *typeVar = type->getAs<TypeVariableType>();
-        if (!typeVar || !typeVar->getImpl().getGenericParameter()->isParameterPack())
-          return;
-
-        this->PackElementCache[typeVar].clear();
-      });
-    }
-
-    for (const auto &entry : PackElementCache) {
-      SmallVector<Type, 8> elements;
-      for (int64_t i = 0; i < (int64_t)entry.second.size(); ++i) {
-        auto *typeVar = entry.second[i];
-
-        // If this argument is a pack expansion, wrap the corresponding
-        // type variable in a pack expansion to distinguish it from
-        // a scalar type argument. The type variable itself represents
-        // the argument pattern.
-        if (auto shape = Expansions[i]) {
-          elements.push_back(PackExpansionType::get(typeVar, shape));
-          continue;
-        }
-
-        elements.push_back(typeVar);
-      }
-
-      auto packType = PackType::get(CS.getASTContext(), elements);
-      fn(entry.first, packType);
-    }
-  }
-
-  Type operator()(Type Ty) {
-    if (!Ty || !Ty->isTypeVariableOrMember())
-      return Ty;
-
-    auto *TV = Ty->getAs<TypeVariableType>();
-    if (!TV)
-      return Ty;
-
-    // Leave plain opened type variables alone.
-    if (!TV->getImpl().getGenericParameter()->isParameterPack())
-      return TV;
-
-    // Create a clone of the parameter pack type variable.
-    auto *clonedTV = CS.createTypeVariable(TV->getImpl().getLocator(),
-                                           TV->getImpl().getRawOptions());
-
-    // Is there an entry for this parameter pack?
-    const auto &entries = PackElementCache.find(TV);
-    if (entries == PackElementCache.end()) {
-      // We're just seeing this parameter pack fresh, so enter a new type
-      // variable in its place and cache down the fact we just saw it.
-      PackElementCache[TV] = {clonedTV};
-    } else if ((int64_t)entries->second.size() <= argIdx) {
-      // We've seen this pack before, but we have a brand new element.
-      // Expand the cache entry.
-      PackElementCache[TV].push_back(clonedTV);
-    } else {
-      // Not only have we seen this pack before, we've seen this
-      // argument index before. Extract the old cache entry, emplace the new
-      // one, and bind them together.
-      auto *oldEntry = PackElementCache[TV][argIdx];
-      PackElementCache[TV][argIdx] = clonedTV;
-
-      CS.addConstraint(ConstraintKind::Bind, oldEntry, clonedTV,
-                       TV->getImpl().getLocator());
-    }
-
-    return clonedTV;
-  }
-};
-}
-
-namespace {
   /// Flags that should be applied to the existential argument type after
   /// opening.
   enum class OpenedExistentialAdjustmentFlags {
@@ -1860,31 +1746,20 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     // inout and @autoclosure.
     if (cs.getASTContext().LangOpts.hasFeature(Feature::VariadicGenerics) &&
         paramInfo.isVariadicGenericParameter(paramIdx)) {
-      auto *PET = paramTy->castTo<PackExpansionType>();
-      OpenParameterPackElements openParameterPack{cs, PET};
+      auto *paramPackExpansion = paramTy->castTo<PackExpansionType>();
+
+      SmallVector<Type, 2> argTypes;
       for (auto argIdx : parameterBindings[paramIdx]) {
-        const auto &argument = argsWithLabels[argIdx];
-        auto argTy = argument.getPlainType();
-
-        // First, expand the opened parameter pack for this argument.
-        // This will open a new type variable for each pack reference
-        // in the pattern type of the parameter, and substitute the type
-        // variables into the pattern type.
-        auto substParamTy = openParameterPack.expandParameter(argTy);
-
-        cs.addConstraint(
-            subKind, argTy, substParamTy, loc, /*isFavored=*/false);
+        auto argType = argsWithLabels[argIdx].getPlainType();
+        argTypes.push_back(argType);
       }
 
-      // Now that we have the pack mappings, bind the raw list to the
-      // whole parameter pack. This ensures references to the pack in
-      // return position refer to the whole pack of elements we just gathered.
-      std::move(openParameterPack)
-          .intoPackTypes([&](TypeVariableType *tsParam, Type pack) {
-            cs.addConstraint(ConstraintKind::Bind, pack, tsParam, loc,
-                             /*isFavored=*/false);
-          });
+      auto *argPack = PackType::get(cs.getASTContext(), argTypes);
+      auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
 
+      cs.addConstraint(
+          subKind, argPackExpansion, paramPackExpansion,
+          loc, /*isFavored=*/false);
       continue;
     }
 
@@ -2466,21 +2341,209 @@ ConstraintSystem::matchPackTypes(PackType *pack1, PackType *pack2,
   return getTypeMatchSuccess();
 }
 
+namespace {
+
+/// Collects all unique pack type variables referenced from the pattern type,
+/// skipping those captured by nested pack expansion types.
+///
+/// FIXME: This could probably be a common utility method somewhere.
+struct PackTypeVariableCollector: TypeWalker {
+  llvm::SetVector<TypeVariableType *> typeVars;
+
+  Action walkToTypePre(Type t) override {
+    if (t->is<PackExpansionType>())
+      return Action::SkipChildren;
+
+    if (auto *typeVar = t->getAs<TypeVariableType>()) {
+      if (typeVar->getImpl().canBindToPack())
+        typeVars.insert(typeVar);
+    }
+
+    return Action::Continue;
+  }
+};
+
+}
+
+/// Utility function used when matching a pack expansion type against a
+/// pack type.
+///
+/// Takes a pattern type and an original pack type, and returns an instantiated
+/// pack type. The original pack type is then matched against the instantiated
+/// pack type.
+///
+/// As a side effect, it binds each pack type variable occuring in the pattern
+/// type to a new pack with the same shape as the original pack, but where the
+/// elements are fresh type variables.
+///
+/// The instantiated pack has the same shape as the original pack, where the
+/// ith element is the pattern type with each pack type variable replaced by the
+/// ith element of its binding.
+///
+/// For example, given the pattern Foo<$T0> and the original pack
+/// {Foo<Int>, Foo<String>...}, we're going to bind
+///
+/// $T0 := {$T1, $T2}
+///
+/// And return the new pack {Foo<$T1>, Foo<$T2>...}.
+///
+/// The caller will then match the original pack type against the instantiated
+/// pack type, which will recover the bindings:
+///
+/// $T1 := Int
+/// $T2 := String
+///
+static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
+                                                    Type pattern,
+                                                    PackType *pack,
+                                                    ConstraintLocatorBuilder locator) {
+  SmallVector<Type, 2> elts;
+
+  llvm::MapVector<TypeVariableType *, SmallVector<Type, 2>> typeVars;
+
+  PackTypeVariableCollector collector;
+  pattern.walk(collector);
+
+  if (collector.typeVars.empty())
+    return nullptr;
+
+  auto *loc = cs.getConstraintLocator(locator);
+
+  // For each pack type variable occurring in the pattern type, compute a
+  // binding pack type comprised of fresh type variables.
+  for (auto *typeVar : collector.typeVars) {
+    auto &freshTypeVars = typeVars[typeVar];
+    for (unsigned i = 0, e = pack->getNumElements(); i < e; ++i) {
+      auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
+
+      // Preserve the pack expansion structure of the original pack. If the ith
+      // element was a pack expansion type, create a new pack expansion type
+      // wrapping a pack type variable. Otherwise, create a new scalar
+      // type variable.
+      //
+      // FIXME: Locator for diagnostics
+      // FIXME: Other TVO_* flags for type variables?
+      if (packExpansionElt != nullptr) {
+        auto *freshTypeVar = cs.createTypeVariable(loc, TVO_CanBindToPack);
+        freshTypeVars.push_back(PackExpansionType::get(
+            freshTypeVar, packExpansionElt->getCountType()));
+      } else {
+        freshTypeVars.push_back(cs.createTypeVariable(loc, /*options=*/0));
+      }
+    }
+  }
+
+  // For each element of the original pack type, instantiate the pattern type by
+  // replacing each pack type variable with the corresponding element of the
+  // pack type variable's binding pack.
+  for (unsigned i = 0, e = pack->getNumElements(); i < e; ++i) {
+    auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
+
+    auto instantiatedPattern = pattern.transformRec([&](Type t) -> Optional<Type> {
+      if (t->is<PackExpansionType>())
+        return t;
+
+      if (auto *typeVar = t->getAs<TypeVariableType>()) {
+        if (typeVar->getImpl().canBindToPack()) {
+          auto found = typeVars.find(typeVar);
+          assert(found != typeVars.end());
+
+          // The ith element of the binding pack is either a scalar type variable
+          // or a pack expansion type wrapping a pack type variable.
+          auto projectedType = (found->second)[i];
+          if (packExpansionElt != nullptr) {
+            projectedType = projectedType->castTo<PackExpansionType>()
+                                         ->getPatternType();
+            assert(projectedType->castTo<TypeVariableType>()
+                                ->getImpl().canBindToPack());
+          } else {
+            assert(!projectedType->castTo<TypeVariableType>()
+                                 ->getImpl().canBindToPack());
+          }
+
+          return projectedType;
+        }
+      }
+
+      return None;
+    });
+
+    if (packExpansionElt != nullptr) {
+      elts.push_back(PackExpansionType::get(instantiatedPattern,
+                                            packExpansionElt->getCountType()));
+    } else {
+      elts.push_back(instantiatedPattern);
+    }
+  }
+
+  auto &ctx = cs.getASTContext();
+
+  // Bind each pack type variable occurring in the pattern type to its
+  // binding pack that was constructed above.
+  for (const auto &pair : typeVars) {
+    // FIXME: Locator for diagnostics
+    cs.addConstraint(ConstraintKind::Bind,
+                     pair.first, PackType::get(ctx, pair.second), locator);
+  }
+
+  // Construct the instantiated pack type.
+  return PackType::get(cs.getASTContext(), elts);
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchPackExpansionTypes(PackExpansionType *expansion1,
                                           PackExpansionType *expansion2,
                                           ConstraintKind kind, TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator) {
-  // FIXME: Should we downgrade kind to Bind or something here?
-  auto result = matchTypes(expansion1->getCountType(),
-                           expansion2->getCountType(),
-                           kind, flags, locator);
-  if (result.isFailure())
-    return result;
+  // The count types of two pack expansion types must have the same shape.
+  //
+  // FIXME: Locator for diagnostics.
+  auto *loc = getConstraintLocator(locator);
+  auto *shapeTypeVar = createTypeVariable(loc, TVO_CanBindToPack);
+  addConstraint(ConstraintKind::ShapeOf,
+                expansion1->getCountType(), shapeTypeVar, locator);
+  addConstraint(ConstraintKind::ShapeOf,
+                expansion2->getCountType(), shapeTypeVar, locator);
 
-  return matchTypes(expansion1->getPatternType(),
-                    expansion2->getPatternType(),
-                    kind, flags, locator);
+  auto pattern1 = expansion1->getPatternType();
+  auto pattern2 = expansion2->getPatternType();
+
+  // If both sides are expanded or neither side is, just match them
+  // directly.
+  if (pattern1->is<PackType>() == pattern2->is<PackType>()) {
+    return matchTypes(pattern1, pattern2, kind, flags, locator);
+
+  // If the right hand side is expanded, we have something like
+  // Foo<$T0>... vs Pack{Foo<Int>, Foo<String>}...; We're going to
+  // bind $T0 to Pack{Int, String}.
+  } else if (!pattern1->is<PackType>() && pattern2->is<PackType>()) {
+    if (auto *pack2 = pattern2->getAs<PackType>()) {
+      if (auto *pack1 = replaceTypeVariablesWithFreshPacks(
+             *this, pattern1, pack2, locator)) {
+        // FIXME: Locator for diagnostics.
+        addConstraint(kind, pack1, pack2, locator);
+        return getTypeMatchSuccess();
+      }
+    }
+
+    return getTypeMatchFailure(locator);
+
+  // If the left hand side is expanded, we have something like
+  // Pack{Foo<Int>, Foo<String>}... vs Foo<$T0>...; We're going to
+  // bind $T0 to Pack{Int, String}.
+  } else {
+    assert(pattern1->is<PackType>() && !pattern2->is<PackType>());
+    if (auto *pack1 = pattern1->getAs<PackType>()) {
+      if (auto *pack2 = replaceTypeVariablesWithFreshPacks(
+              *this, pattern2, pack1, locator)) {
+        // FIXME: Locator for diagnostics.
+        addConstraint(kind, pack1, pack2, locator);
+        return getTypeMatchSuccess();
+      }
+    }
+
+    return getTypeMatchFailure(locator);
+  }
 }
 
 /// Check where a representation is a subtype of another.
@@ -2943,7 +3006,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (func1->getGlobalActor() && func2->getGlobalActor()) {
       // If both have a global actor, match them.
       TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
-      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(), ConstraintKind::Equal, subflags, locator);
+      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(),
+                               ConstraintKind::Equal, subflags, locator);
       if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor() && !func2->isAsync()) {
@@ -7471,8 +7535,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
   // smaller constraints.
   if (auto *packType = type->getAs<PackType>()) {
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
-      addConstraint(ConstraintKind::SubclassOf, packType->getElementType(i),
-                    classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+      auto eltType = packType->getElementType(i);
+      if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
+        // FIXME: Locator element for pack expansion pattern
+        addConstraint(ConstraintKind::SubclassOf, packExpansionType->getPatternType(),
+                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+      } else {
+        addConstraint(ConstraintKind::SubclassOf, eltType,
+                      classType, locator.withPathElement(LocatorPathElt::PackElement(i)));
+      }
     }
 
     return SolutionKind::Solved;
@@ -7582,9 +7653,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // smaller constraints.
   if (auto *packType = type->getAs<PackType>()) {
     for (unsigned i = 0, e = packType->getNumElements(); i < e; ++i) {
-      addConstraint(ConstraintKind::ConformsTo, packType->getElementType(i),
-                    protocol->getDeclaredInterfaceType(),
-                    locator.withPathElement(LocatorPathElt::PackElement(i)));
+      auto eltType = packType->getElementType(i);
+      if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
+        // FIXME: Locator element for pack expansion pattern
+        addConstraint(ConstraintKind::ConformsTo,
+                      packExpansionType->getPatternType(),
+                      protocol->getDeclaredInterfaceType(),
+                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+      } else {
+        addConstraint(ConstraintKind::ConformsTo, eltType,
+                      protocol->getDeclaredInterfaceType(),
+                      locator.withPathElement(LocatorPathElt::PackElement(i)));
+      }
     }
 
     return SolutionKind::Solved;
@@ -12502,34 +12582,38 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   return SolutionKind::Solved;
 }
 
-static Type getReducedShape(Type type) {
+/// FIXME: Move this elsewhere if it is broadly useful
+static Type getReducedShape(Type type, ASTContext &ctx) {
   // Pack archetypes know their reduced shape
   if (auto *packArchetype = type->getAs<PackArchetypeType>())
     return packArchetype->getShape();
 
   // Reduced shape of pack is computed recursively
   if (auto *packType = type->getAs<PackType>()) {
-    auto &ctx = type->getASTContext();
     SmallVector<Type, 2> elts;
 
     for (auto elt : packType->getElementTypes()) {
       // T... => shape(T)...
       if (auto *packExpansionType = elt->getAs<PackExpansionType>()) {
-        auto shapeType = getReducedShape(packExpansionType->getCountType());
-        assert(shapeType && "Should not end up here if pack type's shape "
-                            "is still potentially unknown");
+        if (packExpansionType->getCountType()->is<PlaceholderType>()) {
+          elts.push_back(ctx.TheEmptyTupleType);
+          continue;
+        }
+        auto shapeType = getReducedShape(packExpansionType->getCountType(), ctx);
         elts.push_back(PackExpansionType::get(shapeType, shapeType));
       }
 
-      // Use () as a placeholder for scalar shape
+      // Use () as a placeholder for scalar shape.
       elts.push_back(ctx.TheEmptyTupleType);
     }
 
     return PackType::get(ctx, elts);
   }
 
-  // Getting the shape of any other type is an error.
-  return Type();
+  assert(!type->isTypeVariableOrMember());
+
+  // Use () as a placeholder for scalar shape.
+  return ctx.TheEmptyTupleType;
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
@@ -12562,7 +12646,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
       return formUnsolved();
   }
 
-  if (Type shape = getReducedShape(type1)) {
+  if (Type shape = getReducedShape(type1, getASTContext())) {
     addConstraint(ConstraintKind::Bind, shape, type2, locator);
     return SolutionKind::Solved;
   }

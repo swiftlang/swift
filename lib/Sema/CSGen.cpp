@@ -2913,6 +2913,7 @@ namespace {
 
       auto elementResultType = CS.getType(expr->getPatternExpr());
       auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                             TVO_CanBindToPack |
                                              TVO_CanBindToHole);
       CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
                        patternTy, CS.getConstraintLocator(expr));
