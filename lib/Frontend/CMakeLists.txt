@@ -18,6 +18,7 @@ add_dependencies(swiftFrontend
   SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE
   swiftAST
+  swiftConstExtract
   swiftSIL
   swiftMigrator
   swiftOption

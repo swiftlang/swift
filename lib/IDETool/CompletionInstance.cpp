@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/CompletionInstance.h"
+#include "swift/IDETool/CompletionInstance.h"
 
 #include "DependencyChecking.h"
 #include "swift/AST/ASTContext.h"
