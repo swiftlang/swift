@@ -5787,6 +5787,29 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     }
   };
 
+  if (locator->isForSequenceElementType()) {
+    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
+    // If this is a conversion failure related to binding of `for-each`
+    // statement it has to be diagnosed as pattern match if there are
+    // holes present in the contextual type.
+    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
+         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
+        contextualType->hasUnresolvedType()) {
+      auto diagnostic = emitDiagnostic(
+          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
+              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
+              : diag::cannot_match_unresolved_expr_pattern_with_value,
+          eltType);
+      (void)trySequenceSubsequenceFixIts(diagnostic);
+    } else {
+      diagnoseSingleElement(contextualType->isExistentialType()
+                                ? diag::cannot_convert_sequence_element_protocol
+                                : diag::cannot_convert_sequence_element_value,
+                            eltType, contextualType);
+    }
+    return true;
+  }
+
   auto isFixedToDictionary = [&](ArrayExpr *anchor) {
     return llvm::any_of(getSolution().Fixes, [&](ConstraintFix *fix) {
       auto *fixAnchor = getAsExpr<ArrayExpr>(fix->getAnchor());
@@ -5837,29 +5860,6 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     default:
       break;
     }
-  }
-
-  if (locator->isForSequenceElementType()) {
-    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
-    // If this is a conversion failure related to binding of `for-each`
-    // statement it has to be diagnosed as pattern match if there are
-    // holes present in the contextual type.
-    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
-         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
-        contextualType->hasUnresolvedType()) {
-      auto diagnostic = emitDiagnostic(
-          (contextualType->is<TupleType>() && !eltType->is<TupleType>())
-              ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
-              : diag::cannot_match_unresolved_expr_pattern_with_value,
-          eltType);
-      (void)trySequenceSubsequenceFixIts(diagnostic);
-    } else {
-      diagnoseSingleElement(contextualType->isExistentialType()
-                                ? diag::cannot_convert_sequence_element_protocol
-                                : diag::cannot_convert_sequence_element_value,
-                            eltType, contextualType);
-    }
-    return true;
   }
 
   return false;
