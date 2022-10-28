@@ -6703,5 +6703,8 @@ ERROR(implicit_reflectable_conversion,none,
       "expression can't be implicitly converted to Reflectable; "
       "use 'as? Reflectable' or 'as! Reflectable' instead", ())
 
+ERROR(conformance_to_reflectable_with_extension,none,
+      "extensions cannot declare protocol conformance to Reflectable", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

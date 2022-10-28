@@ -185,6 +185,12 @@ static void checkInheritanceClause(
     if (isa<AbstractTypeParamDecl>(decl))
       continue;
 
+    auto *PD = dyn_cast_or_null<ProtocolDecl>(inheritedTy->getAnyNominal());
+    if (isa<ExtensionDecl>(decl) && PD && PD->isSpecificProtocol(KnownProtocolKind::Reflectable)) {
+      diags.diagnose(inherited.getLoc(),
+                      diag::conformance_to_reflectable_with_extension);
+    }
+
     // Check whether we inherited from 'AnyObject' twice.
     // Other redundant-inheritance scenarios are checked below, the
     // GenericSignatureBuilder (for protocol inheritance) or the
