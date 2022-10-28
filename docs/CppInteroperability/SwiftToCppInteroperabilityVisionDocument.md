@@ -98,7 +98,7 @@ The Swift compiler generates specializations for a specific template if the Swif
 
 ### Standard Library Support
 
-The Swift standard library contains a lot of useful functions and types that get bridged to C++. The generated standard library bindings enhance various Swift types like Optional and Array to provide idiomatic C++ APIs that allow the user to use such types in an idiomatic manner from C++. 
+The Swift standard library contains a lot of useful functions and types that get bridged to C++. The generated standard library bindings enhance various Swift types like `Optional` and `Array` to provide idiomatic C++ APIs that allow the user to use such types in an idiomatic manner from C++.
 
 ### Using Swift Types in C++ Templates
 
