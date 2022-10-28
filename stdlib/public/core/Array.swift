@@ -1097,7 +1097,6 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
-    _internalInvariant(!bufferIsUnique || _buffer.isUniquelyReferenced())
     _buffer = _buffer._consumeAndCreateNew(bufferIsUnique: bufferIsUnique,
                                            minimumCapacity: minimumCapacity,
                                            growForAppend: growForAppend)
