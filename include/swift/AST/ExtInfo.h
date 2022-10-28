@@ -412,38 +412,38 @@ public:
 
   // Note that we don't have setters. That is by design, use
   // the following with methods instead of mutating these objects.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withRepresentation(Representation rep) const {
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo(),
                              globalActor);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
                              clangTypeInfo, globalActor);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
     return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
                                         : (bits & ~SendableMask),
                              clangTypeInfo, globalActor);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withAsync(bool async = true) const {
     return ASTExtInfoBuilder(async ? (bits | AsyncMask)
                                    : (bits & ~AsyncMask),
                              clangTypeInfo, globalActor);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withThrows(bool throws = true) const {
     return ASTExtInfoBuilder(
         throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
         globalActor);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return ASTExtInfoBuilder(
@@ -451,7 +451,7 @@ public:
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
         clangTypeInfo, globalActor);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
     return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor);
   }
@@ -461,7 +461,7 @@ public:
   /// SIL type lowering transiently generates AST function types with SIL
   /// representations. However, they shouldn't persist in the AST, and
   /// don't need to be parsed, printed, or serialized.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder
   withSILRepresentation(SILFunctionTypeRepresentation rep) const {
     return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
@@ -470,7 +470,7 @@ public:
                              globalActor);
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfoBuilder withGlobalActor(Type globalActor) const {
     return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor);
   }
@@ -555,7 +555,7 @@ public:
   /// Helper method for changing the representation.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withRepresentation for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withRepresentation(ASTExtInfoBuilder::Representation rep) const {
     return builder.withRepresentation(rep).build();
   }
@@ -563,7 +563,7 @@ public:
   /// Helper method for changing only the noEscape field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withNoEscape for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withNoEscape(bool noEscape = true) const {
     return builder.withNoEscape(noEscape).build();
   }
@@ -571,7 +571,7 @@ public:
   /// Helper method for changing only the concurrent field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withConcurrent for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withConcurrent(bool concurrent = true) const {
     return builder.withConcurrent(concurrent).build();
   }
@@ -579,7 +579,7 @@ public:
   /// Helper method for changing only the throws field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withThrows for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withThrows(bool throws = true) const {
     return builder.withThrows(throws).build();
   }
@@ -587,12 +587,12 @@ public:
   /// Helper method for changing only the async field.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withAsync for chaining.
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withAsync(bool async = true) const {
     return builder.withAsync(async).build();
   }
 
-  LLVM_NODISCARD
+  [[nodiscard]]
   ASTExtInfo withGlobalActor(Type globalActor) const {
     return builder.withGlobalActor(globalActor).build();
   }
@@ -785,36 +785,36 @@ public:
 
   // Note that we don't have setters. That is by design, use
   // the following with methods instead of mutating these objects.
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withRepresentation(Representation rep) const {
     return SILExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
                              shouldStoreClangType(rep) ? clangTypeInfo
                                                        : ClangTypeInfo());
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withIsPseudogeneric(bool isPseudogeneric = true) const {
     return SILExtInfoBuilder(isPseudogeneric ? (bits | PseudogenericMask)
                                              : (bits & ~PseudogenericMask),
                              clangTypeInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return SILExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
                                       : (bits & ~NoEscapeMask),
                              clangTypeInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
     return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
                                           : (bits & ~SendableMask),
                              clangTypeInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withAsync(bool isAsync = true) const {
     return SILExtInfoBuilder(isAsync ? (bits | AsyncMask) : (bits & ~AsyncMask),
                              clangTypeInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder
   withDifferentiabilityKind(DifferentiabilityKind differentiability) const {
     return SILExtInfoBuilder(
@@ -822,7 +822,7 @@ public:
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
         clangTypeInfo);
   }
-  LLVM_NODISCARD
+  [[nodiscard]]
   SILExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
     return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical());
   }
