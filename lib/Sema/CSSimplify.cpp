@@ -6011,6 +6011,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::SequenceElementType: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      recordAnyTypeVarAsPotentialHole(lhs);
+      recordAnyTypeVarAsPotentialHole(rhs);
+      return true;
+    }
+
     // This is going to be diagnosed as `missing conformance`,
     // so no need to create duplicate fixes.
     if (rhs->isExistentialType())
