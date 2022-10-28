@@ -77,7 +77,7 @@ private func allocateUTF8String(
       ptr[utf8.count] = 0
     }
 
-    return (UnsafePointer<UInt8>(ptr), capacity)
+    return (UnsafePointer<UInt8>(ptr), utf8.count)
   }
 }
 
