@@ -3631,12 +3631,31 @@ namespace {
 #if SWIFT_SWIFT_PARSER
       auto &ctx = CS.getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::Macros)) {
-        auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(expr->getMacro());
-        if (!UDRE)
-          return Type();
-        
-        auto macroIdent = UDRE->getName().getBaseIdentifier();
-        return CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        auto macroIdent = expr->getMacroName().getBaseIdentifier();
+        auto refType = CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        if (expr->getArgs()) {
+          CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
+          // FIXME: Do we have object-like vs. function-like macros?
+          if (auto fnType = dyn_cast<FunctionType>(refType.getPointer())) {
+            SmallVector<AnyFunctionType::Param, 8> params;
+            getMatchingParams(expr->getArgs(), params);
+
+            Type resultType = CS.createTypeVariable(
+                CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+                TVO_CanBindToNoEscape);
+
+            CS.addConstraint(
+                ConstraintKind::ApplicableFunction,
+                FunctionType::get(params, resultType),
+                fnType,
+                CS.getConstraintLocator(
+                  expr, ConstraintLocator::ApplyFunction));
+
+            return resultType;
+          }
+        }
+
+        return refType;
       }
 #endif
       return Type();

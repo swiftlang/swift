@@ -2977,9 +2977,12 @@ namespace {
         auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
             .drop_front();
         auto expandedType = solution.simplifyType(solution.getType(expr));
+        cs.setType(expr, expandedType);
+
         if (auto newExpr = expandMacroExpr(dc, expr, kind, expandedType)) {
           auto expansion = new (ctx) MacroExpansionExpr(
-              expr->getStartLoc(), expr, nullptr, /*isImplicit=*/true,
+              expr->getStartLoc(), DeclNameRef(ctx.getIdentifier(kind)),
+              DeclNameLoc(expr->getLoc()), nullptr, /*isImplicit=*/true,
               expandedType);
           expansion->setRewritten(newExpr);
           cs.cacheExprTypes(expansion);
@@ -5385,7 +5388,22 @@ namespace {
     }
 
     Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-      // TODO: Expand macro.
+#if SWIFT_SWIFT_PARSER
+      auto &ctx = cs.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
+        auto macroIdent = E->getMacroName().getBaseIdentifier();
+        auto expandedType = solution.simplifyType(solution.getType(E));
+        cs.setType(E, expandedType);
+        if (auto newExpr = expandMacroExpr(
+                dc, E, macroIdent.str(), expandedType)) {
+          E->setRewritten(newExpr);
+          cs.cacheExprTypes(E);
+          return E;
+        }
+
+        // Fall through to use old implementation.
+      }
+#endif
       return E;
     }
 
