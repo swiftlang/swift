@@ -1230,8 +1230,11 @@ static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
          !ED->getSelfClassDecl()->hasKnownSwiftImplementation() &&
          "@_objcImplementation on non-class or Swift class?");
 
-  if (VD->isSemanticallyFinal() || VD->isObjC()) {
-    assert(isa<DestructorDecl>(VD) || !VD->isObjC() || VD->isDynamic() &&
+  if (!VD->isObjCMemberImplementation())
+    return;
+
+  if (VD->isObjC()) {
+    assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
            "@objc decls in @_objcImplementations should be dynamic!");
     return;
   }

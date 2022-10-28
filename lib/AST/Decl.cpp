@@ -3739,16 +3739,27 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 /// Checks if \p VD is an ObjC member implementation:
 ///
 /// \li It's in an \c \@_objcImplementation extension
-/// \li It's \c \@objc
+/// \li It's not explicitly \c final
 /// \li Its access level is not \c private or \c fileprivate
 static bool
 isObjCMemberImplementation(const ValueDecl *VD,
                            llvm::function_ref<AccessLevel()> getAccessLevel) {
   if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    if (ED->isObjCImplementation())
-      return VD->isObjC() && getAccessLevel() >= AccessLevel::Internal;
+    if (ED->isObjCImplementation() && !isa<TypeDecl>(VD)) {
+      auto attrDecl = isa<AccessorDecl>(VD)
+                    ? cast<AccessorDecl>(VD)->getStorage()
+                    : VD;
+      return !attrDecl->isFinal()
+                  && !attrDecl->getAttrs().hasAttribute<OverrideAttr>()
+                  && getAccessLevel() >= AccessLevel::Internal;
+    }
 
   return false;
+}
+
+bool ValueDecl::isObjCMemberImplementation() const {
+  return ::isObjCMemberImplementation(
+              this, [&]() { return this->getFormalAccess(); });
 }
 
 /// Checks if \p VD may be used from \p useDC, taking \@testable and \@_spi

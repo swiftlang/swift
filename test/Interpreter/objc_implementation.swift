@@ -35,6 +35,7 @@ class LastWords {
       print("implProperty =", impl.implProperty)
       impl.implProperty = 42
       print("implProperty =", impl.implProperty)
+      print("description =", impl.description)
     }
 
     do {
@@ -43,7 +44,7 @@ class LastWords {
       print("implProperty =", swiftSub.implProperty)
       swiftSub.implProperty = 42
       print("implProperty =", swiftSub.implProperty)
-      
+
       print("otherProperty =", swiftSub.otherProperty)
       swiftSub.otherProperty = 13
       print("otherProperty =", swiftSub.otherProperty)
@@ -52,6 +53,10 @@ class LastWords {
   }
 
   @objc func someMethod() -> String { "ImplClass.someMethod()" }
+
+  open override var description: String {
+    "ImplClass(implProperty: \(implProperty), object: \(object))"
+  }
 }
 
 class SwiftSubclass: ImplClass {
@@ -70,6 +75,7 @@ ImplClass.runTests()
 // CHECK: someMethod = ImplClass.someMethod()
 // CHECK: implProperty = 0
 // CHECK: implProperty = 42
+// CHECK: description = ImplClass(implProperty: 42, object: main.LastWords)
 // CHECK: ImplClass It's better to burn out than to fade away.
 // CHECK: someMethod = SwiftSubclass.someMethod()
 // CHECK: implProperty = 0

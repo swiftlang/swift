@@ -122,7 +122,24 @@
   // OK, provides a Swift-only stored property
 
   @objc final var propertyNotFromHeader5: CInt
-  // expected-error@-1 {{property 'propertyNotFromHeader5' cannot be 'final' because Objective-C subclasses of 'ObjCClass' can override it}} {{9-15=}}
+  // OK, @objc final is weird but supported, not a member impl
+
+  override open func superclassMethod(_: CInt) {
+    // OK
+  }
+
+  override open var superclassProperty: CInt {
+    get {
+      // OK
+    }
+    set {
+      // OK
+    }
+  }
+
+  override public init(fromSuperclass _: CInt) {
+    // OK
+  }
 }
 
 // FIXME: Should complain about categoryMethodFromHeader4:
@@ -227,7 +244,6 @@ func usesAreNotAmbiguous(obj: ObjCClass) {
 
   obj.methodNot(fromHeader1: 1)
   obj.methodNot(fromHeader2: 2)
-  obj.methodNot(fromHeader3: 3)
 
   obj.categoryMethod(fromHeader1: 1)
   obj.categoryMethod(fromHeader2: 2)
@@ -236,5 +252,4 @@ func usesAreNotAmbiguous(obj: ObjCClass) {
 
   obj.categoryMethodNot(fromHeader1: 1)
   obj.categoryMethodNot(fromHeader2: 2)
-  obj.categoryMethodNot(fromHeader3: 3)
 }
