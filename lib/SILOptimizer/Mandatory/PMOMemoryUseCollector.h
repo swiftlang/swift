@@ -148,7 +148,7 @@ struct PMOMemoryUse {
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
-LLVM_NODISCARD bool
+[[nodiscard]] bool
 collectPMOElementUsesFrom(const PMOMemoryObjectInfo &MemoryInfo,
                           SmallVectorImpl<PMOMemoryUse> &Uses,
                           SmallVectorImpl<SILInstruction *> &Releases);
