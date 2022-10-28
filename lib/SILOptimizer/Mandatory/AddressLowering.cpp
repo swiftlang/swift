@@ -2599,6 +2599,10 @@ protected:
     CallArgRewriter(applyInst, pass).rewriteIndirectArgument(use);
   }
 
+  void visitPartialApplyInst(PartialApplyInst *pai) {
+    CallArgRewriter(pai, pass).rewriteIndirectArgument(use);
+  }
+
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteIndirectArgument(use);
   }
