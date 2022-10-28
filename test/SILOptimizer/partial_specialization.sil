@@ -37,13 +37,13 @@ bb0(%0 : $*U, %1 : $*V):
   // function_ref use
   %4 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %5 = alloc_stack $U
-  copy_addr %0 to [initialization] %5 : $*U
+  copy_addr %0 to [init] %5 : $*U
   %7 = apply %4<U>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %5 : $*U
   // function_ref use
   %9 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %10 = alloc_stack $V
-  copy_addr %1 to [initialization] %10 : $*V
+  copy_addr %1 to [init] %10 : $*V
   %12 = apply %9<V>(%10) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %10 : $*V
   destroy_addr %1 : $*V
@@ -58,7 +58,7 @@ bb0(%0 : $*U):
   // function_ref simple_generic_callee<A, B>(_:_:)
   %2 = function_ref @simple_generic_callee : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   %3 = alloc_stack $U
-  copy_addr %0 to [initialization] %3 : $*U
+  copy_addr %0 to [init] %3 : $*U
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %7 = alloc_stack $Int32
@@ -80,7 +80,7 @@ bb0(%0 : $*U):
   %3 = function_ref @$s22partial_specialization1SVyACyxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S<τ_0_0>.Type) -> S<τ_0_0>
   %4 = metatype $@thin S<U>.Type
   %5 = alloc_stack $U
-  copy_addr %0 to [initialization] %5 : $*U
+  copy_addr %0 to [init] %5 : $*U
   %7 = apply %3<U>(%5, %4) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S<τ_0_0>.Type) -> S<τ_0_0>
   dealloc_stack %5 : $*U
   %9 = alloc_stack $S<U>
@@ -117,7 +117,7 @@ bb0(%0 : $*U):
   // function_ref simple_generic_callee<A, B>(_:_:)
   %2 = function_ref @simple_generic_callee : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   %3 = alloc_stack $U
-  copy_addr %0 to [initialization] %3 : $*U
+  copy_addr %0 to [init] %3 : $*U
   %5 = apply %2<U, U>(%3, %0) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   dealloc_stack %3 : $*U
   %7 = tuple ()
@@ -135,7 +135,7 @@ bb0(%0 : $*P, %1: $Builtin.Int1):
 bb1:
   %2 = open_existential_addr mutable_access %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
-	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
+	copy_addr [take] %2 to [init] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", P) Self
   %5 = alloc_stack $Builtin.Int1
   store %1 to %5 : $*Builtin.Int1
   // function_ref simple_generic_callee<A, B>(_:_:)

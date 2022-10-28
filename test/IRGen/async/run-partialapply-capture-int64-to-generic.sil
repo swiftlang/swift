@@ -33,7 +33,7 @@ entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
   %printInt32 = function_ref @printInt32 : $@convention(thin) (Int32) -> ()
   %result = apply %printGeneric<T>(%in_t) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 1
   %printInt32_result = apply %printInt32(%x) : $@convention(thin) (Int32) -> () // CHECK: 6789
-  copy_addr %in_t to [initialization] %out_t : $*T
+  copy_addr %in_t to [init] %out_t : $*T
   return %result : $()
 }
 

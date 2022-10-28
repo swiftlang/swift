@@ -47,7 +47,7 @@ func testClonable(c: Clonable) {
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = alloc_stack $τ_0_0
 // CHECK-NEXT:    apply %1([[INNER_RESULT]])
 // CHECK-NEXT:    [[OUTER_RESULT:%.*]] = init_existential_addr %0
-// CHECK-NEXT:    copy_addr [take] [[INNER_RESULT]] to [initialization] [[OUTER_RESULT]]
+// CHECK-NEXT:    copy_addr [take] [[INNER_RESULT]] to [init] [[OUTER_RESULT]]
 // CHECK-NEXT:    [[EMPTY:%.*]] = tuple ()
 // CHECK-NEXT:    dealloc_stack [[INNER_RESULT]]
 // CHECK-NEXT:    return [[EMPTY]]

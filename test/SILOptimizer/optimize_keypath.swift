@@ -119,7 +119,7 @@ struct SimpleStruct: P {
 
 // CHECK-LABEL: sil {{.*}}testGenStructRead
 // CHECK: [[A:%[0-9]+]] = struct_element_addr %1
-// CHECK: copy_addr [[A]] to [initialization] %0
+// CHECK: copy_addr [[A]] to [init] %0
 // CHECK: return
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
@@ -131,7 +131,7 @@ func testGenStructRead<T>(_ s: GenStruct<T>) -> T {
 // CHECK-LABEL: sil {{.*}}testGenStructWrite
 // CHECK: [[A:%[0-9]+]] = struct_element_addr %0
 // CHECK: destroy_addr [[A]]
-// CHECK: copy_addr {{.*}} to [initialization] [[A]]
+// CHECK: copy_addr {{.*}} to [init] [[A]]
 // CHECK: return
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
@@ -143,7 +143,7 @@ func testGenStructWrite<T>(_ s: inout GenStruct<T>, _ t: T) {
 // CHECK-LABEL: sil {{.*}}testGenClassRead
 // CHECK: [[E:%[0-9]+]] = ref_element_addr %1
 // CHECK: [[A:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E]]
-// CHECK: copy_addr [[A]] to [initialization] %0
+// CHECK: copy_addr [[A]] to [init] %0
 // CHECK: end_access [[A]]
 // CHECK: return
 @inline(never)
@@ -185,7 +185,7 @@ func testDerivedClass2Read(_ c: DerivedClass2) -> Int {
 // CHECK: [[E:%[0-9]+]] = ref_element_addr %0
 // CHECK: [[A:%[0-9]+]] = begin_access [modify] [dynamic] [[E]]
 // CHECK: destroy_addr [[A]]
-// CHECK: copy_addr [take] [[S]] to [initialization] [[A]]
+// CHECK: copy_addr [take] [[S]] to [init] [[A]]
 // CHECK: end_access [[A]]
 // CHECK: return
 @inline(never)
@@ -252,7 +252,7 @@ func testNestedRead1(_ s: GenStruct<GenClass<GenStruct<SimpleClass>>>) -> Int {
 // CHECK: [[E1:%[0-9]+]] = ref_element_addr [[R]]
 // CHECK: [[A:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E1]]
 // CHECK: [[E2:%[0-9]+]] = struct_element_addr [[A]]
-// CHECK: copy_addr [[E2]] to [initialization] %0
+// CHECK: copy_addr [[E2]] to [init] %0
 // CHECK: end_access [[A]]
 // CHECK: return
 @inline(never)

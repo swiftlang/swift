@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/TBDGen/TBDGen.h"
+#include "swift/IRGen/TBDGen.h"
 
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"

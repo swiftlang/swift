@@ -701,6 +701,8 @@ def create_argument_parser():
                 'match the ones that would be generated from current main')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
+    option(['--install-swiftformat'], toggle_true('install_swiftformat'),
+           help='install SourceKitLSP')
     option(['--install-skstresstester'], toggle_true('install_skstresstester'),
            help='install the SourceKit stress tester')
     option(['--install-swift-driver'], toggle_true('install_swift_driver'),

@@ -17,11 +17,15 @@
 #define SWIFT_SEMA_TYPECHECKMACROS_H
 
 #include "swift/AST/Type.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
 class Expr;
-  
+class TypeRepr;
+
+#if SWIFT_SWIFT_PARSER
+
 /// Expands the given macro expression and type-check the result with
 /// the given expanded type.
 ///
@@ -29,6 +33,8 @@ class Expr;
 // macro could not be expanded.
 Expr *expandMacroExpr(
     DeclContext *dc, Expr *expr, StringRef macroName, Type expandedType);
+
+#endif // SWIFT_SWIFT_PARSER
 
 } // end namespace swift
 

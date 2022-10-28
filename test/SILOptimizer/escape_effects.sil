@@ -140,7 +140,7 @@ bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.y
   %2 = global_addr @globalY : $*Y
   // Even a store does not make the argument escaping.
-  copy_addr %2 to [initialization] %1 : $*Y
+  copy_addr %2 to [init] %1 : $*Y
   %4 = tuple ()
   return %4 : $()
 }
@@ -246,7 +246,7 @@ sil [ossa] @test_content_to_arg_addr : $@convention(thin) (@guaranteed Y) -> @ou
 bb0(%0 : $*Str, %1 : @guaranteed $Y):
   %2 = ref_element_addr %1 : $Y, #Y.s
   %3 = begin_access [read] [dynamic] %2 : $*Str
-  copy_addr %3 to [initialization] %0 : $*Str
+  copy_addr %3 to [init] %0 : $*Str
   end_access %3 : $*Str
   %6 = tuple ()
   return %6 : $()

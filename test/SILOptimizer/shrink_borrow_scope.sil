@@ -657,7 +657,7 @@ entry(%instance : @owned $DBox):
   %d_addr = ref_element_addr %lifetime : $DBox, #DBox.d
   %d = load [copy] %d_addr : $*D
   %some_d = enum $Optional<D>, #Optional.some!enumelt, %d : $D
-  store_weak %some_d to [initialization] %addr : $*@sil_weak Optional<D>
+  store_weak %some_d to [init] %addr : $*@sil_weak Optional<D>
   destroy_value %some_d : $Optional<D>
 
   %loaded = load_weak %addr : $*@sil_weak Optional<D>

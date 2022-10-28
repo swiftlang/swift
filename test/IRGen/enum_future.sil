@@ -2662,7 +2662,7 @@ enum MyOptional {
 sil @test_large_optional : $@convention(thin) (@in MyOptional) -> () {
 entry(%x : $*MyOptional):
  %stk = alloc_stack $MyOptional
- copy_addr %x to [initialization] %stk : $*MyOptional
+ copy_addr %x to [init] %stk : $*MyOptional
  dealloc_stack %stk: $*MyOptional
  %tuple = tuple ()
  return %tuple : $()

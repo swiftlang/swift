@@ -489,7 +489,7 @@ bb0(%0 : $*X, %1 : $*X):
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @copy_doesnt_destoy : $@convention(thin) (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
-  copy_addr %1 to [initialization] %0 : $*X
+  copy_addr %1 to [init] %0 : $*X
   %2 = tuple ()
   return %2 : $()
 }
@@ -593,7 +593,7 @@ bb0(%0 : $*X):
 sil [ossa] @copy_addr_take_and_destroy : $@convention(thin) (@in X) -> () {
 bb0(%0 : $*X):
   %1 = alloc_stack $X
-  copy_addr [take] %0 to [initialization] %1 : $*X
+  copy_addr [take] %0 to [init] %1 : $*X
   destroy_addr %1 : $*X
   dealloc_stack %1 : $*X
   %r = tuple ()
@@ -607,7 +607,7 @@ bb0(%0 : $*X):
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @copy_addr_take_and_init : $@convention(thin) (@in X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
-  copy_addr [take] %1 to [initialization] %0 : $*X
+  copy_addr [take] %1 to [init] %0 : $*X
   %r = tuple ()
   return %r : $()
 }
@@ -619,7 +619,7 @@ bb0(%0 : $*X, %1 : $*X):
 sil [ossa] @copy_addr_and_destroy : $@convention(thin) (@in_guaranteed X) -> () {
 bb0(%0 : $*X):
   %1 = alloc_stack $X
-  copy_addr %0 to [initialization] %1 : $*X
+  copy_addr %0 to [init] %1 : $*X
   destroy_addr %1 : $*X
   dealloc_stack %1 : $*X
   %r = tuple ()
@@ -646,7 +646,7 @@ bb0(%0 : $*TwoSPs):
 sil [ossa] @copy_addr_and_consume_by_unknown_func : $@convention(thin) (@in X) -> () {
 bb0(%0 : $*X):
   %1 = alloc_stack $X
-  copy_addr [take] %0 to [initialization] %1 : $*X
+  copy_addr [take] %0 to [init] %1 : $*X
   %f = function_ref @unknown_func_with_in_arg : $@convention(thin) (@in X) -> ()
   %a = apply %f(%1) : $@convention(thin) (@in X) -> ()
   dealloc_stack %1 : $*X

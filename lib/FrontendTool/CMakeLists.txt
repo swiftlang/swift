@@ -26,7 +26,6 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftSIL
     swiftSILGen
     swiftSILOptimizer
-    swiftTBDGen
     swiftThreading)
 
 set_swift_llvm_is_available(swiftFrontendTool)

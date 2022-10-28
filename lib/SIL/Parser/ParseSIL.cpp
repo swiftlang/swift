@@ -2241,7 +2241,7 @@ static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
   // Then try to parse one of our other initialization kinds. We do not support
   // parsing unknown here so we use that as our fail value.
   auto Tmp = llvm::StringSwitch<AssignByWrapperInst::Mode>(Str)
-        .Case("initialization", AssignByWrapperInst::Initialization)
+        .Case("init", AssignByWrapperInst::Initialization)
         .Case("assign", AssignByWrapperInst::Assign)
         .Case("assign_wrapped_value", AssignByWrapperInst::AssignWrappedValue)
         .Default(AssignByWrapperInst::Unknown);
@@ -4403,7 +4403,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseValueName(from) ||
         parseSILIdentifier(toToken, toLoc, diag::expected_tok_in_sil_instr,
                            "to") ||
-        (isRefStorage && parseSILOptional(isInit, *this, "initialization")) ||
+        (isRefStorage && parseSILOptional(isInit, *this, "init")) ||
         parseTypedValueRef(addrVal, addrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
@@ -5011,7 +5011,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILOptional(IsTake, *this, "take") || parseValueName(SrcLName) ||
           parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                              "to") ||
-          parseSILOptional(IsInit, *this, "initialization") ||
+          parseSILOptional(IsInit, *this, "init") ||
           parseTypedValueRef(DestLVal, DestLoc, B) ||
           parseSILDebugLocation(InstLoc, B))
         return true;
@@ -5041,7 +5041,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILOptional(IsTake, *this, "take") || parseValueName(SrcLName) ||
           parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                              "to") ||
-          parseSILOptional(IsInit, *this, "initialization") ||
+          parseSILOptional(IsInit, *this, "init") ||
           parseTypedValueRef(DestLVal, DestLoc, B) ||
           parseSILDebugLocation(InstLoc, B))
         return true;

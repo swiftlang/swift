@@ -4169,7 +4169,7 @@ assign_by_wrapper
 
   sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-  mode ::= '[initialization]' | '[assign]' | '[assign_wrapped_value]'
+  mode ::= '[init]' | '[assign]' | '[assign_wrapped_value]'
 
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
@@ -4286,9 +4286,9 @@ copy_addr
 ::
 
   sil-instruction ::= 'copy_addr' '[take]'? sil-value
-                        'to' '[initialization]'? sil-operand
+                        'to' '[init]'? sil-operand
 
-  copy_addr [take] %0 to [initialization] %1 : $*T
+  copy_addr [take] %0 to [init] %1 : $*T
   // %0 and %1 must be of the same $*T address type
 
 Loads the value at address ``%0`` from memory and assigns a copy of it back into
@@ -4307,11 +4307,11 @@ is equivalent to::
 
 except that ``copy_addr`` may be used even if ``%0`` is of an address-only
 type. The ``copy_addr`` may be given one or both of the ``[take]`` or
-``[initialization]`` attributes:
+``[init]`` attributes:
 
 * ``[take]`` destroys the value at the source address in the course of the
   copy.
-* ``[initialization]`` indicates that the destination address is uninitialized.
+* ``[init]`` indicates that the destination address is uninitialized.
   Without the attribute, the destination address is treated as already
   initialized, and the existing value will be destroyed before the new value
   is stored.
@@ -4329,7 +4329,7 @@ operations::
     store %new to %1 : $*T
 
   // copy-initialization
-    copy_addr %0 to [initialization] %1 : $*T
+    copy_addr %0 to [init] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     strong_retain %new : $T
@@ -4337,7 +4337,7 @@ operations::
     store %new to %1 : $*T
 
   // take-initialization
-    copy_addr [take] %0 to [initialization] %1 : $*T
+    copy_addr [take] %0 to [init] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     // no retain of %new!
@@ -4355,9 +4355,9 @@ explicit_copy_addr
 ::
 
   sil-instruction ::= 'explicit_copy_addr' '[take]'? sil-value
-                        'to' '[initialization]'? sil-operand
+                        'to' '[init]'? sil-operand
 
-  explicit_copy_addr [take] %0 to [initialization] %1 : $*T
+  explicit_copy_addr [take] %0 to [init] %1 : $*T
   // %0 and %1 must be of the same $*T address type
 
 This instruction is exactly the same as `copy_addr`_ except that it has special
@@ -4789,14 +4789,14 @@ store_weak
 
 ::
 
-  sil-instruction ::= 'store_weak' sil-value 'to' '[initialization]'? sil-operand
+  sil-instruction ::= 'store_weak' sil-value 'to' '[init]'? sil-operand
 
-  store_weak %0 to [initialization] %1 : $*@sil_weak Optional<T>
+  store_weak %0 to [init] %1 : $*@sil_weak Optional<T>
   // $T must be an optional wrapping a reference type
 
 Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
-If ``[initialization]`` is given, the weak reference must currently either be
+If ``[init]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
 currently be initialized. After the evaluation:
 
@@ -6019,7 +6019,7 @@ an `inject_enum_addr`_ instruction::
   entry(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyType):
     // Store the data argument for the case.
     %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt
-    copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
+    copy_addr [take] %2 to [init] %1 : $*AddressOnlyType
     // Inject the tag.
     inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt
     return

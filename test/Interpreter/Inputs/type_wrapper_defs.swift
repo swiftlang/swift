@@ -1,27 +1,51 @@
 @typeWrapper
-public struct Wrapper<S> {
+public struct Wrapper<W, S> {
   var underlying: S
 
-  public init(memberwise: S) {
-    print("Wrapper.init(\(memberwise))")
-    self.underlying = memberwise
+  public init(for wrappedType: W.Type, storage: S) {
+    print("Wrapper.init(for: \(wrappedType), storage: \(storage))")
+    self.underlying = storage
   }
 
-  public subscript<V>(storageKeyPath path: KeyPath<S, V>) -> V {
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: KeyPath<S, V>) -> V {
     get {
-      print("in read-only getter")
-      return underlying[keyPath: path]
+      print("in read-only getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
     }
   }
 
-  public subscript<V>(storageKeyPath path: WritableKeyPath<S, V>) -> V {
+  public subscript<V>(propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
     get {
-      print("in getter")
-      return underlying[keyPath: path]
+      print("in getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
     }
     set {
       print("in setter => \(newValue)")
-      underlying[keyPath: path] = newValue
+      underlying[keyPath: storagePath] = newValue
+    }
+  }
+
+  public subscript<V>(wrappedSelf w: W,
+                      propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: KeyPath<S, V>) -> V {
+    get {
+      print("in (reference type) let getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+  }
+
+  public subscript<V>(wrappedSelf w: W,
+                      propertyKeyPath propertyPath: KeyPath<W, V>,
+                      storageKeyPath storagePath: WritableKeyPath<S, V>) -> V {
+    get {
+      print("in (reference type) getter storage: \(storagePath)")
+      return underlying[keyPath: storagePath]
+    }
+    set {
+      print("in (reference type) setter => \(newValue)")
+      underlying[keyPath: storagePath] = newValue
     }
   }
 }
@@ -282,7 +306,7 @@ public class UserDefinedInitWithConditionalTest<T> {
 @Wrapper
 public class ClassWithConvenienceInit<T> {
   public var a: T?
-  public var b: String = ""
+  public var b: String = "<default-placeholder>"
 
   public init(aWithoutB: T?) {
     self.a = aWithoutB
@@ -300,13 +324,13 @@ public class ClassWithConvenienceInit<T> {
   }
 
   public convenience init() {
-    self.init(a: nil)
+    self.init(val: nil)
     print(self.a)
     print(self.b)
   }
 
-  public convenience init(a: T?) {
-    self.init(a: a, b: "<placeholder>")
+  public convenience init(val: T?) {
+    self.init(a: val, b: "<placeholder>")
     print(self.a)
     print(self.b)
 

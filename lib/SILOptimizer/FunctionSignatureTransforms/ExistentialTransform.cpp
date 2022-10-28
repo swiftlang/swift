@@ -198,7 +198,7 @@ void ExistentialSpecializerCloner::cloneArguments(
       /// bb0(%0 : $*T):
       /// %3 = alloc_stack $P
       /// %4 = init_existential_addr %3 : $*P, $T
-      /// copy_addr [take] %0 to [initialization] %4 : $*T
+      /// copy_addr [take] %0 to [init] %4 : $*T
       /// %7 = open_existential_addr immutable_access %3 : $*P to
       /// $*@opened P
       auto *ASI =

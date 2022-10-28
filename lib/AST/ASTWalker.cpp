@@ -1247,8 +1247,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitMacroExpansionExpr(MacroExpansionExpr *E) {
-    auto *macro = doIt(E->getMacro());
-    if (!macro) return nullptr;
     Expr *rewritten = nullptr;
     if (E->getRewritten()) {
       rewritten = doIt(E->getRewritten());
@@ -1259,7 +1257,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       args = doIt(E->getArgs());
       if (!args) return nullptr;
     }
-    E->setMacro(macro);
     E->setRewritten(rewritten);
     E->setArgs(args);
     return E;

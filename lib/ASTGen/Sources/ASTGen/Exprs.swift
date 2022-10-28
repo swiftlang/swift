@@ -41,17 +41,6 @@ extension ASTGenVisitor {
     return SwiftIdentifierExpr_create(ctx, id, loc)
   }
 
-  public func visit(_ node: SimpleTypeIdentifierSyntax) -> UnsafeMutableRawPointer {
-    let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    
-    var text = node.name.text
-    let id = text.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
-    }
-
-    return SimpleIdentTypeRepr_create(ctx, loc, id)
-  }
-
   public func visit(_ node: IdentifierPatternSyntax) -> UnsafeMutableRawPointer {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     

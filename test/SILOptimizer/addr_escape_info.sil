@@ -240,7 +240,7 @@ bb0:
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
   %3 = alloc_stack $Str
-  copy_addr %1 to [initialization] %3 : $*Str
+  copy_addr %1 to [init] %3 : $*Str
   %5 = function_ref @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
   %6 = apply %5(%3) : $@convention(thin) (@in Str) -> ()
   strong_release %0 : $X

@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"

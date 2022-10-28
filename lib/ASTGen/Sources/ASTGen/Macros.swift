@@ -20,6 +20,106 @@ extension SyntaxProtocol {
   }
 }
 
+/// Describes a macro that has been "exported" to the C++ part of the
+/// compiler, with enough information to interface with the C++ layer.
+struct ExportedMacro {
+  var macro: Macro.Type
+}
+
+/// Look up a macro with the given name.
+///
+/// Returns an unmanaged pointer to an ExportedMacro instance that describes
+/// the specified macro. If there is no macro with the given name, produces
+/// nil.
+@_cdecl("swift_ASTGen_lookupMacro")
+public func lookupMacro(
+  macroNamePtr: UnsafePointer<UInt8>
+) -> UnsafeRawPointer? {
+  let macroSystem = MacroSystem.exampleSystem
+
+  // Look for a macro with this name.
+  let macroName = String(cString: macroNamePtr)
+  guard let macro = macroSystem.lookup(macroName) else { return nil }
+
+  // Allocate and initialize the exported macro.
+  let exportedPtr = UnsafeMutablePointer<ExportedMacro>.allocate(capacity: 1)
+  exportedPtr.initialize(to: .init(macro: macro))
+  return UnsafeRawPointer(exportedPtr)
+}
+
+/// Destroys the given macro.
+@_cdecl("swift_ASTGen_destroyMacro")
+public func destroyMacro(
+  macroPtr: UnsafeMutablePointer<UInt8>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    macro.deinitialize(count: 1)
+    macro.deallocate()
+  }
+}
+
+/// Allocate a copy of the given string as a UTF-8 string.
+private func allocateUTF8String(
+  _ string: String,
+  nullTerminated: Bool = false
+) -> (UnsafePointer<UInt8>, Int) {
+  var string = string
+  return string.withUTF8 { utf8 in
+    let capacity = utf8.count + (nullTerminated ? 1 : 0)
+    let ptr = UnsafeMutablePointer<UInt8>.allocate(
+      capacity: capacity
+    )
+    if let baseAddress = utf8.baseAddress {
+      ptr.initialize(from: baseAddress, count: utf8.count)
+    }
+
+    if nullTerminated {
+      ptr[utf8.count] = 0
+    }
+
+    return (UnsafePointer<UInt8>(ptr), utf8.count)
+  }
+}
+
+/// Query the type signature of the given macro.
+@_cdecl("swift_ASTGen_getMacroTypeSignature")
+public func getMacroTypeSignature(
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  evaluationContextPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
+  evaluationContextLengthPtr: UnsafeMutablePointer<Int>
+) {
+  macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    (evaluationContextPtr.pointee, evaluationContextLengthPtr.pointee) =
+      allocateUTF8String(macro.pointee.evaluationContext, nullTerminated: true)
+  }
+}
+
+extension ExportedMacro {
+  var evaluationContext: String {
+    """
+    struct __MacroEvaluationContext\(self.macro.genericSignature?.description ?? "") {
+      typealias SignatureType = \(self.macro.signature)
+    }
+    """
+  }
+}
+
+/// Query the macro evaluation context of the given macro.
+@_cdecl("swift_ASTGen_getMacroEvaluationContext")
+public func getMacroEvaluationContext(
+  sourceFilePtr: UnsafePointer<UInt8>,
+  declContext: UnsafeMutableRawPointer,
+  context: UnsafeMutableRawPointer,
+  macroPtr: UnsafeMutablePointer<UInt8>,
+  contextPtr: UnsafeMutablePointer<UnsafeMutableRawPointer?>
+) {
+  contextPtr.pointee = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
+    return ASTGenVisitor(ctx: context, base: sourceFilePtr, declContext: declContext)
+      .visit(StructDeclSyntax(stringLiteral: macro.pointee.evaluationContext))
+  }
+}
+
+
 @_cdecl("swift_ASTGen_evaluateMacro")
 public func evaluateMacro(
   sourceFilePtr: UnsafePointer<UInt8>,

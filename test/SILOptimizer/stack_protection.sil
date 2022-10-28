@@ -91,9 +91,9 @@ bb0:
 
 // CHECK-LABEL: sil [stack_protection] @inout_with_unknown_callers1
 // CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] %0 to [initialization] [[T]] : $*Int64
+// CHECK:         copy_addr [take] %0 to [init] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] %0 : $*Int64
+// CHECK:         copy_addr [take] [[T]] to [init] %0 : $*Int64
 // CHECK:         dealloc_stack [[T]] : $*Int64
 // CHECK:       } // end sil function 'inout_with_unknown_callers1'
 sil @inout_with_unknown_callers1 : $@convention(thin) (@inout Int64) -> () {
@@ -117,9 +117,9 @@ bb0(%0 : $*Int64):
 // CHECK-LABEL: sil [stack_protection] @inout_with_modify_access
 // CHECK:         [[A:%[0-9]+]] = begin_access [modify] [dynamic] %0 : $*Int64
 // CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
+// CHECK:         copy_addr [take] [[A]] to [init] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
+// CHECK:         copy_addr [take] [[T]] to [init] [[A]] : $*Int64
 // CHECK:         dealloc_stack [[T]] : $*Int64
 // CHECK:       } // end sil function 'inout_with_modify_access'
 sil @inout_with_modify_access : $@convention(thin) (@inout Int64) -> () {
@@ -147,12 +147,12 @@ bb0(%0 : $*Int64):
 
 // CHECK-LABEL: sil [stack_protection] @inout_with_unknown_callers2
 // CHECK:         [[T:%[0-9]+]] = alloc_stack $S
-// CHECK:         copy_addr [take] %0 to [initialization] [[T]] : $*S
+// CHECK:         copy_addr [take] %0 to [init] [[T]] : $*S
 // CHECK:         [[A:%[0-9]+]] = struct_element_addr [[T]] : $*S, #S.a
 // CHECK:         address_to_pointer [stack_protection] [[A]]
 // CHECK:         [[B:%[0-9]+]] = struct_element_addr [[T]] : $*S, #S.b
 // CHECK:         address_to_pointer [stack_protection] [[B]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] %0 : $*S
+// CHECK:         copy_addr [take] [[T]] to [init] %0 : $*S
 // CHECK:         dealloc_stack [[T]] : $*S
 // CHECK:       } // end sil function 'inout_with_unknown_callers2'
 sil @inout_with_unknown_callers2 : $@convention(thin) (@inout S) -> () {
@@ -169,9 +169,9 @@ bb0(%0 : $*S):
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
 // CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
 // CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
+// CHECK:         copy_addr [take] [[A]] to [init] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
+// CHECK:         copy_addr [take] [[T]] to [init] [[A]] : $*Int64
 // CHECK:         dealloc_stack [[T]] : $*Int64
 // CHECK:         end_access [[A]] : $*Int64
 // CHECK:       } // end sil function 'object_with_unknown_callers1'
@@ -189,10 +189,10 @@ bb0(%0 : $C):
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
 // CHECK:         [[A:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
 // CHECK:         [[T:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[A]] to [initialization] [[T]] : $*Int64
+// CHECK:         copy_addr [take] [[A]] to [init] [[T]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[T]]
 // CHECK:         address_to_pointer [stack_protection] [[T]]
-// CHECK:         copy_addr [take] [[T]] to [initialization] [[A]] : $*Int64
+// CHECK:         copy_addr [take] [[T]] to [init] [[A]] : $*Int64
 // CHECK:         dealloc_stack [[T]] : $*Int64
 // CHECK:         end_access [[A]] : $*Int64
 // CHECK:       } // end sil function 'object_with_unknown_callers2'
@@ -211,16 +211,16 @@ bb0(%0 : $C):
 // CHECK:         [[I:%[0-9]+]] = ref_element_addr %0 : $C, #C.i
 // CHECK:         [[AI:%[0-9]+]] = begin_access [modify] [static] [[I]] : $*Int64
 // CHECK:         [[TI:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[AI]] to [initialization] [[TI]] : $*Int64
+// CHECK:         copy_addr [take] [[AI]] to [init] [[TI]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[TI]]
 // CHECK:         [[J:%[0-9]+]] = ref_element_addr %0 : $C, #C.j
 // CHECK:         [[AJ:%[0-9]+]] = begin_access [modify] [static] [[J]] : $*Int64
 // CHECK:         [[TJ:%[0-9]+]] = alloc_stack $Int64
-// CHECK:         copy_addr [take] [[AJ]] to [initialization] [[TJ]] : $*Int64
-// CHECK:         copy_addr [take] [[TI]] to [initialization] [[AI]] : $*Int64
+// CHECK:         copy_addr [take] [[AJ]] to [init] [[TJ]] : $*Int64
+// CHECK:         copy_addr [take] [[TI]] to [init] [[AI]] : $*Int64
 // CHECK:         end_access [[AI]] : $*Int64
 // CHECK:         address_to_pointer [stack_protection] [[TJ]]
-// CHECK:         copy_addr [take] [[TJ]] to [initialization] [[AJ]] : $*Int64
+// CHECK:         copy_addr [take] [[TJ]] to [init] [[AJ]] : $*Int64
 // CHECK:         dealloc_stack [[TJ]] : $*Int64
 // CHECK:         dealloc_stack [[TI]] : $*Int64
 // CHECK:         end_access [[AJ]] : $*Int64

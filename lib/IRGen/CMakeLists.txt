@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
+  APIGen.cpp
   ClassLayout.cpp
   DebugTypeInfo.cpp
   EnumPayload.cpp
@@ -57,6 +58,8 @@ add_swift_host_library(swiftIRGen STATIC
   Outlining.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
+  TBDGen.cpp
+  TBDGenRequests.cpp
   TypeLayout.cpp
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp

@@ -3929,8 +3929,12 @@ public:
   NominalTypeDecl *getTypeWrapperStorageDecl() const;
 
   /// If this declaration is a type wrapper, retrieve
-  /// its required initializer - `init(storage:)`.
+  /// its required initializer - `init(storageWrapper:)`.
   ConstructorDecl *getTypeWrapperInitializer() const;
+
+  /// Get an initializer that accepts a type wrapper instance to
+  /// initialize the wrapped type.
+  ConstructorDecl *getTypeWrappedTypeStorageInitializer() const;
 
   /// Get a memberwise initializer that could be used to instantiate a
   /// type wrapped type.

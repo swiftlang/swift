@@ -18,6 +18,7 @@ add_dependencies(swiftFrontend
   SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE
   swiftAST
+  swiftConstExtract
   swiftSIL
   swiftMigrator
   swiftOption
@@ -27,7 +28,6 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftLocalization
   swiftSema
   swiftSerialization
-  swiftTBDGen
   swiftAPIDigester)
 
 set_swift_llvm_is_available(swiftFrontend)

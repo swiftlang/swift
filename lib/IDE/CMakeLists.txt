@@ -15,12 +15,9 @@ add_swift_host_library(swiftIDE STATIC
   CodeCompletionString.cpp
   CodeCompletionStringPrinter.cpp
   CommentConversion.cpp
-  CompileInstance.cpp
-  CompletionInstance.cpp
   CompletionLookup.cpp
   CompletionOverrideLookup.cpp
   ConformingMethodList.cpp
-  DependencyChecking.cpp
   ExprCompletion.cpp
   ExprContextAnalysis.cpp
   Formatting.cpp
@@ -45,8 +42,6 @@ target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter
   swiftDriver
-  swiftFrontend
-  swiftFrontendTool
   swiftIndex
   swiftParse
   swiftSema)

@@ -794,6 +794,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
+    case ConstraintLocator::TernaryBranch:
+      diagnostic = diag::ternary_expr_cases_mismatch;
+      break;
+
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));

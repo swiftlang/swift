@@ -1457,7 +1457,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
-  copy_addr [take] %1 to [initialization] %0 : $*T // id: %3
+  copy_addr [take] %1 to [init] %0 : $*T // id: %3
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
 }
@@ -1473,7 +1473,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $B):
 sil hidden @retain_not_blocked_by_copyaddr_notake_init : $@convention(thin) <T> (@in T, B) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $B):
   retain_value %2 : $B
-  copy_addr %1 to [initialization] %0 : $*T // id: %3
+  copy_addr %1 to [init] %0 : $*T // id: %3
   %4 = tuple ()                                   // user: %5
   return %4 : $()                                 // id: %5
 }
