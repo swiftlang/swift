@@ -26,7 +26,6 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"

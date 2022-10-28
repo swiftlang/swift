@@ -29,7 +29,6 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
@@ -6213,11 +6212,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto *typeVar1 = dyn_cast<TypeVariableType>(desugar1);
   auto *typeVar2 = dyn_cast<TypeVariableType>(desugar2);
 
-    // Emit diagnostics for conversion to Reflectable.
-  if (
-    kind == ConstraintKind::Conversion || 
-    kind == ConstraintKind::ArgumentConversion || 
-    kind == ConstraintKind::OperatorArgumentConversion) {
+  // Emit diagnostics for conversion to Reflectable.
+  if (kind == ConstraintKind::Conversion ||
+      kind == ConstraintKind::ArgumentConversion ||
+      kind == ConstraintKind::OperatorArgumentConversion) {
     // type1 can be an optional type_variable, so let's unwrap it.
     auto unwrappedType1 = type1->lookThroughAllOptionalTypes();
     auto unwrappedTypeVar1 = dyn_cast<TypeVariableType>(unwrappedType1->getDesugaredType());

@@ -20,7 +20,6 @@
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
