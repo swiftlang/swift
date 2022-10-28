@@ -665,7 +665,7 @@ The Swift driver schedules \emph{frontend jobs} to perform the actual compilatio
 
 Source files are divided among frontend jobs according to the \emph{compilation mode}:
 \begin{enumerate}
-\item In \emph{batch mode}, source files is partitioned into fixed-size batches, up to the maximum batch size. Each frontend job compiles the source files of a single batch. This is the default.
+\item In \emph{batch mode}, source files are partitioned into fixed-size batches, up to the maximum batch size. Each frontend job compiles the source files of a single batch. This is the default.
 \item In \emph{single file mode}, there is frontend job per source file, which is effectively the same as batch mode with a maximum batch size of one. Single file mode is only used for debugging and performance testing the compiler itself. The \texttt{-disable-batch-mode} command line flag instructs the driver to run in single file mode.
 \item In \emph{whole module optimization mode}, there is no parallelism; a single frontend job is scheduled to build all source files. This trades build time for quality of generated code, because the compiler is able to perform more aggressive optimization across source file boundaries. The \texttt{-wmo} driver flag enables whole module optimization.
 \end{enumerate}
