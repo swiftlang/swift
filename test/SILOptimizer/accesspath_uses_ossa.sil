@@ -412,25 +412,25 @@ enum IntTEnum<T> {
 }
 
 // CHECK-LABEL: @testEnumUses
-// CHECK: ###For MemOp:   copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK: ###For MemOp:   copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK: Storage: Argument %0 = argument of bb0 : $*IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
 // CHECK-NEXT:  debug_value %0 : $*IntTEnum<T>, let, name "self", argno 1, expr op_deref
 // CHECK-NEXT:  Path: ()
-// CHECK-NEXT:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK-NEXT:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
 // CHECK-NEXT:  debug_value %0 : $*IntTEnum<T>, let, name "self", argno 1, expr op_deref
 // CHECK-NEXT:  Path: ()
-// CHECK-NEXT:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK-NEXT:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
 // CHECK: Storage: Stack   %2 = alloc_stack $IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK-NEXT:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK-NEXT:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK-NEXT:  Path: ()
@@ -450,7 +450,7 @@ enum IntTEnum<T> {
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK-NEXT:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK-NEXT:  Path: ()
@@ -473,7 +473,7 @@ enum IntTEnum<T> {
 // CHECK: Storage: Stack   %2 = alloc_stack $IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -481,7 +481,7 @@ enum IntTEnum<T> {
 // CHECK:  %13 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.other!enumelt
 // CHECK: }
 // CHECK: Overlapping Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -492,7 +492,7 @@ enum IntTEnum<T> {
 // CHECK: Storage: Stack   %2 = alloc_stack $IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -500,7 +500,7 @@ enum IntTEnum<T> {
 // CHECK:  %13 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.other!enumelt
 // CHECK: }
 // CHECK: Overlapping Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -511,7 +511,7 @@ enum IntTEnum<T> {
 // CHECK: Storage: Stack   %2 = alloc_stack $IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -519,7 +519,7 @@ enum IntTEnum<T> {
 // CHECK:  %13 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.other!enumelt
 // CHECK: }
 // CHECK: Overlapping Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -530,7 +530,7 @@ enum IntTEnum<T> {
 // CHECK: Storage: Stack   %2 = alloc_stack $IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -538,7 +538,7 @@ enum IntTEnum<T> {
 // CHECK:  %13 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.other!enumelt
 // CHECK: }
 // CHECK: Overlapping Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -549,7 +549,7 @@ enum IntTEnum<T> {
 // CHECK: Storage: Stack   %2 = alloc_stack $IntTEnum<T>
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -557,7 +557,7 @@ enum IntTEnum<T> {
 // CHECK:  %13 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.other!enumelt
 // CHECK: }
 // CHECK: Overlapping Uses {
-// CHECK:  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+// CHECK:  copy_addr %0 to [init] %2 : $*IntTEnum<T>
 // CHECK:  switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 // CHECK:  %5 = unchecked_take_enum_data_addr %2 : $*IntTEnum<T>, #IntTEnum.int!enumelt
 // CHECK:  %6 = load [take] %5 : $*<τ_0_0> { var Int } <T>
@@ -568,7 +568,7 @@ sil hidden [ossa] @testEnumUses : $@convention(method) <T> (@in_guaranteed IntTE
 bb0(%0 : $*IntTEnum<T>):
   debug_value %0 : $*IntTEnum<T>, let, name "self", argno 1, expr op_deref
   %2 = alloc_stack $IntTEnum<T>
-  copy_addr %0 to [initialization] %2 : $*IntTEnum<T>
+  copy_addr %0 to [init] %2 : $*IntTEnum<T>
   switch_enum_addr %2 : $*IntTEnum<T>, case #IntTEnum.int!enumelt: bb1, case #IntTEnum.other!enumelt: bb2
 
 bb1:
@@ -632,23 +632,23 @@ bb0(%0 : @guaranteed $Storage):
 }
 
 // CHECK-LABEL: @testBeginAccessUses
-// CHECK: ###For MemOp:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK: ###For MemOp:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK: Storage: Argument %1 = argument of bb0 : $*T
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT: }
 // CHECK: Storage: Stack   %{{.*}} = alloc_stack $T, var, name "$value"
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
-// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   copy_addr %{{.*}} to [init] %0 : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT:   end_access %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
@@ -658,9 +658,9 @@ bb0(%0 : @guaranteed $Storage):
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
-// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   copy_addr %{{.*}} to [init] %0 : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT:   end_access %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
@@ -669,13 +669,13 @@ bb0(%0 : @guaranteed $Storage):
 // CHECK-NEXT:   dealloc_stack %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT: }
-// CHECK: ###For MemOp:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK: ###For MemOp:   copy_addr %{{.*}} to [init] %0 : $*T
 // CHECK: Storage: Stack   %{{.*}} = alloc_stack $T, var, name "$value"
 // CHECK: Path: ()
 // CHECK: Exact Uses {
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
-// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   copy_addr %{{.*}} to [init] %0 : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT:   end_access %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
@@ -685,9 +685,9 @@ bb0(%0 : @guaranteed $Storage):
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT: }
 // CHECK: Overlapping Uses {
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %{{.*}} : $*T
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
-// CHECK-NEXT:   copy_addr %{{.*}} to [initialization] %0 : $*T
+// CHECK-NEXT:   copy_addr %{{.*}} to [init] %0 : $*T
 // CHECK-NEXT:   Path: ()
 // CHECK-NEXT:   end_access %{{.*}} : $*T
 // CHECK-NEXT:   Path: ()
@@ -699,9 +699,9 @@ bb0(%0 : @guaranteed $Storage):
 sil [ossa] @testBeginAccessUses : $@convention(thin) <T where T : Comparable> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %2 = alloc_stack $T, var, name "$value"
-  copy_addr [take] %1 to [initialization] %2 : $*T
+  copy_addr [take] %1 to [init] %2 : $*T
   %4 = begin_access [modify] [static] %2 : $*T
-  copy_addr %4 to [initialization] %0 : $*T
+  copy_addr %4 to [init] %0 : $*T
   end_access %4 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T

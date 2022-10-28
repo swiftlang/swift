@@ -644,7 +644,7 @@ bb2:
 sil hidden [ossa] [always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
 bb0(%instance : $*T):
   %addr = alloc_stack $T
-  copy_addr %instance to [initialization] %addr : $*T
+  copy_addr %instance to [init] %addr : $*T
   yield %addr : $*T, resume bb1, unwind bb2
 bb1:
   destroy_addr %addr : $*T

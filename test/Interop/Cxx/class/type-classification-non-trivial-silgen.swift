@@ -59,12 +59,12 @@ public func testStructWithCopyConstructorAndValue() -> Bool {
 // CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithSubobjectCopyConstructorAndValue
 // CHECK: [[META:%.*]] = metatype $@thin StructWithSubobjectCopyConstructorAndValue.Type
 // CHECK: [[MEMBER_1:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
-// CHECK: copy_addr %0 to [initialization] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr %0 to [init] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
 // CHECK: [[FN:%.*]] = function_ref @$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
 // CHECK: apply [[FN]]([[AS]], [[MEMBER_1]], [[META]]) : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER:%.*]] = struct_element_addr [[AS]] : $*StructWithSubobjectCopyConstructorAndValue, #StructWithSubobjectCopyConstructorAndValue.member
 // CHECK: [[MEMBER_2:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
-// CHECK: copy_addr [[OBJ_MEMBER]] to [initialization] [[MEMBER_2]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr [[OBJ_MEMBER]] to [init] [[MEMBER_2]] : $*StructWithCopyConstructorAndValue
 // CHECK: [[OBJ_VALUE_ADDR:%.*]] = struct_element_addr [[MEMBER_2]] : $*StructWithCopyConstructorAndValue, #StructWithCopyConstructorAndValue.value
 // CHECK: [[OBJ_VALUE:%.*]] = load [trivial] [[OBJ_VALUE_ADDR]] : $*Int32
 // CHECK: [[MAKE_INT:%.*]] = function_ref @$ss5Int32V22_builtinIntegerLiteralABBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
@@ -82,7 +82,7 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 // StructWithSubobjectCopyConstructorAndValue.init(member:)
 // CHECK-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC : $@convention(method) (@in StructWithCopyConstructorAndValue, @thin StructWithSubobjectCopyConstructorAndValue.Type) -> @out StructWithSubobjectCopyConstructorAndValue
 // CHECK: [[MEMBER:%.*]] = struct_element_addr %0 : $*StructWithSubobjectCopyConstructorAndValue, #StructWithSubobjectCopyConstructorAndValue.member
-// CHECK: copy_addr [take] %1 to [initialization] [[MEMBER]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr [take] %1 to [init] [[MEMBER]] : $*StructWithCopyConstructorAndValue
 // CHECK-LABEL: end sil function '$sSo42StructWithSubobjectCopyConstructorAndValueV6memberABSo0abdefG0V_tcfC'
 
 // testStructWithCopyConstructorAndSubobjectCopyConstructorAndValue()
@@ -92,12 +92,12 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 // CHECK: apply [[CREATE_MEMBER_FN]]([[MEMBER_0]], %{{.*}}) : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 // CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: [[MEMBER_1:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
-// CHECK: copy_addr [[MEMBER_0]] to [initialization] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr [[MEMBER_0]] to [init] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
 // CHECK: [[FN:%.*]] = function_ref @{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC1E33StructWithCopyConstructorAndValue|\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z}} : $@convention(c) (@in StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: apply [[FN]]([[AS]], [[MEMBER_1]]) : $@convention(c) (@in StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER_ADDR:%.*]] = struct_element_addr [[AS]] : $*StructWithCopyConstructorAndSubobjectCopyConstructorAndValue, #StructWithCopyConstructorAndSubobjectCopyConstructorAndValue.member
 // CHECK: [[MEMBER_2:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
-// CHECK: copy_addr [[OBJ_MEMBER_ADDR]] to [initialization] [[MEMBER_2]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr [[OBJ_MEMBER_ADDR]] to [init] [[MEMBER_2]] : $*StructWithCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER_VALUE_ADDR:%.*]] = struct_element_addr [[MEMBER_2]] : $*StructWithCopyConstructorAndValue, #StructWithCopyConstructorAndValue.value
 // CHECK: [[OBJ_MEMBER_VALUE:%.*]] = load [trivial] [[OBJ_MEMBER_VALUE_ADDR]] : $*Int32
 // CHECK: [[ICMP:%.*]] = function_ref @$ss5Int32V2eeoiySbAB_ABtFZ : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
@@ -133,7 +133,7 @@ public func test(obj: StructWithCopyConstructorAndValue) -> Bool {
 // CHECK: [[INT_META:%.*]] = metatype $@thin Int32.Type
 // CHECK: [[OBJ_MEMBER:%.*]] = struct_element_addr %0 : $*StructWithSubobjectCopyConstructorAndValue, #StructWithSubobjectCopyConstructorAndValue.member
 // CHECK: [[MEMBER_TMP:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
-// CHECK: copy_addr [[OBJ_MEMBER]] to [initialization] [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr [[OBJ_MEMBER]] to [init] [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER_VALUE_ADDR:%.*]] = struct_element_addr [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue, #StructWithCopyConstructorAndValue.value
 // CHECK: [[OBJ_MEMBER_VALUE:%.*]] = load [trivial] [[OBJ_MEMBER_VALUE_ADDR]] : $*Int32
 // CHECK: destroy_addr [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue
@@ -154,7 +154,7 @@ public func test(obj: StructWithSubobjectCopyConstructorAndValue) -> Bool {
 // CHECK: [[META_INT_1:%.*]] = metatype $@thin Int32.Type
 // CHECK: [[OBJ_MEMBER:%.*]] = struct_element_addr %0 : $*StructWithCopyConstructorAndSubobjectCopyConstructorAndValue, #StructWithCopyConstructorAndSubobjectCopyConstructorAndValue.member
 // CHECK: [[MEMBER_TMP:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
-// CHECK: copy_addr [[OBJ_MEMBER]] to [initialization] [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue
+// CHECK: copy_addr [[OBJ_MEMBER]] to [init] [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER_VAL_ADDR:%.*]] = struct_element_addr [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue, #StructWithCopyConstructorAndValue.value
 // CHECK: [[OBJ_MEMBER_VAL:%.*]] = load [trivial] [[OBJ_MEMBER_VAL_ADDR]] : $*Int32
 // CHECK: destroy_addr [[MEMBER_TMP]] : $*StructWithCopyConstructorAndValue

@@ -906,7 +906,7 @@ var anyHashable: AnyHashable = 0
 // CHECK: [[GLOBAL:%[0-9]+]] = global_addr @$s21bridged_casts_folding11anyHashables03AnyE0Vv
 // CHECK: [[TMP:%[0-9]+]] = alloc_stack $AnyHashable
 // CHECK: [[ACCESS:%[0-9]+]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]]
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[TMP]]
+// CHECK: copy_addr [[ACCESS]] to [init] [[TMP]]
 // CHECK: [[FUNC:%.*]] = function_ref @$ss11AnyHashableV10FoundationE19_bridgeToObjectiveCSo8NSObjectCyF
 // CHECK-NEXT: apply [[FUNC]]([[TMP]])
 // CHECK-NEXT: destroy_addr [[TMP]]
@@ -937,7 +937,7 @@ class MyThing: Hashable {
 
 // CHECK-LABEL: sil hidden [noinline] @$s21bridged_casts_folding26doSomethingWithAnyHashableyys0gH0VF : $@convention(thin) (@in_guaranteed AnyHashable) -> () {
 // CHECK: %2 = alloc_stack $AnyHashable
-// CHECK: copy_addr %0 to [initialization] %2 : $*AnyHashable
+// CHECK: copy_addr %0 to [init] %2 : $*AnyHashable
 // CHECK: checked_cast_addr_br take_always AnyHashable in %2 : $*AnyHashable to MyThing
 @inline(never)
 func doSomethingWithAnyHashable(_ item: AnyHashable) {

@@ -34,7 +34,7 @@ bb0(%0 : $*P, %1 : @owned $@callee_owned () -> @out τ_0_0):
   %2 = alloc_stack $τ_0_0
   %3 = apply %1(%2) : $@callee_owned () -> @out τ_0_0
   %4 = init_existential_addr %0 : $*P, $τ_0_0
-  copy_addr [take] %2 to [initialization] %4 : $*τ_0_0
+  copy_addr [take] %2 to [init] %4 : $*τ_0_0
   %6 = tuple ()
   dealloc_stack %2 : $*τ_0_0
   return %6 : $()

@@ -236,7 +236,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PADDR]]
   // CHECK: [[TEMP:%.*]] = alloc_stack $any SomeProtocol
-  // CHECK: copy_addr [[READ]] to [initialization] [[TEMP]]
+  // CHECK: copy_addr [[READ]] to [init] [[TEMP]]
   // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*any SomeProtocol to $*[[OPENED:@opened\(.*, any SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]

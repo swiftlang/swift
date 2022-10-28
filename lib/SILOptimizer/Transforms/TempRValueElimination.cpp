@@ -55,7 +55,7 @@ namespace {
 /// are emitted as copies...
 ///
 ///   %temp = alloc_stack $T
-///   copy_addr %src to [initialization] %temp : $*T
+///   copy_addr %src to [init] %temp : $*T
 ///   // no writes to %src or %temp
 ///   destroy_addr %temp : $*T
 ///   dealloc_stack %temp : $*T
@@ -70,7 +70,7 @@ namespace {
 /// a simple form of redundant-load-elimination (RLE).
 ///
 ///   %temp = alloc_stack $T
-///   store %src to [initialization] %temp : $*T
+///   store %src to [init] %temp : $*T
 ///   // no writes to %temp
 ///   %v = load [take] %temp : $*T
 ///   dealloc_stack %temp : $*T
@@ -379,7 +379,7 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
 /// of the temporary. For example:
 ///
 ///   %a = begin_access %src
-///   copy_addr %a to [initialization] %temp : $*T
+///   copy_addr %a to [init] %temp : $*T
 ///   end_access %a
 ///   use %temp
 ///
@@ -586,8 +586,8 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // re-initialized by exactly this instruction.
   // This is a corner case, but can happen if lastLoadInst is a copy_addr.
   // Example:
-  //   copy_addr [take] %copySrc to [initialization] %tempObj   // copyInst
-  //   copy_addr [take] %tempObj to [initialization] %copySrc   // lastLoadInst
+  //   copy_addr [take] %copySrc to [init] %tempObj   // copyInst
+  //   copy_addr [take] %tempObj to [init] %copySrc   // lastLoadInst
   if (needToInsertDestroy && lastLoadInst != copyInst &&
       !isa<DestroyAddrInst>(lastLoadInst) &&
       aa->mayWriteToMemory(lastLoadInst, copySrc))

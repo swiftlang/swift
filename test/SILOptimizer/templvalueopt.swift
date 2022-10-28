@@ -25,7 +25,7 @@ public struct TestStruct {
   // CHECK: [[E:%[0-9]+]] = struct_element_addr %0 : $*TestStruct, #TestStruct.e
   // CHECK: [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]] : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
   // CHECK: [[A:%[0-9]+]] = struct_element_addr [[LEFT]] : $*AddressOnlyPayload, #AddressOnlyPayload.a
-  // CHECK: copy_addr [take] %1 to [initialization] [[A]] : $*Any
+  // CHECK: copy_addr [take] %1 to [init] [[A]] : $*Any
   // CHECK: [[I:%[0-9]+]] = struct_element_addr [[LEFT]] : $*AddressOnlyPayload, #AddressOnlyPayload.i
   // CHECK: store %2 to [[I]] : $*Int
   // CHECK: inject_enum_addr [[E]] : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
@@ -39,7 +39,7 @@ public struct TestStruct {
 // CHECK-LABEL: sil [noinline] {{.*}}@$s4test13createAnyLeftyAA6EitherOyypSgSiGypF
 // CHECK:  [[E:%[0-9]+]] = init_enum_data_addr %0 : $*Either<Optional<Any>, Int>, #Either.left!enumelt
 // CHECK:  [[SOME:%[0-9]+]] = init_enum_data_addr [[E]] : $*Optional<Any>, #Optional.some!enumelt
-// CHECK:  copy_addr %1 to [initialization] [[SOME]] : $*Any
+// CHECK:  copy_addr %1 to [init] [[SOME]] : $*Any
 // CHECK:  inject_enum_addr [[E]] : $*Optional<Any>, #Optional.some!enumelt
 // CHECK:  inject_enum_addr %0 : $*Either<Optional<Any>, Int>, #Either.left!enumelt
 // CHECK: } // end sil function '$s4test13createAnyLeftyAA6EitherOyypSgSiGypF'

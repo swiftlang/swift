@@ -71,7 +71,7 @@ func write_to_capture(_ x: Int) -> Int {
   // CHECK:   [[X2BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[X2BOX_PB:%.*]] = project_box [[X2BOX]]
   // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[XBOX_PB]] : $*Int
-  // CHECK:   copy_addr [[ACCESS]] to [initialization] [[X2BOX_PB]]
+  // CHECK:   copy_addr [[ACCESS]] to [init] [[X2BOX_PB]]
   // CHECK:   [[X2LIFETIME:%[0-9]+]] = begin_borrow [[X2BOX]]
   // CHECK:   mark_function_escape [[X2BOX_PB]]
   var x2 = x

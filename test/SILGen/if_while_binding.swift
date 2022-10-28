@@ -111,7 +111,7 @@ func while_loop() {
 // CHECK:         switch_enum_addr {{.*}}, case #Optional.some!enumelt: [[LOOPBODY:bb.*]], case #Optional.none!enumelt: [[OUT:bb[0-9]+]]
 // CHECK:       [[LOOPBODY]]:
 // CHECK:         [[ENUMVAL:%.*]] = unchecked_take_enum_data_addr
-// CHECK:         copy_addr [take] [[ENUMVAL]] to [initialization] [[X]]
+// CHECK:         copy_addr [take] [[ENUMVAL]] to [init] [[X]]
 // CHECK:         destroy_addr [[X]]
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]

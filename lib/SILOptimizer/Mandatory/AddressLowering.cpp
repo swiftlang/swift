@@ -925,7 +925,7 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (EnumDecl *enumDecl = userValue->getType().getEnumOrBoundGenericEnum()) {
+  if (userValue->getType().getEnumOrBoundGenericEnum()) {
     storage.initializesEnum = true;
   }
   assert(!storage.isPhiProjection());
@@ -1140,7 +1140,7 @@ bool OpaqueStorageAllocation::checkStorageDominates(
     }
     // Handle both phis and terminator results.
     auto *bbArg = cast<SILPhiArgument>(incomingValue);
-    // The storage block must strictly dominate the phi.
+    // The storage block must strictly dominate the argument block.
     if (!pass.domInfo->properlyDominates(allocInst->getParent(),
                                          bbArg->getParent())) {
       return false;
@@ -1581,9 +1581,9 @@ namespace {
 //     br bb3(val0, val1)
 //   bb2:
 //     temp = alloc_stack
-//     copy_addr [take] addr0 to [initialization] temp
-//     copy_addr [take] addr1 to [initialization] addr0
-//     copy_addr [take] temp to [initialization] addr1
+//     copy_addr [take] addr0 to [init] temp
+//     copy_addr [take] addr1 to [init] addr0
+//     copy_addr [take] temp to [init] addr1
 //     dealloc_stack temp
 //     br bb3(val1, val1)
 //   bb3(phi0, phi1):
@@ -2772,13 +2772,15 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 
   // Borrows are irrelevant unless they are marked lexical.
   if (borrow->isLexical()) {
-    if (auto *allocStack = dyn_cast<AllocStackInst>(address)) {
-      allocStack->setIsLexical();
-      return;
+    if (auto base = getAccessBase(address)) {
+      if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
+        allocStack->setIsLexical();
+        return;
+      }
+      // Function arguments are inherently lexical.
+      if (isa<SILFunctionArgument>(base))
+        return;
     }
-    // Function arguments are inherently lexical.
-    if (isa<SILFunctionArgument>(address))
-      return;
 
     SWIFT_ASSERT_ONLY(address->dump());
     llvm_unreachable("^^^ unknown lexical address producer");

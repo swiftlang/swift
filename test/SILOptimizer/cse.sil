@@ -1039,7 +1039,7 @@ bb0(%0 : $Airplane):
 sil hidden [transparent] [thunk] @_TTWV2p28AirplaneS_7FlyableS_FS1_3flyuRq_S1__fq_FT_T_ : $@convention(witness_method: Flyable) (@in_guaranteed Airplane) -> () {
 bb0(%0 : $*Airplane):
   %1 = alloc_stack $Airplane                      // users: %2, %6
-  copy_addr %0 to [initialization] %1 : $*Airplane // id: %2
+  copy_addr %0 to [init] %1 : $*Airplane // id: %2
   %3 = struct $Airplane ()                        // user: %5
   // function_ref p2.Airplane.fly (p2.Airplane)() -> ()
   %4 = function_ref @_TFV2p28Airplane3flyfS0_FT_T_ : $@convention(method) (Airplane) -> () // user: %5

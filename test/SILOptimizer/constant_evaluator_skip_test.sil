@@ -258,7 +258,7 @@ bb0:
   %9 = function_ref @skipConstructInnerProto : $@convention(thin) () -> @out InnerProto
   %10 = apply %9(%8) : $@convention(thin) () -> @out InnerProto
   %12 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.second
-  copy_addr [take] %8 to [initialization] %12 : $*InnerProto
+  copy_addr [take] %8 to [init] %12 : $*InnerProto
   dealloc_stack %8 : $*InnerProto
   %19 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.first
   %20 = load %19 : $*Int64

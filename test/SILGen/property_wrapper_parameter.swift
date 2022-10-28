@@ -492,7 +492,7 @@ func testImplicitWrapperWithResilientStruct() {
   // implicit closure #1 in testImplicitWrapperWithResilientStruct()
   // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter38testImplicitWrapperWithResilientStructyyFyAA010ProjectionF0Vy11def_structA1AVGcfu_ : $@convention(thin) (@in_guaranteed ProjectionWrapper<A>) -> ()
   // CHECK: [[P:%.*]] = alloc_stack $ProjectionWrapper<A>
-  // CHECK: copy_addr %0 to [initialization] [[P]]
+  // CHECK: copy_addr %0 to [init] [[P]]
   // CHECK: [[I:%.*]] = function_ref @$s26property_wrapper_parameter38testImplicitWrapperWithResilientStructyyFyAA010ProjectionF0Vy11def_structA1AVGcfu_yAHcfU_6$valueL_AHvpfW : $@convention(thin) (@in ProjectionWrapper<A>) -> @out ProjectionWrapper<A>
   // CHECK: apply [[I]]({{.*}}, [[P]]) : $@convention(thin) (@in ProjectionWrapper<A>) -> @out ProjectionWrapper<A>
 

@@ -52,7 +52,7 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   // querying EscapeAnalysis.
   %localRef = alloc_ref $SomeClass
   %localPropAdr = ref_element_addr %localRef : $SomeClass, #SomeClass.someProperty
-  copy_addr %0 to [initialization] %localPropAdr : $*SomeProtocol
+  copy_addr %0 to [init] %localPropAdr : $*SomeProtocol
   %stk0 = alloc_stack $SomeStruct
   %stk0Ref = struct_element_addr %stk0 : $*SomeStruct, #SomeStruct.someRef
   store %localRef to %stk0Ref : $*SomeClass
@@ -66,7 +66,7 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   // EscapeAnalysis for only a few special instructions, like
   // init_existential_addr.
   %stkAdr1 = alloc_stack $SomeProtocol
-  copy_addr %0 to [initialization] %stkAdr1 : $*SomeProtocol
+  copy_addr %0 to [init] %stkAdr1 : $*SomeProtocol
   %instanceAdr = init_existential_addr %indirectLocalPropAdr : $*SomeProtocol, $SomeInstance
   %openadr1 = open_existential_addr immutable_access %stkAdr1 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self
   %witness1 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr1 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
@@ -77,7 +77,7 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   // creates a content node that refers back to the dead stack
   // location.
   %stkAdr2 = alloc_stack $SomeProtocol
-  copy_addr %propAdr1 to [initialization] %stkAdr2 : $*SomeProtocol
+  copy_addr %propAdr1 to [init] %stkAdr2 : $*SomeProtocol
   %openadr2 = open_existential_addr immutable_access %stkAdr2 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self
   %witness2 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr2 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   %call2 = apply %witness2<@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self>(%openadr2) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()

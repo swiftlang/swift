@@ -362,7 +362,7 @@ bb0(%0 : $Pointer):
 // CHECK-NEXT:  End
 sil @copy_addr_content : $@convention(thin) (@in_guaranteed Int32) -> @out Int32 {
 bb0(%0: $*Int32, %1: $*Int32):
-  copy_addr %1 to [initialization] %0 : $*Int32
+  copy_addr %1 to [init] %0 : $*Int32
   %2 = tuple()
   return %2 : $()
 }
@@ -375,7 +375,7 @@ bb0(%0: $*Int32, %1: $*Int32):
 // CHECK-NEXT:  End
 sil @copy_addr_take_content : $@convention(thin) (@in Int32) -> @out Int32 {
 bb0(%0: $*Int32, %1: $*Int32):
-  copy_addr [take] %1 to [initialization] %0 : $*Int32
+  copy_addr [take] %1 to [init] %0 : $*Int32
   %2 = tuple()
   return %2 : $()
 }

@@ -162,7 +162,7 @@ func convOptionalAddrOnly(_ a1: @escaping (AddrOnly?) -> AddrOnly) {
 // CHECK:         [[TEMP:%.*]] = alloc_stack $AddrOnly
 // CHECK-NEXT:    apply %2([[TEMP]], %1)
 // CHECK-NEXT:    init_enum_data_addr %0 : $*Optional<AddrOnly>
-// CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*AddrOnly
+// CHECK-NEXT:    copy_addr [take] {{.*}} to [init] {{.*}} : $*AddrOnly
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<AddrOnly>
 // CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    dealloc_stack {{.*}} : $*AddrOnly
@@ -223,7 +223,7 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 // CHECK:         [[TMP:%.*]] = alloc_stack $any Q
 // CHECK-NEXT:    open_existential_addr immutable_access %1 : $*any P
 // CHECK-NEXT:    init_existential_addr [[TMP]] : $*any Q
-// CHECK-NEXT:    copy_addr {{.*}} to [initialization] {{.*}}
+// CHECK-NEXT:    copy_addr {{.*}} to [init] {{.*}}
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    init_existential_addr
 // CHECK-NEXT:    store
@@ -576,7 +576,7 @@ func convTupleAny(_ f1: @escaping () -> (),
 // CHECK-NEXT:    store %1 to [trivial] [[RIGHT_ADDR]]
 // CHECK-NEXT:    [[OPTIONAL_VALUE:%.*]] = alloc_stack $Optional<Any>
 // CHECK-NEXT:    [[OPTIONAL_PAYLOAD:%.*]] = init_enum_data_addr [[OPTIONAL_VALUE]]
-// CHECK-NEXT:    copy_addr [take] [[ANY_VALUE]] to [initialization] [[OPTIONAL_PAYLOAD]]
+// CHECK-NEXT:    copy_addr [take] [[ANY_VALUE]] to [init] [[OPTIONAL_PAYLOAD]]
 // CHECK-NEXT:    inject_enum_addr [[OPTIONAL_VALUE]]
 // CHECK-NEXT:    apply %2([[OPTIONAL_VALUE]])
 // CHECK-NEXT:    tuple ()

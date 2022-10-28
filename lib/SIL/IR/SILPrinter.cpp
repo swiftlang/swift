@@ -1706,7 +1706,7 @@ public:
     case AssignByWrapperInst::Unknown:
       break;
     case AssignByWrapperInst::Initialization:
-      *this << "[initialization] ";
+      *this << "[init] ";
       break;
     case AssignByWrapperInst::Assign:
       *this << "[assign] ";
@@ -1771,7 +1771,7 @@ public:
   void visitStore##Name##Inst(Store##Name##Inst *SI) { \
     *this << Ctx.getID(SI->getSrc()) << " to "; \
     if (SI->isInitializationOfDest()) \
-      *this << "[initialization] "; \
+      *this << "[init] "; \
     *this << getIDAndType(SI->getDest()); \
   }
 #include "swift/AST/ReferenceStorage.def"
@@ -1781,7 +1781,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -1790,7 +1790,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 

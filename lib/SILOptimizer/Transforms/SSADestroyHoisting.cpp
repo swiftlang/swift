@@ -943,7 +943,7 @@ void SSADestroyHoisting::run() {
   // instruction into
   //
   //     destroy_addr
-  //     copy_addr to [initialization]
+  //     copy_addr to [init]
   //
   // sequences to create still more destroy_addrs to hoist.
   //

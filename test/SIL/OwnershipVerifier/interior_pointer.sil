@@ -76,7 +76,7 @@ bb0(%0 : @owned $OptionalBox<T>, %1 : $*T):
   %2 = begin_borrow %0 : $OptionalBox<T>
   %3 = ref_element_addr %2 : $OptionalBox<T>, #OptionalBox.t
   %4 = init_enum_data_addr %3 : $*FakeOptional<T>, #FakeOptional.some!enumelt
-  copy_addr %1 to [initialization] %4 : $*T
+  copy_addr %1 to [init] %4 : $*T
   end_borrow %2 : $OptionalBox<T>
   destroy_value %0 : $OptionalBox<T>
   %5 = tuple ()

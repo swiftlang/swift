@@ -33,7 +33,7 @@ func testShuffleOpaque() {
 
   // CHECK:      [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TMP]])
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PBX]] : $*any P
+  // CHECK-NEXT: copy_addr [take] [[TMP]] to [init] [[PBX]] : $*any P
   // CHECK-NEXT: store [[T1]] to [trivial] [[PBY]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var (x,y) : (y:P, x:Int) = make_xy()
@@ -47,7 +47,7 @@ func testShuffleOpaque() {
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TMP]])
   // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 0
   // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 1
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PAIR_0]] : $*any P
+  // CHECK-NEXT: copy_addr [take] [[TMP]] to [init] [[PAIR_0]] : $*any P
   // CHECK-NEXT: store [[T1]] to [trivial] [[PAIR_1]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var pair : (y:P, x:Int) = make_xy()
@@ -80,7 +80,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
   // CHECK-NEXT: apply [[T0]]([[TMP]])
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PBX]]
+  // CHECK-NEXT: copy_addr [take] [[TMP]] to [init] [[PBX]]
   // CHECK-NEXT: store [[T1]] to [trivial] [[PBY]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var (x,y) : (y:P, x:Int) = (x: make_int(), y: make_p())
@@ -97,7 +97,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: apply [[T0]]([[TMP]])
   // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 0
   // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 1
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [initialization] [[PBX]]
+  // CHECK-NEXT: copy_addr [take] [[TMP]] to [init] [[PBX]]
   // CHECK-NEXT: store [[T1]] to [trivial] [[PAIR_1]]
   // CHECK-NEXT: dealloc_stack [[TMP]]
   var pair : (y:P, x:Int) = (x: make_int(), y: make_p())
@@ -155,7 +155,7 @@ extension P {
   // CHECK:   [[TUP0_COPY:%.*]] = copy_value [[TUP0]]
   // CHECK:   store [[TUP0_COPY]] to [init] [[ZERO_ADDR]]
   // CHECK:   [[ONE_ADDR:%.*]] = tuple_element_addr [[RVALUE]] : $*(index: C, value: Self), 1
-  // CHECK:   copy_addr [[TUP1]] to [initialization] [[ONE_ADDR]]
+  // CHECK:   copy_addr [[TUP1]] to [init] [[ONE_ADDR]]
   //
   // What we are actually trying to check. Note that there is no actual use of
   // LOADED_CLASS. This is b/c of the nature of the RValue we are working with.

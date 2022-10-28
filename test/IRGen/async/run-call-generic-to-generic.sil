@@ -24,7 +24,7 @@ sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 // CHECK-LL: define hidden swift{{(tail)?}}cc void @genericToGeneric(
 sil hidden @genericToGeneric : $@async @convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%out : $*T, %in : $*T):
-  copy_addr %in to [initialization] %out : $*T
+  copy_addr %in to [init] %out : $*T
   %result = tuple ()
   return %result : $()
 }
