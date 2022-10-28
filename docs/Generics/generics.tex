@@ -678,7 +678,7 @@ In batch mode and single file mode, the driver can also perform an \emph{increme
 \index{secondary file}
 The driver invokes the frontend with a list of \emph{primary files} and \emph{secondary files}. The primary files are those that this specific frontend job is tasked with building, and the secondary files are the remaining source files in the module. Each source file is a primary file of exactly one frontend job, and each frontend job's primary files and secondary files together form the full list of source files in the module.
 
-The \verb|-###| flag driver flags performs a ``dry run'' which prints all commands to run without actually doing anything.
+The \verb|-###| driver flag performs a ``dry run'' which prints all commands to run without actually doing anything.
 \begin{Verbatim}
 $ swiftc m.swift v.swift c.swift -###
 swift-frontend -frontend -c -primary-file m.swift v.swift c.swift ...
