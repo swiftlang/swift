@@ -123,6 +123,19 @@
 
   @objc final var propertyNotFromHeader5: CInt
   // OK, @objc final is weird but supported, not a member impl
+
+  override open func superclassMethod(_: CInt) {
+    // OK
+  }
+
+  override open var superclassProperty: CInt {
+    get {
+      // OK
+    }
+    set {
+      // OK
+    }
+  }
 }
 
 // FIXME: Should complain about categoryMethodFromHeader4:

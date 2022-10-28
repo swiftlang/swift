@@ -1458,6 +1458,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
 
 void LLVM_ATTRIBUTE_USED ValueDecl::dumpRef() const {
   dumpRef(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 void SourceFile::dump() const {

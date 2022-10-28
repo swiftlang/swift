@@ -1,4 +1,11 @@
-@interface ObjCClass
+@interface ObjCBaseClass
+
+- (void)superclassMethod:(int)param;
+@property (assign) int superclassProperty;
+
+@end
+
+@interface ObjCClass : ObjCBaseClass
 - (void)methodFromHeader1:(int)param;
 - (void)methodFromHeader2:(int)param;
 - (void)methodFromHeader3:(int)param;
@@ -37,6 +44,12 @@
 @property int categoryPropertyFromHeader2;
 @property int categoryPropertyFromHeader3;
 @property int categoryPropertyFromHeader4;
+
+@end
+
+@interface ObjCSubclass : ObjCClass
+
+- (void)subclassMethodFromHeader1:(int)param;
 
 @end
 

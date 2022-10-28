@@ -3745,8 +3745,14 @@ static bool
 isObjCMemberImplementation(const ValueDecl *VD,
                            llvm::function_ref<AccessLevel()> getAccessLevel) {
   if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    if (ED->isObjCImplementation() && !isa<TypeDecl>(VD))
-      return !VD->isFinal() && getAccessLevel() >= AccessLevel::Internal;
+    if (ED->isObjCImplementation() && !isa<TypeDecl>(VD)) {
+      auto attrDecl = isa<AccessorDecl>(VD)
+                    ? cast<AccessorDecl>(VD)->getStorage()
+                    : VD;
+      return !attrDecl->isFinal()
+                  && !attrDecl->getAttrs().hasAttribute<OverrideAttr>()
+                  && getAccessLevel() >= AccessLevel::Internal;
+    }
 
   return false;
 }
