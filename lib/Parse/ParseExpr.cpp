@@ -3643,8 +3643,6 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
       DeclNameOptions());
   if (!macroNameRef)
     return makeParserError();
-  auto *macroExpr = new (Context) UnresolvedDeclRefExpr(
-      macroNameRef, DeclRefKind::Ordinary, macroNameLoc);
 
   ArgumentList *argList = nullptr;
   if (Tok.isFollowingLParen()) {
@@ -3669,7 +3667,8 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   }
 
   return makeParserResult(
-      new (Context) MacroExpansionExpr(poundLoc, macroExpr, argList));
+      new (Context) MacroExpansionExpr(
+          poundLoc, macroNameRef, macroNameLoc, argList));
 }
 
 /// parseExprCollection - Parse a collection literal expression.

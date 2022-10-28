@@ -137,11 +137,6 @@ bool hasOtherStoreBorrowsInLifetime(StoreBorrowInst *sbi,
                                     SSAPrunedLiveness *liveness,
                                     DeadEndBlocks *deadEndBlocks);
 
-/// Extend the store_borrow \p sbi's scope such that it encloses \p newUsers.
-bool extendStoreBorrow(StoreBorrowInst *sbi,
-                       SmallVectorImpl<Operand *> &newUses,
-                       DeadEndBlocks *deadEndBlocks,
-                       InstModCallbacks callbacks = InstModCallbacks());
 } // namespace swift
 
 #endif

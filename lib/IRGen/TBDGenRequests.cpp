@@ -16,8 +16,8 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/Subsystems.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/TextAPI/InterfaceFile.h"
 

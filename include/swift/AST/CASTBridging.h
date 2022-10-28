@@ -14,6 +14,7 @@
 #define SWIFT_C_AST_ASTBRIDGING_H
 
 #include <inttypes.h>
+#include "swift/Basic/Compiler.h"
 
 #if __clang__
 // Provide macros to temporarily suppress warning about the use of
@@ -47,6 +48,43 @@ typedef struct {
 } BridgedCharSourceRange;
 
 typedef void *BridgedIdentifier;
+
+typedef struct {
+  BridgedIdentifier _Nullable Name;
+  void *_Nullable NameLoc;
+  BridgedIdentifier _Nullable SecondName;
+  void *_Nullable SecondNameLoc;
+  void *_Nullable UnderscoreLoc;
+  void *_Nullable ColonLoc;
+  void *Type;
+  void *_Nullable TrailingCommaLoc;
+} BridgedTupleTypeElement;
+
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : long {
+  /// A type bound T : P, where T is a type that depends on a generic
+  /// parameter and P is some type that should bound T, either as a concrete
+  /// supertype or a protocol to which T must conform.
+  BridgedRequirementReprKindTypeConstraint,
+
+  /// A same-type requirement T == U, where T and U are types that shall be
+  /// equivalent.
+  BridgedRequirementReprKindSameType,
+
+  /// A layout bound T : L, where T is a type that depends on a generic
+  /// parameter and L is some layout specification that should bound T.
+  BridgedRequirementReprKindLayoutConstraint,
+
+  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
+  // when adding enumerators.
+} BridgedRequirementReprKind;
+
+typedef struct {
+  void *_Nullable SeparatorLoc;
+  BridgedRequirementReprKind Kind;
+  void *FirstType;
+  void *SecondType;
+  // FIXME: Handle Layout Requirements
+} BridgedRequirementRepr;
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,9 +161,32 @@ struct DeclContextAndDecl {
 };
 
 struct DeclContextAndDecl StructDecl_create(
-    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
+    void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams, void *dc);
 struct DeclContextAndDecl ClassDecl_create(
     void *ctx, void *loc, BridgedIdentifier name, void *nameLoc, void *dc);
+
+void *ArrayTypeRepr_create(void *ctx, void *base, void *lsquareLoc, void *rsquareLoc);
+void *DictionaryTypeRepr_create(void *ctx, void *keyType, void *valueType, void *lsquareLoc, void *colonloc, void *rsquareLoc);
+void *OptionalTypeRepr_create(void *ctx, void *base, void *questionLoc);
+void *ImplicitlyUnwrappedOptionalTypeRepr_create(void *ctx, void *base, void *exclamationLoc);
+void *MetatypeTypeRepr_create(void *ctx, void *baseType, void *typeLoc);
+void *ProtocolTypeRepr_create(void *ctx, void *baseType, void *protoLoc);
+void *PackExpansionTypeRepr_create(void *ctx, void *base, void *ellipsisLoc);
+void *TupleTypeRepr_create(void *ctx, BridgedArrayRef elements, void *lParenLoc, void *rParenLoc);
+void *IdentTypeRepr_create(void *ctx, BridgedArrayRef components);
+void *GenericIdentTypeRepr_create(void *ctx, BridgedIdentifier name, void *nameLoc, BridgedArrayRef genericArgs, void *lAngle, void *rAngle);
+void *CompositionTypeRepr_create(void *ctx, BridgedArrayRef types, void *firstTypeLoc);
+void *FunctionTypeRepr_create(void *ctx, void *argsTy, void *_Nullable asyncLoc, void *_Nullable throwsLoc, void *arrowLoc, void *returnType);
+void *NamedOpaqueReturnTypeRepr_create(void *ctx, void *baseTy);
+void *OpaqueReturnTypeRepr_create(void *ctx, void *opaqueLoc, void *baseTy);
+void *ExistentialTypeRepr_create(void *ctx, void *anyLoc, void *baseTy);
+void *GenericParamList_create(void *ctx, void *lAngleLoc, BridgedArrayRef params, void *_Nullable whereLoc, BridgedArrayRef reqs, void *rAngleLoc);
+void *GenericTypeParamDecl_create(void *ctx, void *declContext, BridgedIdentifier name, void *nameLoc, void *_Nullable ellipsisLoc, long index, _Bool isParameterPack);
+void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty);
+
+struct DeclContextAndDecl TypeAliasDecl_create(void *ctx, void *declContext, void *aliasLoc, void *equalLoc, BridgedIdentifier name, void *nameLoc, void *_Nullable genericParams);
+void TypeAliasDecl_setUnderlyingTypeRepr(void *decl, void *underlyingType);
+
 
 void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);

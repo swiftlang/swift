@@ -16,16 +16,18 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "../../SILGen/SILGen.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/BridgingUtils.h"
@@ -1029,9 +1031,4 @@ SILInstruction::MemoryBehavior SILFunction::getMemoryBehavior(bool observeRetain
 
   auto b = getMemBehvaiorFunction({this}, observeRetains);
   return (SILInstruction::MemoryBehavior)b;
-}
-
-SILFunction *SILFunction::getFunction(SILDeclRef ref, SILModule &M) {
-  swift::Lowering::SILGenModule SILGenModule(M, ref.getModuleContext());
-  return SILGenModule.getFunction(ref, swift::NotForDefinition);
 }

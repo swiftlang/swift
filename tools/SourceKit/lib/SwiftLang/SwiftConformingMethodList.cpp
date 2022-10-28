@@ -16,7 +16,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ConformingMethodList.h"
-#include "swift/IDE/CompletionInstance.h"
+#include "swift/IDETool/CompletionInstance.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"

@@ -19,15 +19,74 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 
 using namespace swift;
 
+extern "C" void *swift_ASTGen_lookupMacro(const char *macroName);
+
+extern "C" void swift_ASTGen_destroyMacro(void *macro);
+
+extern "C" void
+swift_ASTGen_getMacroEvaluationContext(const void *sourceFile,
+                                       void *declContext, void *astContext,
+                                       void *macro, void **evaluationContext);
+
 extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
     void *sourceFile, const void *sourceLocation,
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
+
+extern "C" void
+swift_ASTGen_getMacroTypeSignature(void *macro, const char **genericSignature,
+                                   ptrdiff_t *genericSignatureLength);
+
+StructDecl *MacroContextRequest::evaluate(Evaluator &evaluator,
+                                          std::string macroName,
+                                          ModuleDecl *mod) const {
+#if SWIFT_SWIFT_PARSER
+  auto &ctx = mod->getASTContext();
+  auto *macro = swift_ASTGen_lookupMacro(macroName.c_str());
+  if (!macro)
+    return nullptr;
+
+  const char *evaluatedSource;
+  ptrdiff_t evaluatedSourceLength;
+  swift_ASTGen_getMacroTypeSignature(macro, &evaluatedSource,
+                                     &evaluatedSourceLength);
+
+  // Create a new source buffer with the contents of the macro's
+  // signature.
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  std::string bufferName;
+  {
+    llvm::raw_string_ostream out(bufferName);
+    out << "Macro signature of #" << macroName;
+  }
+  auto macroBuffer = llvm::MemoryBuffer::getMemBuffer(
+      StringRef(evaluatedSource, evaluatedSourceLength), bufferName);
+  unsigned macroBufferID =
+      sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  auto macroSourceFile = new (ctx) SourceFile(
+      *mod, SourceFileKind::Library, macroBufferID);
+  // Make sure implicit imports are resolved in this file.
+  performImportResolution(*macroSourceFile);
+
+  auto *start = sourceMgr.getLocForBufferStart(macroBufferID)
+                    .getOpaquePointerValue();
+  void *context = nullptr;
+  swift_ASTGen_getMacroEvaluationContext(
+      (const void *)start, (void *)(DeclContext *)macroSourceFile,
+      (void *)&ctx, macro, &context);
+
+  ctx.addCleanup([macro]() { swift_ASTGen_destroyMacro(macro); });
+  return dyn_cast<StructDecl>((Decl *)context);
+#else
+  return nullptr;
+#endif // SWIFT_SWIFT_PARSER
+}
 
 #if SWIFT_SWIFT_PARSER
 Expr *swift::expandMacroExpr(
