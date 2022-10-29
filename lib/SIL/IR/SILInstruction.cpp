@@ -24,7 +24,6 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/Basic/AssertImplements.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
