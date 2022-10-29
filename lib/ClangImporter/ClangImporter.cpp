@@ -695,16 +695,9 @@ importer::getNormalInvocationArguments(
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
-  if (importerOpts.DetailedPreprocessingRecord) {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-Xclang", "-detailed-preprocessing-record",
-      "-Xclang", "-fmodule-format=raw",
-    });
-  } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-Xclang", "-fmodule-format=obj",
-    });
-  }
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+    "-Xclang", "-fmodule-format=obj",
+  });
 
   // Enable API notes alongside headers/in frameworks.
   invocationArgStrs.push_back("-fapinotes-modules");

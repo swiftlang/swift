@@ -332,7 +332,6 @@ bool ide::initCompilerInvocation(
   }
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
-  ImporterOpts.DetailedPreprocessingRecord = true;
 
   assert(!Invocation.getModuleName().empty());
 
