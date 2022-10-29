@@ -665,7 +665,7 @@ The Swift driver schedules \emph{frontend jobs} to perform the actual compilatio
 
 Source files are divided among frontend jobs according to the \emph{compilation mode}:
 \begin{enumerate}
-\item In \emph{batch mode}, source files is partitioned into fixed-size batches, up to the maximum batch size. Each frontend job compiles the source files of a single batch. This is the default.
+\item In \emph{batch mode}, source files are partitioned into fixed-size batches, up to the maximum batch size. Each frontend job compiles the source files of a single batch. This is the default.
 \item In \emph{single file mode}, there is frontend job per source file, which is effectively the same as batch mode with a maximum batch size of one. Single file mode is only used for debugging and performance testing the compiler itself. The \texttt{-disable-batch-mode} command line flag instructs the driver to run in single file mode.
 \item In \emph{whole module optimization mode}, there is no parallelism; a single frontend job is scheduled to build all source files. This trades build time for quality of generated code, because the compiler is able to perform more aggressive optimization across source file boundaries. The \texttt{-wmo} driver flag enables whole module optimization.
 \end{enumerate}
@@ -678,7 +678,7 @@ In batch mode and single file mode, the driver can also perform an \emph{increme
 \index{secondary file}
 The driver invokes the frontend with a list of \emph{primary files} and \emph{secondary files}. The primary files are those that this specific frontend job is tasked with building, and the secondary files are the remaining source files in the module. Each source file is a primary file of exactly one frontend job, and each frontend job's primary files and secondary files together form the full list of source files in the module.
 
-The \verb|-###| flag driver flags performs a ``dry run'' which prints all commands to run without actually doing anything.
+The \verb|-###| driver flag performs a ``dry run'' which prints all commands to run without actually doing anything.
 \begin{Verbatim}
 $ swiftc m.swift v.swift c.swift -###
 swift-frontend -frontend -c -primary-file m.swift v.swift c.swift ...
@@ -808,7 +808,7 @@ Operator symbols are declared at the top level of a module. Operator symbols hav
 \index{operator lookup}
 An arithmetic expression like \texttt{2 + 3 * 6} is parsed as a \emph{sequence expression}, which is a flat list of nodes and operator symbols. The parser does not know the precedence, fixity or associativity of the \texttt{+} and \texttt{*} operators. Indeed, it does not know that they exist at all. The \emph{pre-check} phase of the expression type checker looks up operator symbols and transforms sequence expressions into the more familiar nested tree form.
 
-Operator symbols do not themselves have an implementation; they are just names. An operator symbol can used as the name of a function implementing the operator on a specific type (for prefix and postfix operators) or a specific pair of types (for infix operators). Operator functions can be declared either at the top level, or as a member of a type. As far as a name lookup is concerned, the interesting thing about operator functions is that they are visible globally, even when declared inside of a type. Operator functions are found by consulting the operator lookup table, which contains top-level operator functions as well as member operator functions of all declared types.
+Operator symbols do not themselves have an implementation; they are just names. An operator symbol can be used as the name of a function implementing the operator on a specific type (for prefix and postfix operators) or a specific pair of types (for infix operators). Operator functions can be declared either at the top level, or as a member of a type. As far as a name lookup is concerned, the interesting thing about operator functions is that they are visible globally, even when declared inside of a type. Operator functions are found by consulting the operator lookup table, which contains top-level operator functions as well as member operator functions of all declared types.
 
 When the compiler type checks the expression \texttt{2 + 3 * 6}, it must pick two specific operator functions for \texttt{+} and \texttt{*} among all the possibilities in order to make this expression type check. In this case, the overloads for \texttt{Int} are chosen, because \texttt{Int} is the default literal type for the literals \texttt{2}, \texttt{3} and \texttt{6}.
 
