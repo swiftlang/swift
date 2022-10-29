@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/TypeID.h"
 #include "swift/ConstExtract/ConstExtract.h"
+#include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
@@ -23,6 +25,7 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "swift/Subsystems.h"
 
 #include <set>
 #include <sstream>
@@ -239,3 +242,22 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
 }
 
 } // namespace swift
+
+#define SWIFT_TYPEID_ZONE ConstExtract
+#define SWIFT_TYPEID_HEADER "swift/ConstExtract/ConstExtractTypeIDZone.def"
+#include "swift/Basic/ImplementTypeIDZone.h"
+#undef SWIFT_TYPEID_ZONE
+#undef SWIFT_TYPEID_HEADER
+
+// Define request evaluation functions for each of the name lookup requests.
+static AbstractRequestFunction *constExtractRequestFunctions[] = {
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
+  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
+#include "swift/ConstExtract/ConstExtractTypeIDZone.def"
+#undef SWIFT_REQUEST
+};
+
+void swift::registerConstExtractRequestFunctions(Evaluator &evaluator) {
+  evaluator.registerRequestFunctions(Zone::ConstExtract,
+                                     constExtractRequestFunctions);
+}
