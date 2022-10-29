@@ -249,6 +249,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
 
   SILOptions &SILOpts = Invocation.getSILOptions();
   auto Mod = Instance.getMainModule();
+  Mod->setIsBuiltFromInterface(true);
   auto &TC = Instance.getSILTypes();
   auto SILMod = performASTLowering(Mod, TC, SILOpts);
   if (!SILMod) {

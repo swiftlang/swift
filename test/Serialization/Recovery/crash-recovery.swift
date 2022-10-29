@@ -19,5 +19,5 @@ public class Sub: Base {
 // CHECK-CRASH-LABEL: *** DESERIALIZATION FAILURE ***
 // CHECK-CRASH-LABEL: *** If any module named here was modified in the SDK, please delete the ***
 // CHECK-CRASH-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
-// CHECK-CRASH: module 'Lib' with full misc version {{.*}}4.1.50
+// CHECK-CRASH: module 'Lib', builder version {{.*}}4.1.50
 // CHECK-CRASH: could not find 'disappearingMethod()' in parent class
