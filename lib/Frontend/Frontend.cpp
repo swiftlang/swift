@@ -239,6 +239,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerClangImporterRequestFunctions(Context->evaluator);
+  registerConstExtractRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
   registerSILOptimizerRequestFunctions(Context->evaluator);
   registerTBDGenRequestFunctions(Context->evaluator);

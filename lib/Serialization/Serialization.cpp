@@ -1049,6 +1049,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
       }
 
+      if (M->isBuiltFromInterface()) {
+        options_block::IsBuiltFromInterfaceLayout BuiltFromInterface(Out);
+        BuiltFromInterface.emit(ScratchRecord);
+      }
+
       if (allowCompilerErrors()) {
         options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
             AllowErrors(Out);

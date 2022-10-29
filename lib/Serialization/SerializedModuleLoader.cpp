@@ -770,6 +770,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setImplicitDynamicEnabled();
     if (loadedModuleFile->hasIncrementalInfo())
       M.setHasIncrementalInfo();
+    if (loadedModuleFile->isBuiltFromInterface())
+      M.setIsBuiltFromInterface();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())

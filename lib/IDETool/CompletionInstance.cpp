@@ -247,6 +247,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
   registerClangImporterRequestFunctions(tmpCtx->evaluator);
+  registerConstExtractRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)

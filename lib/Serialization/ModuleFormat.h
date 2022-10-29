@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 718;  // element archetype
+const uint16_t SWIFTMODULE_VERSION_MINOR = 719;  // isBuiltFromInterface
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -826,6 +826,7 @@ namespace options_block {
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
     IS_IMPLICIT_DYNAMIC_ENABLED,
+    IS_BUILT_FROM_INTERFACE,
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
     MODULE_ABI_NAME,
     IS_CONCURRENCY_CHECKED,
@@ -869,6 +870,10 @@ namespace options_block {
   using ResilienceStrategyLayout = BCRecordLayout<
     RESILIENCE_STRATEGY,
     BCFixed<2>
+  >;
+
+  using IsBuiltFromInterfaceLayout = BCRecordLayout<
+    IS_BUILT_FROM_INTERFACE
   >;
 
   using IsAllowModuleWithCompilerErrorsEnabledLayout = BCRecordLayout<
