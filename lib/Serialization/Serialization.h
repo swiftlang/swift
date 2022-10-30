@@ -560,12 +560,6 @@ public:
   bool allowCompilerErrors() const;
 };
 
-/// Serialize module documentation to the given stream.
-void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                      StringRef GroupInfoPath);
-
-/// Serialize module source info to the given stream.
-void writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC);
 } // end namespace serialization
 } // end namespace swift
 #endif
