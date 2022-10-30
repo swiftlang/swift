@@ -46,6 +46,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/IDETool/CompletionInstance.h"
 #include "swift/Index/Index.h"
 #include "swift/Markup/Markup.h"

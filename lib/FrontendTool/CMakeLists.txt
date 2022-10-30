@@ -20,6 +20,7 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftImmediate
     swiftIndex
     swiftIRGen
+    swiftMigrator
     swiftOption
     swiftPrintAsClang
     swiftSerialization
