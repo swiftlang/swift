@@ -266,6 +266,7 @@ static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     break;
   }
 
@@ -366,6 +367,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   switch (SF.Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
@@ -406,6 +408,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
 
   switch (SF.Kind) {
   case SourceFileKind::Library:
+  case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
     DerivativeFinder finder;
     SF.walkContext(finder);

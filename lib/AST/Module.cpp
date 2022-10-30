@@ -514,6 +514,123 @@ void ModuleDecl::addFile(FileUnit &newFile) {
   clearLookupCache();
 }
 
+void ModuleDecl::addAuxiliaryFile(SourceFile &sourceFile) {
+  AuxiliaryFiles.push_back(&sourceFile);
+}
+
+namespace {
+  /// Compare the source location ranges for two files, as an ordering to
+  /// use for fast searches.
+  struct SourceFileRangeComparison {
+    SourceManager *sourceMgr;
+
+    bool operator()(SourceFile *lhs, SourceFile *rhs) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getStart().getOpaquePointerValue(),
+          (const char *)rhsRange.getStart().getOpaquePointerValue());
+    }
+
+    bool operator()(SourceFile *lhs, SourceLoc rhsLoc) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(*lhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
+          (const char *)rhsLoc.getOpaquePointerValue());
+    }
+
+    bool operator()(SourceLoc lhsLoc, SourceFile *rhs) const {
+      auto rhsRange = sourceMgr->getRangeForBuffer(*rhs->getBufferID());
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsLoc.getOpaquePointerValue(),
+          (const char *)rhsRange.getEnd().getOpaquePointerValue());
+    }
+  };
+}
+
+class swift::ModuleSourceFileLocationMap {
+public:
+  unsigned numFiles = 0;
+  unsigned numAuxiliaryFiles = 0;
+  std::vector<SourceFile *> allSourceFiles;
+};
+
+void ModuleDecl::updateSourceFileLocationMap() {
+  // Allocate a source file location map, if we don't have one already.
+  if (!sourceFileLocationMap) {
+    ASTContext &ctx = getASTContext();
+    sourceFileLocationMap = ctx.Allocate<ModuleSourceFileLocationMap>();
+    ctx.addCleanup([sourceFileLocationMap=sourceFileLocationMap]() {
+      sourceFileLocationMap->~ModuleSourceFileLocationMap();
+    });
+  }
+
+  // If we are up-to-date, there's nothing to do.
+  if (sourceFileLocationMap->numFiles == getFiles().size() &&
+      sourceFileLocationMap->numAuxiliaryFiles ==
+          AuxiliaryFiles.size())
+    return;
+
+  // Rebuild the range structure.
+  sourceFileLocationMap->allSourceFiles.clear();
+
+  // First, add all of the source files with a backing buffer.
+  for (auto *fileUnit : getFiles()) {
+    if (auto sourceFile = dyn_cast<SourceFile>(fileUnit)) {
+      if (sourceFile->getBufferID())
+        sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+    }
+  }
+
+  // Next, add all of the macro expansion files.
+  for (auto *sourceFile : AuxiliaryFiles)
+    sourceFileLocationMap->allSourceFiles.push_back(sourceFile);
+
+  // Finally, sort them all so we can do a binary search for lookup.
+  std::sort(sourceFileLocationMap->allSourceFiles.begin(),
+            sourceFileLocationMap->allSourceFiles.end(),
+            SourceFileRangeComparison{&getASTContext().SourceMgr});
+}
+
+SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
+  if (loc.isInvalid())
+    return nullptr;
+
+  SourceLoc adjustedLoc = loc;
+
+  // Check whether this location is in a "replaced" range, in which case
+  // we want to use the original source file.
+  auto &sourceMgr = getASTContext().SourceMgr;
+  for (const auto &pair : sourceMgr.getReplacedRanges()) {
+    if (sourceMgr.rangeContainsTokenLoc(pair.second, loc)) {
+      adjustedLoc = pair.first.Start;
+      break;
+    }
+  }
+  updateSourceFileLocationMap();
+
+  auto found = std::lower_bound(sourceFileLocationMap->allSourceFiles.begin(),
+                                sourceFileLocationMap->allSourceFiles.end(),
+                                adjustedLoc,
+                                SourceFileRangeComparison{&sourceMgr});
+  if (found == sourceFileLocationMap->allSourceFiles.end())
+    return nullptr;
+
+  auto foundSourceFile = *found;
+  auto foundRange = sourceMgr.getRangeForBuffer(*foundSourceFile->getBufferID());
+  if (!foundRange.contains(adjustedLoc))
+    return nullptr;
+
+
+  return foundSourceFile;
+}
+
 ArrayRef<SourceFile *>
 PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
@@ -745,6 +862,14 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   auto &cache = getCache();
   cache.populateMemberCache(*this);
   cache.lookupClassMembers(accessPath, consumer);
+}
+
+SourceFile *SourceFile::getEnclosingSourceFile() const {
+  if (Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+
+  auto sourceLoc = macroExpansion.getStartLoc();
+  return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -3075,19 +3200,26 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ParsingOptions parsingOpts, bool isPrimary)
+                       ParsingOptions parsingOpts, bool isPrimary,
+                       ASTNode macroExpansion)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
+      ParsingOpts(parsingOpts), IsPrimary(isPrimary),
+      macroExpansion(macroExpansion), Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
   assert(!IsPrimary || M.isMainModule() &&
          "A primary cannot appear outside the main module");
+  assert(macroExpansion.isNull() == (K != SourceFileKind::MacroExpansion) &&
+         "Macro expansions always need an expansion node");
 
   if (isScriptMode()) {
     bool problem = M.registerEntryPointFile(this, SourceLoc(), None);
     assert(!problem && "multiple main files?");
     (void)problem;
   }
+
+  if (Kind == SourceFileKind::MacroExpansion)
+    M.addAuxiliaryFile(*this);
 }
 
 SourceFile::ParsingOptions

@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCEFILE_H
 #define SWIFT_AST_SOURCEFILE_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
@@ -195,6 +196,15 @@ private:
   friend ASTContext;
 
 public:
+  /// For source files created to hold the source code created by expanding
+  /// a macro, this is the AST node that describes the macro expansion.
+  ///
+  /// The source location of this AST node is the place in the source that
+  /// triggered the creation of the macro expansion whose resulting source
+  /// code is in this source file. This field is only valid when
+  /// the \c SourceFileKind is \c MacroExpansion.
+  const ASTNode macroExpansion;
+
   /// Appends the given declaration to the end of the top-level decls list. Do
   /// not add any additional uses of this function.
   void addTopLevelDecl(Decl *d) {
@@ -326,7 +336,8 @@ public:
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ParsingOptions parsingOpts = {}, bool isPrimary = false);
+             ParsingOptions parsingOpts = {}, bool isPrimary = false,
+             ASTNode macroExpansion = ASTNode());
 
   ~SourceFile();
 
@@ -487,6 +498,11 @@ public:
     return BufferID;
   }
 
+  /// When this source file is enclosed within another source file, for example
+  /// because it describes a macro expansion, return the source file it was
+  /// enclosed in.
+  SourceFile *getEnclosingSourceFile() const;
+
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
@@ -545,6 +561,7 @@ public:
     case SourceFileKind::Library:
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
+    case SourceFileKind::MacroExpansion:
       return false;
     }
     llvm_unreachable("bad SourceFileKind");

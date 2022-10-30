@@ -73,6 +73,8 @@ StructDecl *MacroContextRequest::evaluate(Evaluator &evaluator,
       sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroSourceFile = new (ctx) SourceFile(
       *mod, SourceFileKind::Library, macroBufferID);
+  mod->addAuxiliaryFile(*macroSourceFile);
+
   // Make sure implicit imports are resolved in this file.
   performImportResolution(*macroSourceFile);
 
@@ -179,10 +181,11 @@ Expr *swift::expandMacroExpr(
       llvm::MemoryBuffer::getMemBuffer(evaluatedSource, bufferName);
   unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
 
-  // Create a source file to hold the macro buffer.
-  // FIXME: Seems like we should record this somewhere?
+  // Create a source file to hold the macro buffer. This is automatically
+  // registered with the enclosing module.
   auto macroSourceFile = new (ctx) SourceFile(
-      *dc->getParentModule(), SourceFileKind::Library, macroBufferID);
+      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
+      /*parsingOpts=*/{}, /*isPrimary=*/false, expr);
 
   // Parse the expression.
   Parser parser(macroBufferID, *macroSourceFile, &ctx.Diags, nullptr, nullptr);

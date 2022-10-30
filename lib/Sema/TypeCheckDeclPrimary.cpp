@@ -1539,6 +1539,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
       break;
     }
   }
@@ -2185,6 +2186,7 @@ public:
             return;
           case SourceFileKind::Main:
           case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
             break;
           }
 
@@ -2205,6 +2207,7 @@ public:
           case SourceFileKind::SIL:
             return;
           case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
             break;
           }
 
@@ -2894,6 +2897,7 @@ public:
         return false;
       case SourceFileKind::Library:
       case SourceFileKind::Main:
+      case SourceFileKind::MacroExpansion:
         break;
       }
     }
