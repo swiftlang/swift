@@ -75,7 +75,7 @@ extension ASTGenVisitor {
     let isLet = node.letOrVarKeyword.tokenKind == .letKeyword
 
     // TODO: don't drop "initializer" on the floor.
-    return .decl(SwiftVarDecl_create(ctx, nil, loc, isStateic, isLet, declContext))
+    return .decl(SwiftVarDecl_create(ctx, pattern, loc, isStateic, isLet, declContext))
   }
 
   public func visit(_ node: FunctionParameterSyntax) -> ASTNode {

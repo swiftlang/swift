@@ -141,9 +141,10 @@ void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
 void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
                           void *loc, bool isStatic, bool isLet, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto name = (UnresolvedDeclRefExpr *)nameId;
   return new (Context) VarDecl(
       isStatic, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-      getSourceLocFromPointer(loc), Identifier::getFromOpaquePointer(nameId),
+      getSourceLocFromPointer(loc), name->getName().getBaseIdentifier(),
       reinterpret_cast<DeclContext *>(dc));
 }
 
