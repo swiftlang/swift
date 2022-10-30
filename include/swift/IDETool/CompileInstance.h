@@ -24,7 +24,6 @@
 namespace swift {
 
 class CompilerInstance;
-class CompilerInvocation;
 class DiagnosticConsumer;
 
 namespace ide {

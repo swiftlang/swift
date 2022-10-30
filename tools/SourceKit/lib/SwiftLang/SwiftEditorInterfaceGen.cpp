@@ -21,7 +21,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/SyntaxModel.h"
-#include "swift/IDE/Utils.h"
+#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 
