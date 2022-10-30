@@ -128,8 +128,13 @@ void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable name,
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, void *_Nullable elseLoc,
                     void *_Nullable elseStmt);
 
-void *BraceStmt_createExpr(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
-void *BraceStmt_createStmt(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
+struct ASTNodeBridged {
+  void *ptr;
+  _Bool isExpr; // Must be expr or stmt.
+};
+
+void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
+void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc);
 
 void *BridgedSourceLoc_advanced(void *loc, long len);
 

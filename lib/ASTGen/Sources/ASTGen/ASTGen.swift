@@ -35,6 +35,17 @@ enum ASTNode {
       return ptr
     }
   }
+  
+  func bridged() -> ASTNodeBridged {
+    switch self {
+    case .expr(let e):
+      return ASTNodeBridged(ptr: e, isExpr: true)
+    case .stmt(let s):
+      return ASTNodeBridged(ptr: s, isExpr: false)
+    default:
+      fatalError("Must be expr or stmt.")
+    }
+  }
 }
 
 /// Little utility wrapper that lets us have some mutable state within

@@ -5,11 +5,11 @@ import CASTBridging
 
 extension ASTGenVisitor {
   public func visit(_ node: CodeBlockSyntax) -> ASTNode {
-    let statements = node.statements.map(self.visit)
+    let statements = node.statements.map(self.visit).map { $0.bridged() }
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
 
     return .stmt(statements.withBridgedArrayRef { ref in
-      BraceStmt_createStmt(ctx, loc, ref, loc)
+      BraceStmt_create(ctx, loc, ref, loc)
     })
   }
 
