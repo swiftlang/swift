@@ -186,6 +186,8 @@ void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
                        void *_Nullable type,
                        void *declContext) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  if (!paramName)
+    paramName = argName;
   auto paramDecl = new (Context) ParamDecl(
       getSourceLocFromPointer(loc), getSourceLocFromPointer(argLoc),
       Identifier::getFromOpaquePointer(argName),
