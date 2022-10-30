@@ -1,16 +1,18 @@
+import CASTBridging
 import SwiftParser
 import SwiftSyntax
-
-import CASTBridging
 
 extension ASTGenVisitor {
   func visit(_ node: GenericParameterClauseSyntax) -> ASTNode {
     let lAngleLoc = self.base.advanced(by: node.leftAngleBracket.position.utf8Offset).raw
-    let whereLoc = node.genericWhereClause.map { self.base.advanced(by: $0.whereKeyword.position.utf8Offset).raw }
+    let whereLoc = node.genericWhereClause.map {
+      self.base.advanced(by: $0.whereKeyword.position.utf8Offset).raw
+    }
     let rAngleLoc = self.base.advanced(by: node.rightAngleBracket.position.utf8Offset).raw
-    return .decl(self.withBridgedParametersAndRequirements(node) { params, reqs in
-      return GenericParamList_create(self.ctx, lAngleLoc, params, whereLoc, reqs, rAngleLoc)
-    })
+    return .decl(
+      self.withBridgedParametersAndRequirements(node) { params, reqs in
+        return GenericParamList_create(self.ctx, lAngleLoc, params, whereLoc, reqs, rAngleLoc)
+      })
   }
 
   func visit(_ node: GenericParameterSyntax) -> ASTNode {
@@ -21,7 +23,10 @@ extension ASTGenVisitor {
     let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
     let ellipsisLoc = node.ellipsis.map { self.base.advanced(by: $0.position.utf8Offset).raw }
 
-    return .decl(GenericTypeParamDecl_create(self.ctx, self.declContext, name, nameLoc, ellipsisLoc, node.indexInParent / 2, ellipsisLoc != nil))
+    return .decl(
+      GenericTypeParamDecl_create(
+        self.ctx, self.declContext, name, nameLoc, ellipsisLoc, node.indexInParent / 2,
+        ellipsisLoc != nil))
   }
 }
 
@@ -41,7 +46,7 @@ extension ASTGenVisitor {
       }
 
       let loweredRequirement = self.visit(requirement)
-      GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredRequirement.rawValue);
+      GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredRequirement.rawValue)
     }
 
     if let nodeRequirements = node.genericWhereClause?.requirementList {
@@ -51,20 +56,22 @@ extension ASTGenVisitor {
           let firstType = self.visit(conformance.leftTypeIdentifier).rawValue
           let separatorLoc = self.base.advanced(by: conformance.colon.position.utf8Offset).raw
           let secondType = self.visit(conformance.rightTypeIdentifier).rawValue
-          requirements.append(BridgedRequirementRepr(
-            SeparatorLoc: separatorLoc,
-            Kind: .typeConstraint,
-            FirstType: firstType,
-            SecondType: secondType))
+          requirements.append(
+            BridgedRequirementRepr(
+              SeparatorLoc: separatorLoc,
+              Kind: .typeConstraint,
+              FirstType: firstType,
+              SecondType: secondType))
         case .sameTypeRequirement(let sameType):
           let firstType = self.visit(sameType.leftTypeIdentifier).rawValue
           let separatorLoc = self.base.advanced(by: sameType.equalityToken.position.utf8Offset).raw
           let secondType = self.visit(sameType.rightTypeIdentifier).rawValue
-          requirements.append(BridgedRequirementRepr(
-            SeparatorLoc: separatorLoc,
-            Kind: .sameType,
-            FirstType: firstType,
-            SecondType: secondType))
+          requirements.append(
+            BridgedRequirementRepr(
+              SeparatorLoc: separatorLoc,
+              Kind: .sameType,
+              FirstType: firstType,
+              SecondType: secondType))
         case .layoutRequirement(_):
           fatalError("Cannot handle layout requirements!")
         }

@@ -1,7 +1,6 @@
+import CASTBridging
 import SwiftParser
 import SwiftSyntax
-
-import CASTBridging
 
 extension ASTGenVisitor {
   public func visit(_ node: TypealiasDeclSyntax) -> ASTNode {
@@ -13,7 +12,8 @@ extension ASTGenVisitor {
     }
     let nameLoc = self.base.advanced(by: node.identifier.position.utf8Offset).raw
     let genericParams = node.genericParameterClause.map(self.visit).map { $0.rawValue }
-    let out = TypeAliasDecl_create(self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, genericParams)
+    let out = TypeAliasDecl_create(
+      self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, genericParams)
 
     let oldDeclContext = declContext
     declContext = out.declContext
@@ -43,10 +43,10 @@ extension ASTGenVisitor {
     node.members.members.map(self.visit).withBridgedArrayRef { ref in
       NominalTypeDecl_setMembers(out.nominalDecl, ref)
     }
-    
+
     return .decl(out.decl)
   }
-  
+
   public func visit(_ node: ClassDeclSyntax) -> ASTNode {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var nameText = node.identifier.text
@@ -62,16 +62,16 @@ extension ASTGenVisitor {
     node.members.members.map(self.visit).withBridgedArrayRef { ref in
       NominalTypeDecl_setMembers(out.nominalDecl, ref)
     }
-    
+
     return .decl(out.decl)
   }
-  
+
   public func visit(_ node: VariableDeclSyntax) -> ASTNode {
     let pattern = visit(node.bindings.first!.pattern).rawValue
     let initializer = visit(node.bindings.first!.initializer!).rawValue
-    
+
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    let isStateic = false // TODO: compute this
+    let isStateic = false  // TODO: compute this
     let isLet = node.letOrVarKeyword.tokenKind == .letKeyword
 
     // TODO: don't drop "initializer" on the floor.
@@ -80,10 +80,10 @@ extension ASTGenVisitor {
 
   public func visit(_ node: FunctionParameterSyntax) -> ASTNode {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    
+
     let firstName: UnsafeMutableRawPointer?
     let secondName: UnsafeMutableRawPointer?
-    
+
     if let nodeFirstName = node.firstName {
       var text = nodeFirstName.text
       firstName = text.withUTF8 { buf in
@@ -92,7 +92,7 @@ extension ASTGenVisitor {
     } else {
       firstName = nil
     }
-    
+
     if let nodeSecondName = node.secondName {
       var text = nodeSecondName.text
       secondName = text.withUTF8 { buf in
@@ -101,18 +101,18 @@ extension ASTGenVisitor {
     } else {
       secondName = nil
     }
-    
+
     return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, declContext))
   }
 
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    
+
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
     }
-    
+
     let body: ASTNode?
     if let nodeBody = node.body {
       body = visit(nodeBody)
@@ -126,10 +126,13 @@ extension ASTGenVisitor {
     } else {
       returnType = nil
     }
-    
+
     let params = node.signature.input.parameterList.map { visit($0) }
-    return .decl(params.withBridgedArrayRef { ref in
-      FuncDecl_create(ctx, loc, false, loc, name, loc, false, nil, false, nil, loc, ref, loc, body?.rawValue, returnType?.rawValue, declContext)
-    })
+    return .decl(
+      params.withBridgedArrayRef { ref in
+        FuncDecl_create(
+          ctx, loc, false, loc, name, loc, false, nil, false, nil, loc, ref, loc, body?.rawValue,
+          returnType?.rawValue, declContext)
+      })
   }
 }

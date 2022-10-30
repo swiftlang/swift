@@ -29,9 +29,10 @@ public func parseSourceFile(
   let sourceFile = Parser.parse(source: buffer)
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
-  exportedPtr.initialize(to: .init(
-    buffer: buffer, moduleName: String(cString: moduleName),
-    fileName: String(cString: filename), syntax: sourceFile)
+  exportedPtr.initialize(
+    to: .init(
+      buffer: buffer, moduleName: String(cString: moduleName),
+      fileName: String(cString: filename), syntax: sourceFile)
   )
 
   return UnsafeRawPointer(exportedPtr)

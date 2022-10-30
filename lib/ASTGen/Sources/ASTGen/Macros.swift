@@ -120,7 +120,6 @@ public func getMacroEvaluationContext(
   }
 }
 
-
 @_cdecl("swift_ASTGen_evaluateMacro")
 public func evaluateMacro(
   sourceFilePtr: UnsafePointer<UInt8>,
@@ -155,7 +154,8 @@ public func evaluateMacro(
     }
 
     guard let parentSyntax = token.parent,
-          parentSyntax.is(MacroExpansionExprSyntax.self) else {
+      parentSyntax.is(MacroExpansionExprSyntax.self)
+    else {
       print("not on a macro expansion node: \(token.recursiveDescription)")
       return -1
     }

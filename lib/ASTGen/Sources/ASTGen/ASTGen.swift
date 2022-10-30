@@ -1,7 +1,6 @@
+import CASTBridging
 import SwiftParser
 import SwiftSyntax
-
-import CASTBridging
 
 extension Array {
   public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
@@ -22,7 +21,7 @@ enum ASTNode {
   case stmt(UnsafeMutableRawPointer)
   case expr(UnsafeMutableRawPointer)
   case type(UnsafeMutableRawPointer)
-  
+
   var rawValue: UnsafeMutableRawPointer {
     switch self {
     case .decl(let ptr):
@@ -35,7 +34,7 @@ enum ASTNode {
       return ptr
     }
   }
-  
+
   func bridged() -> ASTNodeBridged {
     switch self {
     case .expr(let e):
@@ -61,17 +60,17 @@ class Boxed<Value> {
 
 struct ASTGenVisitor: SyntaxTransformVisitor {
   typealias ResultType = ASTNode
-  
+
   let ctx: UnsafeMutableRawPointer
   let base: UnsafePointer<UInt8>
 
   @Boxed var declContext: UnsafeMutableRawPointer
 
   // TODO: this some how messes up the witness table when I uncomment it locally :/
-//  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
-//    if let node = node { return visit(node) }
-//    return nil
-//  }
+  //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
+  //    if let node = node { return visit(node) }
+  //    return nil
+  //  }
 
   @_disfavoredOverload
   public func visit(_ node: SourceFileSyntax) -> ASTNode {

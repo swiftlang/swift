@@ -1,7 +1,6 @@
+import CASTBridging
 import SwiftParser
 import SwiftSyntax
-
-import CASTBridging
 
 extension ASTGenVisitor {
   public func visit(_ node: SimpleTypeIdentifierSyntax) -> ASTNode {
@@ -38,17 +37,20 @@ extension ASTGenVisitor {
       if let generics = generics {
         let lAngle = self.base.advanced(by: generics.leftAngleBracket.position.utf8Offset).raw
         let rAngle = self.base.advanced(by: generics.rightAngleBracket.position.utf8Offset).raw
-        elements.append(generics.arguments.map({ self.visit($0.argumentType) }).withBridgedArrayRef { genericArgs in
-          GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
-        })
+        elements.append(
+          generics.arguments.map({ self.visit($0.argumentType) }).withBridgedArrayRef {
+            genericArgs in
+            GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
+          })
       } else {
         elements.append(SimpleIdentTypeRepr_create(self.ctx, nameLoc, name))
       }
     }
 
-    return .type(elements.withBridgedArrayRef { elements in
-      return IdentTypeRepr_create(self.ctx, elements)
-    })
+    return .type(
+      elements.withBridgedArrayRef { elements in
+        return IdentTypeRepr_create(self.ctx, elements)
+      })
   }
 
   public func visit(_ node: ArrayTypeSyntax) -> ASTNode {
@@ -64,7 +66,8 @@ extension ASTGenVisitor {
     let colonLoc = self.base.advanced(by: node.colon.position.utf8Offset).raw
     let lSquareLoc = self.base.advanced(by: node.leftSquareBracket.position.utf8Offset).raw
     let rSquareLoc = self.base.advanced(by: node.rightSquareBracket.position.utf8Offset).raw
-    return .type(DictionaryTypeRepr_create(self.ctx, keyType, valueType, colonLoc, lSquareLoc, rSquareLoc))
+    return .type(
+      DictionaryTypeRepr_create(self.ctx, keyType, valueType, colonLoc, lSquareLoc, rSquareLoc))
   }
 
   public func visit(_ node: MetatypeTypeSyntax) -> ASTNode {
@@ -108,18 +111,21 @@ extension ASTGenVisitor {
     assert(node.elements.count > 1)
     let types = node.elements.map { visit($0.type) }.map { $0.rawValue }
     let firstTypeLoc = self.base.advanced(by: node.elements.first!.type.position.utf8Offset).raw
-    return .type(types.withBridgedArrayRef { types in
-      return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc)
-    })
+    return .type(
+      types.withBridgedArrayRef { types in
+        return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc)
+      })
   }
-  
+
   public func visit(_ node: FunctionTypeSyntax) -> ASTNode {
     return self.withBridgedTupleElements(node.arguments) { elements in
       let lParenLoc = self.base.advanced(by: node.leftParen.position.utf8Offset).raw
       let rParenLoc = self.base.advanced(by: node.rightParen.position.utf8Offset).raw
       let args = TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc)
       let asyncLoc = node.asyncKeyword.map { self.base.advanced(by: $0.position.utf8Offset).raw }
-      let throwsLoc = node.throwsOrRethrowsKeyword.map { self.base.advanced(by: $0.position.utf8Offset).raw }
+      let throwsLoc = node.throwsOrRethrowsKeyword.map {
+        self.base.advanced(by: $0.position.utf8Offset).raw
+      }
       let arrowLoc = self.base.advanced(by: node.arrow.position.utf8Offset).raw
       let retTy = visit(node.returnType).rawValue
       return .type(FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy))
@@ -164,20 +170,25 @@ extension ASTGenVisitor {
       let secondName = secondNameText?.withUTF8 { buf in
         return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
       }
-      let secondNameLoc = element.secondName.map { self.base.advanced(by: $0.position.utf8Offset).raw }
+      let secondNameLoc = element.secondName.map {
+        self.base.advanced(by: $0.position.utf8Offset).raw
+      }
       let colonLoc = element.colon.map { self.base.advanced(by: $0.position.utf8Offset).raw }
       let type = visit(element.type).rawValue
-      let trailingCommaLoc = element.trailingComma.map { self.base.advanced(by: $0.position.utf8Offset).raw }
+      let trailingCommaLoc = element.trailingComma.map {
+        self.base.advanced(by: $0.position.utf8Offset).raw
+      }
 
-      elements.append(BridgedTupleTypeElement(
-        Name: name,
-        NameLoc: nameLoc,
-        SecondName: secondName,
-        SecondNameLoc: secondNameLoc,
-        UnderscoreLoc: nil, /*N.B. Only important for SIL*/
-        ColonLoc: colonLoc,
-        Type: type,
-        TrailingCommaLoc: trailingCommaLoc))
+      elements.append(
+        BridgedTupleTypeElement(
+          Name: name,
+          NameLoc: nameLoc,
+          SecondName: secondName,
+          SecondNameLoc: secondNameLoc,
+          UnderscoreLoc: nil, /*N.B. Only important for SIL*/
+          ColonLoc: colonLoc,
+          Type: type,
+          TrailingCommaLoc: trailingCommaLoc))
     }
     return elements.withBridgedArrayRef { elements in
       return action(elements)
