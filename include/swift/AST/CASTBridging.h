@@ -125,6 +125,7 @@ void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
 void *SwiftBooleanLiteralExpr_create(void *ctx, _Bool value, void *TokenLoc);
 
 void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable name,
+                          void *initExpr,
                           void *loc, _Bool isStatic, _Bool isLet, void *dc);
 
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then,

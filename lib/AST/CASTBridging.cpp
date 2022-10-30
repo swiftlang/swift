@@ -6,6 +6,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -139,12 +140,19 @@ void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
 }
 
 void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
+                          void *initExpr,
                           void *loc, bool isStatic, bool isLet, void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto name = (UnresolvedDeclRefExpr *)nameId;
-  return new (Context) VarDecl(
+  auto sourceLoc = getSourceLocFromPointer(loc);
+  auto varDecl = new (Context) VarDecl(
       isStatic, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-      getSourceLocFromPointer(loc), name->getName().getBaseIdentifier(),
+      sourceLoc, name->getName().getBaseIdentifier(),
+      reinterpret_cast<DeclContext *>(dc));
+  auto pattern = NamedPattern::createImplicit(Context, varDecl);
+  return PatternBindingDecl::create(Context, sourceLoc,
+      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
+      sourceLoc, pattern, sourceLoc, (Expr *)initExpr,
       reinterpret_cast<DeclContext *>(dc));
 }
 
