@@ -116,6 +116,7 @@ public func getMacroEvaluationContext(
   contextPtr.pointee = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
     return ASTGenVisitor(ctx: context, base: sourceFilePtr, declContext: declContext)
       .visit(StructDeclSyntax(stringLiteral: macro.pointee.evaluationContext))
+      .rawValue
   }
 }
 
