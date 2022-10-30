@@ -26,4 +26,17 @@ extension ASTGenVisitor {
     
     return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, nil, nil))
   }
+
+  public func visit(_ node: ReturnStmtSyntax) -> ASTNode {
+    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+
+    let expr: ASTNode?
+    if let expression = node.expression {
+      expr = visit(expression)
+    } else {
+      expr = nil
+    }
+
+    return .stmt(ReturnStmt_create(ctx, loc, expr?.rawValue))
+  }
 }

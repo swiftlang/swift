@@ -105,6 +105,9 @@ void *SwiftTopLevelCodeDecl_createStmt(void *ctx, void *DC, void *startLoc,
 void *SwiftTopLevelCodeDecl_createExpr(void *ctx, void *DC, void *startLoc,
                                        void *element, void *endLoc);
 
+void *ReturnStmt_create(void *ctx, void *loc, void *_Nullable expr);
+
+
 void *SwiftSequenceExpr_create(void *ctx, BridgedArrayRef exprs);
 
 void *SwiftTupleExpr_create(void *ctx, void *lparen, BridgedArrayRef subs,
