@@ -83,6 +83,7 @@ extension ASTGenVisitor {
 
     let firstName: UnsafeMutableRawPointer?
     let secondName: UnsafeMutableRawPointer?
+    let type: UnsafeMutableRawPointer?
 
     if let nodeFirstName = node.firstName {
       var text = nodeFirstName.text
@@ -101,8 +102,14 @@ extension ASTGenVisitor {
     } else {
       secondName = nil
     }
+    
+    if let typeSyntax = node.type {
+      type = visit(typeSyntax).rawValue
+    } else {
+      type = nil
+    }
 
-    return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, declContext))
+    return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, type, declContext))
   }
 
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {

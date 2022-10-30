@@ -183,13 +183,16 @@ void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
                        BridgedIdentifier _Nullable argName,
                        void *_Nullable paramLoc,
                        BridgedIdentifier _Nullable paramName,
+                       void *_Nullable type,
                        void *declContext) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) ParamDecl(
+  auto paramDecl = new (Context) ParamDecl(
       getSourceLocFromPointer(loc), getSourceLocFromPointer(argLoc),
       Identifier::getFromOpaquePointer(argName),
       getSourceLocFromPointer(paramLoc),
       Identifier::getFromOpaquePointer(paramName), (DeclContext *)declContext);
+  paramDecl->setTypeRepr((TypeRepr *)type);
+  return paramDecl;
 }
 
 void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,

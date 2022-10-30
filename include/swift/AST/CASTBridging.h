@@ -144,7 +144,8 @@ void *BridgedSourceLoc_advanced(void *loc, long len);
 
 void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
                        void *_Nullable argName, void *_Nullable paramLoc,
-                       void *_Nullable paramName, void *declContext);
+                       void *_Nullable paramName, void *_Nullable type,
+                       void *declContext);
 
 void *FuncDecl_create(void *ctx, void *staticLoc, _Bool isStatic, void *funcLoc,
                       BridgedIdentifier name, void *nameLoc, _Bool isAsync,
