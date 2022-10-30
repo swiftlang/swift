@@ -164,12 +164,16 @@ void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
                        void *rbloc) {
   llvm::SmallVector<ASTNode, 6> nodes;
   for (auto node : getArrayRef<ASTNodeBridged>(elements)) {
-    if (node.isExpr) {
+    if (node.kind == ASTNodeKindExpr) {
       auto expr = (Expr *)node.ptr;
       nodes.push_back(expr);
-    } else {
+    } else if (node.kind == ASTNodeKindStmt) {
       auto stmt = (Stmt *)node.ptr;
       nodes.push_back(stmt);
+    } else {
+      assert(node.kind == ASTNodeKindDecl);
+      auto decl = (Decl *)node.ptr;
+      nodes.push_back(decl);
     }
   }
 

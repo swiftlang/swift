@@ -130,9 +130,15 @@ void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable name,
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then,
                     void *_Nullable elseLoc, void *_Nullable elseStmt);
 
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : long {
+  ASTNodeKindExpr,
+  ASTNodeKindStmt,
+  ASTNodeKindDecl
+} ASTNodeKind;
+
 struct ASTNodeBridged {
   void *ptr;
-  _Bool isExpr; // Must be expr or stmt.
+  ASTNodeKind kind;
 };
 
 void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
