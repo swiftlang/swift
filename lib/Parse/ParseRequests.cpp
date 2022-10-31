@@ -26,7 +26,7 @@
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 
-#ifdef SWIFT_SWIFT_PARSER
+#if SWIFT_SWIFT_PARSER
 #include "SwiftCompilerSupport.h"
 #endif
 
@@ -193,7 +193,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
   if (auto tokens = parser.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
-#ifdef SWIFT_SWIFT_PARSER
+#if SWIFT_SWIFT_PARSER
   if ((ctx.LangOpts.hasFeature(Feature::ParserRoundTrip) ||
        ctx.LangOpts.hasFeature(Feature::ParserValidation)) &&
       ctx.SourceMgr.getCodeCompletionBufferID() != bufferID &&

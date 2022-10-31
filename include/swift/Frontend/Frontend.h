@@ -192,6 +192,14 @@ public:
     return SearchPathOpts.getFrameworkSearchPaths();
   }
 
+  void setCompilerPluginLibraryPaths(const std::vector<std::string> &Paths) {
+    SearchPathOpts.setCompilerPluginLibraryPaths(Paths);
+  }
+
+  ArrayRef<std::string> getCompilerPluginLibraryPaths() {
+    return SearchPathOpts.getCompilerPluginLibraryPaths();
+  }
+
   void setExtraClangArgs(const std::vector<std::string> &Args) {
     ClangImporterOpts.ExtraArgs = Args;
   }
