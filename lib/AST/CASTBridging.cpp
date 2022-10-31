@@ -220,12 +220,12 @@ void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
   return paramDecl;
 }
 
-void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
+struct FuncDeclBridged FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
                       BridgedIdentifier name, void *nameLoc, bool isAsync,
                       void *_Nullable asyncLoc, bool throws,
                       void *_Nullable throwsLoc, void *paramLLoc,
                       BridgedArrayRef params, void *paramRLoc,
-                      void *_Nullable body, void *_Nullable returnType,
+                      void *_Nullable returnType,
                       void *declContext) {
   auto *paramList = ParameterList::create(
       *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(paramLLoc),
@@ -240,9 +240,12 @@ void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
       getSourceLocFromPointer(asyncLoc), throws,
       getSourceLocFromPointer(throwsLoc), nullptr, paramList,
       (TypeRepr *)returnType, (DeclContext *)declContext);
-  out->setBody((BraceStmt *)body, FuncDecl::BodyKind::Parsed);
 
-  return static_cast<Decl *>(out);
+  return {static_cast<DeclContext *>(out), static_cast<FuncDecl *>(out), static_cast<Decl *>(out)};
+}
+
+void FuncDecl_setBody(void *fn, void *body) {
+  ((FuncDecl *)fn)->setBody((BraceStmt *)body, FuncDecl::BodyKind::Parsed);
 }
 
 void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id) {
