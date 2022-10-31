@@ -33,6 +33,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -2490,6 +2491,8 @@ public:
       }
     }
 
+    diagnoseCopyableTypeContainingMoveOnlyType(ED);
+
     checkExplicitAvailability(ED);
 
     TypeChecker::checkDeclCircularity(ED);
@@ -2512,8 +2515,9 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    for (Decl *Member : SD->getMembers())
+    for (Decl *Member : SD->getMembers()) {
       visit(Member);
+    }
 
     TypeChecker::checkPatternBindingCaptures(SD);
 
@@ -2527,6 +2531,10 @@ public:
     TypeChecker::checkDeclCircularity(SD);
 
     TypeChecker::checkConformancesInContext(SD);
+
+    // If this struct is not move only, check that all vardecls of nominal type
+    // are not move only.
+    diagnoseCopyableTypeContainingMoveOnlyType(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.

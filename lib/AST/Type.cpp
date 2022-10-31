@@ -165,6 +165,12 @@ bool TypeBase::isAny() {
   return constraint->isEqual(getASTContext().TheAnyType);
 }
 
+bool TypeBase::isPureMoveOnly() const {
+  if (auto *nom = getCanonicalType()->getNominalOrBoundGenericNominal())
+    return nom->isMoveOnly();
+  return false;
+}
+
 bool TypeBase::isPlaceholder() {
   return is<PlaceholderType>();
 }
