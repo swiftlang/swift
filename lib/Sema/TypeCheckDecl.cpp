@@ -1143,7 +1143,9 @@ static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
     }
 
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
-      APInt nextVal = intLit->getRawValue().sextOrSelf(128) + 1;
+      APInt raw = intLit->getRawValue();
+      APInt sext = (raw.getBitWidth() < 128 ? raw.sext(128) : raw);
+      APInt nextVal = sext + 1;
       bool negative = nextVal.slt(0);
       if (negative)
         nextVal = -nextVal;
