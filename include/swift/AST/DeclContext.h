@@ -251,7 +251,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
   friend class AbstractClosureExpr; // uses setParent
   
   template<class A, class B, class C>
-  friend struct ::llvm::cast_convert_val;
+  friend struct ::llvm::CastInfo;
   
   // See swift/AST/Decl.h
   static DeclContext *castDeclToDeclContext(const Decl *D);
@@ -762,7 +762,7 @@ class IterableDeclContext {
   unsigned HasNestedClassDeclarations : 1;
 
   template<class A, class B, class C>
-  friend struct ::llvm::cast_convert_val;
+  friend struct ::llvm::CastInfo;
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
 
@@ -952,16 +952,26 @@ SourceLoc extractNearestSourceLoc(const IterableDeclContext *idc);
 
 namespace llvm {
   template<class FromTy>
-  struct cast_convert_val< ::swift::DeclContext, FromTy, FromTy> {
-    static ::swift::DeclContext *doit(const FromTy &Val) {
-      return ::swift::DeclContext::castDeclToDeclContext(Val);
+  struct CastInfo<::swift::DeclContext, FromTy, std::enable_if_t<is_simple_type<FromTy>::value>>
+      : public CastIsPossible<::swift::DeclContext, FromTy>,
+        public DefaultDoCastIfPossible<::swift::DeclContext *, FromTy,
+                                       CastInfo<::swift::DeclContext, FromTy>> {
+    static inline ::swift::DeclContext *castFailed() { return nullptr; }
+
+    static inline ::swift::DeclContext *doCast(const FromTy &val) {
+      return ::swift::DeclContext::castDeclToDeclContext(val);
     }
   };
 
   template<class FromTy>
-  struct cast_convert_val< ::swift::IterableDeclContext, FromTy, FromTy> {
-    static ::swift::IterableDeclContext *doit(const FromTy &Val) {
-      return ::swift::IterableDeclContext::castDeclToIterableDeclContext(Val);
+  struct CastInfo<::swift::IterableDeclContext, FromTy, std::enable_if_t<is_simple_type<FromTy>::value>>
+      : public CastIsPossible<::swift::IterableDeclContext, FromTy>,
+        public DefaultDoCastIfPossible<::swift::IterableDeclContext *, FromTy,
+                                       CastInfo<::swift::IterableDeclContext, FromTy>> {
+    static inline ::swift::IterableDeclContext *castFailed() { return nullptr; }
+
+    static inline ::swift::IterableDeclContext *doCast(const FromTy &val) {
+      return ::swift::IterableDeclContext::castDeclToIterableDeclContext(val);
     }
   };
 }
