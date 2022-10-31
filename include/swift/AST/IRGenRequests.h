@@ -150,6 +150,7 @@ struct IRGenDescriptor {
   StringRef PrivateDiscriminator;
   ArrayRef<std::string> parallelOutputFilenames;
   llvm::GlobalVariable **outModuleHash;
+  llvm::raw_pwrite_stream *out = nullptr;
 
   friend llvm::hash_code hash_value(const IRGenDescriptor &owner) {
     return llvm::hash_combine(owner.Ctx, owner.SymbolsToEmit, owner.SILMod);

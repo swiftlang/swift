@@ -212,7 +212,9 @@ int main(int argc, char **argv) {
   };
 
   auto &eval = CI.getASTContext().evaluator;
-  auto generatedMod = llvm::cantFail(eval(OptimizedIRRequest{getDescriptor()}));
+  auto desc = getDescriptor();
+  desc.out = &outStream;
+  auto generatedMod = llvm::cantFail(eval(OptimizedIRRequest{desc}));
   if (!generatedMod)
     return 1;
 
