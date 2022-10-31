@@ -66,6 +66,7 @@
 // RUN: c-index-test core -print-record %t/idx | %FileCheck -check-prefix=BROKEN-RECORD %s
 // BROKEN-RECORD-NOT: function/Swift | systemFunc()
 
+/// Subsequent builds won't attempt to index the broken swiftinterface again
 // RUN: %target-swift-frontend -typecheck -parse-stdlib \
 // RUN:     -index-system-modules \
 // RUN:     -index-store-path %t/idx \
@@ -77,6 +78,20 @@
 // RUN:     %t/Client.swift \
 // RUN:     2>&1 | %FileCheck -check-prefix=BROKEN-BUILD-2 --allow-empty %s
 // BROKEN-BUILD-2-NOT: indexing system module
+
+/// Local errors should be preserved even when indexing against a broken swiftinterface
+// RUN: %empty-directory(%t/idx)
+// RUN: %empty-directory(%t/modulecache)
+// RUN: not %target-swift-frontend -typecheck -parse-stdlib \
+// RUN:     -index-system-modules \
+// RUN:     -index-store-path %t/idx \
+// RUN:     -index-ignore-stdlib \
+// RUN:     -sdk %t/SDK \
+// RUN:     -Fsystem %t/SDK/Frameworks \
+// RUN:     -module-cache-path %t/modulecache \
+// RUN:     %t/ClientWithError.swift 2> %t/client-with-error.err
+// RUN: cat %t/client-with-error.err | %FileCheck -check-prefix=WITH-ERROR %s
+// WITH-ERROR: cannot convert return expression of type 'U' to return type 'T'
 
 //--- SecretModule.swift
 public struct SecretType {}
@@ -92,3 +107,12 @@ func leakyFunc(_ a: SecretType) { }
 import SystemModule
 
 public func clientFunc() {}
+
+//--- ClientWithError.swift
+
+import SystemModule
+public func clientFunc() {}
+
+struct T {}
+struct U {}
+func f() -> T { return U() }
