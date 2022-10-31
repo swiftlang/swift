@@ -50,7 +50,7 @@ The adherence to Swift’s type and memory safety rules should be prioritized ah
 
 Swift APIs should be mapped over to C++ language features that have a direct correspondence to the Swift language feature. In cases where there isn’t a directly corresponding C++ language feature, the Swift compiler should provide a reasonable approximation to the original Swift language feature using other C++ constructs. For example, Swift’s enum type can contain methods and nested types, and such constructs can’t be represented by a single C++ enum type in an idiomatic manner. Swift’s enum type can be mapped to a C++ class instead that allows both enum-like switch statement behavior and also enables the C++ user to invoke member functions on the Swift enum value and access its nested types from C++.
 
-The C++ representation of certain Swift types should be appropriately enhanced to allow them to be used in an idiomatic manner. For instance, it should be possible to use Swift’s Array type (or any type that conforms to Collection) in a ranged for loop in C++. Such enhancements should be done with safety in mind, to ensure that Swift’s memory model is not violated.
+The C++ representation of certain Swift types should be appropriately enhanced to allow them to be used in an idiomatic manner. For instance, it should be possible to use Swift’s `Array` type (or any type that conforms to `Collection`) in a ranged for loop in C++. Such enhancements should be done with safety in mind, to ensure that Swift’s memory model is not violated.
 
 There should be no differences on the C++ side between using libraries that opt-in into library evolution and libraries that don’t, except in specific required cases, like checking the unknown default case of a resilient enum.
 
