@@ -8,7 +8,7 @@ This document does not cover the “forward” (i.e. using C++ APIs from Swift) 
 
 This document is a prospective feature vision document, as described in the [draft review management guidelines](https://github.com/rjmccall/swift-evolution/blob/057b2383102f34c3d0f5b257f82bba0f5b94683d/review_management.md#future-directions-and-roadmaps) of the Swift evolution process. It has not yet been approved by the Language Workgroup.
 
-## Overview of How Swift Is Bridged to C++
+## Overview of how Swift is bridged to C++
 
 Swift and C++ have different approaches to interoperability with each other. The Swift compiler embeds a copy of the Clang compiler, which is then used to import C and Objective-C declarations into Swift for Objective-C interoperability. Similarly to Objective-C, Swift uses the embedded Clang compiler to import C++ declarations when the user wants to access C++ APIs from Swift. Swift also allows Objective-C code to call into Swift declarations annotated with the @objc attribute. Instead of being embedded into Clang, Swift generates an Objective-C compatibility header that contains the Objective-C declarations that the Swift programmer intended to expose to Objective-C. 
 
@@ -40,7 +40,7 @@ Swift to C++ bridging should be as efficient as possible. The Swift compiler sho
 
 Some Swift features require additional overhead to be used in C++. Resilient value types are a good example of this; C++ expects types to have a statically-known layout, but Swift's resilient value types do not satisfy this, and so the generated C++ types representing those types may need to dynamically allocate memory internally. In cases like these, the C++ interface should at least strive to minimize the dynamic overhead, for example by avoiding allocation for sufficiently small types.
 
-### Achieving Safety With Performance In Mind
+### Achieving safety with performance in mind
 
 Certain aspects of Swift’s memory model impose certain restrictions that create tension between the goal of achieving safety and the goal of avoiding unnecessary overhead for calling into Swift from C++. Checking for exclusivity violations is a good example of this. The C++ compiler does not have a notion of exclusivity it can verify, so it is difficult to prove that a value is accessed exclusively in the C++ code that calls into Swift. This means that the C++ code that calls into Swift APIs will most likely require more run-time checks to validate exclusivity than similar Swift code that calls the same Swift APIs.
 
@@ -54,7 +54,7 @@ The C++ representation of certain Swift types should be appropriately enhanced t
 
 There should be no differences on the C++ side between using libraries that opt-in into library evolution and libraries that don’t, except in specific required cases, like checking the unknown default case of a resilient enum.
 
-### Clear Language Mapping Rules
+### Clear language mapping rules
 
 C++ is a very expressive language and it can provide representation for a lot of Swift language constructs. Not every Swift language construct will map to its direct C++ counterpart. For instance, Swift initializers might get bridged to static `init` member functions instead of constructors in C++, to allow C++ code to call failable initializers in a way that’s consistent with other initializer calls. Therefore, it’s important to provide documentation that describes how Swift language constructs get mapped to C++. It is a goal of C++ interoperability to provide a clear and well-defined mapping for how Swift language constructs are mapped to C++. Additionally, it is also a goal to clearly document which language constructs are not bridged to C++. In addition to documentation, compiler diagnostics should inform the user about types or functions that can’t be exposed to C++, when the user wants to expose them explicitly. It is a goal of C++ interoperability to add a set of clear diagnostics that let the user know when a certain Swift declaration is not exposed. It is not a goal to diagnose such cases when the user did not instruct the compiler to expose a declaration explicitly. For example, the Swift compiler might not diagnose when an exposed Swift type does not expose one of its public methods to C++ due to its return type not being exposed if such method does not have an explicit annotation that instructs the compiler that this method must be exposed to C++.
 
@@ -62,15 +62,15 @@ Some Swift APIs patterns will map to distinct C++ language constructs or pattern
 
 The semantics of how Swift types behave should be preserved when they’re mapped to C++. For instance, in C++, there should still be a semantic difference between Swift value and reference types. Additionally, Swift’s copy-on-write data types like `Array` should still obey the copy-on-write semantics in C++.
 
-### Swift API Design Should be Unaffected
+### Swift API design should be unaffected
 
 Swift API authors should not change the way they write Swift code and design Swift APIs based on how specific Swift language constructs are exposed to C++. They should use the most effective Swift constructs for the task. It is a key goal of C++ interoperability that the exposed C++ interfaces are safe, performant, and ergonomic enough that programmers will not be tempted to make their Swift code worse just to make the C++ interfaces better.
 
-### Objective-C Support
+### Objective-C support
 
 The existing Swift to Objective-C bridging layer should still be supported even when C++ bindings are generated in the generated header. Furthermore, the generated C++ bindings should use appropriate Objective-C++ types or constructs in the generated C++ declarations where it makes sense to do so. For instance, a Swift function that returns an Objective-C class instance should be usable from an Objective-C++ compilation unit.
 
-## The Approach
+## The approach
 
 The Swift compiler exposes Swift APIs to C++ by generating a header file that contains C++ declarations that wrap around the underlying calls into Swift code and provide a suitable representation for Swift types. Typically, a single header file is generated for one Swift module.
 
@@ -82,13 +82,13 @@ The generated header file also contains the C and the Objective-C declarations t
 
 The generated header file is a temporary build artifact. On platforms with ABI stability, the generated C++ code for an ABI stable Swift interface is not tied to the Swift compiler that compiled the Swift code for that Swift module, as ABI stability is respected by the C++ code in the header. In all other cases the generated C++ code in the header is assumed to be tied to the Swift compiler that compiled the Swift module, and thus the header should be regenerated when the compiler changes.
 
-### Bridging Swift Types
+### Bridging Swift types
 
 The generated header contains C++ class types that represent Swift’s struct, enum and class types that are exposed in the Swift module. These types provide access to methods, properties and other members using idiomatic C++ constructs, or non-idiomatic C++ constructs that allow C++ to access more functionality in a consistent manner. These types follow Swift semantics. For instance, a C++ value of Swift’s struct type gets copied and destroyed using Swift’s copy and destroy semantics. C++ also provides mechanisms that allow the programmer to move such values in a destructive way, i.e. “take” them. This ensures that C++ can interoperate with a wider range of Swift APIs and types, such as Swift’s move only types.
 
 Protocol types also get exposed to C++. They provide access to their protocol interface to C++. The generated header also provides facilities to combine protocol types into a protocol composition type. The protocol composition type provides access to the combined protocol interface in C++. 
 
-### Bridging Generics
+### Bridging generics
 
 Swift generic functions and types get bridged to C++ as C++ function and class templates. A generated C++ template instantiates a type-checked generic interface that uses the underlying polymorphic semantics that generics require when Swift APIs are called from the generated header. Type-checking is performed using the requires clause introduced in C++20. When C++17 and earlier is used, type-checking is performed using other legacy methods, like `enable_if` and `static_assert`. The two type-checking methods are compatible with the delayed template parsing compiler feature that Clang uses when building for Windows.
 
@@ -96,32 +96,32 @@ To help achieve the performance goals outlined in the prior section, the generat
 
 The Swift compiler generates specializations for a specific template if the Swift module pre-specializes the specific generic declaration. These C++ specializations invoke pre-specialized Swift generic code.
 
-### Standard Library Support
+### Standard library support
 
 The Swift standard library contains a lot of useful functions and types that get bridged to C++. The generated standard library bindings enhance various Swift types like `Optional` and `Array` to provide idiomatic C++ APIs that allow the user to use such types in an idiomatic manner from C++.
 
-### Using Swift Types in C++ Templates
+### Using Swift types in C++ templates
 
 The generated header is useful in mixed language projects as C++ sources can include it, allowing C++ to call Swift APIs. However the C++ interoperability project also provides support for calling C++ APIs from Swift. In certain cases such C++ APIs contain function or class templates that need to be instantiated in Swift. Swift gives the user the ability to use Swift types in such cases, so the C++ templates have to be instantiated with Swift types. This means that the Swift types needs to be translated into their C++ counterparts, which can then be used inside the instantiated C++ template specialization. This Swift to C++ type translation is performed using the same mechanism that’s used by the Swift compiler to generate the C++ compatibility header. This means that a C++ template instantiated with a Swift type will see the same C++ representation of that Swift type regardless of whether it was instantiated from C++, or from Swift.
 
-## Evolution Process
+## Evolution process
 
 The approach and the goals for how Swift APIs get bridged to C++ are outlined above. Each distinct Swift language construct that’s bridged to C++ will need to be covered by a detailed evolution proposal. These evolution proposals can refer to this vision document as a general context document for how Swift APIs should be bridged to C++. Every Swift API pattern that has a distinct mapping in C++ will also need a detailed and self-contained evolution proposal as well. The design for how each district language feature or API pattern is bridged to C++ is ratified only once its respective proposal goes through the Swift evolution process and is accepted by the Swift community.
 
-## The Swift Ecosystem
+## The Swift ecosystem
 
 As a supported language feature, C++ and Swift interoperability must work well on every platform supported by Swift. In similar vein, tools in the Swift ecosystem should be updated to support C++ interoperability. More specifically, tools in this ecosystem should know how to deal with C++ code that imports the compatibility header that’s generated by the Swift compiler. Tools should also understand that C++ types and functions in the generated header act as wrappers around underlying Swift types and functions.
 
-### Build Tool Support
+### Build tool support
 
 The Swift package manager (SwiftPM) is one of the most commonly used ways to build Swift code. Swift package manager can also build C and C++ code. SwiftPM should provide good support for bridging Swift APIs to C++ out of the box. It should generate a compatibility header for a Swift package when it determines that the C++ code in the same or dependent package includes such a header, and it should ensure that this header can be found when the C++ code is compiled.
 
 CMake is a widely used tool used for configuring and building C++ code. CMake should provide good support for adding Swift code to C++ CMake targets. Swift’s ecosystem as a whole should ensure that it should be as straightforward as possible to add support for bridging Swift APIs to C++ within the same CMake project. The C++ interoperability workgroup should provide an example CMake project that shows how Swift and C++ can interoperate between each other.
 
-### Debugging Support
+### Debugging support
 
 Debugging support is critical for great user experience. LLDB should understand that C++ types in the generated header are just wrappers around Swift values. It should be able to display the underlying Swift value in the debugger when the user tries to inspect the C++ value that stores the Swift value in the debugger. In addition to that, the generated compatibility header should be correctly annotated to ensure that C++ inline thunks that call Swift APIs can be skipped when a user steps in or steps out into or from a call when debugging a program.
 
-### IDE Support
+### IDE support
 
 SourceKit-LSP is a language server that provides cross-platform IDE support for Swift code in the Swift ecosystem. It can also act as a language server for C, Objective-C and C++ as it can wrap around and redirect queries to clangd. This in turn allows SourceKit-LSP to provide support for mixed-language IDE queries, like jump-to-definition, that allows the IDE client to jump from an Objective-C method to call to its underlying Swift implementation. SourceKit-LSP should provide an equivalent level of support for C++ interoperability as well. It should understand that certain C++ declarations that get indexed by Clang are just wrappers around the declarations in Swift. This should ensure that IDE features like jump-to-definition can operate across the C++ and Swift language boundary in an IDE client that uses SourceKit-LSP.
