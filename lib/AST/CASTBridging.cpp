@@ -160,6 +160,11 @@ void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then, vo
       getSourceLocFromPointer(elseLoc), (Stmt *)elseStmt, None, Context);
 }
 
+void *ReturnStmt_create(void *ctx, void *loc, void *_Nullable expr) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return new (Context) ReturnStmt(getSourceLocFromPointer(loc), (Expr *)expr);
+}
+
 void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements, void *rbloc) {
   llvm::SmallVector<ASTNode, 6> nodes;
   for (auto node : getArrayRef<ASTNodeBridged>(elements)) {
