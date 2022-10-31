@@ -585,11 +585,15 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
 
     if (EmitRegularLTOSummary || opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
       // Rename anon globals to be able to export them in the summary.
-      EmitPasses.add(createNameAnonGlobalPass());
+      llvm_unreachable("TODO: fix this");
+      // TODO:
+      // EmitPasses.add(createNameAnonGlobalPass());
     }
 
     if (opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-      EmitPasses.add(createWriteThinLTOBitcodePass(out));
+      llvm_unreachable("TODO: fix this");
+      // TODO:
+      // EmitPasses.add(createWriteThinLTOBitcodePass(out));
     } else {
       if (EmitRegularLTOSummary) {
         module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
