@@ -545,7 +545,7 @@ public:
   }
 
   /// Returns true if the module was rebuilt from a module interface instead
-  /// of being build from the full source.
+  /// of being built from the full source.
   bool isBuiltFromInterface() const {
     return Bits.ModuleDecl.IsBuiltFromInterface;
   }

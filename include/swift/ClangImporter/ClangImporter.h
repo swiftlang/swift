@@ -220,8 +220,8 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
-  /// \param AllowMemoryCache Enables preserving the loaded module in the
-  /// in-memory cache for the next loading attempt.
+  /// \param AllowMemoryCache Affects only loading serialized Swift modules,
+  /// this parameter has no effect in the ClangImporter.
   ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
