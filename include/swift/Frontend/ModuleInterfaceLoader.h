@@ -478,7 +478,7 @@ private:
   }
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
-                                     const LangOptions &LangOpts,
+                                     const LangOptions &LangOpts, bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SmallVectorImpl<const char *> &SubArgs,
