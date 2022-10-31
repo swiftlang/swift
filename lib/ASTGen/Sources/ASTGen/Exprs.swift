@@ -66,9 +66,8 @@ extension ASTGenVisitor {
   public func visit(_ node: TupleExprElementListSyntax) -> ASTNode {
     let elements = node.map { self.visit($0).rawValue }
 
-    // TODO: find correct paren locs.
     let lParenLoc = self.base.advanced(by: node.position.utf8Offset).raw
-    let rParenLoc = self.base.advanced(by: node.position.utf8Offset).raw
+    let rParenLoc = self.base.advanced(by: node.endPosition.utf8Offset).raw
 
     return .expr(
       elements.withBridgedArrayRef { elementsRef in
