@@ -64,7 +64,7 @@ The semantics of how Swift types behave should be preserved when they’re mappe
 
 ### Swift API Design Should be Unaffected
 
-Swift API authors should not change the way they write Swift code and design Swift APIs based on how specific Swift language constructs are exposed to C++. They should use the most effective Swift constructs for the task. C++ interop should provide best effort view for these constructs without imposing decisions or restrictions that might limit the Swift API designers and authors.
+Swift API authors should not change the way they write Swift code and design Swift APIs based on how specific Swift language constructs are exposed to C++. They should use the most effective Swift constructs for the task. It is a key goal of C++ interoperability that the exposed C++ interfaces are safe, performant, and ergonomic enough that programmers will not be tempted to make their Swift code worse just to make the C++ interfaces better.
 
 ### Objective-C Support
 
