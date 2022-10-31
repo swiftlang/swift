@@ -133,6 +133,14 @@ void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
       getSourceLocFromPointer(TokenLoc));
 }
 
+void *ArrayExpr_create(void *ctx, void *lLoc, BridgedArrayRef elements,
+                       BridgedArrayRef commas, void *rLoc) {
+  ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  return ArrayExpr::create(
+      Context, getSourceLocFromPointer(lLoc), getArrayRef<Expr *>(elements),
+      getArrayRef<SourceLoc>(commas), getSourceLocFromPointer(rLoc));
+}
+
 void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   return new (Context)
