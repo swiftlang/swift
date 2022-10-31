@@ -275,9 +275,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                             SanitizerKind::Address);
       ASOpts.UseAfterScope = false;
       ASOpts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Runtime;
-      MPM.addPass(
-          RequireAnalysisPass<ASanGlobalsMetadataAnalysis, llvm::Module>());
-      MPM.addPass(ModuleAddressSanitizerPass(
+      MPM.addPass(AddressSanitizerPass(
           ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
           /*DestructorKind=*/llvm::AsanDtorKind::Global));
     });
@@ -297,8 +295,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                            OptimizationLevel Level) {
       std::vector<std::string> allowlistFiles;
       std::vector<std::string> ignorelistFiles;
-      MPM.addPass(ModuleSanitizerCoveragePass(Opts.SanitizeCoverage,
-                                              allowlistFiles, ignorelistFiles));
+      MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage,
+                                        allowlistFiles, ignorelistFiles));
     });
   }
   if (RunSwiftSpecificLLVMOptzns && RunSwiftMergeFunctions) {
