@@ -21,6 +21,7 @@ enum ASTNode {
   case stmt(UnsafeMutableRawPointer)
   case expr(UnsafeMutableRawPointer)
   case type(UnsafeMutableRawPointer)
+  case misc(UnsafeMutableRawPointer)
 
   var rawValue: UnsafeMutableRawPointer {
     switch self {
@@ -31,6 +32,8 @@ enum ASTNode {
     case .expr(let ptr):
       return ptr
     case .type(let ptr):
+      return ptr
+    case .misc(let ptr):
       return ptr
     }
   }
@@ -44,7 +47,7 @@ enum ASTNode {
     case .decl(let d):
       return ASTNodeBridged(ptr: d, kind: .decl)
     default:
-      fatalError("Must be expr or stmt.")
+      fatalError("Must be expr, stmt, or decl.")
     }
   }
 }
@@ -96,8 +99,8 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
         out.append(SwiftTopLevelCodeDecl_createStmt(ctx, declContext, loc, s, loc))
       case .expr(let e):
         out.append(SwiftTopLevelCodeDecl_createExpr(ctx, declContext, loc, e, loc))
-      case .type(_):
-        fatalError("Type should not exist at top level.")
+      default:
+        fatalError("Top level nodes must be decls, stmts, or exprs.")
       }
     }
 

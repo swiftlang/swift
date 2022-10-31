@@ -9,7 +9,7 @@ extension ASTGenVisitor {
       self.base.advanced(by: $0.whereKeyword.position.utf8Offset).raw
     }
     let rAngleLoc = self.base.advanced(by: node.rightAngleBracket.position.utf8Offset).raw
-    return .decl(
+    return .misc(
       self.withBridgedParametersAndRequirements(node) { params, reqs in
         return GenericParamList_create(self.ctx, lAngleLoc, params, whereLoc, reqs, rAngleLoc)
       })

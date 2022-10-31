@@ -4,7 +4,7 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   public func visit(_ node: CodeBlockSyntax) -> ASTNode {
-    let statements = node.statements.map(self.visit).map { $0.bridged() }
+    let statements = node.statements.map { self.visit($0).bridged() }
     let startLoc = self.base.advanced(by: node.position.utf8Offset).raw
     let endLoc = self.base.advanced(by: node.endPosition.utf8Offset).raw
 
@@ -15,7 +15,7 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: IfStmtSyntax) -> ASTNode {
-    let conditions = node.conditions.map(self.visit).map { $0.rawValue }
+    let conditions = node.conditions.map { self.visit($0).rawValue }
     assert(conditions.count == 1)  // TODO: handle multiple conditions.
 
     let body = visit(node.body).rawValue
