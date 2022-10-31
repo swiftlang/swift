@@ -195,6 +195,89 @@ template <class T> inline void *_Nonnull getOpaquePointer(T &value) {
 
 } // namespace _impl
 
+/// The Expected class has either an error or an value.
+template<class T>
+class Expected {
+public:
+
+  /// Default
+  constexpr Expected() { has_val = false; }
+  constexpr Expected(T buf) : buffer(buf) { has_val = true; }
+  constexpr Expected(swift::Error * _Nonnull error_val)  : err(error_val) { has_val = false; }
+
+  /// Copy
+  constexpr Expected(Expected const& other) noexcept {
+    if (other.has_value()) {
+      buffer = other.buffer;
+      has_val = true;
+    }
+  }
+  /// Move
+  constexpr Expected(Expected&& other) noexcept {
+    if (other.has_value()) {
+      buffer = other.buffer;
+      has_val = true;
+    }
+  }
+
+  ~Expected() noexcept { }
+
+  /// assignment
+  constexpr auto operator=(Expected&& other) noexcept { auto temp = buffer; buffer = other.buffer; other.buffer = temp; }
+  constexpr auto operator=(Expected&) noexcept = delete;
+
+  /// For accessing T's members
+  // precondition: has_value() == true
+  constexpr T const* _Nonnull operator->() const noexcept { return &buffer; }
+
+  // precondition: has_value() == true
+  constexpr T* _Nonnull operator->() noexcept { return &buffer; }
+
+  /// Getting reference to T
+  // precondition: has_value() == true
+  constexpr T const& operator*() const& noexcept { return buffer; }
+
+  // precondition: has_value() == true
+  constexpr T& operator*() & noexcept { return buffer; }
+
+  constexpr explicit operator bool() const noexcept {
+    return has_value();
+  }
+
+  // Get value, if not exists abort
+  // FIXME: throw exception instead of abort?
+  constexpr T const& value() const& {
+    if (!has_value())
+      abort();
+    return *reinterpret_cast<const T *>(buffer);
+  }
+
+  constexpr T& value() & {
+    if (!has_value())
+      abort();
+    return *reinterpret_cast<T *>(buffer);
+  }
+
+  // Get error
+  constexpr swift::Error const& error() const& {
+    if (has_value())
+      abort();
+    return err;
+  }
+  constexpr swift::Error& error() & {
+    if (has_value())
+      abort();
+    return err;
+  }
+
+  constexpr bool has_value() const noexcept { return has_val; }
+
+private:
+  T buffer;
+  swift::Error err;
+  bool has_val;
+};
+
 #pragma clang diagnostic pop
 
 } // namespace swift
