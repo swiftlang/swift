@@ -478,3 +478,24 @@ enum TestEnum<T> {
   }
 }
 
+// Verify exit block arguments are ordered correctly.
+// 
+// CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
+// CHECK:         br [[EPILOG:bb[0-9]+]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:         br [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:       [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : @owned $Value, {{%[^,]+}} : @owned $Value):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_'
+func doit<T>(_ f: () -> T) -> T {
+  f()
+}
+@_silgen_name("duplicate_with_int4")
+func duplicate_with_int4<Value>(condition: Bool, value: Value) -> (Int, Int, Int, (Value, Value)) {
+  doit {
+    if condition {
+      return (Int(), Int(), Int(), (value, value))
+    } else {
+      return (Int(), Int(), Int(), (value, value))
+    }
+  }
+}
+
