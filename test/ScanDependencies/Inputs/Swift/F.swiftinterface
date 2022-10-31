@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name F
+// swift-module-flags: -module-name F -enable-library-evolution
 import Swift
 @_exported import F
 public func funcF() { }

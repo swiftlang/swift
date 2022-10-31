@@ -5,7 +5,7 @@
 // RUN: echo 'public func publicFunction() {}' > %t/TestModule.swift
 
 // 2. Create both an interface and a compiled module for it
-// RUN: %target-swift-frontend -emit-module -o %t/Build/TestModule.swiftmodule %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5 -module-name TestModule
+// RUN: %target-swift-frontend -emit-module -o %t/Build/TestModule.swiftmodule %t/TestModule.swift -emit-module-interface-path %t/Build/TestModule.swiftinterface -swift-version 5 -module-name TestModule -enable-library-evolution
 
 // 3. Make the compiled module unreadable so it gets added as a dependency but is not used
 // RUN: mv %t/Build/TestModule.swiftmodule %t/Build/TestModule.swiftmodule.moved-aside

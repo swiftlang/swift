@@ -9,7 +9,7 @@
 //
 // Phase 1: build LeafModule into a .swiftinterface file:
 //
-// RUN: %target-swift-frontend -I %t -emit-module-interface-path %t/LeafModule.swiftinterface -module-name LeafModule %t/leaf.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -emit-module-interface-path %t/LeafModule.swiftinterface -module-name LeafModule %t/leaf.swift -emit-module -o /dev/null -enable-library-evolution
 // RUN: test -f %t/LeafModule.swiftinterface
 // RUN: %FileCheck %s -check-prefix=CHECK-LEAFINTERFACE <%t/LeafModule.swiftinterface
 // CHECK-LEAFINTERFACE: LeafFunc
@@ -17,7 +17,7 @@
 //
 // Phase 2: build OtherModule into a .swiftinterface _using_ LeafModule via LeafModule.swiftinterface, creating LeafModule-*.swiftmodule along the way.
 //
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module-interface-path %t/OtherModule.swiftinterface -module-name OtherModule %t/other.swift -emit-module -o /dev/null -enable-library-evolution
 // RUN: test -f %t/OtherModule.swiftinterface
 // RUN: %FileCheck %s -check-prefix=CHECK-OTHERINTERFACE <%t/OtherModule.swiftinterface
 // CHECK-OTHERINTERFACE: OtherFunc

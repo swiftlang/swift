@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: echo 'public func externalFunc() {}' | %target-swift-frontend -typecheck -emit-module-interface-path %t/Library.swiftinterface -
+// RUN: echo 'public func externalFunc() {}' | %target-swift-frontend -typecheck -emit-module-interface-path %t/Library.swiftinterface - -enable-library-evolution
 // RUN: %empty-directory(%t/LibraryWithoutThisArchitecture.swiftmodule)
-// RUN: echo 'public func externalFunc() {}' | %target-swift-frontend -typecheck -emit-module-interface-path %t/LibraryWithoutThisArchitecture.swiftmodule/arm40000-apple-ios.swiftinterface -
+// RUN: echo 'public func externalFunc() {}' | %target-swift-frontend -typecheck -emit-module-interface-path %t/LibraryWithoutThisArchitecture.swiftmodule/arm40000-apple-ios.swiftinterface - -enable-library-evolution
 // RUN: %target-swift-frontend -typecheck %s -I %t
 
 #if canImport(Library)

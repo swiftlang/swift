@@ -1,4 +1,4 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -swift-version 5 -enforce-exclusivity=checked -module-name SIMod 
+// swift-module-flags: -swift-version 5 -enforce-exclusivity=checked -module-name SIMod -enable-library-evolution
 import CIMod
 

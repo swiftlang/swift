@@ -2,8 +2,8 @@
 // RUN: %empty-directory(%t/modulecache)
 
 // 1) Build .swiftinterface files for MyPoint and MyExtensions, using a non-default module cache path
-// RUN: %target-swift-frontend -emit-module-interface-path %t/MyPointModule.swiftinterface -module-name MyPointModule -emit-module -o /dev/null %S/Inputs/parseable-interface/MyPoint.swift
-// RUN: %target-swift-frontend -emit-module-interface-path %t/MyPointExtensions.swiftinterface -module-name MyPointExtensions -emit-module -o /dev/null -module-cache-path %t/modulecache -I %t %S/Inputs/parseable-interface/MyPointExtensions.swift
+// RUN: %target-swift-frontend -emit-module-interface-path %t/MyPointModule.swiftinterface -module-name MyPointModule -emit-module -o /dev/null %S/Inputs/parseable-interface/MyPoint.swift -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module-interface-path %t/MyPointExtensions.swiftinterface -module-name MyPointExtensions -emit-module -o /dev/null -module-cache-path %t/modulecache -I %t %S/Inputs/parseable-interface/MyPointExtensions.swift -enable-library-evolution
 // RUN: %empty-directory(%t/modulecache)
 
 // 2) Check completion using the default (cold) module cache

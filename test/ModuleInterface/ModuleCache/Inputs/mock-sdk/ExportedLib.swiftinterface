@@ -1,10 +1,10 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -parse-stdlib -module-name ExportedLib
+// swift-module-flags: -parse-stdlib -module-name ExportedLib -enable-library-evolution
 
 @_exported import SomeCModule
 
 public struct ExportedInterface {
-  @inlinable public init() {}
+  @inlinable public init() { self.init() }
 }
 public var testValue: ExportedInterface {
   @inlinable get { return ExportedInterface() }

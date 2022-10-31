@@ -6,7 +6,7 @@
 
 // 1) Build the 'Inherited' library and its interface from this file
 //
-// RUN: %target-build-swift-dylib(%t/%target-library-name(Inherited)) -emit-module-path %t/Inherited.swiftmodule -emit-module-interface-path %t/Inherited.swiftinterface -module-name Inherited %s
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Inherited)) -emit-module-path %t/Inherited.swiftmodule -emit-module-interface-path %t/Inherited.swiftinterface -module-name Inherited %s -enable-library-evolution
 // RUN: rm %t/Inherited.swiftmodule
 // RUN: %target-swift-typecheck-module-from-interface(%t/Inherited.swiftinterface)
 

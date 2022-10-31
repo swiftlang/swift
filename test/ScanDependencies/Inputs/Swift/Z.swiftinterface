@@ -1,4 +1,4 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name Z
+// swift-module-flags: -module-name Z -enable-library-evolution
 import missing_module
 public func funcZ() { }

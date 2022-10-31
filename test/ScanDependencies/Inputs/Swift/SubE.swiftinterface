@@ -1,4 +1,4 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name SubE
+// swift-module-flags: -module-name SubE -enable-library-evolution
 import Swift
 public func funcSubE() {}

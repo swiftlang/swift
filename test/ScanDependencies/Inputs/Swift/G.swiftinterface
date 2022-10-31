@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name G -swift-version 5
+// swift-module-flags: -module-name G -swift-version 5 -enable-library-evolution
 
 #if swift(>=5.0)
 import Swift

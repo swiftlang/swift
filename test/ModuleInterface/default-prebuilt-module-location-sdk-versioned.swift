@@ -11,12 +11,12 @@
 // 3. Compile this into a module and put it into the default SKD-versioned prebuilt cache
 //    location relative to the fake resource dir. Also drop an interface into
 //    the build dir.
-// RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/10.15/PrebuiltModule.swiftmodule/%target-swiftmodule-name -module-name PrebuiltModule -parse-stdlib -emit-module-interface-path %t/PrebuiltModule.swiftmodule/%target-swiftinterface-name
+// RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/10.15/PrebuiltModule.swiftmodule/%target-swiftmodule-name -module-name PrebuiltModule -parse-stdlib -emit-module-interface-path %t/PrebuiltModule.swiftmodule/%target-swiftinterface-name -enable-library-evolution
 
 // 4. Compile this into a module and put it into the default non-versioned prebuilt cache
 //    location relative to the fake resource dir. Also drop an interface into
 //    the build dir.
-// RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/PrebuiltModule.swiftmodule/%target-swiftmodule-name -module-name PrebuiltModule -parse-stdlib -emit-module-interface-path %t/PrebuiltModule.swiftmodule/%target-swiftinterface-name
+// RUN: %target-swift-frontend -emit-module %t/PrebuiltModule.swift -o %t/ResourceDir/%target-sdk-name/prebuilt-modules/PrebuiltModule.swiftmodule/%target-swiftmodule-name -module-name PrebuiltModule -parse-stdlib -emit-module-interface-path %t/PrebuiltModule.swiftmodule/%target-swiftinterface-name -enable-library-evolution
 
 // 5. Import this prebuilt module, but DON'T pass in -prebuilt-module-cache-path, it should use the implicit one from the SDK-versioned prebuilt module cache dir.
 // RUN: %target-swift-frontend -typecheck -resource-dir %t/ResourceDir -I %t %s -parse-stdlib -module-cache-path %t/ModuleCache -sdk %t -target-sdk-version 10.15

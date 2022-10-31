@@ -1,4 +1,4 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name P
+// swift-module-flags: -module-name P -enable-library-evolution
 import Y
 public func funcP() { }
