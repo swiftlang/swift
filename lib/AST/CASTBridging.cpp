@@ -220,13 +220,13 @@ void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
   return paramDecl;
 }
 
-struct FuncDeclBridged FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
-                      BridgedIdentifier name, void *nameLoc, bool isAsync,
-                      void *_Nullable asyncLoc, bool throws,
-                      void *_Nullable throwsLoc, void *paramLLoc,
-                      BridgedArrayRef params, void *paramRLoc,
-                      void *_Nullable returnType,
-                      void *declContext) {
+struct FuncDeclBridged
+FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
+                BridgedIdentifier name, void *nameLoc, bool isAsync,
+                void *_Nullable asyncLoc, bool throws,
+                void *_Nullable throwsLoc, void *paramLLoc,
+                BridgedArrayRef params, void *paramRLoc,
+                void *_Nullable returnType, void *declContext) {
   auto *paramList = ParameterList::create(
       *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(paramLLoc),
       getArrayRef<ParamDecl *>(params), getSourceLocFromPointer(paramRLoc));
@@ -241,7 +241,8 @@ struct FuncDeclBridged FuncDecl_create(void *ctx, void *staticLoc, bool isStatic
       getSourceLocFromPointer(throwsLoc), nullptr, paramList,
       (TypeRepr *)returnType, (DeclContext *)declContext);
 
-  return {static_cast<DeclContext *>(out), static_cast<FuncDecl *>(out), static_cast<Decl *>(out)};
+  return {static_cast<DeclContext *>(out), static_cast<FuncDecl *>(out),
+          static_cast<Decl *>(out)};
 }
 
 void FuncDecl_setBody(void *fn, void *body) {

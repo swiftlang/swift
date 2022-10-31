@@ -5,7 +5,7 @@ import SwiftSyntax
 extension ASTGenVisitor {
   public func visit(_ node: ClosureExprSyntax) -> ASTNode {
     let statements = node.statements.map { self.visit($0).bridged() }
-    let body = statements.withBridgedArrayRef { ref in
+    let body: UnsafeMutableRawPointer = statements.withBridgedArrayRef { ref in
       let startLoc = self.base.advanced(by: node.leftBrace.position.utf8Offset).raw
       let endLoc = self.base.advanced(by: node.rightBrace.position.utf8Offset).raw
       return BraceStmt_create(ctx, startLoc, ref, endLoc)

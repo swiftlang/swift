@@ -160,13 +160,13 @@ struct FuncDeclBridged {
   void *decl;
 };
 
-struct FuncDeclBridged FuncDecl_create(void *ctx, void *staticLoc, _Bool isStatic, void *funcLoc,
-                      BridgedIdentifier name, void *nameLoc, _Bool isAsync,
-                      void *_Nullable asyncLoc, _Bool throws,
-                      void *_Nullable throwsLoc, void *paramLLoc,
-                      BridgedArrayRef params, void *paramRLoc,
-                      void *_Nullable returnType,
-                      void *declContext);
+struct FuncDeclBridged
+FuncDecl_create(void *ctx, void *staticLoc, _Bool isStatic, void *funcLoc,
+                BridgedIdentifier name, void *nameLoc, _Bool isAsync,
+                void *_Nullable asyncLoc, _Bool throws,
+                void *_Nullable throwsLoc, void *paramLLoc,
+                BridgedArrayRef params, void *paramRLoc,
+                void *_Nullable returnType, void *declContext);
 void FuncDecl_setBody(void *fn, void *body);
 
 void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id);
