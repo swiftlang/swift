@@ -152,7 +152,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndAccessInst:
@@ -162,6 +161,9 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::EndBorrowInst:
     return true;
+  case SILInstructionKind::IsUniqueInst:
+    // TODO: Consider is_unique to be a barrier for optimization.
+    return !Inst->getFunction()->hasOwnership();
   default:
     return false;
   }
