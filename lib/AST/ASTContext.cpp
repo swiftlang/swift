@@ -19,6 +19,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/CompilerPlugin.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -96,7 +97,8 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
 namespace {
   enum class SearchPathKind : uint8_t {
     Import = 1 << 0,
-    Framework = 1 << 1
+    Framework = 1 << 1,
+    CompilerPlugin = 1 << 2
   };
 } // end anonymous namespace
 
@@ -680,10 +682,14 @@ ASTContext::ASTContext(
     getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
   for (const auto &framepath : SearchPathOpts.getFrameworkSearchPaths())
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
+  for (StringRef path : SearchPathOpts.getCompilerPluginLibraryPaths())
+    getImpl().SearchPathsSet[path] |= SearchPathKind::CompilerPlugin;
 
   // Register any request-evaluator functions available at the AST layer.
   registerAccessRequestFunctions(evaluator);
   registerNameLookupRequestFunctions(evaluator);
+
+  loadCompilerPlugins();
 }
 
 ASTContext::~ASTContext() {
@@ -1117,6 +1123,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::UnsafeCxxInputIterator:
   case KnownProtocolKind::UnsafeCxxRandomAccessIterator:
     M = getLoadedModule(Id_Cxx);
+    break;
+  case KnownProtocolKind::CompilerPlugin:
+    M = getLoadedModule(Id_CompilerPluginSupport);
     break;
   default:
     M = getStdlibModule();
@@ -6031,4 +6040,25 @@ BuiltinTupleType *ASTContext::getBuiltinTupleType() {
   result = new (*this) BuiltinTupleType(getBuiltinTupleDecl(), *this);
 
   return result;
+}
+
+CompilerPlugin *ASTContext::getLoadedPlugin(StringRef name) {
+  auto lookup = LoadedPlugins.find(name);
+  if (lookup == LoadedPlugins.end())
+    return nullptr;
+  return &lookup->second;
+}
+
+void *ASTContext::getAddressOfSymbol(StringRef name,
+                                     llvm::sys::DynamicLibrary *libraryHint) {
+  auto lookup = LoadedSymbols.try_emplace(name, nullptr);
+  void *&address = lookup.first->getValue();
+  if (lookup.second) {
+    if (libraryHint && libraryHint->isValid())
+      address = libraryHint->getAddressOfSymbol(name.data());
+    else
+      address = llvm::sys::DynamicLibrary::
+          SearchForAddressOfSymbol(name.data());
+  }
+  return address;
 }

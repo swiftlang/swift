@@ -1404,6 +1404,13 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
 
+  std::vector<std::string> CompilerPluginLibraryPaths(
+      Opts.getCompilerPluginLibraryPaths());
+  for (const Arg *A : Args.filtered(OPT_load_plugin_library)) {
+    CompilerPluginLibraryPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+  Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
+
   return false;
 }
 

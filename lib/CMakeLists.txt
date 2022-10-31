@@ -56,4 +56,4 @@ add_subdirectory(SymbolGraphGen)
 add_subdirectory(Syntax)
 add_subdirectory(SyntaxParse)
 add_subdirectory(Threading)
-
+add_subdirectory(CompilerPluginSupport)
