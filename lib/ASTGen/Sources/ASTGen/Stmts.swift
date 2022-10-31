@@ -1,20 +1,43 @@
+import CASTBridging
 import SwiftParser
 import SwiftSyntax
 
-import CASTBridging
-
 extension ASTGenVisitor {
-  public func visit(_ node: IfStmtSyntax) -> UnsafeMutableRawPointer {
-    let conditions = node.conditions.map(self.visit)
-    assert(conditions.count == 1) // TODO: handle multiple conditions.
-    
-    let body = visit(node.body)
+  public func visit(_ node: CodeBlockSyntax) -> ASTNode {
+    let statements = node.statements.map(self.visit).map { $0.bridged() }
+    let startLoc = self.base.advanced(by: node.position.utf8Offset).raw
+    let endLoc = self.base.advanced(by: node.endPosition.utf8Offset).raw
+
+    return .stmt(
+      statements.withBridgedArrayRef { ref in
+        BraceStmt_create(ctx, startLoc, ref, endLoc)
+      })
+  }
+
+  public func visit(_ node: IfStmtSyntax) -> ASTNode {
+    let conditions = node.conditions.map(self.visit).map { $0.rawValue }
+    assert(conditions.count == 1)  // TODO: handle multiple conditions.
+
+    let body = visit(node.body).rawValue
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
-    
+
     if let elseBody = node.elseBody, node.elseKeyword != nil {
-      return IfStmt_create(ctx, loc, conditions.first!, body, loc, visit(elseBody))
+      return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, loc, visit(elseBody).rawValue))
     }
-    
-    return IfStmt_create(ctx, loc, conditions.first!, body, nil, nil)
+
+    return .stmt(IfStmt_create(ctx, loc, conditions.first!, body, nil, nil))
+  }
+
+  public func visit(_ node: ReturnStmtSyntax) -> ASTNode {
+    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+
+    let expr: ASTNode?
+    if let expression = node.expression {
+      expr = visit(expression)
+    } else {
+      expr = nil
+    }
+
+    return .stmt(ReturnStmt_create(ctx, loc, expr?.rawValue))
   }
 }

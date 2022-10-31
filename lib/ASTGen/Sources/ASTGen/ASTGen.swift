@@ -1,7 +1,6 @@
+import CASTBridging
 import SwiftParser
 import SwiftSyntax
-
-import CASTBridging
 
 extension Array {
   public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
@@ -17,6 +16,39 @@ extension UnsafePointer {
   }
 }
 
+enum ASTNode {
+  case decl(UnsafeMutableRawPointer)
+  case stmt(UnsafeMutableRawPointer)
+  case expr(UnsafeMutableRawPointer)
+  case type(UnsafeMutableRawPointer)
+
+  var rawValue: UnsafeMutableRawPointer {
+    switch self {
+    case .decl(let ptr):
+      return ptr
+    case .stmt(let ptr):
+      return ptr
+    case .expr(let ptr):
+      return ptr
+    case .type(let ptr):
+      return ptr
+    }
+  }
+
+  func bridged() -> ASTNodeBridged {
+    switch self {
+    case .expr(let e):
+      return ASTNodeBridged(ptr: e, kind: .expr)
+    case .stmt(let s):
+      return ASTNodeBridged(ptr: s, kind: .stmt)
+    case .decl(let d):
+      return ASTNodeBridged(ptr: d, kind: .decl)
+    default:
+      fatalError("Must be expr or stmt.")
+    }
+  }
+}
+
 /// Little utility wrapper that lets us have some mutable state within
 /// immutable structs, and is therefore pretty evil.
 @propertyWrapper
@@ -29,23 +61,25 @@ class Boxed<Value> {
 }
 
 struct ASTGenVisitor: SyntaxTransformVisitor {
+  typealias ResultType = ASTNode
+
   let ctx: UnsafeMutableRawPointer
   let base: UnsafePointer<UInt8>
 
   @Boxed var declContext: UnsafeMutableRawPointer
 
   // TODO: this some how messes up the witness table when I uncomment it locally :/
-//  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
-//    if let node = node { return visit(node) }
-//    return nil
-//  }
+  //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
+  //    if let node = node { return visit(node) }
+  //    return nil
+  //  }
 
   @_disfavoredOverload
-  public func visit(_ node: SourceFileSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: SourceFileSyntax) -> ASTNode {
     fatalError("Use other overload.")
   }
 
-  public func visitAny(_ node: Syntax) -> UnsafeMutableRawPointer {
+  public func visitAny(_ node: Syntax) -> ASTNode {
     fatalError("Not implemented.")
   }
 
@@ -55,13 +89,15 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
 
     for element in node.statements {
       let swiftASTNodes = visit(element)
-      if element.item.is(StmtSyntax.self) {
-        out.append(SwiftTopLevelCodeDecl_createStmt(ctx, declContext, loc, swiftASTNodes, loc))
-      } else if element.item.is(ExprSyntax.self) {
-        out.append(SwiftTopLevelCodeDecl_createExpr(ctx, declContext, loc, swiftASTNodes, loc))
-      } else {
-        assert(element.item.is(DeclSyntax.self))
-        out.append(swiftASTNodes)
+      switch swiftASTNodes {
+      case .decl(let d):
+        out.append(d)
+      case .stmt(let s):
+        out.append(SwiftTopLevelCodeDecl_createStmt(ctx, declContext, loc, s, loc))
+      case .expr(let e):
+        out.append(SwiftTopLevelCodeDecl_createExpr(ctx, declContext, loc, e, loc))
+      case .type(_):
+        fatalError("Type should not exist at top level.")
       }
     }
 

@@ -116,9 +116,9 @@ public func getMacroEvaluationContext(
   contextPtr.pointee = macroPtr.withMemoryRebound(to: ExportedMacro.self, capacity: 1) { macro in
     return ASTGenVisitor(ctx: context, base: sourceFilePtr, declContext: declContext)
       .visit(StructDeclSyntax(stringLiteral: macro.pointee.evaluationContext))
+      .rawValue
   }
 }
-
 
 @_cdecl("swift_ASTGen_evaluateMacro")
 public func evaluateMacro(
@@ -154,7 +154,8 @@ public func evaluateMacro(
     }
 
     guard let parentSyntax = token.parent,
-          parentSyntax.is(MacroExpansionExprSyntax.self) else {
+      parentSyntax.is(MacroExpansionExprSyntax.self)
+    else {
       print("not on a macro expansion node: \(token.recursiveDescription)")
       return -1
     }
