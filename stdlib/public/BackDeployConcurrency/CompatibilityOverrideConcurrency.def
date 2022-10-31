@@ -34,11 +34,11 @@
 /// entries, or define one or more of the more specific OVERRIDE_* variants to
 /// get only those entries.
 
-// NOTE: this file is used to build the definition of OverrideSection in
-// CompatibilityOverride.cpp, which is part of the ABI. Moving or removing
-// entries in this file will break the ABI. Additional entries can be added to
-// the end. ABI breaks or version-specific changes can be accommodated by
-// changing the name of the override section in that file.
+// NOTE: the entries in this file are used to build the struct layout for
+// OverrideSection in CompatibilityOverride.cpp, which is built into the
+// concurrency runtime.  The back-deployment concurrency runtime targets
+// the same compatibility overrides as the OS-deployed runtime in Swift 5.6.
+// This file should not be edited.
 
 #ifdef OVERRIDE
 #  define OVERRIDE_ACTOR OVERRIDE
