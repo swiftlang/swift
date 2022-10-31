@@ -1,3 +1,4 @@
+// RUN: chmod a+rx %t/bad 2>/dev/null || true
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/good)
 // RUN: %empty-directory(%t/bad)
