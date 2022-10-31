@@ -241,7 +241,7 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters) {
-  assert(numParameters <= llvm::array_lengthof(GenericParamNames));
+  assert(numParameters <= std::size(GenericParamNames));
 
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
@@ -910,7 +910,7 @@ static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,
                                                  Identifier Id,
                                                  int NumTailTypes) {
   if (NumTailTypes < 1 ||
-      1 + NumTailTypes > (int)llvm::array_lengthof(GenericParamNames))
+      1 + NumTailTypes > (int)std::size(GenericParamNames))
     return nullptr;
   BuiltinFunctionBuilder builder(Context, 1 + NumTailTypes);
   builder.addParameter(makeMetatype(makeGenericParam(0)));
