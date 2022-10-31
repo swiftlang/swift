@@ -75,7 +75,10 @@ extension ASTGenVisitor {
     let isLet = node.letOrVarKeyword.tokenKind == .letKeyword
 
     // TODO: don't drop "initializer" on the floor.
-    return .decl(SwiftVarDecl_create(ctx, nil, loc, isStateic, isLet, declContext))
+    return .decl(
+      SwiftVarDecl_create(
+        ctx, pattern, initializer, loc, isStateic,
+        isLet, declContext))
   }
 
   public func visit(_ node: FunctionParameterSyntax) -> ASTNode {
@@ -83,6 +86,7 @@ extension ASTGenVisitor {
 
     let firstName: UnsafeMutableRawPointer?
     let secondName: UnsafeMutableRawPointer?
+    let type: UnsafeMutableRawPointer?
 
     if let nodeFirstName = node.firstName {
       var text = nodeFirstName.text
@@ -102,7 +106,13 @@ extension ASTGenVisitor {
       secondName = nil
     }
 
-    return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, declContext))
+    if let typeSyntax = node.type {
+      type = visit(typeSyntax).rawValue
+    } else {
+      type = nil
+    }
+
+    return .decl(ParamDecl_create(ctx, loc, loc, firstName, loc, secondName, type, declContext))
   }
 
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {

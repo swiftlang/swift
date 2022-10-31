@@ -125,14 +125,21 @@ void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
 void *SwiftBooleanLiteralExpr_create(void *ctx, _Bool value, void *TokenLoc);
 
 void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable name,
-                          void *loc, _Bool isStatic, _Bool isLet, void *dc);
+                          void *initExpr, void *loc, _Bool isStatic,
+                          _Bool isLet, void *dc);
 
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then,
                     void *_Nullable elseLoc, void *_Nullable elseStmt);
 
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : long {
+  ASTNodeKindExpr,
+  ASTNodeKindStmt,
+  ASTNodeKindDecl
+} ASTNodeKind;
+
 struct ASTNodeBridged {
   void *ptr;
-  _Bool isExpr; // Must be expr or stmt.
+  ASTNodeKind kind;
 };
 
 void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
@@ -144,7 +151,8 @@ void *BridgedSourceLoc_advanced(void *loc, long len);
 
 void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
                        void *_Nullable argName, void *_Nullable paramLoc,
-                       void *_Nullable paramName, void *declContext);
+                       void *_Nullable paramName, void *_Nullable type,
+                       void *declContext);
 
 void *FuncDecl_create(void *ctx, void *staticLoc, _Bool isStatic, void *funcLoc,
                       BridgedIdentifier name, void *nameLoc, _Bool isAsync,

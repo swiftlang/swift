@@ -7,6 +7,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 
@@ -139,11 +140,20 @@ void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
 }
 
 void *SwiftVarDecl_create(void *ctx, BridgedIdentifier _Nullable nameId,
-                          void *loc, bool isStatic, bool isLet, void *dc) {
+                          void *initExpr, void *loc, bool isStatic, bool isLet,
+                          void *dc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) VarDecl(
+  auto name = (UnresolvedDeclRefExpr *)nameId;
+  auto sourceLoc = getSourceLocFromPointer(loc);
+  auto varDecl = new (Context) VarDecl(
       isStatic, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-      getSourceLocFromPointer(loc), Identifier::getFromOpaquePointer(nameId),
+      sourceLoc, name->getName().getBaseIdentifier(),
+      reinterpret_cast<DeclContext *>(dc));
+  auto pattern = NamedPattern::createImplicit(Context, varDecl);
+  return PatternBindingDecl::create(
+      Context, sourceLoc,
+      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
+      sourceLoc, pattern, sourceLoc, (Expr *)initExpr,
       reinterpret_cast<DeclContext *>(dc));
 }
 
@@ -164,12 +174,16 @@ void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
                        void *rbloc) {
   llvm::SmallVector<ASTNode, 6> nodes;
   for (auto node : getArrayRef<ASTNodeBridged>(elements)) {
-    if (node.isExpr) {
+    if (node.kind == ASTNodeKindExpr) {
       auto expr = (Expr *)node.ptr;
       nodes.push_back(expr);
-    } else {
+    } else if (node.kind == ASTNodeKindStmt) {
       auto stmt = (Stmt *)node.ptr;
       nodes.push_back(stmt);
+    } else {
+      assert(node.kind == ASTNodeKindDecl);
+      auto decl = (Decl *)node.ptr;
+      nodes.push_back(decl);
     }
   }
 
@@ -183,13 +197,17 @@ void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
                        BridgedIdentifier _Nullable argName,
                        void *_Nullable paramLoc,
                        BridgedIdentifier _Nullable paramName,
-                       void *declContext) {
+                       void *_Nullable type, void *declContext) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) ParamDecl(
+  if (!paramName)
+    paramName = argName;
+  auto paramDecl = new (Context) ParamDecl(
       getSourceLocFromPointer(loc), getSourceLocFromPointer(argLoc),
       Identifier::getFromOpaquePointer(argName),
       getSourceLocFromPointer(paramLoc),
       Identifier::getFromOpaquePointer(paramName), (DeclContext *)declContext);
+  paramDecl->setTypeRepr((TypeRepr *)type);
+  return paramDecl;
 }
 
 void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
