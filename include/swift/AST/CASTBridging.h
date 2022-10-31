@@ -144,8 +144,6 @@ struct ASTNodeBridged {
 
 void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
                        void *rbloc);
-void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
-                       void *rbloc);
 
 void *BridgedSourceLoc_advanced(void *loc, long len);
 

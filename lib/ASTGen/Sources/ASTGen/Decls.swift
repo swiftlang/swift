@@ -11,7 +11,7 @@ extension ASTGenVisitor {
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
     }
     let nameLoc = self.base.advanced(by: node.identifier.position.utf8Offset).raw
-    let genericParams = node.genericParameterClause.map(self.visit).map { $0.rawValue }
+    let genericParams = node.genericParameterClause.map { self.visit($0).rawValue }
     let out = TypeAliasDecl_create(
       self.ctx, self.declContext, aliasLoc, equalLoc, name, nameLoc, genericParams)
 
@@ -33,16 +33,17 @@ extension ASTGenVisitor {
     }
 
     let genericParams = node.genericParameterClause
-      .map(self.visit)
-      .map { $0.rawValue }
+      .map { self.visit($0).rawValue }
     let out = StructDecl_create(ctx, loc, name, loc, genericParams, declContext)
     let oldDeclContext = declContext
     declContext = out.declContext
     defer { declContext = oldDeclContext }
 
-    node.members.members.map(self.visit).withBridgedArrayRef { ref in
-      NominalTypeDecl_setMembers(out.nominalDecl, ref)
-    }
+    node.members.members
+      .map { self.visit($0).rawValue }
+      .withBridgedArrayRef { ref in
+        NominalTypeDecl_setMembers(out.nominalDecl, ref)
+      }
 
     return .decl(out.decl)
   }
@@ -59,9 +60,11 @@ extension ASTGenVisitor {
     declContext = out.declContext
     defer { declContext = oldDeclContext }
 
-    node.members.members.map(self.visit).withBridgedArrayRef { ref in
-      NominalTypeDecl_setMembers(out.nominalDecl, ref)
-    }
+    node.members.members
+      .map { self.visit($0).rawValue }
+      .withBridgedArrayRef { ref in
+        NominalTypeDecl_setMembers(out.nominalDecl, ref)
+      }
 
     return .decl(out.decl)
   }

@@ -4,7 +4,7 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   public func visit(_ node: ClosureExprSyntax) -> ASTNode {
-    let statements = node.statements.map(self.visit).map { $0.bridged() }
+    let statements = node.statements.map { self.visit($0).bridged() }
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
 
     let body = statements.withBridgedArrayRef { ref in
@@ -64,7 +64,7 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: TupleExprElementListSyntax) -> ASTNode {
-    let elements = node.map(self.visit).map { $0.rawValue }
+    let elements = node.map { self.visit($0).rawValue }
 
     // TODO: find correct paren locs.
     let lParenLoc = self.base.advanced(by: node.position.utf8Offset).raw
