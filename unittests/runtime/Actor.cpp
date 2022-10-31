@@ -100,7 +100,7 @@ void destroyTestActor(SWIFT_CONTEXT HeapObject *_object) {
   delete static_cast<TestActor*>(_object);
 }
 static FullMetadata<ClassMetadata> TestActorMetadata = {
-  { { &destroyTestActor }, { &VALUE_WITNESS_SYM(Bo) } },
+  { { nullptr }, { &destroyTestActor }, { &VALUE_WITNESS_SYM(Bo) } },
   { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
 TestActor::TestActor() : DefaultActor(&TestActorMetadata) {

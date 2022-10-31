@@ -21,8 +21,8 @@
 // CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC9resilient0H7_struct0E3IntVvpWvd" = hidden global [[INT]] 0,
 
 // CHECK: @"$s16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 2, i32 [[#MDWORDS + 6 + 4]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 2, i32 [[#MDWORDS + 3 + 4]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 3, i32 [[#MDWORDS + 6 + 4]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 3, i32 [[#MDWORDS + 3 + 4]] }
 
 // CHECK: @"$s16class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvpWvd" = hidden constant [[INT]] {{8|16}}
 // CHECK: @"$s16class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvpWvd" = hidden constant [[INT]] {{12|20}}
@@ -105,20 +105,20 @@
 // CHECK-native-SAME: i32 0
 
 // CHECK: @"$s16class_resilience17MyResilientParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 2, i32 [[#MDWORDS + 6 + 2]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 2, i32 [[#MDWORDS + 3 + 2]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 3, i32 [[#MDWORDS + 6 + 2]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 3, i32 [[#MDWORDS + 3 + 2]] }
 
 // CHECK: @"$s16class_resilience16MyResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 6 + 3]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 3 + 3]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 6 + 3]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 3 + 3]] }
 
 // CHECK: @"$s16class_resilience24MyResilientGenericParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 2, i32 [[#MDWORDS + 6 + 3]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 2, i32 [[#MDWORDS + 3 + 3]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32]], i32 3, i32 [[#MDWORDS + 6 + 3]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64]], i32 3, i32 [[#MDWORDS + 3 + 3]] }
 
 // CHECK: @"$s16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
-// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 6 + 5]] }
-// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 2, i32 [[#MDWORDS + 3 + 5]] }
+// CHECK-32-SAME: { [[INT]] [[#MDSIZE32 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 6 + 5]] }
+// CHECK-64-SAME: { [[INT]] [[#MDSIZE64 + WORDSIZE + WORDSIZE + WORDSIZE]], i32 3, i32 [[#MDWORDS + 3 + 5]] }
 
 // CHECK: @"$s16class_resilience27ClassWithEmptyThenResilientC5emptyAA0E0VvpWvd" = hidden constant [[INT]] 0,
 // CHECK: @"$s16class_resilience27ClassWithResilientThenEmptyC5emptyAA0G0VvpWvd" = hidden constant [[INT]] 0,

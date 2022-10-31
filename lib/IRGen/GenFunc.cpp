@@ -241,7 +241,7 @@ namespace {
 #include "swift/AST/ReferenceStorage.def"
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
+                                          SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       } else if (isPOD(ResilienceExpansion::Maximal)) {
@@ -423,7 +423,7 @@ namespace {
       return ReferenceCounting::Block;
     }
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
+                                          SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
@@ -447,9 +447,9 @@ namespace {
                          IsFixedSize),
         CaptureOffset(captureOffset)
     {}
-    
+
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
+                                          SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }

@@ -394,8 +394,7 @@ namespace {
       unsigned emptyCases = 0;
       std::vector<TypeLayoutEntry *> nonEmptyCases;
       nonEmptyCases.push_back(
-        getSingleton()->buildTypeLayoutEntry(IGM,
-                                             getSingletonType(IGM, T)));
+          getSingleton()->buildTypeLayoutEntry(IGM, getSingletonType(IGM, T)));
       return IGM.typeLayoutCache.getOrCreateEnumEntry(emptyCases,
                                                       nonEmptyCases);
     }
@@ -1093,7 +1092,6 @@ namespace {
                                                         ScalarKind::POD);
     }
 
-
     // TODO: Support this function also for other enum implementation strategies.
     int64_t getDiscriminatorIndex(EnumElementDecl *elt) const override {
       // The elements are assigned discriminators in declaration order.
@@ -1649,8 +1647,8 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-     if (!ElementsAreABIAccessible)
-       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+      if (!ElementsAreABIAccessible)
+        return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
 
       unsigned emptyCases = ElementsWithNoPayload.size();
       std::vector<TypeLayoutEntry *> nonEmptyCases;
@@ -3536,7 +3534,8 @@ namespace {
       if (!ElementsAreABIAccessible)
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
 
-      if (!IGM.getOptions().ForceStructTypeLayouts && AllowFixedLayoutOptimizations && TIK >= Loadable) {
+      if (!IGM.getOptions().ForceStructTypeLayouts &&
+          AllowFixedLayoutOptimizations && TIK >= Loadable) {
         // The type layout entry code does not handle spare bits atm.
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(getTypeInfo(),
                                                                  T);
@@ -5657,7 +5656,8 @@ namespace {
       emitDestructiveProjectEnumDataCall(IGF, T, enumAddr);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T) const override {
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
+                                          SILType T) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
 

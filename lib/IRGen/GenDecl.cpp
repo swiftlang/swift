@@ -4987,6 +4987,9 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     defaultVarTy = FullTypeMetadataStructTy;
     if (concreteType->getClassOrBoundGenericClass() && !foreign) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
+    } else if (foreign) {
+      defaultVarTy = FullForeignTypeMetadataStructTy;
+      adjustmentIndex = MetadataAdjustmentIndex::Foreign;
     } else {
       adjustmentIndex = MetadataAdjustmentIndex::ValueType;
     }

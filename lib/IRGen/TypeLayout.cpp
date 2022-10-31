@@ -2963,7 +2963,7 @@ void ResilientTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
 }
 
 void ResilientTypeLayoutEntry::assignWithCopy(IRGenFunction &IGF, Address dest,
-                                           Address src) const {
+                                              Address src) const {
   emitAssignWithCopyCall(IGF, ty, dest, src);
 }
 

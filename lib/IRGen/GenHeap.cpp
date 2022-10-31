@@ -34,6 +34,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -50,162 +51,154 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
-  class Nativeness##Name##ReferenceTypeInfo \
-      : public IndirectTypeInfo<Nativeness##Name##ReferenceTypeInfo, \
-                                FixedTypeInfo> { \
-    llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
-  public: \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                        SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
-      } \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry( \
-          *this, T, ScalarKind::Nativeness##Name##Reference); \
-    } \
-    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
-                                    llvm::Type *type, \
-                                    Size size, Alignment alignment, \
-                                    SpareBitVector &&spareBits, \
-                                    bool isOptional) \
-      : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotPOD, IsNotBitwiseTakable, IsFixedSize), \
-        ValueTypeAndIsOptional(valueType, isOptional) {} \
-    void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
-                            Address srcAddr, SILType T, \
-                            bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##CopyInit(destAddr, srcAddr); \
-    } \
-    void initializeWithTake(IRGenFunction &IGF, Address destAddr, \
-                            Address srcAddr, SILType T, \
-                            bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##TakeInit(destAddr, srcAddr); \
-    } \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness)            \
+  class Nativeness##Name##ReferenceTypeInfo                                    \
+      : public IndirectTypeInfo<Nativeness##Name##ReferenceTypeInfo,           \
+                                FixedTypeInfo> {                               \
+    llvm::PointerIntPair<llvm::Type *, 1, bool> ValueTypeAndIsOptional;        \
+                                                                               \
+  public:                                                                      \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      if (!IGM.getOptions().ForceStructTypeLayouts) {                          \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);    \
+      }                                                                        \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(                       \
+          *this, T, ScalarKind::Nativeness##Name##Reference);                  \
+    }                                                                          \
+    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType,                 \
+                                        llvm::Type *type, Size size,           \
+                                        Alignment alignment,                   \
+                                        SpareBitVector &&spareBits,            \
+                                        bool isOptional)                       \
+        : IndirectTypeInfo(type, size, std::move(spareBits), alignment,        \
+                           IsNotPOD, IsNotBitwiseTakable, IsFixedSize),        \
+          ValueTypeAndIsOptional(valueType, isOptional) {}                     \
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,              \
+                            Address srcAddr, SILType T,                        \
+                            bool isOutlined) const override {                  \
+      IGF.emit##Nativeness##Name##CopyInit(destAddr, srcAddr);                 \
+    }                                                                          \
+    void initializeWithTake(IRGenFunction &IGF, Address destAddr,              \
+                            Address srcAddr, SILType T,                        \
+                            bool isOutlined) const override {                  \
+      IGF.emit##Nativeness##Name##TakeInit(destAddr, srcAddr);                 \
+    }                                                                          \
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr, \
-                        SILType T, bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##CopyAssign(destAddr, srcAddr); \
-    } \
+                        SILType T, bool isOutlined) const override {           \
+      IGF.emit##Nativeness##Name##CopyAssign(destAddr, srcAddr);               \
+    }                                                                          \
     void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr, \
-                        SILType T, bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##TakeAssign(destAddr, srcAddr); \
-    } \
-    void destroy(IRGenFunction &IGF, Address addr, SILType T, \
-                 bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##Destroy(addr); \
-    } \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      auto count = IGM.getReferenceStorageExtraInhabitantCount( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-      return count - ValueTypeAndIsOptional.getInt(); \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      return IGM.getReferenceStorageExtraInhabitantValue(bits, \
-                                      index + ValueTypeAndIsOptional.getInt(), \
-                                      ReferenceOwnership::Name, \
-                                      ReferenceCounting::Nativeness); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T, bool isOutlined) \
-    const override { \
-      return IGF.getReferenceStorageExtraInhabitantIndex(src, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T, bool isOutlined) \
-    const override { \
-      return IGF.storeReferenceStorageExtraInhabitant(index, dest, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
-      return IGM.getReferenceStorageExtraInhabitantMask( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    llvm::Type *getOptionalIntType() const { \
-      return llvm::IntegerType::get( \
-          ValueTypeAndIsOptional.getPointer()->getContext(), \
-          getFixedSize().getValueInBits()); \
-    } \
+                        SILType T, bool isOutlined) const override {           \
+      IGF.emit##Nativeness##Name##TakeAssign(destAddr, srcAddr);               \
+    }                                                                          \
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,                  \
+                 bool isOutlined) const override {                             \
+      IGF.emit##Nativeness##Name##Destroy(addr);                               \
+    }                                                                          \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {   \
+      auto count = IGM.getReferenceStorageExtraInhabitantCount(                \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+      return count - ValueTypeAndIsOptional.getInt();                          \
+    }                                                                          \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,        \
+                                       unsigned index) const override {        \
+      return IGM.getReferenceStorageExtraInhabitantValue(                      \
+          bits, index + ValueTypeAndIsOptional.getInt(),                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,      \
+                                         SILType T,                            \
+                                         bool isOutlined) const override {     \
+      return IGF.getReferenceStorageExtraInhabitantIndex(                      \
+          src, ReferenceOwnership::Name, ReferenceCounting::Nativeness);       \
+    }                                                                          \
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,          \
+                              Address dest, SILType T,                         \
+                              bool isOutlined) const override {                \
+      return IGF.storeReferenceStorageExtraInhabitant(                         \
+          index, dest, ReferenceOwnership::Name,                               \
+          ReferenceCounting::Nativeness);                                      \
+    }                                                                          \
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {       \
+      return IGM.getReferenceStorageExtraInhabitantMask(                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    llvm::Type *getOptionalIntType() const {                                   \
+      return llvm::IntegerType::get(                                           \
+          ValueTypeAndIsOptional.getPointer()->getContext(),                   \
+          getFixedSize().getValueInBits());                                    \
+    }                                                                          \
   };
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
-  class Nativeness##Name##ReferenceTypeInfo \
-    : public SingleScalarTypeInfo<Nativeness##Name##ReferenceTypeInfo, \
-                                  LoadableTypeInfo> { \
-    llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
-  public: \
-    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
-                                              llvm::Type *type, \
-                                              Size size, Alignment alignment, \
-                                              SpareBitVector &&spareBits, \
-                                              bool isOptional) \
-      : SingleScalarTypeInfo(type, size, std::move(spareBits), \
-                             alignment, IsNotPOD, IsFixedSize), \
-        ValueTypeAndIsOptional(valueType, isOptional) {} \
-    enum { IsScalarPOD = false }; \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
-      } \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry( \
-          *this, T, ScalarKind::Nativeness##Name##Reference); \
-    } \
-    llvm::Type *getScalarType() const { \
-      return ValueTypeAndIsOptional.getPointer(); \
-    } \
-    Address projectScalar(IRGenFunction &IGF, Address addr) const { \
-      return IGF.Builder.CreateElementBitCast(addr, getScalarType()); \
-    } \
-    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value, \
-                          Atomicity atomicity) const { \
-      IGF.emit##Nativeness##Name##Retain(value, atomicity); \
-    } \
-    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value, \
-                           Atomicity atomicity) const { \
-      IGF.emit##Nativeness##Name##Release(value, atomicity); \
-    } \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness)           \
+  class Nativeness##Name##ReferenceTypeInfo                                    \
+      : public SingleScalarTypeInfo<Nativeness##Name##ReferenceTypeInfo,       \
+                                    LoadableTypeInfo> {                        \
+    llvm::PointerIntPair<llvm::Type *, 1, bool> ValueTypeAndIsOptional;        \
+                                                                               \
+  public:                                                                      \
+    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType,                 \
+                                        llvm::Type *type, Size size,           \
+                                        Alignment alignment,                   \
+                                        SpareBitVector &&spareBits,            \
+                                        bool isOptional)                       \
+        : SingleScalarTypeInfo(type, size, std::move(spareBits), alignment,    \
+                               IsNotPOD, IsFixedSize),                         \
+          ValueTypeAndIsOptional(valueType, isOptional) {}                     \
+    enum { IsScalarPOD = false };                                              \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      if (!IGM.getOptions().ForceStructTypeLayouts) {                          \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);    \
+      }                                                                        \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(                       \
+          *this, T, ScalarKind::Nativeness##Name##Reference);                  \
+    }                                                                          \
+    llvm::Type *getScalarType() const {                                        \
+      return ValueTypeAndIsOptional.getPointer();                              \
+    }                                                                          \
+    Address projectScalar(IRGenFunction &IGF, Address addr) const {            \
+      return IGF.Builder.CreateElementBitCast(addr, getScalarType());          \
+    }                                                                          \
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,              \
+                          Atomicity atomicity) const {                         \
+      IGF.emit##Nativeness##Name##Retain(value, atomicity);                    \
+    }                                                                          \
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,             \
+                           Atomicity atomicity) const {                        \
+      IGF.emit##Nativeness##Name##Release(value, atomicity);                   \
+    }                                                                          \
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const { \
-      IGF.emitFixLifetime(value); \
-    } \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      auto count = IGM.getReferenceStorageExtraInhabitantCount( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-      return count - ValueTypeAndIsOptional.getInt(); \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      return IGM.getReferenceStorageExtraInhabitantValue(bits, \
-                                      index + ValueTypeAndIsOptional.getInt(), \
-                                      ReferenceOwnership::Name, \
-                                      ReferenceCounting::Nativeness); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T, bool isOutlined) \
-    const override {     \
-      return IGF.getReferenceStorageExtraInhabitantIndex(src, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T, bool isOutlined) \
-    const override { \
-      return IGF.storeReferenceStorageExtraInhabitant(index, dest, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
-      return IGM.getReferenceStorageExtraInhabitantMask( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
+      IGF.emitFixLifetime(value);                                              \
+    }                                                                          \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {   \
+      auto count = IGM.getReferenceStorageExtraInhabitantCount(                \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+      return count - ValueTypeAndIsOptional.getInt();                          \
+    }                                                                          \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,        \
+                                       unsigned index) const override {        \
+      return IGM.getReferenceStorageExtraInhabitantValue(                      \
+          bits, index + ValueTypeAndIsOptional.getInt(),                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,      \
+                                         SILType T,                            \
+                                         bool isOutlined) const override {     \
+      return IGF.getReferenceStorageExtraInhabitantIndex(                      \
+          src, ReferenceOwnership::Name, ReferenceCounting::Nativeness);       \
+    }                                                                          \
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,          \
+                              Address dest, SILType T,                         \
+                              bool isOutlined) const override {                \
+      return IGF.storeReferenceStorageExtraInhabitant(                         \
+          index, dest, ReferenceOwnership::Name,                               \
+          ReferenceCounting::Nativeness);                                      \
+    }                                                                          \
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {       \
+      return IGM.getReferenceStorageExtraInhabitantMask(                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
   };
 
   // The nativeness of a reference storage type is a policy decision.

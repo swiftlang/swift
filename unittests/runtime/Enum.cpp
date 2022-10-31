@@ -73,9 +73,8 @@ ValueWitnessTable Int8WithExtraInhabitantValueWitness = {
 };
 
 FullMetadata<OpaqueMetadata> XI_TMBi8_ = {
-  {&Int8WithExtraInhabitantValueWitness},
-  {{MetadataKind::Opaque}}
-};
+    {{nullptr}, {&Int8WithExtraInhabitantValueWitness}},
+    {{MetadataKind::Opaque}}};
 
 const OpaqueValue *asOpaque(const void *v) {
   return reinterpret_cast<const OpaqueValue*>(v);

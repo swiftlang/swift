@@ -47,6 +47,7 @@
 // CHECK-SAME:         i64
 // CHECK-SAME:       }>,
 // CHECK-SAME:       <{
+// CHECK-SAME:         i8*,
 // CHECK-SAME:         i8**,
 // CHECK-SAME:         [[INT]],
 // CHECK-SAME:         <{
@@ -65,7 +66,7 @@
 // CHECK-SAME:         i64
 // CHECK-SAME:       }>* @"$s4main11TheArgumentVMf",
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ) to %swift.type*
 // CHECK-SAME:   ),
 // CHECK-SAME:   i32 0,
@@ -96,6 +97,7 @@ struct TheArgument {
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       %swift.full_type* bitcast (
 // CHECK-SAME:         <{
+// CHECK-SAME:           i8*,
 // CHECK-SAME:           i8**,
 // CHECK-SAME:           [[INT]],
 // CHECK-SAME:           %swift.type_descriptor*,
@@ -106,7 +108,7 @@ struct TheArgument {
 // CHECK-SAME:         }>* @"$s7Generic11OneArgumentVy4main03TheC0VGMN" to %swift.full_type*
 // CHECK-SAME:       ),
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ),
 // CHECK-SAME:   %swift.type** @"$s7Generic11OneArgumentVy4main03TheC0VGMJ"
 // CHECK-SAME:   )

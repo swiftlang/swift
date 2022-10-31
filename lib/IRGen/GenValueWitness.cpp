@@ -503,8 +503,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
         auto *assignFn = IGF.IGM.getGenericAssignFn();
         auto *assignFnTy = IGF.IGM.getGenericAssignFnType();
         IGF.Builder.CreateCallWithoutDbgLoc(
-            assignFnTy,
-            assignFn,
+            assignFnTy, assignFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(false)});
@@ -542,8 +541,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
         auto *assignFn = IGF.IGM.getGenericAssignFn();
         auto *assignFnTy = IGF.IGM.getGenericAssignFnType();
         IGF.Builder.CreateCallWithoutDbgLoc(
-            assignFnTy,
-            assignFn,
+            assignFnTy, assignFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(true)});
@@ -577,8 +575,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
         auto *destroyFn = IGF.IGM.getGenericDestroyFn();
         auto *destroyFnTy = IGF.IGM.getGenericDestroyFnType();
         IGF.Builder.CreateCallWithoutDbgLoc(
-            destroyFnTy,
-            destroyFn,
+            destroyFnTy, destroyFn,
             {castAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr});
@@ -634,8 +631,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
         auto *initFn = IGF.IGM.getGenericInitializeFn();
         auto *initFnTy = IGF.IGM.getGenericInitializeFnType();
         IGF.Builder.CreateCallWithoutDbgLoc(
-            initFnTy,
-            initFn,
+            initFnTy, initFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(false)});
@@ -675,8 +671,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
         auto *initFn = IGF.IGM.getGenericInitializeFn();
         auto *initFnTy = IGF.IGM.getGenericInitializeFnType();
         IGF.Builder.CreateCallWithoutDbgLoc(
-            initFnTy,
-            initFn,
+            initFnTy, initFn,
             {destAddr, srcAddr,
              IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
              castStr, IGF.Builder.getInt1(true)});

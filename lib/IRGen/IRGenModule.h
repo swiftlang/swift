@@ -696,6 +696,7 @@ public:
   llvm::PointerType *FullBoxMetadataPtrTy;/// %swift.full_boxmetadata*
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
+  llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
   llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
   llvm::StructType *ProtocolRequirementStructTy; /// %swift.protocol_requirement

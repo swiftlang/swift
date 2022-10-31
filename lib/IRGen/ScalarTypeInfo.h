@@ -302,7 +302,6 @@ private:
     return IGM.typeLayoutCache.getOrCreateScalarEntry(asDerived(), T,
                                                       ScalarKind::POD);
   }
-
 };
 
 }

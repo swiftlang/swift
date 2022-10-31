@@ -563,7 +563,8 @@ BitVector AlignedGroup::spareBits() const {
         // 'R' <nameLength: uint32_t> <mangledName...>
         size_t fieldOffset = 1;
         const uint8_t *fieldLayout = fields[fieldIdx].fieldPtr;
-        uint32_t mangledNameLength = readBytes<uint32_t>(fieldLayout, fieldOffset);
+        uint32_t mangledNameLength =
+            readBytes<uint32_t>(fieldLayout, fieldOffset);
         const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
             (const char *)(fieldLayout + offset), mangledNameLength, nullptr,
             (const void *const *)getGenericArgs(metadata));

@@ -45,6 +45,7 @@
 // CHECK-SAME:         i64
 // CHECK-SAME:       }>,
 // CHECK-SAME:       <{
+// CHECK-SAME:         i8*,
 // CHECK-SAME:         i8**,
 // CHECK-SAME:         [[INT]],
 // CHECK-SAME:         <{
@@ -63,7 +64,7 @@
 // CHECK-SAME:         i64
 // CHECK-SAME:       }>* @"$s4main11TheArgumentVMf",
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ) to %swift.type*
 // CHECK-SAME:   ),
 // CHECK-SAME:   i64 1
@@ -97,7 +98,7 @@ struct TheArgument {
 // CHECK-SAME:         }>* @"$s8Argument03OneA0Oy4main03TheA0VGMN" to %swift.full_type*
 // CHECK-SAME:       ),
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ),
 // CHECK-SAME:     %swift.type** @"$s8Argument03OneA0Oy4main03TheA0VGMJ"
 // CHECK-SAME:   )

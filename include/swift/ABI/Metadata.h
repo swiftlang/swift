@@ -116,6 +116,12 @@ struct MetadataDependency {
   }
 };
 
+/// Prefix of a metadata header, containing a pointer to the
+/// type layout string.
+struct TargetTypeMetadataLayoutPrefix {
+  const uint8_t *typeLayout;
+};
+
 /// The header before a metadata object which appears on all type
 /// metadata.  Note that heap metadata are not necessarily type
 /// metadata, even for objects of a heap type: for example, objects of
@@ -124,11 +130,25 @@ struct MetadataDependency {
 /// This case can be distinguished using the isTypeMetadata() flag
 /// on ClassMetadata.
 template <typename Runtime>
-struct TargetTypeMetadataHeader {
+struct TargetTypeMetadataHeaderBase {
   /// A pointer to the value-witnesses for this type.  This is only
   /// present for type metadata.
   TargetPointer<Runtime, const ValueWitnessTable> ValueWitnesses;
 };
+
+template <typename Runtime>
+struct TargetTypeMetadataHeader
+    : TargetTypeMetadataLayoutPrefix,
+      TargetTypeMetadataHeaderBase<Runtime> {
+
+  TargetTypeMetadataHeader() = default;
+  constexpr TargetTypeMetadataHeader(
+    const TargetTypeMetadataLayoutPrefix &layout,
+    const TargetTypeMetadataHeaderBase<Runtime> &header)
+      : TargetTypeMetadataLayoutPrefix(layout),
+        TargetTypeMetadataHeaderBase<Runtime>(header) {}
+};
+
 using TypeMetadataHeader = TargetTypeMetadataHeader<InProcess>;
 
 /// A "full" metadata pointer is simply an adjusted address point on a
@@ -285,7 +305,13 @@ public:
   }
 
   const ValueWitnessTable *getValueWitnesses() const {
-    return asFullMetadata(this)->ValueWitnesses;
+    auto *full = asFullMetadata(this);
+    fprintf(stderr, "=======================\n");
+    fprintf(stderr, "Pre: %p\n", (void *)this);
+    fprintf(stderr, "-----------------------\n");
+    fprintf(stderr, "Post: %p\n", (void *)full);
+    fprintf(stderr, "=======================\n");
+    return full->ValueWitnesses;
   }
 
   const TypeLayout *getTypeLayout() const {
@@ -469,13 +495,16 @@ using HeapMetadataHeaderPrefix =
 /// The header present on all heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeader
-    : TargetHeapMetadataHeaderPrefix<Runtime>,
-      TargetTypeMetadataHeader<Runtime> {
+    : TargetTypeMetadataLayoutPrefix,
+      TargetHeapMetadataHeaderPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
+      const TargetTypeMetadataLayoutPrefix &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
-      const TargetTypeMetadataHeader<Runtime> &typePrefix)
-    : TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
-      TargetTypeMetadataHeader<Runtime>(typePrefix) {}
+      const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
+    : TargetTypeMetadataLayoutPrefix(typeLayoutPrefix),
+      TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+      TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };
 using HeapMetadataHeader =
   TargetHeapMetadataHeader<InProcess>;

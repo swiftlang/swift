@@ -277,11 +277,9 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING) =
 /*** Known metadata **********************************************************/
 
 // Define some builtin opaque metadata.
-#define OPAQUE_METADATA(TYPE) \
-  const FullOpaqueMetadata swift::METADATA_SYM(TYPE) = { \
-    { &VALUE_WITNESS_SYM(TYPE) },                             \
-    { { MetadataKind::Opaque } }                 \
-  };
+#define OPAQUE_METADATA(TYPE)                                                  \
+  const FullOpaqueMetadata swift::METADATA_SYM(TYPE) = {                       \
+      {{nullptr}, {&VALUE_WITNESS_SYM(TYPE)}}, {{MetadataKind::Opaque}}};
 #define BUILTIN_TYPE(Symbol, Name) \
   OPAQUE_METADATA(Symbol)
 #if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
@@ -290,13 +288,11 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING) =
 #include "swift/Runtime/BuiltinTypes.def"
 
 /// The standard metadata for the empty tuple.
-const FullMetadata<TupleTypeMetadata> swift::
-METADATA_SYM(EMPTY_TUPLE_MANGLING) = {
-  { &VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING) },                 // ValueWitnesses
-  {
-    { MetadataKind::Tuple },   // Kind
-    0,                         // NumElements
-    nullptr                    // Labels
-  }
-};
-
+const FullMetadata<TupleTypeMetadata> swift::METADATA_SYM(
+    EMPTY_TUPLE_MANGLING) = {
+    {{nullptr}, {&VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING)}}, // ValueWitnesses
+    {
+        {MetadataKind::Tuple}, // Kind
+        0,                     // NumElements
+        nullptr                // Labels
+    }};

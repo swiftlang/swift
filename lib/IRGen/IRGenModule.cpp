@@ -348,13 +348,19 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full type metadata record is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
-  static_assert(MetadataAdjustmentIndex::ValueType == 1,
+  static_assert(MetadataAdjustmentIndex::ValueType == 2,
                 "Adjustment index must be synchronized with this layout");
   FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
+    Int8PtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy
   });
   FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
+
+  FullForeignTypeMetadataStructTy = createStructType(*this, "swift.full_foreign_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
 
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
@@ -362,10 +368,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
-  static_assert(MetadataAdjustmentIndex::Class == 2,
+  static_assert(MetadataAdjustmentIndex::Class == 3,
                 "Adjustment index must be synchronized with this layout");
   FullHeapMetadataStructTy =
                   createStructType(*this, "swift.full_heapmetadata", {
+    Int8PtrTy,
     dtorPtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy
@@ -1970,7 +1977,6 @@ TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
 const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
   return Types.getTypeLayoutEntry(T);
 }
-
 
 void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
   if (!hasSwiftAsyncFunctionDef || extendedFramePointerFlagsWeakRef)

@@ -82,9 +82,9 @@
 //         CHECK-SAME:   i32 {{(24|12)}},
 //         CHECK-SAME:   i16 {{(7|3)}},
 //         CHECK-SAME:   i16 0,
-//   CHECK-apple-SAME:   i32 {{(120|72)}},
+//   CHECK-apple-SAME:   i32 {{(128|76)}},
 // CHECK-unknown-SAME:   i32 96,
-//         CHECK-SAME:   i32 {{(16|8)}},
+//         CHECK-SAME:   i32 {{(24|12)}},
 //                   :   %swift.type_descriptor* bitcast (
 //                   :     <{
 //                   :       i32,
@@ -146,7 +146,7 @@
 //         CHECK-SAME:       }>* @"$s4main3Box[[UNIQUE_ID_1]]LLCySiGMf" to %swift.full_heapmetadata*
 //         CHECK-SAME:     ),
 //         CHECK-SAME:     i32 0,
-//         CHECK-SAME:     i32 2
+//         CHECK-SAME:     i32 3
 //         CHECK-SAME:   ),
 //         CHECK-SAME:   [[INT]] {{(16|8)}},
 //         CHECK-SAME:   %T4main5Value[[UNIQUE_ID_1]]LLC* (

@@ -1524,8 +1524,7 @@ namespace {
   public:
     StructContextDescriptorBuilder(IRGenModule &IGM, StructDecl *Type,
                                    RequireMetadata_t requireMetadata)
-      : super(IGM, Type, requireMetadata)
-    {
+        : super(IGM, Type, requireMetadata) {
       auto &layout = IGM.getMetadataLayout(getType());
       FieldVectorOffset = layout.getFieldOffsetVectorOffset().getStatic();
     }
@@ -3587,6 +3586,11 @@ namespace {
       B.add(metadata);
     }
 
+    void addLayoutStringPointer() {
+      // TODO: really add the pointer
+      B.addNullPointer(IGM.Int8PtrTy);
+    }
+
     void addDestructorFunction() {
       if (asImpl().getFieldLayout().hasObjCImplementation())
         return;
@@ -3947,6 +3951,11 @@ namespace {
       B.addRelativeAddressOrNull(nullptr);
     }
 
+    void addLayoutStringPointer() {
+      // TODO: really add the pointer
+      B.addNullPointer(IGM.Int8PtrTy);
+    }
+
     void addDestructorFunction() {
       if (FieldLayout.hasObjCImplementation())
         return;
@@ -4083,6 +4092,11 @@ namespace {
       emitClassMetadataBaseOffset(IGM, Target);
 
       super::emitInstantiationDefinitions();
+    }
+
+    void addLayoutStringPointer() {
+      // TODO: really add the pointer
+      B.addNullPointer(IGM.Int8PtrTy);
     }
 
     void addDestructorFunction() {
@@ -4746,7 +4760,7 @@ namespace {
 
     llvm::Constant *emitNominalTypeDescriptor() {
       auto descriptor =
-        StructContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+          StructContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
       return descriptor;
     }
 
@@ -4768,6 +4782,11 @@ namespace {
 
     ConstantReference getValueWitnessTable(bool relativeReference) {
       return emitValueWitnessTable(relativeReference);
+    }
+
+    void addLayoutStringPointer() {
+      // TODO: really add the pointer
+      B.addNullPointer(IGM.Int8PtrTy);
     }
 
     void addValueWitnessTable() {
@@ -4895,7 +4914,8 @@ namespace {
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
-      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata).emit();
+      return StructContextDescriptorBuilder(IGM, Target, RequireMetadata)
+          .emit();
     }
 
     GenericMetadataPatternFlags getPatternFlags() {
@@ -5138,6 +5158,11 @@ namespace {
 
     ConstantReference getValueWitnessTable(bool relativeReference) {
       return emitValueWitnessTable(relativeReference);
+    }
+
+    void addLayoutStringPointer() {
+      // TODO: really add the pointer
+      B.addNullPointer(IGM.Int8PtrTy);
     }
 
     void addValueWitnessTable() {

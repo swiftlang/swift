@@ -332,7 +332,8 @@ public:
   FullMetadata<GenericBoxHeapMetadata> Data;
 
   BoxCacheEntry(const Metadata *type)
-    : Data{HeapMetadataHeader{{destroyGenericBox}, {/*vwtable*/ nullptr}},
+    : Data{HeapMetadataHeader{ {/*type layout*/nullptr}, {destroyGenericBox},
+                               {/*vwtable*/ nullptr}},
            GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable,
                                   GenericBoxHeapMetadata::getHeaderOffset(type),
                                   type}} {

@@ -38,7 +38,7 @@
 // CHECK-SAME:       to %swift.full_type*
 // CHECK-SAME:     ), 
 // CHECK-SAME:     i32 0, 
-// CHECK-SAME:     i32 1
+// CHECK-SAME:     i32 2
 // CHECK-SAME:   ), 
 // CHECK-SAME:   i64 3 
 // CHECK-SAME: }>, align [[ALIGNMENT]]
@@ -72,7 +72,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:         to %swift.full_type*
 // CHECK-SAME:       ), 
 // CHECK-SAME:       i32 0, 
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     )
 // CHECK-SAME:   )
 // CHECK: }
