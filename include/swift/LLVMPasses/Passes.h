@@ -21,8 +21,8 @@
 
 namespace swift {
 
-  struct SwiftAAResult : llvm::AAResultBase<SwiftAAResult> {
-    friend llvm::AAResultBase<SwiftAAResult>;
+  struct SwiftAAResult : llvm::AAResultBase {
+    friend llvm::AAResultBase;
 
     explicit SwiftAAResult() : AAResultBase() {}
     SwiftAAResult(SwiftAAResult &&Arg)
@@ -39,9 +39,11 @@ namespace swift {
     using AAResultBase::getModRefInfo;
     llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
                                    const llvm::MemoryLocation &Loc) {
-      llvm::SimpleAAQueryInfo AAQI;
-      return getModRefInfo(Call, Loc, AAQI);
-    }
+// FIXME: how to construct a SimpleAAQueryInfo without an AAResults?
+//      llvm::SimpleAAQueryInfo AAQI;
+//      return getModRefInfo(Call, Loc, AAQI);
+      return llvm::ModRefInfo::ModRef;
+   }
     llvm::ModRefInfo getModRefInfo(const llvm::CallBase *Call,
                                    const llvm::MemoryLocation &Loc,
                                    llvm::AAQueryInfo &AAQI);
