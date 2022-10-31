@@ -60,7 +60,7 @@ C++ is a very expressive language and it can provide representation for a lot of
 
 Some Swift APIs patterns will map to distinct C++ language constructs or patterns. For instance, an empty Swift enum with static members is commonly used in a namespace-like manner in Swift. This kind of enum can be mapped to a C++ namespace. It is a goal of C++ interoperability to provide a clear mapping for how Swift API patterns like this one are bridged to C++.
 
-The semantics of how Swift types behave should be preserved when they’re mapped to C++. For instance, in C++, there should still be a semantic difference between Swift value and reference types. Additionally, Swift’s copy-on-write data types like Array should still obey the copy-on-write semantics in C++.
+The semantics of how Swift types behave should be preserved when they’re mapped to C++. For instance, in C++, there should still be a semantic difference between Swift value and reference types. Additionally, Swift’s copy-on-write data types like `Array` should still obey the copy-on-write semantics in C++.
 
 ### Swift API Design Should be Unaffected
 
