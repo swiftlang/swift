@@ -283,10 +283,13 @@ void *ClosureExpr_create(void *ctx, void *body, void *dc) {
   SourceLoc inLoc;
 
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto params = ParameterList::create(Context, inLoc, {}, inLoc);
+
   auto *out = new (Context)
       ClosureExpr(attributes, bracketRange, nullptr, nullptr, asyncLoc,
                   throwsLoc, arrowLoc, inLoc, nullptr, 0, (DeclContext *)dc);
   out->setBody((BraceStmt *)body, true);
+  out->setParameterList(params);
   return (Expr *)out;
 }
 
