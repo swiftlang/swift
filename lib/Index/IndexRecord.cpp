@@ -513,14 +513,40 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   if (*isUptodateOpt)
     return false;
 
-  // FIXME: Would be useful for testing if swift had clang's -Rremark system so
-  // we could output a remark here that we are going to create index data for
-  // a module file.
+  // Reload resilient modules from swiftinterface to avoid indexing
+  // internal details.
+  bool skipIndexingModule = false;
+  if (module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
+      !module->isBuiltFromInterface() &&
+      !module->isStdlibModule()) {
+    module->getASTContext().setIgnoreAdjacentModules(true);
+
+    ImportPath::Module::Builder builder(module->getName());
+    ASTContext &ctx = module->getASTContext();
+    auto reloadedModule = ctx.getModule(builder.get(),
+                                        /*AllowMemoryCached=*/false);
+
+    if (reloadedModule) {
+      module = reloadedModule;
+    } else {
+      // If we can't rebuild from the swiftinterface, don't index this module.
+      skipIndexingModule = true;
+    }
+  }
+
+  if (module->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
+    diags.diagnose(SourceLoc(),
+                   diag::remark_indexing_system_module,
+                   filename, skipIndexingModule);
+  }
 
   // Pairs of (recordFile, groupName).
   std::vector<std::pair<std::string, std::string>> records;
 
-  if (!module->isStdlibModule()) {
+  if (skipIndexingModule) {
+    // Don't add anything to records but keep going so we still mark the module
+    // as indexed to avoid rebuilds of broken swiftinterfaces.
+  } else if (!module->isStdlibModule()) {
     std::string recordFile;
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),

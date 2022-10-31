@@ -249,10 +249,14 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param AllowMemoryCache Enables preserving the loaded module in the
+  /// in-memory cache for the next loading attempt.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
-  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path) = 0;
+  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path,
+                         bool AllowMemoryCache = true) = 0;
 
   /// Load extensions to the given nominal type.
   ///

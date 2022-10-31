@@ -2023,7 +2023,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
 ModuleDecl *
 ClangImporter::loadModule(SourceLoc importLoc,
-                          ImportPath::Module path) {
+                          ImportPath::Module path,
+                          bool AllowMemoryCache) {
   return Impl.loadModule(importLoc, path);
 }
 
