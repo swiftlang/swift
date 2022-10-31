@@ -75,7 +75,6 @@
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/Coroutines.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
