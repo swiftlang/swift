@@ -140,7 +140,7 @@ extension ASTGenVisitor {
       returnType = nil
     }
 
-    let params = node.signature.input.parameterList.map { visit($0) }
+    let params = node.signature.input.parameterList.map { visit($0).rawValue }
     return .decl(
       params.withBridgedArrayRef { ref in
         FuncDecl_create(

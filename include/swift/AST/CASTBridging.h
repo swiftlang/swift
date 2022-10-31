@@ -230,6 +230,7 @@ void TopLevelCodeDecl_dump(void *);
 void Expr_dump(void *);
 void Decl_dump(void *);
 void Stmt_dump(void *);
+void Type_dump(void *);
 
 #ifdef __cplusplus
 }
