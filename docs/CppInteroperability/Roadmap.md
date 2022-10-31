@@ -80,7 +80,7 @@ Because iterators and ranges follow some specific API semantics, the Swift compi
 
 ### Other projections
 
-Value types that own memory through custom lifetime operations do not natively exist in Swift today. Any value types that own memory in Swift do so transatively through reference types that have long, stable lifetimes. Because Swift was not built around this kind of value type with short lifetimes and deep copies, dealing with projections of these owned types can be dangerious. This pattern is, up until now, foreign to Swift, so there are no existing tools that allow users to control this behavior or improve saftey. The best model for handling these potentially unsafe APIs is unclear; maybe most projects can be represented using generalized accessors, maybe most projects can be represented as iterators, maybe some projections should not be projections at all (and rather imported as values that are copied), most likely the answer is some combination of these. The best approach for handling projections will be revealed over time as evolution posts propose potential solutions, such as the iterator bridging described above, and as users of interop provide feedback. 
+Value types that own memory through custom lifetime operations do not natively exist in Swift today. Any value types that own memory in Swift do so transatively through reference types that have long, stable lifetimes. Because Swift was not built around this kind of value type with short lifetimes and deep copies, dealing with projections of these owned types can be dangerous. This pattern is, up until now, foreign to Swift, so there are no existing tools that allow users to control this behavior or improve saftey. The best model for handling these potentially unsafe APIs is unclear; maybe most projects can be represented using generalized accessors, maybe most projects can be represented as iterators, maybe some projections should not be projections at all (and rather imported as values that are copied), most likely the answer is some combination of these. The best approach for handling projections will be revealed over time as evolution posts propose potential solutions, such as the iterator bridging described above, and as users of interop provide feedback.
 
 Besides the dissonant semantic models for representing projections, the bredth of ways to define projections in C++ will prove a challenege for importing this API pattern. 
 
@@ -111,13 +111,11 @@ Several specific API patterns are outlined above. These specific API patterns wi
 
 This roadmap allows specific, focused, and self contained evolution proposals to be created for individual pieces of the language and specific programming patterns by providing goals that lend themself to this kind of incremental design and evolution (by not importing everything and requiring specific mappings for specific API patterns) and by framing interop in a larger context that these individual evolution proposals can fit into.
 
-For example, “virtual type interfaces that API consumers provide implementations for” are a fairly common API pattern in C++. Currently, there is no design for such a pattern, but some Swift contributor may extend interop to provide a clear, native mapping for this API pattern through a self-contained proposal following the goals outlined by this document, and framed by “the approach” described above. 
-
 ## The Swift ecosystem
 
 ### Tooling and build process
 
-It goes without saying (yet will be said anyway) that as a supported language feature, C++ and Swift interoperability must work well on every platform supported by Swift. In a similar vein, tools in the Swift ecosystem should be updated to support interoperability features. For example, SourceKit should provide autocompletion, jump-to-definition, etc. for C++ functions, methods, and types and lldb should be able to print C++ types (even in Swift frames). Finally, the Swift package manager should be updated with the necessary features to support building C++ dependencies, a topic which Saleem Abdulrasool may be able to expand on here :)
+It goes without saying (yet will be said anyway) that as a supported language feature, C++ and Swift interoperability must work well on every platform supported by Swift. In a similar vein, tools in the Swift ecosystem should be updated to support interoperability features. For example, SourceKit should provide autocompletion, jump-to-definition, etc. for C++ functions, methods, and types and lldb should be able to print C++ types (even in Swift frames). Finally, the Swift package manager should be updated with the necessary features to support building C++ dependencies.
 
 This roadmap outlines a strategy for importing APIs that relies on semantic information from the user. In order to make this painless for users across a variety of projects, Swift will need to provide both inline annotation support for C++ APIs and side-file support for APIs that cannot be updated. For Objective-C, this side-file is an APINotes file. As part of Swift and C++ interoperability, APINotes will either need to be updated to support C++ APIs, or another kind side-file will need to be created. 
 
@@ -125,7 +123,7 @@ This roadmap outlines a strategy for importing APIs that relies on semantic info
 
 Egor Zhdan will discuss importing the standard library, the Swift C++ standard library overlay, etc. :)
 
-## Examples and Definitions
+## Appendix 1: Examples and Definitions
 
 **Reference Types** have reference semantics and object identity. A reference type is a pointer (or “reference”) to some object which means there is a layer of indirection. When a reference type is copied, the pointer’s value is copied rather than the object’s storage. This means reference types can be used to represent non-copyable types in C++. For real-world examples of C++ reference types, consider LLVM's [`Instruction` class](https://llvm.org/doxygen/IR_2Instruction_8h_source.html) or Qt's [`QWidget` class](https://github.com/qt/qtbase/blob/dev/src/widgets/kernel/qwidget.h).
 
@@ -233,7 +231,7 @@ Iterators are also projections:
 Because `string` is an owned type, the Swift compiler cannot represent a projection of its storage, so the `begin`, `end`, and `c_str` APIs are not imported. A projection is only valid as long as the storage it points to is valid. Projections of reference types are usually safe because reference types have storage with long, stable lifetimes, but projections of owned types are more dangerous because the storage associated with a specific copy usually has a much shorter lifetime (therefore most of these projections of owned storage cannot yet be imported).
 
 
-## Lifetime and safety of self-contained types and projections 
+## Appendix 2: Lifetime and safety of self-contained types and projections
 
 The following section will go further into depth on the issues with using projections of self contained types in Swift, rather than proposing a solution on how to import them. Let’s start with an example Swift program that naively imports some self-contained type and returns a projections of it:
 
