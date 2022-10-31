@@ -5,10 +5,10 @@ import SwiftSyntax
 extension ASTGenVisitor {
   public func visit(_ node: ClosureExprSyntax) -> ASTNode {
     let statements = node.statements.map { self.visit($0).bridged() }
-    let loc = self.base.advanced(by: node.position.utf8Offset).raw
-
     let body = statements.withBridgedArrayRef { ref in
-      BraceStmt_create(ctx, loc, ref, loc)
+      let startLoc = self.base.advanced(by: node.leftBrace.position.utf8Offset).raw
+      let endLoc = self.base.advanced(by: node.rightBrace.position.utf8Offset).raw
+      return BraceStmt_create(ctx, startLoc, ref, endLoc)
     }
 
     return .expr(ClosureExpr_create(ctx, body, declContext))

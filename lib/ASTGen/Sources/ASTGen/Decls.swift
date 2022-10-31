@@ -119,7 +119,12 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: FunctionDeclSyntax) -> ASTNode {
-    let loc = self.base.advanced(by: node.position.utf8Offset).raw
+    let staticLoc = self.base.advanced(by: node.position.utf8Offset).raw
+    let funcLoc = self.base.advanced(by: node.funcKeyword.position.utf8Offset).raw
+    let nameLoc = self.base.advanced(by: node.identifier.position.utf8Offset).raw
+    let rParamLoc = self.base.advanced(by: node.signature.input.leftParen.position.utf8Offset).raw
+    let lParamLoc = self.base.advanced(by: node.signature.input.rightParen.position.utf8Offset).raw
+    
 
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
@@ -144,7 +149,7 @@ extension ASTGenVisitor {
     return .decl(
       params.withBridgedArrayRef { ref in
         FuncDecl_create(
-          ctx, loc, false, loc, name, loc, false, nil, false, nil, loc, ref, loc, body?.rawValue,
+          ctx, staticLoc, false, funcLoc, name, nameLoc, false, nil, false, nil, rParamLoc, ref, lParamLoc, body?.rawValue,
           returnType?.rawValue, declContext)
       })
   }

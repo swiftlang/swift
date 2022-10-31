@@ -5,8 +5,8 @@ import SwiftSyntax
 extension ASTGenVisitor {
   public func visit(_ node: CodeBlockSyntax) -> ASTNode {
     let statements = node.statements.map { self.visit($0).bridged() }
-    let startLoc = self.base.advanced(by: node.position.utf8Offset).raw
-    let endLoc = self.base.advanced(by: node.endPosition.utf8Offset).raw
+    let startLoc = self.base.advanced(by: node.leftBrace.position.utf8Offset).raw
+    let endLoc = self.base.advanced(by: node.rightBrace.position.utf8Offset).raw
 
     return .stmt(
       statements.withBridgedArrayRef { ref in
