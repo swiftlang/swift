@@ -4,7 +4,7 @@
 
 This vision document presents a high level overview of the “reverse” (i.e. using Swift APIs from C++) half of the C++ interoperability Swift language feature. It highlights the key principles and goals that determine how Swift APIs are exposed to C++ users. It also outlines the evolution process for this feature. This document does not present the final design for how Swift APIs get mapped to C++ language constructs. The final design of this feature will evolve as this feature goes through the Swift evolution process.
 
-This document does not cover the “forward” (i.e. using C++ APIs from Swift) half of the C++ interoperability feature, as it’s already covered by a sibling document that can be found here: https://github.com/apple/swift/pull/60501 (https://github.com/apple/swift/pull/60501/files).
+This document does not cover the “forward” (i.e. using C++ APIs from Swift) half of the C++ interoperability feature, as it’s already covered by a [sibling document](https://github.com/apple/swift/pull/60501/files).
 
 This document is a prospective feature vision document, as described in the [draft review management guidelines](https://github.com/rjmccall/swift-evolution/blob/057b2383102f34c3d0f5b257f82bba0f5b94683d/review_management.md#future-directions-and-roadmaps) of the Swift evolution process. It has not yet been approved by the Language Workgroup.
 
