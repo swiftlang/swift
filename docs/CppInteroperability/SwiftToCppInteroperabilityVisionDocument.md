@@ -36,9 +36,9 @@ Swift’s memory safety model also requires exclusive access to a value in order
 
 ### Performance
 
-Swift to C++ bridging should be as efficient as possible. The Swift compiler should avoid unnecessary overhead for calling into Swift functions from C++, or using Swift types from C++. Furthermore, the bridging code should not convert Swift types into their C++ counterparts automatically as that can add a lot of overhead. For instance, a Swift function returning a String should still return a Swift String in C++, and not a std::string.
+Swift to C++ bridging should be as efficient as possible. The Swift compiler should avoid unnecessary overhead for calling into Swift functions from C++, or using Swift types from C++. Furthermore, the bridging code should not convert Swift types into their C++ counterparts automatically as that can add a lot of overhead. For instance, a Swift function returning a String should still return a Swift String in C++, and not a `std::string`.
 
-Certain Swift features do not have a corresponding C++ mapping which can impose some additional overhead to make them work in C++. Resilient value types are a good example of this, as their layout and size is not known at compile time. This means that the generated C++ type that represents such a Swift type might need to impose additional performance overhead by allocating the storage for such value dynamically on the heap (i.e. boxing). In cases like this, the Swift compiler should strive to have minimal possible overhead, by finding solutions where this overhead can be optimized out for common cases.
+Some Swift features require additional overhead to be used in C++. Resilient value types are a good example of this; C++ expects types to have a statically-known layout, but Swift's resilient value types do not satisfy this, and so the generated C++ types representing those types may need to dynamically allocate memory internally. In cases like these, the C++ interface should at least strive to minimize the dynamic overhead, for example by avoiding allocation for sufficiently small types.
 
 ### Achieving Safety With Performance In Mind
 
