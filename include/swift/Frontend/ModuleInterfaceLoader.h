@@ -439,7 +439,8 @@ public:
       StringRef OutPath, StringRef ABIOutputPath,
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
-      RequireOSSAModules_t RequireOSSAModules);
+      RequireOSSAModules_t RequireOSSAModules,
+      bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).

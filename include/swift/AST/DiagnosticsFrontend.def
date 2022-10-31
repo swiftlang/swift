@@ -255,6 +255,10 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
+REMARK(remark_indexing_system_module,none,
+       "indexing system module at %0"
+       "%select{|; skipping because of a broken swiftinterface}1",
+       (StringRef, bool))
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",

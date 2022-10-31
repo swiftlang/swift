@@ -309,6 +309,10 @@ public:
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
 
+  /// Should we globally ignore swiftmodule files adjacent to swiftinterface
+  /// files?
+  bool IgnoreAdjacentModules = false;
+
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
@@ -1144,9 +1148,12 @@ public:
   ///
   /// \param ModulePath The module's \c ImportPath which describes
   /// the name of the module being loaded, possibly including submodules.
-
+  /// \param AllowMemoryCached Should we allow reuse of an already loaded
+  /// module or force reloading from disk, defaults to true.
+  ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ImportPath::Module ModulePath);
+  ModuleDecl *
+  getModule(ImportPath::Module ModulePath, bool AllowMemoryCached = true);
 
   /// Attempts to load the matching overlay module for the given clang
   /// module into this ASTContext.
@@ -1173,7 +1180,10 @@ public:
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
 
-public:
+  /// Change the behavior of all loaders to ignore swiftmodules next to
+  /// swiftinterfaces.
+  void setIgnoreAdjacentModules(bool value);
+
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.
