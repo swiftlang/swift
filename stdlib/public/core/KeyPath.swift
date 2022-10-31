@@ -3688,7 +3688,6 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   }
 
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
-    isPureStruct.append(false)
     // Get the metadata for the intermediate type.
     let metadata = _resolveKeyPathMetadataReference(
                      metadataRef,
