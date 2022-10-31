@@ -2469,11 +2469,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    OPT_disable_emit_generic_class_ro_t_list,
                    Opts.EmitGenericRODatas);
 
-  Opts.LegacyPassManager =
-      Args.hasFlag(OPT_disable_new_llvm_pass_manager,
-                   OPT_enable_new_llvm_pass_manager,
-                   Opts.LegacyPassManager);
-
   return false;
 }
 
