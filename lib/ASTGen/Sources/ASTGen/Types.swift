@@ -4,7 +4,7 @@ import SwiftSyntax
 import CASTBridging
 
 extension ASTGenVisitor {
-  public func visit(_ node: SimpleTypeIdentifierSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: SimpleTypeIdentifierSyntax) -> ASTNode {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
 
     var text = node.name.text
@@ -12,10 +12,10 @@ extension ASTGenVisitor {
       return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
     }
 
-    return SimpleIdentTypeRepr_create(ctx, loc, id)
+    return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
   }
 
-  public func visit(_ node: MemberTypeIdentifierSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: MemberTypeIdentifierSyntax) -> ASTNode {
     var path = [(TokenSyntax, GenericArgumentClauseSyntax?)]()
     var memberRef: Syntax? = Syntax(node)
     while let nestedMember = memberRef?.as(MemberTypeIdentifierSyntax.self) {
@@ -46,74 +46,74 @@ extension ASTGenVisitor {
       }
     }
 
-    return elements.withBridgedArrayRef { elements in
+    return .type(elements.withBridgedArrayRef { elements in
       return IdentTypeRepr_create(self.ctx, elements)
-    }
+    })
   }
 
-  public func visit(_ node: ArrayTypeSyntax) -> UnsafeMutableRawPointer {
-    let elementType = visit(node.elementType)
+  public func visit(_ node: ArrayTypeSyntax) -> ASTNode {
+    let elementType = visit(node.elementType).rawValue
     let lSquareLoc = self.base.advanced(by: node.leftSquareBracket.position.utf8Offset).raw
     let rSquareLoc = self.base.advanced(by: node.rightSquareBracket.position.utf8Offset).raw
-    return ArrayTypeRepr_create(self.ctx, elementType, lSquareLoc, rSquareLoc)
+    return .type(ArrayTypeRepr_create(self.ctx, elementType, lSquareLoc, rSquareLoc))
   }
 
-  public func visit(_ node: DictionaryTypeSyntax) -> UnsafeMutableRawPointer {
-    let keyType = visit(node.keyType)
-    let valueType = visit(node.valueType)
+  public func visit(_ node: DictionaryTypeSyntax) -> ASTNode {
+    let keyType = visit(node.keyType).rawValue
+    let valueType = visit(node.valueType).rawValue
     let colonLoc = self.base.advanced(by: node.colon.position.utf8Offset).raw
     let lSquareLoc = self.base.advanced(by: node.leftSquareBracket.position.utf8Offset).raw
     let rSquareLoc = self.base.advanced(by: node.rightSquareBracket.position.utf8Offset).raw
-    return DictionaryTypeRepr_create(self.ctx, keyType, valueType, colonLoc, lSquareLoc, rSquareLoc)
+    return .type(DictionaryTypeRepr_create(self.ctx, keyType, valueType, colonLoc, lSquareLoc, rSquareLoc))
   }
 
-  public func visit(_ node: MetatypeTypeSyntax) -> UnsafeMutableRawPointer {
-    let baseType = visit(node.baseType)
+  public func visit(_ node: MetatypeTypeSyntax) -> ASTNode {
+    let baseType = visit(node.baseType).rawValue
     let tyLoc = self.base.advanced(by: node.typeOrProtocol.position.utf8Offset).raw
     if node.typeOrProtocol.text == "Type" {
-      return MetatypeTypeRepr_create(self.ctx, baseType, tyLoc)
+      return .type(MetatypeTypeRepr_create(self.ctx, baseType, tyLoc))
     } else {
       assert(node.typeOrProtocol.text == "Protocol")
-      return ProtocolTypeRepr_create(self.ctx, baseType, tyLoc)
+      return .type(ProtocolTypeRepr_create(self.ctx, baseType, tyLoc))
     }
   }
 
-  public func visit(_ node: ImplicitlyUnwrappedOptionalTypeSyntax) -> UnsafeMutableRawPointer {
-    let base = visit(node.wrappedType)
+  public func visit(_ node: ImplicitlyUnwrappedOptionalTypeSyntax) -> ASTNode {
+    let base = visit(node.wrappedType).rawValue
     let exclaimLoc = self.base.advanced(by: node.exclamationMark.position.utf8Offset).raw
-    return ImplicitlyUnwrappedOptionalTypeRepr_create(self.ctx, base, exclaimLoc)
+    return .type(ImplicitlyUnwrappedOptionalTypeRepr_create(self.ctx, base, exclaimLoc))
   }
 
-  public func visit(_ node: OptionalTypeSyntax) -> UnsafeMutableRawPointer {
-    let base = visit(node.wrappedType)
+  public func visit(_ node: OptionalTypeSyntax) -> ASTNode {
+    let base = visit(node.wrappedType).rawValue
     let questionLoc = self.base.advanced(by: node.questionMark.position.utf8Offset).raw
-    return OptionalTypeRepr_create(self.ctx, base, questionLoc)
+    return .type(OptionalTypeRepr_create(self.ctx, base, questionLoc))
   }
 
-  public func visit(_ node: PackExpansionTypeSyntax) -> UnsafeMutableRawPointer {
-    let base = visit(node.patternType)
+  public func visit(_ node: PackExpansionTypeSyntax) -> ASTNode {
+    let base = visit(node.patternType).rawValue
     let ellipsisLoc = self.base.advanced(by: node.ellipsis.position.utf8Offset).raw
-    return PackExpansionTypeRepr_create(self.ctx, base, ellipsisLoc)
+    return .type(PackExpansionTypeRepr_create(self.ctx, base, ellipsisLoc))
   }
 
-  public func visit(_ node: TupleTypeSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: TupleTypeSyntax) -> ASTNode {
     return self.withBridgedTupleElements(node.elements) { elements in
       let lParenLoc = self.base.advanced(by: node.leftParen.position.utf8Offset).raw
       let rParenLoc = self.base.advanced(by: node.rightParen.position.utf8Offset).raw
-      return TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc)
+      return .type(TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc))
     }
   }
 
-  public func visit(_ node: CompositionTypeSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: CompositionTypeSyntax) -> ASTNode {
     assert(node.elements.count > 1)
-    let types = node.elements.map { visit($0.type) }
+    let types = node.elements.map { visit($0.type) }.map { $0.rawValue }
     let firstTypeLoc = self.base.advanced(by: node.elements.first!.type.position.utf8Offset).raw
-    return types.withBridgedArrayRef { types in
+    return .type(types.withBridgedArrayRef { types in
       return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc)
-    }
+    })
   }
   
-  public func visit(_ node: FunctionTypeSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: FunctionTypeSyntax) -> ASTNode {
     return self.withBridgedTupleElements(node.arguments) { elements in
       let lParenLoc = self.base.advanced(by: node.leftParen.position.utf8Offset).raw
       let rParenLoc = self.base.advanced(by: node.rightParen.position.utf8Offset).raw
@@ -121,28 +121,28 @@ extension ASTGenVisitor {
       let asyncLoc = node.asyncKeyword.map { self.base.advanced(by: $0.position.utf8Offset).raw }
       let throwsLoc = node.throwsOrRethrowsKeyword.map { self.base.advanced(by: $0.position.utf8Offset).raw }
       let arrowLoc = self.base.advanced(by: node.arrow.position.utf8Offset).raw
-      let retTy = visit(node.returnType)
-      return FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy)
+      let retTy = visit(node.returnType).rawValue
+      return .type(FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy))
     }
   }
 
-  public func visit(_ node: NamedOpaqueReturnTypeSyntax) -> UnsafeMutableRawPointer {
-    let baseTy = visit(node.baseType)
-    return NamedOpaqueReturnTypeRepr_create(self.ctx, baseTy)
+  public func visit(_ node: NamedOpaqueReturnTypeSyntax) -> ASTNode {
+    let baseTy = visit(node.baseType).rawValue
+    return .type(NamedOpaqueReturnTypeRepr_create(self.ctx, baseTy))
   }
 
-  public func visit(_ node: ConstrainedSugarTypeSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: ConstrainedSugarTypeSyntax) -> ASTNode {
     let someOrAnyLoc = self.base.advanced(by: node.someOrAnySpecifier.position.utf8Offset).raw
-    let baseTy = visit(node.baseType)
+    let baseTy = visit(node.baseType).rawValue
     if node.someOrAnySpecifier.text == "some" {
-      return OpaqueReturnTypeRepr_create(self.ctx, someOrAnyLoc, baseTy)
+      return .type(OpaqueReturnTypeRepr_create(self.ctx, someOrAnyLoc, baseTy))
     } else {
       assert(node.someOrAnySpecifier.text == "any")
-      return ExistentialTypeRepr_create(self.ctx, someOrAnyLoc, baseTy)
+      return .type(ExistentialTypeRepr_create(self.ctx, someOrAnyLoc, baseTy))
     }
   }
 
-  public func visit(_ node: AttributedTypeSyntax) -> UnsafeMutableRawPointer {
+  public func visit(_ node: AttributedTypeSyntax) -> ASTNode {
     // FIXME: Respect the attributes
     return visit(node.baseType)
   }
@@ -166,7 +166,7 @@ extension ASTGenVisitor {
       }
       let secondNameLoc = element.secondName.map { self.base.advanced(by: $0.position.utf8Offset).raw }
       let colonLoc = element.colon.map { self.base.advanced(by: $0.position.utf8Offset).raw }
-      let type = visit(element.type)
+      let type = visit(element.type).rawValue
       let trailingCommaLoc = element.trailingComma.map { self.base.advanced(by: $0.position.utf8Offset).raw }
 
       elements.append(BridgedTupleTypeElement(
