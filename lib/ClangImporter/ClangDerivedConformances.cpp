@@ -273,13 +273,13 @@ void swift::conformToCxxIteratorIfNeeded(
 
   // Try to conform to UnsafeCxxRandomAccessIterator if possible.
 
-  auto minus = dyn_cast<FuncDecl>(getMinusOperator(decl));
+  auto minus = dyn_cast_or_null<FuncDecl>(getMinusOperator(decl));
   if (!minus)
     return;
   auto distanceTy = minus->getResultInterfaceType();
   // distanceTy conforms to BinaryInteger, this is ensured by getMinusOperator.
 
-  auto plusEqual = dyn_cast<FuncDecl>(getPlusEqualOperator(decl, distanceTy));
+  auto plusEqual = dyn_cast_or_null<FuncDecl>(getPlusEqualOperator(decl, distanceTy));
   if (!plusEqual)
     return;
 
