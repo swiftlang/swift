@@ -57,4 +57,16 @@ public protocol _CompilerPlugin {
     localSourceText: UnsafePointer<UInt8>,
     localSourceTextCount: Int
   ) -> (UnsafePointer<UInt8>?, count: Int)
+
+  /// Returns the generic signature of the plugin.
+  ///
+  /// - Returns: A newly allocated buffer containing the generic signature.
+  ///   The caller is responsible for managing the memory.
+  static func _genericSignature() -> (UnsafePointer<UInt8>?, count: Int)
+
+  /// Returns the type signature of the plugin.
+  ///
+  /// - Returns: A newly allocated buffer containing the type signature. The
+  ///   caller is responsible for managing the memory.
+  static func _typeSignature() -> (UnsafePointer<UInt8>, count: Int)
 }

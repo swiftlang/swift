@@ -73,6 +73,10 @@
 #include <queue>
 #include <memory>
 
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
+
 #include "RequirementMachine/RewriteContext.h"
 
 using namespace swift;
@@ -6055,16 +6059,15 @@ CompilerPlugin *ASTContext::getLoadedPlugin(StringRef name) {
   return &lookup->second;
 }
 
-void *ASTContext::getAddressOfSymbol(StringRef name,
-                                     llvm::sys::DynamicLibrary *libraryHint) {
+void *ASTContext::getAddressOfSymbol(const char *name,
+                                     void *libraryHandleHint) {
   auto lookup = LoadedSymbols.try_emplace(name, nullptr);
   void *&address = lookup.first->getValue();
+#if !defined(_WIN32)
   if (lookup.second) {
-    if (libraryHint && libraryHint->isValid())
-      address = libraryHint->getAddressOfSymbol(name.data());
-    else
-      address = llvm::sys::DynamicLibrary::
-          SearchForAddressOfSymbol(name.data());
+    auto *handle = libraryHandleHint ? libraryHandleHint : RTLD_DEFAULT;
+    address = dlsym(handle, name);
   }
+#endif
   return address;
 }
