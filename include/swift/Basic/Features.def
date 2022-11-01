@@ -103,7 +103,7 @@ EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(MoveOnly, false)
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
-EXPERIMENTAL_FEATURE(ResultBuilderASTTransform, false)
+EXPERIMENTAL_FEATURE(ResultBuilderASTTransform, true)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, false)
 
 /// Whether to enable experimental differentiable programming features:
