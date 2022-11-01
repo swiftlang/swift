@@ -72,9 +72,6 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
 
   llvm::StringMap<AnyAttrKind> ExcludeAttrs;
 
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
-  if (StringRef(#SPELLING).startswith("_")) \
-    ExcludeAttrs.insert(std::make_pair("DAK_" #CLASS, DAK_##CLASS));
 #define TYPE_ATTR(X) ExcludeAttrs.insert(std::make_pair("TAK_" #X, TAK_##X));
 #include "swift/AST/Attr.def"
 
@@ -98,6 +95,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   // In "emit modules separately" jobs, access modifiers show up as attributes,
   // but we don't want them to be printed in declarations
   ExcludeAttrs.insert(std::make_pair("DAK_AccessControl", DAK_AccessControl));
+  ExcludeAttrs.insert(std::make_pair("DAK_SetterAccess", DAK_SetterAccess));
 
   for (const auto &Entry : ExcludeAttrs) {
     Opts.ExcludeAttrList.push_back(Entry.getValue());
