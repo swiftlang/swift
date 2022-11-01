@@ -16,13 +16,11 @@ The existing model of generating a header file that can then be imported by Obje
 
 ## Goals
 
-Swift and C++ are both feature rich programming languages. While they both have a lot of similar features, Swift has some features which C++ can not represent natively. For instance, Swift supports overloading based on argument labels, but C++ does not. A gap like this can be bridged in an idiomatic manner between the two languages, as the C++ name of the exposed Swift function can be modified to reflect the Swift argument labels. However, some Swift features like result builders can not be bridged in an idiomatic manner to C++. Therefore, we can assume that it is impractical for Swift to expose all Swift APIs to C++. Additionally, some Swift API patterns, like conforming Swift types to specific protocols, require advanced compiler features that are impractical to support in a generated header. Thus, we can assume that it is also impractical for Swift to bridge all Swift API patterns into C++.
+Swift and C++ are both feature rich programming languages. They share many similar features, but Swift has some features that lack close analogues in C++. The primary goal of Swift-to-C++ interoperability is to expose every language feature of Swift for which a reasonable C++ API can be created to represent that feature. For example, C++ does not have a concept of argument labels, but the argument labels can be integrated into the base name of a function to get a roughly similar effect. On the other hand, C++ does not have any feature that can represent a Swift feature like result builders in a reasonable manner. Therefore, APIs that use Swift features like result builders must be dropped in the C++ interface to the module.
 
-For the reasons outlined above, it is not a goal to expose every Swift API and language construct to C++, and it is also not a goal to make every Swift library accessible to C++. There will certainly be libraries that will lend themselves well to an ergonomic and an idiomatic C++ interface, however, there will always be some libraries that rely on language features or API patterns that can’t be bridged to C++ in a reasonable manner. 
+It is a goal that Swift-to-C++ interoperability can be used by both mixed Swift/C++ language projects that want to interoperate within their own code base, and by C++ projects that need to use a Swift library that wasn't developed with C++ interoperability in mind.
 
-It is a goal to allow mixed Swift and C++ projects to call their own Swift APIs that lend themselves well to interoperability from C++, and do it in a safe, performant and ergonomic manner. It is also a goal to allow these exposed Swift APIs to use Swift types from other Swift libraries (including the Swift standard library), even if the other Swift library wasn’t developed with C++ interoperability in mind. 
-
-When Swift APIs get exposed to C++, the Swift compiler and the language specification should follow several key principles that are presented below.
+It is a goal of Swift-to-C++ interoperability to expose Swift APIs in a safe, performant and ergonomic manner. The Swift compiler and the language specification should follow several key related principles that are presented below.
 
 ### Safety
 
@@ -36,7 +34,7 @@ Swift’s memory safety model also requires exclusive access to a value in order
 
 ### Performance
 
-Swift to C++ bridging should be as efficient as possible. The Swift compiler should avoid unnecessary overhead for calling into Swift functions from C++, or using Swift types from C++. Furthermore, the bridging code should not convert Swift types into their C++ counterparts automatically as that can add a lot of overhead. For instance, a Swift function returning a `String` should still return a Swift `String` in C++, and not a `std::string`.
+Swift-to-C++ bridging should be as efficient as possible. The Swift compiler should avoid unnecessary overhead for calling into Swift functions from C++, or using Swift types from C++. Furthermore, the bridging code should not convert Swift types into their C++ counterparts automatically as that can add a lot of overhead. For instance, a Swift function returning a `String` should still return a Swift `String` in C++, and not a `std::string`.
 
 Some Swift features require additional overhead to be used in C++. Resilient value types are a good example of this; C++ expects types to have a statically-known layout, but Swift's resilient value types do not satisfy this, and so the generated C++ types representing those types may need to dynamically allocate memory internally. In cases like these, the C++ interface should at least strive to minimize the dynamic overhead, for example by avoiding allocation for sufficiently small types.
 
@@ -102,7 +100,7 @@ The Swift standard library contains a lot of useful functions and types that get
 
 ### Using Swift types in C++ templates
 
-The generated header is useful in mixed language projects as C++ sources can include it, allowing C++ to call Swift APIs. However the C++ interoperability project also provides support for calling C++ APIs from Swift. In certain cases such C++ APIs contain function or class templates that need to be instantiated in Swift. Swift gives the user the ability to use Swift types in such cases, so the C++ templates have to be instantiated with Swift types. This means that the Swift types needs to be translated into their C++ counterparts, which can then be used inside the instantiated C++ template specialization. This Swift to C++ type translation is performed using the same mechanism that’s used by the Swift compiler to generate the C++ compatibility header. This means that a C++ template instantiated with a Swift type will see the same C++ representation of that Swift type regardless of whether it was instantiated from C++, or from Swift.
+The generated header is useful in mixed language projects as C++ sources can include it, allowing C++ to call Swift APIs. However the C++ interoperability project also provides support for calling C++ APIs from Swift. In certain cases such C++ APIs contain function or class templates that need to be instantiated in Swift. Swift gives the user the ability to use Swift types in such cases, so the C++ templates have to be instantiated with Swift types. This means that the Swift types needs to be translated into their C++ counterparts, which can then be used inside the instantiated C++ template specialization. This Swift-to-C++ type translation is performed using the same mechanism that’s used by the Swift compiler to generate the C++ compatibility header. This means that a C++ template instantiated with a Swift type will see the same C++ representation of that Swift type regardless of whether it was instantiated from C++, or from Swift.
 
 ## Evolution process
 
