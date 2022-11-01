@@ -1606,9 +1606,12 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       auto declRef = info->getReferencedDecl();
       assert(declRef);
 
-      auto queryFunc = declRef.getDecl()->getHasSymbolQueryDecl();
+      auto decl = declRef.getDecl();
+      getModule().addHasSymbolDecl(decl);
+
       SILFunction *silFn = SGM.getFunction(
-          SILDeclRef(queryFunc, SILDeclRef::Kind::Func), NotForDefinition);
+          SILDeclRef(decl->getHasSymbolQueryDecl(), SILDeclRef::Kind::Func),
+          NotForDefinition);
       SILValue fnRef = B.createFunctionRefFor(loc, silFn);
       booleanTestValue = B.createApply(loc, fnRef, {}, {});
       booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
