@@ -3192,13 +3192,6 @@ protected:
     : TypeDecl(kind, dc, name, NameLoc, { }) { }
 
 public:
-  /// Return the superclass of the generic parameter.
-  Type getSuperclass() const;
-
-  /// Retrieve the set of protocols to which this abstract type
-  /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
-
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
            D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
