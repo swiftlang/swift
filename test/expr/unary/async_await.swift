@@ -181,6 +181,13 @@ func testAsyncLet() async throws {
   } catch {
   }
 
+  defer {
+    async let deferX: Int = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
+    _ = await deferX // expected-error {{async let 'deferX' cannot be referenced in a defer body}}
+    async let _: Int = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
+    async let _ = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
+  }
+
   async let x1 = getIntUnsafely() // okay, try is implicit here
 
   async let x2 = getInt() // okay, await is implicit here
