@@ -1858,6 +1858,12 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
+  // Unconditionally disable this until we can fix the metadata.
+  // The trick of using the Empty array metadata for static arrays
+  // breaks Obj-C interop quite badly.
+  // rdar://101126543
+  return false;
+
   if (getOptions().DisableReadonlyStaticObjects)
     return false;
 
