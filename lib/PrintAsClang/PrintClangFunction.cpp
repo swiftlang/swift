@@ -986,17 +986,17 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
     llvm::raw_string_ostream os(resultTyName);
     ClangSyntaxPrinter(os).printGenericTypeParamTypeName(gtpt);
   }
-
-  os << "  if constexpr (std::is_base_of<::swift::"
-     << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
-     << resultTyName << ">::value) {\n";
-  os << "  void *returnValue;\n  ";
-  if (!initializeWithTakeFromValue) {
-    invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
-  } else {
-    os << "returnValue = *reinterpret_cast<void **>("
-       << *initializeWithTakeFromValue << ")";
-  }
+  ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+    os << "  if constexpr (std::is_base_of<::swift::"
+       << cxx_synthesis::getCxxImplNamespaceName() << "::RefCountedClass, "
+       << resultTyName << ">::value) {\n";
+    os << "  void *returnValue;\n  ";
+    if (!initializeWithTakeFromValue) {
+      invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+    } else {
+      os << "returnValue = *reinterpret_cast<void **>("
+         << *initializeWithTakeFromValue << ")";
+    }
     os << ";\n";
     os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
        << "::implClassFor<" << resultTyName
@@ -1010,34 +1010,35 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
        << ">::type::returnNewValue([&](void * _Nonnull returnValue) {\n";
     if (!initializeWithTakeFromValue) {
       invocationPrinter(/*additionalParam=*/StringRef("returnValue"));
-  } else {
-    os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
-       << "::implClassFor<" << resultTyName
-       << ">::type::initializeWithTake(reinterpret_cast<char * "
-          "_Nonnull>(returnValue), "
-       << *initializeWithTakeFromValue << ")";
-  }
-  os << ";\n  });\n";
-  os << "  } else if constexpr (::swift::"
-     << cxx_synthesis::getCxxImplNamespaceName() << "::isSwiftBridgedCxxRecord<"
-     << resultTyName << ">) {\n";
-  if (!initializeWithTakeFromValue) {
-    ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
-                                                 invocationPrinter);
-  } else {
-    // FIXME: support taking a C++ record type.
-    os << "abort();\n";
-  }
-  os << "  } else {\n";
-  os << "  " << resultTyName << " returnValue;\n";
-  if (!initializeWithTakeFromValue) {
-    invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
-  } else {
-    os << "memcpy(&returnValue, " << *initializeWithTakeFromValue
-       << ", sizeof(returnValue))";
-  }
-  os << ";\n  return returnValue;\n";
-  os << "  }\n";
+    } else {
+      os << "  return ::swift::" << cxx_synthesis::getCxxImplNamespaceName()
+         << "::implClassFor<" << resultTyName
+         << ">::type::initializeWithTake(reinterpret_cast<char * "
+            "_Nonnull>(returnValue), "
+         << *initializeWithTakeFromValue << ")";
+    }
+    os << ";\n  });\n";
+    os << "  } else if constexpr (::swift::"
+       << cxx_synthesis::getCxxImplNamespaceName()
+       << "::isSwiftBridgedCxxRecord<" << resultTyName << ">) {\n";
+    if (!initializeWithTakeFromValue) {
+      ClangTypeHandler::printGenericReturnScaffold(os, resultTyName,
+                                                   invocationPrinter);
+    } else {
+      // FIXME: support taking a C++ record type.
+      os << "abort();\n";
+    }
+    os << "  } else {\n";
+    os << "  " << resultTyName << " returnValue;\n";
+    if (!initializeWithTakeFromValue) {
+      invocationPrinter(/*additionalParam=*/StringRef(ros.str()));
+    } else {
+      os << "memcpy(&returnValue, " << *initializeWithTakeFromValue
+         << ", sizeof(returnValue))";
+    }
+    os << ";\n  return returnValue;\n";
+    os << "  }\n";
+  });
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(

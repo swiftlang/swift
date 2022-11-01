@@ -190,6 +190,14 @@ public:
   // Print the #define for the given macro.
   void printDefine(StringRef macroName);
 
+  // Print the ignored Clang diagnostic preprocessor directives around the given
+  // source.
+  void printIgnoredDiagnosticBlock(StringRef diagName,
+                                   llvm::function_ref<void()> bodyPrinter);
+
+  void printIgnoredCxx17ExtensionDiagnosticBlock(
+      llvm::function_ref<void()> bodyPrinter);
+
 protected:
   raw_ostream &os;
 };

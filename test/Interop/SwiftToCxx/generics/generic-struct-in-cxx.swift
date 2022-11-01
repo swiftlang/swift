@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
 
 // Check that an instantiation compiles too.
 // RUN: echo "constexpr int x = sizeof(Generics::GenericPair<int, int>);" >> %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
 
 // FIXME: remove the need for -Wno-reserved-identifier
 
@@ -316,6 +316,8 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_1 GenericPair<T_0_0, T_0_1>::getY() const {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_1>::value) {
 // CHECK-NEXT: void *returnValue;
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV1yq_vg(reinterpret_cast<void *>(&returnValue), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
@@ -330,6 +332,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV1yq_vg(reinterpret_cast<void *>(&returnValue), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: return returnValue;
 // CHECK-NEXT: }
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts
@@ -370,6 +373,8 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_1_0>::value) {
 // CHECK-NEXT: void *returnValue;
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata(), _getOpaquePointer());
@@ -384,6 +389,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: return returnValue;
 // CHECK-NEXT: }
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts

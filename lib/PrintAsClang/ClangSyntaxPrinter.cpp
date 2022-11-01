@@ -359,3 +359,16 @@ void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
 void ClangSyntaxPrinter::printDefine(StringRef macroName) {
   os << "#define " << macroName << "\n";
 }
+
+void ClangSyntaxPrinter::printIgnoredDiagnosticBlock(
+    StringRef diagName, llvm::function_ref<void()> bodyPrinter) {
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-W" << diagName << "\"\n";
+  bodyPrinter();
+  os << "#pragma clang diagnostic pop\n";
+}
+
+void ClangSyntaxPrinter::printIgnoredCxx17ExtensionDiagnosticBlock(
+    llvm::function_ref<void()> bodyPrinter) {
+  printIgnoredDiagnosticBlock("c++17-extensions", bodyPrinter);
+}

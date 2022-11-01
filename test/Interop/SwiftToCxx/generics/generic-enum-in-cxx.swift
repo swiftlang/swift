@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
+// RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier)
 
 // FIXME: remove the need for -Wno-reserved-identifier
 
@@ -204,6 +204,8 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:       alignas(GenericOpt) unsigned char buffer[sizeof(GenericOpt)];
 // CHECK-NEXT:       auto *thisCopy = new(buffer) GenericOpt(*this);
 // CHECK-NEXT:       char * _Nonnull payloadFromDestruction = thisCopy->_destructiveProjectEnumData();
+// CHECK-NEXT:     #pragma clang diagnostic push
+// CHECK-NEXT:     #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT:     if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:     void *returnValue;
 // CHECK-NEXT:     returnValue = *reinterpret_cast<void **>(payloadFromDestruction);
@@ -219,6 +221,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:   memcpy(&returnValue, payloadFromDestruction, sizeof(returnValue));
 // CHECK-NEXT:     return returnValue;
 // CHECK-NEXT:     }
+// CHECK-NEXT:     #pragma clang diagnostic pop
 // CHECK-NEXT:   }
 // CHECK-NEXT: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts

@@ -2,12 +2,12 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -Wno-unused-function)
 
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions-evo.h
 // RUN: %FileCheck %s < %t/functions-evo.h
 
-// RUN: %check-generic-interop-cxx-header-in-clang(%t/functions-evo.h -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions-evo.h -Wno-unused-function)
 
 public func genericPrintFunctionTwoArg<T>(_ x: T, _ y: Int) {
     print("X:", x)
@@ -154,6 +154,8 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_0 genericRet(const T_0_0& x) noexcept SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT:    if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:    void *returnValue;
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
@@ -174,6 +176,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:    _impl::$s9Functions10genericRetyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:    return returnValue;
 // CHECK-NEXT:    }
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  }
 
 // CHECK:      template<class T_0_0>
@@ -189,6 +192,8 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_0 TestSmallStruct::genericMethodPassThrough(const T_0_0& x) const {
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT:   if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:   void *returnValue;
 // CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
@@ -209,6 +214,7 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   return returnValue;
 // CHECK-NEXT:   }
+// CHECK-NEXT:   #pragma clang diagnostic pop
 // CHECK-NEXT:   }
 // CHECK-NEXT:   template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
