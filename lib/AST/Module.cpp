@@ -559,6 +559,7 @@ public:
   unsigned numFiles = 0;
   unsigned numAuxiliaryFiles = 0;
   std::vector<SourceFile *> allSourceFiles;
+  SourceFile *lastSourceFile = nullptr;
 };
 
 void ModuleDecl::updateSourceFileLocationMap() {
@@ -602,17 +603,28 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (loc.isInvalid())
     return nullptr;
 
-  SourceLoc adjustedLoc = loc;
 
   // Check whether this location is in a "replaced" range, in which case
   // we want to use the original source file.
   auto &sourceMgr = getASTContext().SourceMgr;
+  SourceLoc adjustedLoc = loc;
   for (const auto &pair : sourceMgr.getReplacedRanges()) {
     if (sourceMgr.rangeContainsTokenLoc(pair.second, loc)) {
       adjustedLoc = pair.first.Start;
       break;
     }
   }
+
+  // Before we do any extra work, check the last source file we found a result
+  // in to see if it contains this.
+  if (sourceFileLocationMap) {
+    if (auto lastSourceFile = sourceFileLocationMap->lastSourceFile) {
+      auto range = sourceMgr.getRangeForBuffer(*lastSourceFile->getBufferID());
+      if (range.contains(adjustedLoc))
+        return lastSourceFile;
+    }
+  }
+
   updateSourceFileLocationMap();
 
   auto found = std::lower_bound(sourceFileLocationMap->allSourceFiles.begin(),
@@ -627,7 +639,8 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   if (!foundRange.contains(adjustedLoc))
     return nullptr;
 
-
+  // Update the last source file.
+  sourceFileLocationMap->lastSourceFile = foundSourceFile;
   return foundSourceFile;
 }
 
