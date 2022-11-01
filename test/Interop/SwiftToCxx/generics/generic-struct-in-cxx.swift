@@ -201,11 +201,15 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(const void * _Nonnull x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericPair;
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class _impl_GenericPair;
 // CHECK-EMPTY:
 // CHECK-NEXT: static_assert(2 <= 3, "unsupported generic requirement list for metadata func");
@@ -213,7 +217,9 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s8Generics11GenericPairVMa(swift::_impl::MetadataRequestTy, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericPair final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   inline ~GenericPair() {
@@ -224,7 +230,9 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class _impl_GenericPair {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   static inline char * _Nonnull getOpaquePointer(GenericPair<T_0_0, T_0_1> &object) { return object._getOpaquePointer(); }
@@ -240,7 +248,9 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: struct TypeMetadataTrait<Generics::GenericPair<T_0_0, T_0_1>> {
 // CHECK-NEXT:   static inline void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return Generics::_impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata())._0;
@@ -256,13 +266,17 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void inoutGenericPair(GenericPair<T_0_0, T_0_1>& x, const T_0_0& y) noexcept {
 // CHECK-NEXT:   return _impl::$s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline GenericPair<T_0_0, T_0_1> makeGenericPair(const T_0_0& x, const T_0_1& y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(result, swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
@@ -276,7 +290,9 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline GenericPair<T_0_0, T_0_1> passThroughGenericPair(const GenericPair<T_0_0, T_0_1>& x, const T_0_1& y) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s8Generics22passThroughGenericPairyAA0dE0Vyxq_GAE_q_tr0_lF(result, _impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
@@ -288,13 +304,17 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void takeGenericPair(const GenericPair<T_0_0, T_0_1>& x) noexcept {
 // CHECK-NEXT:  return _impl::$s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(_impl::_impl_GenericPair<T_0_0, T_0_1>::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT:}
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_1 GenericPair<T_0_0, T_0_1>::getY() const {
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_1>::value) {
 // CHECK-NEXT: void *returnValue;
@@ -312,31 +332,43 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: }
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void GenericPair<T_0_0, T_0_1>::setY(const T_0_1& value) {
 // CHECK-NEXT: return _impl::$s8Generics11GenericPairV1yq_vs(swift::_impl::getOpaquePointer(value), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline GenericPair<T_0_0, T_0_1> GenericPair<T_0_0, T_0_1>::init(const T_0_0& x, swift::Int i, const T_0_1& y) {
 // CHECK-NEXT: return _impl::_impl_GenericPair<T_0_0, T_0_1>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s8Generics11GenericPairVyACyxq_Gx_Siq_tcfC(result, swift::_impl::getOpaquePointer(x), i, swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void GenericPair<T_0_0, T_0_1>::method() const {
 // CHECK-NEXT: return _impl::$s8Generics11GenericPairV6methodyyF(swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void GenericPair<T_0_0, T_0_1>::mutatingMethod(const GenericPair<T_0_1, T_0_0>& other) {
 // CHECK-NEXT: return _impl::$s8Generics11GenericPairV14mutatingMethodyyACyq_xGF(_impl::_impl_GenericPair<T_0_1, T_0_0>::getOpaquePointer(other), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: template<class T_1_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const {
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_1_0>::value) {
 // CHECK-NEXT: void *returnValue;
@@ -354,7 +386,9 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: }
 // CHECK-NEXT: }
 // CHECK-NEXT: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline swift::Int GenericPair<T_0_0, T_0_1>::getComputedProp() const {
 // CHECK-NEXT: return _impl::$s8Generics11GenericPairV12computedPropSivg(swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }

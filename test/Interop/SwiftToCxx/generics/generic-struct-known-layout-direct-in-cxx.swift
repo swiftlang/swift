@@ -71,12 +71,16 @@
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(struct swift_interop_passStub_Generics_[[PTRPTRENC]] x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)
 
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericPair;
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericPair final {
 
 // CHECK: swift::_impl::OpaqueStorage _storage;

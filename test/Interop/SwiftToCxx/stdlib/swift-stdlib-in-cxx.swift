@@ -9,17 +9,23 @@
 // CHECK: namespace Swift {
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class Optional;
 
 // CHECK: class String;
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class Array;
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class Array final {
 // CHECK-NEXT: public:
 // CHECK-NEXT: inline ~Array() {
@@ -38,7 +44,9 @@
 
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class Optional final {
 // CHECK-NEXT: public:
 // CHECK-NEXT: inline ~Optional() {

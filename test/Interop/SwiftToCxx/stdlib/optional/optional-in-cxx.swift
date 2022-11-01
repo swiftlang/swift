@@ -75,7 +75,9 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void resetOpt(Swift::Optional<T_0_0>& val) noexcept {
 // CHECK-NEXT:   return _impl::$s11UseOptional8resetOptyyxSgzlF(Swift::_impl::_impl_Optional<T_0_0>::getOpaquePointer(val), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }

@@ -284,6 +284,7 @@ void ClangSyntaxPrinter::printGenericSignature(
                           printGenericTypeParamTypeName(genericParamType);
                         });
   os << ">\n";
+  os << "#ifdef __cpp_concepts\n";
   os << "requires ";
   llvm::interleave(
       signature.getInnermostGenericParams(), os,
@@ -293,7 +294,7 @@ void ClangSyntaxPrinter::printGenericSignature(
         os << ">";
       },
       " && ");
-  os << "\n";
+  os << "\n#endif // __cpp_concepts\n";
 }
 
 void ClangSyntaxPrinter::printGenericSignatureParams(

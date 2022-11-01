@@ -111,36 +111,48 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // Skip templates in impl classes.
 // CHECK: _impl_TestSmallStruct
 // CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_0 genericMethodPassThrough(const T_0_0& x) const;
 // CHECK-NEXT: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void genericMethodMutTake(const T_0_0& x);
 // CHECK:      template<class T>
 // CHECK-NEXT: returnNewValue
 
 // CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void genericPrintFunction(const T_0_0& x) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions20genericPrintFunctionyyxlF(swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
 
 
 // CHECK:      template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void genericPrintFunctionMultiGeneric(swift::Int x, const T_0_0& t1, const T_0_0& t1p, swift::Int y, const T_0_1& t2) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(x, swift::_impl::getOpaquePointer(t1), swift::_impl::getOpaquePointer(t1p), y, swift::_impl::getOpaquePointer(t2), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 // CHECK-NEXT: }
 
 
 // CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void genericPrintFunctionTwoArg(const T_0_0& x, swift::Int y) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions26genericPrintFunctionTwoArgyyx_SitlF(swift::_impl::getOpaquePointer(x), y, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
 
 // CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_0 genericRet(const T_0_0& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:    if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:    void *returnValue;
@@ -165,13 +177,17 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:  }
 
 // CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void genericSwap(T_0_0& x, T_0_0& y) noexcept {
 // CHECK-NEXT:   return _impl::$s9Functions11genericSwapyyxz_xztlF(swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
 
 // CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_0_0 TestSmallStruct::genericMethodPassThrough(const T_0_0& x) const {
 // CHECK-NEXT:   if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:   void *returnValue;
@@ -195,7 +211,9 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   }
 // CHECK-NEXT:   template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void TestSmallStruct::genericMethodMutTake(const T_0_0& x) {
 // CHECK-NEXT:   return _impl::$s9Functions15TestSmallStructV20genericMethodMutTakeyyxlF(swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT:   }

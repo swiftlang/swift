@@ -90,17 +90,23 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 }
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericOpt;
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class _impl_GenericOpt;
 
 // CHECK: SWIFT_EXTERN swift::_impl::MetadataResponseTy $s8Generics10GenericOptOMa(swift::_impl::MetadataRequestTy, void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL;
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericOpt final {
 // CHECK-NEXT: public:
 // CHECK-NEXT: inline ~GenericOpt() {
@@ -130,7 +136,9 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK: inline void method() const;
 // CHECK-NEXT: inline void reset();
 // CHECK-NEXT: template<class T_1_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_1_0 genericMethod(const T_1_0& x) const;
 // CHECK-NEXT: inline swift::Int getComputedProp() const;
 
@@ -141,7 +149,9 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void inoutGenericOpt(GenericOpt<T_0_0>& x, const T_0_0& y) noexcept {
 // CHECK-NEXT:   return _impl::$s8Generics15inoutGenericOptyyAA0cD0OyxGz_xtlF(_impl::_impl_GenericOpt<T_0_0>::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
@@ -155,7 +165,9 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline GenericOpt<T_0_0> makeGenericOpt(const T_0_0& x) noexcept SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return _impl::_impl_GenericOpt<T_0_0>::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s8Generics14makeGenericOptyAA0cD0OyxGxlF(result, swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
@@ -169,18 +181,24 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void takeGenericOpt(const GenericOpt<T_0_0>& x) noexcept {
 // CHECK-NEXT:  return _impl::$s8Generics14takeGenericOptyyAA0cD0OyxGlF(_impl::_impl_GenericOpt<T_0_0>::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   inline bool GenericOpt<T_0_0>::isSome() const {
 // CHECK-NEXT:     return *this == GenericOpt<T_0_0>::some;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   template<class T_0_0>
+// CHECK-NEXT:   #ifdef __cpp_concepts
 // CHECK-NEXT:   requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT:   #endif
 // CHECK-NEXT:     inline T_0_0 GenericOpt<T_0_0>::getSome() const {
 // CHECK-NEXT:       if (!isSome()) abort();
 // CHECK-NEXT:       alignas(GenericOpt) unsigned char buffer[sizeof(GenericOpt)];
@@ -203,29 +221,41 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   inline bool GenericOpt<T_0_0>::isNone() const {
 // CHECK-NEXT:     return *this == GenericOpt<T_0_0>::none;
 // CHECK-NEXT:   }
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline void GenericOpt<T_0_0>::method() const {
 // CHECK-NEXT: return _impl::$s8Generics10GenericOptO6methodyyF(swift::TypeMetadataTrait<GenericOpt<T_0_0>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: void GenericOpt<T_0_0>::reset()
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: template<class T_1_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_1_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline T_1_0 GenericOpt<T_0_0>::genericMethod(const T_1_0& x) const {
 
 // CHECK: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline swift::Int GenericOpt<T_0_0>::getComputedProp() const {
 // CHECK-NEXT: return _impl::$s8Generics10GenericOptO12computedPropSivg(swift::TypeMetadataTrait<GenericOpt<T_0_0>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
