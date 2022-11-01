@@ -3503,7 +3503,7 @@ public:
   /// Retrieve the (first) overridden associated type declaration, if any.
   AssociatedTypeDecl *getOverriddenDecl() const {
     return cast_or_null<AssociatedTypeDecl>(
-                                   AbstractTypeParamDecl::getOverriddenDecl());
+        TypeDecl::getOverriddenDecl());
   }
 
   /// Retrieve the set of associated types overridden by this associated

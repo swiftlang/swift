@@ -547,7 +547,7 @@ bool Decl::canHaveComment() const {
   return !this->hasClangNode() &&
          (isa<ValueDecl>(this) || isa<ExtensionDecl>(this)) &&
          !isa<ParamDecl>(this) &&
-         (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
+         !isa<GenericTypeParamDecl>(this);
 }
 
 ModuleDecl *Decl::getModuleContext() const {
@@ -4756,7 +4756,7 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   if (auto cached = request.getCachedResult())
     overridden = std::move(*cached);
   else
-    overridden = AbstractTypeParamDecl::getOverriddenDecls();
+    overridden = TypeDecl::getOverriddenDecls();
 
   llvm::TinyPtrVector<AssociatedTypeDecl *> assocTypes;
   for (auto decl : overridden) {
@@ -4784,7 +4784,7 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
     auto anchor = getAssociatedTypeAnchor(assocType, searched);
     if (!anchor)
       continue;
-    if (!bestAnchor || AbstractTypeParamDecl::compare(anchor, bestAnchor) < 0)
+    if (!bestAnchor || TypeDecl::compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
   }
 
