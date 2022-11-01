@@ -128,6 +128,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class GenericTypeOrExtensionWherePortion;
   friend class IterableTypeBodyPortion;
   friend class ScopeCreator;
+  friend class ASTSourceFileScope;
 
 #pragma mark - tree state
 protected:

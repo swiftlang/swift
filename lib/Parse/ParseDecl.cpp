@@ -197,7 +197,7 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
-void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
+void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 #if SWIFT_SWIFT_PARSER
   if ((Context.LangOpts.hasFeature(Feature::Macros) ||
        Context.LangOpts.hasFeature(Feature::BuiltinMacros) ||
@@ -220,7 +220,7 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
     // If we want to do ASTGen, do so now.
     if (Context.LangOpts.hasFeature(Feature::ParserASTGen)) {
       swift_ASTGen_buildTopLevelASTNodes(
-          exportedSourceFile, CurDeclContext, &Context, &decls, appendToVector);
+          exportedSourceFile, CurDeclContext, &Context, &items, appendToVector);
 
       // Spin the C++ parser to the end; we won't be using it.
       while (!Tok.is(tok::eof)) {
@@ -237,7 +237,6 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
     consumeTokenWithoutFeedingReceiver();
 
   // Parse the body of the file.
-  SmallVector<ASTNode, 128> items;
   while (!Tok.is(tok::eof)) {
     // If we run into a SIL decl, skip over until the next Swift decl. We need
     // to delay parsing these, as SIL parsing currently requires type checking
@@ -248,9 +247,25 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
       continue;
     }
 
-    parseBraceItems(items, allowTopLevelCode()
-                               ? BraceItemListKind::TopLevelCode
-                               : BraceItemListKind::TopLevelLibrary);
+    // Figure out how to parse the items in this source file.
+    BraceItemListKind braceItemListKind;
+    switch (SF.Kind) {
+    case SourceFileKind::Main:
+      braceItemListKind = BraceItemListKind::TopLevelCode;
+      break;
+
+    case SourceFileKind::Library:
+    case SourceFileKind::Interface:
+    case SourceFileKind::SIL:
+      braceItemListKind = BraceItemListKind::TopLevelLibrary;
+      break;
+
+    case SourceFileKind::MacroExpansion:
+      braceItemListKind = BraceItemListKind::MacroExpansion;
+      break;
+    }
+
+    parseBraceItems(items, braceItemListKind);
 
     // In the case of a catastrophic parse error, consume any trailing
     // #else, #elseif, or #endif and move on to the next statement or
@@ -265,13 +280,6 @@ void Parser::parseTopLevel(SmallVectorImpl<Decl *> &decls) {
 
       consumeToken();
     }
-  }
-
-  // Then append the top-level decls we parsed.
-  for (auto item : items) {
-    auto *decl = item.get<Decl *>();
-    assert(!isa<AccessorDecl>(decl) && "accessors should not be added here");
-    decls.push_back(decl);
   }
 
   // Finalize the syntax context.
@@ -8751,6 +8759,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       break;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
         consumeToken();

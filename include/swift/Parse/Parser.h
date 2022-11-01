@@ -79,6 +79,8 @@ namespace swift {
     InactiveConditionalBlock,
     /// The body of the active clause of an #if/#else/#endif block
     ActiveConditionalBlock,
+    /// The top-level of a macro expansion "file".
+    MacroExpansion,
   };
 
 /// The receiver will be fed with consumed tokens while parsing. The main purpose
@@ -969,8 +971,10 @@ public:
   /// Returns true if the parser is at the start of a SIL decl.
   bool isStartOfSILDecl();
 
-  /// Parse the top-level Swift decls into the provided vector.
-  void parseTopLevel(SmallVectorImpl<Decl *> &decls);
+  /// Parse the top-level Swift items into the provided vector.
+  ///
+  /// Each item will be a declaration, statement, or expression.
+  void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.

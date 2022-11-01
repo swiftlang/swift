@@ -212,8 +212,10 @@ void swift::bindExtensions(ModuleDecl &mod) {
           worklist.push_back(ED);;
     };
 
-    for (auto *D : SF->getTopLevelDecls())
-      visitTopLevelDecl(D);
+    for (auto item : SF->getTopLevelItems()) {
+      if (auto D = item.dyn_cast<Decl *>())
+        visitTopLevelDecl(D);
+    }
 
     for (auto *D : SF->getHoistedDecls())
       visitTopLevelDecl(D);
@@ -266,6 +268,7 @@ static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     break;
   }
 
@@ -366,6 +369,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   switch (SF.Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
@@ -406,6 +410,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
 
   switch (SF.Kind) {
   case SourceFileKind::Library:
+  case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
     DerivativeFinder finder;
     SF.walkContext(finder);
