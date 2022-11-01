@@ -220,13 +220,13 @@ void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
   return paramDecl;
 }
 
-void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
-                      BridgedIdentifier name, void *nameLoc, bool isAsync,
-                      void *_Nullable asyncLoc, bool throws,
-                      void *_Nullable throwsLoc, void *paramLLoc,
-                      BridgedArrayRef params, void *paramRLoc,
-                      void *_Nullable body, void *_Nullable returnType,
-                      void *declContext) {
+struct FuncDeclBridged
+FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
+                BridgedIdentifier name, void *nameLoc, bool isAsync,
+                void *_Nullable asyncLoc, bool throws,
+                void *_Nullable throwsLoc, void *paramLLoc,
+                BridgedArrayRef params, void *paramRLoc,
+                void *_Nullable returnType, void *declContext) {
   auto *paramList = ParameterList::create(
       *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(paramLLoc),
       getArrayRef<ParamDecl *>(params), getSourceLocFromPointer(paramRLoc));
@@ -240,9 +240,13 @@ void *FuncDecl_create(void *ctx, void *staticLoc, bool isStatic, void *funcLoc,
       getSourceLocFromPointer(asyncLoc), throws,
       getSourceLocFromPointer(throwsLoc), nullptr, paramList,
       (TypeRepr *)returnType, (DeclContext *)declContext);
-  out->setBody((BraceStmt *)body, FuncDecl::BodyKind::Parsed);
 
-  return static_cast<Decl *>(out);
+  return {static_cast<DeclContext *>(out), static_cast<FuncDecl *>(out),
+          static_cast<Decl *>(out)};
+}
+
+void FuncDecl_setBody(void *fn, void *body) {
+  ((FuncDecl *)fn)->setBody((BraceStmt *)body, FuncDecl::BodyKind::Parsed);
 }
 
 void *SimpleIdentTypeRepr_create(void *ctx, void *loc, BridgedIdentifier id) {
@@ -283,10 +287,13 @@ void *ClosureExpr_create(void *ctx, void *body, void *dc) {
   SourceLoc inLoc;
 
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
+  auto params = ParameterList::create(Context, inLoc, {}, inLoc);
+
   auto *out = new (Context)
       ClosureExpr(attributes, bracketRange, nullptr, nullptr, asyncLoc,
                   throwsLoc, arrowLoc, inLoc, nullptr, 0, (DeclContext *)dc);
   out->setBody((BraceStmt *)body, true);
+  out->setParameterList(params);
   return (Expr *)out;
 }
 
@@ -505,3 +512,4 @@ void TopLevelCodeDecl_dump(void *decl) {
 void Expr_dump(void *expr) { ((Expr *)expr)->dump(llvm::errs()); }
 void Decl_dump(void *expr) { ((Decl *)expr)->dump(llvm::errs()); }
 void Stmt_dump(void *expr) { ((Stmt *)expr)->dump(llvm::errs()); }
+void Type_dump(void *expr) { ((TypeRepr *)expr)->dump(); }
