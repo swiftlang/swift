@@ -22,4 +22,8 @@ extension ASTGenVisitor {
   public func visit(_ node: CodeBlockItemSyntax) -> ASTNode {
     visit(node.item)
   }
+
+  public func visit(_ node: ArrayElementSyntax) -> ASTNode {
+    visit(node.expression)
+  }
 }
