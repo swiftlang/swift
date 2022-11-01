@@ -55,7 +55,9 @@
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE
-#  define EXPERIMENTAL_FEATURE(FeatureName)  \
+// Warning: setting `AvailableInProd` to `true` on a feature means that the flag
+//          cannot be dropped in the future.
+#  define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)  \
      LANGUAGE_FEATURE(FeatureName, 0, #FeatureName, \
                       langOpts.hasFeature(#FeatureName))
 #endif
@@ -94,63 +96,63 @@ UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
 UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 6)
 
-EXPERIMENTAL_FEATURE(StaticAssert)
-EXPERIMENTAL_FEATURE(VariadicGenerics)
-EXPERIMENTAL_FEATURE(NamedOpaqueTypes)
-EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures)
-EXPERIMENTAL_FEATURE(MoveOnly)
-EXPERIMENTAL_FEATURE(OneWayClosureParameters)
-EXPERIMENTAL_FEATURE(TypeWitnessSystemInference)
-EXPERIMENTAL_FEATURE(ResultBuilderASTTransform)
-EXPERIMENTAL_FEATURE(LayoutPrespecialization)
+EXPERIMENTAL_FEATURE(StaticAssert, false)
+EXPERIMENTAL_FEATURE(VariadicGenerics, false)
+EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
+EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
+EXPERIMENTAL_FEATURE(MoveOnly, false)
+EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
+EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
+EXPERIMENTAL_FEATURE(ResultBuilderASTTransform, true)
+EXPERIMENTAL_FEATURE(LayoutPrespecialization, false)
 
 /// Whether to enable experimental differentiable programming features:
 /// `@differentiable` declaration attribute, etc.
-EXPERIMENTAL_FEATURE(DifferentiableProgramming)
+EXPERIMENTAL_FEATURE(DifferentiableProgramming, false)
 
 /// Whether to enable forward mode differentiation.
-EXPERIMENTAL_FEATURE(ForwardModeDifferentiation)
+EXPERIMENTAL_FEATURE(ForwardModeDifferentiation, false)
 
 /// Whether to enable experimental `AdditiveArithmetic` derived
 /// conformances.
-EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances)
+EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
 
 /// Whether Objective-C completion handler parameters are imported as
 /// @Sendable.
-EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
+EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
-EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
+EXPERIMENTAL_FEATURE(OpaqueTypeErasure, false)
 
 /// Whether to enable experimental @typeWrapper feature which allows to
 /// declare a type that controls access to all stored properties of the
 /// wrapped type.
-EXPERIMENTAL_FEATURE(TypeWrappers)
+EXPERIMENTAL_FEATURE(TypeWrappers, false)
 
 /// Whether to perform round-trip testing of the Swift Swift parser.
-EXPERIMENTAL_FEATURE(ParserRoundTrip)
+EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 
 /// Whether to perform validation of the parse tree produced by the Swift
 /// Swift parser.
-EXPERIMENTAL_FEATURE(ParserValidation)
+EXPERIMENTAL_FEATURE(ParserValidation, false)
 
 /// Whether to fold sequence expressions in the syntax tree produced by the
 /// Swift Swift parser.
-EXPERIMENTAL_FEATURE(ParserSequenceFolding)
+EXPERIMENTAL_FEATURE(ParserSequenceFolding, false)
 
 /// Enables implicit some while also enabling existential `any`
-EXPERIMENTAL_FEATURE(ImplicitSome)
+EXPERIMENTAL_FEATURE(ImplicitSome, false)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
-EXPERIMENTAL_FEATURE(ParserASTGen)
+EXPERIMENTAL_FEATURE(ParserASTGen, false)
 
 /// Enable the experimental macros feature.
-EXPERIMENTAL_FEATURE(Macros)
+EXPERIMENTAL_FEATURE(Macros, false)
 
 /// Parse using the Swift (swift-syntax) parser and use ASTGen to generate the
 /// corresponding syntax tree.
-EXPERIMENTAL_FEATURE(BuiltinMacros)
+EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

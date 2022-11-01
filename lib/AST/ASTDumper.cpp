@@ -804,13 +804,21 @@ namespace {
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
 
-      if (auto decls = SF.getCachedTopLevelDecls()) {
-        for (Decl *D : *decls) {
-          if (D->isImplicit())
+      if (auto items = SF.getCachedTopLevelItems()) {
+        for (auto item : *items) {
+          if (item.isImplicit())
             continue;
 
           OS << '\n';
-          printRec(D);
+
+          if (auto decl = item.dyn_cast<Decl *>()) {
+            printRec(decl);
+          } else if (auto stmt = item.dyn_cast<Stmt *>()) {
+            stmt->dump(OS, &SF.getASTContext(), Indent + 2);
+          } else {
+            auto expr = item.get<Expr *>();
+            expr->dump(OS, Indent + 2);
+          }
         }
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -1470,7 +1478,7 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   // parsing request as by default the dumping logic tries not to kick any
   // requests.
   if (parseIfNeeded)
-    (void)getTopLevelDecls();
+    (void)getTopLevelItems();
 
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';

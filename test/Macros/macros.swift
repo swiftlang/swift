@@ -2,9 +2,10 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-let a = 1, b = 1
-let s = #stringify(a + b)
-// CHECK: macro_expansion_expr type='(Int, String)'{{.*}}name=stringify
-// CHECK-NEXT: argument_list
-// CHECK: tuple_expr type='(Int, String)' location=Macro expansion of #stringify
+func test(a: Int, b: Int) {
+  let s = #stringify(a + b)
 
+  // CHECK: macro_expansion_expr type='(Int, String)'{{.*}}name=stringify
+  // CHECK-NEXT: argument_list
+  // CHECK: tuple_expr type='(Int, String)' location=Macro expansion of #stringify
+}

@@ -45,6 +45,7 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
           return false;
 
         case SourceFileKind::Library:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
           return true;
@@ -4486,6 +4487,7 @@ ProtocolConformance *GetImplicitSendableRequest::evaluate(
           return nullptr;
 
         case SourceFileKind::Library:
+        case SourceFileKind::MacroExpansion:
         case SourceFileKind::Main:
         case SourceFileKind::SIL:
           break;

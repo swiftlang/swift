@@ -635,9 +635,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // (non-release) builds for testing purposes.
     if (auto feature = getExperimentalFeature(A->getValue())) {
 #ifdef NDEBUG
-      Diags.diagnose(SourceLoc(),
-                     diag::error_experimental_feature_not_available,
-                     A->getValue());
+      if (!isFeatureAvailableInProduction(*feature)) {
+        Diags.diagnose(SourceLoc(),
+                       diag::error_experimental_feature_not_available,
+                       A->getValue());
+      }
 #endif
 
       Opts.Features.insert(*feature);

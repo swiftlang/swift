@@ -49,7 +49,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
   module->addFile(*FileForLookups);
 
   if (optionals == DeclareOptionalTypes) {
-    SmallVector<Decl *, 2> optionalTypes;
+    SmallVector<ASTNode, 2> optionalTypes;
     optionalTypes.push_back(createOptionalType(
         Ctx, FileForLookups, Ctx.getIdentifier("Optional")));
     optionalTypes.push_back(createOptionalType(
