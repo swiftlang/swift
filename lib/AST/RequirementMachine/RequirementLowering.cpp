@@ -724,9 +724,27 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   auto selfTy = proto->getSelfInterfaceType();
 
+  unsigned errorCount = errors.size();
   realizeInheritedRequirements(proto, selfTy,
                                /*inferRequirements=*/false,
                                result, errors);
+
+  if (errors.size() > errorCount) {
+    // Add requirements from inherited protocols, which are obtained via
+    // getDirectlyInheritedNominalTypeDecls(). Normally this duplicates
+    // the information found in the resolved types from the inheritance
+    // clause, except when type resolution fails and returns an ErrorType.
+    //
+    // For example, in 'protocol P: Q & Blah', where 'Blah' does not exist,
+    // the type 'Q & Blah' resolves to an ErrorType, while the simpler
+    // mechanism in getDirectlyInheritedNominalTypeDecls() still finds 'Q'.
+    for (auto *inheritedProto : proto->getInheritedProtocols()) {
+      result.push_back({
+          Requirement(RequirementKind::Conformance,
+                      selfTy, inheritedProto->getDeclaredInterfaceType()),
+          SourceLoc(), /*wasInferred=*/false});
+    }
+  }
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
