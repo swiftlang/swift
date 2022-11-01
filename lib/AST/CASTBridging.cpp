@@ -120,17 +120,19 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
 void *SwiftStringLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
                                     long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) StringLiteralExpr(
-      StringRef{reinterpret_cast<const char *>(string), size_t(len)},
-      getSourceLocFromPointer(TokenLoc));
+  auto stringRef = Context.AllocateCopy(
+      StringRef{reinterpret_cast<const char *>(string), size_t(len)});
+  return new (Context)
+      StringLiteralExpr(stringRef, getSourceLocFromPointer(TokenLoc));
 }
 
 void *SwiftIntegerLiteralExpr_create(void *ctx, const uint8_t *_Nullable string,
                                      long len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
-  return new (Context) IntegerLiteralExpr(
-      StringRef{reinterpret_cast<const char *>(string), size_t(len)},
-      getSourceLocFromPointer(TokenLoc));
+  auto stringRef = Context.AllocateCopy(
+      StringRef{reinterpret_cast<const char *>(string), size_t(len)});
+  return new (Context)
+      IntegerLiteralExpr(stringRef, getSourceLocFromPointer(TokenLoc));
 }
 
 void *SwiftBooleanLiteralExpr_create(void *ctx, bool value, void *TokenLoc) {
