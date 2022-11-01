@@ -26,4 +26,22 @@ extension ASTGenVisitor {
     let value = node.booleanLiteral == .trueKeyword()
     return .expr(SwiftBooleanLiteralExpr_create(ctx, value, loc))
   }
+
+  public func visit(_ node: ArrayExprSyntax) -> ASTNode {
+    let lLoc = self.base.advanced(by: node.leftSquare.position.utf8Offset).raw
+    let rLoc = self.base.advanced(by: node.rightSquare.position.utf8Offset).raw
+
+    let elements = node.elements.map { self.visit($0).rawValue }
+    let commas = node.elements
+      .compactMap { $0.trailingComma }
+      .map {
+        self.base.advanced(by: $0.position.utf8Offset).raw
+      }
+
+    return elements.withBridgedArrayRef { elementsRef in
+      commas.withBridgedArrayRef { commasRef in
+        .expr(ArrayExpr_create(ctx, lLoc, elementsRef, commasRef, rLoc))
+      }
+    }
+  }
 }
