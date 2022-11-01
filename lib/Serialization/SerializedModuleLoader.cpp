@@ -540,9 +540,9 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
   // -module-alias is used (otherwise same).
   //
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
-  // and a source file has 'import Foo', a module called Bar (real name)
+  // and a source file has 'import Foo', a module called Bar (binary name)
   // should be searched.
-  StringRef moduleNameRef = Ctx.getRealModuleName(moduleID.Item).str();
+  StringRef moduleNameRef = Ctx.getBinaryModuleName(moduleID.Item).str();
   SmallString<32> moduleName(moduleNameRef);
   SerializedModuleBaseName genericBaseName(moduleName);
 

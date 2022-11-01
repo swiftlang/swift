@@ -1161,10 +1161,10 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangN)
     D->setClangNode(ClangN);
-  auto realNameIfExists = Ctx.getRealModuleName(Path.front().Item,
-                                                ASTContext::ModuleAliasLookupOption::realNameFromAlias);
-  if (!realNameIfExists.empty()) {
-    D->RealModuleName = realNameIfExists;
+  auto binaryNameIfExists = Ctx.getBinaryModuleName(Path.front().Item,
+                                                ASTContext::ModuleAliasLookupOption::binaryNameFromSyntaxName);
+  if (!binaryNameIfExists.empty()) {
+    D->BinaryModuleName = binaryNameIfExists;
   }
   return D;
 }
@@ -1263,16 +1263,16 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-ImportPath ImportDecl::getRealImportPath(ImportPath::Builder &scratch) const {
+ImportPath ImportDecl::getBinaryImportPath(ImportPath::Builder &scratch) const {
   assert(scratch.empty() && "scratch ImportPath::Builder must be initially empty");
   auto path = getImportPath();
-  if (RealModuleName.empty())
+  if (BinaryModuleName.empty())
     return path;
 
   for (auto elem : path) {
     if (scratch.empty()) {
-      // Add the real module name instead of its alias
-      scratch.push_back(RealModuleName);
+      // Add the binary module name instead of its syntax name
+      scratch.push_back(BinaryModuleName);
     } else {
       // Add the rest if any (access path elements)
       scratch.push_back(elem.Item);

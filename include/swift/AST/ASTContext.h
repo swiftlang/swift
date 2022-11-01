@@ -372,13 +372,13 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::StringSet<> FailedModuleImportNames;
 
-  /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
-  /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
-  /// if the module names appearing in source files are aliases or real names.
-  /// \see ASTContext::getRealModuleName.
+  /// Set if a `-module-alias` was passed. Used to store mapping between module syntax names and
+  /// their corresponding binary names, and vice versa for a reverse lookup, which is needed to check
+  /// if the module names appearing in source files are syntax names or binary names.
+  /// \see ASTContext::getBinaryModuleName.
   ///
-  /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
-  /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
+  /// The boolean in the value indicates whether or not the entry is keyed by a syntax name vs binary name,
+  /// i.e. true if the entry is [key: syntax_name, value: (binary_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
   /// Retrieve the allocator for the given arena.
@@ -512,30 +512,30 @@ public:
   /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
-  /// are the real (physical) module names on disk.
+  /// are the binary module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
-  /// Look up option used in \c getRealModuleName when module aliasing is applied.
+  /// Look up option used in \c getBinaryModuleName when module aliasing is applied.
   enum class ModuleAliasLookupOption {
-    alwaysRealName,
-    realNameFromAlias,
-    aliasFromRealName
+    alwaysBinaryName,
+    binaryNameFromSyntaxName,
+    syntaxNameFromBinaryName
   };
 
   /// Look up the module alias map by the given \p key and a lookup \p option.
   ///
-  /// \param key A module alias or real name to look up the map by.
-  /// \param option A look up option \c ModuleAliasLookupOption. Defaults to alwaysRealName.
+  /// \param key A module syntax name or binary name to look up the map by.
+  /// \param option A look up option \c ModuleAliasLookupOption. Defaults to alwaysBinaryName.
   ///
-  /// \return The real name or alias mapped to the key.
+  /// \return The binary name or syntax name mapped to the key.
   ///         If no aliasing is used, return \p key regardless of \p option.
-  ///         If \p option is alwaysRealName, return the real module name whether the \p key is an alias
-  ///         or a real name.
-  ///         If \p option is realNameFromAlias, only return a real name if \p key is an alias.
-  ///         If \p option is aliasFromRealName, only return an alias if \p key is a real name.
-  ///         Else return a real name or an alias mapped to the \p key.
-  Identifier getRealModuleName(Identifier key,
-                               ModuleAliasLookupOption option = ModuleAliasLookupOption::alwaysRealName) const;
+  ///         If \p option is alwaysBinaryName, return the binary module name whether the \p key is a syntax name
+  ///         or a binary name.
+  ///         If \p option is binaryNameFromSyntaxName, only return a binary name if \p key is a syntax name.
+  ///         If \p option is syntaxNameFromBinaryName, only return a syntax name if \p key is a binary name.
+  ///         Else return a binary name or a syntax name mapped to the \p key.
+  Identifier getBinaryModuleName(Identifier key,
+                               ModuleAliasLookupOption option = ModuleAliasLookupOption::alwaysBinaryName) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

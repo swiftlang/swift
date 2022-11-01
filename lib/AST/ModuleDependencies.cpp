@@ -101,8 +101,8 @@ void ModuleDependencies::addModuleDependencies(
       continue;
 
     ImportPath::Builder scratch;
-    auto realPath = importDecl->getRealModulePath(scratch);
-    addModuleDependency(realPath, &alreadyAddedModules);
+    auto binaryModulePath = importDecl->getBinaryModulePath(scratch);
+    addModuleDependency(binaryModulePath, &alreadyAddedModules);
   }
 
   auto fileName = sf.getFilename();

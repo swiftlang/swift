@@ -1863,7 +1863,7 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
     if (!v.empty()) {
       auto key = getIdentifier(k);
       auto val = getIdentifier(v);
-      // key is a module alias, val is its corresponding real name
+      // key is a module syntax name, val is its corresponding binary name
       ModuleAliasMap[key] = std::make_pair(val, true);
       // add an entry with an alias as key for an easier lookup later
       ModuleAliasMap[val] = std::make_pair(key, false);
@@ -1871,7 +1871,7 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   }
 }
 
-Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption option) const {
+Identifier ASTContext::getBinaryModuleName(Identifier key, ModuleAliasLookupOption option) const {
   auto found = ModuleAliasMap.find(key);
   if (found == ModuleAliasMap.end())
     return key; // No module aliasing was used, so just return the given key
@@ -1879,22 +1879,22 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   // Found an entry
   auto value = found->second;
 
-  // With the alwaysRealName option, look up the real name by treating
-  // the given key as an alias; if the key's not an alias, return the key
-  // itself since that's the real name.
-  if (option == ModuleAliasLookupOption::alwaysRealName) {
+  // With the alwaysBinaryName option, look up the binary name by treating
+  // the given key as a module syntax name; if the key's not a syntax name, return the key
+  // itself since that's the binary name.
+  if (option == ModuleAliasLookupOption::alwaysBinaryName) {
      return value.second ? value.first : key;
   }
 
-  // With realNameFromAlias or aliasFromRealName option, only return the value
-  // if the given key matches the description (whether it's an alias or real name)
-  // by looking up the value.second (true if keyed by an alias). If not matched,
+  // With binaryNameFromSyntaxName or syntaxNameFromBinaryName option, only return the value
+  // if the given key matches the description (whether it's a syntax name or binary name)
+  // by looking up the value.second (true if keyed by a syntax name). If not matched,
   // return an empty Identifier.
-  if ((option == ModuleAliasLookupOption::realNameFromAlias && !value.second) ||
-      (option == ModuleAliasLookupOption::aliasFromRealName && value.second))
+  if ((option == ModuleAliasLookupOption::binaryNameFromSyntaxName && !value.second) ||
+      (option == ModuleAliasLookupOption::binaryNameFromSyntaxName && value.second))
       return Identifier();
 
-  // Otherwise return the value found (whether the key is an alias or real name)
+  // Otherwise return the value found (whether the key is a syntax name or binary name)
   return value.first;
 }
 
@@ -2196,14 +2196,14 @@ ASTContext::getLoadedModules() const {
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
   // Look up a loaded module using an actual module name (physical name
   // on disk). If the -module-alias option is used, the module name that
-  // appears in source code will be different from the real module name
+  // appears in source code will be different from the binary module name
   // on disk, otherwise the same.
   //
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
-  // and a source file has 'import Foo', a module called Bar (real name)
+  // and a source file has 'import Foo', a module called Bar (binary name)
   // will be loaded and returned.
-  auto realName = getRealModuleName(ModuleName);
-  return getImpl().LoadedModules.lookup(realName);
+  auto binaryName = getBinaryModuleName(ModuleName);
+  return getImpl().LoadedModules.lookup(binaryName);
 }
 
 void ASTContext::addLoadedModule(ModuleDecl *M) {
@@ -2212,9 +2212,9 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // on disk), in case -module-alias is used (otherwise same).
   //
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
-  // and a source file has 'import Foo', a module called Bar (real name)
+  // and a source file has 'import Foo', a module called Bar (binary name)
   // will be loaded and added to the map.
-  getImpl().LoadedModules[M->getRealName()] = M;
+  getImpl().LoadedModules[M->getBinaryName()] = M;
 }
 
 void ASTContext::setIgnoreAdjacentModules(bool value) {

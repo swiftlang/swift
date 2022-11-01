@@ -136,9 +136,9 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   // actually loaded module. In case module aliasing is used when building the main
   // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
   // that maps to 'Foo' is actually Bar.swiftmodule|.swiftinterface (applies to swift
-  // modules only), which is retrieved via M->getRealName(). If no module aliasing is
-  // used, M->getRealName() will return the same value as M->getName(), which is 'Foo'.
-  if (M->getRealName().str() != Core->Name) {
+  // modules only), which is retrieved via M->getBinaryName(). If no module aliasing is
+  // used, M->getBinaryName() will return the same value as M->getName(), which is 'Foo'.
+  if (M->getBinaryName().str() != Core->Name) {
     return error(Status::NameMismatch);
   }
 

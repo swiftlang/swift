@@ -1860,11 +1860,11 @@ ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
 
 StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
   assert(current && "all name components exhausted");
-  // Return the module's real (binary) name, which can be different from
-  // the name if module aliasing was used (-module-alias flag). The real
+  // Return the module's binary name, which can be different from
+  // the syntax name if module aliasing was used (-module-alias flag). The binary
   // name is used for serialization and loading.
   if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
-    return swiftModule->getRealName().str();
+    return swiftModule->getBinaryName().str();
 
   auto *clangModule =
       static_cast<const clang::Module *>(current.get<const void *>());
@@ -1926,9 +1926,9 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
-Identifier ModuleDecl::getRealName() const {
-  // This will return the real name for an alias (if used) or getName()
-  return getASTContext().getRealModuleName(getName());
+Identifier ModuleDecl::getBinaryName() const {
+  // This will return the binary name for its syntax name (if used) or getName()
+  return getASTContext().getBinaryModuleName(getName());
 }
 
 Identifier ModuleDecl::getABIName() const {
@@ -2180,7 +2180,7 @@ bool ModuleDecl::isExportedAs(const ModuleDecl *other) const {
   if (!clangModule)
     return false;
 
-  return other->getRealName().str() == clangModule->ExportAsModule;
+  return other->getBinaryName().str() == clangModule->ExportAsModule;
 }
 
 void ModuleDecl::collectBasicSourceFileInfo(
@@ -3680,17 +3680,17 @@ getClangModule(llvm::PointerUnion<const ModuleDecl *, const void *> Union) {
   return static_cast<const clang::Module *>(Union.get<const void *>());
 }
 
-StringRef ModuleEntity::getName(bool useRealNameIfAliased) const {
+StringRef ModuleEntity::getName(bool useBinaryNameIfAliased) const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return useRealNameIfAliased ? SwiftMod->getRealName().str() : SwiftMod->getName().str();
+    return useBinaryNameIfAliased ? SwiftMod->getBinaryName().str() : SwiftMod->getName().str();
   return getClangModule(Mod)->Name;
 }
 
-std::string ModuleEntity::getFullName(bool useRealNameIfAliased) const {
+std::string ModuleEntity::getFullName(bool useBinaryNameIfAliased) const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return std::string(useRealNameIfAliased ? SwiftMod->getRealName() : SwiftMod->getName());
+    return std::string(useBinaryNameIfAliased ? SwiftMod->getBinaryName() : SwiftMod->getName());
   return getClangModule(Mod)->getFullModuleName();
 }
 

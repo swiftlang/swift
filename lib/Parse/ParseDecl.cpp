@@ -5332,12 +5332,12 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 
   // Look up if the imported module is being aliased via -module-alias,
   // and check that the module alias appeared in source files instead of
-  // its corresponding real name
+  // its corresponding binary name
   auto parsedModuleID = importPath.get().front().Item;
-  if (Context.getRealModuleName(parsedModuleID, ASTContext::ModuleAliasLookupOption::realNameFromAlias).empty()) {
-    // If reached here, it means the parsed module name is a real module name
+  if (Context.getBinaryModuleName(parsedModuleID, ASTContext::ModuleAliasLookupOption::binaryNameFromSyntaxName).empty()) {
+    // If reached here, it means the parsed module name is a binary module name
     // which appeared in the source file; only a module alias should be allowed
-    auto aliasName = Context.getRealModuleName(parsedModuleID, ASTContext::ModuleAliasLookupOption::aliasFromRealName);
+    auto aliasName = Context.getBinaryModuleName(parsedModuleID, ASTContext::ModuleAliasLookupOption::syntaxNameFromBinaryName);
     diagnose(importPath.front().Loc, diag::expected_module_alias,
                      parsedModuleID, aliasName)
       .fixItReplace(importPath.front().Loc, aliasName.str());

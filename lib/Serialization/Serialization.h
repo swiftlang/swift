@@ -528,7 +528,7 @@ public:
   /// may not be exactly the same as the name of the module containing DC;
   /// instead, it will match the containing file's "exported module name".
   ///
-  /// \param ignoreExport When true, register the real module name,
+  /// \param ignoreExport When true, register the binary module name,
   /// ignoring exported_as definitions.
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.

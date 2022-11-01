@@ -204,7 +204,7 @@ public:
     }
 
     /// Returns the name of the current module.
-    /// Note that for a Swift module, it returns the current module's real (binary) name,
+    /// Note that for a Swift module, it returns the current module's binary name,
     /// which can be different from the name if module aliasing was used (see `-module-alias`).
     StringRef operator*() const;
     ReverseFullNameIterator &operator++();
@@ -408,10 +408,10 @@ public:
   ///
   /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
   /// and this module is (a) not the main module and (b) is named Foo, then it returns
-  /// the real (physically on-disk) module name Bar.
+  /// the binary module name Bar.
   ///
   /// If no module aliasing is set, it will return getName(), i.e. Foo.
-  Identifier getRealName() const;
+  Identifier getBinaryName() const;
 
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
@@ -949,19 +949,19 @@ public:
   ModuleEntity(const ModuleDecl *Mod) : Mod(Mod) {}
   ModuleEntity(const clang::Module *Mod) : Mod(static_cast<const void *>(Mod)){}
 
-  /// @param useRealNameIfAliased Whether to use the module's real name in case
+  /// @param useBinaryNameIfAliased Whether to use the module's binary name in case
   ///                             module aliasing is used. For example, if a file
   ///                             has `import Foo` and `-module-alias Foo=Bar` is
-  ///                             passed, treat Foo as an alias and Bar as the real
+  ///                             passed, treat Foo as the syntax name and Bar as the binary
   ///                             module name as its dependency. This only applies
   ///                             to Swift modules.
-  /// @return The module name; for Swift modules, the real module name could be
+  /// @return The module name; for Swift modules, the binary module name could be
   ///         different from the name if module aliasing is used.
-  StringRef getName(bool useRealNameIfAliased = false) const;
+  StringRef getName(bool useBinaryNameIfAliased = false) const;
 
   /// For Swift modules, it returns the same result as \c ModuleEntity::getName(bool).
   /// For Clang modules, it returns the result of \c clang::Module::getFullModuleName.
-  std::string getFullName(bool useRealNameIfAliased = false) const;
+  std::string getFullName(bool useBinaryNameIfAliased = false) const;
 
   bool isSystemModule() const;
   bool isBuiltinModule() const;

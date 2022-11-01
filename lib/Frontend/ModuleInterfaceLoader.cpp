@@ -615,7 +615,7 @@ class ModuleInterfaceLoaderImpl {
       path::filename(path::parent_path(interfacePath));
     if (path::extension(inParentDirName) == ".swiftmodule") {
       assert(path::stem(inParentDirName) ==
-             ctx.getRealModuleName(ctx.getIdentifier(moduleName)).str());
+             ctx.getBinaryModuleName(ctx.getIdentifier(moduleName)).str());
       path::append(scratch, inParentDirName);
     }
     path::append(scratch, path::filename(modulePath));
@@ -1028,7 +1028,7 @@ class ModuleInterfaceLoaderImpl {
       }
       // Set up a builder if we need to build the module. It'll also set up
       // the genericSubInvocation we'll need to use to compute the cache paths.
-      Identifier realName = ctx.getRealModuleName(ctx.getIdentifier(moduleName));
+      Identifier realName = ctx.getBinaryModuleName(ctx.getIdentifier(moduleName));
       ImplicitModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
         astDelegate, interfacePath, realName.str(), cacheDir,
@@ -1898,8 +1898,8 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
   // -module-alias is used (otherwise same).
   //
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend, and an
-  // input file has 'import Foo', a module called Bar (real name) should be searched.
-  StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
+  // input file has 'import Foo', a module called Bar (binary name) should be searched.
+  StringRef moduleName = Ctx.getBinaryModuleName(ModuleID.Item).str();
 
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
@@ -1982,12 +1982,12 @@ bool ExplicitSwiftModuleLoader::canImportModule(
   if (path.hasSubmodule())
     return false;
   ImportPath::Element mID = path.front();
-  // Look up the module with the real name (physical name on disk);
+  // Look up the module with the binary name;
   // in case `-module-alias` is used, the name appearing in source files
-  // and the real module name are different. For example, '-module-alias Foo=Bar'
-  // maps Foo appearing in source files, e.g. 'import Foo', to the real module
+  // and the binary module name are different. For example, '-module-alias Foo=Bar'
+  // maps Foo appearing in source files, e.g. 'import Foo', to the binary module
   // name Bar (on-disk name), which should be searched for loading.
-  StringRef moduleName = Ctx.getRealModuleName(mID.Item).str();
+  StringRef moduleName = Ctx.getBinaryModuleName(mID.Item).str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no provided explicit module matches the name, then it cannot be imported.
   if (it == Impl.ExplicitModuleMap.end()) {

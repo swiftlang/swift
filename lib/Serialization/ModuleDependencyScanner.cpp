@@ -76,7 +76,7 @@ bool PlaceholderSwiftModuleScanner::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
     bool skipBuildingInterface, bool &isFramework, bool &isSystemModule) {
-  StringRef moduleName = Ctx.getRealModuleName(moduleID.Item).str();
+  StringRef moduleName = Ctx.getBinaryModuleName(moduleID.Item).str();
   auto it = PlaceholderDependencyModuleMap.find(moduleName);
   if (it == PlaceholderDependencyModuleMap.end()) {
     return false;
@@ -102,7 +102,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  auto realModuleName = Ctx.getRealModuleName(moduleName);
+  auto realModuleName = Ctx.getBinaryModuleName(moduleName);
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   Optional<ModuleDependencies> Result;

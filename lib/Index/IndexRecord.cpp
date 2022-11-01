@@ -426,11 +426,11 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
         if (auto F = fileMgr.getFile(LFU->getFilename())) {
-          // Use module real name for unit writer in case module aliasing
+          // Use module binary name for unit writer in case module aliasing
           // is used. For example, if a file being indexed has `import Foo`
-          // and `-module-alias Foo=Bar` is passed, treat Foo as an alias
-          // and Bar as the real module name as its dependency.
-          StringRef moduleName = mod->getRealName().str();
+          // and `-module-alias Foo=Bar` is passed, treat Foo as the module syntax name
+          // and Bar as the binary module name as its dependency.
+          StringRef moduleName = mod->getBinaryName().str();
           bool withoutUnitName = true;
           if (FU->getKind() == FileUnitKind::ClangModule) {
             auto clangModUnit = cast<ClangModuleUnit>(LFU);

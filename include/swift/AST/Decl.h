@@ -1244,10 +1244,10 @@ class ImportDecl final : public Decl,
 
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
-  /// Used to store the real module name corresponding to this import decl in
+  /// Used to store the binary module name corresponding to this import decl in
   /// case module aliasing is used. For example if '-module-alias Foo=Bar' was
-  /// passed and this decl is 'import Foo', the real name 'Bar' will be stored.
-  Identifier RealModuleName;
+  /// passed and this decl is 'import Foo', the binary name 'Bar' will be stored.
+  Identifier BinaryModuleName;
 
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
@@ -1289,17 +1289,17 @@ public:
                         static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
   }
 
-  /// Retrieves the import path, replacing any module aliases with real names.
+  /// Retrieves the import path, replacing any module aliases with binary names.
   /// 
   /// \param scratch An \c ImportPath::Builder which may, if necessary, be used to
   ///        construct the return value. It may go unused, so you should not try to
   ///        read the result from it; use the return value instead.
   /// \returns An \c ImportPath corresponding to this import decl. If module aliasing
-  ///          was used, this will contain the real name of the module; for instance,
+  ///          was used, this will contain the binary name of the module; for instance,
   ///          if you wrote 'import Foo' but passed '-module-alias Foo=Bar', this import
   ///          path will include 'Bar'. This return value may be owned by \p scratch,
   ///          so it should not be used after \p scratch is destroyed.
-  ImportPath getRealImportPath(ImportPath::Builder &scratch) const;
+  ImportPath getBinaryImportPath(ImportPath::Builder &scratch) const;
 
   /// Retrieves the part of the import path that contains the module name,
   /// as written in the source code.
@@ -1314,18 +1314,18 @@ public:
   }
 
   /// Retrieves the part of the import path that contains the module name,
-  /// replacing any module aliases with real names.
+  /// replacing any module aliases with binary names.
   /// 
   /// \param scratch An \c ImportPath::Builder which may, if necessary, be used to
   ///        construct the return value. It may go unused, so you should not try to
   ///        read the result from it; use the return value instead.
   /// \returns An \c ImportPath::Module corresponding to this import decl. If module
-  ///          aliasing was used, this will contain the real name of the module; for
+  ///          aliasing was used, this will contain the binary name of the module; for
   ///          instance, if you wrote 'import Foo' but passed '-module-alias Foo=Bar',
   ///          the returned path will contain 'Bar'. This return value may be owned
   ///          by \p scratch, so it should not be used after \p scratch is destroyed.
-  ImportPath::Module getRealModulePath(ImportPath::Builder &scratch) const {
-    return getRealImportPath(scratch).getModulePath(getImportKind());
+  ImportPath::Module getBinaryModulePath(ImportPath::Builder &scratch) const {
+    return getBinaryImportPath(scratch).getModulePath(getImportKind());
   }
 
   ImportPath::Access getAccessPath() const {
