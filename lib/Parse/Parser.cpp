@@ -1307,8 +1307,8 @@ OpaqueSyntaxNode ParserUnit::parse() {
   auto &P = getParser();
   auto &ctx = P.Context;
 
-  SmallVector<Decl *, 128> decls;
-  P.parseTopLevel(decls);
+  SmallVector<ASTNode, 128> items;
+  P.parseTopLevelItems(items);
 
   Optional<ArrayRef<Token>> tokensRef;
   if (auto tokens = P.takeTokenReceiver()->finalize())
@@ -1321,7 +1321,7 @@ OpaqueSyntaxNode ParserUnit::parse() {
       syntaxRoot.emplace(*root);
   }
 
-  auto result = SourceFileParsingResult{ctx.AllocateCopy(decls), tokensRef,
+  auto result = SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef,
                                         P.CurrentTokenHash, syntaxRoot};
   ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF}, std::move(result));
   return rawNode;

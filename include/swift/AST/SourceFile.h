@@ -21,6 +21,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 
@@ -152,11 +153,11 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
-  /// The list of top-level declarations in the source file. This is \c None if
+  /// The list of top-level items in the source file. This is \c None if
   /// they have not yet been parsed.
   /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
   /// have been removed, this can become an optional ArrayRef.
-  Optional<std::vector<Decl *>> Decls;
+  Optional<std::vector<ASTNode>> Items;
 
   /// The list of hoisted declarations. See Decl::isHoisted().
   /// This is only used by lldb.
@@ -207,11 +208,7 @@ public:
 
   /// Appends the given declaration to the end of the top-level decls list. Do
   /// not add any additional uses of this function.
-  void addTopLevelDecl(Decl *d) {
-    // Force decl parsing if we haven't already.
-    (void)getTopLevelDecls();
-    Decls->push_back(d);
-  }
+  void addTopLevelDecl(Decl *d);
 
   /// Prepends a declaration to the top-level decls list.
   ///
@@ -219,28 +216,29 @@ public:
   /// always a mistake, and additional uses should not be added.
   ///
   /// See rdar://58355191
-  void prependTopLevelDecl(Decl *d) {
-    // Force decl parsing if we haven't already.
-    (void)getTopLevelDecls();
-    Decls->insert(Decls->begin(), d);
-  }
+  void prependTopLevelDecl(Decl *d);
 
   /// Add a hoisted declaration. See Decl::isHoisted().
   void addHoistedDecl(Decl *d);
 
+  /// Retrieves an immutable view of the list of top-level items in this file.
+  ArrayRef<ASTNode> getTopLevelItems() const;
+
   /// Retrieves an immutable view of the list of top-level decls in this file.
+  ///
+  /// NOTE: Please use getTopLevelItems() instead.
   ArrayRef<Decl *> getTopLevelDecls() const;
 
   /// Retrieves an immutable view of the list of hoisted decls in this file.
   /// See Decl::isHoisted().
   ArrayRef<Decl *> getHoistedDecls() const;
 
-  /// Retrieves an immutable view of the top-level decls if they have already
+  /// Retrieves an immutable view of the top-level items if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
-  Optional<ArrayRef<Decl *>> getCachedTopLevelDecls() const {
-    if (!Decls)
+  Optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
+    if (!Items)
       return None;
-    return llvm::makeArrayRef(*Decls);
+    return llvm::makeArrayRef(*Items);
   }
 
   /// Retrieve the parsing options for the file.
@@ -522,7 +520,7 @@ public:
     // FIXME: Ideally the parser state should be an output of
     // ParseSourceFileRequest, but the evaluator doesn't currently support
     // move-only outputs for cached requests.
-    (void)getTopLevelDecls();
+    (void)getTopLevelItems();
 
     auto *state = DelayedParserState.get();
     assert(state && "Didn't set any delayed parser state!");

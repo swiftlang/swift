@@ -212,8 +212,10 @@ void swift::bindExtensions(ModuleDecl &mod) {
           worklist.push_back(ED);;
     };
 
-    for (auto *D : SF->getTopLevelDecls())
-      visitTopLevelDecl(D);
+    for (auto item : SF->getTopLevelItems()) {
+      if (auto D = item.dyn_cast<Decl *>())
+        visitTopLevelDecl(D);
+    }
 
     for (auto *D : SF->getHoistedDecls())
       visitTopLevelDecl(D);

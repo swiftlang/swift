@@ -3276,8 +3276,37 @@ void SourceFile::addHoistedDecl(Decl *d) {
 ArrayRef<Decl *> SourceFile::getTopLevelDecls() const {
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, ParseTopLevelDeclsRequest{mutableThis}, {});
+}
+
+void SourceFile::addTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelItems();
+  Items->push_back(d);
+
+  // FIXME: This violates core properties of the evaluator.
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+}
+
+void SourceFile::prependTopLevelDecl(Decl *d) {
+  // Force decl parsing if we haven't already.
+  (void)getTopLevelItems();
+  Items->insert(Items->begin(), d);
+
+  // FIXME: This violates core properties of the evaluator.
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
+  ctx.evaluator.clearCachedOutput(ParseTopLevelDeclsRequest{mutableThis});
+}
+
+ArrayRef<ASTNode> SourceFile::getTopLevelItems() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(ctx.evaluator, ParseSourceFileRequest{mutableThis},
-                           {}).TopLevelDecls;
+                           {}).TopLevelItems;
 }
 
 ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
@@ -3335,20 +3364,21 @@ bool FileUnit::walk(ASTWalker &walker) {
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : getTopLevelDecls()) {
-#ifndef NDEBUG
-    PrettyStackTraceDecl debugStack("walking into decl", D);
-#endif
-
-    if (D->walk(walker))
-      return true;
+  for (auto Item : getTopLevelItems()) {
+    if (auto D = Item.dyn_cast<Decl *>()) {
+      if (D->walk(walker))
+        return true;
+    } else {
+      Item.walk(walker);
+    }
 
     if (walker.shouldWalkAccessorsTheOldWay()) {
       // Pretend that accessors share a parent with the storage.
       //
       // FIXME: Update existing ASTWalkers to deal with accessors appearing as
       // children of the storage instead.
-      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(
+              Item.dyn_cast<Decl *>())) {
         for (auto AD : ASD->getAllAccessors()) {
           if (AD->walk(walker))
             return true;

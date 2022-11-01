@@ -1351,7 +1351,7 @@ Abstract base class representing a file unit.
 \apiref{SourceFile}{class}
 Represents a parsed source file from disk. Inherits from \texttt{FileUnit}.
 \begin{itemize}
-\item \texttt{getTopLevelDecls()} returns an array of all top-level declarations in this source file.
+\item \texttt{getTopLevelItems()} returns an array of all top-level items in this source file.
 \item \texttt{isPrimary()} returns \texttt{true} if this is a primary file, \texttt{false} if this is a secondary file.
 \item \texttt{isScriptMode()} answers if this is the main file of a module.
 \item \texttt{getScope()} returns the root of the scope tree for unqualified lookup.

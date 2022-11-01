@@ -692,9 +692,9 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   SourceLoc endLoc = getSourceRangeOfThisASTNode().End;
 
   ASTScopeImpl *insertionPoint = this;
-  for (auto *d : SF->getTopLevelDecls()) {
+  for (auto node : SF->getTopLevelItems()) {
     insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(
-      ASTNode(d), insertionPoint, endLoc);
+      node, insertionPoint, endLoc);
   }
 
   return {insertionPoint, "Next time decls are added they go here."};
