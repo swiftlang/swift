@@ -279,7 +279,7 @@ private:
   llvm::DenseMap<const NominalTypeDecl *, SILMoveOnlyDeinit *>
       MoveOnlyDeinitMap;
 
-  /// The list of SILVTables in the module.
+  /// The list of move only deinits in the module.
   std::vector<SILMoveOnlyDeinit *> moveOnlyDeinits;
 
   /// Declarations which are externally visible.
