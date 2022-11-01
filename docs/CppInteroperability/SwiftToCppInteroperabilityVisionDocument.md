@@ -1,18 +1,20 @@
 # Bridging Swift to C++
 
-## Introduction
-
-This vision document presents a high level overview of the “reverse” (i.e. using Swift APIs from C++) half of the C++ interoperability Swift language feature. It highlights the key principles and goals that determine how Swift APIs are exposed to C++ users. It also outlines the evolution process for this feature. This document does not present the final design for how Swift APIs get mapped to C++ language constructs. The final design of this feature will evolve as this feature goes through the Swift evolution process.
-
-This document does not cover the “forward” (i.e. using C++ APIs from Swift) half of the C++ interoperability feature, as it’s already covered by a [sibling document](https://github.com/apple/swift/pull/60501/files).
+This vision document presents a high level overview of the "reverse" (i.e. Swift-to-C++) half of the C++ interoperability Swift language feature. It highlights the key principles and goals that determine how Swift APIs are exposed to C++ users. It also outlines the evolution process for this feature. This document does not present the final design for how Swift APIs get mapped to C++ language constructs. The final design of this feature will evolve as this feature goes through the Swift evolution process. This document does not cover the "forward" (i.e. using C++ APIs from Swift) aspect of the C++ interoperability feature, as it’s covered by a [sibling document](https://github.com/apple/swift/pull/60501/files).
 
 This document is a prospective feature vision document, as described in the [draft review management guidelines](https://github.com/rjmccall/swift-evolution/blob/057b2383102f34c3d0f5b257f82bba0f5b94683d/review_management.md#future-directions-and-roadmaps) of the Swift evolution process. It has not yet been approved by the Language Workgroup.
 
-## Overview of how Swift is bridged to C++
+## Introduction
 
-Swift and C++ have different approaches to interoperability with each other. The Swift compiler embeds a copy of the Clang compiler, which is then used to import C and Objective-C declarations into Swift for Objective-C interoperability. Similarly to Objective-C, Swift uses the embedded Clang compiler to import C++ declarations when the user wants to access C++ APIs from Swift. Swift also allows Objective-C code to call into Swift declarations annotated with the @objc attribute. Instead of being embedded into Clang, Swift generates an Objective-C compatibility header that contains the Objective-C declarations that the Swift programmer intended to expose to Objective-C. 
+The Swift programming language was designed to interoperate well with C and Objective-C. Existing Objective-C APIs were available to Swift programs in the initial release of Swift. This rich interoperability support allowed Swift to supplant Objective-C in a lot of codebases. On the other hand, Swift did not have a good C++ interoperability story, which hindered its ability to coexist with or supplant C++ in existing C++ codebases.
 
-The existing model of generating a header file that can then be imported by Objective-C code can be adopted to bridge Swift declarations to C++ as well. The Clang compiler knows how to emit calls to functions with the Swift calling convention, so it’s possible to call into Swift from C++ using the matching ABI that the Swift program expects. This in turn allows the Swift compiler to generate a C++ header that is able to call into Swift functions, methods, initializers and accessors correctly. These raw calls that use the Swift calling convention can then be wrapped in inline thunk stub functions, allowing a C++ programmer to call into Swift APIs using the familiar C++ function and member function call syntax. Swift types can also be mapped to C++ types, allowing a C++ programmer to use and manipulate Swift values using familiar syntax from C++. The exact details of how Swift types and other language constructs get mapped to C++ are not covered in this document, as there’s another document that describes this: https://github.com/apple/swift/blob/main/docs/CppInteroperability/UserGuide-CallingSwiftFromC%2B%2B.md .
+Both Swift and C++ are capable of interoperating with each other, and a well designed and supported C++ interoperability feature would allow Swift to coexist with and potentially supplant C++ in existing C++ or mixed language codebases. Such codebases would want to adopt Swift incrementally, so that it would not be necessary to rewrite everything in Swift right away. Swift-to-C++ interoperability is a key aspect of interoperability that's required for incremental adoption, as it ensures that newly written Swift APIs can be called from existing C++ code. Additionally, rich Swift-to-C++ interoperability support would grow the pool of potential adopters of Swift-only libraries, as such libraries would be importable into C++.
+
+## Overview of Swift's interoperability support
+
+Swift currently provides support for interoperability with C and Objective-C. The approach is very different for the two directions of interoperability, though. For "forward" interoperability, Swift embeds a copy of the Clang compiler, which it uses to directly load C and Objective-C Clang modules and translate declarations into a native Swift representation. For "reverse" interoperability, Swift does not want to require Clang to embed Swift, and so Swift generates an Objective-C header that can be used to call into Swift APIs that are exposed in that header. Because Objective-C is restricted in what kinds of types it can work with, and because it requires code to be emitted in a special way that doesn't match the regular Swift ABI, methods and types must be marked as being exposed to Objective-C with the `@objc` attribute.
+
+Swift's support for C++ interoperability is modeled after its support for C and Objective-C interoperability. For "forward" interoperability, the embeded Clang compiler is used to directly load C++ Clang modules and translate declarations into a native Swift representation. The "forward" interoperability [vision document](https://github.com/apple/swift/pull/60501/files) provides more details about this model. For "reverse" interoperability, Swift generates a header that uses C++ language constructs to represent Swift APIs that are exposed by the Swift module. Because C++ is much more expressive and flexible than Objective-C, the generated header is able to provide representation for native Swift functions, methods, initializers, accessors and types. This allows C++ programmers to call into Swift APIs using the familiar C++ function and member function call syntax, and does not require any special ABI annotations on the Swift side.
 
 ## Goals
 
@@ -70,7 +72,7 @@ The existing Swift to Objective-C bridging layer should still be supported even 
 
 ## The approach
 
-The Swift compiler exposes Swift APIs to C++ by generating a header file that contains C++ declarations that wrap around the underlying calls into Swift code and provide a suitable representation for Swift types. Typically, a single header file is generated for one Swift module.
+The Swift compiler exposes Swift APIs to C++ by generating a header file that contains C++ declarations that wrap around the underlying calls into Swift functions that use the native Swift calling convention. The header also provides a suitable representation for Swift types. Typically, a single header file is generated for one Swift module.
 
 The generated header file depends on specific LLVM and Clang compiler features for Swift calling convention support, and thus it can only be compiled by Clang. The header does not depend on any Clang-specific C++ language extensions. The header might depend on other Clang-only features that improve developer experience for the C++ users, like specific attributes that improve diagnostics.
 
@@ -79,6 +81,8 @@ The generated header file uses advanced C++ features that require a recent C++ l
 The generated header file also contains the C and the Objective-C declarations that Swift exposes to C and Objective-C on platforms that support C or Objective-C interoperability. Thus a single header file can be used by codebases that mix C, Objective-C and C++.
 
 The generated header file is a temporary build artifact. On platforms with ABI stability, the generated C++ code for an ABI stable Swift interface is not tied to the Swift compiler that compiled the Swift code for that Swift module, as ABI stability is respected by the C++ code in the header. In all other cases the generated C++ code in the header is assumed to be tied to the Swift compiler that compiled the Swift module, and thus the header should be regenerated when the compiler changes.
+
+ The next few sections provide a high level overview of how Swift types and some other language constructs get bridged to C++. The exact details of how Swift language constructs are bridged will be covered by Swift evolution proposals, and additional documentation, such as this preliminary [user guide document](https://github.com/apple/swift/blob/main/docs/CppInteroperability/UserGuide-CallingSwiftFromC%2B%2B.md).
 
 ### Bridging Swift types
 
