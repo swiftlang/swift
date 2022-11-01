@@ -3690,6 +3690,8 @@ public:
       if (Parent.isNull())
           return;
 
+      // An alternative enclosing scope, used for macro expansions.
+      SourceRange AltEnclosing;
       if (Parent.getAsModule()) {
         return;
       } else if (Decl *D = Parent.getAsDecl()) {
@@ -3720,7 +3722,12 @@ public:
 
         if (E->isImplicit())
           return;
-        
+
+        if (auto expansion = dyn_cast<MacroExpansionExpr>(E)) {
+          if (auto rewritten = expansion->getRewritten())
+            AltEnclosing = rewritten->getSourceRange();
+        }
+
         Enclosing = E->getSourceRange();
       } else if (TypeRepr *TyR = Parent.getAsTypeRepr()) {
         Enclosing = TyR->getSourceRange();
@@ -3728,7 +3735,9 @@ public:
         llvm_unreachable("impossible parent node");
       }
       
-      if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
+      if (!Ctx.SourceMgr.rangeContains(Enclosing, Current) &&
+          !(AltEnclosing.isValid() &&
+            Ctx.SourceMgr.rangeContains(AltEnclosing, Current))) {
         Out << "child source range not contained within its parent: ";
         printEntity();
         Out << "\n  parent range: ";

@@ -246,7 +246,14 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
-    : SF(SF), scopeCreator(scopeCreator) {}
+    : SF(SF), scopeCreator(scopeCreator) {
+  if (auto enclosingSF = SF->getEnclosingSourceFile()) {
+    SourceLoc parentLoc = SF->macroExpansion.getStartLoc();
+    if (auto parentScope = findStartingScopeForLookup(enclosingSF, parentLoc)) {
+      parentAndWasExpanded.setPointer(const_cast<ASTScopeImpl *>(parentScope));
+    }
+  }
+}
 
 #pragma mark NodeAdder
 
