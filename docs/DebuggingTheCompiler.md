@@ -905,14 +905,14 @@ example:
 $ utils/build-script --release-debuginfo --dry-run
 + mkdir -p /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert
 --- Building earlyswiftdriver ---
-+ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py build --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/earlyswiftdriver-macosx-x86_64 --configuration release --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake --local_compiler_build
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py build --package-path /SwiftWorkspace/swift-driver --scratch-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/earlyswiftdriver-macosx-x86_64 --configuration release --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake --local_compiler_build
 Building the standard library for: swift-test-stdlib-macosx-x86_64
 ...
 ```
 One of the first steps is an invocation of the driver's
 `build-script-helper.py` script which specifies that the driver us to be built
 (`build`) using the host toolchain (`--toolchain`) to a specified location
-(`--build-path`). 
+(`--scratch-path`). 
 
 ## Installing the Compiler Driver
 In order to create a Swift compiler installation (`--install-swift`), the
@@ -931,16 +931,16 @@ a standalone build product:
 $ utils/build-script --release-debuginfo --dry-run --swift-driver --install-swift-driver
 ...
 --- Cleaning swiftdriver ---
-+ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py clean --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py clean --package-path /SwiftWorkspace/swift-driver --scratch-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
 --- Building swiftdriver ---
-+ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py build --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py build --package-path /SwiftWorkspace/swift-driver --scratch-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
 --- Installing swiftdriver ---
-+ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py install --package-path /SwiftWorkspace/swift-driver --build-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x
++ /SwiftWorkspace/swift-driver/Utilities/build-script-helper.py install --package-path /SwiftWorkspace/swift-driver --scratch-path /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/swiftdriver-macosx-x
 86_64 --configuration release --toolchain /SwiftWorkspace/build/Ninja-RelWithDebInfoAssert/toolchain-macosx-x86_64/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr --ninja-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/ninja --cmake-bin /Applications/Xcode.app/Contents/Developer/usr/local/bin/cmake
 ```
 These invocations of the driver's `build-script-helper.py` script specify the
 individual build actions (`clean`, `build`, `install`), the product build path
-(`--build-path`), and the *just-built* toolchain which should be used
+(`--scratch-path`), and the *just-built* toolchain which should be used
 (`--toolchain`).
 
 # Debugging Swift Executables

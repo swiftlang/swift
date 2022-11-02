@@ -63,7 +63,7 @@ class SwiftFormat(product.Product):
             action,
             '--toolchain', self.install_toolchain_path(host_target),
             '--configuration', configuration,
-            '--build-path', self.build_dir,
+            '--scratch-path', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
             # There might have been a Package.resolved created by other builds
             # or by the package being opened using Xcode. Discard that and

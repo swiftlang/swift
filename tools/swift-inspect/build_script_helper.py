@@ -10,7 +10,7 @@ def perform_build(args, swiftbuild_path):
         swiftbuild_path,
         "--package-path",
         args.package_path,
-        "--build-path",
+        "--scratch-path",
         args.build_path,
         "--configuration",
         args.configuration,
@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--package-path", type=str, required=True)
-    parser.add_argument("--build-path", type=str, required=True)
+    parser.add_argument("--scratch-path", type=str, required=True)
     parser.add_argument("--toolchain", type=str, required=True)
     parser.add_argument("--configuration", type=str, choices=['debug', 'release'],
                         default='release')

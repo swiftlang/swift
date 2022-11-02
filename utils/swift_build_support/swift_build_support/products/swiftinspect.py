@@ -100,7 +100,7 @@ def run_build_script_helper(host_target, product, args):
         helper_path,
         '--verbose',
         '--package-path', package_path,
-        '--build-path', product.build_dir,
+        '--scratch-path', product.build_dir,
         '--toolchain', toolchain_path,
     ]
     shell.call(build_cmd)

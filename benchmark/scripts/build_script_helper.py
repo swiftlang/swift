@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--package-path", type=str, required=True)
-    parser.add_argument("--build-path", type=str, required=True)
+    parser.add_argument("--scratch-path", type=str, required=True)
     parser.add_argument("--toolchain", type=str, required=True)
 
     args = parser.parse_args()
