@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking -enable-library-evolution
 
 // REQUIRES: concurrency
 
@@ -27,5 +28,23 @@ public func testThis(_ task: __owned SomeClass) async {
     let _ : Int = try await _taskFutureGetThrowing(task)
   } catch _ {
     print("error")
+  }
+}
+
+
+public protocol P {}
+
+struct I : P{
+  var x = 0
+}
+
+public struct S {
+  public func callee() async -> some P {
+    return I()
+  }
+  // We used to assert on this in resilient mode due to mismatch function
+  // pointers.
+  public func caller() async -> some P {
+      return await callee()
   }
 }
