@@ -60,7 +60,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
   }
 
   // Second step: If an argument has unknown uses, we must add all previously collected
-  // global effects to the argument, because we don't know to wich "global" side-effect
+  // global effects to the argument, because we don't know to which "global" side-effect
   // instruction the argument might have escaped.
   for argument in function.arguments {
     collectedEffects.addEffectsForEcapingArgument(argument: argument)
