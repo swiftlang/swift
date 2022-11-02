@@ -132,3 +132,30 @@ struct UnsafePointerWithOwner<T> {
     func doNothing() {}
 }
 
+// Make sure we error whenever we attempt to conform a move only type to a
+// protocol.
+protocol P {}
+@_moveOnly class ProtocolCheckMoveOnlyKlass {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform to protocol 'P'}}
+@_moveOnly struct ProtocolCheckMoveOnlyStruct { // expected-error {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform to protocol 'P'}}
+    var k: MoveOnlyKlass
+}
+@_moveOnly enum ProtocolCheckMoveOnlyEnum {} // expected-error {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform to protocol 'P'}}
+
+extension ProtocolCheckMoveOnlyKlass : P {} // expected-error {{move-only class 'ProtocolCheckMoveOnlyKlass' cannot conform yet to any protocols}}
+extension ProtocolCheckMoveOnlyStruct : P {} // expected-error {{move-only struct 'ProtocolCheckMoveOnlyStruct' cannot conform yet to any protocols}}
+extension ProtocolCheckMoveOnlyEnum : P {} // expected-error {{move-only enum 'ProtocolCheckMoveOnlyEnum' cannot conform yet to any protocols}}
+
+// But a normal extension is ok.
+extension ProtocolCheckMoveOnlyKlass {}
+extension ProtocolCheckMoveOnlyStruct {}
+extension ProtocolCheckMoveOnlyEnum {}
+
+// Check if we define a move only type and make it conform on the base type
+@_moveOnly
+class MoveOnlyKlassP : P {} // expected-error {{move-only class 'MoveOnlyKlassP' cannot conform to protocol 'P'}}
+@_moveOnly
+struct MoveOnlyStructP : P { // expected-error {{move-only struct 'MoveOnlyStructP' cannot conform to protocol 'P'}}
+    var mv: MoveOnlyKlass
+}
+@_moveOnly
+enum MoveOnlyEnumP : P {} // expected-error {{move-only enum 'MoveOnlyEnumP' cannot conform to protocol 'P'}}
