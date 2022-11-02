@@ -222,6 +222,10 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class GenericPair final {
 // CHECK-NEXT: public:
+// CHECK-NEXT: #ifndef __cpp_concepts
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   inline ~GenericPair() {
 // CHECK-NEXT:     auto metadata = _impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 
@@ -235,6 +239,10 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class _impl_GenericPair {
 // CHECK-NEXT: public:
+// CHECK-NEXT: #ifndef __cpp_concepts
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   static inline char * _Nonnull getOpaquePointer(GenericPair<T_0_0, T_0_1> &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT:   static inline const char * _Nonnull getOpaquePointer(const GenericPair<T_0_0, T_0_1> &object) { return object._getOpaquePointer(); }
 // CHECK-NEXT: template<class T>

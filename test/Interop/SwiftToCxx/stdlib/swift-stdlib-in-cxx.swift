@@ -28,6 +28,9 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class Array final {
 // CHECK-NEXT: public:
+// CHECK-NEXT: #ifndef __cpp_concepts
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline ~Array() {
 // CHECK: }
 // CHECK-NEXT: inline Array(const Array &other) {
@@ -49,6 +52,9 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class Optional final {
 // CHECK-NEXT: public:
+// CHECK-NEXT: #ifndef __cpp_concepts
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: #endif
 // CHECK-NEXT: inline ~Optional() {
 // CHECK: }
 // CHECK-NEXT: inline Optional(const Optional &other) {
