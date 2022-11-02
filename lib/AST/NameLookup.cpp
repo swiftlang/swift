@@ -2300,7 +2300,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
     }
 
     // Make sure we didn't miss some interesting kind of type declaration.
-    assert(isa<AbstractTypeParamDecl>(typeDecl));
+    assert(isa<GenericTypeParamDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl));
   }
 
   return nominalDecls;

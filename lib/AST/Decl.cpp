@@ -547,7 +547,7 @@ bool Decl::canHaveComment() const {
   return !this->hasClangNode() &&
          (isa<ValueDecl>(this) || isa<ExtensionDecl>(this)) &&
          !isa<ParamDecl>(this) &&
-         (!isa<AbstractTypeParamDecl>(this) || isa<AssociatedTypeDecl>(this));
+         !isa<GenericTypeParamDecl>(this);
 }
 
 ModuleDecl *Decl::getModuleContext() const {
@@ -4623,36 +4623,11 @@ Type TypeAliasDecl::getStructuralType() const {
   return ErrorType::get(ctx);
 }
 
-Type AbstractTypeParamDecl::getSuperclass() const {
-  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
-  assert(genericEnv != nullptr && "Too much circularity");
-
-  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *archetype = contextTy->getAs<ArchetypeType>())
-    return archetype->getSuperclass();
-
-  // FIXME: Assert that this is never queried.
-  return nullptr;
-}
-
-ArrayRef<ProtocolDecl *>
-AbstractTypeParamDecl::getConformingProtocols() const {
-  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
-  assert(genericEnv != nullptr && "Too much circularity");
-
-  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *archetype = contextTy->getAs<ArchetypeType>())
-    return archetype->getConformsTo();
-
-  // FIXME: Assert that this is never queried.
-  return { };
-}
-
 GenericTypeParamDecl::GenericTypeParamDecl(
     DeclContext *dc, Identifier name, SourceLoc nameLoc, SourceLoc ellipsisLoc,
     unsigned depth, unsigned index, bool isParameterPack, bool isOpaqueType,
     TypeRepr *opaqueTypeRepr)
-    : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
+    : TypeDecl(DeclKind::GenericTypeParam, dc, name, nameLoc, { }) {
   assert(!(ellipsisLoc && !isParameterPack) &&
          "Ellipsis always means type parameter pack");
 
@@ -4736,7 +4711,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
                                        TypeRepr *defaultDefinition,
                                        TrailingWhereClause *trailingWhere)
-    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+    : TypeDecl(DeclKind::AssociatedType, dc, name, nameLoc, { }),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
       TrailingWhere(trailingWhere) {}
 
@@ -4745,7 +4720,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TrailingWhereClause *trailingWhere,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
-    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+    : TypeDecl(DeclKind::AssociatedType, dc, name, nameLoc, { }),
       KeywordLoc(keywordLoc), DefaultDefinition(nullptr),
       TrailingWhere(trailingWhere), Resolver(definitionResolver),
       ResolverContextData(resolverData) {
@@ -4781,7 +4756,7 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   if (auto cached = request.getCachedResult())
     overridden = std::move(*cached);
   else
-    overridden = AbstractTypeParamDecl::getOverriddenDecls();
+    overridden = TypeDecl::getOverriddenDecls();
 
   llvm::TinyPtrVector<AssociatedTypeDecl *> assocTypes;
   for (auto decl : overridden) {
@@ -4809,7 +4784,7 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
     auto anchor = getAssociatedTypeAnchor(assocType, searched);
     if (!anchor)
       continue;
-    if (!bestAnchor || AbstractTypeParamDecl::compare(anchor, bestAnchor) < 0)
+    if (!bestAnchor || TypeDecl::compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
   }
 
