@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Actor -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/actor.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Actor -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/actor.h -disable-availability-checking
 // RUN: %FileCheck %s < %t/actor.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/actor.h)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Actor -enable-library-evolution -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/actor-evo.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Actor -enable-library-evolution -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/actor-evo.h -disable-availability-checking
 // RUN: %FileCheck %s < %t/actor-evo.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/actor-evo.h)
