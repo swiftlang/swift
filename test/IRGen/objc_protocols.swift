@@ -218,3 +218,7 @@ func gallop<T : Vanner>(_ t: Stirrup<T>) {
 func triggerDoubleInheritedFunging() -> AnyObject {
   return NSDoubleInheritedFunging.self as AnyObject
 }
+
+class TestNonRuntimeProto : RuntimeP { }
+
+class TestNonRuntime2Proto : Runtime2P {}
