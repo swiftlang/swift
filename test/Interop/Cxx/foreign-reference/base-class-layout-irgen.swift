@@ -1,6 +1,4 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -module-name=test  | %FileCheck %s
-//
-// XFAIL: OS=linux-android, OS=linux-androideabi
 
 import MemberLayout
 
