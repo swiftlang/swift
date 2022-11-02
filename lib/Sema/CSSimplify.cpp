@@ -13850,6 +13850,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         impact = 10;
     }
 
+    // Increase impact of invalid conversions to `Any` and `AnyHashable`
+    // associated with collection elements (i.e. for-in sequence element)
+    // because it means that other side is structurally incompatible.
+    if (fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch) {
+      if (type2->isAny() || type2->isAnyHashable())
+        ++impact;
+    }
+
     if (recordFix(fix, impact))
       return SolutionKind::Error;
 
