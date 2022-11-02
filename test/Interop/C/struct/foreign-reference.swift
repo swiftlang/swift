@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // TODO: This should work without ObjC interop in the future rdar://97497120
 // REQUIRES: objc_interop
+// REQUIRES: rdar101790203
 
 import StdlibUnittest
 import ForeignReference
