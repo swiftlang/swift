@@ -2530,7 +2530,9 @@ public:
                                  getCallee().getFunctionPointer().getKind());
 
     return FunctionPointer::createForAsyncCall(
-        calleeFunction, codeAuthInfo, awaitSig, awaitEntrySig.getType());
+        IGF.Builder.CreateBitCast(calleeFunction,
+                                  awaitEntrySig.getType()->getPointerTo()),
+        codeAuthInfo, awaitSig, awaitEntrySig.getType());
   }
 
   SILType getParameterType(unsigned index) override {
@@ -5355,6 +5357,12 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
     return cast<llvm::Function>(SecondaryValue)->getFunctionType();
   }
 
+  if (awaitSignature) {
+    assert(llvm::cast<llvm::PointerType>(Value->getType())
+               ->isOpaqueOrPointeeTypeMatches(awaitSignature));
+    return cast<llvm::FunctionType>(awaitSignature);
+  }
+
   // Read the function type off the global or else from the Signature.
   if (auto *constant = dyn_cast<llvm::Constant>(Value)) {
     auto *gv = dyn_cast<llvm::GlobalValue>(Value);
@@ -5375,12 +5383,6 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
     assert(llvm::cast<llvm::PointerType>(Value->getType())
                ->isOpaqueOrPointeeTypeMatches(gv->getValueType()));
     return cast<llvm::FunctionType>(gv->getValueType());
-  }
-
-  if (awaitSignature) {
-    assert(llvm::cast<llvm::PointerType>(Value->getType())
-               ->isOpaqueOrPointeeTypeMatches(awaitSignature));
-    return cast<llvm::FunctionType>(awaitSignature);
   }
 
   assert(llvm::cast<llvm::PointerType>(Value->getType())
