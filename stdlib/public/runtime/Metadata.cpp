@@ -1525,7 +1525,7 @@ static Lazy<TupleCache> TupleTypes;
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
 static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
-  return ((const ValueWitnessTable *)asFullMetadata(metatype)) - 1;
+  return asFullMetadata(metatype)->ValueWitnesses;
 }
 
 /// Generic tuple value witness for 'projectBuffer'.
@@ -3729,34 +3729,33 @@ OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
 /// The standard metadata for Any.
-const FullMetadata<ExistentialTypeMetadata>
-    swift::METADATA_SYM(ANY_MANGLING) = {
-        {{(const uint8_t *)0xc0ffee},
-         {&OpaqueExistentialValueWitnesses_0}}, // ValueWitnesses
-        ExistentialTypeMetadata(
-            ExistentialTypeFlags() // Flags
-                .withNumWitnessTables(0)
-                .withClassConstraint(ProtocolClassConstraint::Any)
-                .withHasSuperclass(false)
-                .withSpecialProtocol(SpecialProtocol::None)),
+const FullMetadata<ExistentialTypeMetadata> swift::
+METADATA_SYM(ANY_MANGLING) = {
+  { &OpaqueExistentialValueWitnesses_0 }, // ValueWitnesses
+  ExistentialTypeMetadata(
+    ExistentialTypeFlags() // Flags
+      .withNumWitnessTables(0)
+      .withClassConstraint(ProtocolClassConstraint::Any)
+      .withHasSuperclass(false)
+      .withSpecialProtocol(SpecialProtocol::None)),
 };
 
 /// The standard metadata for AnyObject.
-const FullMetadata<ExistentialTypeMetadata>
-    swift::METADATA_SYM(ANYOBJECT_MANGLING) = {
-        {{(const uint8_t *)0xbeefbeef},
+const FullMetadata<ExistentialTypeMetadata> swift::
+METADATA_SYM(ANYOBJECT_MANGLING) = {
+  {
 #if SWIFT_OBJC_INTEROP
-         {&VALUE_WITNESS_SYM(BO)}
+    &VALUE_WITNESS_SYM(BO)
 #else
-         {&VALUE_WITNESS_SYM(Bo)}
+    &VALUE_WITNESS_SYM(Bo)
 #endif
-        },
-        ExistentialTypeMetadata(
-            ExistentialTypeFlags() // Flags
-                .withNumWitnessTables(0)
-                .withClassConstraint(ProtocolClassConstraint::Class)
-                .withHasSuperclass(false)
-                .withSpecialProtocol(SpecialProtocol::None)),
+  },
+  ExistentialTypeMetadata(
+    ExistentialTypeFlags() // Flags
+      .withNumWitnessTables(0)
+      .withClassConstraint(ProtocolClassConstraint::Class)
+      .withHasSuperclass(false)
+      .withSpecialProtocol(SpecialProtocol::None)),
 };
 
 /// The uniquing structure for opaque existential value witness tables.

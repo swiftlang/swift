@@ -305,13 +305,7 @@ public:
   }
 
   const ValueWitnessTable *getValueWitnesses() const {
-    auto *full = asFullMetadata(this);
-    fprintf(stderr, "=======================\n");
-    fprintf(stderr, "Pre: %p\n", (void *)this);
-    fprintf(stderr, "-----------------------\n");
-    fprintf(stderr, "Post: %p\n", (void *)full);
-    fprintf(stderr, "=======================\n");
-    return full->ValueWitnesses;
+    return asFullMetadata(this)->ValueWitnesses;
   }
 
   const TypeLayout *getTypeLayout() const {
@@ -1540,6 +1534,7 @@ using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
   TargetTupleTypeMetadata() = default;
   constexpr TargetTupleTypeMetadata(const TargetMetadata<Runtime> &base,
                                     uint32_t numElements,
@@ -1725,6 +1720,7 @@ struct TargetExistentialTypeMetadata
       TargetExistentialTypeMetadata<Runtime>,
       ConstTargetMetadataPointer<Runtime, TargetMetadata>,
       TargetProtocolDescriptorRef<Runtime>> {
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
