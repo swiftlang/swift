@@ -44,16 +44,9 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects", {
 
   var collectedEffects = CollectedEffects(function: function, context)
 
-  var deadEndBlocks = DeadEndBlocks(function: function, context)
-  defer { deadEndBlocks.deinitialize() }
-  
   // First step: collect effects from all instructions.
   //
   for block in function.blocks {
-    // Effects in blocks from which the function doesn't return are not relevant for the caller.
-    if deadEndBlocks.isDeadEnd(block: block) {
-      continue
-    }
     for inst in block.instructions {
       collectedEffects.addInstructionEffects(inst)
     }

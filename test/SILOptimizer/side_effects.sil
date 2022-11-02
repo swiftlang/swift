@@ -655,7 +655,7 @@ bb0(%0 : $*X):
 }
 
 // CHECK-LABEL: sil @call_noreturn
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: read]
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_noreturn : $@convention(thin) () -> () {
 bb0:
