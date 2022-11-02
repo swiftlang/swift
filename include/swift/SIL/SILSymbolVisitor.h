@@ -76,7 +76,8 @@ public:
                     const SILSymbolVisitorContext &ctx);
 
   /// Override to prepare for enumeration of the symbols for a specific decl.
-  virtual void willVisitDecl(Decl *D) {}
+  /// Return \c true to proceed with visiting the decl or \c false to skip it.
+  virtual bool willVisitDecl(Decl *D) { return true; }
 
   /// Override to clean up after enumeration of the symbols for a specific decl.
   virtual void didVisitDecl(Decl *D) {}

@@ -41,7 +41,7 @@ func testGlobalFunctions() {
 
 // --- forwardDeclaredFunc() ---
 // CHECK: sil hidden_external @$s17has_symbol_helper19forwardDeclaredFuncyyFTwS : $@convention(thin) () -> Builtin.Int1
-// FIXME: missing forward declared function
+// CHECK: sil @forward_declared_func : $@convention(thin) () -> ()
 
 
 // CHECK: sil hidden [ossa] @$s4test0A4VarsyyF : $@convention(thin) () -> ()

@@ -72,8 +72,8 @@ public:
       : Visitor{Visitor}, Ctx{Ctx},
         PublicSymbolsOnly{Ctx.getSILCtx().getOpts().PublicSymbolsOnly} {}
 
-  void willVisitDecl(Decl *D) override {
-    Visitor.willVisitDecl(D);
+  bool willVisitDecl(Decl *D) override {
+    return Visitor.willVisitDecl(D);
   }
 
   void didVisitDecl(Decl *D) override {
