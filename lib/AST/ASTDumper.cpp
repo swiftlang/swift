@@ -648,19 +648,14 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
-                                      const char *name) {
-      printCommon(decl, name);
-    }
-
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
-      printAbstractTypeParamCommon(decl, "generic_type_param");
+      printCommon(decl, "generic_type_param");
       OS << " depth=" << decl->getDepth() << " index=" << decl->getIndex();
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
-      printAbstractTypeParamCommon(decl, "associated_type_decl");
+      printCommon(decl, "associated_type_decl");
       if (auto defaultDef = decl->getDefaultDefinitionType()) {
         OS << " default=";
         defaultDef.print(OS);

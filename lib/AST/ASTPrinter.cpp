@@ -6559,16 +6559,13 @@ public:
 
       // Print based on the type.
       Printer << "some ";
-      if (!decl->getConformingProtocols().empty()) {
-        llvm::interleave(decl->getConformingProtocols(), Printer, [&](ProtocolDecl *proto){
-          if (auto printType = proto->getDeclaredType())
-            printType->print(Printer, Options);
-          else
-            Printer << proto->getNameStr();
-        }, " & ");
-      } else {
-        Printer << "Any";
-      }
+      auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
+          decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
+      auto constraintType = archetypeType->getExistentialType();
+      if (auto *existentialType = constraintType->getAs<ExistentialType>())
+        constraintType = existentialType->getConstraintType();
+
+      constraintType->print(Printer, Options);
       return;
     }
 

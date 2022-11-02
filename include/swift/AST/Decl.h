@@ -499,9 +499,8 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
-  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1+1,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+1+1,
     : NumPadBits,
 
     Depth : 16,
@@ -3182,29 +3181,6 @@ public:
   }
 };
 
-/// Abstract class describing generic type parameters and associated types,
-/// whose common purpose is to anchor the abstract type parameter and specify
-/// requirements for any corresponding type argument.
-class AbstractTypeParamDecl : public TypeDecl {
-protected:
-  AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
-                        SourceLoc NameLoc)
-    : TypeDecl(kind, dc, name, NameLoc, { }) { }
-
-public:
-  /// Return the superclass of the generic parameter.
-  Type getSuperclass() const;
-
-  /// Retrieve the set of protocols to which this abstract type
-  /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
-
-  static bool classof(const Decl *D) {
-    return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
-           D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
-  }
-};
-
 /// A declaration of a generic type parameter.
 ///
 /// A generic type parameter introduces a new, named type parameter along
@@ -3219,7 +3195,7 @@ public:
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
 class GenericTypeParamDecl final
-    : public AbstractTypeParamDecl,
+    : public TypeDecl,
       private llvm::TrailingObjects<GenericTypeParamDecl, TypeRepr *,
                                     SourceLoc> {
   friend TrailingObjects;
@@ -3446,7 +3422,7 @@ public:
 ///   func getNext() -> Element?
 /// }
 /// \endcode
-class AssociatedTypeDecl : public AbstractTypeParamDecl {
+class AssociatedTypeDecl : public TypeDecl {
   /// The location of the initial keyword.
   SourceLoc KeywordLoc;
 
@@ -3510,7 +3486,7 @@ public:
   /// Retrieve the (first) overridden associated type declaration, if any.
   AssociatedTypeDecl *getOverriddenDecl() const {
     return cast_or_null<AssociatedTypeDecl>(
-                                   AbstractTypeParamDecl::getOverriddenDecl());
+        TypeDecl::getOverriddenDecl());
   }
 
   /// Retrieve the set of associated types overridden by this associated

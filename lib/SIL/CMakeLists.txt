@@ -4,7 +4,9 @@ target_link_libraries(swiftSIL PUBLIC
   swiftDemangling)
 target_link_libraries(swiftSIL PRIVATE
   swiftAST
-  swiftClangImporter)
+  swiftClangImporter
+  swiftSema
+  swiftSerialization)
 
 add_subdirectory(IR)
 add_subdirectory(Utils)

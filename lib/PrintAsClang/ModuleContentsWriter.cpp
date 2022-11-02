@@ -314,8 +314,10 @@ public:
       return;
     } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
       forwardDeclare(ED);
-    } else if (isa<AbstractTypeParamDecl>(TD)) {
-      llvm_unreachable("should not see type params here");
+    } else if (isa<GenericTypeParamDecl>(TD)) {
+      llvm_unreachable("should not see generic parameters here");
+    } else if (isa<AssociatedTypeDecl>(TD)) {
+      llvm_unreachable("should not see associated types here");
     } else if (isa<StructDecl>(TD) &&
                TD->getModuleContext()->isStdlibModule()) {
       // stdlib has some @_cdecl functions with structs.

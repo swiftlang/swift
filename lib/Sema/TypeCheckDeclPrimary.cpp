@@ -180,7 +180,8 @@ static void checkInheritanceClause(
     // For generic parameters and associated types, the GSB checks constraints;
     // however, we still want to fire off the requests to produce diagnostics
     // in some circular validation cases.
-    if (isa<AbstractTypeParamDecl>(decl))
+    if (isa<GenericTypeParamDecl>(decl) ||
+        isa<AssociatedTypeDecl>(decl))
       continue;
 
     // Check whether we inherited from 'AnyObject' twice.
@@ -192,7 +193,7 @@ static void checkInheritanceClause(
       // for Swift >= 5.
       auto sourceRange = inherited.getSourceRange();
       bool isWrittenAsClass =
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          isa<ProtocolDecl>(decl) &&
           Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
               .is(tok::kw_class);
       if (ctx.LangOpts.isSwiftVersionAtLeast(5) && isWrittenAsClass) {
@@ -210,7 +211,7 @@ static void checkInheritanceClause(
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = getRemovalRange(knownIndex);
         if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
-            (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+            isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
           SourceLoc classLoc = knownRange.Start;

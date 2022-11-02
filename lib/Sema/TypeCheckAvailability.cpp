@@ -3254,13 +3254,22 @@ public:
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
-    if (auto *RLE = dyn_cast<RegexLiteralExpr>(E)) {
-      // Regex literals require both the Regex<Output> type to be available, as
-      // well as the initializer that is implicitly called.
-      auto Range = RLE->getSourceRange();
-      diagnoseDeclRefAvailability(Context.getRegexDecl(), Range);
-      diagnoseDeclRefAvailability(RLE->getInitializer(), Range);
+
+    if (auto *LE = dyn_cast<LiteralExpr>(E)) {
+      auto Range = LE->getSourceRange();
+      if (auto *RLE = dyn_cast<RegexLiteralExpr>(LE)) {
+        // Regex literals require both the Regex<Output> type to be available,
+        // as well as the initializer that is implicitly called.
+        diagnoseDeclRefAvailability(Context.getRegexDecl(), Range);
+      }
+      diagnoseDeclRefAvailability(LE->getInitializer(), Range);
     }
+
+    if (auto *CE = dyn_cast<CollectionExpr>(E)) {
+      // Diagnose availability of implicit collection literal initializers.
+      diagnoseDeclRefAvailability(CE->getInitializer(), CE->getSourceRange());
+    }
+
     if (auto *EE = dyn_cast<ErasureExpr>(E)) {
       maybeDiagParameterizedExistentialErasure(EE, Where);
     }

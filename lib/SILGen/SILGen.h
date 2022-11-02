@@ -272,7 +272,8 @@ public:
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *d) {}
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
-  void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
+  void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
