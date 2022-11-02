@@ -31,4 +31,22 @@ public func _copy<T>(_ value: T) -> T {
   #endif
 }
 
+// CHECK-LABEL: sil hidden @getRawPointer : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
+// CHECK:         [[PTR:%[^,]+]] = address_to_pointer [stack_protection] [[ADDR]]
+// CHECK:         return [[PTR]]
+// CHECK-LABEL: } // end sil function 'getRawPointer'
+@_silgen_name("getRawPointer")
+func getRawPointer<T>(to value: T) -> Builtin.RawPointer {
+  return Builtin.addressOfBorrow(value)
+}
 
+// CHECK-LABEL: sil hidden @getUnprotectedRawPointer : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
+// CHECK:         [[PTR:%[^,]+]] = address_to_pointer [[ADDR]]
+// CHECK:         return [[PTR]]
+// CHECK-LABEL: } // end sil function 'getUnprotectedRawPointer'
+@_silgen_name("getUnprotectedRawPointer")
+func getUnprotectedRawPointer<T>(to value: T) -> Builtin.RawPointer {
+  return Builtin.unprotectedAddressOfBorrow(value)
+}

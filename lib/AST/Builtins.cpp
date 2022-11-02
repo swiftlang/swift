@@ -2701,7 +2701,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
+  case BuiltinValueKind::AddressOfBorrowOpaque:
   case BuiltinValueKind::UnprotectedAddressOfBorrow:
+  case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
