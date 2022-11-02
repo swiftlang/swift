@@ -83,6 +83,15 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
   return false;
 }
 
+bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
+    const NominalTypeDecl *typeDecl) {
+  if (!typeDecl->isGeneric())
+    return true;
+  printGenericSignatureInnerStaticAsserts(
+      typeDecl->getGenericSignature().getCanonicalSignature());
+  return false;
+}
+
 void ClangSyntaxPrinter::printNominalClangTypeReference(
     const clang::Decl *typeDecl) {
   auto &clangCtx = typeDecl->getASTContext();
@@ -294,6 +303,20 @@ void ClangSyntaxPrinter::printGenericSignature(
         os << ">";
       },
       " && ");
+  os << "\n#endif // __cpp_concepts\n";
+}
+
+void ClangSyntaxPrinter::printGenericSignatureInnerStaticAsserts(
+    const CanGenericSignature &signature) {
+  os << "#ifndef __cpp_concepts\n";
+  llvm::interleave(
+      signature.getInnermostGenericParams(), os,
+      [&](const GenericTypeParamType *genericParamType) {
+        os << "static_assert(swift::isUsableInGenericContext<";
+        printGenericTypeParamTypeName(genericParamType);
+        os << ">, \"type cannot be used in a Swift generic context\");";
+      },
+      "\n");
   os << "\n#endif // __cpp_concepts\n";
 }
 

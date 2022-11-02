@@ -78,6 +78,19 @@ public:
   bool printNominalTypeOutsideMemberDeclTemplateSpecifiers(
       const NominalTypeDecl *typeDecl);
 
+  /// Print out additional C++ `static_assert` clauses that
+  /// are required to emit a generic member definition outside a C++ class that
+  /// is generated for the given Swift type declaration.
+  ///
+  /// \returns true if nothing was printed.
+  ///
+  /// Examples:
+  ///    1) For Swift's `String` type, it will print nothing.
+  ///    2) For Swift's `Array<T>` type, it will print
+  ///    `static_assert(swift::isUsableInGenericContext<T_0_0>);\n`
+  bool printNominalTypeOutsideMemberDeclInnerStaticAssert(
+      const NominalTypeDecl *typeDecl);
+
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.
   ///
@@ -162,6 +175,11 @@ public:
   /// Print the Swift generic signature as C++ template declaration alongside
   /// its requirements.
   void printGenericSignature(const CanGenericSignature &signature);
+
+  /// Print the `static_assert` statements used for legacy type-checking for
+  /// generics in C++14/C++17 mode.
+  void
+  printGenericSignatureInnerStaticAsserts(const CanGenericSignature &signature);
 
   /// Print the C++ template parameters that should be passed for a given
   /// generic signature.

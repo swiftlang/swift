@@ -1043,9 +1043,16 @@ void DeclAndTypeClangFunctionPrinter::printGenericReturnSequence(
 
 void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
-    StringRef swiftSymbolName, const ModuleDecl *moduleContext, Type resultTy,
-    const ParameterList *params, bool hasThrows,
-    const AnyFunctionType *funcType) {
+    StringRef swiftSymbolName, const NominalTypeDecl *typeDeclContext,
+    const ModuleDecl *moduleContext, Type resultTy, const ParameterList *params,
+    bool hasThrows, const AnyFunctionType *funcType) {
+  if (typeDeclContext)
+    ClangSyntaxPrinter(os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
+        typeDeclContext);
+  if (FD->isGeneric()) {
+    auto Signature = FD->getGenericSignature().getCanonicalSignature();
+    ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(Signature);
+  }
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
     os << "  void* _ctx = nullptr;\n";
@@ -1281,8 +1288,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
 
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(FD, signature, swiftSymbolName, FD->getModuleContext(),
-                    resultTy, FD->getParameters(), FD->hasThrows(),
+  printCxxThunkBody(FD, signature, swiftSymbolName, typeDeclContext,
+                    FD->getModuleContext(), resultTy, FD->getParameters(),
+                    FD->hasThrows(),
                     FD->getInterfaceType()->castTo<AnyFunctionType>());
   os << "  }\n";
 }
@@ -1340,7 +1348,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(accessor, signature, swiftSymbolName,
+  printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
                     accessor->getModuleContext(), resultTy,
                     accessor->getParameters());
   os << "  }\n";
@@ -1366,7 +1374,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
   }
   os << " {\n";
   // FIXME: should it be objTy for resultTy?
-  printCxxThunkBody(accessor, signature, swiftSymbolName,
+  printCxxThunkBody(accessor, signature, swiftSymbolName, typeDeclContext,
                     accessor->getModuleContext(), resultTy,
                     accessor->getParameters());
   os << "  }\n";

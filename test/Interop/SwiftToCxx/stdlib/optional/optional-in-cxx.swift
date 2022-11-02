@@ -79,6 +79,9 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: inline void resetOpt(Swift::Optional<T_0_0>& val) noexcept {
+// CHECK-NEXT: #ifndef __cpp_concepts
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: #endif
 // CHECK-NEXT:   return _impl::$s11UseOptional8resetOptyyxSgzlF(Swift::_impl::_impl_Optional<T_0_0>::getOpaquePointer(val), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
 
