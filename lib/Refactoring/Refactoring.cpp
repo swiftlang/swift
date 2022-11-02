@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -814,7 +814,7 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
     return RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine) ;    \
   }                                                                           \
 };
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 class RangeBasedRefactoringAction : public RefactoringAction {
 protected:
@@ -843,7 +843,7 @@ class RefactoringAction##KIND: public RangeBasedRefactoringAction {           \
     return RefactoringAction##KIND::isApplicable(RangeInfo, DiagEngine) ;     \
   }                                                                           \
 };
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 bool RefactoringActionLocalRename::
 isApplicable(const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
@@ -8409,7 +8409,7 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
       case RefactoringKind::None:
         llvm_unreachable("Should be a valid refactoring kind");
 #define REFACTORING(KIND, NAME, ID) case RefactoringKind::KIND: return NAME;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
     }
     llvm_unreachable("unhandled kind");
   }
@@ -8598,7 +8598,7 @@ void swift::ide::collectAvailableRefactorings(
   if (RefactoringKind::KIND != RefactoringKind::LocalRename &&                 \
       RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
     Kinds.push_back(RefactoringKind::KIND);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 }
 
 void swift::ide::collectAvailableRefactorings(
@@ -8629,7 +8629,7 @@ void swift::ide::collectAvailableRefactorings(
 #define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
   if (enableInternalRefactoring)                                              \
     RANGE_REFACTORING(KIND, NAME, ID)
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
   CollectRangeStartRefactorings = collectRangeStartRefactorings(Result);
 }
@@ -8654,7 +8654,7 @@ case RefactoringKind::KIND: {                                                  \
         return Action.performChange();                                         \
       return true;                                                             \
   }
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
     case RefactoringKind::FindLocalRenameRanges:

@@ -102,7 +102,7 @@ static void fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) static LazySKDUID Kind##Refactoring##KIND("source.refactoring.kind."#ID);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 static SourceKit::Context *GlobalCtx = nullptr;
 
@@ -1203,7 +1203,7 @@ static void handleSemanticRequest(
 
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
   if (KA == KindRefactoring##KIND) Info.Kind = SemanticRefactoringKind::KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
     if (Info.Kind == SemanticRefactoringKind::None)
       return Rec(createErrorRequestInvalid("'key.actionuid' isn't recognized"));

@@ -45,6 +45,7 @@ target_link_libraries(SourceKitSwiftLang PRIVATE
   swiftSyntax
   swiftOption
   swiftSymbolGraphGen
+  swiftRefactoring
   libcmark-gfm_static
   # Clang dependencies.
   clangIndex
