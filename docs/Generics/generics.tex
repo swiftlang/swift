@@ -2321,7 +2321,7 @@ struct S {
 \index{typed pattern}
 \index{tuple pattern}
 \begin{example}
-A funny quirk of the pattern grammar is that typed patterns and tuple patterns do not compose in the way one might think. If ``\texttt{let x:~Int}'' is a typed pattern declaring a variable \texttt{x} type with annotation \texttt{Int}, and ``\texttt{let (x, y)}'' is a tuple pattern declaring two variables \texttt{x} and \texttt{y}, you might expect ``\texttt{let~(x:~Int,~y:~Int)}'' to declare two variables \texttt{x} and \texttt{y} with type annotations \texttt{Int} and \texttt{String} respectively; what actually happens is you get a tuple pattern declaring two variables named \texttt{Int} and \texttt{String} that binds a two-element tuple with \emph{labels} \texttt{x} and \texttt{y}:
+A funny quirk of the pattern grammar is that typed patterns and tuple patterns do not compose in the way one might think. If ``\texttt{let x:~Int}'' is a typed pattern declaring a variable \texttt{x} type with annotation \texttt{Int}, and ``\texttt{let (x, y)}'' is a tuple pattern declaring two variables \texttt{x} and \texttt{y}, you might expect ``\texttt{let~(x:~Int,~y:~String)}'' to declare two variables \texttt{x} and \texttt{y} with type annotations \texttt{Int} and \texttt{String} respectively; what actually happens is you get a tuple pattern declaring two variables named \texttt{Int} and \texttt{String} that binds a two-element tuple with \emph{labels} \texttt{x} and \texttt{y}:
 \begin{Verbatim}
 let (x: Int, y: String) = (x: 123, y: "hello")
 print(Int)  // huh? prints 123
