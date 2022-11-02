@@ -526,7 +526,7 @@ struct NameTranslatingInfo {
 enum class SemanticRefactoringKind {
   None,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 };
 
 struct SemanticRefactoringInfo {

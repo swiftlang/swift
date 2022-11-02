@@ -25,7 +25,7 @@
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Indenting.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDETool/CompileInstance.h"
 #include "swift/IDETool/CompletionInstance.h"
 #include "swift/Index/IndexSymbol.h"
