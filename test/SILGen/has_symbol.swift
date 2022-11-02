@@ -263,3 +263,15 @@ func testMetatypes() {
 
 // --- E.self ---
 // CHECK: sil hidden_external @$s17has_symbol_helper1EOTwS : $@convention(thin) () -> Builtin.Int1
+
+// CHECK: sil hidden [ossa] @$s4test0A15NotWeaklyLinkedyyF : $@convention(thin) () -> ()
+func testNotWeaklyLinked() {
+  // `Swift.Int` is not weakly imported so this check is a no-op.
+
+  // CHECK: [[RES:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+  // CHECK: cond_br [[RES]], bb{{[0-9]+}}, bb{{[0-9]+}}
+  if #_hasSymbol(Swift.Int.self) {}
+}
+
+// We should not generate a #_hasSymbol query helper for Swift.Int.
+// CHECK-NOT: sSiTwS

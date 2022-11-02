@@ -1602,7 +1602,15 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
     case StmtConditionElement::CK_HasSymbol: {
       auto info = elt.getHasSymbolInfo();
-      assert(!info->isInvalid());
+      if (info->isInvalid()) {
+        // This condition may have referenced a decl that isn't valid in some
+        // way but for developer convenience wasn't treated as an error. Just
+        // emit a 'true' condition value.
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        booleanTestValue = B.createIntegerLiteral(loc, i1, 1);
+        break;
+      }
+
       auto expr = info->getSymbolExpr();
       auto declRef = info->getReferencedDecl();
       assert(declRef);
