@@ -1379,8 +1379,8 @@ private:
     os << " {\n";
     funcPrinter.printCxxThunkBody(
         FD, funcABI.getSignature(), funcABI.getSymbolName(),
-        FD->getModuleContext(), resultTy, FD->getParameters(),
-        funcTy->isThrowing(), funcTy);
+        /*typeDeclContext=*/nullptr, FD->getModuleContext(), resultTy,
+        FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 
