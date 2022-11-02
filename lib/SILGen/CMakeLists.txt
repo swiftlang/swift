@@ -36,6 +36,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenThunk.cpp
   SILGenType.cpp)
 target_link_libraries(swiftSILGen PRIVATE
+  swiftSerialization
   swiftSIL)
 
 set_swift_llvm_is_available(swiftSILGen)

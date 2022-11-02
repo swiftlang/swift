@@ -41,6 +41,22 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   return result;
 }
 
+/// Similar to ModuleDecl::conformsToProtocol, but doesn't introduce a
+/// dependency on Sema.
+static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
+                               ModuleDecl *module) {
+  if (conformanceRef.isInvalid())
+    return false;
+  if (!conformanceRef.isConcrete())
+    return false;
+  auto conformance = conformanceRef.getConcrete();
+  auto subMap = conformance->getSubstitutions(module);
+  return llvm::all_of(subMap.getConformances(),
+                      [&](ProtocolConformanceRef each) -> bool {
+                        return isConcreteAndValid(each, module);
+                      });
+}
+
 static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   clang::IdentifierInfo *iteratorCategoryDeclName =
@@ -126,7 +142,9 @@ static ValueDecl *getMinusOperator(NominalTypeDecl *decl) {
     if (lhsNominal != rhsNominal || lhsNominal != decl)
       return false;
     auto returnTy = minus->getResultInterfaceType();
-    if (!module->conformsToProtocol(returnTy, binaryIntegerProto))
+    auto conformanceRef =
+        module->lookupConformance(returnTy, binaryIntegerProto);
+    if (!isConcreteAndValid(conformanceRef, module))
       return false;
     return true;
   };
@@ -331,9 +349,10 @@ void swift::conformToCxxSequenceIfNeeded(
     return;
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef = decl->getModuleContext()->conformsToProtocol(
-      rawIteratorTy, cxxIteratorProto);
-  if (!rawIteratorConformanceRef || !rawIteratorConformanceRef.isConcrete())
+  ModuleDecl *module = decl->getModuleContext();
+  auto rawIteratorConformanceRef =
+      module->lookupConformance(rawIteratorTy, cxxIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
@@ -356,7 +375,7 @@ void swift::conformToCxxSequenceIfNeeded(
           return declSelfTy;
         return Type(dependentType);
       },
-      LookUpConformanceInModule(decl->getModuleContext()));
+      LookUpConformanceInModule(module));
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
