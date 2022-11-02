@@ -1731,7 +1731,7 @@ Unbound generic types predate placeholder types, and can be seen as a special ca
 let myPets: Array = ["Zelda", "Giblet"]
 \end{Verbatim}
 \index{underlying type}
-One other place where unbound generic types can appear is in the underlying type of a non-generic type alias, which is shorthand for declaring a generic type alias that forwards its generic arguments. For example, the following declarations two are equivalent:
+One other place where unbound generic types can appear is in the underlying type of a non-generic type alias, which is shorthand for declaring a generic type alias that forwards its generic arguments. For example, the following two declarations are equivalent:
 \begin{Verbatim}
 typealias MyDictionary = Dictionary
 typealias MyDictionary<Key, Value> = Dictionary<Key, Value>
