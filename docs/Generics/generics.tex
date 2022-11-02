@@ -1495,7 +1495,7 @@ When type checking a call to function value with a variadic parameter, the type 
 
 \index{autoclosure function type}
 \index{tuple splat}
-The \texttt{@autoclosure} attribute instructs the type checker to treat the corresponding argument in the caller as if it were a value of type \texttt{T}, rather than a function type \texttt{()~->~T}. The argument is then wrapped inside an implicit closure expression. In the body of the callee, an \texttt{@autoclosure} parameter behaves exactly like an ordinary function value, and can be called to evaluate the expression provided by the caller.
+The \texttt{@autoclosure} attribute instructs the type checker to treat the corresponding argument in the caller as if it was a value of type \texttt{T}, rather than a function type \texttt{()~->~T}. The argument is then wrapped inside an implicit closure expression. In the body of the callee, an \texttt{@autoclosure} parameter behaves exactly like an ordinary function value, and can be called to evaluate the expression provided by the caller.
 
 \medskip
 Note that the following are two different function types:
