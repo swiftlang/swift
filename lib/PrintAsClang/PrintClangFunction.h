@@ -105,6 +105,7 @@ public:
   void printCxxThunkBody(const AbstractFunctionDecl *FD,
                          const LoweredFunctionSignature &signature,
                          StringRef swiftSymbolName,
+                         const NominalTypeDecl *typeDeclContext,
                          const ModuleDecl *moduleContext, Type resultTy,
                          const ParameterList *params, bool hasThrows = false,
                          const AnyFunctionType *funcType = nullptr);

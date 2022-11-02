@@ -33,7 +33,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
@@ -2464,7 +2464,7 @@ static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
     case SemanticRefactoringKind::None: return RefactoringKind::None;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
     case SemanticRefactoringKind::KIND: return RefactoringKind::KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
   }
 }
 
