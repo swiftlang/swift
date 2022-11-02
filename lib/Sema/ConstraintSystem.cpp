@@ -6540,7 +6540,7 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   // First check whether this declaration is universally unavailable.
-  if (AvailableAttr::isUnavailable(D))
+  if (D->getAttrs().isUnavailable(getASTContext()))
     return true;
 
   return TypeChecker::isDeclarationUnavailable(D, DC, [&] {
