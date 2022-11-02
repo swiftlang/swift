@@ -9,6 +9,8 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/actor-evo.h)
 
+// REQUIRES: concurrency
+
 @_expose(Cxx)
 public final actor ActorWithField {
   var field: Int64

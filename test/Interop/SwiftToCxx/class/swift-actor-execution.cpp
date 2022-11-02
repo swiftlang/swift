@@ -20,6 +20,8 @@
 
 // REQUIRES: executable_test
 
+// REQUIRES: concurrency
+
 #include <assert.h>
 #include "actor.h"
 #include <cstdio>
