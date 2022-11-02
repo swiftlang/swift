@@ -180,6 +180,8 @@ OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
+// select_value is only supported for integer types currently.
+OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -420,23 +422,6 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   }
   return getOwnershipKind().getForwardingOperandOwnership(
     /*allowUnowned*/true);
-}
-
-OperandOwnership
-OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
-  if (getValue() == i->getDefaultResult())
-    return OperandOwnership::GuaranteedForwarding;
-
-  for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
-    SILValue casevalue;
-    SILValue result;
-    std::tie(casevalue, result) = i->getCase(idx);
-
-    if (getValue() == casevalue) {
-      return OperandOwnership::GuaranteedForwarding;
-    }
-  }
-  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
