@@ -241,25 +241,65 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
               builder.readTypeRef(descriptor, descriptor->TypeName)))
 {}
 
-bool
-BuiltinTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
-                                          remote::RemoteAddress address,
-                                          int *extraInhabitantIndex) const {
-    if (getNumExtraInhabitants() == 0) {
-      *extraInhabitantIndex = -1;
-      return true;
-    }
-    // If it has extra inhabitants, it must be a pointer.  (The only non-pointer
-    // data with extra inhabitants is a non-payload enum, which doesn't get here.)
-    if (Name == "yyXf") {
-      // But there are two different conventions, one for function pointers:
-      return reader.readFunctionPointerExtraInhabitantIndex(address, extraInhabitantIndex);
-    } else {
-      // And one for pointers to heap-allocated blocks of memory
-      return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
-    }
+bool BuiltinTypeInfo::readExtraInhabitantIndex(
+    remote::MemoryReader &reader, remote::RemoteAddress address,
+    int *extraInhabitantIndex) const {
+  if (getNumExtraInhabitants() == 0) {
+    *extraInhabitantIndex = -1;
+    return true;
   }
+  // If it has extra inhabitants, it could be an integer type with extra
+  // inhabitants (a bool) or a pointer.
+  // Check if it's an integer first. The mangling of an integer type is
+  // type ::= 'Bi' NATURAL '_'
+  llvm::StringRef nameRef(Name);
+  if (nameRef.startswith("Bi") && nameRef.endswith("_")) {
+    // Drop the front "Bi" and "_" end, check that what we're left with is a
+    // bool.
+    llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
+    uint8_t natural;
+    if (naturalRef.getAsInteger(10, natural))
+      return false;
 
+    assert(natural == 1 &&
+           "Reading extra inhabitants of integer with more than 1 byte!");
+    if (natural != 1)
+      return false;
+
+    assert(getSize() == 1 && "Reading extra inhabitants of integer but size of "
+                             "type info is different than 1!");
+    if (getSize() != 1)
+      return false;
+
+    assert(getNumExtraInhabitants() == 254 &&
+           "Boolean type info should have 254 extra inhabitants!");
+    if (getNumExtraInhabitants() != 254)
+      return false;
+
+    uint8_t rawValue;
+    if (!reader.readInteger(address, &rawValue))
+      return false;
+
+    // The max valid value, for a bool valid values are 0 or 1, so this would
+    // be 1.
+    auto maxValidValue = 1;
+    // If the raw value falls outside the range of valid values, this is an
+    // extra inhabitant.
+    if (maxValidValue < rawValue)
+      *extraInhabitantIndex = rawValue - maxValidValue - 1;
+    else
+      *extraInhabitantIndex = -1;
+    return true;
+  } else if (Name == "yyXf") {
+    // But there are two different conventions, one for function pointers:
+    return reader.readFunctionPointerExtraInhabitantIndex(address,
+                                                          extraInhabitantIndex);
+  } else {
+    // And one for pointers to heap-allocated blocks of memory
+    return reader.readHeapObjectExtraInhabitantIndex(address,
+                                                     extraInhabitantIndex);
+  }
+}
 
 bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
                                               remote::RemoteAddress address,
