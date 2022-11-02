@@ -4576,14 +4576,6 @@ NOTE(async_call_without_await_in_async_let,none,
 
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
-ERROR(async_call_in_illegal_context,none,
-      "'async' call cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
-ERROR(await_in_illegal_context,none,
-      "'await' operation cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
@@ -4631,10 +4623,32 @@ ERROR(async_let_no_variables,none,
       "'async let' requires at least one named variable", ())
 NOTE(async_let_without_await,none,
       "reference to async let %0 is 'async'", (DeclName))
+
+#define EFFECTS_CONTEXT_KIND \
+  "%select{<<ERROR>>|" \
+  "a default argument|" \
+  "a property wrapper initializer|" \
+  "a property initializer|" \
+  "a global variable initializer|" \
+  "an enum case raw value|" \
+  "a catch pattern|" \
+  "a catch guard expression|" \
+  "a defer body}" \
+
+ERROR(async_call_in_illegal_context,none,
+      "'async' call cannot occur in " EFFECTS_CONTEXT_KIND "0",
+      (unsigned))
+ERROR(await_in_illegal_context,none,
+      "'await' operation cannot occur in " EFFECTS_CONTEXT_KIND "0",
+      (unsigned))
 ERROR(async_let_in_illegal_context,none,
-      "async let %0 cannot be referenced in "
-      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
+      "async let %0 cannot be referenced in " EFFECTS_CONTEXT_KIND "1",
       (DeclName, unsigned))
+ERROR(async_let_binding_illegal_context,none,
+      "'async let' cannot be used on declarations in " EFFECTS_CONTEXT_KIND "0",
+      (unsigned))
+
+#undef EFFECTS_CONTEXT_KIND
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
