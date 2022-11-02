@@ -2,6 +2,9 @@
 # Each line is a file pattern followed by one or more owners.
 # Order is important. The last matching pattern has the most precedence.
 
+# Owners of ASTGen
+lib/ASTGen @zoecarver @CodaFi
+
 # Owners of the parser
 include/swift/Parse @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 lib/Parse           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
