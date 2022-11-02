@@ -201,6 +201,17 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       }
     }
 
+    // If something from a C++ class is used, emit all virtual methods of this
+    // class because they might be emitted in the vtable even if not used
+    // directly from Swift.
+    if (auto *record = dyn_cast<clang::CXXRecordDecl>(next->getDeclContext())) {
+      for (auto *method : record->methods()) {
+        if (method->isVirtual()) {
+          callback(method);
+        }
+      }
+    }
+
     if (auto var = dyn_cast<clang::VarDecl>(next))
       if (!var->isFileVarDecl())
         continue;
