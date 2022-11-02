@@ -1553,7 +1553,7 @@ Generic function types have a special behavior when their canonical type is comp
 \index{concrete metatype type}
 \index{instance type}
 \paragraph{Metatype types}
-Types are values in Swift, and a metatype is the type of a type used as a value. The metatype of a type \texttt{T} is written as \texttt{T.Type}. The type \texttt{T} is the \emph{instance type} of the metatype. For example \texttt{(()~->~()).Type} is the metatype type with the instance type \verb|() -> ()|. This metatype has one value, the function type \verb|() -> ()|.
+Types are values in Swift, and a metatype is the type of a type used as a value. The metatype of a type \texttt{T} is written as \texttt{T.Type}. The type \texttt{T} is the \emph{instance type} of the metatype. For example, \texttt{(()~->~()).Type} is the metatype type with the instance type \verb|() -> ()|. This metatype has one value, the function type \verb|() -> ()|.
 
 Metatypes are sometimes referred to as \emph{concrete metatypes}, to distinguish them from \emph{existential metatypes}. Most concrete metatypes are singleton types, where the only value is the instance type itself. One exception is class metatypes for non-final classes; the values of a class metatype include the class type itself, but also all subclasses of the class.
 
@@ -1619,7 +1619,7 @@ SomeClass<Int> & P
 \paragraph{Parameterized protocol types}
 A parameterized protocol type\footnote{The evolution proposal calls them ``constrained protocol types''; here we're going to use the terminology that appeared in the compiler implementation itself. Perhaps the latter should be renamed to match the evolution proposal at some point.} stores a protocol type together with a list of generic arguments. As a constraint type, it expands to a conformance requirement together with one or more same-type requirements. The same-type requirements constrain the protocol's \emph{primary associated types}, which are declared with a syntax similar to a generic parameter list.
 
-The written representation looks like a generic nominal type, except the named declaration is a protocol, for example \texttt{Sequence<Int>}. Full details appear in Section~\ref{protocols}. Parameterized protocol types were introduced in Swift 5.7 \cite{se0346}.
+The written representation looks like a generic nominal type, except the named declaration is a protocol, for example, \texttt{Sequence<Int>}. Full details appear in Section~\ref{protocols}. Parameterized protocol types were introduced in Swift 5.7 \cite{se0346}.
 
 \index{existential type}
 \paragraph{Existential types}
@@ -1736,7 +1736,7 @@ One other place where unbound generic types can appear is in the underlying type
 typealias MyDictionary = Dictionary
 typealias MyDictionary<Key, Value> = Dictionary<Key, Value>
 \end{Verbatim}
-Unbound generic types are also occasionally useful in diagnostics when you want to print the name of a type declaration only (like \texttt{Outer.Inner}) without the generic parameters of its declared interface type (\texttt{Outer<T>.Inner<U>} for example).
+Unbound generic types are also occasionally useful in diagnostics when you want to print the name of a type declaration only (like \texttt{Outer.Inner}) without the generic parameters of its declared interface type (\texttt{Outer<T>.Inner<U>}, for example).
 
 \index{type variable type}
 \index{constraint solver arena}
@@ -1893,7 +1893,7 @@ Finally, \verb|castTo<>| is an unconditional cast which asserts that the type ha
 \begin{Verbatim}
 FunctionType *funcTy = type->castTo<FunctionType>();
 \end{Verbatim}
-These template methods desugar the type if it is a sugared type, and the casted type can never itself be a sugared type. This is usually what you want; for example if \texttt{type} is the \texttt{Swift.Void} type alias type, then \texttt{type->is<TupleType>()} returns true, because it is for all intents and purposes a tuple (an empty tuple), except when printed in diagnostics.
+These template methods desugar the type if it is a sugared type, and the casted type can never itself be a sugared type. This is usually what you want; for example, if \texttt{type} is the \texttt{Swift.Void} type alias type, then \texttt{type->is<TupleType>()} returns true, because it is for all intents and purposes a tuple (an empty tuple), except when printed in diagnostics.
 
 There are also top-level template functions \verb|isa<>|, \verb|dyn_cast<>| and \verb|cast<>| that operate on \texttt{TypeBase *}. Using these with \texttt{Type} is an error; you must explicitly unwrap the pointer with \texttt{getPointer()}. These casts do not desugar, and permit casting to sugared types. This is occasionally useful if you need to handle sugared types differently from canonical types for some reason:
 \begin{Verbatim}
@@ -1938,7 +1938,7 @@ MyVisitor visitor;
 Type ty = ...;
 visitor.visit(ty);
 \end{Verbatim}
-The \texttt{TypeVisitor} also defines various methods corresponding to abstract base classes in the \texttt{TypeBase} hierarchy, so for example you can override \texttt{visitNominalType()} to handle all nominal types at once.
+The \texttt{TypeVisitor} also defines various methods corresponding to abstract base classes in the \texttt{TypeBase} hierarchy, so, for example, you can override \texttt{visitNominalType()} to handle all nominal types at once.
 
 The \texttt{TypeVisitor} preserves information if it receives a sugared type; for example, visiting \texttt{Int?}\ will call \texttt{visitOptionalType()}, while visiting \texttt{Optional<Int>} will call \texttt{visitBoundGenericEnumType()}. In the common situation where the semantics of your operation do not depend on type sugar, you can use the \texttt{CanTypeVisitor} template class instead. Here, the \texttt{visit()} method takes a \texttt{CanType}, so \texttt{Int?}\ will need to be canonicalized to \texttt{Optional<Int>} before being passed in.
 
