@@ -1228,6 +1228,18 @@ bb2(%9 : $Error):
   throw %9 : $Error
 }
 
+// CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
+// CHECK:         fix_lifetime [[ADDR]]
+// CHECK-LABEL: } // end sil function 'fixeeLifetime'
+sil [ossa] @fixeeLifetime : $@convention(thin) <T> (@in T) -> () {
+bb0(%instance : @owned $T):
+  fix_lifetime %instance : $T
+  destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @lexical_borrow_struct_extract {{.*}} {
 // CHECK:         [[PAIR_ADDR:%[^,]+]] = alloc_stack [lexical]
 // CHECK:         [[X_ADDR:%[^,]+]] = struct_element_addr [[PAIR_ADDR]]

@@ -2651,6 +2651,13 @@ protected:
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
 
+  void visitFixLifetimeInst(FixLifetimeInst *fli) {
+    SILValue value = fli->getOperand();
+    SILValue address = pass.valueStorageMap.getStorage(value).storageAddress;
+    builder.createFixLifetime(fli->getLoc(), address);
+    pass.deleter.forceDelete(fli);
+  }
+
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
