@@ -13,6 +13,10 @@
 #ifndef SWIFT_BASIC_BASICBRIDGING_H
 #define SWIFT_BASIC_BASICBRIDGING_H
 
+// Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
+// when including VirtualFileSystem.h
+#include "llvm/CAS/CASReference.h"
+
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/SourceLoc.h"
 #include <stddef.h>
