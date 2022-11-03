@@ -1817,10 +1817,7 @@ void MultiConformanceChecker::checkAllConformances() {
       return *checker;
     };
 
-    for (auto member : proto->getABIMembers()) {
-      auto req = dyn_cast<ValueDecl>(member);
-      if (!req || !req->isProtocolRequirement()) continue;
-
+    for (auto *req : proto->getProtocolRequirements()) {
       // If the requirement is unsatisfied, we might want to warn
       // about near misses; record it.
       if (isUnsatisfiedReq(getChecker(), conformance, req)) {
@@ -5124,17 +5121,9 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 }
 
 void ConformanceChecker::resolveValueWitnesses() {
-  for (auto member : Proto->getABIMembers()) {
-    auto requirement = dyn_cast<ValueDecl>(member);
-    if (!requirement)
-      continue;
-
+  for (auto *requirement : Proto->getProtocolRequirements()) {
     // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
-      continue;
-
-    // Type aliases don't have requirements themselves.
-    if (!requirement->isProtocolRequirement())
       continue;
 
     /// Local function to finalize the witness.
@@ -5467,7 +5456,7 @@ ConformanceChecker::getObjCRequirements(ObjCMethodKey key) {
 
   // Fill in the data structure if we haven't done so yet.
   if (!computedObjCMethodRequirements) {
-    for (auto requirement : proto->getABIMembers()) {
+    for (auto requirement : proto->getProtocolRequirements()) {
       auto funcRequirement = dyn_cast<AbstractFunctionDecl>(requirement);
       if (!funcRequirement)
         continue;
@@ -7129,15 +7118,11 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     return {defaultType, defaultedAssocType};
   };
 
-  for (auto *requirement : proto->getABIMembers()) {
+  for (auto *requirement : proto->getProtocolRequirements()) {
     if (requirement->isInvalid())
       continue;
 
-    auto *valueDecl = dyn_cast<ValueDecl>(requirement);
-    if (!valueDecl)
-      continue;
-
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(valueDecl)) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(requirement)) {
       if (assocType->getOverriddenDecls().empty()) {
         if (Type defaultType = findAssociatedTypeDefault(assocType).first)
           proto->setDefaultTypeWitness(assocType, defaultType);
@@ -7146,20 +7131,16 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       continue;
     }
 
-    if (isa<TypeDecl>(valueDecl))
-      continue;
+    assert(!isa<TypeDecl>(requirement));
 
-    if (!valueDecl->isProtocolRequirement())
-      continue;
-
-    ResolveWitnessResult result = checker.resolveWitnessViaLookup(valueDecl);
+    ResolveWitnessResult result = checker.resolveWitnessViaLookup(requirement);
 
     if (result == ResolveWitnessResult::Missing &&
         requirement->isSPI() &&
         !proto->isSPI()) {
       // SPI requirements need a default value, unless the protocol is SPI too.
-      valueDecl->diagnose(diag::spi_attribute_on_protocol_requirement,
-                          valueDecl->getName());
+      requirement->diagnose(diag::spi_attribute_on_protocol_requirement,
+                            requirement->getName());
     }
   }
 
