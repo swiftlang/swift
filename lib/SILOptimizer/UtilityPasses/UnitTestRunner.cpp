@@ -295,6 +295,20 @@ struct SimplifyCFGSimplifySwitchEnumBlock : UnitTest {
   }
 };
 
+struct SimplifyCFGSimplifySwitchEnumUnreachableBlocks : UnitTest {
+  SimplifyCFGSimplifySwitchEnumUnreachableBlocks(UnitTestRunner *pass)
+      : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifySwitchEnumUnreachableBlocks(
+            cast<SwitchEnumInst>(arguments.takeInstruction()));
+  }
+};
+
 // Arguments:
 // - string: list of characters, each of which specifies subsequent arguments
 //           - A: (block) argument
@@ -449,9 +463,16 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("is-deinit-barrier", IsDeinitBarrierTest)
     ADD_UNIT_TEST_SUBCLASS("pruned-liveness-boundary-with-list-of-last-users-insertion-points", PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest)
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
-    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum", SimplifyCFGCanonicalizeSwitchEnum)
+
+    // SimplifyCFG unit tests
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum",
+                           SimplifyCFGCanonicalizeSwitchEnum)
     ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-switch-enum-block",
                            SimplifyCFGSimplifySwitchEnumBlock)
+    ADD_UNIT_TEST_SUBCLASS(
+        "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+        SimplifyCFGSimplifySwitchEnumUnreachableBlocks)
+
     ADD_UNIT_TEST_SUBCLASS("test-specification-parsing", TestSpecificationTest)
     ADD_UNIT_TEST_SUBCLASS("visit-adjacent-reborrows-of-phi", VisitAdjacentReborrowsOfPhiTest)
     ADD_UNIT_TEST_SUBCLASS("find-enclosing-defs", FindEnclosingDefsTest)

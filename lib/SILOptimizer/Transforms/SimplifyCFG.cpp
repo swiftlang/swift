@@ -1715,10 +1715,6 @@ static bool isOnlyUnreachable(SILBasicBlock *BB) {
 /// switch_enum where all but one block consists of just an
 /// "unreachable" with an unchecked_enum_data and branch.
 bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    if (!SEI->getOperand()->getType().isTrivial(Fn))
-      return false;
-  }
   auto Count = SEI->getNumCases();
 
   SILBasicBlock *Dest = nullptr;
