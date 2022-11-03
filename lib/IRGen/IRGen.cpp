@@ -78,6 +78,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
 #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
@@ -186,7 +187,8 @@ static void align(llvm::Module *Module) {
 
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::Module *Module,
-                                     llvm::TargetMachine *TargetMachine) {
+                                     llvm::TargetMachine *TargetMachine,
+                                     llvm::raw_pwrite_stream *out) {
   Optional<PGOOptions> PGOOpt;
 
   PipelineTuningOptions PTO;
@@ -326,8 +328,14 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         });
   }
 
+  bool isThinLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Thin;
+  bool isFullLTO = Opts.LLVMLTOKind  == IRGenLLVMLTOKind::Full;
   if (!Opts.shouldOptimize() || Opts.DisableLLVMOptzns) {
-    MPM = PB.buildO0DefaultPipeline(level, false);
+    MPM = PB.buildO0DefaultPipeline(level, isFullLTO || isThinLTO);
+  } else if (isThinLTO) {
+    MPM = PB.buildThinLTOPreLinkDefaultPipeline(level);
+  } else if (isFullLTO) {
+    MPM = PB.buildLTOPreLinkDefaultPipeline(level);
   } else {
     MPM = PB.buildPerModuleDefaultPipeline(level);
   }
@@ -357,8 +365,45 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   if (Opts.PrintInlineTree)
     MPM.addPass(InlineTreePrinterPass());
 
-  if (!Opts.DisableLLVMOptzns)
-    MPM.run(*Module, MAM);
+  // Add bitcode/ll output passes to pass manager.
+  ModulePassManager EmptyPassManager;
+  auto &PassManagerToRun = Opts.DisableLLVMOptzns ? EmptyPassManager : MPM;
+
+  switch (Opts.OutputKind) {
+  case IRGenOutputKind::LLVMAssemblyBeforeOptimization:
+    llvm_unreachable("Should be handled earlier.");
+  case IRGenOutputKind::NativeAssembly:
+  case IRGenOutputKind::ObjectFile:
+  case IRGenOutputKind::Module:
+    break;
+  case IRGenOutputKind::LLVMAssemblyAfterOptimization:
+    PassManagerToRun.addPass(PrintModulePass(*out, "", false));
+    break;
+  case IRGenOutputKind::LLVMBitcode: {
+    // Emit a module summary by default for Regular LTO except ld64-based ones
+    // (which use the legacy LTO API).
+    bool EmitRegularLTOSummary =
+        TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
+
+    if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
+      PassManagerToRun.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
+    } else {
+      if (EmitRegularLTOSummary) {
+        Module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
+        // Assume other sources are compiled with -fsplit-lto-unit (it's enabled
+        // by default when -flto is specified on platforms that support regular
+        // lto summary.)
+        Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
+                              uint32_t(1));
+      }
+      PassManagerToRun.addPass(BitcodeWriterPass(
+          *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
+    }
+    break;
+  }
+  }
+
+  PassManagerToRun.run(*Module, MAM);
 
   if (AlignModuleToPageSize) {
     align(Module);
@@ -542,7 +587,8 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
-  performLLVMOptimizations(Opts, Module, TargetMachine);
+  performLLVMOptimizations(Opts, Module, TargetMachine,
+                           RawOS ? &*RawOS : nullptr);
 
   if (Stats) {
     if (DiagMutex)
@@ -566,50 +612,22 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
                                 DiagnosticEngine &diags,
                                 llvm::raw_pwrite_stream &out,
                                 llvm::sys::Mutex *diagMutex) {
-  legacy::PassManager EmitPasses;
 
-  // Set up the final emission passes.
+  // Set up the final code emission pass. Bitcode/LLVM IR is emitted as part of
+  // the optimization pass pipeline.
   switch (opts.OutputKind) {
   case IRGenOutputKind::LLVMAssemblyBeforeOptimization:
     llvm_unreachable("Should be handled earlier.");
   case IRGenOutputKind::Module:
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
-    EmitPasses.add(createPrintModulePass(out));
     break;
   case IRGenOutputKind::LLVMBitcode: {
-    // Emit a module summary by default for Regular LTO except ld64-based ones
-    // (which use the legacy LTO API).
-    bool EmitRegularLTOSummary =
-        targetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
-
-    if (EmitRegularLTOSummary || opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-      // Rename anon globals to be able to export them in the summary.
-      llvm_unreachable("TODO: fix this");
-      // TODO:
-      // EmitPasses.add(createNameAnonGlobalPass());
-    }
-
-    if (opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-      llvm_unreachable("TODO: fix this");
-      // TODO:
-      // EmitPasses.add(createWriteThinLTOBitcodePass(out));
-    } else {
-      if (EmitRegularLTOSummary) {
-        module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
-        // Assume other sources are compiled with -fsplit-lto-unit (it's enabled
-        // by default when -flto is specified on platforms that support regular
-        // lto summary.)
-        module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
-                              uint32_t(1));
-      }
-      EmitPasses.add(createBitcodeWriterPass(
-          out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
-    }
     break;
   }
   case IRGenOutputKind::NativeAssembly:
   case IRGenOutputKind::ObjectFile: {
+    legacy::PassManager EmitPasses;
     CodeGenFileType FileType;
     FileType =
         (opts.OutputKind == IRGenOutputKind::NativeAssembly ? CGFT_AssemblyFile
@@ -624,11 +642,11 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
                    diag::error_codegen_init_fail);
       return true;
     }
+
+    EmitPasses.run(*module);
     break;
   }
   }
-
-  EmitPasses.run(*module);
 
   if (stats) {
     if (diagMutex)
@@ -1634,12 +1652,14 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
     return irMod;
 
   performLLVMOptimizations(desc.Opts, irMod.getModule(),
-                           irMod.getTargetMachine());
+                           irMod.getTargetMachine(), desc.out);
   return irMod;
 }
 
 StringRef SymbolObjectCodeRequest::evaluate(Evaluator &evaluator,
                                             IRGenDescriptor desc) const {
+  return "";
+#if 0
   auto &ctx = desc.getParentModule()->getASTContext();
   auto mod = cantFail(evaluator(OptimizedIRRequest{desc}));
   auto *targetMachine = mod.getTargetMachine();
@@ -1656,4 +1676,5 @@ StringRef SymbolObjectCodeRequest::evaluate(Evaluator &evaluator,
   emitPasses.run(*mod.getModule());
   os << '\0';
   return ctx.AllocateCopy(output.str());
+#endif
 }

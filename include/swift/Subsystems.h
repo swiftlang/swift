@@ -240,10 +240,11 @@ namespace swift {
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
-  /// the Swift LLVM Pipeline upon it. This does not cause the module to be
-  /// printed, only to be optimized.
+  /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR
+  /// if requested (\out is not null).
   void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
-                                llvm::TargetMachine *TargetMachine);
+                                llvm::TargetMachine *TargetMachine,
+                                llvm::raw_pwrite_stream *out);
 
   /// Compiles and writes the given LLVM module into an output stream in the
   /// format specified in the \c IRGenOptions.
