@@ -24,6 +24,8 @@
 
 namespace swift {
 
+class SubstitutionMap;
+
 /// This describes a list of parameters.  Each parameter descriptor is tail
 /// allocated onto this list.
 class alignas(ParamDecl *) ParameterList final :
@@ -133,6 +135,8 @@ public:
   /// Return a list of function parameters for this parameter list,
   /// based on the interface types of the parameters in this list.
   void getParams(SmallVectorImpl<AnyFunctionType::Param> &params) const;
+
+  unsigned getOrigParamIndex(SubstitutionMap subMap, unsigned substIndex) const;
 
   /// Return the full source range of this parameter.
   SourceRange getSourceRange() const;

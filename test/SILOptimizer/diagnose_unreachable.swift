@@ -344,12 +344,15 @@ while true {
  // no warning!
 
 
-// SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
-struct SR1010<T> {
+// rdar://25278336
+// https://github.com/apple/swift/issues/43622
+// Spurious 'will never be executed' warnings when building standard library
+
+struct S_43622<T> {
   var a : T
 }
 
-extension SR1010 {
+extension S_43622 {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   init(_ base: Int) {
     fatalError("unavailable function can't be called")
@@ -373,7 +376,7 @@ class FailingClass {
   }
 }
 
-// <https://bugs.swift.org/browse/SR-2729>
+// https://github.com/apple/swift/issues/45333
 // We should not report unreachable code inside protocol witness thunks
 
 protocol Fooable {
@@ -437,7 +440,7 @@ func sillyGenericExample() -> Never {
   }
 }
 
-// https://bugs.swift.org/browse/SR-7472
+// https://github.com/apple/swift/issues/50015
 
 protocol P {
     static var theThing: Self { get }
@@ -489,7 +492,7 @@ func keypathToEmptyEnum() -> Never {
   // does not trigger an unreachable code warning here.
   let kp = \StructWithNeverProp.property // no warning
   let s = StructWithNeverProp()
-  // Emit a diagnostic here becase the keypath is actually used.
+  // Emit a diagnostic here because the keypath is actually used.
   let prop = s[keyPath: kp]
     // expected-warning@-1 {{will never be executed}} \
     // expected-note {{a call to a never-returning function}} \
@@ -512,6 +515,6 @@ public enum DynamicLookupEnum {
 
 func keypathWithDynamicLookup() {
   // Check that we still don't diagnose the keypath getter as unreachable
-  // when used in conjuction with a dynamicMemberLookup enum.
+  // when used in conjunction with a dynamicMemberLookup enum.
   let _ = \DynamicLookupEnum.innerEnum // no warning
 }

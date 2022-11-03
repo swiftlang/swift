@@ -169,6 +169,25 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
   return &*getFunction().begin()->begin();
 }
 
+static SingleValueInstruction *
+getUninitializedValue(MarkUninitializedInst *MemoryInst) {
+  SILValue inst = MemoryInst;
+  if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
+    inst = bbi;
+  }
+
+  if (SingleValueInstruction *svi =
+          inst->getSingleUserOfType<ProjectBoxInst>()) {
+    return svi;
+  }
+
+  return MemoryInst;
+}
+
+SingleValueInstruction *DIMemoryObjectInfo::getUninitializedValue() const {
+  return ::getUninitializedValue(MemoryInst);
+}
+
 /// Given a symbolic element number, return the type of the element.
 static SILType getElementTypeRec(TypeExpansionContext context,
                                  SILModule &Module, SILType T, unsigned EltNo,
@@ -236,7 +255,7 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 /// resigning the identity requires a call into the \p actorSystem.
 /// Since deinitialization consistently happens in-order, according to the
 /// listing returned by \p NominalTypeDecl::getStoredProperties
-/// it is important the the VarDecl for the \p id is synthesized before
+/// it is important the VarDecl for the \p id is synthesized before
 /// the \p actorSystem so that we get the right ordering in DI and deinits.
 ///
 /// \param nomDecl a distributed actor decl
@@ -394,7 +413,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
                                            std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
-  if (isAnyInitSelf())
+  if (isAnyInitSelf() || getAsTypeWrapperLocalStorageVar())
     Result = "self";
   else if (ValueDecl *VD =
                dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
@@ -449,19 +468,37 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
 /// If the specified value is a 'let' property in an initializer, return true.
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
+  // If this is an element of a `_storage` tuple, we need to
+  // check the `$Storage` to determine whether underlying storage
+  // backing element is immutable.
+  if (auto *storageVar = getAsTypeWrapperLocalStorageVar()) {
+    auto *wrappedType = cast<NominalTypeDecl>(
+        storageVar->getDeclContext()->getInnermostTypeContext());
+    assert(wrappedType && "_storage reference without type wrapper");
+
+    auto storageVarType = storageVar->getInterfaceType()->getAs<TupleType>();
+    assert(Element < storageVarType->getNumElements());
+    auto propertyName = storageVarType->getElement(Element).getName();
+
+    auto *storageDecl = wrappedType->getTypeWrapperStorageDecl();
+    auto *property = storageDecl->lookupDirect(propertyName).front();
+    return cast<VarDecl>(property)->isLet();
+  }
+
   // If we aren't representing 'self' in a non-delegating initializer, then we
   // can't have 'let' properties.
   if (!isNonDelegatingInit())
     return IsLet;
 
-  auto &Module = MemoryInst->getModule();
+  auto NTD = MemorySILType.getNominalOrBoundGenericNominal();
 
-  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
   if (!NTD) {
     // Otherwise, we miscounted elements?
     assert(Element == 0 && "Element count problem");
     return false;
   }
+
+  auto &Module = MemoryInst->getModule();
 
   auto expansionContext = TypeExpansionContext(*MemoryInst->getFunction());
   for (auto *VD : NTD->getStoredProperties()) {
@@ -478,6 +515,31 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   return false;
 }
 
+SingleValueInstruction *DIMemoryObjectInfo::findUninitializedSelfValue() const {
+  // If the object is 'self', return its uninitialized value.
+  if (isAnyInitSelf())
+    return getUninitializedValue();
+
+  // Otherwise we need to scan entry block to find mark_uninitialized
+  // instruction that belongs to `self`.
+
+  auto *BB = getFunction().getEntryBlock();
+  if (!BB)
+    return nullptr;
+
+  for (auto &I : *BB) {
+    SILInstruction *Inst = &I;
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
+      // If instruction is not a local variable, it could only
+      // be some kind of `self` (root, delegating, derived etc.)
+      // see \c MarkUninitializedInst::Kind for more details.
+      if (!MUI->isVar())
+        return ::getUninitializedValue(MUI);
+    }
+  }
+  return nullptr;
+}
+
 ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
   // is it 'self'?
   if (!MemoryInst->isVar())
@@ -490,6 +552,13 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
                             silFn->getDeclContext()->getAsDecl()))
             return ctor;
+
+  return nullptr;
+}
+
+VarDecl *DIMemoryObjectInfo::getAsTypeWrapperLocalStorageVar() const {
+  if (isTypeWrapperLocalStorageVar(getFunction(), MemoryInst))
+    return getLoc().getAsASTNode<VarDecl>();
 
   return nullptr;
 }
@@ -744,6 +813,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Ignore end_access.
     if (isa<EndAccessInst>(User)) {
+      continue;
+    }
+
+    // Look through mark_must_check. To us, it is not interesting.
+    if (auto *mmi = dyn_cast<MarkMustCheckInst>(User)) {
+      collectUses(mmi, BaseEltNo);
       continue;
     }
 
@@ -1588,6 +1663,12 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
       continue;
     }
 
+    // Look through mark_must_check.
+    if (auto *MMCI = dyn_cast<MarkMustCheckInst>(User)) {
+      collectDelegatingInitUses(TheMemory, UseInfo, MMCI);
+      continue;
+    }
+
     // Ignore end_access
     if (isa<EndAccessInst>(User))
       continue;
@@ -1934,4 +2015,33 @@ void swift::ownership::collectDIElementUsesFrom(
   ElementUseCollector collector(MemoryInfo, UseInfo, VisitedClosures);
   collector.collectFrom(MemoryInfo.getUninitializedValue(),
                         /*collectDestroysOfContainer*/ true);
+}
+
+bool swift::ownership::canHaveTypeWrapperLocalStorageVar(SILFunction &F) {
+  auto *DC = F.getDeclContext();
+  if (!DC)
+    return false;
+
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl());
+  if (!ctor || ctor->isImplicit() || !ctor->isDesignatedInit())
+    return false;
+
+  auto *parentType = ctor->getDeclContext()->getSelfNominalTypeDecl();
+  return parentType && parentType->hasTypeWrapper();
+}
+
+bool swift::ownership::isTypeWrapperLocalStorageVar(
+    SILFunction &F, MarkUninitializedInst *Inst) {
+  if (!Inst->isVar())
+    return false;
+
+  if (!canHaveTypeWrapperLocalStorageVar(F))
+    return false;
+
+  if (auto *var = Inst->getLoc().getAsASTNode<VarDecl>()) {
+    auto &ctx = var->getASTContext();
+    return var->isImplicit() && var->getName() == ctx.Id_localStorageVar;
+  }
+
+  return false;
 }

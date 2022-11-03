@@ -117,7 +117,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 /// in the predecessors. 
 ///
 /// The search stop when we encounter an instruction that may decrement
-/// the return'ed value, as we do not want to create a lifetime gap once the
+/// the returned value, as we do not want to create a lifetime gap once the
 /// retain is moved.
 class ConsumedResultToEpilogueRetainMatcher {
 public:

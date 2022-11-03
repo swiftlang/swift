@@ -104,24 +104,35 @@ void GenericSignatureImpl::forEachParam(
     SmallVector<bool, 4>(genericParams.size(), true);
 
   for (auto req : getRequirements()) {
-    if (req.getKind() != RequirementKind::SameType) continue;
-
     GenericTypeParamType *gp;
-    if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
-      // If two generic parameters are same-typed, then the right-hand one
-      // is non-canonical.
-      assert(req.getFirstType()->is<GenericTypeParamType>());
-      gp = secondGP;
-    } else {
-      // Otherwise, the right-hand side is an associated type or concrete type,
-      // and the left-hand one is non-canonical.
-      gp = req.getFirstType()->getAs<GenericTypeParamType>();
-      if (!gp) continue;
+    switch (req.getKind()) {
+    case RequirementKind::SameType: {
+      if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
+        // If two generic parameters are same-typed, then the right-hand one
+        // is non-canonical.
+        assert(req.getFirstType()->is<GenericTypeParamType>());
+        gp = secondGP;
+      } else {
+        // Otherwise, the right-hand side is an associated type or concrete
+        // type, and the left-hand one is non-canonical.
+        gp = req.getFirstType()->getAs<GenericTypeParamType>();
+        if (!gp)
+          continue;
 
-      // If an associated type is same-typed, it doesn't constrain the generic
-      // parameter itself. That is, if T == U.Foo, then T is canonical, whereas
-      // U.Foo is not.
-      if (req.getSecondType()->isTypeParameter()) continue;
+        // If an associated type is same-typed, it doesn't constrain the generic
+        // parameter itself. That is, if T == U.Foo, then T is canonical,
+        // whereas U.Foo is not.
+        if (req.getSecondType()->isTypeParameter())
+          continue;
+      }
+      break;
+    }
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+      continue;
     }
 
     unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
@@ -136,11 +147,22 @@ void GenericSignatureImpl::forEachParam(
 bool GenericSignatureImpl::areAllParamsConcrete() const {
   unsigned numConcreteGenericParams = 0;
   for (const auto &req : getRequirements()) {
-    if (req.getKind() != RequirementKind::SameType) continue;
-    if (!req.getFirstType()->is<GenericTypeParamType>()) continue;
-    if (req.getSecondType()->isTypeParameter()) continue;
+    switch (req.getKind()) {
+    case RequirementKind::SameType:
+      if (!req.getFirstType()->is<GenericTypeParamType>())
+        continue;
+      if (req.getSecondType()->isTypeParameter())
+        continue;
 
-    ++numConcreteGenericParams;
+      ++numConcreteGenericParams;
+      break;
+
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+      continue;
+    }
   }
 
   return numConcreteGenericParams == getGenericParams().size();
@@ -447,6 +469,35 @@ CanType GenericSignature::getReducedType(Type type) const {
   return getPointer()->getReducedType(type);
 }
 
+GenericSignature GenericSignature::typeErased(ArrayRef<Type> typeErasedParams) const {
+  bool changedSignature = false;
+  llvm::SmallVector<Requirement, 4> requirementsErased;
+
+  for (auto req : getRequirements()) {
+    bool found = std::any_of(typeErasedParams.begin(),
+                             typeErasedParams.end(),
+                             [&](Type t) {
+      auto other = req.getFirstType();
+      return t->isEqual(other);
+    });
+    if (found) {
+      requirementsErased.push_back(Requirement(RequirementKind::SameType,
+                                               req.getFirstType(),
+                                               Ptr->getASTContext().getAnyObjectType()));
+    } else {
+      requirementsErased.push_back(req);
+    }
+    changedSignature |= found;
+  }
+
+  if (changedSignature) {
+    return GenericSignature::get(getGenericParams(),
+                                 requirementsErased, false);
+  }
+
+  return *this;
+}
+
 CanType GenericSignatureImpl::getReducedType(Type type) const {
   type = type->getCanonicalType();
 
@@ -481,6 +532,16 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
   assert(type->isTypeParameter());
 
   return getRequirementMachine()->lookupNestedType(type, name);
+}
+
+Type
+GenericSignatureImpl::getReducedShape(Type type) const {
+  return getRequirementMachine()->getReducedShape(type);
+}
+
+bool
+GenericSignatureImpl::haveSameShape(Type type1, Type type2) const {
+  return getRequirementMachine()->haveSameShape(type1, type2);
 }
 
 unsigned GenericParamKey::findIndexIn(
@@ -587,8 +648,7 @@ bool Requirement::hasError() const {
   if (getFirstType()->hasError())
     return true;
 
-  if (getKind() != RequirementKind::Layout &&
-      getSecondType()->hasError())
+  if (getKind() != RequirementKind::Layout && getSecondType()->hasError())
     return true;
 
   return false;
@@ -599,7 +659,7 @@ bool Requirement::isCanonical() const {
     return false;
 
   switch (getKind()) {
-  case RequirementKind::SameCount:
+  case RequirementKind::SameShape:
   case RequirementKind::Conformance:
   case RequirementKind::SameType:
   case RequirementKind::Superclass:
@@ -619,7 +679,7 @@ Requirement Requirement::getCanonical() const {
   Type firstType = getFirstType()->getCanonicalType();
 
   switch (getKind()) {
-  case RequirementKind::SameCount:
+  case RequirementKind::SameShape:
   case RequirementKind::Conformance:
   case RequirementKind::SameType:
   case RequirementKind::Superclass: {
@@ -642,8 +702,8 @@ bool
 Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
                          bool allowMissing) const {
   switch (getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirements not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirements not supported here");
 
   case RequirementKind::Conformance: {
     auto *proto = getProtocolDecl();
@@ -683,8 +743,8 @@ Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
 
 bool Requirement::canBeSatisfied() const {
   switch (getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirements not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirements not supported here");
 
   case RequirementKind::Conformance:
     return getFirstType()->is<ArchetypeType>();
@@ -713,7 +773,7 @@ bool Requirement::canBeSatisfied() const {
 /// Determine the canonical ordering of requirements.
 static unsigned getRequirementKindOrder(RequirementKind kind) {
   switch (kind) {
-  case RequirementKind::SameCount: return 4;
+  case RequirementKind::SameShape: return 4;
   case RequirementKind::Conformance: return 2;
   case RequirementKind::Superclass: return 0;
   case RequirementKind::SameType: return 3;
@@ -861,7 +921,7 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
 
     // Check canonicalization of requirement itself.
     switch (reqt.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
       if (!reqt.getFirstType()->is<GenericTypeParamType>()) {
         llvm::errs() << "Left hand side is not a generic parameter: ";
         reqt.dump(llvm::errs());
@@ -869,8 +929,8 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
         abort();
       }
 
-      if (!reqt.getFirstType()->castTo<GenericTypeParamType>()->isTypeSequence()) {
-        llvm::errs() << "Left hand side is not a type sequence: ";
+      if (!reqt.getFirstType()->castTo<GenericTypeParamType>()->isParameterPack()) {
+        llvm::errs() << "Left hand side is not a parameter pack: ";
         reqt.dump(llvm::errs());
         llvm::errs() << "\n";
         abort();
@@ -883,8 +943,8 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
         abort();
       }
 
-      if (!reqt.getSecondType()->castTo<GenericTypeParamType>()->isTypeSequence()) {
-        llvm::errs() << "Right hand side is not a type sequence: ";
+      if (!reqt.getSecondType()->castTo<GenericTypeParamType>()->isParameterPack()) {
+        llvm::errs() << "Right hand side is not a parameter pack: ";
         reqt.dump(llvm::errs());
         llvm::errs() << "\n";
         abort();
@@ -1059,8 +1119,8 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   auto subjectType = stripBoundDependentMemberTypes(req.getFirstType());
 
   switch (req.getKind()) {
-  case RequirementKind::SameCount:
-    // Same-count requirements do not involve dependent member types.
+  case RequirementKind::SameShape:
+    // Same-shape requirements do not involve dependent member types.
     return req;
 
   case RequirementKind::Conformance:

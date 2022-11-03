@@ -30,7 +30,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 
 using namespace swift;
 
@@ -58,13 +58,16 @@ struct CheckerLivenessInfo {
   SmallSetVector<Operand *, 8> consumingUse;
   SmallSetVector<SILInstruction *, 8> nonLifetimeEndingUsesInLiveOut;
   SmallVector<Operand *, 8> interiorPointerTransitiveUses;
-  PrunedLiveness liveness;
+  DiagnosticPrunedLiveness liveness;
 
   CheckerLivenessInfo()
       : nonLifetimeEndingUsesInLiveOut(),
         liveness(nullptr, &nonLifetimeEndingUsesInLiveOut) {}
 
-  void initDef(SILValue def) { defUseWorklist.insert(def); }
+  void initDef(SILValue def) {
+    liveness.initializeDef(def);
+    defUseWorklist.insert(def);
+  }
 
   /// Compute the liveness for any value currently in the defUseWorklist.
   ///
@@ -149,14 +152,15 @@ bool CheckerLivenessInfo::compute() {
             // Otherwise, try to update liveness for a borrowing operand
             // use. This will make it so that we add the end_borrows of the
             // liveness use. If we have a reborrow here, we will bail.
-            bool failed = !liveness.updateForBorrowingOperand(use);
-            if (failed)
+            if (liveness.updateForBorrowingOperand(use)
+                != InnerBorrowKind::Contained) {
               return false;
+            }
           }
         }
         break;
       }
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
         // A forwarding borrow is validated as part of its parent borrow. So
         // just mark it as extending liveness and look through it.
         liveness.updateForUse(user, /*lifetimeEnding*/ false);
@@ -187,6 +191,7 @@ bool CheckerLivenessInfo::compute() {
       case OperandOwnership::EndBorrow:
         // Don't care about this use.
         break;
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::Reborrow:
         // Reborrows do not occur this early in the pipeline.
         llvm_unreachable(

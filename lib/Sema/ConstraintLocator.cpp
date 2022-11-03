@@ -122,8 +122,8 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
     switch (kind) {
-    case RequirementKind::SameCount:
-      out << "same_length";
+    case RequirementKind::SameShape:
+      out << "same_shape";
       break;
     case RequirementKind::Conformance:
       out << "conformance";

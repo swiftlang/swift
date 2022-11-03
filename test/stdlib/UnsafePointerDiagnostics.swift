@@ -125,8 +125,8 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeRawBufferPointer(start: orp, count: 1)
 }
 
-
-struct SR9800 {
+// https://github.com/apple/swift/issues/52224
+struct S_52224 {
   func foo(_: UnsafePointer<CChar>) {}
   func foo(_: UnsafePointer<UInt8>) {}
 

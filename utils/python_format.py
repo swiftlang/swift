@@ -35,7 +35,6 @@ _KNOWN_SCRIPT_PATHS = [
     _SWIFT_PATH / "test/Driver/Inputs/fake-toolchain/ld",
     _SWIFT_PATH / "utils/80+-check",
     _SWIFT_PATH / "utils/backtrace-check",
-    _SWIFT_PATH / "utils/build-parser-lib",
     _SWIFT_PATH / "utils/build-script",
     _SWIFT_PATH / "utils/check-incremental",
     _SWIFT_PATH / "utils/coverage/coverage-build-db",
@@ -113,7 +112,7 @@ def parse_args():
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Don't format the file, just retun the status.",
+        help="Don't format the file, just return the status.",
     )
 
     parser.add_argument(

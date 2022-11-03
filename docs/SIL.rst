@@ -956,7 +956,7 @@ Functions
   decl ::= sil-function
   sil-function ::= 'sil' sil-linkage? sil-function-attribute+
                      sil-function-name ':' sil-type
-                     '{' sil-basic-block+ '}'
+                     '{' effects* sil-basic-block* '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
 SIL functions are defined with the ``sil`` keyword. SIL function names
@@ -967,6 +967,8 @@ The ``sil`` syntax declares the function's name and SIL type, and
 defines the body of the function inside braces. The declared type must
 be a function type, which may be generic.
 
+If a function body does not contain atleast one ``sil-basic-block``, the
+function is an external declaration.
 
 Function Attributes
 ```````````````````
@@ -1055,6 +1057,12 @@ the top-level `switch_enum`_.
 Cross-module references to this function should always use weak linking.
 ::
 
+  sil-function-attribute ::= '[stack_protection]'
+
+Stack protectors are inserted into this function to detect stack related
+buffer overflows.
+::
+
   sil-function-attribute ::= '[available' sil-version-tuple ']'
   sil-version-tuple ::= [0-9]+ ('.' [0-9]+)*
 
@@ -1090,30 +1098,6 @@ from the command line.
 The specified memory effects of the function.
 ::
 
-  sil-function-attribute ::= '[' 'escapes' escape-list ']'
-  sil-function-attribute ::= '[' 'defined_escapes' escape-list ']'
-  escape-list ::= (escape-list ',')? escape
-  escape ::= '!' arg-selection                 // not-escaping
-  escape ::= arg-selection '=>' arg-selection  // exclusive escaping
-  escape ::= arg-selection '->' arg-selection  // not-exclusive escaping
-  arg-selection ::= arg-or-return ('.' projection-path)?
-  arg-or-return ::= '%' [0-9]+
-  arg-or-return ::= '%r'
-  projection-path ::= (projection-path '.')? path-component
-  path-component ::= 's' [0-9]+        // struct field
-  path-component ::= 'c' [0-9]+        // class field
-  path-component ::= 'ct'              // class tail element
-  path-component ::= 'e' [0-9]+        // enum case
-  path-component ::= [0-9]+            // tuple element
-  path-component ::= 'v**'             // any value fields
-  path-component ::= 'c*'              // any class field
-  path-component ::= '**'              // anything
-
-The escaping effects for function arguments. For details see the documentation
-in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
-
-::
-
   sil-function-attribute ::= '[_semantics "' [A-Za-z._0-9]+ '"]'
 
 The specified high-level semantics of the function. The optimizer can use this
@@ -1140,6 +1124,46 @@ The clang node owner.
 Specifies the performance constraints for the function, which defines which type
 of runtime functions are allowed to be called from the function.
 
+
+Argument Effects
+````````````````
+
+The function effects, especially for function arguments. For details see the
+documentation in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+::
+
+  effects ::= '[' argument-name ':' argument-effect (',' argument-effect)*]'
+  effects ::= '[' 'global' ':' global-effect (',' global-effect)*]'
+  argument-name ::= '%' [0-9]+
+
+  argument-effect ::= 'noescape' defined-effect? projection-path?
+  argument-effect ::= 'escape' defined-effect? projection-path? '=>' arg-or-return  // exclusive escape
+  argument-effect ::= 'escape' defined-effect? projection-path? '->' arg-or-return  // not-exclusive escape
+  argument-effect ::= side-effect
+
+  global-effect ::= 'traps'
+  global-effect ::= 'allocates'
+  global-effect ::= side-effect
+
+  side-effect ::= 'read' projection-path?
+  side-effect ::= 'write' projection-path?
+  side-effect ::= 'copy' projection-path?
+  side-effect ::= 'read' projection-path?
+
+  arg-or-return ::= argument-name ('.' projection-path)?
+  arg-or-return ::= '%r' ('.' projection-path)?
+  defined-effect ::= '!'    // the effect is defined in the source code and not
+                            // derived by the optimizer
+
+  projection-path ::= path-component ('.' path-component)* 
+  path-component ::= 's' [0-9]+        // struct field
+  path-component ::= 'c' [0-9]+        // class field
+  path-component ::= 'ct'              // class tail element
+  path-component ::= 'e' [0-9]+        // enum case
+  path-component ::= [0-9]+            // tuple element
+  path-component ::= 'v**'             // any value fields
+  path-component ::= 'c*'              // any class field
+  path-component ::= '**'              // anything
 
 Basic Blocks
 ~~~~~~~~~~~~
@@ -2420,10 +2444,10 @@ required.
 Deinit Barriers
 ```````````````
 
-Deinit barriers (see swift::isDeinitBarrier) are instructions which would be
-affected by the side effects of deinitializers.  To maintain the order of
-effects that is visible to the programmer, destroys of lexical values cannot be
-reordered with respect to them.  There are three kinds:
+Deinit barriers (see Instruction.isDeinitBarrier(_:)) are instructions which
+would be affected by the side effects of deinitializers.  To maintain the order
+of effects that is visible to the programmer, destroys of lexical values cannot
+be reordered with respect to them.  There are three kinds:
 
 1. synchronization points (locks, memory barriers, syscalls, etc.)
 2. loads of weak or unowned values
@@ -2587,9 +2611,9 @@ only values" that are guaranteed to never be copied. This is enforced by:
 * Having SILGen emit copies as it normally does.
 
 * Use OSSA canonicalization to eliminate copies that aren't needed semantically
-  due to consuming uses of the value. This is implemented by the pass guaranteed
-  pass "MoveOnlyChecker". Emit errors on any of the consuming uses that we found
-  in said pass.
+  due to consuming uses of the value. This is implemented by the guaranteed
+  passes "MoveOnlyObjectChecker" and "MoveOnlyAddressChecker". We will emit
+  errors on any of the consuming uses that we found in said pass.
 
 Assuming that no errors are emitted, we can then conclude before we reach
 canonical SIL that the value was never copied and thus is a "move only value"
@@ -2661,7 +2685,7 @@ rather than a viral type level annotation that would constrain the type system.
 As mentioned above trivial move only wrapped types are actually
 non-trivial. This is because in SIL ownership is tied directly to
 non-trivialness so unless we did that we could not track ownership
-accurately. This is loss of triviality is not an issue for most of the pipeline
+accurately. This loss of triviality is not an issue for most of the pipeline
 since we eliminate all move only wrapper types for trivial types during the
 guaranteed optimizations after we have run various ownership checkers but before
 we have run diagnostics for trivial types (e.x.: DiagnosticConstantPropagation).
@@ -3792,7 +3816,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value '[poison]'? '[moved]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+  sil-instruction ::= debug_value '[poison]'? '[moved]'? '[trace]'? sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
 
   debug_value %1 : $Int
 
@@ -3898,6 +3922,84 @@ It is worth noting that a SIL DIExpression is similar to
 info metadata. While LLVM represents ``!DIExpression`` are a list of 64-bit integers,
 SIL DIExpression can have elements with various types, like AST nodes or strings.
 
+The ``[trace]`` flag is available for compiler unit testing. It is not produced during normal compilation. It is used combination with internal logging and optimization controls to select specific values to trace or to transform. For example, liveness analysis combines all "traced" values into a single live range with multiple definitions. This exposes corner cases that cannot be represented by passing valid SIL through the pipeline.
+
+Testing
+~~~~~~~
+
+test_specification
+``````````````````
+::
+
+  sil-instruction ::= 'test_specification' string-literal
+
+  test_specification "parsing @trace[3] @function[other].block[2].instruction[1]"
+
+Exists only for writing FileCheck tests.  Specifies a list of test arguments
+which should be used in order to run a particular test "in the context" of the
+function containing the instruction.
+
+Parsing of these test arguments is done via ``parseTestArgumentsFromSpecification``.
+
+The following types of test arguments are supported:
+
+- boolean: true false
+- unsigned integer: 0...ULONG_MAX
+- string
+- function: @function <-- the current function
+            @function[uint] <-- function at index ``uint``
+            @function[name] <-- function named ``name``
+- block: @block <-- the block containing the test_specification instruction
+         @block[+uint] <-- the block ``uint`` blocks after the containing block
+         @block[-uint] <-- the block ``uint`` blocks before the containing block
+         @block[uint] <-- the block at index ``uint``
+         @{function}.{block} <-- the indicated block in the indicated function
+         Example: @function[foo].block[2]
+- trace: @trace <-- the first ``debug_value [trace]`` in the current function
+         @trace[uint] <-- the ``debug_value [trace]`` at index ``uint``
+         @{function}.{trace} <-- the indicated trace in the indicated function
+         Example: @function[bar].trace
+- argument: @argument <-_ the first argument of the current block
+            @argument[uint] <-- the argument at index ``uint`` of the current block
+            @{block}.{argument} <-- the indicated argument in the indicated block
+            @{function}.{argument} <-- the indicated argument in the entry block of the indicated function
+- instruction: @instruction <-- the instruction after* the test_specification instruction
+               @instruction[+uint] <-- the instruction ``uint`` instructions after* the test_specification instruction
+               @instruction[-uint] <-- the instruction ``uint`` instructions before* the test_specification instruction
+               @instruction[uint] <-- the instruction at index ``uint``
+               @{function}.{instruction} <-- the indicated instruction in the indicated function
+               Example: @function[baz].instruction[19]
+               @{block}.{instruction} <-- the indicated instruction in the indicated block
+               Example: @function[bam].block.instruction
+- operand: @operand <-- the first operand
+           @operand[uint] <-- the operand at index ``uint``
+           @{instruction}.{operand} <-- the indicated operand of the indicated instruction
+           Example: @block[19].instruction[2].operand[3]
+           Example: @function[2].instruction.operand
+
+* Not counting instructions that are deleted when processing functions for tests.
+  The following instructions currently are deleted:
+
+      test_specification
+      debug_value [trace]
+
+
+Profiling
+~~~~~~~~~
+
+increment_profiler_counter
+``````````````````````````
+::
+
+  sil-instruction ::= 'increment_profiler_counter' int-literal ',' string-literal ',' 'num_counters' int-literal ',' 'hash' int-literal
+
+  increment_profiler_counter 1, "$foo", num_counters 3, hash 0
+
+Increments a given profiler counter for a given PGO function name. This is
+lowered to the ``llvm.instrprof.increment`` LLVM intrinsic. This instruction
+is emitted when profiling is enabled, and enables features such as code coverage
+and profile-guided optimization.
+
 Accessing Memory
 ~~~~~~~~~~~~~~~~
 
@@ -3957,21 +4059,21 @@ store_borrow
 
   sil-instruction ::= 'store_borrow' sil-value 'to' sil-operand
 
-  store_borrow %0 to %1 : $*T
+  %2 = store_borrow %0 to %1 : $*T
   // $T must be a loadable type
   // %1 must be an alloc_stack $T
+  // %2 is the return address
 
 Stores the value ``%0`` to a stack location ``%1``, which must be an
 ``alloc_stack $T``.
 The stack location must not be modified by other instructions than
 ``store_borrow``.
-The stored value is alive until the ``dealloc_stack`` or until another
-``store_borrow`` overwrites the value. During the its lifetime, the stored
-value must not be modified or destroyed.
+All uses of the store_borrow destination ```%1`` should be via the store_borrow
+return address ``%2`` except dealloc_stack.
+The stored value is alive until the ``end_borrow``. During the its lifetime,the
+stored value must not be modified or destroyed.
 The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
 must outlive the lifetime of the stored value.
-
-Note: This is the current implementation and the design is not final.
 
 begin_borrow
 ````````````
@@ -4067,7 +4169,7 @@ assign_by_wrapper
 
   sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-  mode ::= '[initialization]' | '[assign]' | '[assign_wrapped_value]'
+  mode ::= '[init]' | '[assign]' | '[assign_wrapped_value]'
 
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
@@ -4184,9 +4286,9 @@ copy_addr
 ::
 
   sil-instruction ::= 'copy_addr' '[take]'? sil-value
-                        'to' '[initialization]'? sil-operand
+                        'to' '[init]'? sil-operand
 
-  copy_addr [take] %0 to [initialization] %1 : $*T
+  copy_addr [take] %0 to [init] %1 : $*T
   // %0 and %1 must be of the same $*T address type
 
 Loads the value at address ``%0`` from memory and assigns a copy of it back into
@@ -4205,11 +4307,11 @@ is equivalent to::
 
 except that ``copy_addr`` may be used even if ``%0`` is of an address-only
 type. The ``copy_addr`` may be given one or both of the ``[take]`` or
-``[initialization]`` attributes:
+``[init]`` attributes:
 
 * ``[take]`` destroys the value at the source address in the course of the
   copy.
-* ``[initialization]`` indicates that the destination address is uninitialized.
+* ``[init]`` indicates that the destination address is uninitialized.
   Without the attribute, the destination address is treated as already
   initialized, and the existing value will be destroyed before the new value
   is stored.
@@ -4227,7 +4329,7 @@ operations::
     store %new to %1 : $*T
 
   // copy-initialization
-    copy_addr %0 to [initialization] %1 : $*T
+    copy_addr %0 to [init] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     strong_retain %new : $T
@@ -4235,7 +4337,7 @@ operations::
     store %new to %1 : $*T
 
   // take-initialization
-    copy_addr [take] %0 to [initialization] %1 : $*T
+    copy_addr [take] %0 to [init] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     // no retain of %new!
@@ -4253,9 +4355,9 @@ explicit_copy_addr
 ::
 
   sil-instruction ::= 'explicit_copy_addr' '[take]'? sil-value
-                        'to' '[initialization]'? sil-operand
+                        'to' '[init]'? sil-operand
 
-  explicit_copy_addr [take] %0 to [initialization] %1 : $*T
+  explicit_copy_addr [take] %0 to [init] %1 : $*T
   // %0 and %1 must be of the same $*T address type
 
 This instruction is exactly the same as `copy_addr`_ except that it has special
@@ -4292,7 +4394,7 @@ index_addr
 ``````````
 ::
 
-  sil-instruction ::= 'index_addr' sil-operand ',' sil-operand
+  sil-instruction ::= 'index_addr' ('[' 'stack_protection' ']')? sil-operand ',' sil-operand
 
   %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
   // %0 must be of an address type $*T
@@ -4307,6 +4409,9 @@ bytes within a value, using ``index_addr``. (``Int8`` address types have no
 special behavior in this regard, unlike ``char*`` or ``void*`` in C.) It is
 also undefined behavior to index out of bounds of an array, except to index
 the "past-the-end" address of the array.
+
+The ``stack_protection`` flag indicates that stack protection is done for
+the pointer origin.
 
 tail_addr
 `````````
@@ -4363,11 +4468,22 @@ bind_memory
 Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
 capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
 
-Produces a opaque token representing the previous memory state. For
-memory binding semantics, this state includes the type that the memory
-was previously bound to. The token cannot, however, be used to
-retrieve a metatype. It's value is only meaningful to the Swift
-runtime for typed pointer verification.
+Produces a opaque token representing the previous memory state for
+memory binding semantics. This abstract state includes the type that
+the memory was previously bound to along with the size of the affected
+memory region, which can be derived from ``%1``. The token cannot, for
+example, be used to retrieve a metatype. It only serves a purpose when
+used by ``rebind_memory``, which has no static type information. The
+token dynamically passes type information from the first bind_memory
+into a chain of rebind_memory operations.
+
+Example::
+
+  %_      = bind_memory %0   : $Builtin.RawPointer, %numT : $Builtin.Word to $T // holds type 'T'
+  %token0 = bind_memory %0   : $Builtin.RawPointer, %numU : $Builtin.Word to $U // holds type 'U'
+  %token1 = rebind_memory %0 : $Builtin.RawPointer, %token0 : $Builtin.Word  // holds type 'T'
+  %token2 = rebind_memory %0 : $Builtin.RawPointer, %token1 : $Builtin.Word  // holds type 'U'
+
 
 rebind_memory
 `````````````
@@ -4386,8 +4502,8 @@ This instruction's semantics are identical to ``bind_memory``, except
 that the types to which memory will be bound, and the extent of the
 memory region is unknown at compile time. Instead, the bound-types are
 represented by a token that was produced by a prior memory binding
-operation. ``%in_token`` must be the result of bind_memory or
-rebind_memory.
+operation. ``%in_token`` must be the result of ``bind_memory`` or
+``rebind_memory``.
 
 begin_access
 ````````````
@@ -4673,14 +4789,14 @@ store_weak
 
 ::
 
-  sil-instruction ::= 'store_weak' sil-value 'to' '[initialization]'? sil-operand
+  sil-instruction ::= 'store_weak' sil-value 'to' '[init]'? sil-operand
 
-  store_weak %0 to [initialization] %1 : $*@sil_weak Optional<T>
+  store_weak %0 to [init] %1 : $*@sil_weak Optional<T>
   // $T must be an optional wrapping a reference type
 
 Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
-If ``[initialization]`` is given, the weak reference must currently either be
+If ``[init]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
 currently be initialized. After the evaluation:
 
@@ -5903,7 +6019,7 @@ an `inject_enum_addr`_ instruction::
   entry(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyType):
     // Store the data argument for the case.
     %2 = init_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt
-    copy_addr [take] %2 to [initialization] %1 : $*AddressOnlyType
+    copy_addr [take] %2 to [init] %1 : $*AddressOnlyType
     // Inject the tag.
     inject_enum_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.HasData!enumelt
     return
@@ -6531,7 +6647,7 @@ address_to_pointer
 ``````````````````
 ::
 
-  sil-instruction ::= 'address_to_pointer' sil-operand 'to' sil-type
+  sil-instruction ::= 'address_to_pointer' ('[' 'stack_protection' ']')? sil-operand 'to' sil-type
 
   %1 = address_to_pointer %0 : $*T to $Builtin.RawPointer
   // %0 must be of an address type $*T
@@ -6542,6 +6658,9 @@ Converting the result pointer back to an address of the same type will give
 an address equivalent to ``%0``. It is undefined behavior to cast the
 ``RawPointer`` to any address type other than its original address type or
 any `layout compatible types`_.
+
+The ``stack_protection`` flag indicates that stack protection is done for
+the pointer origin.
 
 pointer_to_address
 ``````````````````

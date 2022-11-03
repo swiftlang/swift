@@ -20,6 +20,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include <map>
 
@@ -192,6 +193,41 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
 bool Decl::isAvailableAsSPI() const {
   return AvailabilityInference::availableRange(this, getASTContext())
     .isAvailableAsSPI();
+}
+
+bool IsSemanticallyUnavailableRequest::evaluate(Evaluator &evaluator,
+                                                const Decl *decl) const {
+  // Directly marked unavailable.
+  if (AvailableAttr::isUnavailable(decl))
+    return true;
+
+  // If this is an extension, it's semantically unavailable if its nominal is,
+  // as there is no way to reference or construct the type.
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto *nom = ext->getExtendedNominal()) {
+      if (nom->isSemanticallyUnavailable())
+        return true;
+    }
+  }
+
+  // If the parent decl is semantically unavailable, then this decl is too.
+  // For local contexts, this means it's a local decl in e.g an unavailable
+  // function, which cannot be accessed. For non-local contexts, this is a
+  // nested type or a member with an unavailable parent, which cannot be
+  // referenced.
+  // Similar to `AvailableAttr::isUnavailable`, don't apply this logic to
+  // Clang decls, as they may be inaccurately parented.
+  if (!decl->hasClangNode()) {
+    auto *DC = decl->getDeclContext();
+    if (auto *parentDecl = DC->getInnermostDeclarationDeclContext())
+      return parentDecl->isSemanticallyUnavailable();
+  }
+  return false;
+}
+
+bool Decl::isSemanticallyUnavailable() const {
+  auto &eval = getASTContext().evaluator;
+  return evaluateOrDefault(eval, IsSemanticallyUnavailableRequest{this}, false);
 }
 
 AvailabilityContext

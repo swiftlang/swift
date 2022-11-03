@@ -41,7 +41,8 @@ extension DoubleOverloadedSameTypealias where MyAssocType == Int {
 }
 func useDoubleOverloadedSameTypealias() -> DoubleOverloadedSameTypealias.Content {}
 
-// Overload associatedtype with typealias (SR-8274)
+// Overload associatedtype with typealias
+// https://github.com/apple/swift/issues/50805
 
 protocol MarkerProtocol {}
 protocol ProtocolWithAssoctype {

@@ -7,6 +7,7 @@
 // CHECK-NEXT:       init()
 // CHECK-NEXT:       mutating func basicMember() -> UnsafePointer<CChar>!
 // CHECK-NEXT:     }
+// CHECK-NEXT:     @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:     struct ForwardDeclaredClassTemplate<> {
 // CHECK-NEXT:     }
 // CHECK-NEXT:     static func forwardDeclaredFunctionTemplateOutOfLine<T>(_: T) -> UnsafePointer<CChar>!
@@ -14,6 +15,7 @@
 // CHECK-NEXT:       init()
 // CHECK-NEXT:       mutating func basicMember() -> UnsafePointer<CChar>!
 // CHECK-NEXT:     }
+// CHECK-NEXT:     @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:     struct ForwardDeclaredClassTemplateOutOfLine<> {
 // CHECK-NEXT:     }
 // CHECK-NEXT:     typealias BasicClassTemplateChar = TemplatesNS1.TemplatesNS3.__CxxTemplateInstN12TemplatesNS112TemplatesNS318BasicClassTemplateIcEE
@@ -24,10 +26,12 @@
 // CHECK-NEXT:     init()
 // CHECK-NEXT:     mutating func basicMember() -> UnsafePointer<CChar>!
 // CHECK-NEXT:   }
+// CHECK-NEXT:   @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:   struct BasicClassTemplate<> {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   typealias BasicClassTemplateChar = TemplatesNS1.__CxxTemplateInstN12TemplatesNS118BasicClassTemplateIcEE
 // CHECK-NEXT:   static func basicFunctionTemplateDefinedInDefs<T>(_: T) -> UnsafePointer<CChar>!
+// CHECK-NEXT:   @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:   struct BasicClassTemplateDefinedInDefs<> {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   typealias UseTemplate = TemplatesNS4.__CxxTemplateInstN12TemplatesNS417HasSpecializationIcEE
@@ -36,6 +40,7 @@
 // CHECK-NEXT:     struct __CxxTemplateInstN12TemplatesNS112TemplatesNS318BasicClassTemplateIcEE {
 // CHECK-NEXT:       init()
 // CHECK-NEXT:     }
+// CHECK-NEXT:     @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:     struct BasicClassTemplate<> {
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -53,6 +58,7 @@
 // CHECK-NEXT:   struct __CxxTemplateInstN12TemplatesNS417HasSpecializationIiEE {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
+// CHECK-NEXT:   @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")
 // CHECK-NEXT:   struct HasSpecialization<> {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }

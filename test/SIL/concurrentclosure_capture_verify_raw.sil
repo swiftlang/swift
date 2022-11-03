@@ -90,7 +90,7 @@ bb0(%0 : $*T):
   store %5 to [init] %2 : $*F                     // id: %7
   %8 = alloc_box $<τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <T>, var, name "i2" // users: %32, %14, %9
   %9 = project_box %8 : $<τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <T>, 0 // users: %24, %10
-  copy_addr %0 to [initialization] %9 : $*T       // id: %10
+  copy_addr %0 to [init] %9 : $*T       // id: %10
   %11 = copy_value %6 : $F                        // users: %23, %18
   destroy_value %6 : $F                           // id: %12
   // function_ref closure #1 in testCaseAddressOnly2<A>(i:)

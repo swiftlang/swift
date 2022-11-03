@@ -65,13 +65,14 @@ TermInst *changeEdgeValue(TermInst *branch, SILBasicBlock *dest, size_t idx,
 /// specified index. Asserts internally that the argument along the edge does
 /// not have uses.
 TermInst *deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                          size_t argIndex);
+                          size_t argIndex, bool cleanupDeadPhiOp = true);
 
 /// Erase the \p argIndex phi argument from \p block. Asserts that the argument
 /// is a /real/ phi argument. Removes all incoming values for the argument from
 /// predecessor terminators. Asserts internally that it only ever is given
 /// "true" phi argument.
-void erasePhiArgument(SILBasicBlock *block, unsigned argIndex);
+void erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
+                      bool cleanupDeadPhiOp = true);
 
 /// Replace a branch target.
 ///

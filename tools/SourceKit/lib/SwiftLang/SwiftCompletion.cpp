@@ -23,7 +23,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
-#include "swift/IDE/CompletionInstance.h"
+#include "swift/IDETool/CompletionInstance.h"
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"

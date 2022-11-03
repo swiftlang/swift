@@ -2041,6 +2041,11 @@ void PatternMatchEmission::emitEnumElementDispatch(
     // be passed take_on_success if src is an address only type.
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
+    if (src.getType().isAddressOnly(SGF.F) &&
+        src.getOwnershipKind() == OwnershipKind::Guaranteed) {
+      // If it's an opaque value with guaranteed ownership, we need to copy.
+      src = src.copy(SGF, PatternMatchStmt);
+    }
 
     // Finally perform the enum element dispatch.
     return emitEnumElementObjectDispatch(rows, src, handleCase, outerFailure,
@@ -2814,7 +2819,6 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   emission.emitAddressOnlyAllocations();
 
   SILBasicBlock *contBB = createBasicBlock();
-  emitProfilerIncrement(S);
   JumpDest contDest(contBB, Cleanups.getCleanupsDepth(), CleanupLocation(S));
 
   LexicalScope switchScope(*this, CleanupLocation(S));
@@ -2835,7 +2839,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   auto subject = ([&]() -> ConsumableManagedValue {
     // If we have a move only value, ensure plus one and convert it. Switches
     // always consume move only values.
-    if (subjectMV.getType().isMoveOnly()) {
+    if (subjectMV.getType().isMoveOnly() && subjectMV.getType().isObject()) {
       if (subjectMV.getType().isMoveOnlyWrapped()) {
         subjectMV = B.createOwnedMoveOnlyWrapperToCopyableValue(
             S, subjectMV.ensurePlusOne(*this, S));

@@ -75,10 +75,23 @@ class SwiftSyntax(product.Product):
 
     def build(self, host_target):
         if self.args.swiftsyntax_verify_generated_files:
-            self.run_swiftsyntax_build_script(target=host_target,
-                                              command='verify-source-code')
+            build_cmd = [
+                os.path.join(self.source_dir, 'build-script.py'),
+                'verify-source-code',
+                '--toolchain', self.install_toolchain_path(host_target),
+                # Verifying the files generated using SwiftSyntaxBuilder requires
+                # internet access to pull the pinned SwiftSyntaxBuilder version. Since
+                # we don't have internet access in CI, don't verify these files.
+                # This is not a huge deal because only SwiftSyntaxBuilder is generated
+                # in terms of itself and it will most likely fail to compile if it isn't
+                # re-generated after gyb files have been updated.
+                '--gyb-only'
+            ]
+            if self.args.verbose_build:
+                build_cmd.append('--verbose')
+            shell.call(build_cmd)
 
-        self.run_swiftsyntax_build_script(target=host_target, 
+        self.run_swiftsyntax_build_script(target=host_target,
                                           command='build')
 
     def should_test(self, host_target):
@@ -91,9 +104,9 @@ class SwiftSyntax(product.Product):
         self.run_swiftsyntax_build_script(target=host_target,
                                           command='test',
                                           additional_params=[
-                                              '--filecheck-exec', 
-                                              os.path.join(llvm_build_dir, 
-                                                           'bin', 
+                                              '--filecheck-exec',
+                                              os.path.join(llvm_build_dir,
+                                                           'bin',
                                                            'FileCheck')
                                           ])
 
@@ -101,8 +114,8 @@ class SwiftSyntax(product.Product):
         return self.args.install_swiftsyntax
 
     def install(self, target_name):
-        # SwiftSyntax doesn't produce any products thate should be installed 
-        # into the toolchein. All tools using it link against SwiftSyntax 
+        # SwiftSyntax doesn't produce any products that should be installed
+        # into the toolchain. All tools using it link against SwiftSyntax
         # statically.
         pass
 

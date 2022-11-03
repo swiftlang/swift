@@ -22,7 +22,7 @@ public enum EnumWithClassArchetypeAndDynamicSize<T : AnyObject> {
 sil [ossa] @copyDynamicMultiEnum : $@convention(method) <T, U where T: AnyObject> (@in_guaranteed EnumWithClassArchetypeAndDynamicSize<T>) -> () {
 bb0(%0 : $*EnumWithClassArchetypeAndDynamicSize<T>):
   %1 = alloc_stack $EnumWithClassArchetypeAndDynamicSize<T> 
-  copy_addr %0 to [initialization] %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
+  copy_addr %0 to [init] %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
   destroy_addr %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
   dealloc_stack %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
   %ret = tuple ()

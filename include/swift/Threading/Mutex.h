@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Provides a system-independent Mutex abstraction, as well as some
-// related utilities like ScopedLock.
+// Provides a system-independent Mutex abstraction.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,44 +20,11 @@
 #include <type_traits>
 #include <utility>
 
+#include "ScopedLock.h"
+
 #include "Impl.h"
 
 namespace swift {
-
-// -- ScopedLock ---------------------------------------------------------------
-
-/// Compile time adjusted stack based object that locks/unlocks the supplied
-/// Mutex type. Use the provided typedefs instead of this directly.
-template <typename T, bool Inverted>
-class ScopedLockT {
-  ScopedLockT() = delete;
-  ScopedLockT(const ScopedLockT &) = delete;
-  ScopedLockT &operator=(const ScopedLockT &) = delete;
-  ScopedLockT(ScopedLockT &&) = delete;
-  ScopedLockT &operator=(ScopedLockT &&) = delete;
-
-public:
-  explicit ScopedLockT(T &l) : Lock(l) {
-    if (Inverted) {
-      Lock.unlock();
-    } else {
-      Lock.lock();
-    }
-  }
-
-  ~ScopedLockT() {
-    if (Inverted) {
-      Lock.lock();
-    } else {
-      Lock.unlock();
-    }
-  }
-
-private:
-  T &Lock;
-};
-
-// -- Mutex --------------------------------------------------------------------
 
 /// A Mutex object that supports `BasicLockable` and `Lockable` C++ concepts.
 /// See http://en.cppreference.com/w/cpp/concept/BasicLockable

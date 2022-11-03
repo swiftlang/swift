@@ -93,19 +93,27 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-static bool hasStoredProperties(NominalTypeDecl *decl) {
+static bool hasStoredProperties(NominalTypeDecl *decl,
+                                IterableDeclContext *implDecl) {
   bool isForeignReferenceTy =
       isa<ClassDecl>(decl) && cast<ClassDecl>(decl)->isForeignReferenceType();
 
   return (isa<StructDecl>(decl) ||
           (isa<ClassDecl>(decl) &&
-           (!decl->hasClangNode() || isForeignReferenceTy)));
+           (!decl->hasClangNode() || isForeignReferenceTy
+                || (decl != implDecl))));
 }
 
-static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+static void computeLoweredStoredProperties(NominalTypeDecl *decl,
+                                           IterableDeclContext *implDecl) {
+  // If declaration has a type wrapper, make sure that
+  // `$storage` property is synthesized.
+  if (decl->hasTypeWrapper())
+    (void)decl->getTypeWrapperProperty();
+
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
-  for (auto *member : decl->getMembers()) {
+  for (auto *member : implDecl->getMembers()) {
     auto *var = dyn_cast<VarDecl>(member);
     if (!var || var->isStatic())
       continue;
@@ -116,6 +124,10 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     if (var->hasAttachedPropertyWrapper()) {
       (void) var->getPropertyWrapperAuxiliaryVariables();
       (void) var->getPropertyWrapperInitializerInfo();
+    }
+
+    if (var->isAccessedViaTypeWrapper()) {
+      (void)var->getUnderlyingTypeWrapperStorage();
     }
   }
 
@@ -151,6 +163,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
 /// in a deterministic order.
 static void enumerateStoredPropertiesAndMissing(
     NominalTypeDecl *decl,
+    IterableDeclContext *implDecl,
     llvm::function_ref<void(VarDecl *)> addStoredProperty,
     llvm::function_ref<void(MissingMemberDecl *)> addMissing) {
   // If we have a distributed actor, find the id and actorSystem
@@ -160,7 +173,7 @@ static void enumerateStoredPropertiesAndMissing(
   VarDecl *distributedActorSystem = nullptr;
   if (decl->isDistributedActor()) {
     ASTContext &ctx = decl->getASTContext();
-    for (auto *member : decl->getMembers()) {
+    for (auto *member : implDecl->getMembers()) {
       if (auto *var = dyn_cast<VarDecl>(member)) {
         if (!var->isStatic() && var->hasStorage()) {
           if (var->getName() == ctx.Id_id) {
@@ -181,7 +194,7 @@ static void enumerateStoredPropertiesAndMissing(
       addStoredProperty(distributedActorSystem);
   }
 
-  for (auto *member : decl->getMembers()) {
+  for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
       if (!var->isStatic() && var->hasStorage()) {
         // Skip any properties that we already emitted explicitly
@@ -200,20 +213,29 @@ static void enumerateStoredPropertiesAndMissing(
   }
 }
 
+static bool isInSourceFile(IterableDeclContext *idc) {
+  const DeclContext *dc = idc->getAsGenericContext();
+  return isa<SourceFile>(dc->getModuleScopeContext());
+}
+
 ArrayRef<VarDecl *>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
+  // If this is an imported class with an @_objcImplementation extension, get
+  // members from the extension instead.
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<VarDecl *>();
 
   SmallVector<VarDecl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
   // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
+  if (isInSourceFile(implDecl))
+    computeLoweredStoredProperties(decl, implDecl);
 
-  enumerateStoredPropertiesAndMissing(decl,
+  enumerateStoredPropertiesAndMissing(decl, implDecl,
     [&](VarDecl *var) {
       results.push_back(var);
     },
@@ -225,17 +247,21 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 ArrayRef<Decl *>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
+  // If this is an imported class with an @_objcImplementation extension, get
+  // members from the extension instead.
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<Decl *>();
 
   SmallVector<Decl *, 4> results;
 
   // Unless we're in a source file we don't have to do anything
   // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
+  if (isInSourceFile(implDecl))
+    computeLoweredStoredProperties(decl, implDecl);
 
-  enumerateStoredPropertiesAndMissing(decl,
+  enumerateStoredPropertiesAndMissing(decl, implDecl,
     [&](VarDecl *var) {
       results.push_back(var);
     },
@@ -608,20 +634,6 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
-/// Create the generic parameters needed for the given accessor, if any.
-static GenericParamList *createAccessorGenericParams(
-                                              AbstractStorageDecl *storage) {
-  // Accessors of generic subscripts get a copy of the subscript's
-  // generic parameter list, because they're not nested inside the
-  // subscript.
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
-    if (auto genericParams = subscript->getGenericParams())
-      return genericParams->clone(subscript->getDeclContext());
-  }
-
-  return nullptr;
-}
-
 static bool doesAccessorHaveBody(AccessorDecl *accessor) {
   // Protocol requirements don't have bodies.
   //
@@ -914,7 +926,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
       }
     }
-    semantics = AccessSemantics::DirectToStorage;
+    semantics = backing->isAccessedViaTypeWrapper()
+                    ? AccessSemantics::DirectToImplementation
+                    : AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
@@ -943,7 +957,9 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         { var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar,
           isLValue });
     }
-    semantics = AccessSemantics::DirectToStorage;
+    semantics = backing->isAccessedViaTypeWrapper()
+                    ? AccessSemantics::DirectToImplementation
+                    : AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
@@ -1331,11 +1347,11 @@ namespace {
   public:
     RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // If we find a closure, update its declcontext and do *not* walk into it.
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
-        return { false, E };
+        return Action::SkipChildren(E);
       }
       
       if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
@@ -1356,12 +1372,16 @@ namespace {
           node.walk(RecontextualizeClosures(NewDC));
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
 
     /// We don't want to recurse into declarations or statements.
-    bool walkToDeclPre(Decl *) override { return false; }
-    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override { return {false,S}; }
+    PreWalkAction walkToDeclPre(Decl *) override {
+      return Action::SkipChildren();
+    }
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      return Action::SkipChildren(S);
+    }
   };
 } // end anonymous namespace
 
@@ -1498,12 +1518,35 @@ synthesizeInvalidAccessor(AccessorDecl *accessor, ASTContext &ctx) {
   return { BraceStmt::create(ctx, loc, ArrayRef<ASTNode>(), loc, true), true };
 }
 
+/// Synthesize the body of a getter for a stored property that belongs to
+/// a type wrapped type.
+static std::pair<BraceStmt *, bool>
+synthesizeTypeWrappedPropertyGetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  auto *body = evaluateOrDefault(
+      ctx.evaluator, SynthesizeTypeWrappedPropertyGetterBody{getter}, nullptr);
+  return body ? std::make_pair(body, /*isTypeChecked=*/false)
+              : synthesizeInvalidAccessor(getter, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeTypeWrappedPropertySetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  auto *body = evaluateOrDefault(
+      ctx.evaluator, SynthesizeTypeWrappedPropertySetterBody{getter}, nullptr);
+  return body ? std::make_pair(body, /*isTypeChecked=*/false)
+              : synthesizeInvalidAccessor(getter, ctx);
+}
+
 static std::pair<BraceStmt *, bool>
 synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   auto storage = getter->getStorage();
 
   // Synthesize the getter for a lazy property or property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
+    // If the type this stored property belongs to has a type wrapper
+    // we need to route getter/setter through the wrapper.
+    if (var->isAccessedViaTypeWrapper())
+      return synthesizeTypeWrappedPropertyGetterBody(getter, ctx);
+
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       auto *storage = var->getLazyStorageProperty();
       return synthesizeLazyGetterBody(getter, var, storage, ctx);
@@ -1740,6 +1783,11 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   // Synthesize the setter for a lazy property or property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
+    // If the type this stored property belongs to has a type wrapper
+    // we need to route getter/setter through the wrapper.
+    if (var->isAccessedViaTypeWrapper())
+      return synthesizeTypeWrappedPropertySetterBody(setter, ctx);
+
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
       if (var->hasObservers()) {
@@ -1999,8 +2047,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
     }
   }
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   // Add an index-forwarding clause.
   auto *getterParams = buildIndexForwardingParamList(storage, {}, ctx);
 
@@ -2009,14 +2055,10 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
     staticLoc = storage->getLoc();
 
   auto getter = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::Get, storage,
+      ctx, loc, /*AccessorKeywordLoc*/ loc, AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams,
-      getterParams,
-      Type(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), getterParams, Type(),
       storage->getDeclContext());
   getter->setSynthesized();
 
@@ -2099,8 +2141,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   bool isMutating = storage->isSetterMutating();
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   // Add a "(value : T, indices...)" argument list.
   auto *param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), loc,
@@ -2112,13 +2152,10 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   auto *params = buildIndexForwardingParamList(storage, param, ctx);
 
   auto setter = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::Set, storage,
+      ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(), AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params,
-      Type(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, Type(),
       storage->getDeclContext());
   setter->setSynthesized();
 
@@ -2193,15 +2230,11 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // Coroutine accessors always return ().
   const Type retTy = TupleType::getEmpty(ctx);
 
-  GenericParamList *genericParams = createAccessorGenericParams(storage);
-
   auto *accessor = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      kind, storage,
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      genericParams, params, retTy, dc);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, retTy, dc);
   accessor->setSynthesized();
 
   if (isMutating)
@@ -2438,6 +2471,12 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
 
   switch (accessor->getAccessorKind()) {
   case AccessorKind::Get:
+    // Synthesized getter for a type wrapped variable is never transparent.
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (var->isAccessedViaTypeWrapper())
+        return false;
+    }
+
     break;
 
   case AccessorKind::Set:
@@ -2456,6 +2495,10 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
                      PropertyWrapperSynthesizedPropertyKind::Projection)) {
           break;
         }
+
+        // Synthesized setter for a type wrapped variable is never transparent.
+        if (var->isAccessedViaTypeWrapper())
+          return false;
       }
 
       if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
@@ -2930,7 +2973,8 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
 PropertyWrapperInitializerInfo
 PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
                                                 VarDecl *var) const {
-  if (!var->hasAttachedPropertyWrapper() || var->isImplicit())
+  if (!var->hasAttachedPropertyWrapper() ||
+      (var->isImplicit() && !isa<ParamDecl>(var)))
     return PropertyWrapperInitializerInfo();
 
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
@@ -3249,6 +3293,9 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
       finishNSManagedImplInfo(var, info);
     } else if (var->hasAttachedPropertyWrapper()) {
       finishPropertyWrapperImplInfo(var, info);
+    } else if (var->isAccessedViaTypeWrapper()) {
+      info = var->isLet() ? StorageImplInfo::getImmutableComputed()
+                          : StorageImplInfo::getMutableComputed();
     }
   }
 
@@ -3265,8 +3312,17 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     if (isa<EnumDecl>(dc)) {
       storage->diagnose(diag::enum_stored_property);
       info = StorageImplInfo::getMutableComputed();
-    } else if (isa<ExtensionDecl>(dc) &&
-              !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      // Extensions can dynamically replace a stored property.
+      if (storage->getAttrs().getAttribute<DynamicReplacementAttr>())
+        return;
+
+      // @_objcImplementation extensions on a non-category can declare stored
+      // properties; StoredPropertiesRequest knows to look for them there.
+      if (ext->isObjCImplementation() &&
+          ext->getCategoryNameForObjCImplementation() == Identifier())
+        return;
+
       storage->diagnose(diag::extension_stored_property);
 
       info = (info.supportsMutation()
@@ -3486,19 +3542,19 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   public:
     OldValueFinder(const ParamDecl *param) : OldValueParam(param) {}
 
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)
-        return {true, E};
+        return Action::Continue(E);
       if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
         if (auto decl = DRE->getDecl()) {
           if (decl == OldValueParam) {
             foundOldValueRef = true;
-            return {false, nullptr};
+            return Action::Stop();
           }
         }
       }
 
-      return {true, E};
+      return Action::Continue(E);
     }
 
     bool didFindOldValueRef() { return foundOldValueRef; }
@@ -3530,7 +3586,8 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   // If we find a reference to the implicit 'oldValue' parameter, then it is
   // not a "simple" didSet because we need to fetch it.
   auto walker = OldValueFinder(param);
-  decl->getTypecheckedBody()->walk(walker);
+  if (auto *body = decl->getTypecheckedBody())
+    body->walk(walker);
   auto hasOldValueRef = walker.didFindOldValueRef();
   if (!hasOldValueRef) {
     // If the body does not refer to implicit 'oldValue', it means we can

@@ -64,6 +64,11 @@ public:
     /// has been modified.
     Branches = 0x4,
 
+    /// The function effects.
+    ///
+    /// The computed effects of the function are invalidated.
+    Effects = 0x8,
+
     /// Convenience states:
     FunctionBody = Calls | Branches | Instructions,
 
@@ -71,7 +76,7 @@ public:
 
     BranchesAndInstructions = Branches | Instructions,
 
-    Everything = Calls | Branches | Instructions,
+    Everything = FunctionBody | Effects,
   };
 
 private:

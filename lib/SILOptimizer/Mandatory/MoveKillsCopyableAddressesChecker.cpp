@@ -161,7 +161,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -575,19 +575,16 @@ namespace {
 struct ClosureArgDataflowState {
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
-  PrunedLiveness livenessForConsumes;
+  MultiDefPrunedLiveness livenessForConsumes;
   UseState &useState;
 
 public:
-  ClosureArgDataflowState(UseState &useState) : useState(useState) {}
+  ClosureArgDataflowState(SILFunction *function, UseState &useState)
+      : livenessForConsumes(function), useState(useState) {}
 
   bool process(
       SILArgument *arg, ClosureOperandState &state,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
-
-  void clear() {
-    livenessForConsumes.clear();
-  }
 
 private:
   /// Perform our liveness dataflow. Returns true if we found any liveness uses
@@ -752,6 +749,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
       LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
+      livenessForConsumes.initializeDef(cast<SILNode>(user));
       initBlocks.insert(user->getParent());
     }
   }
@@ -797,8 +795,6 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 bool ClosureArgDataflowState::process(
     SILArgument *address, ClosureOperandState &state,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers) {
-  clear();
-
   SILFunction *fn = address->getFunction();
   assert(fn);
 
@@ -865,9 +861,9 @@ bool ClosureArgDataflowState::process(
       return false;
     }
 
-    SWIFT_DEFER { livenessForConsumes.clear(); };
-    auto *frontBlock = &*fn->begin();
-    livenessForConsumes.initializeDefBlock(frontBlock);
+    //!!! FIXME: Why?
+    // auto *frontBlock = &*fn->begin();
+    // livenessForConsumes.initializeDefBlock(frontBlock);
 
     for (unsigned i : indices(livenessWorklist)) {
       if (auto *ptr = livenessWorklist[i]) {
@@ -932,7 +928,7 @@ bool GatherClosureUseVisitor::visitUse(Operand *op, AccessUseType useTy) {
   if (isa<DebugValueInst>(op->getUser()))
     return true;
 
-  // Ignore end_access. For our purposes, they are irrelevent and we do not want
+  // Ignore end_access. For our purposes, they are irrelevant and we do not want
   // to treat them like liveness uses.
   if (isa<EndAccessInst>(op->getUser()))
     return true;
@@ -1950,7 +1946,6 @@ struct MoveKillsCopyableAddressesChecker {
   UseState useState;
   DataflowState dataflowState;
   UseState closureUseState;
-  ClosureArgDataflowState closureUseDataflowState;
   SILOptFunctionBuilder &funcBuilder;
   llvm::SmallMapVector<FullApplySite, SmallBitVector, 8>
       applySiteToPromotedArgIndices;
@@ -1961,8 +1956,7 @@ struct MoveKillsCopyableAddressesChecker {
       : fn(fn), useState(),
         dataflowState(funcBuilder, useState, applySiteToPromotedArgIndices,
                       closureConsumes),
-        closureUseState(), closureUseDataflowState(closureUseState),
-        funcBuilder(funcBuilder) {}
+        closureUseState(), funcBuilder(funcBuilder) {}
 
   void cloneDeferCalleeAndRewriteUses(
       SmallVectorImpl<SILValue> &temporaryStorage,
@@ -2085,7 +2079,7 @@ bool MoveKillsCopyableAddressesChecker::performClosureDataflow(
   if (!visitAccessPathUses(visitor, accessPath, fn))
     return false;
 
-  SWIFT_DEFER { closureUseDataflowState.clear(); };
+  ClosureArgDataflowState closureUseDataflowState(fn, closureUseState);
   return closureUseDataflowState.process(address, calleeOperandState,
                                          closureConsumes);
 }

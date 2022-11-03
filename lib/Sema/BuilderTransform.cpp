@@ -48,6 +48,7 @@ const StmtConditionElement *findAvailabilityCondition(StmtCondition stmtCond) {
     switch (cond.getKind()) {
     case StmtConditionElement::CK_Boolean:
     case StmtConditionElement::CK_PatternBinding:
+    case StmtConditionElement::CK_HasSymbol:
       continue;
 
     case StmtConditionElement::CK_Availability:
@@ -432,12 +433,7 @@ protected:
     // If the builder supports `buildPartialBlock(first:)` and
     // `buildPartialBlock(accumulated:next:)`, use this to combine
     // subexpressions pairwise.
-    if (!expressions.empty() &&
-        builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                         /*checkAvailability*/ true) &&
-        builder.supports(ctx.Id_buildPartialBlock,
-                         {ctx.Id_accumulated, ctx.Id_next},
-                         /*checkAvailability*/ true)) {
+    if (!expressions.empty() && builder.canUseBuildPartialBlock()) {
       // NOTE: The current implementation uses one-way constraints in between
       // subexpressions. It's functionally equivalent to the following:
       //   let v0 = Builder.buildPartialBlock(first: arg_0)
@@ -1020,13 +1016,6 @@ protected:
 
       if (auto *decl = element.dyn_cast<Decl *>()) {
         switch (decl->getKind()) {
-        case DeclKind::PatternBinding: {
-          if (!isValidPatternBinding(cast<PatternBindingDecl>(decl)))
-            return failTransform(decl);
-
-          LLVM_FALLTHROUGH;
-        }
-
         // Just ignore #if; the chosen children should appear in
         // the surrounding context.  This isn't good for source
         // tools but it at least works.
@@ -1034,8 +1023,7 @@ protected:
         // Skip #warning/#error; we'll handle them when applying
         // the builder.
         case DeclKind::PoundDiagnostic:
-        // Ignore variable declarations, because they're always
-        // handled within their enclosing pattern bindings.
+        case DeclKind::PatternBinding:
         case DeclKind::Var:
         case DeclKind::Param:
           newBody.push_back(element);
@@ -1087,12 +1075,7 @@ protected:
       // If the builder supports `buildPartialBlock(first:)` and
       // `buildPartialBlock(accumulated:next:)`, use this to combine
       // sub-expressions pairwise.
-      if (!buildBlockArguments.empty() &&
-          builder.supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
-                           /*checkAvailability*/ true) &&
-          builder.supports(ctx.Id_buildPartialBlock,
-                           {ctx.Id_accumulated, ctx.Id_next},
-                           /*checkAvailability*/ true)) {
+      if (!buildBlockArguments.empty() && builder.canUseBuildPartialBlock()) {
         //   let v0 = Builder.buildPartialBlock(first: arg_0)
         //   let v1 = Builder.buildPartialBlock(accumulated: v0, next: arg_1)
         //   ...
@@ -1255,10 +1238,26 @@ protected:
         auto *builderCall =
             buildWrappedChainPayload(branchVarRef, i, numPayloads, isOptional);
 
+        auto isTopLevel = [&](Stmt *anchor) {
+          if (ifStmt->getThenStmt() == anchor)
+            return true;
+
+          // The situation is this:
+          //
+          // if <cond> {
+          //   ...
+          // } else if <other-cond> {
+          //   ...
+          // }
+          if (auto *innerIf = getAsStmt<IfStmt>(ifStmt->getElseStmt()))
+            return innerIf->getThenStmt() == anchor;
+
+          return ifStmt->getElseStmt() == anchor;
+        };
+
         // The operand should have optional type if we had optional results,
         // so we just need to call `buildIf` now, since we're at the top level.
-        if (isOptional && (ifStmt->getThenStmt() == anchor ||
-                           ifStmt->getElseStmt() == anchor)) {
+        if (isOptional && isTopLevel(anchor)) {
           builderCall = buildCallIfWanted(ifStmt->getEndLoc(),
                                           builder.getBuildOptionalId(),
                                           builderCall, /*argLabels=*/{});
@@ -1575,30 +1574,6 @@ protected:
     }
 
     return DoStmt::createImplicit(ctx, LabeledStmtInfo(), doBody);
-  }
-
-  bool isValidPatternBinding(PatternBindingDecl *PB) {
-    // Enforce some restrictions on local variables inside a result builder.
-    for (unsigned i : range(PB->getNumPatternEntries())) {
-      // The pattern binding must have an initial value expression.
-      if (!PB->isExplicitlyInitialized(i))
-        return false;
-
-      // Each variable bound by the pattern must be stored, and cannot
-      // have observers.
-      SmallVector<VarDecl *, 8> variables;
-      PB->getPattern(i)->collectVariables(variables);
-
-      for (auto *var : variables) {
-        if (!var->getImplInfo().isSimpleStored())
-          return false;
-
-        // Also check for invalid attributes.
-        TypeChecker::checkDeclAttributes(var);
-      }
-    }
-
-    return true;
   }
 
   UNSUPPORTED_STMT(Throw)
@@ -2335,6 +2310,12 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     log << '\n';
   }
 
+  // Map type parameters into context. We don't want type
+  // parameters to appear in the result builder type, because
+  // the result builder type will only be used inside the body
+  // of this decl; it's not part of the interface type.
+  builderType = func->mapTypeIntoContext(builderType);
+
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
           cs.getConstraintLocator(func->getBody()))) {
@@ -2348,9 +2329,11 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     cs.solveForCodeCompletion(solutions);
 
     CompletionContextFinder analyzer(func, func->getDeclContext());
-    filterSolutionsForCodeCompletion(solutions, analyzer);
-    for (const auto &solution : solutions) {
-      cs.getASTContext().CompletionCallback->sawSolution(solution);
+    if (analyzer.hasCompletion()) {
+      filterSolutionsForCodeCompletion(solutions, analyzer);
+      for (const auto &solution : solutions) {
+        cs.getASTContext().CompletionCallback->sawSolution(solution);
+      }
     }
     return nullptr;
   }
@@ -2425,6 +2408,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
+  assert(!builderType->hasTypeParameter());
 
   if (InvalidResultBuilderBodies.count(fn)) {
     (void)recordFix(IgnoreInvalidResultBuilderBody::create(
@@ -2681,9 +2665,9 @@ public:
     return ResultBuilderBodyPreCheck::Okay;
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (SkipPrecheck)
-      return std::make_pair(false, E);
+      return Action::SkipChildren(E);
 
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
@@ -2707,21 +2691,24 @@ public:
       if (SuppressDiagnostics)
         transaction.abort();
 
-      return std::make_pair(false, HasError ? nullptr : E);
+      if (HasError)
+        return Action::Stop();
+
+      return Action::SkipChildren(E);
     }
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     // If we see a return statement, note it..
     if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
       if (!returnStmt->isImplicit()) {
         ReturnStmts.push_back(returnStmt);
-        return std::make_pair(false, S);
+        return Action::SkipChildren(S);
       }
     }
 
     // Otherwise, recurse into the statement normally.
-    return std::make_pair(true, S);
+    return Action::Continue(S);
   }
 
   /// Check whether given expression (including single-statement
@@ -2748,8 +2735,8 @@ public:
   }
 
   /// Ignore patterns.
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
-    return { false, pat };
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+    return Action::SkipChildren(pat);
   }
 };
 
@@ -2770,11 +2757,22 @@ std::vector<ReturnStmt *> TypeChecker::findReturnStatements(AnyFunctionRef fn) {
   return precheck.getReturnStmts();
 }
 
-bool TypeChecker::typeSupportsBuilderOp(
+ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
     Type builderType, DeclContext *dc, Identifier fnName,
-    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults,
-    bool checkAvailability) {
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+
+  auto isUnavailable = [&](Decl *D) -> bool {
+    if (AvailableAttr::isUnavailable(D))
+      return true;
+
+    auto loc = extractNearestSourceLoc(dc);
+    auto context = ExportContext::forFunctionBody(dc, loc);
+    return TypeChecker::checkDeclarationAvailability(D, context).hasValue();
+  };
+
   bool foundMatch = false;
+  bool foundUnavailable = false;
+
   SmallVector<ValueDecl *, 4> foundDecls;
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
@@ -2793,17 +2791,12 @@ bool TypeChecker::typeSupportsBuilderOp(
           continue;
       }
 
-      // If we are checking availability, the candidate must have enough
-      // availability in the calling context.
-      if (checkAvailability) {
-        if (AvailableAttr::isUnavailable(func))
-          continue;
-        if (TypeChecker::checkDeclarationAvailability(
-                func, ExportContext::forFunctionBody(
-                    dc, extractNearestSourceLoc(dc))))
-          continue;
+      // Check if the the candidate has a suitable availability for the
+      // calling context.
+      if (isUnavailable(func)) {
+        foundUnavailable = true;
+        continue;
       }
-
       foundMatch = true;
       break;
     }
@@ -2812,7 +2805,24 @@ bool TypeChecker::typeSupportsBuilderOp(
   if (allResults)
     allResults->append(foundDecls.begin(), foundDecls.end());
 
-  return foundMatch;
+  if (!foundMatch) {
+    return foundUnavailable ? ResultBuilderOpSupport::Unavailable
+                            : ResultBuilderOpSupport::Unsupported;
+  }
+  // If the builder type itself isn't available, don't consider any builder
+  // method available.
+  if (auto *D = builderType->getAnyNominal()) {
+    if (isUnavailable(D))
+      return ResultBuilderOpSupport::Unavailable;
+  }
+  return ResultBuilderOpSupport::Supported;
+}
+
+bool TypeChecker::typeSupportsBuilderOp(
+    Type builderType, DeclContext *dc, Identifier fnName,
+    ArrayRef<Identifier> argLabels, SmallVectorImpl<ValueDecl *> *allResults) {
+  return checkBuilderOpSupport(builderType, dc, fnName, argLabels, allResults)
+      .isSupported(/*requireAvailable*/ false);
 }
 
 Type swift::inferResultBuilderComponentType(NominalTypeDecl *builder) {
@@ -2971,18 +2981,43 @@ ResultBuilder::ResultBuilder(ConstraintSystem *CS, DeclContext *DC,
   }
 }
 
+bool ResultBuilder::supportsBuildPartialBlock(bool checkAvailability) {
+  auto &ctx = DC->getASTContext();
+  return supports(ctx.Id_buildPartialBlock, {ctx.Id_first},
+                  checkAvailability) &&
+         supports(ctx.Id_buildPartialBlock, {ctx.Id_accumulated, ctx.Id_next},
+                  checkAvailability);
+}
+
+bool ResultBuilder::canUseBuildPartialBlock() {
+  // If buildPartialBlock doesn't exist at all, we can't use it.
+  if (!supportsBuildPartialBlock(/*checkAvailability*/ false))
+    return false;
+
+  // If buildPartialBlock exists and is available, use it.
+  if (supportsBuildPartialBlock(/*checkAvailability*/ true))
+    return true;
+
+  // We have buildPartialBlock, but it is unavailable. We can however still
+  // use it if buildBlock is also unavailable.
+  auto &ctx = DC->getASTContext();
+  return supports(ctx.Id_buildBlock) &&
+         !supports(ctx.Id_buildBlock, /*labels*/ {},
+                   /*checkAvailability*/ true);
+}
+
 bool ResultBuilder::supports(Identifier fnBaseName,
                              ArrayRef<Identifier> argLabels,
                              bool checkAvailability) {
   DeclName name(DC->getASTContext(), fnBaseName, argLabels);
   auto known = SupportedOps.find(name);
-  if (known != SupportedOps.end()) {
-    return known->second;
-  }
+  if (known != SupportedOps.end())
+    return known->second.isSupported(checkAvailability);
 
-  return SupportedOps[name] = TypeChecker::typeSupportsBuilderOp(
-             BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {},
-             checkAvailability);
+  auto support = TypeChecker::checkBuilderOpSupport(
+      BuilderType, DC, fnBaseName, argLabels, /*allResults*/ {});
+  SupportedOps.insert({name, support});
+  return support.isSupported(checkAvailability);
 }
 
 Expr *ResultBuilder::buildCall(SourceLoc loc, Identifier fnName,

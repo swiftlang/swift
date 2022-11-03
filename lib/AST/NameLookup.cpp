@@ -17,6 +17,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -56,25 +57,7 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
   if (BaseDC == nullptr)
     return nullptr;
 
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(BaseDC))
-    return AFD->getImplicitSelfDecl();
-
-  if (auto *PBI = dyn_cast<PatternBindingInitializer>(BaseDC)) {
-    auto *selfDecl = PBI->getImplicitSelfDecl();
-    assert(selfDecl);
-    return selfDecl;
-  }
-
-  if (auto *CE = dyn_cast<ClosureExpr>(BaseDC)) {
-    auto *selfDecl = CE->getCapturedSelfDecl();
-    assert(selfDecl);
-    assert(selfDecl->isSelfParamCapture());
-    return selfDecl;
-  }
-
-  auto *nominalDecl = BaseDC->getSelfNominalTypeDecl();
-  assert(nominalDecl);
-  return nominalDecl;
+  return BaseDecl;
 }
 
 void LookupResult::filter(
@@ -1718,11 +1701,24 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
+static bool inObjCImplExtension(AbstractFunctionDecl *newDecl) {
+  if (auto ext = dyn_cast<ExtensionDecl>(newDecl->getDeclContext()))
+    return ext->isObjCImplementation();
+  return false;
+}
+
 /// If there is an apparent conflict between \p newDecl and one of the methods
 /// in \p vec, should we diagnose it?
 static bool
 shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
+  // Conflicts between member implementations and their interfaces, or
+  // inherited inits and their overrides in @_objcImpl extensions, are spurious.
+  if (newDecl->isObjCMemberImplementation()
+      || (isa<ConstructorDecl>(newDecl) && inObjCImplExtension(newDecl)
+          && newDecl->getAttrs().hasAttribute<OverrideAttr>()))
+    return false;
+
   // Are all conflicting methods imported from ObjC and in our ObjC half or a
   // bridging header? Some code bases implement ObjC methods in Swift even
   // though it's not exactly supported.
@@ -1738,15 +1734,6 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
     return oldDeclModuleName == newDeclModuleName
                || oldDeclModuleName == newDeclPrivateModuleName
                || oldDeclModuleName == bridgingHeaderModuleName;
-  }))
-    return false;
-
-  // If we're looking at protocol requirements, is the new method an async
-  // alternative of any existing method, or vice versa?
-  if (isa<ProtocolDecl>(ty) &&
-      llvm::any_of(vec, [&](AbstractFunctionDecl *oldDecl) {
-    return newDecl->getAsyncAlternative(/*isKnownObjC=*/true) == oldDecl
-              || oldDecl->getAsyncAlternative(/*isKnownObjC=*/true) == newDecl;
   }))
     return false;
 
@@ -1900,6 +1887,11 @@ void namelookup::extractDirectlyReferencedNominalTypes(
   if (auto existential = type->getAs<ExistentialType>()) {
     extractDirectlyReferencedNominalTypes(
         existential->getConstraintType(), decls);
+    return;
+  }
+
+  if (type->is<TupleType>()) {
+    decls.push_back(type->getASTContext().getBuiltinTupleDecl());
     return;
   }
 
@@ -2061,8 +2053,6 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     // step.
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
-
-    SmallVector<ProtocolDecl *, 4> protocols;
 
     if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
       // If we haven't seen a class declaration yet, look into the protocol.
@@ -2310,7 +2300,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
     }
 
     // Make sure we didn't miss some interesting kind of type declaration.
-    assert(isa<AbstractTypeParamDecl>(typeDecl));
+    assert(isa<GenericTypeParamDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl));
   }
 
   return nominalDecls;
@@ -2532,6 +2523,13 @@ directReferencesForTypeRepr(Evaluator &evaluator,
                                          allowUsableFromInline);
     }
     return { };
+  }
+
+  case TypeReprKind::PackExpansion: {
+    auto packExpansionRepr = cast<PackExpansionTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       packExpansionRepr->getPatternType(), dc,
+                                       allowUsableFromInline);
   }
 
   case TypeReprKind::Error:
@@ -2763,6 +2761,22 @@ static bool declsAreAssociatedTypes(ArrayRef<TypeDecl *> decls) {
   return true;
 }
 
+/// Verify there is at least one protocols in the set of declarations.
+static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
+  if (decls.empty())
+    return false;
+  return llvm::any_of(decls, [&](const TypeDecl *decl) { return isa<ProtocolDecl>(decl); });;;
+}
+
+bool TypeRepr::isProtocol(DeclContext *dc){
+  auto &ctx = dc->getASTContext();
+  return findIf([&ctx, dc](TypeRepr *ty) {
+    return declsAreProtocols(directReferencesForTypeRepr(ctx.evaluator, ctx, ty, dc));
+
+  });
+}
+
+
 static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
                              ExtensionDecl *ext,
@@ -2782,12 +2796,65 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
+CollectedOpaqueReprs swift::collectOpaqueReturnTypeReprs(TypeRepr *r, ASTContext &ctx, DeclContext *d) {
+  class Walker : public ASTWalker {
+    CollectedOpaqueReprs &Reprs;
+    ASTContext &Ctx;
+    DeclContext *dc;
+
+  public:
+    explicit Walker(CollectedOpaqueReprs &reprs, ASTContext &ctx, DeclContext *d) : Reprs(reprs), Ctx(ctx), dc(d) {}
+
+    PreWalkAction walkToTypeReprPre(TypeRepr *repr) override {
+
+      // Don't allow variadic opaque parameter or return types.
+      if (isa<PackExpansionTypeRepr>(repr))
+        return Action::SkipChildren();
+
+      if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
+        Reprs.push_back(opaqueRepr);
+        if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
+          return Action::SkipChildren();
+      }
+
+      if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
+        return Action::Continue();
+      
+      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+        auto meta = dyn_cast<MetatypeTypeRepr>(existential->getConstraint());
+        auto generic = dyn_cast<GenericIdentTypeRepr>(existential->getConstraint());
+        if(generic)
+          Reprs.push_back(existential);
+        return Action::VisitChildrenIf(meta || generic);
+      } else if (auto compositionRepr = dyn_cast<CompositionTypeRepr>(repr)) {
+        if (!compositionRepr->isTypeReprAny())
+          Reprs.push_back(compositionRepr);
+        return Action::SkipChildren();
+      } else if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
+        // prevent any P<some P>
+        if (!Reprs.empty() && isa<ExistentialTypeRepr>(Reprs.front())){
+          Reprs.clear();
+        }
+      } else if (auto identRepr = dyn_cast<IdentTypeRepr>(repr)) {
+        if (identRepr->isProtocol(dc))
+          Reprs.push_back(identRepr);
+      }
+      return Action::Continue();
+    }
+
+  };
+
+  CollectedOpaqueReprs reprs;
+  r->walk(Walker(reprs, ctx, d));
+  return reprs;
+}
+
 /// If there are opaque parameters in the given declaration, create the
 /// generic parameters associated with them.
 static SmallVector<GenericTypeParamDecl *, 2>
-createOpaqueParameterGenericParams(
-    GenericContext *genericContext, GenericParamList *parsedGenericParams) {
+createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
+    
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
   if (!value)
     return { };
@@ -2806,29 +2873,34 @@ createOpaqueParameterGenericParams(
   SmallVector<GenericTypeParamDecl *, 2> implicitGenericParams;
   auto dc = value->getInnermostDeclContext();
   for (auto param : *params) {
-    // Don't permit variadic parameters.
-    if (param->isVariadic())
-      continue;
-
     auto typeRepr = param->getTypeRepr();
     if (!typeRepr)
       continue;
 
-    auto opaqueTypeReprs = typeRepr->collectOpaqueReturnTypeReprs();
-    for (auto opaqueRepr : opaqueTypeReprs) {
+    // Plain protocols should imply 'some' with experimetal feature
+    CollectedOpaqueReprs typeReprs;
+    typeReprs = collectOpaqueReturnTypeReprs(typeRepr, ctx, dc);
+
+    for (auto repr : typeReprs) {
+   
       // Allocate a new generic parameter to represent this opaque type.
-      auto gp = GenericTypeParamDecl::create(
-          dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
-          GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
-          opaqueRepr);
-      gp->setImplicit();
+      auto *gp = GenericTypeParamDecl::createImplicit(
+          dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
+          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr);
 
       // Use the underlying constraint as the constraint on the generic parameter.
-      InheritedEntry inherited[1] = {
-        { TypeLoc(opaqueRepr->getConstraint()) }
-      };
-      gp->setInherited(ctx.AllocateCopy(inherited));
-
+      //  The underlying constraint is only present for OpaqueReturnTypeReprs
+      if (auto opaque = dyn_cast<OpaqueReturnTypeRepr>(repr)) {
+              InheritedEntry inherited[1] = {
+                  { TypeLoc(opaque->getConstraint()) }
+              };
+              gp->setInherited(ctx.AllocateCopy(inherited));
+      } else {
+            InheritedEntry inherited[1] = {
+                { TypeLoc(repr) }
+            };
+            gp->setInherited(ctx.AllocateCopy(inherited));
+      }
       implicitGenericParams.push_back(gp);
     }
   }
@@ -2838,6 +2910,18 @@ createOpaqueParameterGenericParams(
 
 GenericParamList *
 GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
+  if (auto *tupleDecl = dyn_cast<BuiltinTupleDecl>(value)) {
+    auto &ctx = value->getASTContext();
+
+    // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
+    auto *genericParam = GenericTypeParamDecl::createImplicit(
+        tupleDecl->getDeclContext(), ctx.Id_Elements, /*depth*/ 0, /*index*/ 0,
+        /*isParameterPack*/ true);
+
+    return GenericParamList::create(ctx, SourceLoc(), genericParam,
+                                    SourceLoc());
+  }
+
   if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
     // Create the generic parameter list for the extension by cloning the
     // generic parameter lists of the nominal and any of its parent types.
@@ -2872,10 +2956,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = GenericTypeParamDecl::create(
-        proto, selfId, SourceLoc(), /*type sequence=*/false,
-        /*depth=*/0, /*index=*/0, /*opaque type=*/false,
-        /*opaque type repr=*/nullptr);
+    auto selfDecl = GenericTypeParamDecl::createImplicit(
+        proto, selfId, /*depth*/ 0, /*index*/ 0);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
@@ -2886,6 +2968,20 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                            SourceLoc());
     return result;
+  }
+
+  // AccessorDecl generic parameter list is the same of its storage
+  // context.
+  if (auto *AD = dyn_cast<AccessorDecl>(value)) {
+    auto *GC = AD->getStorage()->getAsGenericContext();
+    if (!GC)
+      return nullptr;
+
+    auto *GP = GC->getGenericParams();
+    if (!GP)
+      return nullptr;
+
+    return GP->clone(AD->getDeclContext());
   }
 
   auto parsedGenericParams = value->getParsedGenericParams();

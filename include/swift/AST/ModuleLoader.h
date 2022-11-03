@@ -19,13 +19,13 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
-#include "swift/AST/ModuleDependencies.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/VersionTuple.h"
 #include <system_error>
@@ -52,6 +52,7 @@ class NominalTypeDecl;
 class SourceFile;
 class TypeDecl;
 class CompilerInstance;
+enum class ModuleDependenciesKind : int8_t;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -195,14 +196,51 @@ public:
   virtual void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const = 0;
 
+  /// The kind of source for a module's version.
+  ///
+  /// NOTE: The order of the members is significant; they are declared in
+  ///       ascending priority order.
+  enum class ModuleVersionSourceKind {
+    ClangModuleTBD,
+    SwiftBinaryModule,
+    SwiftInterface,
+  };
+
+  /// Represents a module version and the source it was parsed from.
+  class ModuleVersionInfo {
+    llvm::VersionTuple Version;
+    llvm::Optional<ModuleVersionSourceKind> SourceKind;
+
+  public:
+    /// Returns true if the version has a valid source kind.
+    bool isValid() const { return SourceKind.hasValue(); }
+
+    /// Returns the version, which may be empty if a version was not present or
+    /// was unparsable.
+    llvm::VersionTuple getVersion() const { return Version; }
+
+    /// Returns the kind of source of the module version. Do not call if
+    /// \c isValid() returns false.
+    ModuleVersionSourceKind getSourceKind() const {
+      return SourceKind.getValue();
+    }
+
+    void setVersion(llvm::VersionTuple version, ModuleVersionSourceKind kind) {
+      Version = version;
+      SourceKind = kind;
+    }
+  };
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
+  ///
+  /// If a non-null \p versionInfo is provided, the module version will be
+  /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named,
-                               llvm::VersionTuple version,
-                               bool underlyingVersion) = 0;
+                               ModuleVersionInfo *versionInfo) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -211,10 +249,14 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param AllowMemoryCache Enables preserving the loaded module in the
+  /// in-memory cache for the next loading attempt.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
-  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path) = 0;
+  ModuleDecl *loadModule(SourceLoc importLoc, ImportPath::Module path,
+                         bool AllowMemoryCache = true) = 0;
 
   /// Load extensions to the given nominal type.
   ///

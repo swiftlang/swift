@@ -34,8 +34,8 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
-#include "../SwiftShims/RuntimeShims.h"
-#include "../SwiftShims/AssertionReporting.h"
+#include "swift/shims/RuntimeShims.h"
+#include "swift/shims/AssertionReporting.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "Private.h"
@@ -1272,7 +1272,8 @@ Class swift::swift_getInitializedObjCClass(Class c) {
   // class "c" might be valid metadata, but it hasn't been initialized yet.
   // Send a message that's likely not to be overridden to minimize potential
   // side effects. Ignore the return value in case it is overridden to
-  // return something different. See SR-10463 for an example.
+  // return something different. See
+  // https://github.com/apple/swift/issues/52863 for an example.
   [c self];
   return c;
 }

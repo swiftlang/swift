@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Enums -clang-header-expose-public-decls -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
 // RUN: %FileCheck %s < %t/enums.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
@@ -46,13 +46,13 @@ public func inoutLarge(_ en: inout Large, _ x: Int) {
 // CHECK-NEXT: }
 
 // CHECK:      inline Large makeLarge(swift::Int x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s5Enums9makeLargeyAA0C0OSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      inline Large passThroughLarge(const Large& en) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s5Enums16passThroughLargeyAA0D0OADF(result, _impl::_impl_Large::getOpaquePointer(en));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }

@@ -43,6 +43,10 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps SwiftUnitTests)
   endif()
 
+  if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+    list(APPEND deps sdk-overlay)
+  endif()
+
   set(deps_binaries)
 
   if (SWIFT_INCLUDE_TOOLS)
@@ -304,7 +308,7 @@ foreach(SDK ${SWIFT_SDKS})
               "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
         else()
           list(APPEND test_dependencies
-              "swift-reflection-test${VARIANT_SUFFIX}_signed")
+              "swift-reflection-test${VARIANT_SUFFIX}")
         endif()
       endif()
 

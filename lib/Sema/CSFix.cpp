@@ -257,6 +257,7 @@ getConcurrencyFixBehavior(
   switch (constraintKind) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::Subtype:
     break;
 
   default:
@@ -462,6 +463,18 @@ SkipSameTypeRequirement *
 SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator()) SkipSameTypeRequirement(cs, lhs, rhs, locator);
+}
+
+bool SkipSameShapeRequirement::diagnose(const Solution &solution,
+                                       bool asNote) const {
+  SameShapeRequirementFailure failure(solution, LHS, RHS, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SkipSameShapeRequirement *
+SkipSameShapeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SkipSameShapeRequirement(cs, lhs, rhs, locator);
 }
 
 bool SkipSuperclassRequirement::diagnose(const Solution &solution,
@@ -2413,8 +2426,8 @@ bool AddExplicitExistentialCoercion::isRequired(
                                   ArrayRef<Requirement> requirements) {
       for (const auto &req : requirements) {
         switch (req.getKind()) {
-        case RequirementKind::SameCount:
-          llvm_unreachable("Same-count requirement not supported here");
+        case RequirementKind::SameShape:
+          llvm_unreachable("Same-shape requirement not supported here");
 
         case RequirementKind::Superclass:
         case RequirementKind::Conformance:
@@ -2449,8 +2462,8 @@ bool AddExplicitExistentialCoercion::isRequired(
         auto requirementSig = protocol->getRequirementSignature();
         for (const auto &req : requirementSig.getRequirements()) {
           switch (req.getKind()) {
-          case RequirementKind::SameCount:
-            llvm_unreachable("Same-count requirement not supported here");
+          case RequirementKind::SameShape:
+            llvm_unreachable("Same-shape requirement not supported here");
 
           case RequirementKind::Conformance:
           case RequirementKind::Layout:

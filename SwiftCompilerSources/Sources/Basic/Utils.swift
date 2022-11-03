@@ -13,18 +13,57 @@
 @_exported import BasicBridging
 import std
 
+/// The assert function to be used in the compiler.
+///
+/// This overrides the standard Swift assert for two reasons:
+/// * We also like to check for assert failures in release builds. Although this could be
+///   achieved with `precondition`, it's easy to forget about it and use `assert` instead.
+/// * We need to see the error message in crashlogs of release builds. This is even not the
+///   case for `precondition`.
+@_transparent
+public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
+                   file: StaticString = #fileID, line: UInt = #line) {
+  if !condition {
+    fatalError(message(), file: file, line: line)
+  }
+}
+
+/// The assert function (without a message) to be used in the compiler.
+///
+/// Unforuntately it's not possible to just add a default argument to `message` in the
+/// other `assert` function. We need to defined this overload.
+@_transparent
+public func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt = #line) {
+  if !condition {
+    fatalError("", file: file, line: line)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Debugging Utilities
+//===----------------------------------------------------------------------===//
+
+/// Let's lldb's `po` command not print any "internal" properties of the conforming type.
+///
+/// This is useful if the `description` already contains all the information of a type instance.
+public protocol NoReflectionChildren : CustomReflectable { }
+
+public extension NoReflectionChildren {
+  var customMirror: Mirror { Mirror(self, children: []) }
+}
+
+
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, CustomReflectable {
+public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   let _bridged: llvm.StringRef
 
   public init(bridged: llvm.StringRef) { self._bridged = bridged }
 
   public var string: String { _bridged.string }
   public var description: String { string }
-  public var customMirror: Mirror { Mirror(self, children: []) }
   
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
     let lhsBuffer = UnsafeBufferPointer<UInt8>(
@@ -37,6 +76,8 @@ public struct StringRef : CustomStringConvertible, CustomReflectable {
   }
   
   public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
+
+  public static func ~=(pattern: StaticString, value: StringRef) -> Bool { value == pattern }
 }
 
 //===----------------------------------------------------------------------===//

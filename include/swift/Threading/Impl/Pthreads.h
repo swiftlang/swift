@@ -23,6 +23,8 @@
 #include <atomic>
 #include <cstdint>
 
+#include "chrono_utils.h"
+
 #include "llvm/ADT/Optional.h"
 
 #include "swift/Threading/Errors.h"
@@ -37,13 +39,13 @@ namespace threading_impl {
       swift::threading::fatal(#expr " failed with error %d\n", res_);          \
   } while (0)
 
-#define SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(expr)                              \
+#define SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(falseerr, expr)                    \
   do {                                                                         \
     int res_ = (expr);                                                         \
     switch (res_) {                                                            \
     case 0:                                                                    \
       return true;                                                             \
-    case EBUSY:                                                                \
+    case falseerr:                                                             \
       return false;                                                            \
     default:                                                                   \
       swift::threading::fatal(#expr " failed with error (%d)\n", res_);        \
@@ -91,7 +93,7 @@ inline void mutex_unlock(mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_unlock(&handle));
 }
 inline bool mutex_try_lock(mutex_handle &handle) {
-  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(::pthread_mutex_trylock(&handle));
+  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(EBUSY, ::pthread_mutex_trylock(&handle));
 }
 
 inline void mutex_unsafe_lock(mutex_handle &handle) {
@@ -119,7 +121,7 @@ inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {
   SWIFT_PTHREADS_CHECK(::pthread_mutex_unlock(&handle));
 }
 inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) {
-  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(::pthread_mutex_trylock(&handle));
+  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(EBUSY, ::pthread_mutex_trylock(&handle));
 }
 
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
@@ -127,6 +129,55 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 }
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   (void)::pthread_mutex_unlock(&handle);
+}
+
+// .. ConditionVariable support ..............................................
+
+struct cond_handle {
+  ::pthread_cond_t  condition;
+  ::pthread_mutex_t mutex;
+};
+
+inline void cond_init(cond_handle &handle) {
+  handle.condition = PTHREAD_COND_INITIALIZER;
+  handle.mutex = PTHREAD_MUTEX_INITIALIZER;
+}
+inline void cond_destroy(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_destroy(&handle.condition));
+  SWIFT_PTHREADS_CHECK(::pthread_mutex_destroy(&handle.mutex));
+}
+inline void cond_lock(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_mutex_lock(&handle.mutex));
+}
+inline void cond_unlock(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_mutex_unlock(&handle.mutex));
+}
+inline void cond_signal(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_signal(&handle.condition));
+}
+inline void cond_broadcast(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_broadcast(&handle.condition));
+}
+inline void cond_wait(cond_handle &handle) {
+  SWIFT_PTHREADS_CHECK(::pthread_cond_wait(&handle.condition, &handle.mutex));
+}
+template <class Rep, class Period>
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::duration<Rep, Period> duration) {
+  auto to_wait = chrono_utils::ceil<
+    std::chrono::system_clock::duration>(duration);
+  auto deadline = std::chrono::system_clock::now() + to_wait;
+  return cond_wait(handle, deadline);
+}
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::system_clock::time_point deadline) {
+  auto ns = chrono_utils::ceil<std::chrono::nanoseconds>(
+    deadline.time_since_epoch()).count();
+  struct ::timespec ts = { ::time_t(ns / 1000000000), long(ns % 1000000000) };
+  SWIFT_PTHREADS_RETURN_TRUE_OR_FALSE(
+    ETIMEDOUT,
+    ::pthread_cond_timedwait(&handle.condition, &handle.mutex, &ts)
+  );
 }
 
 // .. Once ...................................................................

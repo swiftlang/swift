@@ -32,6 +32,13 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
+// The deployment targets and availability versions hardcoded into this test
+// aren't compatible with the environment of the back deployment CI bots.
+// UNSUPPORTED: back_deployment_runtime
+
+// Remote test execution does not support dynamically loaded libraries.
+// UNSUPPORTED: remote_run
+
 // ---- (0) Prepare SDK
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/SDK_ABI)
@@ -62,7 +69,7 @@
 
 // ---- (3) Run executable
 // RUN: %target-codesign %t/test_ABI
-// RUN: %target-run %t/test_ABI %t/SDK_ABI/Frameworks/BackDeployHelper.framework/BackDeployHelper | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ABI %s
+// RUN: %target-run %t/test_ABI | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ABI %s
 
 // ---- (4) Build framework with BackDeploy 2.0 in the future
 // RUN: mkdir -p %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule
@@ -89,9 +96,10 @@
 
 // ---- (6) Run executable
 // RUN: %target-codesign %t/test_BD
-// RUN: %target-run %t/test_BD %t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-BD %s
+// RUN: %target-run %t/test_BD | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-BD %s
 
 // ---- (7) Re-build framework with the back deployed APIs stripped
+// RUN: %empty-directory(%t/SDK_BD)
 // RUN: mkdir -p %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule
 // RUN: %target-build-swift-dylib(%t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper) \
 // RUN:   -emit-module-path %t/SDK_BD/Frameworks/BackDeployHelper.framework/Modules/BackDeployHelper.swiftmodule/%module-target-triple.swiftmodule \
@@ -106,7 +114,7 @@
 
 // ---- (8) Re-run executable
 // RUN: %target-codesign %t/test_BD
-// RUN: %target-run %t/test_BD %t/SDK_BD/Frameworks/BackDeployHelper.framework/BackDeployHelper | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-BD %s
+// RUN: %target-run %t/test_BD | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-BD %s
 
 import BackDeployHelper
 

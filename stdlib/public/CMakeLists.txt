@@ -62,7 +62,7 @@ if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
     "-Werror=exit-time-destructors")
 endif()
 
-add_subdirectory(SwiftShims)
+add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
 add_subdirectory(Threading)
 

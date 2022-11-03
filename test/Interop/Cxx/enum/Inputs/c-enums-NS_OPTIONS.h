@@ -17,6 +17,7 @@ extern "C" {
 
 #define CF_OPTIONS(_type, _name) _type __attribute__((availability(swift, unavailable))) _name; enum __CF_OPTIONS_ATTRIBUTES : _name
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
+#define NS_REFINED_FOR_SWIFT __attribute__((swift_private))
 
 typedef unsigned long NSUInteger;
 
@@ -26,4 +27,16 @@ typedef NS_OPTIONS(NSUInteger, NSBinarySearchingOptions) {
 	NSBinarySearchingInsertionIndex = (1UL << 10),
 };
 
+typedef NS_OPTIONS(NSUInteger, NSAttributedStringFormattingOptions) {
+  NSAttributedStringFormattingInsertArgumentAttributesWithoutMerging = 1 << 0,
+  NSAttributedStringFormattingApplyReplacementIndexAttribute = 1 << 1,
+} NS_REFINED_FOR_SWIFT;
+
+@interface NSAttributedString
+@end
+
+@interface NSAttributedString (NSAttributedStringFormatting)
+- (instancetype)initWithOptions:(NSAttributedStringFormattingOptions)options
+    NS_REFINED_FOR_SWIFT;
+@end
 }

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// https://bugs.swift.org/browse/SR-14143
+// https://github.com/apple/swift/issues/56522
 
 @propertyWrapper
 struct SomeLongFooName<Holder, T> {

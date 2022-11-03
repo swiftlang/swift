@@ -1,15 +1,17 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 // XFAIL: *
 
-// rdar://87429620 (Differentiable curry thunk RequirementMachine error)
+// rdar://87429620
+// https://github.com/apple/swift/issues/54819
+// Differentiable curry thunk RequirementMachine error
 
 import _Differentiation
 
-public struct SR_14228_Struct<Scalar> {
+public struct Struct<Scalar> {
   var x: Scalar
 }
 
-extension SR_14228_Struct: Differentiable where Scalar: Differentiable {
+extension Struct: Differentiable where Scalar: Differentiable {
   @differentiable(reverse)
   public static func id(x: Self) -> Self {
     return x
@@ -17,10 +19,10 @@ extension SR_14228_Struct: Differentiable where Scalar: Differentiable {
 }
 
 @differentiable(reverse, wrt: x)
-public func SR_14228<Scalar: Differentiable>(
-  _ x: SR_14228_Struct<Scalar>,
-  reduction: @differentiable(reverse) (SR_14228_Struct<Scalar>) -> SR_14228_Struct<Scalar> = SR_14228_Struct.id
-) -> SR_14228_Struct<Scalar> {
+public func f<Scalar: Differentiable>(
+  _ x: Struct<Scalar>,
+  reduction: @differentiable(reverse) (Struct<Scalar>) -> Struct<Scalar> = Struct.id
+) -> Struct<Scalar> {
   reduction(x)
 }
 

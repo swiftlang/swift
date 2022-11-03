@@ -68,7 +68,7 @@ final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, 
   // CHECK-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}burts
   @inline(never)
   final func burts() {
-    // CHECK: [[TYPE_GEP:%.*]] = getelementptr {{.*}} %0
+    // CHECK: [[TYPE_GEP:%.*]] = bitcast {{.*}} %0
     // CHECK: [[TYPE:%.*]] = load {{.*}} [[TYPE_GEP]]
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<U>.self)
@@ -90,7 +90,7 @@ final private class PrivateFinal<T, U, V> {
 
   // CHECK-LABEL: define {{.*}}PrivateFinal{{.*}}butts
   func butts() {
-    // CHECK: [[TYPE_GEP:%.*]] = getelementptr {{.*}} %0
+    // CHECK: [[TYPE_GEP:%.*]] = bitcast {{.*}} %0
     // CHECK: [[TYPE:%.*]] = load {{.*}} [[TYPE_GEP]]
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
     useMetadata(PrivateFinal<T, U, V>.self)

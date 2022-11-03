@@ -249,6 +249,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
 
   SILOptions &SILOpts = Invocation.getSILOptions();
   auto Mod = Instance.getMainModule();
+  Mod->setIsBuiltFromInterface(true);
   auto &TC = Instance.getSILTypes();
   auto SILMod = performASTLowering(Mod, TC, SILOpts);
   if (!SILMod) {
@@ -319,11 +320,19 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModuleInternal(
       llvm::RestorePrettyStackState(savedInnerPrettyStackState);
     };
 
+    Optional<DiagnosticEngine> localDiags;
+    DiagnosticEngine *rebuildDiags = diags;
+    if (silenceInterfaceDiagnostics) {
+      // To silence diagnostics, use a local temporary engine.
+      localDiags.emplace(sourceMgr);
+      rebuildDiags = &*localDiags;
+    }
+
     SubError = (bool)subASTDelegate.runInSubCompilerInstance(
         moduleName, interfacePath, OutPath, diagnosticLoc,
         [&](SubCompilerInstanceInfo &info) {
           auto EBuilder = ExplicitModuleInterfaceBuilder(
-              *info.Instance, diags, sourceMgr, moduleCachePath, backupInterfaceDir,
+              *info.Instance, rebuildDiags, sourceMgr, moduleCachePath, backupInterfaceDir,
               prebuiltCachePath, ABIDescriptorPath, extraDependencies, diagnosticLoc,
               dependencyTracker);
           return EBuilder.buildSwiftModuleFromInterface(

@@ -44,23 +44,20 @@ public:
 
 class FilteringDiagnosticConsumer: public DiagnosticConsumer {
   bool HasError = false;
-  std::unique_ptr<DiagnosticConsumer> subConsumer;
+  std::vector<std::unique_ptr<DiagnosticConsumer>> subConsumers;
   std::unique_ptr<llvm::StringSet<>> allowedBreakages;
   bool shouldProceed(const DiagnosticInfo &Info);
 public:
-  FilteringDiagnosticConsumer(std::unique_ptr<DiagnosticConsumer> subConsumer,
+  FilteringDiagnosticConsumer(std::vector<std::unique_ptr<DiagnosticConsumer>> subConsumers,
                               std::unique_ptr<llvm::StringSet<>> allowedBreakages):
-    subConsumer(std::move(subConsumer)),
+    subConsumers(std::move(subConsumers)),
     allowedBreakages(std::move(allowedBreakages)) {}
   ~FilteringDiagnosticConsumer() = default;
 
-  bool finishProcessing() override { return subConsumer->finishProcessing(); }
+  void flush() override;
+  void informDriverOfIncompleteBatchModeCompilation() override;
+  bool finishProcessing() override;
   bool hasError() const { return HasError; }
-  void flush() override { subConsumer->flush(); }
-
-  void informDriverOfIncompleteBatchModeCompilation() override {
-    subConsumer->informDriverOfIncompleteBatchModeCompilation();
-  }
 
   void handleDiagnostic(SourceManager &SM,
                         const DiagnosticInfo &Info) override;

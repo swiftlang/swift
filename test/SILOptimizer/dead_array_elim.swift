@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 // XFAIL: OS=linux-androideabi
 
 // Test needs to be updated for 32bit.
@@ -22,7 +23,7 @@
 // second array is initialized by copying the first. This problem can be
 // overcome by handling non-trivial stores in OSSA, as described here:
 //   [OSSA] Improve DeadObjectElimination to handle array copies
-//   https://bugs.swift.org/browse/SR-13782
+//   https://github.com/apple/swift/issues/56179
 // Once that bug is fixed, remove the requirement: swift_stdlib_no_asserts.
 
 // CHECK-LABEL: sil hidden @$s15dead_array_elim24testDeadArrayEliminationyyF

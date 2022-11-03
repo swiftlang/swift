@@ -59,3 +59,29 @@ distributed actor DA4: ServerProto {
   // CHECK: function_ref @$s17distributed_thunk3DA4C11doSomethingyyYaKFTE
   distributed func doSomething() throws { }
 }
+
+protocol Server2: DistributedActor {
+  distributed func sayHello()
+}
+
+extension Server2 where ActorSystem == LocalTestingDistributedActorSystem {
+  // CHECK-LABEL: sil hidden [thunk] [distributed] [ref_adhoc_requirement_witness "$s11Distributed29LocalTestingInvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"] [ossa] @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyYaKFTE
+  // CHECK-NOT: return
+  // CHECK: function_ref @swift_distributed_actor_is_remote
+  distributed func sayHello() { /* default impl */ }
+
+  // CHECK-LABEL: sil hidden [distributed] [ossa] @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyF
+  // CHECK-NOT: swift_distributed_actor_is_remote
+  // CHECK: return
+}
+
+distributed actor DA5: Server2 {
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  // uses default impl
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA5CAA7Server2A2aDP8sayHelloyyFTW
+  // CHECK: function_ref @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyF
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17distributed_thunk3DA5CAA7Server2A2aDP8sayHelloyyFTWTE
+  // CHECK: function_ref @$s17distributed_thunk7Server2PAA11Distributed012LocalTestingD11ActorSystemC0gH0RtzrlE8sayHelloyyYaKFTE
+}

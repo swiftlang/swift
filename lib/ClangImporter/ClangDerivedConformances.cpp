@@ -41,6 +41,22 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   return result;
 }
 
+/// Similar to ModuleDecl::conformsToProtocol, but doesn't introduce a
+/// dependency on Sema.
+static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef,
+                               ModuleDecl *module) {
+  if (conformanceRef.isInvalid())
+    return false;
+  if (!conformanceRef.isConcrete())
+    return false;
+  auto conformance = conformanceRef.getConcrete();
+  auto subMap = conformance->getSubstitutions(module);
+  return llvm::all_of(subMap.getConformances(),
+                      [&](ProtocolConformanceRef each) -> bool {
+                        return isConcreteAndValid(each, module);
+                      });
+}
+
 static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   clang::IdentifierInfo *iteratorCategoryDeclName =
@@ -53,9 +69,29 @@ getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
   return dyn_cast_or_null<clang::TypeDecl>(iteratorCategory);
 }
 
-static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
-  auto id = decl->getASTContext().Id_EqualsOperator;
+static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
+                                 function_ref<bool(ValueDecl *)> isValid) {
+  // First look for operator declared as a member.
+  auto memberResults = lookupDirectWithoutExtensions(decl, id);
+  for (const auto &member : memberResults) {
+    if (isValid(member))
+      return member;
+  }
 
+  // If no member operator was found, look for out-of-class definitions in the
+  // same module.
+  auto module = decl->getModuleContext();
+  SmallVector<ValueDecl *> nonMemberResults;
+  module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
+  for (const auto &nonMember : nonMemberResults) {
+    if (isValid(nonMember))
+      return nonMember;
+  }
+
+  return nullptr;
+}
+
+static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
   auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
     auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
     if (!equalEqual || !equalEqual->hasParameterList())
@@ -78,24 +114,74 @@ static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
     return true;
   };
 
-  // First look for `func ==` declared as a member.
-  auto memberResults = lookupDirectWithoutExtensions(decl, id);
-  for (const auto &member : memberResults) {
-    if (isValid(member))
-      return member;
-  }
+  return lookupOperator(decl, decl->getASTContext().Id_EqualsOperator, isValid);
+}
 
-  // If no member `func ==` was found, look for out-of-class definitions in the
-  // same module.
+static ValueDecl *getMinusOperator(NominalTypeDecl *decl) {
+  auto binaryIntegerProto =
+      decl->getASTContext().getProtocol(KnownProtocolKind::BinaryInteger);
   auto module = decl->getModuleContext();
-  SmallVector<ValueDecl *> nonMemberResults;
-  module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
-  for (const auto &nonMember : nonMemberResults) {
-    if (isValid(nonMember))
-      return nonMember;
-  }
 
-  return nullptr;
+  auto isValid = [&](ValueDecl *minusOp) -> bool {
+    auto minus = dyn_cast<FuncDecl>(minusOp);
+    if (!minus || !minus->hasParameterList())
+      return false;
+    auto params = minus->getParameters();
+    if (params->size() != 2)
+      return false;
+    auto lhs = params->get(0);
+    auto rhs = params->get(1);
+    if (lhs->isInOut() || rhs->isInOut())
+      return false;
+    auto lhsTy = lhs->getType();
+    auto rhsTy = rhs->getType();
+    if (!lhsTy || !rhsTy)
+      return false;
+    auto lhsNominal = lhsTy->getAnyNominal();
+    auto rhsNominal = rhsTy->getAnyNominal();
+    if (lhsNominal != rhsNominal || lhsNominal != decl)
+      return false;
+    auto returnTy = minus->getResultInterfaceType();
+    auto conformanceRef =
+        module->lookupConformance(returnTy, binaryIntegerProto);
+    if (!isConcreteAndValid(conformanceRef, module))
+      return false;
+    return true;
+  };
+
+  return lookupOperator(decl, decl->getASTContext().getIdentifier("-"),
+                        isValid);
+}
+
+static ValueDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
+  auto isValid = [&](ValueDecl *plusEqualOp) -> bool {
+    auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
+    if (!plusEqual || !plusEqual->hasParameterList())
+      return false;
+    auto params = plusEqual->getParameters();
+    if (params->size() != 2)
+      return false;
+    auto lhs = params->get(0);
+    auto rhs = params->get(1);
+    if (rhs->isInOut())
+      return false;
+    auto lhsTy = lhs->getType();
+    auto rhsTy = rhs->getType();
+    if (!lhsTy || !rhsTy)
+      return false;
+    if (rhsTy->getCanonicalType() != distanceTy->getCanonicalType())
+      return false;
+    auto lhsNominal = lhsTy->getAnyNominal();
+    if (lhsNominal != decl)
+      return false;
+    auto returnTy = plusEqual->getResultInterfaceType();
+    if (!returnTy->isVoid())
+      return false;
+    return true;
+  };
+
+  return lookupOperator(decl, decl->getASTContext().getIdentifier("+="),
+                        isValid);
 }
 
 bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
@@ -110,6 +196,9 @@ void swift::conformToCxxIteratorIfNeeded(
   assert(decl);
   assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
+
+  if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator))
+    return;
 
   // We consider a type to be an input iterator if it defines an
   // `iterator_category` that inherits from `std::input_iterator_tag`, e.g.
@@ -134,16 +223,29 @@ void swift::conformToCxxIteratorIfNeeded(
   if (!underlyingCategoryDecl)
     return;
 
-  auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
+  auto isIteratorCategoryDecl = [&](const clang::CXXRecordDecl *base,
+                                    StringRef tag) {
     return base->isInStdNamespace() && base->getIdentifier() &&
-           base->getName() == "input_iterator_tag";
+           base->getName() == tag;
+  };
+  auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
+    return isIteratorCategoryDecl(base, "input_iterator_tag");
+  };
+  auto isRandomAccessIteratorDecl = [&](const clang::CXXRecordDecl *base) {
+    return isIteratorCategoryDecl(base, "random_access_iterator_tag");
   };
 
   // Traverse all transitive bases of `underlyingDecl` to check if
   // it inherits from `std::input_iterator_tag`.
   bool isInputIterator = isInputIteratorDecl(underlyingCategoryDecl);
+  bool isRandomAccessIterator =
+      isRandomAccessIteratorDecl(underlyingCategoryDecl);
   underlyingCategoryDecl->forallBases([&](const clang::CXXRecordDecl *base) {
     if (isInputIteratorDecl(base)) {
+      isInputIterator = true;
+    }
+    if (isRandomAccessIteratorDecl(base)) {
+      isRandomAccessIterator = true;
       isInputIterator = true;
       return false;
     }
@@ -159,7 +261,7 @@ void swift::conformToCxxIteratorIfNeeded(
   if (pointees.size() != 1)
     return;
   auto pointee = dyn_cast<VarDecl>(pointees.front());
-  if (!pointee || pointee->isGetterMutating())
+  if (!pointee || pointee->isGetterMutating() || pointee->getType()->hasError())
     return;
 
   // Check if present: `func successor() -> Self`
@@ -183,6 +285,25 @@ void swift::conformToCxxIteratorIfNeeded(
                                pointee->getType());
   impl.addSynthesizedProtocolAttrs(decl,
                                    {KnownProtocolKind::UnsafeCxxInputIterator});
+  if (!isRandomAccessIterator ||
+      !ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator))
+    return;
+
+  // Try to conform to UnsafeCxxRandomAccessIterator if possible.
+
+  auto minus = dyn_cast_or_null<FuncDecl>(getMinusOperator(decl));
+  if (!minus)
+    return;
+  auto distanceTy = minus->getResultInterfaceType();
+  // distanceTy conforms to BinaryInteger, this is ensured by getMinusOperator.
+
+  auto plusEqual = dyn_cast_or_null<FuncDecl>(getPlusEqualOperator(decl, distanceTy));
+  if (!plusEqual)
+    return;
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Distance"), distanceTy);
+  impl.addSynthesizedProtocolAttrs(
+      decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
 }
 
 void swift::conformToCxxSequenceIfNeeded(
@@ -228,9 +349,10 @@ void swift::conformToCxxSequenceIfNeeded(
     return;
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef = decl->getModuleContext()->lookupConformance(
-      rawIteratorTy, cxxIteratorProto);
-  if (!rawIteratorConformanceRef.isConcrete())
+  ModuleDecl *module = decl->getModuleContext();
+  auto rawIteratorConformanceRef =
+      module->lookupConformance(rawIteratorTy, cxxIteratorProto);
+  if (!isConcreteAndValid(rawIteratorConformanceRef, module))
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
@@ -253,7 +375,7 @@ void swift::conformToCxxSequenceIfNeeded(
           return declSelfTy;
         return Type(dependentType);
       },
-      LookUpConformanceInModule(decl->getModuleContext()));
+      LookUpConformanceInModule(module));
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);

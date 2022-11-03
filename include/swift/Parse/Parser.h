@@ -79,6 +79,8 @@ namespace swift {
     InactiveConditionalBlock,
     /// The body of the active clause of an #if/#else/#endif block
     ActiveConditionalBlock,
+    /// The top-level of a macro expansion "file".
+    MacroExpansion,
   };
 
 /// The receiver will be fed with consumed tokens while parsing. The main purpose
@@ -807,6 +809,9 @@ public:
   /// Check whether the current token starts with '>'.
   bool startsWithGreater(Token Tok) { return startsWithSymbol(Tok, '>'); }
 
+  /// Check whether the current token starts with '...'.
+  bool startsWithEllipsis(Token Tok);
+
   /// Returns true if token is an identifier with the given value.
   bool isIdentifier(Token Tok, StringRef value) {
     return Tok.is(tok::identifier) && Tok.getText() == value;
@@ -821,6 +826,11 @@ public:
   /// be a complete '>' token or some kind of operator token starting with '>',
   /// e.g., '>>'.
   SourceLoc consumeStartingGreater();
+
+  /// Consume the starting '...' of the current token, which may either be a
+  /// complete '...' token or some kind of operator token starting with '...',
+  /// e.g '...>'.
+  SourceLoc consumeStartingEllipsis();
 
   /// Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
@@ -896,7 +906,7 @@ public:
   
   /// Parse the specified expected token and return its location on success.  On failure, emit the specified
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
-  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diagnostic ErrorDiag,
                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
@@ -961,8 +971,10 @@ public:
   /// Returns true if the parser is at the start of a SIL decl.
   bool isStartOfSILDecl();
 
-  /// Parse the top-level Swift decls into the provided vector.
-  void parseTopLevel(SmallVectorImpl<Decl *> &decls);
+  /// Parse the top-level Swift items into the provided vector.
+  ///
+  /// Each item will be a declaration, statement, or expression.
+  void parseTopLevelItems(SmallVectorImpl<ASTNode> &items);
 
   /// Parse the top-level SIL decls into the SIL module.
   /// \returns \c true if there was a parsing error.
@@ -976,13 +988,12 @@ public:
     PD_AllowTopLevel        = 1 << 1,
     PD_HasContainerType     = 1 << 2,
     PD_DisallowInit         = 1 << 3,
-    PD_AllowDestructor      = 1 << 4,
-    PD_AllowEnumElement     = 1 << 5,
-    PD_InProtocol           = 1 << 6,
-    PD_InClass              = 1 << 7,
-    PD_InExtension          = 1 << 8,
-    PD_InStruct             = 1 << 9,
-    PD_InEnum               = 1 << 10,
+    PD_AllowEnumElement     = 1 << 4,
+    PD_InProtocol           = 1 << 5,
+    PD_InClass              = 1 << 6,
+    PD_InExtension          = 1 << 7,
+    PD_InStruct             = 1 << 8,
+    PD_InEnum               = 1 << 9,
   };
 
   /// Options that control the parsing of declarations.
@@ -1106,6 +1117,7 @@ public:
       AvailabilityContext *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
+      size_t &typeErasedParamsCount,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
       llvm::function_ref<bool(Parser &)> parseSILSIPModule);
 
@@ -1144,6 +1156,14 @@ public:
   /// Parse the @_backDeploy attribute.
   bool parseBackDeployAttribute(DeclAttributes &Attributes, StringRef AttrName,
                                 SourceLoc AtLoc, SourceLoc Loc);
+
+  /// Parse the @_documentation attribute.
+  ParserResult<DocumentationAttr> parseDocumentationAttribute(SourceLoc AtLoc,
+                                                              SourceLoc Loc);
+
+  /// Parse a single argument from a @_documentation attribute.
+  bool parseDocumentationAttributeArgument(Optional<StringRef> &Metadata,
+                                           Optional<AccessLevel> &Visibility);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -1234,10 +1254,8 @@ public:
                bool HasLetOrVarKeyword = true);
 
   struct ParsedAccessors;
-  ParserStatus parseGetSet(ParseDeclOptions Flags,
-                           GenericParamList *GenericParams,
-                           ParameterList *Indices, TypeRepr *ResultType,
-                           ParsedAccessors &accessors,
+  ParserStatus parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
+                           TypeRepr *ResultType, ParsedAccessors &accessors,
                            AbstractStorageDecl *storage, SourceLoc StaticLoc);
   ParserResult<VarDecl> parseDeclVarGetSet(PatternBindingEntry &entry,
                                            ParseDeclOptions Flags,
@@ -1292,6 +1310,9 @@ public:
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
+  ParserResult<MacroExpansionDecl>
+  parseDeclMacroExpansion(ParseDeclOptions flags, DeclAttributes &attributes);
+
   ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
 
   /// Get the location for a type error.
@@ -1307,6 +1328,10 @@ public:
     /// Whether the type is for a closure attribute.
     CustomAttribute,
   };
+
+  ParserResult<TypeRepr> parseTypeScalar(
+      Diag<> MessageID,
+      ParseTypeReason reason);
 
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(
@@ -1424,9 +1449,6 @@ public:
     ///
     /// \p SecondName is the name.
     SourceLoc SecondNameLoc;
-
-    /// The location of the '...', if present.
-    SourceLoc EllipsisLoc;
 
     /// The first name.
     Identifier FirstName;
@@ -1653,6 +1675,8 @@ public:
   ParserResult<Expr> parseExprRegexLiteral();
 
   StringRef copyAndStripUnderscores(StringRef text);
+  StringRef stripUnderscoresIfNeeded(StringRef text,
+                                     SmallVectorImpl<char> &buffer);
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    Token EntireTok,
@@ -1792,6 +1816,7 @@ public:
                                             bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
+  ParserResult<Expr> parseExprMacroExpansion(bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
@@ -1828,6 +1853,7 @@ public:
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
+  ParserResult<PoundHasSymbolInfo> parseStmtConditionPoundHasSymbol();
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo,
                                  bool IfWasImplicitlyInserted = false);
   ParserResult<Stmt> parseStmtGuard();

@@ -24,7 +24,6 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/Basic/AssertImplements.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -103,24 +102,6 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 #define NODE(CLASS, PARENT) \
   ASSERT_IMPLEMENTS_STATIC(CLASS, PARENT, classof, bool(SILNodePointer));
 #include "swift/SIL/SILNodes.def"
-
-SILFunction *SILInstruction::getFunction() const {
-  return getParent()->getParent();
-}
-
-SILModule &SILInstruction::getModule() const {
-  return getFunction()->getModule();
-}
-
-SILInstruction *SILInstruction::getPreviousInstruction() {
-  auto pos = getIterator();
-  return pos == getParent()->begin() ? nullptr : &*std::prev(pos);
-}
-
-SILInstruction *SILInstruction::getNextInstruction() {
-  auto nextPos = std::next(getIterator());
-  return nextPos == getParent()->end() ? nullptr : &*nextPos;
-}
 
 void SILInstruction::removeFromParent() {
 #ifndef NDEBUG
@@ -663,9 +644,8 @@ namespace {
     }
 
     bool visitIndexAddrInst(IndexAddrInst *RHS) {
-      // We have already compared the operands/types, so we should have equality
-      // at this point.
-      return true;
+      auto *lhs = cast<IndexAddrInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
@@ -772,7 +752,8 @@ namespace {
     }
 
     bool visitAddressToPointerInst(AddressToPointerInst *RHS) {
-      return true;
+      auto *lhs = cast<AddressToPointerInst>(LHS);
+      return lhs->needsStackProtection() == RHS->needsStackProtection();
     }
 
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {
@@ -1374,13 +1355,6 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
-}
-
-bool SILInstruction::maySynchronize() const {
-  // TODO: We need side-effect analysis and library annotation for this to be
-  //       a reasonable API.  For now, this is just a placeholder.
-  return isa<FullApplySite>(this) || isa<EndApplyInst>(this) ||
-         isa<AbortApplyInst>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {

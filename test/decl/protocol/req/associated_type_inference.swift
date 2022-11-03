@@ -382,7 +382,8 @@ struct Int8Vector : Vector {
   func process(elements: [Int8]) { }
 }
 
-// SR-4486
+// https://github.com/apple/swift/issues/47063
+
 protocol P13 {
   associatedtype Arg // expected-note{{protocol requires nested type 'Arg'; do you want to add it?}}
   func foo(arg: Arg)
@@ -563,51 +564,6 @@ extension S31 where T: P32 {
   func boo() -> Void {}
 }
 
-// SR-12707
-
-class SR_12707_C<T> {}
-
-// Inference in the adoptee
-protocol SR_12707_P1 {
-  associatedtype A
-  associatedtype B: SR_12707_C<(A, Self)>
-
-  func foo(arg: B)
-}
-struct SR_12707_Conform_P1: SR_12707_P1 {
-  typealias A = Never
-
-  func foo(arg: SR_12707_C<(A, SR_12707_Conform_P1)>) {}
-}
-
-// Inference in protocol extension
-protocol SR_12707_P2: SR_12707_P1 {}
-extension SR_12707_P2 {
-  func foo(arg: SR_12707_C<(A, Self)>) {}
-}
-struct SR_12707_Conform_P2: SR_12707_P2 {
-  typealias A = Never
-}
-
-// SR-13172: Inference when witness is an enum case
-protocol SR_13172_P1 {
-  associatedtype Bar
-  static func bar(_ value: Bar) -> Self
-}
-
-enum SR_13172_E1: SR_13172_P1 {
-  case bar(String) // Okay
-}
-
-protocol SR_13172_P2 {
-  associatedtype Bar
-  static var bar: Bar { get }
-}
-
-enum SR_13172_E2: SR_13172_P2 {
-  case bar // Okay
-}
-
 /** References to type parameters in type witnesses. */
 
 // Circular reference through a fixed type witness.
@@ -703,6 +659,51 @@ do {
   class Conformer: P42b {
     func foo(_: Bool, _: String) {}
   }
+}
+
+// https://github.com/apple/swift/issues/55151
+
+class GenClass<T> {}
+
+// Inference in the adoptee
+protocol P43a {
+  associatedtype A
+  associatedtype B: GenClass<(A, Self)>
+
+  func foo(arg: B)
+}
+struct S43a: P43a {
+  typealias A = Never
+
+  func foo(arg: GenClass<(A, S43a)>) {}
+}
+
+// Inference in protocol extension
+protocol P43b: P43a {}
+extension P43b {
+  func foo(arg: GenClass<(A, Self)>) {}
+}
+struct S43b: P43b {
+  typealias A = Never
+}
+
+// https://github.com/apple/swift/issues/55614
+// Inference when witness is an enum case
+
+protocol P44 {
+  associatedtype Bar
+  static func bar(_ value: Bar) -> Self
+}
+enum E44: P44 {
+  case bar(String) // Okay
+}
+
+protocol P45 {
+  associatedtype Bar
+  static var bar: Bar { get }
+}
+enum E45: P45 {
+  case bar // Okay
 }
 
 // Fails to find the fixed type witness B == FIXME_S1<A>.

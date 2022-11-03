@@ -277,6 +277,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   case SyntaxKind::TernaryExpr:
   case SyntaxKind::AvailabilityLabeledArgument:
   case SyntaxKind::MetatypeType:
+  case SyntaxKind::PackExpansionType:
   case SyntaxKind::OptionalType:
   case SyntaxKind::ImplicitlyUnwrappedOptionalType:
   case SyntaxKind::TypeExpr: {
@@ -323,7 +324,7 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind CollectionKind,
 static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
                                            MutableArrayRef<ParsedRawSyntaxNode> Parts) {
   ParsedRawSyntaxRecorder &Recorder = RootData.Recorder;
-  ParsedRawSyntaxNode Layout[4];
+  ParsedRawSyntaxNode Layout[5];
 
   assert(!Parts.empty() && Parts.back().isToken(tok::eof));
   Layout[3] = std::move(Parts.back());
@@ -337,7 +338,7 @@ static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
   Layout[1] = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList, Parts);
 
   return Recorder.recordRawSyntax(SyntaxKind::SourceFile,
-                                  llvm::makeMutableArrayRef(Layout, 4));
+                                  llvm::makeMutableArrayRef(Layout, 5));
 }
 
 OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {

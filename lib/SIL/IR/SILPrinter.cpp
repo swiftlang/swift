@@ -35,6 +35,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
@@ -1686,12 +1687,26 @@ public:
   }
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
+    {
+      *this << "origin ";
+
+      switch (AI->getOriginator()) {
+      case AssignByWrapperInst::Originator::TypeWrapper:
+        *this << "type_wrapper";
+        break;
+      case AssignByWrapperInst::Originator::PropertyWrapper:
+        *this << "property_wrapper";
+      }
+
+      *this << ", ";
+    }
+
     *this << getIDAndType(AI->getSrc()) << " to ";
     switch (AI->getMode()) {
     case AssignByWrapperInst::Unknown:
       break;
     case AssignByWrapperInst::Initialization:
-      *this << "[initialization] ";
+      *this << "[init] ";
       break;
     case AssignByWrapperInst::Assign:
       *this << "[assign] ";
@@ -1700,9 +1715,13 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
+
+    *this << getIDAndType(AI->getDest());
+
+    if (AI->getOriginator() == AssignByWrapperInst::Originator::PropertyWrapper)
+      *this << ", init " << getIDAndType(AI->getInitializer());
+
+    *this << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
@@ -1736,6 +1755,8 @@ public:
       *this << "[poison] ";
     if (DVI->getWasMoved())
       *this << "[moved] ";
+    if (DVI->hasTrace())
+      *this << "[trace] ";
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(),
                   &DVI->getModule().getASTContext().SourceMgr);
@@ -1750,7 +1771,7 @@ public:
   void visitStore##Name##Inst(Store##Name##Inst *SI) { \
     *this << Ctx.getID(SI->getSrc()) << " to "; \
     if (SI->isInitializationOfDest()) \
-      *this << "[initialization] "; \
+      *this << "[init] "; \
     *this << getIDAndType(SI->getDest()); \
   }
 #include "swift/AST/ReferenceStorage.def"
@@ -1760,7 +1781,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -1769,7 +1790,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -1855,6 +1876,7 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
+    *this << (CI->needsStackProtection() ? "[stack_protection] " : "");
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
@@ -2359,9 +2381,17 @@ public:
     *this << getIDAndType(FI->getOperand()) << ", "
           << QuotedString(FI->getMessage());
   }
-  
+
+  void visitIncrementProfilerCounterInst(IncrementProfilerCounterInst *IPCI) {
+    *this << IPCI->getCounterIndex() << ", "
+          << QuotedString(IPCI->getPGOFuncName()) << ", "
+          << "num_counters " << IPCI->getNumCounters() << ", "
+          << "hash " << IPCI->getPGOFuncHash();
+  }
+
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    *this << getIDAndType(IAI->getBase()) << ", "
+    *this << (IAI->needsStackProtection() ? "[stack_protection] " : "")
+          << getIDAndType(IAI->getBase()) << ", "
           << getIDAndType(IAI->getIndex());
   }
 
@@ -2380,7 +2410,11 @@ public:
   void visitReturnInst(ReturnInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
-  
+
+  void visitTestSpecificationInst(TestSpecificationInst *TSI) {
+    *this << QuotedString(TSI->getArgumentsSpecification());
+  }
+
   void visitThrowInst(ThrowInst *TI) {
     *this << getIDAndType(TI->getOperand());
   }
@@ -3041,36 +3075,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   else if (getEffectsKind() == EffectsKind::ReleaseNone)
     OS << "[releasenone] ";
 
-  llvm::SmallVector<int, 8> definedEscapesIndices;
-  llvm::SmallVector<int, 8> escapesIndices;
-  visitArgEffects([&](int effectIdx, bool isDerived, ArgEffectKind kind) {
-    if (kind == ArgEffectKind::Escape) {
-      if (isDerived) {
-        escapesIndices.push_back(effectIdx);
-      } else {
-        definedEscapesIndices.push_back(effectIdx);
-      }
-    }
-  });
-  if (!definedEscapesIndices.empty()) {
-    OS << "[defined_escapes ";
-    for (int effectIdx : definedEscapesIndices) {
-      if (effectIdx > 0)
-        OS << ", ";
-      writeEffect(OS, effectIdx);
-    }
-    OS << "] ";
-  }
-  if (!escapesIndices.empty()) {
-    OS << "[escapes ";
-    for (int effectIdx : escapesIndices) {
-      if (effectIdx > 0)
-        OS << ", ";
-      writeEffect(OS, effectIdx);
-    }
-    OS << "] ";
-  }
-
   if (auto *replacedFun = getDynamicallyReplacedFunction()) {
     OS << "[dynamic_replacement_for \"";
     OS << replacedFun->getName();
@@ -3117,6 +3121,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
+  if (needsStackProtection())
+    OS << "[stack_protection] ";
+
   llvm::DenseMap<CanType, Identifier> sugaredTypeNames;
   printSILFunctionNameAndType(OS, this, sugaredTypeNames, &PrintCtx);
 
@@ -3125,9 +3132,15 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
       OS << " !function_entry_count(" << eCount.getValue() << ")";
     }
     OS << " {\n";
+    
+    writeEffects(OS);
 
     SILPrinter(PrintCtx, sugaredTypeNames.empty() ? nullptr : &sugaredTypeNames)
         .print(this);
+    OS << "} // end sil function '" << getName() << '\'';
+  } else if (hasArgumentEffects()) {
+    OS << " {\n";
+    writeEffects(OS);
     OS << "} // end sil function '" << getName() << '\'';
   }
 
@@ -3260,6 +3273,30 @@ static void printSILVTables(SILPrintContext &Ctx,
   );
   for (const SILVTable *vt : vtables)
     vt->print(Ctx.OS(), Ctx.printVerbose());
+}
+
+static void printSILMoveOnlyDeinits(
+    SILPrintContext &printCtx,
+    const SILModule::SILMoveOnlyDeinitListType &deinitTables) {
+  if (!printCtx.sortSIL()) {
+    for (const auto &tbl : deinitTables)
+      tbl->print(printCtx.OS(), printCtx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILMoveOnlyDeinit *> sortedTables;
+  sortedTables.reserve(deinitTables.size());
+  for (const auto &tbl : deinitTables)
+    sortedTables.push_back(tbl);
+  std::sort(
+      sortedTables.begin(), sortedTables.end(),
+      [](const SILMoveOnlyDeinit *v1, const SILMoveOnlyDeinit *v2) -> bool {
+        StringRef name1 = v1->getNominalDecl()->getName().str();
+        StringRef name2 = v2->getNominalDecl()->getName().str();
+        return name1.compare(name2) == -1;
+      });
+  for (const auto *tbl : sortedTables)
+    tbl->print(printCtx.OS(), printCtx.printVerbose());
 }
 
 static void
@@ -3514,6 +3551,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
+  printSILMoveOnlyDeinits(PrintCtx, getMoveOnlyDeinits());
   printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
 
   if (M)
@@ -3594,9 +3632,20 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "}\n\n";
 }
 
-void SILVTable::dump() const {
-  print(llvm::errs());
+void SILVTable::dump() const { print(llvm::errs()); }
+
+void SILMoveOnlyDeinit::print(llvm::raw_ostream &OS, bool verbose) const {
+  OS << "sil_moveonlydeinit ";
+  if (isSerialized())
+    OS << "[serialized] ";
+  OS << getNominalDecl()->getName() << " {\n";
+  OS << "  @" << getImplementation()->getName();
+  OS << "\t// " << demangleSymbol(getImplementation()->getName());
+  OS << "\n";
+  OS << "}\n\n";
 }
+
+void SILMoveOnlyDeinit::dump() const { print(llvm::errs(), false); }
 
 /// Returns true if anything was printed.
 static bool printAssociatedTypePath(llvm::raw_ostream &OS, CanType path) {
@@ -3908,7 +3957,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     genericSig = genericEnv->getGenericSignature();
 
   auto requirements =
-      getSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
+      getUnerasedSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
   }
@@ -3920,27 +3969,36 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     OS << "where ";
     SILFunction *F = getFunction();
     assert(F);
-    interleave(requirements,
-               [&](Requirement req) {
-                 if (!genericSig) {
-                   req.print(OS, SubPrinter);
-                   return;
-                 }
-                 // Use GenericEnvironment to produce user-friendly
-                 // names instead of something like t_0_0.
-                 auto FirstTy = genericSig->getSugaredType(req.getFirstType());
-                 if (req.getKind() != RequirementKind::Layout) {
-                   auto SecondTy =
-                       genericSig->getSugaredType(req.getSecondType());
-                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-                   ReqWithDecls.print(OS, SubPrinter);
-                 } else {
-                   Requirement ReqWithDecls(req.getKind(), FirstTy,
-                                            req.getLayoutConstraint());
-                   ReqWithDecls.print(OS, SubPrinter);
-                 }
-               },
-               [&] { OS << ", "; });
+    interleave(
+        requirements,
+        [&](Requirement req) {
+          if (!genericSig) {
+            req.print(OS, SubPrinter);
+            return;
+          }
+
+          // Use GenericEnvironment to produce user-friendly
+          // names instead of something like t_0_0.
+          auto FirstTy = genericSig->getSugaredType(req.getFirstType());
+          auto erasedParams = getTypeErasedParams();
+          bool erased = std::any_of(erasedParams.begin(), erasedParams.end(),
+              [&](auto Ty) {
+            return Ty->isEqual(FirstTy);
+          });
+          if (erased) {
+            OS << " @_noMetadata ";
+          }
+          if (req.getKind() != RequirementKind::Layout) {
+            auto SecondTy = genericSig->getSugaredType(req.getSecondType());
+            Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+            ReqWithDecls.print(OS, SubPrinter);
+          } else {
+            Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                     req.getLayoutConstraint());
+            ReqWithDecls.print(OS, SubPrinter);
+          }
+        },
+        [&] { OS << ", "; });
   }
 }
 

@@ -172,6 +172,10 @@ protected:
       kind : NumKnownProtocolKindBits,
       isUnchecked : 1
     );
+
+    SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
+      isCategoryNameInvalid : 1
+    );
   } Bits;
 
   DeclAttribute *Next = nullptr;
@@ -1396,7 +1400,7 @@ public:
 class SpecializeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<SpecializeAttr, Identifier,
-                                    AvailableAttr *> {
+                                    AvailableAttr *, Type> {
   friend class SpecializeAttrTargetDeclRequest;
   friend TrailingObjects;
 
@@ -1416,12 +1420,15 @@ private:
   uint64_t resolverContextData;
   size_t numSPIGroups;
   size_t numAvailableAttrs;
+  size_t numTypeErasedParams;
+  bool typeErasedParamsInitialized;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
                  DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
-                 ArrayRef<AvailableAttr *> availabilityAttrs);
+                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                 size_t typeErasedParamsCount);
 
 public:
   static SpecializeAttr *
@@ -1429,6 +1436,7 @@ public:
          TrailingWhereClause *clause, bool exported, SpecializationKind kind,
          DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
+         size_t typeErasedParamsCount,
          GenericSignature specializedSignature = nullptr);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,
@@ -1442,6 +1450,7 @@ public:
                                 SpecializationKind kind,
                                 ArrayRef<Identifier> spiGroups,
                                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                                ArrayRef<Type> typeErasedParams,
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
@@ -1465,6 +1474,22 @@ public:
   ArrayRef<AvailableAttr *> getAvailableAttrs() const {
     return {this->template getTrailingObjects<AvailableAttr *>(),
             numAvailableAttrs};
+  }
+
+  ArrayRef<Type> getTypeErasedParams() const {
+    if (!typeErasedParamsInitialized)
+      return {};
+
+    return {this->template getTrailingObjects<Type>(),
+            numTypeErasedParams};
+  }
+
+  void setTypeErasedParams(const ArrayRef<Type> typeErasedParams) {
+    assert(typeErasedParams.size() == numTypeErasedParams);
+    if (!typeErasedParamsInitialized) {
+      std::uninitialized_copy(typeErasedParams.begin(), typeErasedParams.end(), getTrailingObjects<Type>());
+      typeErasedParamsInitialized = true;
+    }
   }
 
   TrailingWhereClause *getTrailingWhereClause() const;
@@ -2169,20 +2194,6 @@ public:
   }
 };
 
-/// The @_typeSequence attribute, which treats a generic param decl as a variadic
-/// sequence of value/type pairs.
-class TypeSequenceAttr : public DeclAttribute {
-  TypeSequenceAttr(SourceLoc atLoc, SourceRange Range);
-
-public:
-  static TypeSequenceAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                  SourceRange Range);
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_TypeSequence;
-  }
-};
-
 /// The @_unavailableFromAsync attribute, used to make function declarations
 /// unavailable from async contexts.
 class UnavailableFromAsyncAttr : public DeclAttribute {
@@ -2221,6 +2232,9 @@ public:
   /// The earliest platform version that may use the back deployed implementation.
   const llvm::VersionTuple Version;
 
+  /// Returns true if this attribute is active given the current platform.
+  bool isActivePlatform(const ASTContext &ctx) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_BackDeploy;
   }
@@ -2241,6 +2255,52 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Expose;
+  }
+};
+
+/// The `@_documentation(...)` attribute, used to override a symbol's visibility
+/// in symbol graphs, and/or adding arbitrary metadata to it.
+class DocumentationAttr: public DeclAttribute {
+public:
+  DocumentationAttr(SourceLoc AtLoc, SourceRange Range,
+                    StringRef Metadata, Optional<AccessLevel> Visibility,
+                    bool Implicit)
+  : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
+    Metadata(Metadata), Visibility(Visibility) {}
+
+  DocumentationAttr(StringRef Metadata, Optional<AccessLevel> Visibility, bool Implicit)
+  : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility, Implicit) {}
+
+  const StringRef Metadata;
+  const Optional<AccessLevel> Visibility;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Documentation;
+  }
+};
+
+class ObjCImplementationAttr final : public DeclAttribute {
+public:
+  Identifier CategoryName;
+
+  ObjCImplementationAttr(Identifier CategoryName, SourceLoc AtLoc,
+                         SourceRange Range, bool Implicit = false,
+                         bool isCategoryNameInvalid = false)
+    : DeclAttribute(DAK_ObjCImplementation, AtLoc, Range, Implicit),
+      CategoryName(CategoryName) {
+    Bits.ObjCImplementationAttr.isCategoryNameInvalid = isCategoryNameInvalid;
+  }
+
+  bool isCategoryNameInvalid() const {
+    return Bits.ObjCImplementationAttr.isCategoryNameInvalid;
+  }
+
+  void setCategoryNameInvalid(bool newValue = true) {
+    Bits.ObjCImplementationAttr.isCategoryNameInvalid = newValue;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ObjCImplementation;
   }
 };
 
@@ -2520,9 +2580,6 @@ public:
     unsigned index;
   };
   Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
-
-  // Force construction of a one-element tuple type.
-  bool IsTuple = false;
 
   TypeAttributes() {}
 

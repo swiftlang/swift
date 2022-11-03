@@ -41,6 +41,10 @@ using namespace ast_scope;
 void ASTScope::unqualifiedLookup(
     SourceFile *SF, SourceLoc loc,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
+  if (loc.isValid()) {
+    SF = SF->getParentModule()->getSourceFileContainingLocation(loc);
+  }
+
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
   ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);
@@ -83,11 +87,11 @@ Pattern *AbstractPatternEntryScope::getPattern() const {
   return getPatternEntry().getPattern();
 }
 
-NullablePtr<ClosureExpr> BraceStmtScope::parentClosureIfAny() const {
+NullablePtr<AbstractClosureExpr> BraceStmtScope::parentClosureIfAny() const {
   return !getParent() ? nullptr : getParent().get()->getClosureIfClosureScope();
 }
 
-NullablePtr<ClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
+NullablePtr<AbstractClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
 }
 

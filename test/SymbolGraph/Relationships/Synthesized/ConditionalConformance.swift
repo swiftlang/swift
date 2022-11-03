@@ -7,9 +7,22 @@
 // RUN: %FileCheck %s --input-file %t/ConditionalConformance.symbols.json --check-prefix=CONFORMS
 // RUN: %FileCheck %s --input-file %t/ConditionalConformance.symbols.json --check-prefix=MEMBER
 
-// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefix=SYNTHEXT
-// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefix=CONFORMSEXT
-// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefix=MEMBEREXT
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefixes=SYNTHEXT,EBSOff_SYNTHEXT
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefixes=CONFORMSEXT,EBSOff_CONFORMSEXT
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefixes=MEMBEREXT,EBSOff_MEMBEREXT
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -module-name ConditionalConformance -emit-module -emit-module-path %t/
+// RUN: %target-swift-symbolgraph-extract -module-name ConditionalConformance -I %t -pretty-print -output-dir %t -emit-extension-block-symbols
+
+// R\UN: %FileCheck %s --input-file %t/ConditionalConformance.symbols.json
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance.symbols.json --check-prefix=SYNTH
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance.symbols.json --check-prefix=CONFORMS
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance.symbols.json --check-prefix=MEMBER
+
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefixes=SYNTHEXT,EBSOn_SYNTHEXT
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefixes=CONFORMSEXT,EBSOn_CONFORMSEXT
+// RUN: %FileCheck %s --input-file %t/ConditionalConformance@Swift.symbols.json --check-prefixes=MEMBEREXT,EBSOn_MEMBEREXT
 
 // Relationships to Swift.Array should only go into the @Swift file.
 // C\HECK-NOT: "s:Sa"
@@ -49,7 +62,8 @@ extension S: P where T == Int {
 }
 
 // CONFORMSEXT: "kind": "conformsTo"
-// CONFORMSEXT-NEXT: "source": "s:Sa"
+// EBSOff_CONFORMSEXT-NEXT: "source": "s:Sa"
+// EBSOn_CONFORMSEXT-NEXT: "source": "s:e:s:Sa22ConditionalConformanceSiRszlE3baryyF"
 // CONFORMSEXT-NEXT: "target": "s:22ConditionalConformance1PP"
 // CONFORMSEXT-NEXT: swiftConstraints
 // CONFORMSEXT: "kind": "sameType"
@@ -58,9 +72,11 @@ extension S: P where T == Int {
 
 extension Array: P where Element == Int {
   // SYNTHEXT: "source": "s:22ConditionalConformance1PPAAE3fooyyF::SYNTHESIZED::s:Sa"
-  // SYNTHEXT-NEXT: "target": "s:Sa"
+  // EBSOff_SYNTHEXT-NEXT: "target": "s:Sa"
+  // EBSOn_SYNTHEXT-NEXT: "target": "s:e:s:Sa22ConditionalConformanceSiRszlE3baryyF"
 
-  // MEMBEREXT: "source": "s:Sa22ConditionalConformanceSiRszlE3baryyF",
-  // MEMBEREXT-NEXT: "target": "s:Sa",
+  // MEMBEREXT: "source": "s:Sa22ConditionalConformanceSiRszlE3baryyF"
+  // EBSOff_MEMBEREXT-NEXT: "target": "s:Sa"
+  // EBSOn_MEMBEREXT-NEXT: "target": "s:e:s:Sa22ConditionalConformanceSiRszlE3baryyF"
   public func bar() {}
 }

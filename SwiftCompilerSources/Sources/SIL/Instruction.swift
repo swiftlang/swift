@@ -104,6 +104,29 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
     return SILInstruction_mayRelease(bridged)
   }
 
+  public final var hasUnspecifiedSideEffects: Bool {
+    return SILInstruction_hasUnspecifiedSideEffects(bridged)
+  }
+
+  public final var mayAccessPointer: Bool {
+    return swift_mayAccessPointer(bridged)
+  }
+
+  public final var mayLoadWeakOrUnowned: Bool {
+    return swift_mayLoadWeakOrUnowned(bridged)
+  }
+
+  public final var maySynchronizeNotConsideringSideEffects: Bool {
+    return swift_maySynchronizeNotConsideringSideEffects(bridged)
+  }
+
+  public final var mayBeDeinitBarrierNotConsideringSideEffects: Bool {
+    return swift_mayBeDeinitBarrierNotConsideringSideEffects(bridged)
+  }
+
+  public func visitReferencedFunctions(_ cl: (Function) -> ()) {
+  }
+
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
@@ -270,6 +293,9 @@ final public class UnconditionalCheckedCastAddrInst : Instruction {
   public override var mayTrap: Bool { true }
 }
 
+final public class EndApplyInst : Instruction, UnaryInstruction {}
+final public class AbortApplyInst : Instruction, UnaryInstruction {}
+
 final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 
 final public class DeallocRefInst : Instruction, UnaryInstruction {}
@@ -309,23 +335,25 @@ final public class UnimplementedRefCountingInst : RefCountingInst {}
 final public class UnimplementedSingleValueInst : SingleValueInstruction {
 }
 
-final public class LoadInst : SingleValueInstruction, UnaryInstruction {}
+final public class LoadInst : SingleValueInstruction, UnaryInstruction {
+  // must match with enum class LoadOwnershipQualifier
+  public enum LoadOwnership: Int {
+    case unqualified = 0, take = 1, copy = 2, trivial = 3
+  }
+  public var ownership: LoadOwnership {
+    LoadOwnership(rawValue: LoadInst_getLoadOwnership(bridged))!
+  }
+}
 
 final public class LoadWeakInst : SingleValueInstruction, UnaryInstruction {}
 final public class LoadUnownedInst : SingleValueInstruction, UnaryInstruction {}
 final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
-  // TODO: find a way to directly reuse the BuiltinValueKind enum
-  public enum ID  {
-    case None
-    case DestroyArray
-  }
-  public var id: ID? {
-    switch BuiltinInst_getID(bridged) {
-      case DestroyArrayBuiltin: return .DestroyArray
-      default: return .None
-    }
+  public typealias ID = swift.BuiltinValueKind
+
+  public var id: ID {
+    return BuiltinInst_getID(bridged)
   }
 }
 
@@ -338,13 +366,24 @@ final public
 class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {}
+class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {
+  public var needsStackProtection: Bool {
+    AddressToPointerInst_needsStackProtection(bridged) != 0
+  }
+}
 
 final public
 class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class IndexAddrInst : SingleValueInstruction {}
+class IndexAddrInst : SingleValueInstruction {
+  public var base: Value { operands[0].value }
+  public var index: Value { operands[1].value }
+  
+  public var needsStackProtection: Bool {
+    IndexAddrInst_needsStackProtection(bridged) != 0
+  }
+}
 
 final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
@@ -388,10 +427,23 @@ public class GlobalAccessInst : SingleValueInstruction {
   }
 }
 
-final public class FunctionRefInst : GlobalAccessInst {
+public class FunctionRefBaseInst : SingleValueInstruction {
   public var referencedFunction: Function {
-    FunctionRefInst_getReferencedFunction(bridged).function
+    FunctionRefBaseInst_getReferencedFunction(bridged).function
   }
+
+  public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
+    cl(referencedFunction)
+  }
+}
+
+final public class FunctionRefInst : FunctionRefBaseInst {
+}
+
+final public class DynamicFunctionRefInst : FunctionRefBaseInst {
+}
+
+final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 }
 
 final public class GlobalAddrInst : GlobalAccessInst {}
@@ -458,6 +510,24 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class KeyPathInst : SingleValueInstruction {
+  public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
+    var results = KeyPathFunctionResults()
+    for componentIdx in 0..<KeyPathInst_getNumComponents(bridged) {
+      KeyPathInst_getReferencedFunctions(bridged, componentIdx, &results)
+      let numFuncs = results.numFunctions
+      withUnsafePointer(to: &results) {
+        $0.withMemoryRebound(to: BridgedFunction.self, capacity: numFuncs) {
+          let functions = UnsafeBufferPointer(start: $0, count: numFuncs)
+          for idx in 0..<numFuncs {
+            cl(functions[idx].function)
+          }
+        }
+      }
+    }
+  }
+}
+
 final public
 class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
@@ -494,39 +564,26 @@ final public class BridgeObjectToRefInst : SingleValueInstruction,
 final public class BridgeObjectToWordInst : SingleValueInstruction,
                                            UnaryInstruction {}
 
-public enum AccessKind {
-  case initialize
-  case read
-  case modify
-  case deinitialize
-}
-
-extension BridgedAccessKind {
-  var kind: AccessKind {
-    switch self {
-    case AccessKind_Init:
-      return .initialize
-    case AccessKind_Read:
-      return .read
-    case AccessKind_Modify:
-      return .modify
-    case AccessKind_Deinit:
-      return .deinitialize
-    default:
-      fatalError("unsupported access kind")
-    }
-  }
-}
+public typealias AccessKind = swift.SILAccessKind
 
 
 // TODO: add support for begin_unpaired_access
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
-  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged).kind }
+  public var accessKind: AccessKind { BeginAccessInst_getAccessKind(bridged) }
+
+  public var isStatic: Bool { BeginAccessInst_isStatic(bridged) != 0 }
 }
 
+// An instruction that is always paired with a scope ending instruction
+// such as `begin_access` (ending with `end_access`) and `alloc_stack`
+// (ending with `dealloc_stack`).
 public protocol ScopedInstruction {
+  // The type of the ending instructions (while `IteratorProtocol` would be
+  // ideal, for performance reasons we allow the user to specify any type as return)
   associatedtype EndInstructions
 
+  // The instructions that end the scope of the instruction denoted
+  // by `self`.
   var endInstructions: EndInstructions { get }
 }
 
@@ -534,7 +591,7 @@ extension BeginAccessInst : ScopedInstruction {
   public typealias EndInstructions = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndAccessInst?>>, EndAccessInst>
 
   public var endInstructions: EndInstructions {
-    uses.lazy.compactMap({ $0.value.definingInstruction as? EndAccessInst })
+    uses.lazy.compactMap({ $0.instruction as? EndAccessInst })
   }
 }
 
@@ -545,6 +602,10 @@ final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class StrongCopyUnownedValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class StrongCopyUnmanagedValueInst : SingleValueInstruction, UnaryInstruction  {}
 
 final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -591,12 +652,14 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
+final public
+class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
 
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
 //===----------------------------------------------------------------------===//
 
-public protocol Allocation : AnyObject { }
+public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation {
 }
@@ -651,21 +714,26 @@ public class TermInst : Instruction {
   final public var successors: SuccessorArray {
     SuccessorArray(succArray: TermInst_getSuccessors(bridged))
   }
+  
+  public var isFunctionExiting: Bool { false }
 }
 
 final public class UnreachableInst : TermInst {
 }
 
 final public class ReturnInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class ThrowInst : TermInst, UnaryInstruction {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class YieldInst : TermInst {
 }
 
 final public class UnwindInst : TermInst {
+  public override var isFunctionExiting: Bool { true }
 }
 
 final public class TryApplyInst : TermInst, FullApplySite {
@@ -680,6 +748,7 @@ final public class TryApplyInst : TermInst, FullApplySite {
 final public class BranchInst : TermInst {
   public var targetBlock: BasicBlock { BranchInst_getTargetBlock(bridged).block }
 
+  /// Returns the target block argument for the cond_br `operand`.
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
@@ -697,8 +766,15 @@ final public class CondBranchInst : TermInst {
     return ops[(CondBranchInst_getNumTrueArgs(bridged) &+ 1)..<ops.count]
   }
 
-  public func getArgument(for operand: Operand) -> Argument {
-    let argIdx = operand.index - 1
+  /// Returns the true or false block argument for the cond_br `operand`.
+  ///
+  /// Return nil if `operand` is the condition itself.
+  public func getArgument(for operand: Operand) -> Argument? {
+    let opIdx = operand.index
+    if opIdx == 0 {
+      return nil
+    }
+    let argIdx = opIdx - 1
     let numTrueArgs = CondBranchInst_getNumTrueArgs(bridged)
     if (0..<numTrueArgs).contains(argIdx) {
       return trueBlock.arguments[argIdx]

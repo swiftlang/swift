@@ -118,7 +118,8 @@ func barFunc() {
   } ()
 }
 
-// SR-852
+// https://github.com/apple/swift/issues/43464
+
 class Aaron {
   init(x: Int) {}
   convenience init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{24-24=self.}}

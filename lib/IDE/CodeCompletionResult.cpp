@@ -206,6 +206,8 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
   case DeclKind::OpaqueType:
+  case DeclKind::BuiltinTuple:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;

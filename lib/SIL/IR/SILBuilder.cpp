@@ -174,7 +174,8 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
 
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
-SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
+SILBuilder::createUncheckedForwardingCast(SILLocation Loc, SILValue Op,
+                                          SILType Ty) {
   // Without ownership, delegate to unchecked reinterpret cast.
   if (!hasOwnership())
     return createUncheckedReinterpretCast(Loc, Op, Ty);
@@ -480,16 +481,12 @@ SILBuilder::emitDestroyValue(SILLocation Loc, SILValue Operand) {
 
 SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-  // If the operand is an otherwise-unused 'metatype' instruction in the
-  // same basic block, zap it and create a 'metatype' instruction that
-  // directly produces an Objective-C metatype.
+  // If the operand is a 'metatype' instruction accessing a known static type's
+  // metadata, create a 'metatype' instruction that
+  // directly produces the Objective-C class object representation instead.
   if (auto metatypeInst = dyn_cast<MetatypeInst>(Op)) {
-    if (metatypeInst->use_empty() &&
-        metatypeInst->getParent() == getInsertionBB()) {
-      auto origLoc = metatypeInst->getLoc();
-      metatypeInst->eraseFromParent();
-      return createMetatype(origLoc, Ty);
-    }
+    auto origLoc = metatypeInst->getLoc();
+    return createMetatype(origLoc, Ty);
   }
 
   // Just create the thick_to_objc_metatype instruction.
@@ -498,16 +495,12 @@ SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
 
 SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
-  // If the operand is an otherwise-unused 'metatype' instruction in the
-  // same basic block, zap it and create a 'metatype' instruction that
-  // directly produces a thick metatype.
+  // If the operand is a 'metatype' instruction accessing a known static type's
+  // metadata, create a 'metatype' instruction that directly produces the
+  // Swift metatype representation instead.
   if (auto metatypeInst = dyn_cast<MetatypeInst>(Op)) {
-    if (metatypeInst->use_empty() &&
-        metatypeInst->getParent() == getInsertionBB()) {
-      auto origLoc = metatypeInst->getLoc();
-      metatypeInst->eraseFromParent();
-      return createMetatype(origLoc, Ty);
-    }
+    auto origLoc = metatypeInst->getLoc();
+    return createMetatype(origLoc, Ty);
   }
 
   // Just create the objc_to_thick_metatype instruction.
@@ -597,24 +590,26 @@ void SILBuilder::emitDestructureValueOperation(
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              bool poisonRefs,
-                                             bool operandWasMoved) {
+                                             bool operandWasMoved,
+                                             bool trace) {
   llvm::SmallString<4> Name;
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueInst::create(
       getSILDebugLocation(Loc), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, operandWasMoved));
+      *substituteAnonymousArgs(Name, Var, Loc), poisonRefs, operandWasMoved,
+      trace));
 }
 
 DebugValueInst *SILBuilder::createDebugValueAddr(SILLocation Loc, SILValue src,
                                                  SILDebugVariable Var,
-                                                 bool wasMoved) {
+                                                 bool wasMoved, bool trace) {
   llvm::SmallString<4> Name;
   // Debug location overrides cannot apply to debug addr instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(DebugValueInst::createAddr(
       getSILDebugLocation(Loc), src, getModule(),
-      *substituteAnonymousArgs(Name, Var, Loc), wasMoved));
+      *substituteAnonymousArgs(Name, Var, Loc), wasMoved, trace));
 }
 
 void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,

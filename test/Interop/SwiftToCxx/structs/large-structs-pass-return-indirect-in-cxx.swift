@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
@@ -37,7 +37,7 @@ public func inoutStructSeveralI64(_ s: inout StructSeveralI64) {
 
 
 // CHECK: inline StructSeveralI64 passThroughStructSeveralI64(int64_t i, const StructSeveralI64& x, float j) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructSeveralI64::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::$s7Structs27passThroughStructSeveralI641i_1jAA0deF0Vs5Int64V_AFSftF(result, i, _impl::_impl_StructSeveralI64::getOpaquePointer(x), j);
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
@@ -49,7 +49,7 @@ public func inoutStructSeveralI64(_ s: inout StructSeveralI64) {
 
 
 // CHECK: inline StructSeveralI64 returnNewStructSeveralI64(int64_t i) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_StructSeveralI64::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:  return _impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:    _impl::$s7Structs25returnNewStructSeveralI641iAA0deF0Vs5Int64V_tF(result, i);
 // CHECK-NEXT:  });
 // CHECK-NEXT: }

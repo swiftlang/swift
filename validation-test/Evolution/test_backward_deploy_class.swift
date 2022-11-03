@@ -1,7 +1,7 @@
 // RUN: %target-resilience-test --backward-deployment
 // REQUIRES: executable_test
 
-// SR-10913
+// https://github.com/apple/swift/issues/53303
 // UNSUPPORTED: OS=windows-msvc
 
 import StdlibUnittest

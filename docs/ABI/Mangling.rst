@@ -157,11 +157,11 @@ Globals
   global ::= protocol-conformance 'MA'   // metadata for remote mirrors: associated type descriptor
   global ::= nominal-type 'MC'           // metadata for remote mirrors: superclass descriptor
 
-  // TODO check this::
   global ::= mangled-name 'TA'                     // partial application forwarder
   global ::= mangled-name 'Ta'                     // ObjC partial application forwarder
   global ::= mangled-name 'TQ' index               // Async await continuation partial function
   global ::= mangled-name 'TY' index               // Async suspend continuation partial function
+  global ::= mangled-name 'TwS'                    // #_hasSymbol query function
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 

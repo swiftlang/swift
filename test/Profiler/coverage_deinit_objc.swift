@@ -6,7 +6,7 @@ import Foundation
 
 public class Derived: NSString {
   // CHECK-LABEL: sil @$s15coverage_deinit7DerivedCfD
-  // CHECK: builtin "int_instrprof_increment"
+  // CHECK: increment_profiler_counter 0
   // CHECK-NEXT: super_method {{.*}} : $Derived, #NSString.deinit!deallocator.foreign
   deinit {
   }

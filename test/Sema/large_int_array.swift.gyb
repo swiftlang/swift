@@ -1,0 +1,13 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/large_int_array.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/large_int_array.swift
+// RUN: %target-swift-frontend %t/large_int_array.swift -emit-sil -o %t
+
+% num_elements = 65537
+
+let v = 0
+let _ : [Int] = [
+% for i in range(num_elements):
+  v,
+% end
+]

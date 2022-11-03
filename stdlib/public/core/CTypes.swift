@@ -86,21 +86,31 @@ public typealias CLongDouble = Double
 // which we don't yet have in Swift.
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
-#endif
-// TODO: Fill in definitions for other OSes.
-#if arch(s390x)
+#elseif arch(s390x)
 // On s390x '-mlong-double-64' option with size of 64-bits makes the
 // Long Double type equivalent to Double type.
 public typealias CLongDouble = Double
 #endif
 #elseif os(Android)
 // On Android, long double is Float128 for AAPCS64, which we don't have yet in
-// Swift (SR-9072); and Double for ARMv7.
+// Swift (https://github.com/apple/swift/issues/51573); and Double for ARMv7.
 #if arch(arm)
 public typealias CLongDouble = Double
 #endif
 #elseif os(OpenBSD)
+#if arch(x86_64)
 public typealias CLongDouble = Float80
+#else
+#error("CLongDouble needs to be defined for this OpenBSD architecture")
+#endif
+#elseif os(FreeBSD)
+#if arch(x86_64) || arch(i386)
+public typealias CLongDouble = Float80
+#else
+#error("CLongDouble needs to be defined for this FreeBSD architecture")
+#endif
+#else
+// TODO: define CLongDouble for other OSes
 #endif
 
 // FIXME: Is it actually UTF-32 on Darwin?

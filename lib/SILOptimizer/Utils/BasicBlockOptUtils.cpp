@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SIL/LoopInfo.h"
 
 using namespace swift;
 
@@ -133,7 +134,7 @@ static bool canBorrowGuaranteedResult(SILValue guaranteedResult) {
 bool swift::canCloneTerminator(TermInst *termInst) {
   // TODO: this is an awkward way to check for guaranteed terminator results.
   for (Operand &oper : termInst->getAllOperands()) {
-    if (oper.getOperandOwnership() != OperandOwnership::ForwardingBorrow)
+    if (oper.getOperandOwnership() != OperandOwnership::GuaranteedForwarding)
       continue;
 
     if (!ForwardingOperand(&oper).visitForwardedValues(

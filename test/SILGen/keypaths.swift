@@ -572,6 +572,14 @@ func tuples(_: T) {
   let _: ReferenceWritableKeyPath<T, Int> = \T.c.x.x
   // CHECK: keypath $KeyPath<T, String>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>; stored_property #C.y : $String)
   let _: KeyPath<T, String> = \T.c.x.y
+
+  typealias Thing = (type: Any.Type, fn: () -> ())
+
+  // CHECK: keypath $WritableKeyPath<(type: any Any.Type, fn: () -> ()), any Any.Type>, (root $(type: any Any.Type, fn: () -> ()); tuple_element #0 : $any Any.Type)
+  let _: WritableKeyPath<Thing, Any.Type> = \Thing.type
+
+  // CHECK: keypath $WritableKeyPath<(type: any Any.Type, fn: () -> ()), () -> ()>, (root $(type: any Any.Type, fn: () -> ()); tuple_element #1 : $() -> ())
+  let _: WritableKeyPath<Thing, () -> ()> = \Thing.fn
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}tuples_generic

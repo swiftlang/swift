@@ -452,7 +452,7 @@ bb5(%6 : $Int64):
   return %6 : $Int64
 }
 
-// Eliminate the trampoline from from a cond_br at bb5->bb3->bb4/
+// Eliminate the trampoline from a cond_br at bb5->bb3->bb4/
 // This becomes a cond_br at bb8->bb5
 // CHECK-LABEL: @elim_trampoline5
 // CHECK: cond_br
@@ -2747,29 +2747,6 @@ bb2(%16 : $Error):
   unreachable
 }
 
-
-// Check that we don't crash on this.
-
-// CHECK-LABEL: @simplified_branch_arg_has_result_value_1
-// CHECK: [[B:%[0-9]+]] = alloc_box
-// CHECK: [[PB:%[0-9]+]] = project_box [[B]]
-// CHECK: br bb1([[PB]] : $*Builtin.Int32)
-sil @simplified_branch_arg_has_result_value_1 : $@convention(thin) (@in Builtin.Int32) -> Builtin.Int32 {
-entry(%0 : $*Builtin.Int32):
-  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
-  %p = project_box %b : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
-  %i = integer_literal $Builtin.Int32, 0
-  store %i to %p : $*Builtin.Int32
-  br bb1(%p : $*Builtin.Int32)
-
-bb1(%a : $*Builtin.Int32):
-  %r = load %a : $*Builtin.Int32
-  cond_br undef, bb1(%0 : $*Builtin.Int32), bb2
-
-bb2:
-  return %r : $Builtin.Int32
-}
-
 // CHECK-LABEL: sil @unpack_enum_arg
 // CHECK: bb1:
 // CHECK:   br bb3(%0 : $Int)
@@ -2967,7 +2944,7 @@ bb1:
 bb2(%5 : $Builtin.Int1):
   // To avoid violating ownership, Q needs to be destroyed here. However, that
   // would create a use of the checked_cast, defeating the test. In theory, Q
-  // could be some unmananged type with no destroy, but we don't have a way to
+  // could be some unmanaged type with no destroy, but we don't have a way to
   // express that in the type system, and bridged casts don't yet go through
   // this optimization path.
   dealloc_stack %p : $*Q
@@ -3015,7 +2992,7 @@ bb3(%11 : $Int):
 // CHECK:   store %0 to [[SRC]]
 // CHECK:   [[DST:%.*]] = alloc_stack $String
 // CHECK:   [[TEMP:%.*]] = alloc_stack $String
-// CHECK:   copy_addr [[SRC]] to [initialization] [[TEMP]]
+// CHECK:   copy_addr [[SRC]] to [init] [[TEMP]]
 // CHECK:   [[LD1:%.*]] = load [[TEMP]]
 // CHECK:   store [[LD1]] to [[DST]]
 // CHECK:   [[LD2:%.*]] = load [[DST]]

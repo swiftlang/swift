@@ -65,7 +65,7 @@ class DominanceAnalysis;
 class PostDominanceAnalysis;
 class DominanceInfo;
 class PostDominanceInfo;
-class SILFunciton;
+class SILFunction;
 
 class DifferentiableActivityCollection;
 class DifferentiableActivityAnalysis
@@ -83,7 +83,7 @@ public:
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) override {
-    return k & InvalidationKind::Everything;
+    return k & InvalidationKind::FunctionBody;
   }
 
   virtual std::unique_ptr<DifferentiableActivityCollection>
@@ -166,7 +166,7 @@ private:
   /// - Incoming values, if the value is a basic block argument.
   void setUsefulAndPropagateToOperands(SILValue value,
                                        unsigned dependentVariableIndex);
-  /// Propagates usefulnesss to the operands of the given instruction.
+  /// Propagates usefulness to the operands of the given instruction.
   void propagateUseful(SILInstruction *inst, unsigned dependentVariableIndex);
   /// Marks the given address or class-typed value as useful and recursively
   /// propagates usefulness inwards (to operands) through projections. Skips

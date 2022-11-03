@@ -260,12 +260,12 @@ A convenient wrapper for swift-api-digester.
     basic_group.add_argument('--separate-by-module',
                              action='store_true',
                              help='When importing entire SDK, dump content '
-                                  'seprately by module names')
+                                  'separately by module names')
 
     basic_group.add_argument('--zippered',
                              action='store_true',
                              help='dump module content to a dir with files for'
-                                  'seprately targets')
+                                  'separately targets')
 
     basic_group.add_argument('--abi',
                              action='store_true',

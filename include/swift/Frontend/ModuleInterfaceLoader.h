@@ -151,8 +151,8 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
                   bool skipBuildingInterface, bool IsFramework) override;
 
-  bool canImportModule(ImportPath::Module named, llvm::VersionTuple version,
-                       bool underlyingVersion) override;
+  bool canImportModule(ImportPath::Module named,
+                       ModuleVersionInfo *versionInfo) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -439,7 +439,8 @@ public:
       StringRef OutPath, StringRef ABIOutputPath,
       bool SerializeDependencyHashes,
       bool TrackSystemDependencies, ModuleInterfaceLoaderOptions Opts,
-      RequireOSSAModules_t RequireOSSAModules);
+      RequireOSSAModules_t RequireOSSAModules,
+      bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).
@@ -478,7 +479,7 @@ private:
   }
   void
   inheritOptionsForBuildingInterface(const SearchPathOptions &SearchPathOpts,
-                                     const LangOptions &LangOpts,
+                                     const LangOptions &LangOpts, bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            SmallVectorImpl<const char *> &SubArgs,

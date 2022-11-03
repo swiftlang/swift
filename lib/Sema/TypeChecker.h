@@ -441,6 +441,10 @@ Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
                                    DeclContext *dc);
 
+/// Returns the unique decl ref identified by the expr according to the
+/// requirements of the \c #_hasSymbol() condition type.
+ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
+
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
@@ -905,8 +909,8 @@ lookupMemberType(DeclContext *dc, Type type, DeclNameRef name,
 
 /// Given an expression that's known to be an infix operator,
 /// look up its precedence group.
-PrecedenceGroupDecl *lookupPrecedenceGroupForInfixOperator(DeclContext *dc,
-                                                           Expr *op);
+PrecedenceGroupDecl *
+lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op, bool diagnose);
 
 PrecedenceGroupLookupResult
 lookupPrecedenceGroup(DeclContext *dc, Identifier name, SourceLoc nameLoc);
@@ -924,7 +928,8 @@ enum class UnsupportedMemberTypeAccessKind : uint8_t {
 /// member of the given base type.
 UnsupportedMemberTypeAccessKind
 isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
-                              bool hasUnboundOpener);
+                              bool hasUnboundOpener,
+                              bool isExtensionBinding = false);
 
 /// @}
 
@@ -1234,10 +1239,20 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 /// Checks whether a result builder type has a well-formed result builder
 /// method with the given name. If provided and non-empty, the argument labels
 /// are verified against any candidates.
+ResultBuilderOpSupport
+checkBuilderOpSupport(Type builderType, DeclContext *dc, Identifier fnName,
+                      ArrayRef<Identifier> argLabels = {},
+                      SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+
+/// Checks whether a result builder type has a well-formed result builder
+/// method with the given name. If provided and non-empty, the argument labels
+/// are verified against any candidates.
+///
+/// This will return \c true even if the builder method is unavailable. Use
+/// \c checkBuilderOpSupport if availability should be checked.
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
-                           SmallVectorImpl<ValueDecl *> *allResults = nullptr,
-                           bool checkAvailability = false);
+                           SmallVectorImpl<ValueDecl *> *allResults = nullptr);
 
 /// Forces all changes specified by the module's access notes file to be
 /// applied to this declaration. It is safe to call this function more than

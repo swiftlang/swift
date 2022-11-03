@@ -126,7 +126,7 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
 void SILGenFunction::mergeCleanupBlocks() {
   for (auto bbPos = F.begin(), bbEnd = F.end(), nextPos = bbPos; bbPos != bbEnd;
        bbPos = nextPos) {
-    // A forward iterator refering to the next unprocessed block in the block
+    // A forward iterator referring to the next unprocessed block in the block
     // list. If blocks are merged and moved, then this will be updated.
     nextPos = std::next(bbPos);
 
@@ -752,7 +752,9 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     LexicalScope trueScope(SGF, S);
 
     auto NumTrueTaken = SGF.loadProfilerCount(S->getThenStmt());
-    auto NumFalseTaken = SGF.loadProfilerCount(S->getElseStmt());
+    auto NumFalseTaken = ProfileCounter();
+    if (auto *Else = S->getElseStmt())
+      NumFalseTaken = SGF.loadProfilerCount(Else);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
                           NumFalseTaken);

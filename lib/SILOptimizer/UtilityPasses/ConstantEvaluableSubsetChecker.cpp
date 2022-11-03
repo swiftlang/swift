@@ -173,7 +173,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       constantEvaluateDriver(&fun);
     }
 
-    // Assert that every function annotated as "constant_evaluable" was convered
+    // Assert that every function annotated as "constant_evaluable" was covered
     // by a test driver.
     bool error = false;
     for (SILFunction *constEvalFun : constantEvaluableFunctions) {

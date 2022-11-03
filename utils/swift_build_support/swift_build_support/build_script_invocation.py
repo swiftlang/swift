@@ -129,6 +129,7 @@ class BuildScriptInvocation(object):
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
             "--build-jobs", str(args.build_jobs),
+            "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
                 pipes.quote(opt) for opt in cmake.common_options()),
             "--build-args=%s" % ' '.join(
@@ -244,6 +245,14 @@ class BuildScriptInvocation(object):
         if args.build_backdeployconcurrency:
             args.extra_cmake_options.append(
                 '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
+
+        swift_syntax_src = os.path.join(self.workspace.source_root,
+                                        "swift-syntax")
+        args.extra_cmake_options.append(
+            '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+
+        if args.build_early_swiftsyntax:
+            impl_args += ["--swift-earlyswiftsyntax"]
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
@@ -548,12 +557,16 @@ class BuildScriptInvocation(object):
         builder = ProductPipelineListBuilder(self.args)
 
         builder.begin_pipeline()
+
+        builder.add_product(products.EarlySwiftSyntax,
+                            is_enabled=self.args.build_early_swiftsyntax)
+
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
         # toolchain, which the later-built compiler will forward
         # `swiftc` invocations to. That is, if we find a Swift compiler
-        # in the host toolchain. If the host toolchain is not equpipped with
+        # in the host toolchain. If the host toolchain is not equipped with
         # a Swift compiler, a warning is emitted. In the future, it may become
         # mandatory that the host toolchain come with its own `swiftc`.
         builder.add_product(products.EarlySwiftDriver,
@@ -636,7 +649,7 @@ class BuildScriptInvocation(object):
         builder.add_product(products.SwiftDocC,
                             is_enabled=self.args.build_swiftdocc)
         builder.add_product(products.SwiftDocCRender,
-                            is_enabled=self.args.install_swiftdocc)                  
+                            is_enabled=self.args.install_swiftdocc)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully

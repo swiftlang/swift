@@ -54,10 +54,9 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
   return nullptr;
 }
 
-bool BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
-  return isa<ClosureExpr>(D->getDeclContext())
-             ? shouldWalkIntoDeclInClosureContext(D)
-             : false;
+ASTWalker::PreWalkAction BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
+  return Action::VisitChildrenIf(isa<ClosureExpr>(D->getDeclContext()) &&
+                                 shouldWalkIntoDeclInClosureContext(D));
 }
 
 bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
@@ -119,18 +118,19 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         : IsExprStmt(isExprStmt), HasReachedSemanticsProvidingExpr(false),
           Ctx(DC->getASTContext()), DC(DC) {}
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::SkipChildren(P);
     }
 
-    bool walkToTypeReprPre(TypeRepr *T) override { return true; }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::Continue();
+    }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto collection = dyn_cast<CollectionExpr>(E)) {
         if (collection->isTypeDefaulted()) {
           // Diagnose type defaulted collection literals in subexpressions as
@@ -285,13 +285,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
-      // Diagnose single-element tuple expressions.
-      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
-        if (tupleExpr->getNumElements() == 1) {
-          Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
-                             diag::tuple_single_element)
-            .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
-                              tupleExpr->getElement(0)->getStartLoc());
+      if (!Ctx.LangOpts.hasFeature(Feature::VariadicGenerics)) {
+        // Diagnose single-element tuple expressions.
+        if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+          if (tupleExpr->getNumElements() == 1) {
+            Ctx.Diags.diagnose(tupleExpr->getElementNameLoc(0),
+                               diag::tuple_single_element)
+              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+                                tupleExpr->getElement(0)->getStartLoc());
+          }
         }
       }
 
@@ -346,7 +348,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         HasReachedSemanticsProvidingExpr = true;
       }
 
-      return { true, E };
+      return Action::Continue(E);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      return Action::Continue(E);
     }
 
     /// Visit each component of the keypath and emit a diagnostic if they
@@ -387,6 +393,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
     void checkMoveExpr(MoveExpr *moveExpr) {
       // Make sure the MoveOnly feature is set. If not, error.
+      // This should not currently be reached because the parse should ignore
+      // the _move keyword unless the feature flag is set.
       if (!Ctx.LangOpts.hasFeature(Feature::MoveOnly)) {
         auto error =
           diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
@@ -502,7 +510,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         return;
 
       // Get underlying params for both callee and caller, if declared.
-      auto *calleeParam = getParameterAt(callee.getDecl(), argIndex);
+      auto *calleeParam = getParameterAt(callee, argIndex);
       auto *callerParam = dyn_cast_or_null<ParamDecl>(
           arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
       );
@@ -1285,9 +1293,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     /// Return true if this is a 'nil' literal.  This looks
     /// like this if the type is Optional<T>:
     ///
-    ///   (dot_syntax_call_expr implicit type='Int?'
-    ///     (declref_expr implicit decl=Optional.none)
-    ///     (type_expr type=Int?))
+    ///   (dot_syntax_call_expr type='String?'
+    ///     (declref_expr type='(Optional<String>.Type) -> Optional<String>'
+    ///      decl=Swift.(file).Optional.none function_ref=unapplied)
+    ///     (argument_list implicit
+    ///       (argument
+    ///         (type_expr implicit type='String?.Type' typerepr='String?'))))
     ///
     /// Or like this if it is any other ExpressibleByNilLiteral type:
     ///
@@ -1296,13 +1307,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     bool isTypeCheckedOptionalNil(Expr *E) {
       if (dyn_cast<NilLiteralExpr>(E)) return true;
 
-      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
-      if (!CE || !CE->isImplicit())
-        return false;
-
-      // First case -- Optional.none
-      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
-        return DRE->getDecl() == Ctx.getOptionalNoneDecl();
+      if (auto *DSCE = dyn_cast_or_null<DotSyntaxCallExpr>(E->getSemanticsProvidingExpr())) {
+        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getSemanticFn()))
+          return DRE->getDecl() == Ctx.getOptionalNoneDecl();
+      }
 
       return false;
     }
@@ -1350,9 +1358,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             (isTypeCheckedOptionalNil(lhs) &&
              (subExpr = isImplicitPromotionToOptional(rhs)))) {
           bool isTrue = calleeName == "!=" || calleeName == "!==";
+          bool isNilLiteral = isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs);
               
           Ctx.Diags.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
-                             subExpr->getType(), isTrue)
+                             subExpr->getType(), isNilLiteral, isTrue)
             .highlight(lhs->getSourceRange())
             .highlight(rhs->getSourceRange());
           return;
@@ -1400,7 +1409,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       Expr *subExpr;
       bool isStore = false;
 
@@ -1409,7 +1418,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
         
         // If we couldn't flatten this expression, don't explode.
         if (!subExpr)
-          return { true, E };
+          return Action::Continue(E);
 
         isStore = true;
       } else if (auto *IOE = dyn_cast<InOutExpr>(E)) {
@@ -1495,12 +1504,34 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 
   DiagnoseWalker walker(var, fn);
   const_cast<Expr *>(E)->walk(walker);
+}
+
+/// Whether or not this closure captures self weakly
+static bool closureHasWeakSelfCapture(const AbstractClosureExpr *ACE) {
+  if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
+    if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+      return selfDecl->getType()->is<WeakStorageType>();
+    }
+  }
+
+  return false;
+}
+
+// Returns true if this is an implicit self expr
+static bool isImplicitSelf(const Expr *E) {
+  auto *DRE = dyn_cast<DeclRefExpr>(E);
+
+  if (!DRE || !DRE->isImplicit())
+    return false;
+
+  ASTContext &Ctx = DRE->getDecl()->getASTContext();
+  return DRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
 }
 
 /// Look for any property references in closures that lack a 'self.' qualifier.
@@ -1513,12 +1544,20 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     SmallVector<AbstractClosureExpr *, 4> Closures;
+
+    /// A list of "implicit self" exprs from shorthand conditions
+    /// like `if let self` or `guard let self`. These conditions
+    /// have an RHS 'self' decl that is implicit, but this is not
+    /// the sort of "implicit self" decl that should trigger
+    /// these diagnostics.
+    SmallPtrSet<Expr *, 16> UnwrapStmtImplicitSelfExprs;
+
   public:
-    explicit DiagnoseWalker(ASTContext &ctx, AbstractClosureExpr *ACE)
-        : Ctx(ctx), Closures() {
-          if (ACE)
-            Closures.push_back(ACE);
-        }
+    explicit DiagnoseWalker(ASTContext &Ctx, AbstractClosureExpr *ACE)
+        : Ctx(Ctx), Closures() {
+      if (ACE)
+        Closures.push_back(ACE);
+    }
 
     static bool isEnclosingSelfReference(VarDecl *var,
                                    const AbstractClosureExpr *inClosure) {
@@ -1536,16 +1575,24 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     /// Return true if this is an implicit reference to self which is required
     /// to be explicit in an escaping closure. Metatype references and value
     /// type references are excluded.
-    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E,
-                                   const AbstractClosureExpr *inClosure) {
+    static bool isImplicitSelfParamUseLikelyToCauseCycle(
+        Expr *E, const AbstractClosureExpr *inClosure) {
+      if (!isImplicitSelf(E)) {
+        return false;
+      }
+
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
-      if (!DRE || !DRE->isImplicit())
-        return false;
-
-      auto var = dyn_cast<VarDecl>(DRE->getDecl());
-      if (!var || !isEnclosingSelfReference(var, inClosure))
-        return false;
+      // If this is an explicit `weak self` capture, then implicit self is
+      // allowed once the closure's self param is unwrapped. We need to validate
+      // that the unwrapped `self` decl specifically refers to an unwrapped copy
+      // of the closure's `self` param, and not something else like in `guard
+      // let self = .someOptionalVariable else { return }` or `let self =
+      // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
+      // an optional, we would have already hit an error elsewhere.
+      if (closureHasWeakSelfCapture(inClosure)) {
+        return !implicitWeakSelfReferenceIsValid(DRE, inClosure);
+      }
 
       // Defensive check for type. If the expression doesn't have type here, it
       // should have been diagnosed somewhere else.
@@ -1563,13 +1610,77 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       if (!ty->hasReferenceSemantics())
         return false;
 
+      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+          // If this capture is using the name `self` actually referring
+          // to some other variable (e.g. with `[self = "hello"]`)
+          // then implicit self is not allowed.
+          if (!selfDecl->isSelfParamCapture()) {
+            return true;
+          }
+        }
+      }
+
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (!isEnclosingSelfReference(var, inClosure)) {
+          return false;
+        }
+      }
+
       return true;
+    }
+
+    static bool
+    implicitWeakSelfReferenceIsValid(const DeclRefExpr *DRE,
+                                     const AbstractClosureExpr *inClosure) {
+      ASTContext &Ctx = DRE->getDecl()->getASTContext();
+
+      // Check if the implicit self decl refers to a var in a conditional stmt
+      LabeledConditionalStmt *conditionalStmt = nullptr;
+      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (auto parentStmt = var->getParentPatternStmt()) {
+          conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
+        }
+      }
+
+      if (!conditionalStmt) {
+        return false;
+      }
+
+      // Find the condition that defined the self decl,
+      // and check that both its LHS and RHS are 'self'
+      for (auto cond : conditionalStmt->getCond()) {
+        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
+            continue;
+          }
+
+          if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
+            if (auto selfDRE = dyn_cast<DeclRefExpr>(LE->getSubExpr())) {
+              return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
+            }
+          }
+        }
+      }
+
+      return false;
     }
 
     /// Return true if this is a closure expression that will require explicit
     /// use or capture of "self." for qualification of member references.
-    static bool isClosureRequiringSelfQualification(
-                  const AbstractClosureExpr *CE) {
+    static bool
+    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
+                                        ASTContext &Ctx) {
+      // If this closure capture self weakly, then we have to validate each
+      // usage of implicit self individually, even in a nonescaping closure.
+      //
+      // We can only do this in Swift 6 mode, since we didn't do this in Swift 5
+      // (and changing this behavior causes new errors to be emitted).
+      if (Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+          closureHasWeakSelfCapture(CE)) {
+        return true;
+      }
+
       // If the closure's type was inferred to be noescape, then it doesn't
       // need qualification.
       if (AnyFunctionRef(const_cast<AbstractClosureExpr *>(CE))
@@ -1595,33 +1706,54 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         // If this is a potentially-escaping closure expression, start looking
-        // for references to self if we aren't already.
-        if (isClosureRequiringSelfQualification(CE))
+        // for references to self if we aren't already. But if this closure
+        // captures self weakly, then we have to validate each usage of implicit
+        // self individually, even in a nonescaping closure
+        if (isClosureRequiringSelfQualification(CE, Ctx) ||
+            closureHasWeakSelfCapture(CE)) {
           Closures.push_back(CE);
+        }
       }
 
       // If we aren't in a closure, no diagnostics will be produced.
       if (Closures.size() == 0)
-        return { true, E };
+        return Action::Continue(E);
 
-      auto &Diags = Ctx.Diags;
-      
       // Diagnostics should correct the innermost closure
       auto *ACE = Closures[Closures.size() - 1];
       assert(ACE);
 
+      auto &Diags = Ctx.Diags;
+
+      // If this is an "implicit self" expr from the RHS of a shorthand
+      // condition like `guard let self` or `if let self`, then this is
+      // always allowed and we shouldn't run any diagnostics.
+      if (UnwrapStmtImplicitSelfExprs.count(E)) {
+        return Action::Continue(E);
+      }
+
       // Until Swift 6, only emit a warning when we get this with an
       // explicit capture, since we used to not diagnose this at all.
       auto shouldOnlyWarn = [&](Expr *selfRef) {
+        // If this implicit self decl is from a closure that captured self
+        // weakly, then we should always emit an error, since implicit self was
+        // only allowed starting in Swift 5.8 and later.
+        if (closureHasWeakSelfCapture(ACE)) {
+          // Implicit self was incorrectly permitted for weak self captures
+          // in non-escaping closures in Swift 5.7, so in that case we can
+          // only warn until Swift 6.
+          return !isClosureRequiringSelfQualification(ACE, Ctx);
+        }
+
         // We know that isImplicitSelfParamUseLikelyToCauseCycle is true,
         // which means all these casts are valid.
         return !cast<VarDecl>(cast<DeclRefExpr>(selfRef)->getDecl())
-                  ->isSelfParameter();
+                    ->isSelfParameter();
       };
-      
+
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
         if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase(), ACE)) {
@@ -1647,26 +1779,63 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       if (memberLoc.isValid()) {
         emitFixIts(Diags, memberLoc, ACE);
-        return { false, E };
+        return Action::SkipChildren(E);
       }
       
-      // Catch any other implicit uses of self with a generic diagnostic.
       if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
              .warnUntilSwiftVersionIf(shouldOnlyWarn(E), 6);
 
-      return { true, E };
+      return Action::Continue(E);
     }
-    
-    Expr *walkToExprPost(Expr *E) override {
-      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        if (isClosureRequiringSelfQualification(CE)) {
-          assert(Closures.size() > 0);
-          Closures.pop_back();
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+      if (!ACE) {
+        return Action::Continue(E);
+      }
+
+      if (isClosureRequiringSelfQualification(ACE, Ctx) ||
+          closureHasWeakSelfCapture(ACE)) {
+        assert(Closures.size() > 0);
+        Closures.pop_back();
+      }
+
+      return Action::Continue(E);
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      /// Conditions like `if let self` or `guard let self`
+      /// have an RHS 'self' decl that is implicit, but this is not
+      /// the sort of "implicit self" decl that should trigger
+      /// these diagnostics. Track these DREs in a list so we can
+      /// avoid running diagnostics on them when we see them later.
+      auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S);
+      if (!conditionalStmt) {
+        return Action::Continue(S);
+      }
+
+      for (auto cond : conditionalStmt->getCond()) {
+        if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+          continue;
+        }
+
+        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
+            continue;
+          }
+
+          if (auto LE = dyn_cast<LoadExpr>(cond.getInitializer())) {
+            if (auto LHS = LE->getSubExpr()) {
+              if (isImplicitSelf(LHS)) {
+                UnwrapStmtImplicitSelfExprs.insert(LHS);
+              }
+            }
+          }
         }
       }
-      
-      return E;
+
+      return Action::Continue(S);
     }
 
     /// Emit any fix-its for this error.
@@ -1681,7 +1850,6 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           // capture 'self' explicitly will result in an error, and using
           // 'self.' explicitly will be accessing something other than the
           // self param.
-          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
           return;
         }
         emitFixItsForExplicitClosure(Diags, memberLoc, CE);
@@ -1702,11 +1870,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       // If we've already captured something with the name "self" other than
       // the actual self param, offer special diagnostics.
       if (auto *VD = closureExpr->getCapturedSelfDecl()) {
-        // Either this is a weak capture of self...
-        if (VD->getType()->is<WeakStorageType>()) {
-          Diags.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
-        // ...or something completely different.
-        } else {
+        if (!VD->getType()->is<WeakStorageType>()) {
           Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
         }
         
@@ -1788,16 +1952,16 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     }
   };
 
+  auto &ctx = DC->getASTContext();
   AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
     while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
-        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
+        if (DiagnoseWalker::isClosureRequiringSelfQualification(closure, ctx))
           ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
-  auto &ctx = DC->getASTContext();
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
@@ -2489,7 +2653,7 @@ public:
 
     VarDecls[vd] |= Flag;
   }
-  
+
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
   void markBaseOfStorageUse(Expr *E, bool isMutating);
   
@@ -2497,10 +2661,10 @@ public:
   
   // We generally walk into declarations, other than types and nested functions.
   // FIXME: peek into capture lists of nested functions.
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (isa<TypeDecl>(D))
-      return false;
-      
+      return Action::SkipChildren();
+
     // The body of #if clauses are not walked into, we need custom processing
     // for them.
     if (auto *ICD = dyn_cast<IfConfigDecl>(D))
@@ -2526,7 +2690,7 @@ public:
     // references the variable, but we don't want to consider it as a real
     // "use".
     if (isa<AccessorDecl>(D) && D->isImplicit())
-      return false;
+      return Action::SkipChildren();
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this AFD is a setter, track the parameter and the getter for
@@ -2542,12 +2706,12 @@ public:
       }
 
       if (afd->isBodyTypeChecked())
-        return true;
+        return Action::Continue();
 
       // Don't walk into a body that has not yet been type checked. This should
       // only occur for top-level code.
       VarDecls.clear();
-      return false;
+      return Action::SkipChildren();
     }
 
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -2583,26 +2747,27 @@ public:
     // Note that we ignore the initialization behavior of PatternBindingDecls,
     // but we do want to walk into them, because we want to see any uses or
     // other things going on in the initializer expressions.
-    return true;
+    return Action::Continue();
   }
 
   /// The heavy lifting happens when visiting expressions.
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
 
   /// handle #if directives.
   void handleIfConfig(IfConfigDecl *ICD);
 
   /// Custom handling for statements.
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     // Keep track of an association between vardecls and the StmtCondition that
     // they are bound in for IfStmt, GuardStmt, WhileStmt, etc.
     if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
-      for (auto &cond : LCS->getCond())
+      for (auto &cond : LCS->getCond()) {
         if (auto pat = cond.getPatternOrNull()) {
           pat->forEachVariable([&](VarDecl *VD) {
             StmtConditionForVD[VD] = LCS;
           });
         }
+      }
     }
     
     // A fallthrough dest case's bound variable means the source case's
@@ -2635,7 +2800,7 @@ public:
       }
     }
 
-    return { true, S };
+    return Action::Continue(S);
   }
 };
   
@@ -2694,20 +2859,28 @@ public:
         auto element = Body->getLastElement();
         // Let's see if the last statement would make for a valid return value.
         if (auto expr = element.dyn_cast<Expr *>()) {
-          bool conforms = llvm::all_of(OpaqueDecl->getOpaqueInterfaceGenericSignature().getRequirements(),
-                                       [&expr, this](auto requirement) {
-            if (requirement.getKind() == RequirementKind::Conformance) {
-              auto conformance =
-                  TypeChecker::conformsToProtocol(expr->getType()->getRValueType(),
-                                                  requirement.getProtocolDecl(),
-                                                  Implementation->getModuleContext(),
-                                                  /*allowMissing=*/ false);
-              return !conformance.isInvalid();
-            }
-            // If we encounter any requirements other than `Conformance`, we do
-            // not attempt to type check the expression.
-            return false;
-          });
+          auto exprType = expr->getType();
+          // Function body might not be valid and we cannot reply on
+          // \c typeCheckStmt here to propagate HadError because its
+          // unreliable.
+          if (!exprType || exprType->hasError())
+            return;
+
+          bool conforms = llvm::all_of(
+              OpaqueDecl->getOpaqueInterfaceGenericSignature()
+                  .getRequirements(),
+              [&exprType, this](auto requirement) {
+                if (requirement.getKind() == RequirementKind::Conformance) {
+                  auto conformance = TypeChecker::conformsToProtocol(
+                      exprType->getRValueType(), requirement.getProtocolDecl(),
+                      Implementation->getModuleContext(),
+                      /*allowMissing=*/false);
+                  return !conformance.isInvalid();
+                }
+                // If we encounter any requirements other than `Conformance`, we
+                // do not attempt to type check the expression.
+                return false;
+              });
 
           // If all requirements are fulfilled, we offer to insert `return` to
           // fix the issue.
@@ -2891,7 +3064,7 @@ public:
         conditionalSubstitutions);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
       auto subMap = underlyingToOpaque->substitutions;
 
@@ -2903,30 +3076,30 @@ public:
 
       if (isSelfReferencing(candidate)) {
         HasInvalidReturn = true;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
       if (subMap.hasDynamicSelf()) {
         Ctx.Diags.diagnose(E->getLoc(),
                            diag::opaque_type_cannot_contain_dynamic_self);
         HasInvalidReturn = true;
-        return {false, nullptr};
+        return Action::Stop();
       }
 
       Candidates.push_back({CurrentAvailability, candidate});
-      return {false, E};
+      return Action::SkipChildren(E);
     }
 
-    return {true, E};
+    return Action::Continue(E);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *If = dyn_cast<IfStmt>(S)) {
       if (Parent.getAsStmt() != Body) {
         // If this is not a top-level `if`, let's drop
         // contextual information that has been set previously.
         CurrentAvailability = nullptr;
-        return {true, S};
+        return Action::Continue(S);
       }
 
       // If this is `if #(un)available` statement with no other dynamic
@@ -2965,7 +3138,7 @@ public:
           Else->walk(*this);
         }
 
-        return {false, S};
+        return Action::SkipChildren(S);
       }
     }
 
@@ -2979,12 +3152,12 @@ public:
       }
     }
 
-    return {true, S};
+    return Action::Continue(S);
   }
 
   // Don't descend into nested decls.
-  bool walkToDeclPre(Decl *D) override {
-    return false;
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return Action::SkipChildren();
   }
 };
 
@@ -3029,9 +3202,9 @@ public:
     }
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return {true, E}; }
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *RS = dyn_cast<ReturnStmt>(S)) {
       if (RS->hasResult()) {
         auto resultTy = RS->getResult()->getType();
@@ -3040,11 +3213,13 @@ public:
       }
     }
 
-    return {true, S};
+    return Action::Continue(S);
   }
 
   // Don't descend into nested decls.
-  bool walkToDeclPre(Decl *D) override { return false; }
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    return Action::SkipChildren();
+  }
 };
 
 } // end anonymous namespace
@@ -3170,7 +3345,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                 auto initExpr = SC->getCond()[0].getInitializer();
                 if (initExpr->getStartLoc().isValid()) {
                   unsigned noParens = initExpr->canAppendPostfixExpression();
-                  
+
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
                   ConditionalCheckedCastExpr *CCE = nullptr;
@@ -3444,6 +3619,16 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     OpaqueValueMap[OEE->getOpaqueValue()] = OEE->getExistentialValue();
     return markStoredOrInOutExpr(OEE->getSubExpr(), Flags);
   }
+
+  // Bind pack references in pack expansions.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    for (unsigned i = 0; i < expansion->getNumBindings(); ++i) {
+      auto *opaqueValue = expansion->getOpaqueValues()[i];
+      auto *packReference = expansion->getBindings()[i];
+      OpaqueValueMap[opaqueValue] = packReference;
+    }
+    return markStoredOrInOutExpr(expansion->getPatternExpr(), Flags);
+  }
   
   // If this is an OpaqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
@@ -3457,7 +3642,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 }
 
 /// The heavy lifting happens when visiting expressions.
-std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   STATISTIC(VarDeclUsageCheckerExprVisits,
             "# of times VarDeclUsageChecker::walkToExprPre is called");
   ++VarDeclUsageCheckerExprVisits;
@@ -3466,7 +3651,7 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
-    return { false, E };
+    return Action::SkipChildren(E);
   }
 
   assert(AllExprsSeen.insert(E).second && "duplicate traversal");
@@ -3487,13 +3672,13 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     if (auto VD = dyn_cast<VarDecl>(MRE->getMember().getDecl())) {
       AssociatedGetterRefExpr.insert(std::make_pair(VD, MRE));
       markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), RK_Read);
-      return { false, E };
+      return Action::SkipChildren(E);
     }
   }
   if (auto SE = dyn_cast<SubscriptExpr>(E)) {
     SE->getArgs()->walk(*this);
     markBaseOfStorageUse(SE->getBase(), SE->getDecl(), RK_Read);
-    return { false, E };
+    return Action::SkipChildren(E);
   }
 
   // If this is an AssignExpr, see if we're mutating something that we know
@@ -3503,14 +3688,14 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     
     // Don't walk into the LHS of the assignment, only the RHS.
     assign->getSrc()->walk(*this);
-    return { false, E };
+    return Action::SkipChildren(E);
   }
   
   // '&x' is a read and write of 'x'.
   if (auto *io = dyn_cast<InOutExpr>(E)) {
     markStoredOrInOutExpr(io->getSubExpr(), RK_Read|RK_Written);
     // Don't bother walking into this.
-    return { false, E };
+    return Action::SkipChildren(E);
   }
   
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
@@ -3518,21 +3703,30 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
     oee->getSubExpr()->walk(*this);
-    return { false, E };
+    return Action::SkipChildren(E);
+  }
+
+  // If we see a PackExpansionExpr, record its pack reference bindings.
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(E)) {
+    for (unsigned i = 0; i < expansion->getNumBindings(); ++i) {
+      auto *opaqueValue = expansion->getOpaqueValues()[i];
+      auto *packReference = expansion->getBindings()[i];
+      OpaqueValueMap[opaqueValue] = packReference;
+    }
   }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
     if (auto mapping = OpaqueValueMap.lookup(ove))
       mapping->walk(*this);
-    return { false, E };
+    return Action::SkipChildren(E);
   }
   
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))
     sawError = true;
-  
-  return { true, E };
+
+  return Action::Continue(E);
 }
 
 /// handle #if directives.  All of the active clauses are already walked by the
@@ -3546,12 +3740,12 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
     ConservativeDeclMarker(VarDeclUsageChecker &VDUC)
       : VDUC(VDUC), SF(VDUC.DC->getParentSourceFile()) {}
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       // If we see a bound reference to a decl in an inactive #if block, then
       // conservatively mark it read and written.  This will silence "variable
       // unused" and "could be marked let" warnings for it.
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-        VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
+        VDUC.addMark(DRE->getDecl(), RK_Read | RK_Written);
       else if (auto *declRef = dyn_cast<UnresolvedDeclRefExpr>(E)) {
         auto name = declRef->getName();
         auto loc = declRef->getLoc();
@@ -3562,7 +3756,7 @@ void VarDeclUsageChecker::handleIfConfig(IfConfigDecl *ICD) {
             VDUC.addMark(varDecl, RK_Read|RK_Written);
         }
       }
-      return E;
+      return Action::Continue(E);
     }
   };
 
@@ -3728,7 +3922,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
-      // FIXME: We ought to handle multiple trailing closures here (SR-15055)
+      // FIXME(https://github.com/apple/swift/issues/57382): We ought to handle multiple trailing closures here.
       auto *args = E->getArgs()->getOriginalArgs();
       if (args->getNumTrailingClosures() != 1)
         return;
@@ -3778,14 +3972,14 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, ArgumentList *>
+    PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
       // Don't walk into an explicit argument list, as trailing closures that
       // appear in child arguments are fine.
-      return {args->isImplicit(), args};
+      return Action::VisitChildrenIf(args->isImplicit(), args);
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
       case ExprKind::Paren:
       case ExprKind::Tuple:
@@ -3795,14 +3989,14 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
       case ExprKind::Closure:
         // If a trailing closure appears as a child of one of these types of
         // expression, don't diagnose it as there is no ambiguity.
-        return {E->isImplicit(), E};
+        return Action::VisitChildrenIf(E->isImplicit(), E);
       case ExprKind::Call:
         diagnoseIt(cast<CallExpr>(E));
         break;
       default:
         break;
       }
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 
@@ -3904,7 +4098,7 @@ public:
 
   bool shouldWalkIntoTapExpression() override { return false; }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
     bool fromStringLiteral = false;
     bool hadParens = false;
@@ -3912,7 +4106,7 @@ public:
       // Is this a string literal that has type 'Selector'.
       if (!stringLiteral->getType() ||
           !stringLiteral->getType()->isEqual(SelectorTy))
-        return { true, expr };
+        return Action::Continue(expr);
 
       fromStringLiteral = true;
 
@@ -3920,11 +4114,11 @@ public:
     } else {
       // Is this an initialization of 'Selector'?
       auto call = dyn_cast<CallExpr>(expr);
-      if (!call) return { true, expr };
+      if (!call) return Action::Continue(expr);
 
       // That produce Selectors.
       if (!call->getType() || !call->getType()->isEqual(SelectorTy))
-        return { true, expr };
+        return Action::Continue(expr);
 
       // Via a constructor.
       ConstructorDecl *ctor = nullptr;
@@ -3936,27 +4130,27 @@ public:
           ctor = otherCtorRef->getDecl();
       }
 
-      if (!ctor) return { true, expr };
+      if (!ctor) return Action::Continue(expr);
 
       // Make sure the constructor is within Selector.
       auto ctorContextType = ctor->getDeclContext()
           ->getSelfNominalTypeDecl()
           ->getDeclaredType();
       if (!ctorContextType || !ctorContextType->isEqual(SelectorTy))
-        return { true, expr };
+        return Action::Continue(expr);
 
       auto argNames = ctor->getName().getArgumentNames();
-      if (argNames.size() != 1) return { true, expr };
+      if (argNames.size() != 1) return Action::Continue(expr);
 
       // Is this the init(stringLiteral:) initializer or init(_:) initializer?
       if (argNames[0] == Ctx.Id_stringLiteral)
         fromStringLiteral = true;
       else if (!argNames[0].empty())
-        return { true, expr };
+        return Action::Continue(expr);
 
       auto *arg = call->getArgs()->getUnaryExpr();
       if (!arg)
-        return { true, expr };
+        return Action::Continue(expr);
 
       // Track whether we had parentheses around the string literal.
       if (auto paren = dyn_cast<ParenExpr>(arg)) {
@@ -3966,7 +4160,7 @@ public:
 
       // Check whether we have a string literal.
       stringLiteral = dyn_cast<StringLiteralExpr>(arg);
-      if (!stringLiteral) return { true, expr };
+      if (!stringLiteral) return Action::Continue(expr);
     }
 
     /// Retrieve the parent expression that coerces to Selector, if
@@ -4012,7 +4206,7 @@ public:
                                      diag::selector_literal_invalid);
       diag.highlight(stringLiteral->getSourceRange());
       addSelectorConstruction(diag);
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
     // Look for methods with this selector.
@@ -4024,7 +4218,7 @@ public:
       // If this was Selector(("selector-name")), suppress, the
       // diagnostic.
       if (!fromStringLiteral && hadParens)
-        return { true, expr };
+        return Action::Continue(expr);
 
       {
         auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
@@ -4043,7 +4237,7 @@ public:
           .fixItInsertAfter(stringLiteral->getEndLoc(), ")");
       }
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
     // Find the "best" method that has this selector, so we can report
@@ -4182,7 +4376,7 @@ public:
                         ? diag::selector_literal_deprecated_suggest
                         : diag::selector_construction_suggest)
           .fixItReplace(replacementRange, replacement);
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
     // If we couldn't pick a method to use for #selector, just wrap
@@ -4191,10 +4385,10 @@ public:
       auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
                                      diag::selector_literal_deprecated);
       addSelectorConstruction(diag);
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
-    return { true, expr };
+    return Action::Continue(expr);
   }
 
 };
@@ -4265,6 +4459,122 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
                        diag::optional_check_nonoptional,
                        subExpr->getType())
       .highlight(subExpr->getSourceRange());
+  }
+}
+
+/// Diagnoses a `if #available(...)` condition. Returns true if a diagnostic
+/// was emitted.
+static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
+                                          DeclContext *DC) {
+  // Reject inlinable code using availability macros. In order to lift this
+  // restriction, macros would need to either be expanded when printed in
+  // swiftinterfaces or be parsable as macros by module clients.
+  auto fragileKind = DC->getFragileFunctionKind();
+  if (fragileKind.kind != FragileFunctionKind::None) {
+    for (auto queries : info->getQueries()) {
+      if (auto availSpec =
+              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries)) {
+        if (availSpec->getMacroLoc().isValid()) {
+          DC->getASTContext().Diags.diagnose(
+              availSpec->getMacroLoc(),
+              swift::diag::availability_macro_in_inlinable,
+              fragileKind.getSelector());
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/// Diagnoses a `if #_hasSymbol(...)` condition. Returns true if a diagnostic
+/// was emitted.
+static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
+                                       DeclContext *DC) {
+  // If we have an invalid info, null expression, or expression without a type
+  // then type checking failed already for this condition.
+  if (info->isInvalid())
+    return false;
+
+  auto symbolExpr = info->getSymbolExpr();
+  if (!symbolExpr)
+    return false;
+
+  if (!symbolExpr->getType())
+    return false;
+
+  auto &ctx = DC->getASTContext();
+  if (!ctx.LangOpts.Target.isOSDarwin()) {
+    // SILGen for #_hasSymbol is currently implemented assuming the target OS
+    // is a Darwin platform.
+    ctx.Diags.diagnose(info->getStartLoc(),
+                       diag::has_symbol_unsupported_on_target,
+                       ctx.LangOpts.Target.str());
+    return true;
+  }
+
+  auto fragileKind = DC->getFragileFunctionKind();
+  if (fragileKind.kind != FragileFunctionKind::None) {
+    // #_hasSymbol cannot be used in inlinable code because of limitations of
+    // the current implementation strategy. It relies on recording the
+    // referenced ValueDecl, mangling a helper function name using that
+    // ValueDecl, and then passing the responsibility of generating the
+    // definition for that helper function to IRGen. In order to lift this
+    // restriction, we will need teach SIL to encode the ValueDecl, or take
+    // another approach entirely.
+    ctx.Diags.diagnose(info->getStartLoc(),
+                       diag::has_symbol_condition_in_inlinable,
+                       fragileKind.getSelector());
+    return true;
+  }
+
+  auto decl = info->getReferencedDecl().getDecl();
+  if (!decl) {
+    // Diagnose because we weren't able to interpret the expression as one
+    // that uniquely identifies a single declaration.
+    ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_invalid_expr);
+    return true;
+  }
+
+  if (!decl->isWeakImported(DC->getParentModule())) {
+    // `if #_hasSymbol(someStronglyLinkedSymbol)` is functionally a no-op
+    // and may indicate the developer has mis-identified the declaration
+    // they want to check (or forgot to import the module weakly).
+    ctx.Diags.diagnose(symbolExpr->getLoc(), diag::has_symbol_decl_must_be_weak,
+                       decl->getDescriptiveKind(), decl->getName());
+    return true;
+  }
+
+  return false;
+}
+
+/// Perform MiscDiagnostics for the conditions belonging to a \c
+/// LabeledConditionalStmt.
+static void checkLabeledStmtConditions(ASTContext &ctx,
+                                       const LabeledConditionalStmt *stmt,
+                                       DeclContext *DC) {
+  for (auto elt : stmt->getCond()) {
+    // Check for implicit optional promotions in stmt-condition patterns.
+    checkImplicitPromotionsInCondition(elt, ctx);
+
+    switch (elt.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+    case StmtConditionElement::CK_PatternBinding:
+      break;
+    case StmtConditionElement::CK_Availability: {
+      auto info = elt.getAvailability();
+      (void)diagnoseAvailabilityCondition(info, DC);
+      break;
+    }
+    case StmtConditionElement::CK_HasSymbol: {
+      auto info = elt.getHasSymbolInfo();
+      if (diagnoseHasSymbolCondition(info, DC))
+        info->setInvalid();
+
+      break;
+    }
+    }
   }
 }
 
@@ -4633,12 +4943,12 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return { false, E };
+        return Action::SkipChildren(E);
 
       if (IgnoredExprs.count(E))
-        return { true, E };
+        return Action::Continue(E);
 
       if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
         visitInterpolatedStringLiteralExpr(literal);
@@ -4652,7 +4962,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       } else {
         visitPossibleOptionalToAnyExpr(E, { E->getType(), nullptr });
       }
-      return { true, E };
+      return Action::Continue(E);
     }
 
   public:
@@ -4710,16 +5020,16 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return {false, E};
+        return Action::SkipChildren(E);
 
       if (auto *KPAE = dyn_cast<KeyPathApplicationExpr>(E)) {
         visitKeyPathApplicationExpr(KPAE);
-        return {true, E};
+        return Action::Continue(E);
       }
 
-      return {true, E};
+      return Action::Continue(E);
     }
 
   public:
@@ -4770,16 +5080,16 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
           .highlight(lastComponent.getLoc());
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return {false, E};
+        return Action::SkipChildren(E);
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         maybeDiagnoseCallExpr(CE);
-        return {false, E};
+        return Action::SkipChildren(E);
       }
 
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 
@@ -4817,16 +5127,16 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       }
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return {false, E};
+        return Action::SkipChildren(E);
 
       if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
         tryDiagnoseExplicitLazyStorageVariableUse(MRE);
-        return {false, E};
+        return Action::SkipChildren(E);
       }
 
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 
@@ -4946,16 +5256,16 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return {false, E};
+        return Action::SkipChildren(E);
 
       if (auto *BE = dyn_cast<BinaryExpr>(E)) {
         tryDiagnoseComparisonWithNaN(BE);
-        return {false, E};
+        return Action::SkipChildren(E);
       }
 
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 
@@ -4981,34 +5291,34 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
-        return {false, E};
+        return Action::SkipChildren(E);
 
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       // If this is not an explicit 'self' reference, let's keep searching.
       if (!DRE || DRE->isImplicit())
-        return {true, E};
+        return Action::Continue(E);
 
       // If this not 'self' or it's not a function reference, it's unrelated.
       if (!(DRE->getDecl()->getBaseName() == Ctx.Id_self &&
             DRE->getType()->is<AnyFunctionType>()))
-        return {true, E};
+        return Action::Continue(E);
 
       auto typeContext = DC->getInnermostTypeContext();
       // Use of 'self' in enums is not confusable.
       if (!typeContext || typeContext->getSelfEnumDecl())
-        return {true, E};
+        return Action::Continue(E);
 
       // self(...) is not easily confusable.
       if (auto *parentExpr = Parent.getAsExpr()) {
         if (isa<CallExpr>(parentExpr))
-          return {true, E};
+          return Action::Continue(E);
 
         // Explicit call to a static method 'self' of some type is not
         // confusable.
         if (isa<DotSyntaxCallExpr>(parentExpr) && !parentExpr->isImplicit())
-          return {true, E};
+          return Action::Continue(E);
       }
 
       auto baseType = typeContext->getDeclaredInterfaceType();
@@ -5022,7 +5332,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
                     baseTypeString)
           .fixItInsert(E->getLoc(), diag::insert_type_qualification, baseType);
 
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 
@@ -5038,13 +5348,44 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 
   private:
     std::string getKeyStringValue(const LiteralExpr *keyExpr) {
-      if (isa<MagicIdentifierLiteralExpr>(keyExpr)) {
-        return keyExpr->getLiteralKindDescription().str();
+      if (auto *MLE = dyn_cast<MagicIdentifierLiteralExpr>(keyExpr)) {
+        return getMagicLiteralKeyValue(MLE);
       }
       std::string out;
       llvm::raw_string_ostream OS(out);
       keyExpr->printConstExprValue(&OS, /*additionalCheck=*/nullptr);
       return out;
+    }
+
+    std::string getMagicLiteralKeyValue(const MagicIdentifierLiteralExpr *MLE) {
+      auto magicLiteralValue = MLE->getLiteralKindDescription().str();
+      switch (MLE->getKind()) {
+      case MagicIdentifierLiteralExpr::DSOHandle:
+      case MagicIdentifierLiteralExpr::FileID:
+      case MagicIdentifierLiteralExpr::FileIDSpelledAsFile:
+      case MagicIdentifierLiteralExpr::FilePath:
+      case MagicIdentifierLiteralExpr::FilePathSpelledAsFile:
+      case MagicIdentifierLiteralExpr::Function:
+        break;
+      // Those are literals that can evaluate to different values in a
+      // dictionary literal declaration context based on source position
+      // so we need to consider that position as part of the literal value.
+      case MagicIdentifierLiteralExpr::Column: {
+        unsigned int column;
+        std::tie(std::ignore, column) =
+            Ctx.SourceMgr.getPresumedLineAndColumnForLoc(MLE->getStartLoc());
+        magicLiteralValue += ":" + std::to_string(column);
+        break;
+      }
+      case MagicIdentifierLiteralExpr::Line: {
+        unsigned int line;
+        std::tie(line, std::ignore) =
+            Ctx.SourceMgr.getPresumedLineAndColumnForLoc(MLE->getStartLoc());
+        magicLiteralValue += ":" + std::to_string(line);
+        break;
+      }
+      }
+      return magicLiteralValue;
     }
 
     std::string getKeyStringValueForDiagnostic(const LiteralExpr *keyExpr) {
@@ -5107,16 +5448,16 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
       if (!DLE)
-        return {true, E};
+        return Action::Continue(E);
 
       auto type = DLE->getType();
       // For other types conforming with `ExpressibleByDictionaryLiteral`
       // protocol, duplicated keys may be allowed.
       if (!(type && type->isDictionary())) {
-        return {true, E};
+        return Action::Continue(E);
       }
 
       using LiteralKey = std::pair<std::string, ExprKind>;
@@ -5143,7 +5484,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 
       // All keys are unique.
       if (groupedLiteralKeys.size() == DLE->getNumElements()) {
-        return {true, E};
+        return Action::Continue(E);
       }
 
       auto &DE = Ctx.Diags;
@@ -5179,7 +5520,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
           emitNoteWithFixit(duplicated);
         }
       }
-      return {true, E};
+      return Action::Continue(E);
     }
   };
 
@@ -5225,11 +5566,9 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
     checkSwitch(ctx, switchStmt, DC);
 
   checkStmtConditionTrailingClosure(ctx, S);
-  
-  // Check for implicit optional promotions in stmt-condition patterns.
+
   if (auto *lcs = dyn_cast<LabeledConditionalStmt>(S))
-    for (const auto &elt : lcs->getCond())
-      checkImplicitPromotionsInCondition(elt, ctx);
+    checkLabeledStmtConditions(ctx, lcs, DC);
 
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));

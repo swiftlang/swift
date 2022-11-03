@@ -66,7 +66,7 @@ protected:
 
   /// Read a multi-bit field.
   template <unsigned FirstBit, unsigned BitWidth, typename FieldType = IntType>
-  FieldType getField() const {
+  constexpr FieldType getField() const {
     return FieldType((Bits >> FirstBit) & lowMaskFor<BitWidth>());
   }
 
@@ -92,7 +92,7 @@ protected:
   // A convenient macro for defining a getter and setter for a field.
   // Intended to be used in the body of a subclass of FlagSet.
 #define FLAGSET_DEFINE_FIELD_ACCESSORS(BIT, WIDTH, TYPE, GETTER, SETTER) \
-  TYPE GETTER() const {                                                  \
+  constexpr TYPE GETTER() const {                                        \
     return this->template getField<BIT, WIDTH, TYPE>();                  \
   }                                                                      \
   void SETTER(TYPE value) {                                              \

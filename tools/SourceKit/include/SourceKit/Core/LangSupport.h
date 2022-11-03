@@ -526,7 +526,7 @@ struct NameTranslatingInfo {
 enum class SemanticRefactoringKind {
   None,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 };
 
 struct SemanticRefactoringInfo {
@@ -911,8 +911,8 @@ public:
 
   virtual void collectExpressionTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-      SourceKitCancellationToken CancellationToken,
+      ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+      bool CanonicalType, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) = 0;
 
@@ -921,7 +921,7 @@ public:
   /// the entire document are collected.
   virtual void collectVariableTypes(
       StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length,
+      Optional<unsigned> Offset, Optional<unsigned> Length, bool FullyQualified,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;

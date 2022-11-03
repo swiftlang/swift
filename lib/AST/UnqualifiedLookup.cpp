@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -76,6 +77,8 @@ namespace {
       
     private:
       SelfBounds findSelfBounds(const DeclContext *dc);
+      ValueDecl *lookupBaseDecl(const DeclContext *baseDC) const;
+      ValueDecl *getBaseDeclForResult(const DeclContext *baseDC) const;
 
       // Classify this declaration.
       // Types are formally members of the metatype.
@@ -343,12 +346,149 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
   SmallVector<ValueDecl *, 4> Lookup;
   contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
   for (auto Result : Lookup) {
-    results.emplace_back(const_cast<DeclContext *>(whereValueIsMember(Result)),
-                         Result);
+    auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
+    auto baseDecl = getBaseDeclForResult(baseDC);
+    results.emplace_back(baseDC, baseDecl, Result);
 #ifndef NDEBUG
     factory->addedResult(results.back());
 #endif
   }
+}
+
+ValueDecl *
+UnqualifiedLookupFactory::ResultFinderForTypeContext::getBaseDeclForResult(
+    const DeclContext *baseDC) const {
+  if (baseDC == nullptr) {
+    return nullptr;
+  }
+
+  if (auto localBaseDecl = lookupBaseDecl(baseDC)) {
+    return localBaseDecl;
+  }
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(baseDC)) {
+    return const_cast<ParamDecl *>(AFD->getImplicitSelfDecl());
+  }
+
+  if (auto *PBI = dyn_cast<PatternBindingInitializer>(baseDC)) {
+    auto *selfDecl = PBI->getImplicitSelfDecl();
+    assert(selfDecl);
+    return selfDecl;
+  }
+
+  else if (auto *CE = dyn_cast<ClosureExpr>(baseDC)) {
+    auto *selfDecl = CE->getCapturedSelfDecl();
+    assert(selfDecl);
+    assert(selfDecl->isSelfParamCapture());
+    return selfDecl;
+  }
+
+  auto *nominalDecl = baseDC->getSelfNominalTypeDecl();
+  assert(nominalDecl);
+  return nominalDecl;
+}
+
+/// Whether or not the given self decl is defined in an optional
+/// unwrapping condition (e.g. `guard let self else { return }`).
+/// If this is true, then we know any implicit self reference in the
+/// following scope is guaranteed to be non-optional.
+bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
+                                      const AbstractClosureExpr *inClosure) {
+  ASTContext &Ctx = selfDecl->getASTContext();
+
+  // Check if the implicit self decl refers to a var in a conditional stmt
+  LabeledConditionalStmt *conditionalStmt = nullptr;
+  if (auto var = dyn_cast<VarDecl>(selfDecl)) {
+    if (auto parentStmt = var->getParentPatternStmt()) {
+      conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
+    }
+  }
+
+  if (!conditionalStmt) {
+    return false;
+  }
+
+  // Find the condition that defined the self decl,
+  // and check that both its LHS and RHS are 'self'
+  for (auto cond : conditionalStmt->getCond()) {
+    if (auto pattern = cond.getPattern()) {
+      if (pattern->getBoundName() != Ctx.Id_self) {
+        continue;
+      }
+    }
+
+    if (auto selfDRE = dyn_cast<DeclRefExpr>(cond.getInitializer())) {
+      return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
+    }
+  }
+
+  return false;
+}
+
+ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
+    const DeclContext *baseDC) const {
+  // Perform an unqualified lookup for the base decl of this result. This
+  // handles cases where self was rebound (e.g. `guard let self = self`)
+  // earlier in the scope.
+  //
+  // Only do this in closures that capture self weakly, since implicit self
+  // isn't allowed to be rebound in other contexts. In other contexts, implicit
+  // self _always_ refers to the context's self `ParamDecl`, even if there
+  // is another local decl with the name `self` that would be found by
+  // `lookupSingleLocalDecl`.
+  auto closureExpr = dyn_cast<ClosureExpr>(factory->DC);
+  if (!closureExpr) {
+    return nullptr;
+  }
+
+  bool capturesSelfWeakly = false;
+  if (auto decl = closureExpr->getCapturedSelfDecl()) {
+    if (auto a = decl->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+      capturesSelfWeakly = a->get() == ReferenceOwnership::Weak;
+    }
+  }
+
+  if (!capturesSelfWeakly) {
+    return nullptr;
+  }
+
+  auto selfDecl = ASTScope::lookupSingleLocalDecl(
+      factory->DC->getParentSourceFile(), DeclName(factory->Ctx.Id_self),
+      factory->Loc);
+
+  if (!selfDecl) {
+    return nullptr;
+  }
+
+  // In Swift 5 mode, implicit self is allowed within non-escaping
+  // closures even before self is unwrapped. For example, this is allowed:
+  //
+  //   doVoidStuffNonEscaping { [weak self] in
+  //     method() // implicitly `self.method()`
+  //   }
+  //
+  // To support this, we have to preserve the lookup behavior from
+  // Swift 5.7 and earlier where implicit self defaults to the closure's
+  // `ParamDecl`. This causes the closure to capture self strongly, however,
+  // which is not acceptable for escaping closures.
+  //
+  // Escaping closures, however, only need to permit implicit self once
+  // it has been unwrapped to be non-optional:
+  //
+  //   doVoidStuffEscaping { [weak self] in
+  //     guard let self else { return }
+  //     method()
+  //   }
+  //
+  // In these cases, using the Swift 6 lookup behavior doesn't affect
+  // how the body is type-checked, so it can be used in Swift 5 mode
+  // without breaking source compatibility for non-escaping closures.
+  if (!factory->Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+      !implicitSelfReferenceIsUnwrapped(selfDecl, closureExpr)) {
+    return nullptr;
+  }
+
+  return selfDecl;
 }
 
 // TODO (someday): Instead of adding unavailable entries to Results,

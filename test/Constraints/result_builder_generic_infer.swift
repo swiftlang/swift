@@ -41,6 +41,19 @@ struct ArchetypeSubstitution<A>: P {
   var x2: [S] { S() }
 }
 
+// CHECK-LABEL: struct_decl{{.*}}ExplicitGenericAttribute
+struct ExplicitGenericAttribute<T: P> {
+  // CHECK: var_decl{{.*}}x1
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T> (substitution T -> T))
+  @Builder<T>
+  var x1: [S] { S() }
+
+  // CHECK: var_decl{{.*}}x2
+  // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T> (substitution T -> T.A))
+  @Builder<T.A>
+  var x2: [S] { S() }
+}
+
 // CHECK: struct_decl{{.*}}ConcreteTypeSubstitution
 struct ConcreteTypeSubstitution<Value> {}
 

@@ -35,6 +35,7 @@
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include "swift/Option/Options.h"
+#include "swift/Parse/ParseVersion.h"
 #include <functional>
 
 using namespace swift;
@@ -1827,19 +1828,22 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
-static std::unique_ptr<DiagnosticConsumer>
+static std::vector<std::unique_ptr<DiagnosticConsumer>>
 createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError, bool DisableFailOnError,
                    bool CompilerStyleDiags, StringRef SerializedDiagPath) {
+  std::vector<std::unique_ptr<DiagnosticConsumer>> results;
   if (!SerializedDiagPath.empty()) {
     FailOnError = !DisableFailOnError;
-    return serialized_diagnostics::createConsumer(SerializedDiagPath);
+    results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
+    results.emplace_back(serialized_diagnostics::createConsumer(SerializedDiagPath));
   } else if (CompilerStyleDiags) {
     FailOnError = !DisableFailOnError;
-    return std::make_unique<PrintingDiagnosticConsumer>();
+    results.emplace_back(std::make_unique<PrintingDiagnosticConsumer>());
   } else {
     FailOnError = false;
-    return std::make_unique<ModuleDifferDiagsConsumer>(true, OS);
+    results.emplace_back(std::make_unique<ModuleDifferDiagsConsumer>(true, OS));
   }
+  return results;
 }
 
 static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
@@ -2422,8 +2426,8 @@ public:
     if (!SwiftVersion.empty()) {
       using version::Version;
       bool isValid = false;
-      if (auto Version =
-              Version::parseVersionString(SwiftVersion, SourceLoc(), nullptr)) {
+      if (auto Version = VersionParser::parseVersionString(
+              SwiftVersion, SourceLoc(), nullptr)) {
         if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
           InitInvoke.getLangOptions().EffectiveLanguageVersion = *Effective;
           isValid = true;

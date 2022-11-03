@@ -19,6 +19,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
@@ -431,8 +432,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_swift_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     bool isValid = false;
     if (vers.hasValue()) {
       if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
@@ -445,8 +446,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
-    auto vers = version::Version::parseVersionString(
-      A->getValue(), SourceLoc(), &Diags);
+    auto vers =
+        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
     if (vers.hasValue()) {
       Opts.PackageDescriptionVersion = vers.getValue();
     } else {
@@ -493,6 +494,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                OPT_disable_deserialization_recovery)) {
     Opts.EnableDeserializationRecovery
       = A->getOption().matches(OPT_enable_deserialization_recovery);
+  }
+
+  // Whether '/.../' regex literals are enabled. This implies experimental
+  // string processing.
+  if (Args.hasArg(OPT_enable_bare_slash_regex)) {
+    Opts.EnableBareSlashRegexLiterals = true;
+    Opts.EnableExperimentalStringProcessing = true;
+  }
+
+  // Experimental string processing.
+  if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,
+                               OPT_disable_experimental_string_processing)) {
+    Opts.EnableExperimentalStringProcessing =
+        A->getOption().matches(OPT_enable_experimental_string_processing);
+
+    // When experimental string processing is explicitly disabled, also disable
+    // forward slash regex `/.../`.
+    if (!Opts.EnableExperimentalStringProcessing)
+      Opts.EnableBareSlashRegexLiterals = false;
+  } else {
+    Opts.EnableExperimentalStringProcessing = true;
   }
 
   Opts.DisableAvailabilityChecking |=
@@ -587,13 +609,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
-  if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
-    Opts.RequireExplicitAvailability = true;
-    if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
-      Opts.RequireExplicitAvailabilityTarget = A->getValue();
-    }
-  }
-
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
@@ -641,9 +656,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // (non-release) builds for testing purposes.
     if (auto feature = getExperimentalFeature(A->getValue())) {
 #ifdef NDEBUG
-      Diags.diagnose(SourceLoc(),
-                     diag::error_experimental_feature_not_available,
-                     A->getValue());
+      if (!isFeatureAvailableInProduction(*feature)) {
+        Diags.diagnose(SourceLoc(),
+                       diag::error_experimental_feature_not_available,
+                       A->getValue());
+      }
 #endif
 
       Opts.Features.insert(*feature);
@@ -693,6 +710,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.hasArg(OPT_enable_experimental_opaque_type_erasure))
     Opts.Features.insert(Feature::OpaqueTypeErasure);
+  if (Args.hasArg(OPT_enable_experimental_implicit_some)){
+      Opts.Features.insert(Feature::ImplicitSome);
+      Opts.Features.insert(Feature::ExistentialAny);
+  }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
@@ -720,6 +741,31 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       }
     }
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_EQ)) {
+    StringRef diagLevel = A->getValue();
+    if (diagLevel == "warn") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+    } else if (diagLevel == "error") {
+      Opts.RequireExplicitAvailability = DiagnosticBehavior::Error;
+    } else if (diagLevel == "ignore") {
+      Opts.RequireExplicitAvailability = None;
+    } else {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unknown_require_explicit_availability,
+                     diagLevel);
+    }
+  } else if (Args.getLastArg(OPT_require_explicit_availability,
+                             OPT_require_explicit_availability_target) ||
+             Opts.LibraryLevel == LibraryLevel::API) {
+    Opts.RequireExplicitAvailability = DiagnosticBehavior::Warning;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailabilityTarget = A->getValue();
+  }
+
+  Opts.EnableSPIOnlyImports = Args.hasArg(OPT_experimental_spi_only_imports);
 
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
@@ -798,6 +844,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableCrossImportRemarks = Args.hasArg(OPT_emit_cross_import_remarks);
 
   Opts.EnableModuleLoadingRemarks = Args.hasArg(OPT_remark_loading_module);
+
+  Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
 
   Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
   
@@ -908,8 +956,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (StringRef(A->getValue()) == "target")
       return Opts.getMinPlatformVersion();
 
-    if (auto vers = version::Version::parseVersionString(A->getValue(),
-                                                         SourceLoc(), &Diags))
+    if (auto vers = VersionParser::parseVersionString(A->getValue(),
+                                                      SourceLoc(), &Diags))
       return (llvm::VersionTuple)*vers;
 
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -1249,6 +1297,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   }
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
+  Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
@@ -1281,6 +1330,8 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
 
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+  Opts.EmitExtensionBlockSymbols =
+      Args.hasArg(OPT_emit_extension_block_symbols);
 
   if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
     Opts.MinimumAccessLevel =
@@ -1378,6 +1429,13 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   // is called before setTargetTriple() and parseArgs().
   // TODO: improve the handling of RuntimeIncludePath.
 
+  std::vector<std::string> CompilerPluginLibraryPaths(
+      Opts.getCompilerPluginLibraryPaths());
+  for (const Arg *A : Args.filtered(OPT_load_plugin_library)) {
+    CompilerPluginLibraryPaths.push_back(resolveSearchPath(A->getValue()));
+  }
+  Opts.setCompilerPluginLibraryPaths(CompilerPluginLibraryPaths);
+
   return false;
 }
 
@@ -1418,6 +1476,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
+  Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   Opts.WarningsAsErrors = Args.hasFlag(options::OPT_warnings_as_errors,
                                        options::OPT_no_warnings_as_errors,
                                        false);
@@ -1762,6 +1821,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
   Opts.EnablePerformanceAnnotations |=
       Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
+  Opts.EnableStackProtection =
+      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
+                   Opts.EnableStackProtection);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -2296,6 +2358,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
       } else if (version.equals("5.5")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
+      } else if (version.equals("5.6")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -2409,10 +2473,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_disable_new_llvm_pass_manager,
                    OPT_enable_new_llvm_pass_manager,
                    Opts.LegacyPassManager);
-
-  Opts.EnableStackProtector =
-      Args.hasFlag(OPT_enable_stack_protector, OPT_disable_stack_protector,
-                   Opts.EnableStackProtector);
 
   return false;
 }
@@ -2607,7 +2667,8 @@ serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
   serialization::ValidationInfo info = serialization::validateSerializedAST(
-      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName, &extendedInfo);
+      data, getSILOptions().EnableOSSAModules, LangOpts.SDKName,
+      !LangOpts.DebuggerSupport, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -2643,7 +2704,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
-      LangOpts.SDKName, &extendedInfo);
+      LangOpts.SDKName, !LangOpts.DebuggerSupport, &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

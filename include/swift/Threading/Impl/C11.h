@@ -22,6 +22,8 @@
 
 #include <threads.h>
 
+#include "chrono_utils.h"
+
 #include "llvm/ADT/Optional.h"
 
 #include "swift/Threading/Errors.h"
@@ -36,13 +38,13 @@ namespace threading_impl {
       swift::threading::fatal(#expr " failed with error %d\n", res_);          \
   } while (0)
 
-#define SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(expr)                            \
+#define SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(falseerr, expr)                  \
   do {                                                                         \
     int res_ = (expr);                                                         \
     switch (res_) {                                                            \
     case thrd_success:                                                         \
       return true;                                                             \
-    case thrd_busy:                                                            \
+    case falseerr:                                                             \
       return false;                                                            \
     default:                                                                   \
       swift::threading::fatal(#expr " failed with error (%d)\n", res_);        \
@@ -78,7 +80,7 @@ inline void mutex_unlock(mutex_handle &handle) {
   SWIFT_C11THREADS_CHECK(::mtx_unlock(&handle));
 }
 inline bool mutex_try_lock(mutex_handle &handle) {
-  SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(::mtx_trylock(&handle));
+  SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(thrd_busy, ::mtx_trylock(&handle));
 }
 
 inline void mutex_unsafe_lock(mutex_handle &handle) {
@@ -134,7 +136,7 @@ inline void lazy_mutex_unlock(lazy_mutex_handle &handle) {
 }
 inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) {
   lazy_mutex_init(handle);
-  SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(::mtx_trylock(&handle.mutex));
+  SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(thrd_busy, ::mtx_trylock(&handle.mutex));
 }
 
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
@@ -144,6 +146,55 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   lazy_mutex_init(handle);
   (void)::mtx_unlock(&handle.mutex);
+}
+
+// .. ConditionVariable support ..............................................
+
+struct cond_handle {
+  ::cnd_t condition;
+  ::mtx_t mutex;
+};
+
+inline void cond_init(cond_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::cnd_init(&handle.condition));
+  SWIFT_C11THREADS_CHECK(::mtx_init(&handle.mutex, ::mtx_plain));
+}
+inline void cond_destroy(cond_handle &handle) {
+  ::cnd_destroy(&handle.condition);
+  ::mtx_destroy(&handle.mutex);
+}
+inline void cond_lock(cond_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::mtx_lock(&handle.mutex));
+}
+inline void cond_unlock(cond_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::mtx_unlock(&handle.mutex));
+}
+inline void cond_signal(cond_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::cnd_signal(&handle.condition));
+}
+inline void cond_broadcast(cond_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::cnd_broadcast(&handle.condition));
+}
+inline void cond_wait(cond_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::cnd_wait(&handle.condition, &handle.mutex));
+}
+template <class Rep, class Period>
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::duration<Rep, Period> duration) {
+  auto to_wait = chrono_utils::ceil<
+    std::chrono::system_clock::duration>(duration);
+  auto deadline = std::chrono::system_clock::now() + to_wait;
+  return cond_wait(handle, deadline);
+}
+inline bool cond_wait(cond_handle &handle,
+                      std::chrono::system_clock::time_point deadline) {
+  auto ns = chrono_utils::ceil<std::chrono::nanoseconds>(
+    deadline.time_since_epoch()).count();
+  struct ::timespec ts = { ::time_t(ns / 1000000000), long(ns % 1000000000) };
+  SWIFT_C11THREADS_RETURN_TRUE_OR_FALSE(
+    thrd_timedout,
+    ::cnd_timedwait(&handle.condition, &handle.mutex, &ts)
+  );
 }
 
 // .. Once ...................................................................

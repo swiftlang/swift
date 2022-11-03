@@ -126,6 +126,10 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
 
   bool CanCurrDeclContextHandleAsync = false;
+  /// Actor isolations that were determined during constraint solving but that
+  /// haven't been saved to the AST.
+  llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+      ClosureActorIsolations;
   bool HaveDot = false;
   bool IsUnwrappedOptional = false;
   SourceLoc DotLoc;
@@ -260,6 +264,12 @@ public:
 
   void setCanCurrDeclContextHandleAsync(bool CanCurrDeclContextHandleAsync) {
     this->CanCurrDeclContextHandleAsync = CanCurrDeclContextHandleAsync;
+  }
+
+  void setClosureActorIsolations(
+      llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+          ClosureActorIsolations) {
+    this->ClosureActorIsolations = ClosureActorIsolations;
   }
 
   const ExpectedTypeContext *getExpectedTypeContext() const {
@@ -487,6 +497,9 @@ public:
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override;
+
+  void onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                  DeclVisibilityKind Reason) override;
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/ConstTypeInfo.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Effects.h"
@@ -707,26 +706,6 @@ private:
 
   // Evaluation.
   PropertyWrapperTypeInfo
-  evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
-/// Retrieve information about compile-time-known
-class ConstantValueInfoRequest
-  : public SimpleRequest<ConstantValueInfoRequest,
-                         ConstValueTypeInfo(NominalTypeDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  ConstValueTypeInfo
   evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:
@@ -3289,6 +3268,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Check that if one import in a file uses \c @_spiOnly, all imports from the
+/// same file are consistently using \c @_spiOnly.
+class CheckInconsistentSPIOnlyImportsRequest
+    : public SimpleRequest<CheckInconsistentSPIOnlyImportsRequest,
+                           evaluator::SideEffect(SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, SourceFile *mod) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Checks to see if any of the imports in a module use \c @_weakLinked
 /// in one file and not in another.
 ///
@@ -3363,6 +3361,10 @@ enum class CustomAttrTypeKind {
   /// Property wrappers have some funky rules, like allowing
   /// unbound generic types.
   PropertyWrapper,
+
+  /// Just like property wrappers, type wrappers are represented
+  /// as custom type attributes and allow unbound generic types.
+  TypeWrapper,
 
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
@@ -3451,8 +3453,7 @@ public:
 
 class RenamedDeclRequest
     : public SimpleRequest<RenamedDeclRequest,
-                           ValueDecl *(const ValueDecl *, const AvailableAttr *,
-                                       bool isKnownObjC),
+                           ValueDecl *(const ValueDecl *, const AvailableAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3461,7 +3462,23 @@ private:
   friend SimpleRequest;
 
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *attached,
-                      const AvailableAttr *attr, bool isKnownObjC) const;
+                      const AvailableAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class IsSemanticallyUnavailableRequest
+    : public SimpleRequest<IsSemanticallyUnavailableRequest,
+                           bool(const Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3494,6 +3511,257 @@ private:
   friend SimpleRequest;
 
   ASTNode evaluate(Evaluator &evaluator, const SourceFile *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Return a type wrapper (if any) associated with the given declaration.
+class GetTypeWrapper
+    : public SimpleRequest<GetTypeWrapper, NominalTypeDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Return a type of the type wrapper (if any) associated with the given
+/// declaration.
+class GetTypeWrapperType
+    : public SimpleRequest<GetTypeWrapperType, Type(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Inject or get `$Storage` type which has all of the stored properties
+/// of the given type with a type wrapper.
+class GetTypeWrapperStorage
+    : public SimpleRequest<GetTypeWrapperStorage,
+                           NominalTypeDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Inject or get `$storage` property which is used to route accesses through
+/// to all stored properties of a type that has a type wrapper.
+class GetTypeWrapperProperty
+    : public SimpleRequest<GetTypeWrapperProperty, VarDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Given a stored property associated with a type wrapped type,
+/// produce a property that mirrors it in the type wrapper context.
+class GetTypeWrapperStorageForProperty
+    : public SimpleRequest<GetTypeWrapperStorageForProperty,
+                           VarDecl *(VarDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, VarDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Synthesize the body of a getter for a stored property that belongs to
+/// a type wrapped type.
+class SynthesizeTypeWrappedPropertyGetterBody
+    : public SimpleRequest<SynthesizeTypeWrappedPropertyGetterBody,
+                           BraceStmt *(AccessorDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, AccessorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Synthesize the body of a setter for a stored property that belongs to
+/// a type wrapped type.
+class SynthesizeTypeWrappedPropertySetterBody
+    : public SimpleRequest<SynthesizeTypeWrappedPropertySetterBody,
+                           BraceStmt *(AccessorDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  BraceStmt *evaluate(Evaluator &evaluator, AccessorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Inject or get `$Storage` type which has all of the stored properties
+/// of the given type with a type wrapper.
+class IsPropertyAccessedViaTypeWrapper
+    : public SimpleRequest<IsPropertyAccessedViaTypeWrapper, bool(VarDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, VarDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SynthesizeTypeWrappedTypeMemberwiseInitializer
+    : public SimpleRequest<SynthesizeTypeWrappedTypeMemberwiseInitializer,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SynthesizeTypeWrappedTypeStorageWrapperInitializer
+    : public SimpleRequest<SynthesizeTypeWrappedTypeStorageWrapperInitializer,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class SynthesizeLocalVariableForTypeWrapperStorage
+    : public SimpleRequest<SynthesizeLocalVariableForTypeWrapperStorage,
+                           VarDecl *(ConstructorDecl *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  VarDecl *evaluate(Evaluator &evaluator, ConstructorDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class GetTypeWrapperInitializer
+    : public SimpleRequest<GetTypeWrapperInitializer,
+                           ConstructorDecl *(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes and returns a `#_hasSymbol` query function for the given
+/// `ValueDecl`. The function has an interface type of `() -> Builtin.Int1`.
+class SynthesizeHasSymbolQueryRequest
+    : public SimpleRequest<SynthesizeHasSymbolQueryRequest,
+                           FuncDecl *(const ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, const ValueDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+
+/// Retrieves the evaluation context of a macro with the given name.
+///
+/// The macro evaluation context is a user-defined generic signature and return
+/// type that serves as the "interface type" of references to the macro. The
+/// current implementation takes those pieces of syntax from the macro itself,
+/// then inserts them into a Swift struct that looks like
+///
+/// \code
+/// struct __MacroEvaluationContext\(macro.genericSignature) {
+///   typealias SignatureType = \(macro.signature)
+/// }
+/// \endcode
+///
+/// So that we can use all of Swift's native name lookup and type resolution
+/// facilities to map the parsed signature type back into a semantic \c Type
+/// AST and a set of requiremnets.
+class MacroContextRequest
+    : public SimpleRequest<MacroContextRequest,
+                           StructDecl *(std::string, ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  StructDecl *evaluate(Evaluator &evaluator,
+                       std::string macroName, ModuleDecl *mod) const;
 
 public:
   bool isCached() const { return true; }

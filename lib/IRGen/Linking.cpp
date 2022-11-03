@@ -703,7 +703,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto linkage = getDeclLinkage(varDecl);
 
     // Classes with resilient storage don't expose field offset symbols.
-    if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
+    auto implContext = varDecl->getDeclContext()->getImplementedObjCContext();
+    if (cast<ClassDecl>(implContext)->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
 
@@ -1021,13 +1022,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.Int8Ty;
     
   case Kind::ClassMetadataBaseOffset:
-    // TODO: put a cache variable on IGM
-    return llvm::StructType::get(IGM.getLLVMContext(), {
-      IGM.SizeTy,  // Immediate members offset
-      IGM.Int32Ty, // Negative size in words
-      IGM.Int32Ty  // Positive size in words
-    });
-    
+    return IGM.ClassMetadataBaseOffsetTy;
+
   case Kind::TypeMetadataInstantiationCache:
     // TODO: put a cache variable on IGM
     return llvm::ArrayType::get(IGM.Int8PtrTy,

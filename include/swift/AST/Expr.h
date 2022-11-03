@@ -350,6 +350,11 @@ protected:
     IsObjC : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(PackExpansionExpr, Expr, 32,
+    : NumPadBits,
+    NumBindings : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
     : NumPadBits,
     NumElements : 32
@@ -357,11 +362,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
     IsPlaceholder : 1
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(PackExpr, Expr, 32,
-    : NumPadBits,
-    NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeJoinExpr, Expr, 32,
@@ -1163,80 +1163,19 @@ public:
   }
 };
 
-/// Describes the actor to which an implicit-async expression will hop.
-struct ImplicitActorHopTarget {
-  enum Kind {
-    /// The "self" instance.
-    InstanceSelf,
-    /// A global actor with the given type.
-    GlobalActor,
-    /// An isolated parameter in a call.
-    IsolatedParameter,
-  };
-
-private:
-  /// The lower two bits are the Kind, and the remaining bits are used for
-  /// the payload, which might by a TypeBase * (for a global actor) or a
-  /// integer value (for an isolated parameter).
-  uintptr_t bits;
-
-  constexpr ImplicitActorHopTarget(uintptr_t bits) : bits(bits) { }
-
-public:
-  /// Default-initialized to instance "self".
-  constexpr ImplicitActorHopTarget() : bits(0) { }
-
-  static ImplicitActorHopTarget forInstanceSelf() {
-    return ImplicitActorHopTarget(InstanceSelf);
-  }
-
-  static ImplicitActorHopTarget forGlobalActor(Type globalActor) {
-    uintptr_t bits =
-      reinterpret_cast<uintptr_t>(globalActor.getPointer()) | GlobalActor;
-    return ImplicitActorHopTarget(bits);
-  }
-
-  static ImplicitActorHopTarget forIsolatedParameter(unsigned index) {
-    uintptr_t bits = static_cast<uintptr_t>(index) << 2 | IsolatedParameter;
-    return ImplicitActorHopTarget(bits);
-  }
-
-  /// Determine the kind of implicit actor hop being performed.
-  Kind getKind() const {
-    return static_cast<Kind>(bits & 0x03);
-  }
-
-  operator Kind() const {
-    return getKind();
-  }
-
-  /// Retrieve the global actor type for an implicit hop to a global actor.
-  Type getGlobalActor() const {
-    assert(getKind() == GlobalActor);
-    return Type(reinterpret_cast<TypeBase *>(bits & ~0x03));
-  }
-
-  /// Retrieve the (zero-based) parameter index for the isolated parameter
-  /// in a call.
-  unsigned getIsolatedParameterIndex() const {
-    assert(getKind() == IsolatedParameter);
-    return bits >> 2;
-  }
-};
-
-
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
   /// The declaration pointer.
   ConcreteDeclRef D;
   DeclNameLoc Loc;
-  ImplicitActorHopTarget implicitActorHopTarget;
+  ActorIsolation implicitActorHopTarget;
 
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
               AccessSemantics semantics = AccessSemantics::Ordinary,
               Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc) {
+    : Expr(ExprKind::DeclRef, Implicit, Ty), D(D), Loc(Loc),
+      implicitActorHopTarget(ActorIsolation::forUnspecified()) {
     Bits.DeclRefExpr.Semantics = (unsigned) semantics;
     Bits.DeclRefExpr.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
@@ -1258,7 +1197,7 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+  Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.DeclRefExpr.IsImplicitlyAsync)
       return None;
 
@@ -1266,7 +1205,7 @@ public:
   }
 
   /// Note that this reference is implicitly async and set the target.
-  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+  void setImplicitlyAsync(ActorIsolation target) {
     Bits.DeclRefExpr.IsImplicitlyAsync = true;
     implicitActorHopTarget = target;
   }
@@ -1600,12 +1539,13 @@ public:
 class LookupExpr : public Expr {
   Expr *Base;
   ConcreteDeclRef Member;
-  ImplicitActorHopTarget implicitActorHopTarget;
+  ActorIsolation implicitActorHopTarget;
 
 protected:
   explicit LookupExpr(ExprKind Kind, Expr *base, ConcreteDeclRef member,
                           bool Implicit)
-      : Expr(Kind, Implicit), Base(base), Member(member) {
+      : Expr(Kind, Implicit), Base(base), Member(member),
+        implicitActorHopTarget(ActorIsolation::forUnspecified()) {
     Bits.LookupExpr.IsSuper = false;
     Bits.LookupExpr.IsImplicitlyAsync = false;
     Bits.LookupExpr.IsImplicitlyThrows = false;
@@ -1640,7 +1580,7 @@ public:
 
   /// Determine whether this reference needs to happen asynchronously, i.e.,
   /// guarded by hop_to_executor, and if so describe the target.
-  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+  Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.LookupExpr.IsImplicitlyAsync)
       return None;
 
@@ -1648,7 +1588,7 @@ public:
   }
 
   /// Note that this reference is implicitly async and set the target.
-  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+  void setImplicitlyAsync(ActorIsolation target) {
     Bits.LookupExpr.IsImplicitlyAsync = true;
     implicitActorHopTarget = target;
   }
@@ -3157,6 +3097,19 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
 
+/// ABISafeConversion - models a type conversion on an l-value that has no
+/// material affect on the ABI of the type, while *preserving* the l-valueness
+/// of the type.
+class ABISafeConversionExpr : public ImplicitConversionExpr {
+public:
+  ABISafeConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ABISafeConversion, subExpr, type) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ABISafeConversion;
+  }
+};
+
 /// This is a conversion from an expression of UnresolvedType to an arbitrary
 /// other type, and from an arbitrary type to UnresolvedType.  This node does
 /// not appear in valid code, only in code involving diagnostics.
@@ -3446,18 +3399,6 @@ public:
   }
 };
 
-/// ReifyPackExpr - Drop the pack structure and reify it either as a tuple or
-/// single value.
-class ReifyPackExpr : public ImplicitConversionExpr {
-public:
-  ReifyPackExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ReifyPack, subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ReifyPack;
-  }
-};
-
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr final : public Expr,
@@ -3571,6 +3512,105 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::VarargExpansion;
+  }
+};
+
+/// A pack expansion expression is a pattern expression followed by
+/// the expansion operator '...'. The pattern expression contains
+/// references to parameter packs of length N, and the expansion
+/// operator will repeat the pattern N times.
+///
+/// Pack expansion expressions are permitted in expression contexts
+/// that naturally accept a comma-separated list of values, including
+/// call argument lists, the elements of a tuple value, and the source
+/// of a for-in loop.
+class PackExpansionExpr final : public Expr,
+    private llvm::TrailingObjects<PackExpansionExpr,
+                                  OpaqueValueExpr *, Expr *> {
+  friend TrailingObjects;
+
+  Expr *PatternExpr;
+  SourceLoc DotsLoc;
+  GenericEnvironment *Environment;
+
+  PackExpansionExpr(Expr *patternExpr,
+                    ArrayRef<OpaqueValueExpr *> opaqueValues,
+                    ArrayRef<Expr *> bindings,
+                    SourceLoc dotsLoc,
+                    GenericEnvironment *environment,
+                    bool implicit, Type type)
+    : Expr(ExprKind::PackExpansion, implicit, type),
+      PatternExpr(patternExpr), DotsLoc(dotsLoc), Environment(environment) {
+    assert(opaqueValues.size() == bindings.size());
+    Bits.PackExpansionExpr.NumBindings = opaqueValues.size();
+
+    assert(Bits.PackExpansionExpr.NumBindings > 0 &&
+           "PackExpansionExpr must have pack references");
+
+    std::uninitialized_copy(opaqueValues.begin(), opaqueValues.end(),
+                            getTrailingObjects<OpaqueValueExpr *>());
+    std::uninitialized_copy(bindings.begin(), bindings.end(),
+                            getTrailingObjects<Expr *>());
+  }
+
+  size_t numTrailingObjects(OverloadToken<OpaqueValueExpr *>) const {
+    return getNumBindings();
+  }
+
+  size_t numTrailingObjects(OverloadToken<Expr *>) const {
+    return getNumBindings();
+  }
+
+  MutableArrayRef<Expr *> getMutableBindings() {
+    return {getTrailingObjects<Expr *>(), getNumBindings()};
+  }
+
+public:
+  static PackExpansionExpr *create(ASTContext &ctx,
+                                   Expr *patternExpr,
+                                   ArrayRef<OpaqueValueExpr *> opaqueValues,
+                                   ArrayRef<Expr *> bindings,
+                                   SourceLoc dotsLoc,
+                                   GenericEnvironment *environment,
+                                   bool implicit = false,
+                                   Type type = Type());
+
+  Expr *getPatternExpr() const { return PatternExpr; }
+
+  void setPatternExpr(Expr *patternExpr) {
+    PatternExpr = patternExpr;
+  }
+
+  unsigned getNumBindings() const {
+    return Bits.PackExpansionExpr.NumBindings;
+  }
+
+  ArrayRef<OpaqueValueExpr *> getOpaqueValues() {
+    return {getTrailingObjects<OpaqueValueExpr *>(), getNumBindings()};
+  }
+
+  ArrayRef<Expr *> getBindings() {
+    return {getTrailingObjects<Expr *>(), getNumBindings()};
+  }
+
+  void setBinding(unsigned i, Expr *e) {
+    getMutableBindings()[i] = e;
+  }
+
+  GenericEnvironment *getGenericEnvironment() {
+    return Environment;
+  }
+
+  SourceLoc getStartLoc() const {
+    return PatternExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return DotsLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PackExpansion;
   }
 };
 
@@ -3705,6 +3745,8 @@ public:
   bool preconcurrency() const {
     return storage.getInt();
   }
+
+  ActorIsolation getActorIsolation() const;
 };
 
 /// A base class for closure expressions.
@@ -4092,14 +4134,6 @@ public:
 ///   func f(x : @autoclosure () -> Int)
 ///   f(42)  // AutoclosureExpr convert from Int to ()->Int
 /// \endcode
-///
-///  They are also created when key path expressions are converted to function
-///  type, in which case, a pair of nested implicit closures are formed:
-/// \code
-///   { $kp$ in { $0[keyPath: $kp$] } }( \(E) )
-/// \endcode
-/// This is to ensure side effects of the key path expression (mainly indices in
-/// subscripts) are only evaluated once.
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
@@ -4197,10 +4231,10 @@ class CaptureListExpr final : public Expr,
     private llvm::TrailingObjects<CaptureListExpr, CaptureListEntry> {
   friend TrailingObjects;
 
-  ClosureExpr *closureBody;
+  AbstractClosureExpr *closureBody;
 
   CaptureListExpr(ArrayRef<CaptureListEntry> captureList,
-                  ClosureExpr *closureBody)
+                  AbstractClosureExpr *closureBody)
     : Expr(ExprKind::CaptureList, /*Implicit=*/false, Type()),
       closureBody(closureBody) {
     Bits.CaptureListExpr.NumCaptures = captureList.size();
@@ -4211,16 +4245,16 @@ class CaptureListExpr final : public Expr,
 public:
   static CaptureListExpr *create(ASTContext &ctx,
                                  ArrayRef<CaptureListEntry> captureList,
-                                 ClosureExpr *closureBody);
+                                 AbstractClosureExpr *closureBody);
 
   ArrayRef<CaptureListEntry> getCaptureList() {
     return {getTrailingObjects<CaptureListEntry>(),
             Bits.CaptureListExpr.NumCaptures};
   }
-  ClosureExpr *getClosureBody() { return closureBody; }
-  const ClosureExpr *getClosureBody() const { return closureBody; }
+  AbstractClosureExpr *getClosureBody() { return closureBody; }
+  const AbstractClosureExpr *getClosureBody() const { return closureBody; }
 
-  void setClosureBody(ClosureExpr *body) { closureBody = body; }
+  void setClosureBody(AbstractClosureExpr *body) { closureBody = body; }
 
   /// This is a bit weird, but the capture list is lexically contained within
   /// the closure, so the ClosureExpr has the full source range.
@@ -4482,12 +4516,13 @@ class ApplyExpr : public Expr {
   /// The list of arguments to call the function with.
   ArgumentList *ArgList;
 
-  ImplicitActorHopTarget implicitActorHopTarget;
+  ActorIsolation implicitActorHopTarget;
 
 protected:
   ApplyExpr(ExprKind kind, Expr *fn, ArgumentList *argList, bool implicit,
             Type ty = Type())
-      : Expr(kind, implicit, ty), Fn(fn), ArgList(argList) {
+      : Expr(kind, implicit, ty), Fn(fn), ArgList(argList),
+        implicitActorHopTarget(ActorIsolation::forUnspecified()) {
     assert(ArgList);
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
     Bits.ApplyExpr.ThrowsIsSet = false;
@@ -4553,7 +4588,7 @@ public:
   ///
   /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
-  Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
+  Optional<ActorIsolation> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
       return None;
 
@@ -4561,7 +4596,7 @@ public:
   }
 
   /// Note that this application is implicitly async and set the target.
-  void setImplicitlyAsync(ImplicitActorHopTarget target) {
+  void setImplicitlyAsync(ActorIsolation target) {
     Bits.ApplyExpr.ImplicitlyAsync = true;
     implicitActorHopTarget = target;
   }
@@ -5113,25 +5148,21 @@ public:
     return E->getKind() == ExprKind::RebindSelfInConstructor;
   }
 };
-  
-/// The conditional expression 'x ? y : z'.
-class IfExpr : public Expr {
+
+/// The ternary conditional expression 'x ? y : z'.
+class TernaryExpr : public Expr {
   Expr *CondExpr, *ThenExpr, *ElseExpr;
   SourceLoc QuestionLoc, ColonLoc;
 public:
-  IfExpr(Expr *CondExpr,
-         SourceLoc QuestionLoc, Expr *ThenExpr,
-         SourceLoc ColonLoc, Expr *ElseExpr,
-         Type Ty = Type())
-    : Expr(ExprKind::If, /*Implicit=*/false, Ty),
-      CondExpr(CondExpr), ThenExpr(ThenExpr), ElseExpr(ElseExpr),
-      QuestionLoc(QuestionLoc), ColonLoc(ColonLoc)
-  {}
-  
-  IfExpr(SourceLoc QuestionLoc, Expr *ThenExpr, SourceLoc ColonLoc)
-    : IfExpr(nullptr, QuestionLoc, ThenExpr, ColonLoc, nullptr)
-  {}
-  
+  TernaryExpr(Expr *CondExpr, SourceLoc QuestionLoc, Expr *ThenExpr,
+              SourceLoc ColonLoc, Expr *ElseExpr, Type Ty = Type())
+      : Expr(ExprKind::Ternary, /*Implicit=*/false, Ty), CondExpr(CondExpr),
+        ThenExpr(ThenExpr), ElseExpr(ElseExpr), QuestionLoc(QuestionLoc),
+        ColonLoc(ColonLoc) {}
+
+  TernaryExpr(SourceLoc QuestionLoc, Expr *ThenExpr, SourceLoc ColonLoc)
+      : TernaryExpr(nullptr, QuestionLoc, ThenExpr, ColonLoc, nullptr) {}
+
   SourceLoc getLoc() const { return QuestionLoc; }
   SourceLoc getStartLoc() const {
     return (isFolded() ? CondExpr->getStartLoc() : QuestionLoc);
@@ -5155,7 +5186,7 @@ public:
   bool isFolded() const { return CondExpr && ElseExpr; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::If;
+    return E->getKind() == ExprKind::Ternary;
   }
 };
 
@@ -5786,8 +5817,8 @@ private:
 public:
   /// Create a new parsed Swift key path expression.
   static KeyPathExpr *createParsed(ASTContext &ctx, SourceLoc backslashLoc,
-                                   Expr *parsedRoot, Expr *parsedPath,
-                                   bool hasLeadingDot);
+     Expr *parsedRoot, Expr *parsedPath,
+     bool hasLeadingDot);
 
   /// Create a new parsed #keyPath expression.
   static KeyPathExpr *createParsedPoundKeyPath(ASTContext &ctx,
@@ -5931,56 +5962,6 @@ public:
   }
 };
 
-/// An expression node that aggregates a set of heterogeneous arguments into a
-/// parameter pack suitable for passing off to a variadic generic function
-/// argument.
-///
-/// There is no user-visible way to spell a pack expression, they are always
-/// implicitly created at applies. As such, any appearance of pack types outside
-/// of applies are illegal. In general, packs appearing in such positions should
-/// have a \c ReifyPackExpr to convert them to a user-available AST type.
-class PackExpr final : public Expr,
-    private llvm::TrailingObjects<PackExpr, Expr *> {
-  friend TrailingObjects;
-
-  size_t numTrailingObjects() const {
-    return getNumElements();
-  }
-
-  PackExpr(ArrayRef<Expr *> SubExprs, Type Ty);
-
-public:
-  /// Create a pack.
-  static PackExpr *create(ASTContext &ctx, ArrayRef<Expr *> SubExprs, Type Ty);
-
-  /// Create an empty pack.
-  static PackExpr *createEmpty(ASTContext &ctx);
-
-  SourceLoc getLoc() const { return SourceLoc(); }
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  /// Retrieve the elements of this pack.
-  MutableArrayRef<Expr *> getElements() {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
-  }
-
-  /// Retrieve the elements of this pack.
-  ArrayRef<Expr *> getElements() const {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
-  }
-
-  unsigned getNumElements() const { return Bits.PackExpr.NumElements; }
-
-  Expr *getElement(unsigned i) const {
-    return getElements()[i];
-  }
-  void setElement(unsigned i, Expr *e) {
-    getElements()[i] = e;
-  }
-
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Pack; }
-};
-
 class TypeJoinExpr final : public Expr,
                            private llvm::TrailingObjects<TypeJoinExpr, Expr *> {
   friend TrailingObjects;
@@ -6030,8 +6011,46 @@ public:
   }
 };
 
+class MacroExpansionExpr final : public Expr {
+private:
+  SourceLoc PoundLoc;
+  DeclNameRef MacroName;
+  DeclNameLoc MacroNameLoc;
+  ArgumentList *ArgList;
+  Expr *Rewritten;
+
+public:
+  explicit MacroExpansionExpr(SourceLoc poundLoc, DeclNameRef macroName,
+                              DeclNameLoc macroNameLoc,
+                              ArgumentList *argList, bool isImplicit = false,
+                              Type ty = Type())
+      : Expr(ExprKind::MacroExpansion, isImplicit, ty), PoundLoc(poundLoc),
+        MacroName(macroName), MacroNameLoc(macroNameLoc), ArgList(argList),
+        Rewritten(nullptr) { }
+
+  DeclNameRef getMacroName() const { return MacroName; }
+  DeclNameLoc getMacroNameLoc() const { return MacroNameLoc; }
+
+  Expr *getRewritten() const { return Rewritten; }
+  void setRewritten(Expr *rewritten) { Rewritten = rewritten; }
+
+  ArgumentList *getArgs() const { return ArgList; }
+  void setArgs(ArgumentList *newArgs) { ArgList = newArgs; }
+
+  SourceLoc getLoc() const { return PoundLoc; }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(
+        PoundLoc, ArgList ? ArgList->getEndLoc() : MacroNameLoc.getEndLoc());
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MacroExpansion;
+  }
+};
+
 inline bool Expr::isInfixOperator() const {
-  return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
+  return isa<BinaryExpr>(this) || isa<TernaryExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
 }
 

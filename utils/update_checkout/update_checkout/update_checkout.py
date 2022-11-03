@@ -266,6 +266,20 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
         if repo_name in args.skip_repository_list:
             print("Skipping update of '" + repo_name + "', requested by user")
             continue
+
+        # If the repository is not listed in the branch-scheme, skip it.
+        if scheme_map and repo_name not in scheme_map:
+            # If the repository exists locally, notify we are skipping it.
+            if os.path.isdir(os.path.join(args.source_root, repo_name)):
+                print(
+                    "Skipping update of '"
+                    + repo_name
+                    + "', repository not listed in the '"
+                    + scheme_name
+                    + "' branch-scheme"
+                )
+            continue
+
         my_args = [args.source_root, config,
                    repo_name,
                    scheme_name,
@@ -461,7 +475,7 @@ def skip_list_for_platform(config, all_repos):
         return []  # Do not skip any platform-specific repositories
 
     # If there is a platforms key only include the repo if the
-    # plaform is in the list
+    # platform is in the list
     skip_list = []
     platform_name = platform.system()
 
@@ -509,7 +523,7 @@ repositories.
         action="append")
     parser.add_argument(
         "--all-repositories",
-        help="""Includes repositories not required for current platform. 
+        help="""Includes repositories not required for current platform.
         This will not override '--skip-repositories'""",
         action='store_true')
     parser.add_argument(

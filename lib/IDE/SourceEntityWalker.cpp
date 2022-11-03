@@ -37,14 +37,11 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
   llvm::SmallPtrSet<Expr *, 16> ExprsToSkip;
-  bool Cancelled = false;
   Optional<AccessKind> OpAccess;
 
 public:
   explicit SemaAnnotator(SourceEntityWalker &SEWalker)
     : SEWalker(SEWalker) { }
-
-  bool isDone() const { return Cancelled; }
 
 private:
 
@@ -59,24 +56,24 @@ private:
     return false;
   }
 
-  bool walkToDeclPre(Decl *D) override;
-  bool walkToDeclPreProper(Decl *D);
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
-  bool walkToTypeReprPre(TypeRepr *T) override;
+  PreWalkAction walkToDeclPre(Decl *D) override;
+  PreWalkAction walkToDeclPreProper(Decl *D);
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
 
-  bool walkToDeclPost(Decl *D) override;
-  bool walkToDeclPostProper(Decl *D);
-  Expr *walkToExprPost(Expr *E) override;
-  bool walkToTypeReprPost(TypeRepr *T) override;
+  PostWalkAction walkToDeclPost(Decl *D) override;
+  PostWalkAction walkToDeclPostProper(Decl *D);
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+  PostWalkAction walkToTypeReprPost(TypeRepr *T) override;
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
-  Stmt *walkToStmtPost(Stmt *S) override;
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
+  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override;
 
-  std::pair<bool, ArgumentList *>
+  PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) override;
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
-  Pattern *walkToPatternPost(Pattern *P) override;
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
+  PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override;
 
   bool handleImports(ImportDecl *Import);
   bool handleCustomAttributes(Decl *D);
@@ -113,22 +110,19 @@ private:
 
 } // end anonymous namespace
 
-bool SemaAnnotator::walkToDeclPre(Decl *D) {
-  if (isDone())
-    return false;
-
+ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPre(Decl *D) {
   if (shouldIgnore(D)) {
     // If we return true here, the children will still be visited, but we won't
     // call walkToDeclPre on SEWalker. The corresponding walkToDeclPost call
     // on SEWalker will be prevented by the check for shouldIgnore in
     // walkToDeclPost in SemaAnnotator.
-    return isa<PatternBindingDecl>(D);
+    return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
   }
 
   SEWalker.beginBalancedASTOrderDeclVisit(D);
-  bool Continue = walkToDeclPreProper(D);
+  auto Result = walkToDeclPreProper(D);
 
-  if (!Continue) {
+  if (Result.Action != PreWalkAction::Continue) {
     // To satisfy the contract of balanced calls to
     // begin/endBalancedASTOrderDeclVisit, we must call
     // endBalancedASTOrderDeclVisit here if walkToDeclPost isn't going to be
@@ -136,14 +130,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     SEWalker.endBalancedASTOrderDeclVisit(D);
   }
 
-  return Continue;
+  return Result;
 }
 
-bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
-  if (!handleCustomAttributes(D)) {
-    Cancelled = true;
-    return false;
-  }
+ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
+  if (!handleCustomAttributes(D))
+    return Action::Stop();
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
@@ -168,7 +160,6 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
           continue;
         if (!SEWalker.visitDeclarationArgumentName(PD->getArgumentName(), Loc,
                                                    VD)) {
-          Cancelled = true;
           return false;
         }
       }
@@ -178,7 +169,7 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
     if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
       auto ParamList = getParameterList(VD);
       if (!ReportParamList(ParamList))
-        return false;
+        return Action::Stop();
     }
 
     if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
@@ -188,10 +179,12 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
         Identifier name = parsedName.first;
         SourceLoc loc = parsedName.second;
         if (auto assocTypeDecl = proto->getAssociatedType(name)) {
-          passReference(assocTypeDecl,
-                        assocTypeDecl->getDeclaredInterfaceType(),
-                        DeclNameLoc(loc),
-                        ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+          auto Continue = passReference(
+              assocTypeDecl, assocTypeDecl->getDeclaredInterfaceType(),
+              DeclNameLoc(loc),
+              ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+          if (!Continue)
+            return Action::Stop();
         }
       }
     }
@@ -205,7 +198,7 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
     IsExtension = true;
   } else if (auto Import = dyn_cast<ImportDecl>(D)) {
     if (!handleImports(Import))
-      return false;
+      return Action::Stop();
 
   } else if (auto OpD = dyn_cast<OperatorDecl>(D)) {
     Loc = OpD->getLoc();
@@ -224,7 +217,7 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
           Member.walk(*this);
         }
       }
-      return false;
+      return Action::SkipChildren();
     }
   }
 
@@ -236,21 +229,18 @@ bool SemaAnnotator::walkToDeclPreProper(Decl *D) {
   if (IsExtension && ShouldVisitChildren) {
     ExtDecls.push_back(static_cast<ExtensionDecl*>(D));
   }
-  return ShouldVisitChildren;
+  return Action::VisitChildrenIf(ShouldVisitChildren);
 }
 
-bool SemaAnnotator::walkToDeclPost(Decl *D) {
-  bool Continue = walkToDeclPostProper(D);
+ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPost(Decl *D) {
+  auto Action = walkToDeclPostProper(D);
   SEWalker.endBalancedASTOrderDeclVisit(D);
-  return Continue;
+  return Action;
 }
 
-bool SemaAnnotator::walkToDeclPostProper(Decl *D) {
-  if (isDone())
-    return false;
-
+ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPostProper(Decl *D) {
   if (shouldIgnore(D))
-    return true;
+    return Action::Continue();
 
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
@@ -258,46 +248,39 @@ bool SemaAnnotator::walkToDeclPostProper(Decl *D) {
   }
 
   bool Continue = SEWalker.walkToDeclPost(D);
-  if (!Continue)
-    Cancelled = true;
-  return Continue;
+  return Action::StopIf(!Continue);
 }
 
-std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
-  if (isDone()) {
-    return { false, nullptr };
-  }
-
+ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
   if (TraverseChildren) {
     if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
       // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
       // walk into the body.
       if (auto *FD = DeferS->getTempDecl()) {
-        auto *RetS = FD->getBody()->walk(*this);
+        auto *Body = FD->getBody();
+        if (!Body)
+          return Action::Stop();
+
+        auto *RetS = Body->walk(*this);
         if (!RetS)
-          return { false, nullptr };
-        assert(RetS == FD->getBody());
+          return Action::Stop();
+        assert(RetS == Body);
       }
       bool Continue = SEWalker.walkToStmtPost(DeferS);
       if (!Continue)
-        Cancelled = true;
+        return Action::Stop();
+
       // Already walked children.
-      return { false, Continue ? DeferS : nullptr };
+      return Action::SkipChildren(DeferS);
     }
   }
-  return { TraverseChildren, S };
+  return Action::VisitChildrenIf(TraverseChildren, S);
 }
 
-Stmt *SemaAnnotator::walkToStmtPost(Stmt *S) {
-  if (isDone()) {
-    return nullptr;
-  }
-
+ASTWalker::PostWalkResult<Stmt *> SemaAnnotator::walkToStmtPost(Stmt *S) {
   bool Continue = SEWalker.walkToStmtPost(S);
-  if (!Continue)
-    Cancelled = true;
-  return Continue ? S : nullptr;
+  return Action::StopIf(!Continue, S);
 }
 
 static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
@@ -308,67 +291,59 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
   return SemaReferenceKind::DeclRef;
 }
 
-std::pair<bool, ArgumentList *>
+ASTWalker::PreWalkResult<ArgumentList *>
 SemaAnnotator::walkToArgumentListPre(ArgumentList *ArgList) {
-  auto doStopTraversal = [&]() -> std::pair<bool, ArgumentList *> {
-    Cancelled = true;
-    return {false, nullptr};
-  };
-
   // Don't consider the argument labels for an implicit ArgumentList.
   if (ArgList->isImplicit())
-    return {true, ArgList};
+    return Action::Continue(ArgList);
 
-  // FIXME: What about SubscriptExpr and KeyPathExpr arg labels? (SR-15063)
+  // FIXME(https://github.com/apple/swift/issues/57390): What about SubscriptExpr and KeyPathExpr arg labels?
   if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
     if (!passCallArgNames(CallE->getFn(), ArgList))
-      return doStopTraversal();
+      return Action::Stop();
   }
-  return {true, ArgList};
+  return Action::Continue(ArgList);
 }
 
-std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   assert(E);
-
-  if (isDone()) {
-    return { false, nullptr };
-  }
 
   if (ExprsToSkip.count(E) != 0) {
     // We are skipping the expression. Call neither walkToExprPr nor
     // walkToExprPost on it
-    return { false, E };
+    return Action::SkipChildren(E);
   }
-
-  auto doStopTraversal = [&]() -> std::pair<bool, Expr *> {
-    Cancelled = true;
-    return { false, nullptr };
-  };
 
   // Skip the synthesized curry thunks and just walk over the unwrapped
   // expression
   if (auto *ACE = dyn_cast<AutoClosureExpr>(E)) {
     if (auto *SubExpr = ACE->getUnwrappedCurryThunkExpr()) {
       if (!SubExpr->walk(*this))
-        return doStopTraversal();
-      return { false, E };
+        return Action::Stop();
+
+      return Action::SkipChildren(E);
     }
   }
 
   if (!SEWalker.walkToExprPre(E)) {
-    return { false, E };
+    return Action::SkipChildren(E);
   }
 
-  auto doSkipChildren = [&]() -> std::pair<bool, Expr *> {
+  auto doSkipChildren = [&]() -> PreWalkResult<Expr *> {
     // If we decide to skip the children after having issued the call to
     // walkToExprPre, we need to simulate a corresponding call to walkToExprPost
     // which will not be issued by the ASTWalker if we return false in the first
     // component.
-    if (!walkToExprPost(E)) {
-      // walkToExprPost has cancelled the traversal. Stop.
-      return { false, nullptr };
+    // TODO: We should consider changing Action::SkipChildren to still call
+    // walkToExprPost, which would eliminate the need for this.
+    auto postWalkResult = walkToExprPost(E);
+    switch (postWalkResult.Action.Action) {
+    case PostWalkAction::Stop:
+      return Action::Stop();
+    case PostWalkAction::Continue:
+      return Action::SkipChildren(*postWalkResult.Value);
     }
-    return { false, E };
+    llvm_unreachable("Unhandled case in switch!");
   };
 
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
@@ -381,32 +356,47 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (DRE->isImplicit() && FD && FD->isCallAsFunctionMethod()) {
       ReferenceMetaData data(SemaReferenceKind::DeclMemberRef, OpAccess);
       if (!passCallAsFunctionReference(FD, DRE->getLoc(), data))
-        return {false, nullptr};
-      return {true, E};
+        return Action::Stop();
+
+      return Action::Continue(E);
     }
   }
 
-  if (!isa<InOutExpr>(E) &&
-      !isa<LoadExpr>(E) &&
-      !isa<OpenExistentialExpr>(E) &&
+  if (!isa<InOutExpr>(E) && !isa<LoadExpr>(E) && !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
-      !isa<CollectionUpcastConversionExpr>(E) &&
-      !isa<OpaqueValueExpr>(E) &&
-      !isa<SubscriptExpr>(E) &&
-      !isa<KeyPathExpr>(E) &&
-      E->isImplicit())
-    return { true, E };
+      !isa<CollectionUpcastConversionExpr>(E) && !isa<OpaqueValueExpr>(E) &&
+      !isa<SubscriptExpr>(E) && !isa<KeyPathExpr>(E) && !isa<LiteralExpr>(E) &&
+      !isa<CollectionExpr>(E) && E->isImplicit())
+    return Action::Continue(E);
 
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+  if (auto LE = dyn_cast<LiteralExpr>(E)) {
+    if (LE->getInitializer() &&
+        !passReference(LE->getInitializer().getDecl(), LE->getType(), {},
+                       LE->getSourceRange(),
+                       ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
+                                         /*isImplicit=*/true))) {
+      return Action::Stop();
+    }
+    return Action::Continue(E);
+  } else if (auto CE = dyn_cast<CollectionExpr>(E)) {
+    if (CE->getInitializer() &&
+        !passReference(CE->getInitializer().getDecl(), CE->getType(), {},
+                       CE->getSourceRange(),
+                       ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
+                                         /*isImplicit=*/true))) {
+      return Action::Stop();
+    }
+    return Action::Continue(E);
+  } else if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
                          {module->getName(), E->getLoc()}))
-        return doStopTraversal();
+        return Action::Stop();
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
                       ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
                                         OpAccess))) {
-      return doStopTraversal();
+      return Action::Stop();
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     {
@@ -425,14 +415,14 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       // Visit in source order.
       if (!MRE->getBase()->walk(*this))
-        return doStopTraversal();
+        return Action::Stop();
     }
 
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
                                          OpAccess)))
-      return doStopTraversal();
+      return Action::Stop();
 
     // We already visited the children.
     return doSkipChildren();
@@ -442,12 +432,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                        OtherCtorE->getConstructorLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclConstructorRef,
                                          OpAccess)))
-      return doStopTraversal();
+      return Action::Stop();
 
   } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     // Visit in source order.
     if (!SE->getBase()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     ValueDecl *SubscrD = nullptr;
     if (SE->hasDecl())
@@ -458,15 +448,15 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getLoc(), data, true))
-        return doStopTraversal();
+        return Action::Stop();
     }
 
     if (!SE->getArgs()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))
-        return doStopTraversal();
+        return Action::Stop();
     }
 
     // We already visited the children.
@@ -480,12 +470,14 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);
-        passReference(decl, component.getComponentType(), loc, range,
-                      ReferenceMetaData(
-                        (isa<SubscriptDecl>(decl)
-                          ? SemaReferenceKind::SubscriptRef
-                          : SemaReferenceKind::DeclMemberRef),
-                        OpAccess));
+        auto Continue = passReference(
+            decl, component.getComponentType(), loc, range,
+            ReferenceMetaData((isa<SubscriptDecl>(decl)
+                                   ? SemaReferenceKind::SubscriptRef
+                                   : SemaReferenceKind::DeclMemberRef),
+                              OpAccess));
+        if (!Continue)
+          return Action::Stop();
         break;
       }
 
@@ -505,11 +497,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getLHS()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
     if (!BinE->getFn()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
     if (!BinE->getRHS()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     // We already visited the children.
     return doSkipChildren();
@@ -518,7 +510,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       C(this->OpAccess, AccessKind::ReadWrite);
 
     if (!IOE->getSubExpr()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     // We already visited the children.
     return doSkipChildren();
@@ -527,7 +519,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       C(this->OpAccess, AccessKind::Read);
 
     if (!LE->getSubExpr()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     // We already visited the children.
     return doSkipChildren();
@@ -537,11 +529,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         C(this->OpAccess, AccessKind::Write);
 
       if (AE->getDest() && !AE->getDest()->walk(*this))
-        return doStopTraversal();
+        return Action::Stop();
     }
 
     if (AE->getSrc() && !AE->getSrc()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     // We already visited the children.
     return doSkipChildren();
@@ -553,7 +545,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     };
 
     if (!OEE->getSubExpr()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     return doSkipChildren();
   } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
@@ -562,12 +554,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     // Original non-escaping closure.
     if (!MTEE->getNonescapingClosureValue()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     // Body, which is called by synthesized CallExpr.
     auto *callExpr = cast<CallExpr>(MTEE->getSubExpr());
     if (!callExpr->getFn()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     return doSkipChildren();
   } else if (auto CUCE = dyn_cast<CollectionUpcastConversionExpr>(E)) {
@@ -575,7 +567,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // because it's only in conversion expressions. Instead, just walk into
     // sub expression.
     if (!CUCE->getSubExpr()->walk(*this))
-      return doStopTraversal();
+      return Action::Stop();
 
     return doSkipChildren();
   } else if (auto OVE = dyn_cast<OpaqueValueExpr>(E)) {
@@ -583,116 +575,96 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     auto value = OpaqueValueMap.find(OVE);
     if (value != OpaqueValueMap.end()) {
       if (!value->second->walk(*this))
-        return doStopTraversal();
+        return Action::Stop();
 
       return doSkipChildren();
     }
   } else if (auto DMRE = dyn_cast<DynamicMemberRefExpr>(E)) {
     // Visit in source order.
     if (!DMRE->getBase()->walk(*this))
-        return doStopTraversal();
+      return Action::Stop();
     if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
                        DMRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
                                          OpAccess)))
-        return doStopTraversal();
+      return Action::Stop();
     // We already visited the children.
     return doSkipChildren();
   }
 
-  return { true, E };
+  return Action::Continue(E);
 }
 
-Expr *SemaAnnotator::walkToExprPost(Expr *E) {
-  if (isDone()) {
-    return nullptr;
-  }
-
+ASTWalker::PostWalkResult<Expr *> SemaAnnotator::walkToExprPost(Expr *E) {
   if (isa<ConstructorRefCallExpr>(E)) {
     assert(CtorRefs.back() == E);
     CtorRefs.pop_back();
   }
 
   bool Continue = SEWalker.walkToExprPost(E);
-  if (!Continue)
-    Cancelled = true;
-  return Continue ? E : nullptr;
+  return Action::StopIf(!Continue, E);
 }
 
-bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
-  if (isDone())
-    return false;
-
+ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   bool Continue = SEWalker.walkToTypeReprPre(T);
-  if (!Continue) {
-    Cancelled = true;
-    return false;
-  }
+  if (!Continue)
+    return Action::Stop();
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
         auto ident = IdT->getNameRef().getBaseIdentifier();
-        return passReference(ModD, { ident, IdT->getLoc() });
+        auto Continue = passReference(ModD, {ident, IdT->getLoc()});
+        return Action::StopIf(!Continue);
       }
-
-      return passReference(VD, Type(), IdT->getNameLoc(),
-                           ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+      auto Continue =
+          passReference(VD, Type(), IdT->getNameLoc(),
+                        ReferenceMetaData(SemaReferenceKind::TypeRef, None));
+      return Action::StopIf(!Continue);
     }
   }
 
-  return true;
+  return Action::Continue();
 }
 
-bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
-  if (isDone()) {
-    return false;
-  }
-
+ASTWalker::PostWalkAction SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
   bool Continue = SEWalker.walkToTypeReprPost(T);
-  if (!Continue)
-    Cancelled = true;
-  return Continue;
+  return Action::StopIf(!Continue);
 }
 
-std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
-  if (isDone()) {
-    return { false, nullptr };
-  }
-
+ASTWalker::PreWalkResult<Pattern *>
+SemaAnnotator::walkToPatternPre(Pattern *P) {
   if (!SEWalker.walkToPatternPre(P))
-    return { false, P };
+    return Action::SkipChildren(P);
 
   if (P->isImplicit())
-    return { true, P };
+    return Action::Continue(P);
 
   if (auto *EP = dyn_cast<EnumElementPattern>(P)) {
     auto *Element = EP->getElementDecl();
     if (!Element)
-      return { true, P };
+      return Action::Continue(P);
     Type T = EP->hasType() ? EP->getType() : Type();
-    return { passReference(Element, T, DeclNameLoc(EP->getLoc()),
-                ReferenceMetaData(SemaReferenceKind::EnumElementRef, None)), P };
+    auto Continue = passReference(
+        Element, T, DeclNameLoc(EP->getLoc()),
+        ReferenceMetaData(SemaReferenceKind::EnumElementRef, None));
+    return Action::StopIf(!Continue, P);
   }
 
   auto *TP = dyn_cast<TypedPattern>(P);
   if (!TP || !TP->isPropagatedType())
-    return { true, P };
+    return Action::Continue(P);
 
   // If the typed pattern was propagated from somewhere, just walk the
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
-  return { false, P };
+  return Action::SkipChildren(P);
 }
 
-Pattern *SemaAnnotator::walkToPatternPost(Pattern *P) {
-  if (isDone())
-     return nullptr;
-
+ASTWalker::PostWalkResult<Pattern *>
+SemaAnnotator::walkToPatternPost(Pattern *P) {
   bool Continue = SEWalker.walkToPatternPost(P);
-  if (!Continue)
-    Cancelled = true;
-  return Continue ? P : nullptr;
+  return Action::StopIf(!Continue, P);
 }
 
 bool SemaAnnotator::handleCustomAttributes(Decl *D) {
@@ -777,11 +749,7 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                         ? CharSourceRange(Loc, 1)
                         : CharSourceRange();
 
-  bool Continue =
-      SEWalker.visitSubscriptReference(D, Range, Data, IsOpenBracket);
-  if (!Continue)
-    Cancelled = true;
-  return Continue;
+  return SEWalker.visitSubscriptReference(D, Range, Data, IsOpenBracket);
 }
 
 bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
@@ -789,10 +757,7 @@ bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
   CharSourceRange Range =
       Loc.isValid() ? CharSourceRange(Loc, 1) : CharSourceRange();
 
-  bool Continue = SEWalker.visitCallAsFunctionReference(D, Range, Data);
-  if (!Continue)
-    Cancelled = true;
-  return Continue;
+  return SEWalker.visitCallAsFunctionReference(D, Range, Data);
 }
 
 bool SemaAnnotator::
@@ -838,11 +803,9 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
   CharSourceRange CharRange =
     Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
                                              Range);
-  bool Continue = SEWalker.visitDeclReference(D, CharRange, CtorTyRef, ExtDecl,
-                                              Ty, Data);
-  if (!Continue)
-    Cancelled = true;
-  return Continue;
+
+  return SEWalker.visitDeclReference(D, CharRange, CtorTyRef, ExtDecl, Ty,
+                                     Data);
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
@@ -851,10 +814,7 @@ bool SemaAnnotator::passReference(ModuleEntity Mod,
     return true;
   unsigned NameLen = IdLoc.Item.getLength();
   CharSourceRange Range{ IdLoc.Loc, NameLen };
-  bool Continue = SEWalker.visitModuleReference(Mod, Range);
-  if (!Continue)
-    Cancelled = true;
-  return Continue;
+  return SEWalker.visitModuleReference(Mod, Range);
 }
 
 bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
@@ -873,10 +833,8 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, ArgumentList *ArgList) {
 
     CharSourceRange Range{ Loc, Name.getLength() };
     bool Continue = SEWalker.visitCallArgName(Name, Range, D);
-    if (!Continue) {
-      Cancelled = true;
+    if (!Continue)
       return false;
-    }
   }
 
   return true;

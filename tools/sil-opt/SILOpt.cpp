@@ -136,6 +136,10 @@ static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
 
+static llvm::cl::opt<bool> EnableExperimentalTypeWrappers(
+    "enable-experimental-type-wrappers",
+    llvm::cl::desc("Enable experimental type wrappers."));
+
 static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
@@ -581,6 +585,10 @@ int main(int argc, char **argv) {
         Feature::DifferentiableProgramming);
   }
 
+  if (EnableExperimentalTypeWrappers) {
+    Invocation.getLangOptions().Features.insert(Feature::TypeWrappers);
+  }
+
   Invocation.getLangOptions().EnableCXXInterop = EnableCxxInterop;
 
   Invocation.getDiagnosticOptions().VerifyMode =
@@ -598,6 +606,7 @@ int main(int argc, char **argv) {
   SILOpts.OptRecordPasses = RemarksPasses;
   SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnablePerformanceAnnotations = true;
+  SILOpts.EnableStackProtection = true;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

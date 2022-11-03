@@ -21,7 +21,7 @@ import Foundation
 sil shared [ossa] @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@in Array<String>) -> @out NSObject {
 bb0(%0 : $*NSObject, %1 : $*Array<String>):
   %2 = alloc_stack $Array<String>
-  copy_addr %1 to [initialization] %2 : $*Array<String>
+  copy_addr %1 to [init] %2 : $*Array<String>
   unconditional_checked_cast_addr Array<String> in %2 : $*Array<String> to NSObject in %0 : $*NSObject
   dealloc_stack %2 : $*Array<String>
   destroy_addr %1 : $*Array<String>
@@ -48,7 +48,7 @@ sil [ossa] @unconditional_checked_cast_addr_address_only_type: $@convention(thin
 bb0(%0 : $*AddressOnlyError):
   %1 = alloc_stack $Error
   %2 = alloc_stack $AddressOnlyError
-  copy_addr %0 to [initialization] %2 : $*AddressOnlyError
+  copy_addr %0 to [init] %2 : $*AddressOnlyError
   unconditional_checked_cast_addr AddressOnlyError in %2 : $*AddressOnlyError to Error in %1 : $*Error
   dealloc_stack %2 : $*AddressOnlyError
   %8 = tuple ()

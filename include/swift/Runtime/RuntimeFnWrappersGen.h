@@ -46,5 +46,9 @@ llvm::Constant *getRuntimeFn(llvm::Module &Module, llvm::Constant *&cache,
                              llvm::ArrayRef<llvm::Attribute::AttrKind> attrs,
                              irgen::IRGenModule *IGM = nullptr);
 
+llvm::FunctionType *getRuntimeFnType(llvm::Module &Module,
+                             llvm::ArrayRef<llvm::Type *> retTypes,
+                             llvm::ArrayRef<llvm::Type *> argTypes);
+
 } // namespace swift
 #endif

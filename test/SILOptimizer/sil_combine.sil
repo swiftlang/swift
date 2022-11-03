@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
 // required to allow address-type block args in canonical SIL.
@@ -1169,50 +1171,6 @@ bb0(%0 : $B):
   return %7 : $FakeOptional<B>
 }
 
-// Negative test corresponding to the previous test.
-// CHECK-LABEL: sil @no_enum_promotion_of_non_concrete_types
-// CHECK: bb0
-// CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: inject_enum_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.none!enumelt
-// CHECK-NEXT: alloc_stack $FakeOptional<T>
-// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}} : $*FakeOptional<T>, #FakeOptional.some!enumelt
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT:  inject_enum_addr
-// CHECK-NEXT: cond_br
-// CHECK: bb1:
-// CHECK-NEXT: br bb3
-// CHECK: bb2:
-// CHECK-NEXT: br bb3
-// CHECK: bb3
-// CHECK-NEXT: copy_addr
-// CHECK-NEXT: tuple
-// CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: return
-sil @no_enum_promotion_of_non_concrete_types : $@convention(thin) <T> (@inout T, Builtin.Int1) -> @out FakeOptional<T> {
-bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
-  %3 = alloc_stack $FakeOptional<T>
-  inject_enum_addr %3 : $*FakeOptional<T>, #FakeOptional.none!enumelt
-  %4 = alloc_stack $FakeOptional<T>
-  %5 = init_enum_data_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
-  copy_addr [take] %1 to [initialization] %5 : $*T
-  inject_enum_addr %4 : $*FakeOptional<T>, #FakeOptional.some!enumelt
-  cond_br %2, bb1, bb2
-
-bb1:
-  br bb3(%3 : $*FakeOptional<T>)
-
-bb2:
-  br bb3(%4 : $*FakeOptional<T>)
-
-bb3(%6 : $*FakeOptional<T>):
-  copy_addr [take] %6 to [initialization] %0 : $*FakeOptional<T>
-  %7 = tuple()
-  dealloc_stack %4 : $*FakeOptional<T>
-  dealloc_stack %3 : $*FakeOptional<T>
-  return %7 : $()
-}
-
 // (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
 // CHECK-LABEL: sil @unchecked_ref_cast_round_trip : $@convention(thin) (B) -> B {
 // CHECK: bb0
@@ -2337,7 +2295,7 @@ bb0:
   %0 = alloc_stack $FloatingPointRoundingRule
   inject_enum_addr %0 : $*FloatingPointRoundingRule, #FloatingPointRoundingRule.toNearestOrEven!enumelt
   %2 = alloc_stack $FloatingPointRoundingRule
-  copy_addr %0 to [initialization] %2 : $*FloatingPointRoundingRule
+  copy_addr %0 to [init] %2 : $*FloatingPointRoundingRule
   destroy_addr %0 : $*FloatingPointRoundingRule
   switch_enum_addr %2 : $*FloatingPointRoundingRule, case #FloatingPointRoundingRule.toNearestOrAwayFromZero!enumelt: bb1, default bb2
 
@@ -2561,12 +2519,12 @@ sil @alloc_ref_dynamic_with_metatype : $() -> () {
   return %4 : $()
 }
 
-// CHECK: sil @alloc_ref_dynamic_with_metatype_genneric
+// CHECK: sil @alloc_ref_dynamic_with_metatype_generic
 // CHECK: metatype
 // CHECK: upcast
 // CHECK: alloc_ref_dynamic
 // CHECK: return
-sil @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
+sil @alloc_ref_dynamic_with_metatype_generic : $<T where T : B>() -> () {
   %1 = metatype $@thick T.Type
   %2 = upcast %1 : $@thick T.Type to $@thick B.Type
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -2643,7 +2601,7 @@ bb3 (%10: $Builtin.Int32):
 sil @delete_dead_alloc_stack : $(@inout B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
-  copy_addr %0 to [initialization] %1 : $*B
+  copy_addr %0 to [init] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
   %2 = tuple()
@@ -2672,7 +2630,7 @@ bb0:
 sil @delete_dead_alloc_stack2 : $(@in B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
-  copy_addr [take] %0 to [initialization] %1 : $*B
+  copy_addr [take] %0 to [init] %1 : $*B
   destroy_addr %1 : $*B
   dealloc_stack %1 : $*B
   %2 = tuple()
@@ -2689,7 +2647,7 @@ sil @use_b : $@convention(thin) (@inout B) -> ()
 sil @dont_delete_dead_alloc_stack : $(@inout B) -> () {
 bb0(%0 : $*B):
   %1 = alloc_stack $B
-  copy_addr %0 to [initialization] %1 : $*B
+  copy_addr %0 to [init] %1 : $*B
   %2 = function_ref @use_b : $@convention(thin) (@inout B) -> ()
   %3 = apply %2(%1) : $@convention(thin) (@inout B) -> ()
   destroy_addr %1 : $*B
@@ -2708,7 +2666,7 @@ bb0(%0 : $B):
   %3 = alloc_stack $B
   %4 = alloc_stack $B
   store %0 to %4 : $*B
-  copy_addr [take] %4 to [initialization] %3 : $*B
+  copy_addr [take] %4 to [init] %3 : $*B
   dealloc_stack %4 : $*B
   strong_retain %0 : $B
   destroy_addr %3 : $*B
@@ -2731,7 +2689,7 @@ bb0(%0 : $B):
   %3 = alloc_stack $B
   %4 = alloc_stack $B
   store %0 to %4 : $*B
-  copy_addr [take] %4 to [initialization] %3 : $*B
+  copy_addr [take] %4 to [init] %3 : $*B
   dealloc_stack %4 : $*B
   cond_br undef, bb1, bb2
 bb1:
@@ -2757,7 +2715,7 @@ bb0(%0 : $B):
   %3 = alloc_stack $B
   %4 = alloc_stack $B
   store %0 to %4 : $*B
-  copy_addr [take] %4 to [initialization] %3 : $*B
+  copy_addr [take] %4 to [init] %3 : $*B
   dealloc_stack %4 : $*B
   cond_br undef, bb1, bb2
 bb1:
@@ -2786,7 +2744,7 @@ bb0(%0 : $B):
   %3 = alloc_stack $B
   %4 = alloc_stack $B
   store %0 to %4 : $*B
-  copy_addr [take] %4 to [initialization] %3 : $*B
+  copy_addr [take] %4 to [init] %3 : $*B
   dealloc_stack %4 : $*B
   br bb1
 bb1:
@@ -2815,7 +2773,7 @@ sil @witness_archetype : $@convention(thin) <T where T : someProtocol> (@in T) -
 bb0(%0 : $*T):
   %3 = alloc_stack $someProtocol                  // users: %4, %7, %10, %13, %15
   %4 = init_existential_addr %3 : $*someProtocol, $T // user: %5
-  copy_addr %0 to [initialization] %4 : $*T       // id: %5
+  copy_addr %0 to [init] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
   %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993", someProtocol) Self // users: %8, %9
   %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993", someProtocol) Self, #someProtocol.i!getter, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993", someProtocol) Self : $@convention(witness_method: someProtocol) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
@@ -3511,7 +3469,7 @@ bb0(%0 : $VV):
   %8 = alloc_stack $PM, let, name "x"
   %9 = ref_element_addr %0 : $VV, #VV.m
   %10 = alloc_stack $PM
-  copy_addr %9 to [initialization] %10 : $*PM
+  copy_addr %9 to [init] %10 : $*PM
   %12 = open_existential_addr immutable_access %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", PM) Self
   %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60", PM) Self
   %14 = function_ref @plus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0

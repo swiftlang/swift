@@ -90,6 +90,7 @@ EXPECTED_DEFAULTS = {
     'build_swiftpm': False,
     'build_swift_driver': False,
     'build_early_swift_driver': True,
+    'build_early_swiftsyntax': True,
     'build_swiftsyntax': False,
     'build_libparser_only': False,
     'build_skstresstester': False,
@@ -107,6 +108,7 @@ EXPECTED_DEFAULTS = {
     'swiftsyntax_verify_generated_files': False,
     'install_playgroundsupport': False,
     'install_sourcekitlsp': False,
+    'install_swiftformat': False,
     'install_skstresstester': False,
     'install_swiftevolve': False,
     'build_toolchainbenchmarks': False,
@@ -185,6 +187,7 @@ EXPECTED_DEFAULTS = {
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'libxml2_build_variant': 'Debug',
+    'lit_jobs': multiprocessing.cpu_count(),
     'zlib_build_variant': 'Debug',
     'curl_build_variant': 'Debug',
     'bootstrapping_mode': None,
@@ -364,7 +367,7 @@ class DisableOption(_BaseOption):
 
 
 class ChoicesOption(_BaseOption):
-    """Option that accepts an argument from a predifined list of choices."""
+    """Option that accepts an argument from a predefined list of choices."""
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
@@ -584,6 +587,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--install-swiftpm', dest='install_swiftpm'),
     EnableOption('--install-swift-driver', dest='install_swift_driver'),
     EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
+    EnableOption('--install-swiftformat', dest='install_swiftformat'),
     EnableOption('--install-skstresstester', dest='install_skstresstester'),
     EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
     EnableOption('--install-swiftdocc', dest='install_swiftdocc'),
@@ -634,6 +638,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-clean-xctest', dest='clean_xctest'),
     DisableOption('--skip-clean-llbuild', dest='clean_llbuild'),
     DisableOption('--skip-early-swift-driver', dest='build_early_swift_driver'),
+    DisableOption('--skip-early-swiftsyntax', dest='build_early_swiftsyntax'),
     DisableOption('--skip-clean-swiftpm', dest='clean_swiftpm'),
     DisableOption('--skip-clean-swift-driver', dest='clean_swift_driver'),
     DisableOption('--skip-test-android', dest='test_android'),
@@ -730,6 +735,7 @@ EXPECTED_OPTIONS = [
     IntOption('--swift-tools-max-parallel-lto-link-jobs'),
     EnableOption('--swift-tools-ld64-lto-codegen-only-for-supporting-targets'),
     IntOption('-j', dest='build_jobs'),
+    IntOption('--lit-jobs', dest='lit_jobs'),
     IntOption('--dsymutil-jobs', dest='dsymutil_jobs'),
 
     AppendOption('--cross-compile-hosts'),
@@ -748,7 +754,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
-    # Options forwared to build-script-impl
+    # Options forwarded to build-script-impl
     BuildScriptImplOption('--skip-test-swift', dest='impl_skip_test_swift'),
     BuildScriptImplOption('--install-swift', dest='impl_install_swift'),
 

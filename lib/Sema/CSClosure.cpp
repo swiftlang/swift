@@ -56,7 +56,7 @@ public:
       ClosureDCs.push_back(closure);
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
       ClosureDCs.push_back(closure);
     }
@@ -84,26 +84,33 @@ public:
             });
 
             CS.setType(decl, transformedTy);
-            return {true, expr};
+            return Action::Continue(expr);
           }
         }
 
         inferVariables(type);
-        return {true, expr};
+        return Action::Continue(expr);
       }
 
       auto var = dyn_cast<VarDecl>(decl);
       if (!var)
-        return {true, expr};
+        return Action::Continue(expr);
 
       if (auto *wrappedVar = var->getOriginalWrappedProperty()) {
+        // If there is no type it means that the body of the
+        // closure hasn't been resolved yet, so we can
+        // just skip it and wait for \c applyPropertyWrapperToParameter
+        // to assign types.
+        if (wrappedVar->hasImplicitPropertyWrapper())
+          return Action::Continue(expr);
+
         auto outermostWrapperAttr =
             wrappedVar->getOutermostAttachedPropertyWrapper();
 
         // If the attribute doesn't have a type it could only mean
         // that the declaration was incorrect.
         if (!CS.hasType(outermostWrapperAttr->getTypeExpr()))
-          return {true, expr};
+          return Action::Continue(expr);
 
         auto wrapperType =
             CS.simplifyType(CS.getType(outermostWrapperAttr->getTypeExpr()));
@@ -113,10 +120,10 @@ public:
           CS.setType(var, computeProjectedValueType(wrappedVar, wrapperType));
         } else {
           // _<name> is the wrapper var
-          CS.setType(var, computeWrappedValueType(wrappedVar, wrapperType));
+          CS.setType(var, wrapperType);
         }
 
-        return {true, expr};
+        return Action::Continue(expr);
       }
 
       // If there is no type recorded yet, let's check whether
@@ -132,17 +139,17 @@ public:
       }
     }
 
-    return {true, expr};
+    return Action::Continue(expr);
   }
 
-  Expr *walkToExprPost(Expr *expr) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
     if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
       ClosureDCs.pop_back();
     }
-    return expr;
+    return Action::Continue(expr);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     // Return statements have to reference outside result type
     // since all of them are joined by it if it's not specified
     // explicitly.
@@ -154,7 +161,7 @@ public:
       }
     }
 
-    return {true, stmt};
+    return Action::Continue(stmt);
   }
 
 private:
@@ -212,7 +219,7 @@ class UnresolvedClosureParameterCollector : public ASTWalker {
 public:
   UnresolvedClosureParameterCollector(ConstraintSystem &cs) : CS(cs) {}
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
       auto *decl = DRE->getDecl();
       if (isa<ParamDecl>(decl)) {
@@ -230,7 +237,7 @@ public:
         }
       }
     }
-    return {true, expr};
+    return Action::Continue(expr);
   }
 
   ArrayRef<TypeVariableType *> getVariables() const {
@@ -530,18 +537,13 @@ private:
       init = TypeChecker::buildDefaultInitializer(patternType);
     }
 
-    if (init) {
-      return SolutionApplicationTarget::forInitialization(
-          init, patternBinding->getDeclContext(), patternType, patternBinding,
-          index,
-          /*bindPatternVarsOneWay=*/false);
-    }
-
-    // If there was no initializer, there could be one from a property
-    // wrapper which has to be pre-checked before use. This is not a
-    // problem in top-level code because pattern bindings go through
-    // `typeCheckExpression` which does pre-check automatically and
-    // result builders do not allow declaring local wrapped variables.
+    // A property wrapper initializer (either user-defined
+    // or a synthesized one) has to be pre-checked before use.
+    //
+    // This is not a problem in top-level code because pattern
+    // bindings go through `typeCheckExpression` which does
+    // pre-check automatically and result builders do not allow
+    // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SolutionApplicationTarget::forInitialization(
           init, patternBinding->getDeclContext(), patternType, patternBinding,
@@ -554,6 +556,13 @@ private:
         return None;
 
       return target;
+    }
+
+    if (init) {
+      return SolutionApplicationTarget::forInitialization(
+          init, patternBinding->getDeclContext(), patternType, patternBinding,
+          index,
+          /*bindPatternVarsOneWay=*/false);
     }
 
     return SolutionApplicationTarget::forUninitializedVar(patternBinding, index,
@@ -891,8 +900,9 @@ private:
         return;
       }
 
+      auto contextualResultInfo = getContextualResultInfo();
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       getContextualResultType(),
+                       contextualResultInfo.getType(),
                        cs.getConstraintLocator(
                            context.getAbstractClosureExpr(),
                            LocatorPathElt::ClosureBody(
@@ -913,8 +923,10 @@ private:
       resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
     }
 
+    auto contextualResultInfo = getContextualResultInfo();
     SolutionApplicationTarget target(resultExpr, context.getAsDeclContext(),
-                                     CTP_ReturnStmt, getContextualResultType(),
+                                     contextualResultInfo.purpose,
+                                     contextualResultInfo.getType(),
                                      /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
@@ -923,8 +935,8 @@ private:
     }
 
     cs.setContextualType(target.getAsExpr(),
-                         TypeLoc::withoutLoc(getContextualResultType()),
-                         CTP_ReturnStmt);
+                         TypeLoc::withoutLoc(contextualResultInfo.getType()),
+                         contextualResultInfo.purpose);
     cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
@@ -939,15 +951,15 @@ private:
     return context.hasSingleExpressionBody();
   }
 
-  Type getContextualResultType() const {
+  ContextualTypeInfo getContextualResultInfo() const {
     if (auto transform = cs.getAppliedResultBuilderTransform(context))
-      return transform->bodyResultType;
+      return {transform->bodyResultType, CTP_ReturnStmt};
 
     if (auto *closure =
             getAsExpr<ClosureExpr>(context.getAbstractClosureExpr()))
-      return cs.getClosureType(closure)->getResult();
+      return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
 
-    return context.getBodyResultType();
+    return {context.getBodyResultType(), CTP_ReturnStmt};
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -1662,7 +1674,7 @@ private:
       assert(isSingleExpression);
       resultTarget = SolutionApplicationTarget(
           resultExpr, context.getAsDeclContext(),
-          mode == convertToResult ? CTP_ReturnStmt : CTP_Unused,
+          mode == convertToResult ? CTP_ClosureResult : CTP_Unused,
           mode == convertToResult ? resultType : Type(),
           /*isDiscarded=*/false);
     }
@@ -1916,6 +1928,7 @@ private:
         switch (cond.getKind()) {
         case StmtConditionElement::CK_Boolean:
         case StmtConditionElement::CK_PatternBinding:
+        case StmtConditionElement::CK_HasSymbol:
           continue;
 
         case StmtConditionElement::CK_Availability:

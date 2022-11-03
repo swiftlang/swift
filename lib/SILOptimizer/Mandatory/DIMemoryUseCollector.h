@@ -100,19 +100,7 @@ public:
   /// alloc_stack, this always just returns the actual mark_uninitialized
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
-  SingleValueInstruction *getUninitializedValue() const {
-    if (IsBox) {
-      SILValue inst = MemoryInst;
-      if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
-        inst = bbi;
-      }
-      // TODO: consider just storing the ProjectBoxInst in this case.
-      SingleValueInstruction *svi = inst->getSingleUserOfType<ProjectBoxInst>();
-      assert(svi);
-      return svi;
-    }
-    return MemoryInst;
-  }
+  SingleValueInstruction *getUninitializedValue() const;
 
   /// Return the number of elements, without the extra "super.init" tracker in
   /// initializers of derived classes.
@@ -129,6 +117,10 @@ public:
 
   /// Return true if this is 'self' in any kind of initializer.
   bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
+
+  /// Return uninitialized value of 'self' if current memory object
+  /// is located in an initializer (of any kind).
+  SingleValueInstruction *findUninitializedSelfValue() const;
 
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
@@ -171,6 +163,11 @@ public:
   /// Returns the initializer if the memory use is 'self' and appears in an
   /// actor's initializer. Otherwise, returns nullptr.
   ConstructorDecl *getActorInitSelf() const;
+
+  /// If \c TheMemory is a temporary variable that is responsible for
+  /// member-by-member initialization of `$Storage` in a user-defined
+  /// initializer of a type wrapped type, return its declaration.
+  VarDecl *getAsTypeWrapperLocalStorageVar() const;
 
   /// True if this memory object is the 'self' of a derived class initializer.
   bool isDerivedClassSelf() const { return MemoryInst->isDerivedClassSelf(); }
@@ -359,6 +356,15 @@ struct DIElementUseInfo {
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               DIElementUseInfo &UseInfo);
+
+/// Check whether given function is a user-defined initializer of a
+/// type wrapped type.
+bool canHaveTypeWrapperLocalStorageVar(SILFunction &F);
+
+/// Check whether this instruction represents `_storage` variable
+/// injected by type-checker into user-defined designated initializer
+/// of a type wrapped type.
+bool isTypeWrapperLocalStorageVar(SILFunction &F, MarkUninitializedInst *Inst);
 
 } // end namespace ownership
 } // end namespace swift

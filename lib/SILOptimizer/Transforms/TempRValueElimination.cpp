@@ -55,13 +55,13 @@ namespace {
 /// are emitted as copies...
 ///
 ///   %temp = alloc_stack $T
-///   copy_addr %src to [initialization] %temp : $*T
+///   copy_addr %src to [init] %temp : $*T
 ///   // no writes to %src or %temp
 ///   destroy_addr %temp : $*T
 ///   dealloc_stack %temp : $*T
 ///
 /// This differs from the copy forwarding algorithm because it handles
-/// copy source and dest lifetimes that are unavoidably overlappying. Instead,
+/// copy source and dest lifetimes that are unavoidably overlapping. Instead,
 /// it finds cases in which it is easy to determine that the source is
 /// unmodified during the copy destination's lifetime. Thus, the destination can
 /// be viewed as a short-lived "rvalue".
@@ -70,7 +70,7 @@ namespace {
 /// a simple form of redundant-load-elimination (RLE).
 ///
 ///   %temp = alloc_stack $T
-///   store %src to [initialization] %temp : $*T
+///   store %src to [init] %temp : $*T
 ///   // no writes to %temp
 ///   %v = load [take] %temp : $*T
 ///   dealloc_stack %temp : $*T
@@ -169,7 +169,7 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     //
     //   %addr = begin_access [read]
     //      ... // there can be no writes to %addr here
-    //   end_acess %addr   // <- This is where the use actually ends.
+    //   end_access %addr   // <- This is where the use actually ends.
     for (EndAccessInst *endAccess : beginAccess->getEndAccesses()) {
       if (endAccess->getParent() != block)
         return false;
@@ -379,7 +379,7 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
 /// of the temporary. For example:
 ///
 ///   %a = begin_access %src
-///   copy_addr %a to [initialization] %temp : $*T
+///   copy_addr %a to [init] %temp : $*T
 ///   end_access %a
 ///   use %temp
 ///
@@ -400,10 +400,15 @@ bool TempRValueOptPass::extendAccessScopes(
       if (endAccessToMove)
         return false;
       // Is this the end of an access scope of the copy-source?
-      if (!aa->isNoAlias(copySrc, endAccess->getSource())) {
-        assert(endAccess->getBeginAccess()->getAccessKind() ==
-                 SILAccessKind::Read &&
-               "a may-write end_access should not be in the copysrc lifetime");
+      if (!aa->isNoAlias(copySrc, endAccess->getSource()) &&
+
+          // There cannot be any aliasing modifying accesses within the liferange
+          // of the temporary, because we would have cought this in
+          // `getLastUseWhileSourceIsNotModified`.
+          // But there are cases where `AliasAnalysis::isNoAlias` is less precise
+          // than `AliasAnalysis::mayWriteToMemory`. Therefore, just ignore any
+          // non-read accesses.
+          endAccess->getBeginAccess()->getAccessKind() == SILAccessKind::Read) {
 
         // Don't move instructions beyond the block's terminator.
         if (isa<TermInst>(lastUseInst))
@@ -581,8 +586,8 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   // re-initialized by exactly this instruction.
   // This is a corner case, but can happen if lastLoadInst is a copy_addr.
   // Example:
-  //   copy_addr [take] %copySrc to [initialization] %tempObj   // copyInst
-  //   copy_addr [take] %tempObj to [initialization] %copySrc   // lastLoadInst
+  //   copy_addr [take] %copySrc to [init] %tempObj   // copyInst
+  //   copy_addr [take] %tempObj to [init] %copySrc   // lastLoadInst
   if (needToInsertDestroy && lastLoadInst != copyInst &&
       !isa<DestroyAddrInst>(lastLoadInst) &&
       aa->mayWriteToMemory(lastLoadInst, copySrc))

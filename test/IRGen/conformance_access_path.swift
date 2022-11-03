@@ -2,8 +2,10 @@
 // RUN: %FileCheck %s < %t.ll
 
 
-// SR-6200: canonicalizing a conformance access path that was built
-// without the requirement signature.
+// https://github.com/apple/swift/issues/48752
+// Canonicalizing a conformance access path that was built without the
+// requirement signature.
+
 public struct Valid<V> {}
 
 extension Valid where V: ValidationSuite {}

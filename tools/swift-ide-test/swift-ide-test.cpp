@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "XMLValidator.h"
 #include "ModuleAPIDiff.h"
+#include "XMLValidator.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTMangler.h"
@@ -27,35 +27,38 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ConformingMethodList.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
-#include "swift/IDE/IDERequests.h"
+#include "swift/IDETool/CompilerInvocation.h"
+#include "swift/IDETool/CompletionInstance.h"
 #include "swift/Index/Index.h"
+#include "swift/Markup/Markup.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Markup/Markup.h"
-#include "swift/Config.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -64,7 +67,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ManagedStatic.h"
 #include <system_error>
 
 #include <algorithm>
@@ -1164,16 +1166,32 @@ static void printCodeCompletionResultsImpl(
   OS << "End completions\n";
 }
 
+static void
+printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
+                                     llvm::raw_ostream &OS) {
+  if (names.empty())
+    return;
+
+  OS << "LookedupTypeNames: [";
+  llvm::interleave(
+      names.begin(), names.end(), [&](auto name) { OS << "'" << name << "'"; },
+      [&]() { OS << ", "; });
+  OS << "]\n";
+}
+
 static int printCodeCompletionResults(
     CancellableResult<CodeCompleteResult> CancellableResult,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
     bool PrintAnnotatedDescription) {
+  llvm::raw_fd_ostream &OS = llvm::outs();
   return printResult<CodeCompleteResult>(
       CancellableResult, [&](CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
-            Result.ResultSink.Results, llvm::outs(), IncludeKeywords,
-            IncludeComments, IncludeSourceText, PrintAnnotatedDescription,
+            Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
+            IncludeSourceText, PrintAnnotatedDescription,
             Result.Info.compilerInstance->getASTContext());
+        printCodeCompletionLookedupTypeNames(
+            Result.Info.completionContext->LookedupNominalTypeNames, OS);
         return 0;
       });
 }
@@ -1554,6 +1572,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                 IncludeComments, IncludeSourceText,
                 CodeCompletionAnnotateResults,
                 Result->Info.compilerInstance->getASTContext());
+            printCodeCompletionLookedupTypeNames(
+                Result->Info.completionContext->LookedupNominalTypeNames, OS);
             break;
           }
           case CancellableResultKind::Failure:
@@ -2595,8 +2615,9 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   for (auto &u: options::UsrFilter)
     Usrs.push_back(u.c_str());
   // Collect all tags of expressions.
-  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch,
-                                     options::CanonicalizeType, OS)) {
+  for (auto R : collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch,
+                                      options::FullyQualifiedTypes,
+                                      options::CanonicalizeType, OS)) {
     SortedTags.push_back({R.offset,
       (llvm::Twine("<expr type:\"") + TypeBuffer.str().substr(R.typeOffset,
                                                   R.typeLength) + "\">").str()});
@@ -3216,7 +3237,7 @@ public:
   ASTTypePrinter(SourceManager &SM, const PrintOptions &Options)
       : OS(llvm::outs()), SM(SM), Options(Options) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       OS.indent(IndentLevel * 2);
       OS << Decl::getKindName(VD->getKind()) << "Decl '''"
@@ -3225,15 +3246,15 @@ public:
       OS << "\n";
     }
     IndentLevel++;
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     IndentLevel--;
-    return true;
+    return Action::Continue();
   }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     StringRef SourceCode{ "<unknown>" };
     unsigned Line = ~0U;
 
@@ -3256,12 +3277,12 @@ public:
     E->getType().print(OS, Options);
     OS << "\n";
     IndentLevel++;
-    return { true, E };
+    return Action::Continue(E);
   }
 
-  Expr *walkToExprPost(Expr *E) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     IndentLevel--;
-    return E;
+    return Action::Continue(E);
   }
 };
 } // unnamed namespace
@@ -3299,16 +3320,16 @@ class ASTDocCommentDumper : public ASTWalker {
 public:
   ASTDocCommentDumper() : OS(llvm::outs()) {}
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return true;
+      return Action::Continue();
 
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
     if (DC)
       swift::markup::dump(DC->getDocument(), OS);
 
-    return true;
+    return Action::Continue();
   }
 };
 } // end anonymous namespace
@@ -3453,9 +3474,9 @@ public:
     }
   }
 
-  bool walkToDeclPre(Decl *D) override {
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return true;
+      return Action::Continue();
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
@@ -3490,7 +3511,7 @@ public:
       printDocComment(D);
       OS << "\n";
     }
-    return true;
+    return Action::Continue();
   }
 };
 } // unnamed namespace
@@ -4347,9 +4368,8 @@ int main(int argc, char *argv[]) {
     // Honor the *last* -swift-version specified.
     const auto &LastSwiftVersion =
       options::SwiftVersion[options::SwiftVersion.size()-1];
-    if (auto swiftVersion =
-          version::Version::parseVersionString(LastSwiftVersion,
-                                               SourceLoc(), nullptr)) {
+    if (auto swiftVersion = VersionParser::parseVersionString(
+            LastSwiftVersion, SourceLoc(), nullptr)) {
       if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }

@@ -169,8 +169,11 @@ option(SWIFT_STDLIB_HAS_COMMANDLINE
        TRUE)
 
 option(SWIFT_ENABLE_REFLECTION
-  "Build stdlib with support for runtime reflection and mirrors."
-  TRUE)
+       "Build stdlib with support for runtime reflection and mirrors."
+       TRUE)
+
+set(SWIFT_STDLIB_REFLECTION_METADATA "enabled" CACHE STRING
+    "Build stdlib with runtime metadata (valid options are 'enabled', 'disabled' and 'debugger-only').")
 
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple" AND NOT SWIFT_FREESTANDING_IS_DARWIN)
   set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default TRUE)

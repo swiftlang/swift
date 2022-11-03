@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-prop | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class C {}
+
+struct Str {
+  @_hasStorage var a: C { get set }
+}
+
+sil @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (@owned Str) -> @owned C) -> ()
+sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+
+// CHECK-LABEL: sil [ossa] @testKeypathNoescapeOSSA
+// CHECK:         [[K:%[0-9]+]] = keypath
+// CHECK:         [[C:%[0-9]+]] = function_ref @$s22closureWithKeypathOSSA{{.*}}main3StrVAC1CCTf3npk_n
+// CHECK:         [[T:%[0-9]+]] = thin_to_thick_function [[C]]
+// CHECK:         [[F:%[0-9]+]] = function_ref @calleeWithKeypath
+// CHECK:         apply [[F]]([[T]])
+// CHECK:         destroy_value [[K]]
+// CHECK:       } // end sil function 'testKeypathNoescapeOSSA'
+sil [ossa] @testKeypathNoescapeOSSA : $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<Str, C>, (root $Str; stored_property #Str.a : $C)
+  %1 = function_ref @closureWithKeypathOSSA : $@convention(thin) (@owned Str, @guaranteed KeyPath<Str, C>) -> @owned C
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (@owned Str, @guaranteed KeyPath<Str, C>) -> @owned C
+  %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (@owned Str) -> @owned C) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@noescape @callee_guaranteed (@owned Str) -> @owned C) -> ()
+  dealloc_stack %2 : $@noescape @callee_guaranteed (@owned Str) -> @owned C
+  destroy_value %0 : $KeyPath<Str, C>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil {{.*}}@$s22closureWithKeypathOSSA{{.*}}main3StrVAC1CCTf3npk_n : {{.*}}{
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove @owned $
+// CHECK:       } // end sil function '$s22closureWithKeypathOSSA{{.*}}main3StrVAC1CCTf3npk_n'
+sil [ossa] @closureWithKeypathOSSA : $@convention(thin) (@owned Str, @guaranteed KeyPath<Str, C>) -> @owned C {
+bb0(%0 : @_eagerMove @owned $Str, %1 : @guaranteed $KeyPath<Str, C>):
+  %4 = alloc_stack $Str
+  store %0 to [init] %4 : $*Str
+  %6 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %7 = alloc_stack $C
+  %8 = apply %6<Str, C>(%7, %4, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %9 = load [take] %7 : $*C
+  dealloc_stack %7 : $*C
+  destroy_addr %4 : $*Str
+  dealloc_stack %4 : $*Str
+  return %9 : $C
+}
+

@@ -82,7 +82,23 @@ public struct Builder {
     let literal = SILBuilder_createIntegerLiteral(bridged, type.bridged, value)
     return literal.getAs(IntegerLiteralInst.self)
   }
-  
+
+  public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
+                               isLexical: Bool = false, wasMoved: Bool = false) -> AllocStackInst {
+    notifyInstructionsChanged()
+    let dr = SILBuilder_createAllocStack(bridged, type.bridged, hasDynamicLifetime ? 1 : 0,
+                                         isLexical ? 1 : 0, wasMoved ? 1 : 0)
+    return dr.getAs(AllocStackInst.self)
+  }
+
+  @discardableResult
+  public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
+    notifyInstructionsChanged()
+    let dr = SILBuilder_createDeallocStack(bridged, operand.bridged)
+    return dr.getAs(DeallocStackInst.self)
+  }
+
+  @discardableResult
   public func createDeallocStackRef(_ operand: Value) -> DeallocStackRefInst {
     notifyInstructionsChanged()
     let dr = SILBuilder_createDeallocStackRef(bridged, operand.bridged)
@@ -111,6 +127,14 @@ public struct Builder {
   public func createCopyValue(operand: Value) -> CopyValueInst {
     notifyInstructionsChanged()
     return SILBuilder_createCopyValue(bridged, operand.bridged).getAs(CopyValueInst.self)
+  }
+
+  @discardableResult
+  public func createCopyAddr(from fromAddr: Value, to toAddr: Value,
+                             takeSource: Bool = false, initializeDest: Bool = false) -> CopyAddrInst {
+    notifyInstructionsChanged()
+    return SILBuilder_createCopyAddr(bridged, fromAddr.bridged, toAddr.bridged,
+                                     takeSource ? 1 : 0, initializeDest ? 1 : 0).getAs(CopyAddrInst.self)
   }
 
   @discardableResult

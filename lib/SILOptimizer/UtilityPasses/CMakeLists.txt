@@ -26,6 +26,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LoopRegionPrinter.cpp
   MemBehaviorDumper.cpp
   ModulePrinter.cpp
+  OSSALifetimeAnalysis.cpp
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
@@ -33,5 +34,8 @@ target_sources(swiftSILOptimizer PRIVATE
   SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
+  UnitTestRunner.cpp
   OwnershipDumper.cpp
-  OwnershipVerifierTextualErrorDumper.cpp)
+  OwnershipVerifierTextualErrorDumper.cpp
+  ParseTestSpecification.cpp)
+  

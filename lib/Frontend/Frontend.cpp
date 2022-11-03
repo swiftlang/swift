@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
@@ -238,6 +239,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerClangImporterRequestFunctions(Context->evaluator);
+  registerConstExtractRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
   registerSILOptimizerRequestFunctions(Context->evaluator);
   registerTBDGenRequestFunctions(Context->evaluator);
@@ -452,6 +454,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   if (Invocation.getDiagnosticOptions().SuppressWarnings) {
     Diagnostics.setSuppressWarnings(true);
+  }
+  if (Invocation.getDiagnosticOptions().SuppressRemarks) {
+    Diagnostics.setSuppressRemarks(true);
   }
   if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
     Diagnostics.setWarningsAsErrors(true);

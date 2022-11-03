@@ -351,39 +351,46 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
+      bos.indent(CS.solverState->getCurrentIndent() + 2);
+      bos << "(";
       bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
+      bos << ")\n";
     }
   });
 
   auto *disjunction = CS.selectDisjunction();
-  auto *conjunction = CS.selectConjunction();
 
   if (CS.isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-
-    auto &log = getDebugLogger();
     if (!potentialBindings.empty()) {
+      auto &log = getDebugLogger();
       log << "(Potential Binding(s): " << '\n';
       log << potentialBindings;
     }
-    log.indent(CS.solverState->getCurrentIndent());
 
-    if (disjunction) {
+    SmallVector<Constraint *, 4> disjunctions;
+    CS.collectDisjunctions(disjunctions);
+    std::vector<std::string> overloadDisjunctions;
+    for (const auto &disjunction : disjunctions) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
+
+      auto constraints = disjunction->getNestedConstraints();
+      if (constraints[0]->getKind() == ConstraintKind::BindOverload)
+        overloadDisjunctions.push_back(
+            constraints[0]->getFirstType()->getString(PO));
+    }
+    if (!overloadDisjunctions.empty()) {
+      auto &log = getDebugLogger();
       log.indent(2);
       log << "Disjunction(s) = [";
-      auto constraints = disjunction->getNestedConstraints();
-      log << constraints[0]->getFirstType()->getString(PO);
-      log << "]";
+      interleave(overloadDisjunctions, log, ", ");
+      log << "]\n";
+
+      if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
+        auto &log = getDebugLogger();
+        log << ")\n";
+      }
     }
-    if (conjunction) {
-      log.indent(2);
-      log << "Conjunction(s) = [";
-      auto constraints = conjunction->getNestedConstraints();
-      log << constraints[0]->getFirstType()->getString(PO);
-      log << "]";
-    }
-    log << ")\n";
   }
 
   if (CS.shouldAttemptFixes()) {
@@ -871,6 +878,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
   // attempted to apply information gained from the
   // isolated constraint to the outer context.
   if (Snapshot && Snapshot->isScoped()) {
+    Snapshot.reset();
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
+    
     return done(/*isSuccess=*/!prevFailed);
   }
 

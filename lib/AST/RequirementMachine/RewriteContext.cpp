@@ -179,6 +179,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("propagate-requirement-ids", DebugFlags::PropagateRequirementIDs)
       .Case("timers", DebugFlags::Timers)
       .Case("conflicting-rules", DebugFlags::ConflictingRules)
+      .Case("split-concrete-equiv-class", DebugFlags::SplitConcreteEquivalenceClass)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
@@ -193,7 +194,8 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
 }
 
 RewriteContext::RewriteContext(ASTContext &ctx)
-    : Context(ctx),
+    : TheShapeSymbol(nullptr),
+      Context(ctx),
       Stats(ctx.Stats),
       SymbolHistogram(Symbol::NumKinds),
       TermHistogram(4, /*Start=*/1),

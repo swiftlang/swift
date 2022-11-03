@@ -343,7 +343,7 @@ bb0(%0 : @owned $T):
 }
 
 // =============================================================================
-// Constrained exisentials and generics are not wrapped
+// Constrained existentials and generics are not wrapped
 
 // CHECK-LABEL: @testClassExistentialToClassIsForwarded
 // CHECK: RESULT #0: 0 = 0

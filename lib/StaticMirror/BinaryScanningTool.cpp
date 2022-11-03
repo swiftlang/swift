@@ -52,7 +52,13 @@ BinaryScanningTool::BinaryScanningTool(
     ObjectOwners.push_back(std::move(ObjectOwner));
     ObjectFiles.push_back(O);
   }
-  Context = makeReflectionContextForObjectFiles(ObjectFiles);
+  // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+  bool ObjCInterop = true;
+#else
+  bool ObjCInterop = false;
+#endif
+  Context = makeReflectionContextForObjectFiles(ObjectFiles, ObjCInterop);
   PointerSize = Context->PointerSize;
 }
 

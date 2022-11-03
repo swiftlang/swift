@@ -189,7 +189,8 @@ enum class DescriptiveDeclKind : uint8_t {
   MissingMember,
   Requirement,
   OpaqueResultType,
-  OpaqueVarType
+  OpaqueVarType,
+  MacroExpansion
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -498,14 +499,13 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
-  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1+1,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+1+1,
     : NumPadBits,
 
     Depth : 16,
     Index : 16,
-    TypeSequence : 1,
+    ParameterPack : 1,
 
     /// Whether this generic parameter represents an opaque type.
     IsOpaqueType : 1
@@ -616,7 +616,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -630,6 +630,10 @@ protected:
     ///
     /// \sa ResilienceStrategy
     RawResilienceStrategy : 1,
+
+    /// Whether the module was rebuilt from a module interface instead of being
+    /// build from the full source.
+    IsBuiltFromInterface : 1,
 
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,
@@ -723,6 +727,13 @@ protected:
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
 
+  /// The imported Clang declaration representing the \c @_objcInterface for
+  /// this declaration (or vice versa), or \c nullptr if there is none.
+  ///
+  /// If \c this (an otherwise nonsensical value), the value has not yet been
+  /// computed.
+  Decl *CachedObjCImplementationDecl;
+
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
@@ -740,7 +751,7 @@ private:
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
-    : Context(context) {
+    : Context(context), CachedObjCImplementationDecl(this) {
     Bits.OpaqueBits = 0;
     Bits.Decl.Kind = unsigned(kind);
     Bits.Decl.Invalid = false;
@@ -837,7 +848,7 @@ public:
   /// Returns the OS version in which the decl became ABI as specified by the
   /// @_backDeploy attribute.
   Optional<llvm::VersionTuple>
-  getBackDeployBeforeOSVersion(PlatformKind Kind) const;
+  getBackDeployBeforeOSVersion(ASTContext &Ctx) const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -975,6 +986,32 @@ public:
     return getClangNodeImpl().getAsMacro();
   }
 
+  /// If this is the Swift implementation of a declaration imported from ObjC,
+  /// returns the imported declaration. Otherwise return \c nullptr.
+  ///
+  /// \seeAlso ExtensionDecl::isObjCInterface()
+  Decl *getImplementedObjCDecl() const;
+
+  /// If this is the ObjC interface of a declaration implemented in Swift,
+  /// returns the implementating declaration. Otherwise return \c nullptr.
+  ///
+  /// \seeAlso ExtensionDecl::isObjCInterface()
+  Decl *getObjCImplementationDecl() const;
+
+  Optional<Decl *> getCachedObjCImplementationDecl() const {
+    if (CachedObjCImplementationDecl == this)
+      return None;
+    return CachedObjCImplementationDecl;
+  }
+
+  void setCachedObjCImplementationDecl(Decl *decl) {
+    assert((CachedObjCImplementationDecl == this
+              || CachedObjCImplementationDecl == decl)
+               && "can't change CachedObjCInterfaceDecl once it's computed");
+    assert(decl != this && "can't form circular reference");
+    CachedObjCImplementationDecl = decl;
+  }
+
   /// Return the GenericContext if the Decl has one.
   LLVM_READONLY
   const GenericContext *getAsGenericContext() const;
@@ -985,6 +1022,19 @@ public:
   
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
+
+  LifetimeAnnotation getLifetimeAnnotation() const {
+    auto &attrs = getAttrs();
+    if (attrs.hasAttribute<EagerMoveAttr>())
+      return LifetimeAnnotation::EagerMove;
+    if (attrs.hasAttribute<NoEagerMoveAttr>())
+      return LifetimeAnnotation::Lexical;
+    return LifetimeAnnotation::None;
+  }
+
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
+  }
 
   AvailabilityContext getAvailabilityForLinkage() const;
 
@@ -1035,6 +1085,12 @@ public:
   bool isSPI() const;
 
   bool isAvailableAsSPI() const;
+
+  /// Whether the declaration is considered unavailable through either being
+  /// explicitly marked as such, or has a parent decl that is semantically
+  /// unavailable. This is a broader notion of unavailability than is checked by
+  /// \c AvailableAttr::isUnavailable.
+  bool isSemanticallyUnavailable() const;
 
   // List the SPI groups declared with @_spi or inherited by this decl.
   //
@@ -1476,6 +1532,16 @@ public:
   /// extension mangling, because an extension method implementation could be
   /// resiliently moved into the original protocol itself.
   bool isEquivalentToExtendedContext() const;
+
+  /// True if this extension provides an implementation for an imported
+  /// Objective-C \c \@interface. This implies various restrictions and special
+  /// behaviors for its members.
+  bool isObjCImplementation() const;
+
+  /// Returns the name of the category specified by the \c \@_objcImplementation
+  /// attribute, or \c None if the name is invalid. Do not call unless
+  /// \c isObjCImplementation() returns \c true.
+  Optional<Identifier> getCategoryNameForObjCImplementation() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -2316,6 +2382,10 @@ public:
   /// Asserts if this is not a member of a protocol.
   bool isProtocolRequirement() const;
 
+  /// Return true if this is a member implementation for an \c @_objcImplementation
+  /// extension.
+  bool isObjCMemberImplementation() const;
+
   void setUserAccessible(bool Accessible) {
     Bits.ValueDecl.IsUserAccessible = Accessible;
   }
@@ -2715,14 +2785,10 @@ public:
   GenericParameterReferenceInfo findExistentialSelfReferences(
       Type baseTy, bool treatNonResultCovariantSelfAsInvariant) const;
 
-  LifetimeAnnotation getLifetimeAnnotation() const {
-    auto &attrs = getAttrs();
-    if (attrs.hasAttribute<EagerMoveAttr>())
-      return LifetimeAnnotation::EagerMove;
-    if (attrs.hasAttribute<LexicalAttr>())
-      return LifetimeAnnotation::Lexical;
-    return LifetimeAnnotation::None;
-  }
+  /// Returns a synthesized declaration for a query function that provides
+  /// the boolean value for a `if #_hasSymbol(...)` condition. The interface
+  /// type of the function is `() -> Builtin.Int1`.
+  FuncDecl *getHasSymbolQueryDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2812,7 +2878,7 @@ public:
 /// (opaque archetype 1))`.
 class OpaqueTypeDecl final :
     public GenericTypeDecl,
-    private llvm::TrailingObjects<OpaqueTypeDecl, OpaqueReturnTypeRepr *> {
+    private llvm::TrailingObjects<OpaqueTypeDecl, TypeRepr *> {
   friend TrailingObjects;
 
 public:
@@ -2856,7 +2922,7 @@ private:
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
+                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -2873,7 +2939,7 @@ public:
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
-      ArrayRef<OpaqueReturnTypeRepr *> OpaqueReturnTypeReprs);
+      ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -2894,7 +2960,7 @@ public:
   /// repr `repr`, as introduce implicitly by an occurrence of "some" in return
   /// position e.g. `func f() -> some P`. Returns -1 if `repr` is not found.
   Optional<unsigned> getAnonymousOpaqueParamOrdinal(
-      OpaqueReturnTypeRepr *repr) const;
+      TypeRepr *repr) const;
 
   GenericSignature getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -2918,9 +2984,9 @@ public:
 
   /// Retrieve the buffer containing the opaque return type
   /// representations that correspond to the opaque generic parameters.
-  ArrayRef<OpaqueReturnTypeRepr *> getOpaqueReturnTypeReprs() const {
+  ArrayRef<TypeRepr *> getOpaqueReturnTypeReprs() const {
     return {
-      getTrailingObjects<OpaqueReturnTypeRepr *>(),
+      getTrailingObjects<TypeRepr *>(),
       getNumOpaqueReturnTypeReprs()
     };
   }
@@ -3115,29 +3181,6 @@ public:
   }
 };
 
-/// Abstract class describing generic type parameters and associated types,
-/// whose common purpose is to anchor the abstract type parameter and specify
-/// requirements for any corresponding type argument.
-class AbstractTypeParamDecl : public TypeDecl {
-protected:
-  AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
-                        SourceLoc NameLoc)
-    : TypeDecl(kind, dc, name, NameLoc, { }) { }
-
-public:
-  /// Return the superclass of the generic parameter.
-  Type getSuperclass() const;
-
-  /// Retrieve the set of protocols to which this abstract type
-  /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
-
-  static bool classof(const Decl *D) {
-    return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
-           D->getKind() <= DeclKind::Last_AbstractTypeParamDecl;
-  }
-};
-
 /// A declaration of a generic type parameter.
 ///
 /// A generic type parameter introduces a new, named type parameter along
@@ -3151,13 +3194,18 @@ public:
 /// \code
 /// func min<T : Comparable>(x : T, y : T) -> T { ... }
 /// \endcode
-class GenericTypeParamDecl final :
-    public AbstractTypeParamDecl,
-    private llvm::TrailingObjects<GenericTypeParamDecl, OpaqueReturnTypeRepr *>{
+class GenericTypeParamDecl final
+    : public TypeDecl,
+      private llvm::TrailingObjects<GenericTypeParamDecl, TypeRepr *,
+                                    SourceLoc> {
   friend TrailingObjects;
 
-  size_t numTrailingObjects(OverloadToken<OpaqueReturnTypeRepr *>) const {
+  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
     return isOpaqueType() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return isParameterPack() ? 1 : 0;
   }
 
   /// Construct a new generic type parameter.
@@ -3168,11 +3216,20 @@ class GenericTypeParamDecl final :
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
+  ///
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isTypeSequence, unsigned depth, unsigned index,
-                       bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
+                       SourceLoc ellipsisLoc, unsigned depth, unsigned index,
+                       bool isParameterPack, bool isOpaqueType,
+                       TypeRepr *opaqueTypeRepr);
 
-public:
   /// Construct a new generic type parameter.
   ///
   /// \param dc The DeclContext in which the generic type parameter's owner
@@ -3181,17 +3238,91 @@ public:
   ///
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
-  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       bool isTypeSequence, unsigned depth, unsigned index)
-      : GenericTypeParamDecl(dc, name, nameLoc, isTypeSequence, depth, index,
-                             false, nullptr) { }
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
+  ///
+  static GenericTypeParamDecl *create(DeclContext *dc, Identifier name,
+                                      SourceLoc nameLoc, SourceLoc ellipsisLoc,
+                                      unsigned depth, unsigned index,
+                                      bool isParameterPack, bool isOpaqueType,
+                                      TypeRepr *opaqueTypeRepr);
 
+public:
   static const unsigned InvalidDepth = 0xFFFF;
 
+  /// Construct a new generic type parameter. This should only be used by the
+  /// ClangImporter, use \c GenericTypeParamDecl::create[...] instead.
+  GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+                       SourceLoc ellipsisLoc, unsigned depth, unsigned index,
+                       bool isParameterPack)
+      : GenericTypeParamDecl(dc, name, nameLoc, ellipsisLoc, depth, index,
+                             isParameterPack, /*isOpaqueType*/ false, nullptr) {
+  }
+
+  /// Construct a deserialized generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  ///
   static GenericTypeParamDecl *
-  create(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-         bool isTypeSequence, unsigned depth, unsigned index,
-         bool isOpaqueType, OpaqueReturnTypeRepr *opaqueTypeRepr);
+  createDeserialized(DeclContext *dc, Identifier name, unsigned depth,
+                     unsigned index, bool isParameterPack, bool isOpaqueType);
+
+  /// Construct a new parsed generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  ///
+  static GenericTypeParamDecl *
+  createParsed(DeclContext *dc, Identifier name, SourceLoc nameLoc,
+               SourceLoc ellipsisLoc, unsigned index, bool isParameterPack);
+
+  /// Construct a new implicit generic type parameter.
+  ///
+  /// \param dc The DeclContext in which the generic type parameter's owner
+  /// occurs. This should later be overwritten with the actual declaration
+  /// context that owns the type parameter.
+  ///
+  /// \param name The name of the generic parameter.
+  /// \param depth The generic signature depth.
+  /// \param index The index of the parameter in the generic signature.
+  /// \param isParameterPack Whether the generic parameter is for a type
+  ///                        parameter pack, denoted by \c <T...>.
+  /// \param isOpaqueType Whether the generic parameter is written as an opaque
+  ///                     parameter e.g 'some Collection'.
+  /// \param opaqueTypeRepr The TypeRepr of an opaque generic parameter.
+  /// \param nameLoc The location of the name.
+  /// \param ellipsisLoc The location of the ellipsis for a type parameter pack.
+  ///
+  static GenericTypeParamDecl *
+  createImplicit(DeclContext *dc, Identifier name, unsigned depth,
+                 unsigned index, bool isParameterPack = false,
+                 bool isOpaqueType = false, TypeRepr *opaqueTypeRepr = nullptr,
+                 SourceLoc nameLoc = SourceLoc(),
+                 SourceLoc ellipsisLoc = SourceLoc());
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -3214,13 +3345,13 @@ public:
   }
 
   /// Returns \c true if this generic type parameter is declared as a type
-  /// sequence.
+  /// parameter pack.
   ///
   /// \code
-  /// func foo<@_typeSequence T>(_ : T...) { }
-  /// struct Foo<@_typeSequence T> { }
+  /// func foo<T...>(_ : T...) { }
+  /// struct Foo<T...> { }
   /// \endcode
-  bool isTypeSequence() const { return Bits.GenericTypeParamDecl.TypeSequence; }
+  bool isParameterPack() const { return Bits.GenericTypeParamDecl.ParameterPack; }
 
   /// Determine whether this generic parameter represents an opaque type.
   ///
@@ -3239,11 +3370,11 @@ public:
   ///     extension, meaning that it was specified explicitly
   ///   - the enclosing declaration was deserialized, in which case it lost
   ///     the source location information and has no type representation.
-  OpaqueReturnTypeRepr *getOpaqueTypeRepr() const {
+  TypeRepr *getOpaqueTypeRepr() const {
     if (!isOpaqueType())
       return nullptr;
 
-    return *getTrailingObjects<OpaqueReturnTypeRepr *>();
+    return *getTrailingObjects<TypeRepr *>();
   }
 
   /// The index of this generic type parameter within its generic parameter
@@ -3257,6 +3388,14 @@ public:
   ///
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
   unsigned getIndex() const { return Bits.GenericTypeParamDecl.Index; }
+
+  /// Retrieve the ellipsis location for a type parameter pack \c T...
+  SourceLoc getEllipsisLoc() const {
+    if (!isParameterPack())
+      return SourceLoc();
+
+    return *getTrailingObjects<SourceLoc>();
+  }
 
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const;
@@ -3283,7 +3422,7 @@ public:
 ///   func getNext() -> Element?
 /// }
 /// \endcode
-class AssociatedTypeDecl : public AbstractTypeParamDecl {
+class AssociatedTypeDecl : public TypeDecl {
   /// The location of the initial keyword.
   SourceLoc KeywordLoc;
 
@@ -3347,7 +3486,7 @@ public:
   /// Retrieve the (first) overridden associated type declaration, if any.
   AssociatedTypeDecl *getOverriddenDecl() const {
     return cast_or_null<AssociatedTypeDecl>(
-                                   AbstractTypeParamDecl::getOverriddenDecl());
+        TypeDecl::getOverriddenDecl());
   }
 
   /// Retrieve the set of associated types overridden by this associated
@@ -3753,6 +3892,34 @@ public:
   bool isGlobalActor() const {
     return getGlobalActorInstance() != nullptr;
   }
+
+  /// Returns true if this type has a type wrapper custom attribute.
+  bool hasTypeWrapper() const { return bool(getTypeWrapper()); }
+
+  /// Return a type wrapper (if any) associated with this type.
+  NominalTypeDecl *getTypeWrapper() const;
+
+  /// If this declaration has a type wrapper return a property that
+  /// is used for all type wrapper related operations (mainly for
+  /// applicable property access routing).
+  VarDecl *getTypeWrapperProperty() const;
+
+  /// If this declaration has a type wrapper, return `$Storage`
+  /// declaration that contains all the stored properties managed
+  /// by the wrapper.
+  NominalTypeDecl *getTypeWrapperStorageDecl() const;
+
+  /// If this declaration is a type wrapper, retrieve
+  /// its required initializer - `init(storageWrapper:)`.
+  ConstructorDecl *getTypeWrapperInitializer() const;
+
+  /// Get an initializer that accepts a type wrapper instance to
+  /// initialize the wrapped type.
+  ConstructorDecl *getTypeWrappedTypeStorageInitializer() const;
+
+  /// Get a memberwise initializer that could be used to instantiate a
+  /// type wrapped type.
+  ConstructorDecl *getTypeWrappedTypeMemberwiseInitializer() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4325,6 +4492,12 @@ public:
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
+  /// Return the imported declaration for the category with the given name; this
+  /// will always be an Objective-C-backed \c ExtensionDecl or, if \p name is
+  /// empty, \c ClassDecl. Returns \c nullptr if the class was not imported from
+  /// Objective-C or does not have an imported category by that name.
+  IterableDeclContext *getImportedObjCCategory(Identifier name) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;
@@ -4724,6 +4897,48 @@ public:
   }
   static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Protocol;
+  }
+  static bool classof(const DeclContext *C) {
+    if (auto D = C->getAsDecl())
+      return classof(D);
+    return false;
+  }
+  static bool classof(const IterableDeclContext *C) {
+    auto NTD = dyn_cast<NominalTypeDecl>(C);
+    return NTD && classof(NTD);
+  }
+};
+
+/// This is the special singleton Builtin.TheTupleType. It is not directly
+/// visible in the source language, but we use it to attach extensions
+/// and conformances for tuple types.
+///
+/// - The declared interface type is the special TheTupleType singleton.
+/// - The generic parameter list has one pack generic parameter, <Elements...>
+/// - The generic signature has no requirements, <Elements...>
+/// - The self interface type is the tuple type containing a single pack
+///   expansion, (Elements...).
+class BuiltinTupleDecl final : public NominalTypeDecl {
+  TupleType *TupleSelfType = nullptr;
+
+public:
+  BuiltinTupleDecl(Identifier Name, DeclContext *Parent);
+
+  SourceRange getSourceRange() const {
+    return SourceRange();
+  }
+
+  TupleType *getTupleSelfType() const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::BuiltinTuple;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::BuiltinTuple;
+  }
+  static bool classof(const NominalTypeDecl *D) {
+    return D->getKind() == DeclKind::BuiltinTuple;
   }
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
@@ -5549,7 +5764,18 @@ public:
   /// Return true if this property either has storage or has an attached property
   /// wrapper that has storage.
   bool hasStorageOrWrapsStorage() const;
-  
+
+  /// Whether this property belongs to a type wrapped type and has
+  /// all access to it routed through a type wrapper.
+  bool isAccessedViaTypeWrapper() const;
+
+  /// For type wrapped properties (see \c isAccessedViaTypeWrapper)
+  /// all access is routed through a type wrapper.
+  ///
+  /// \returns an underlying type wrapper property which is a
+  /// storage endpoint for all access to this property.
+  VarDecl *getUnderlyingTypeWrapperStorage() const;
+
   /// Visit all auxiliary declarations to this VarDecl.
   ///
   /// An auxiliary declaration is a declaration synthesized by the compiler to support
@@ -5626,6 +5852,11 @@ public:
   /// as the moment) to the backing storage property. Otherwise, the stored
   /// backing property will be treated as the member-initialized property.
   bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
+
+  /// Check whether this variable presents a local storage synthesized
+  /// by the compiler in a user-defined designated initializer to
+  /// support initialization of type wrapper managed properties.
+  bool isTypeWrapperLocalStorageForInitializer() const;
 
   /// Return the range of semantics attributes attached to this VarDecl.
   auto getSemanticsAttrs() const
@@ -5783,10 +6014,6 @@ public:
     setDefaultArgumentKind(K.argumentKind);
   }
 
-  bool isNoImplicitCopy() const {
-    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
-  }
-
   /// Whether this parameter has a default argument expression available.
   ///
   /// Note that this will return false for deserialized declarations, which only
@@ -5878,10 +6105,8 @@ public:
 
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
-  /// Whether or not this parameter is varargs.
-  bool isVariadic() const {
-    return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
-  }
+  /// Whether or not this parameter is old-style variadic.
+  bool isVariadic() const;
   void setVariadic(bool value = true) {
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
@@ -6671,6 +6896,11 @@ public:
   /// vtable.
   bool needsNewVTableEntry() const;
 
+  /// True if the decl is a method which introduces a new witness table entry.
+  bool requiresNewWitnessTableEntry() const {
+    return getOverriddenDecls().empty();
+  }
+
 public:
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
@@ -6801,7 +7031,7 @@ public:
   bool hasDynamicSelfResult() const;
 
   /// The async function marked as the alternative to this function, if any.
-  AbstractFunctionDecl *getAsyncAlternative(bool isKnownObjC = false) const;
+  AbstractFunctionDecl *getAsyncAlternative() const;
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the
@@ -7061,32 +7291,24 @@ class AccessorDecl final : public FuncDecl {
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
-               bool hasImplicitSelfDecl, GenericParamList *genericParams,
-               DeclContext *parent)
-    : FuncDecl(DeclKind::Accessor,
-               staticLoc, staticSpelling, /*func loc*/ declLoc,
-               /*name*/ Identifier(), /*name loc*/ declLoc,
-               async, asyncLoc, throws, throwsLoc,
-               hasImplicitSelfDecl, genericParams, parent),
-      AccessorKeywordLoc(accessorKeywordLoc),
-      Storage(storage) {
+               bool hasImplicitSelfDecl, DeclContext *parent)
+      : FuncDecl(DeclKind::Accessor, staticLoc, staticSpelling,
+                 /*func loc*/ declLoc,
+                 /*name*/ Identifier(), /*name loc*/ declLoc, async, asyncLoc,
+                 throws, throwsLoc, hasImplicitSelfDecl,
+                 /*genericParams*/ nullptr, parent),
+        AccessorKeywordLoc(accessorKeywordLoc), Storage(storage) {
     assert(!async || accessorKind == AccessorKind::Get
            && "only get accessors can be async");
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
 
-  static AccessorDecl *createImpl(ASTContext &ctx,
-                                  SourceLoc declLoc,
-                                  SourceLoc accessorKeywordLoc,
-                                  AccessorKind accessorKind,
-                                  AbstractStorageDecl *storage,
-                                  SourceLoc staticLoc,
-                                  StaticSpellingKind staticSpelling,
-                                  bool async, SourceLoc asyncLoc,
-                                  bool throws, SourceLoc throwsLoc,
-                                  GenericParamList *genericParams,
-                                  DeclContext *parent,
-                                  ClangNode clangNode);
+  static AccessorDecl *
+  createImpl(ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
+             AccessorKind accessorKind, AbstractStorageDecl *storage,
+             SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
+             SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+             DeclContext *parent, ClangNode clangNode);
 
   Optional<bool> getCachedIsTransparent() const {
     if (Bits.AccessorDecl.IsTransparentComputed)
@@ -7102,21 +7324,15 @@ public:
                                           AbstractStorageDecl *storage,
                                           StaticSpellingKind staticSpelling,
                                           bool async, bool throws,
-                                          GenericParamList *genericParams,
                                           Type fnRetType, DeclContext *parent);
 
-  static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
-                              SourceLoc accessorKeywordLoc,
-                              AccessorKind accessorKind,
-                              AbstractStorageDecl *storage,
-                              SourceLoc staticLoc,
-                              StaticSpellingKind staticSpelling,
-                              bool async, SourceLoc asyncLoc,
-                              bool throws, SourceLoc throwsLoc,
-                              GenericParamList *genericParams,
-                              ParameterList *parameterList,
-                              Type fnRetType, DeclContext *parent,
-                              ClangNode clangNode = ClangNode());
+  static AccessorDecl *
+  create(ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
+         AccessorKind accessorKind, AbstractStorageDecl *storage,
+         SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
+         SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+         ParameterList *parameterList, Type fnRetType, DeclContext *parent,
+         ClangNode clangNode = ClangNode());
 
   SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }
 
@@ -7577,6 +7793,12 @@ public:
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
 
+  /// If this is a user-defined constructor that belongs to
+  /// a type wrapped type return a local `_storage` variable
+  /// injected by the compiler for aid with type wrapper
+  /// initialization.
+  VarDecl *getLocalTypeWrapperStorageVar() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }
@@ -8030,6 +8252,33 @@ public:
   }
 };
 
+class MacroExpansionDecl : public Decl {
+  SourceLoc PoundLoc;
+  DeclNameRef Macro;
+  DeclNameLoc MacroLoc;
+  ArgumentList *ArgList;
+  Decl *Rewritten;
+
+public:
+  MacroExpansionDecl(DeclContext *dc, SourceLoc poundLoc, DeclNameRef macro,
+                     DeclNameLoc macroLoc, ArgumentList *args)
+      : Decl(DeclKind::MacroExpansion, dc), PoundLoc(poundLoc),
+        Macro(macro), MacroLoc(macroLoc), ArgList(args), Rewritten(nullptr) {}
+
+  SourceRange getSourceRange() const;
+  SourceLoc getLocFromSource() const { return PoundLoc; }
+  SourceLoc getPoundLoc() const { return PoundLoc; }
+  DeclNameLoc getMacroLoc() const { return MacroLoc; }
+  DeclNameRef getMacro() const { return Macro; }
+  ArgumentList *getArgs() const { return ArgList; }
+  Decl *getRewritten() const { return Rewritten; }
+  void setRewritten(Decl *rewritten) { Rewritten = rewritten; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::MacroExpansion;
+  }
+};
+
 /// Find references to the given generic parameter in the type signature of the
 /// given declaration using the given generic signature.
 ///
@@ -8165,7 +8414,7 @@ inline bool Decl::isSyntacticallyOverridable() const {
 }
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
-    : TypeSequence(d->isTypeSequence()), Depth(d->getDepth()),
+    : ParameterPack(d->isParameterPack()), Depth(d->getDepth()),
       Index(d->getIndex()) {}
 
 inline const GenericContext *Decl::getAsGenericContext() const {
@@ -8224,6 +8473,10 @@ ParameterList *getParameterList(ValueDecl *source);
 /// Retrieve the parameter list for a given declaration context, or nullptr if
 /// there is none.
 ParameterList *getParameterList(DeclContext *source);
+
+/// Retrieve parameter declaration from the given source at given index, or
+/// nullptr if the source does not have a parameter list.
+const ParamDecl *getParameterAt(ConcreteDeclRef declRef, unsigned index);
 
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.

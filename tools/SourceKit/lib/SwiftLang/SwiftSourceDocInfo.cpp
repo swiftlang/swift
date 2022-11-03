@@ -33,7 +33,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
@@ -948,6 +948,22 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.TypeName = copyAndClearString(Allocator, Buffer);
 
+  // ParameterizedProtocolType should always be wrapped in ExistentialType and
+  // cannot be mangled on its own.
+  // But ParameterizedProtocolType can currently occur in 'typealias'
+  // declarations. rdar://99176683
+  // To avoid crashing in USR generation, return an error for now.
+  if (auto Ty = DInfo.VD->getInterfaceType()) {
+    while (auto MetaTy = Ty->getAs<MetatypeType>()) {
+      Ty = MetaTy->getInstanceType();
+    }
+    if (Ty && Ty->getCanonicalType()->is<ParameterizedProtocolType>()) {
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "Cannot mangle USR for ParameterizedProtocolType without 'any'.");
+    }
+  }
+
   SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
   Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
 
@@ -988,7 +1004,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         /*PrintMessages=*/false,
         /*SkipInheritedDocs=*/false,
         /*IncludeSPISymbols=*/true,
-        /*IncludeClangDocs=*/true
+        /*IncludeClangDocs=*/true,
+        /*EmitExtensionBlockSymbols=*/false,
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
@@ -1270,7 +1287,7 @@ static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
   auto *VD = CursorInfo.ValueD;
 
   // If the given name is not a function name, and the cursor points to
-  // a contructor call, we use the type declaration instead of the init
+  // a constructor call, we use the type declaration instead of the init
   // declaration to translate the name.
   if (Info.ArgNames.empty() && !Info.IsZeroArgSelector) {
     if (auto *TD = CursorInfo.CtorTyRef) {
@@ -2199,7 +2216,7 @@ public:
       //     print(x)
       Dcl = V->getCanonicalVarDecl();
 
-      // If we have a prioperty wrapper backing property or projected value, use
+      // If we have a property wrapper backing property or projected value, use
       // the wrapped property instead (i.e. if this is _foo or $foo, pretend
       // it's foo).
       if (auto *Wrapped = V->getOriginalWrappedProperty()) {
@@ -2267,7 +2284,7 @@ private:
     if (auto *V = dyn_cast<VarDecl>(D)) {
       D = V->getCanonicalVarDecl();
 
-      // If we have a prioperty wrapper backing property or projected value, use
+      // If we have a property wrapper backing property or projected value, use
       // the wrapped property for comparison instead (i.e. if this is _foo or
       // $foo, pretend it's foo).
       if (auto *Wrapped = V->getOriginalWrappedProperty()) {
@@ -2447,7 +2464,7 @@ static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
     case SemanticRefactoringKind::None: return RefactoringKind::None;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
     case SemanticRefactoringKind::KIND: return RefactoringKind::KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
   }
 }
 
@@ -2509,8 +2526,8 @@ void SwiftLangSupport::semanticRefactoring(
 
 void SwiftLangSupport::collectExpressionTypes(
     StringRef FileName, ArrayRef<const char *> Args,
-    ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
-    SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+    bool CanonicalType, SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<ExpressionTypesInFile> &)>
         Receiver) {
   std::string Error;
@@ -2525,23 +2542,26 @@ void SwiftLangSupport::collectExpressionTypes(
   class ExpressionTypeCollector: public SwiftASTConsumer {
     std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver;
     std::vector<const char *> ExpectedProtocols;
+    bool FullyQualified;
     bool CanonicalType;
   public:
     ExpressionTypeCollector(
-        std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver,
-        ArrayRef<const char *> ExpectedProtocols,
-        bool CanonicalType):
-          Receiver(std::move(Receiver)),
+        std::function<void(const RequestResult<ExpressionTypesInFile> &)>
+            Receiver,
+        ArrayRef<const char *> ExpectedProtocols, bool FullyQualified,
+        bool CanonicalType)
+        : Receiver(std::move(Receiver)),
           ExpectedProtocols(ExpectedProtocols.vec()),
-          CanonicalType(CanonicalType) {}
+          FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
       std::vector<ExpressionTypeInfo> Scratch;
       llvm::SmallString<256> TypeBuffer;
       llvm::raw_svector_ostream OS(TypeBuffer);
       ExpressionTypesInFile Result;
-      for (auto Item: collectExpressionType(*SF, ExpectedProtocols, Scratch,
-                                            CanonicalType, OS)) {
+      for (auto Item :
+           collectExpressionType(*SF, ExpectedProtocols, Scratch,
+                                 FullyQualified, CanonicalType, OS)) {
         Result.Results.push_back({Item.offset, Item.length, Item.typeOffset, {}});
         for (auto P: Item.protocols) {
           Result.Results.back().ProtocolOffsets.push_back(P.first);
@@ -2559,9 +2579,8 @@ void SwiftLangSupport::collectExpressionTypes(
       Receiver(RequestResult<ExpressionTypesInFile>::fromError(Error));
     }
   };
-  auto Collector = std::make_shared<ExpressionTypeCollector>(Receiver,
-                                                             ExpectedProtocols,
-                                                             CanonicalType);
+  auto Collector = std::make_shared<ExpressionTypeCollector>(
+      Receiver, ExpectedProtocols, FullyQualified, CanonicalType);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
@@ -2572,7 +2591,8 @@ void SwiftLangSupport::collectExpressionTypes(
 
 void SwiftLangSupport::collectVariableTypes(
     StringRef FileName, ArrayRef<const char *> Args, Optional<unsigned> Offset,
-    Optional<unsigned> Length, SourceKitCancellationToken CancellationToken,
+    Optional<unsigned> Length, bool FullyQualified,
+    SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
@@ -2589,13 +2609,16 @@ void SwiftLangSupport::collectVariableTypes(
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver;
     Optional<unsigned> Offset;
     Optional<unsigned> Length;
+    bool FullyQualified;
 
   public:
     VariableTypeCollectorASTConsumer(
         std::function<void(const RequestResult<VariableTypesInFile> &)>
             Receiver,
-        Optional<unsigned> Offset, Optional<unsigned> Length)
-        : Receiver(std::move(Receiver)), Offset(Offset), Length(Length) {}
+        Optional<unsigned> Offset, Optional<unsigned> Length,
+        bool FullyQualified)
+        : Receiver(std::move(Receiver)), Offset(Offset), Length(Length),
+          FullyQualified(FullyQualified) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompInst = AstUnit->getCompilerInstance();
@@ -2619,7 +2642,7 @@ void SwiftLangSupport::collectVariableTypes(
       llvm::raw_string_ostream OS(TypeBuffer);
       VariableTypesInFile Result;
 
-      collectVariableType(*SF, Range, Infos, OS);
+      collectVariableType(*SF, Range, FullyQualified, Infos, OS);
 
       for (auto Info : Infos) {
         Result.Results.push_back({Info.Offset, Info.Length, Info.TypeOffset, Info.HasExplicitType});
@@ -2638,7 +2661,7 @@ void SwiftLangSupport::collectVariableTypes(
   };
 
   auto Collector = std::make_shared<VariableTypeCollectorASTConsumer>(
-      Receiver, Offset, Length);
+      Receiver, Offset, Length, FullyQualified);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;

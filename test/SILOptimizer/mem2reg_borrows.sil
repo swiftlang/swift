@@ -79,23 +79,6 @@ bb0(%0 : @owned $Klass):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_no_storeborrow4 :
-// CHECK-NOT: alloc_stack
-// CHECK-LABEL: } // end sil function 'test_no_storeborrow4'
-sil [ossa] @test_no_storeborrow4 : $@convention(thin) (@owned Klass) -> () {
-bb0(%0 : @owned $Klass):
-  %1 = alloc_stack [lexical] $Klass
-  store %0 to [init] %1 : $*Klass
-  %2 = load_borrow %1 : $*Klass
-  %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %2 : $Klass
-  destroy_addr %1 : $*Klass
-  dealloc_stack %1 : $*Klass
-  %6 = tuple ()
-  return %6 : $()
-}
-
 // load_borrow of projections are not optimized
 // CHECK-LABEL: sil [ossa] @test_with_structs_and_borrows1 :
 // CHECK: alloc_stack
@@ -114,10 +97,10 @@ bb0(%0 : @guaranteed $WrapperStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: sil [ossa] @store_only_allocas :
-// CHECK: alloc_stack
-// CHECK-LABEL: } // end sil function 'store_only_allocas'
-sil [ossa] @store_only_allocas : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil [ossa] @storeborrow_only_allocas :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'storeborrow_only_allocas'
+sil [ossa] @storeborrow_only_allocas : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = alloc_stack $Klass
   %2 = store_borrow %0 to %1 : $*Klass
@@ -127,21 +110,8 @@ bb0(%0 : @guaranteed $Klass):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @store_only_lexicalallocas :
-// CHECK: alloc_stack
-// CHECK-LABEL: } // end sil function 'store_only_lexicalallocas'
-sil [ossa] @store_only_lexicalallocas : $@convention(thin) (@guaranteed Klass) -> () {
-bb0(%0 : @guaranteed $Klass):
-  %1 = alloc_stack [lexical] $Klass
-  %2 = store_borrow %0 to %1 : $*Klass
-  end_borrow %2 : $*Klass
-  dealloc_stack  %1 : $*Klass
-  %6 = tuple ()
-  return %6 : $()
-}
-
 // CHECK-LABEL: sil [ossa] @test1 :
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test1'
 sil [ossa] @test1 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -158,7 +128,7 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test1_lexical :
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test1_lexical'
 sil [ossa] @test1_lexical : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -175,7 +145,7 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test2 :
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test2'
 sil [ossa] @test2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -196,7 +166,7 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test3 :
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test3'
 sil [ossa] @test3 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
@@ -218,7 +188,7 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test4 :
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test4'
 sil [ossa] @test4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -238,7 +208,7 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @test6 :
-// CHECK: alloc_stack
+// CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'test6'
 sil [ossa] @test6 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):

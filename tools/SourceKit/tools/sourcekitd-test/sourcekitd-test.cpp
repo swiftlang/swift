@@ -127,7 +127,7 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) static sourcekitd_uid_t Kind##Refactoring##KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
@@ -252,7 +252,7 @@ static void skt_main(skt_args *args) {
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -785,7 +785,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-  case SourceKitRequest::CollectExpresstionType: {
+  case SourceKitRequest::CollectExpressionType: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCollectExpressionType);
     addRequestOptionsDirect(Req, Opts);
     break;
@@ -806,7 +806,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::KIND:                                                 \
     setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
     break;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
   case SourceKitRequest::MarkupToXML: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestMarkupToXML);
@@ -1365,7 +1365,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printRangeInfo(Info, SourceFile, llvm::outs());
       break;
 
-    case SourceKitRequest::CollectExpresstionType:
+    case SourceKitRequest::CollectExpressionType:
       printExpressionType(Info, llvm::outs());
       break;
 
@@ -1496,7 +1496,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         printModuleGroupNames(Info, llvm::outs());
         break;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
       case SourceKitRequest::SyntacticRename:
         printSyntacticRenameEdits(Info, llvm::outs());
         break;

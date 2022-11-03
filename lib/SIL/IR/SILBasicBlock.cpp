@@ -123,8 +123,10 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   if (isEntry()) {
     assert(args_empty() && "Expected to have no arguments");
     for (auto *FuncArg : Other->getSILFunctionArguments()) {
-      createFunctionArgument(FuncArg->getType(),
-                             FuncArg->getDecl());
+      auto *NewArg =
+          createFunctionArgument(FuncArg->getType(), FuncArg->getDecl());
+      NewArg->setNoImplicitCopy(FuncArg->isNoImplicitCopy());
+      NewArg->setLifetimeAnnotation(FuncArg->getLifetimeAnnotation());
     }
     return;
   }
@@ -359,10 +361,6 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
   assert(ClonedScopeCache.find(OrigScope) == ClonedScopeCache.end());
   ClonedScopeCache.insert({OrigScope, ClonedScope});
   return ClonedScope;
-}
-
-bool SILBasicBlock::isEntry() const {
-  return this == &*getParent()->begin();
 }
 
 /// Declared out of line so we can have a declaration of SILArgument.

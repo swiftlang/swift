@@ -106,7 +106,8 @@ protocol AsExistentialAssocTypeAgainB {
   func aMethod(_ object : AsExistentialAssocTypeAgainA) // expected-error {{use of protocol 'AsExistentialAssocTypeAgainA' as a type must be written 'any AsExistentialAssocTypeAgainA'}}
 }
 
-// SR-547
+// https://github.com/apple/swift/issues/43164
+
 protocol A {
     associatedtype B1: B
     associatedtype C1: C

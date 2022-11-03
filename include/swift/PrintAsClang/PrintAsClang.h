@@ -18,6 +18,7 @@
 #include "swift/AST/Identifier.h"
 
 namespace swift {
+class FrontendOptions;
 class IRGenOptions;
 class ModuleDecl;
 class ValueDecl;
@@ -34,7 +35,7 @@ class ValueDecl;
 /// Returns true on error.
 bool printAsClangHeader(raw_ostream &out, ModuleDecl *M,
                         StringRef bridgingHeader,
-                        bool ExposePublicDeclsInClangHeader,
+                        const FrontendOptions &frontendOpts,
                         const IRGenOptions &irGenOpts);
 }
 

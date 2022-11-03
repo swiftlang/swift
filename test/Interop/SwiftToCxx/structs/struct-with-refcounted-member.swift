@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-function)
@@ -47,5 +47,5 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   inline StructWithRefcountedMember(StructWithRefcountedMember &&) = default;
+// CHECK-NEXT:   inline StructWithRefcountedMember(StructWithRefcountedMember &&) { abort(); }
 // CHECK-NEXT: private:

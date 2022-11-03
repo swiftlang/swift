@@ -1124,7 +1124,7 @@ exit:
   return %instance_1_loaded : $C
 }
 
-// Ensure thtat a destroy_addr following an initial load [copy] gets a deferred
+// Ensure that a destroy_addr following an initial load [copy] gets a deferred
 // scope end.
 // CHECK-LABEL: sil [ossa] @deferred_4 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):

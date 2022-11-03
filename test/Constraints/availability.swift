@@ -43,3 +43,24 @@ func unavailableFunction(_ x: Int) -> Bool { true } // expected-note {{'unavaila
 func f_55700(_ arr: [Int]) {
   for x in arr where unavailableFunction(x) {} // expected-error {{'unavailableFunction' is unavailable}}
 }
+
+// rdar://101814209
+public struct Box<T> {
+  @usableFromInline
+  let value: T
+}
+
+@available(macOS, unavailable)
+extension Box where T == Int {
+  @usableFromInline
+  init(value: T) {
+    self.value = value
+  }
+}
+
+@available(macOS, unavailable)
+@_alwaysEmitIntoClient public func aeicFunction() {
+  // Select the unavailable @usableFromInline init over the synthesized internal
+  // memberwise initializer.
+  _ = Box(value: 42)
+}

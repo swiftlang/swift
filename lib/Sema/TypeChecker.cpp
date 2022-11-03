@@ -212,8 +212,10 @@ void swift::bindExtensions(ModuleDecl &mod) {
           worklist.push_back(ED);;
     };
 
-    for (auto *D : SF->getTopLevelDecls())
-      visitTopLevelDecl(D);
+    for (auto item : SF->getTopLevelItems()) {
+      if (auto D = item.dyn_cast<Decl *>())
+        visitTopLevelDecl(D);
+    }
 
     for (auto *D : SF->getHoistedDecls())
       visitTopLevelDecl(D);
@@ -266,6 +268,7 @@ static void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf) {
 
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     break;
   }
 
@@ -337,6 +340,11 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
   evaluateOrDefault(
       Ctx.evaluator,
+      CheckInconsistentSPIOnlyImportsRequest{SF},
+      {});
+
+  evaluateOrDefault(
+      Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Perform various AST transforms we've been asked to perform.
@@ -361,6 +369,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   switch (SF.Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
@@ -386,7 +395,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   public:
     DerivativeFinder() {}
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
         for (auto *derAttr : afd->getAttrs().getAttributes<DerivativeAttr>()) {
           // Resolve derivative function configurations from `@derivative`
@@ -395,12 +404,13 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
         }
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 
   switch (SF.Kind) {
   case SourceFileKind::Library:
+  case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
     DerivativeFinder finder;
     SF.walkContext(finder);
@@ -462,7 +472,7 @@ namespace {
                             GenericParamList *params)
         : dc(dc), params(params) {}
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto *ident = dyn_cast<IdentTypeRepr>(T)) {
         auto firstComponent = ident->getComponentRange().front();
         auto name = firstComponent->getNameRef().getBaseIdentifier();
@@ -470,7 +480,7 @@ namespace {
           firstComponent->setValue(paramDecl, dc);
       }
 
-      return true;
+      return Action::Continue();
     }
   };
 }

@@ -301,7 +301,7 @@ swift::rewriting::buildTypeDifference(
   auto nextSubstitution = [&](Term t) -> Type {
     unsigned index = resultSubstitutions.size();
     resultSubstitutions.push_back(t);
-    return GenericTypeParamType::get(/*isTypeSequence=*/false,
+    return GenericTypeParamType::get(/*isParameterPack=*/false,
                                      /*depth=*/0, index, astCtx);
   };
 

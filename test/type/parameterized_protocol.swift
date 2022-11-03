@@ -89,8 +89,9 @@ protocol SequenceWrapperProtocol {
   associatedtype E
 }
 
-// https://bugs.swift.org/browse/SR-15979 - the GenericSignatureBuilder doesn't like this protocol.
-
+// https://github.com/apple/swift/issues/58240
+// the GenericSignatureBuilder doesn't like this protocol.
+//
 // CHECK-LABEL: .Recursive@
 // CHECK-NEXT: Requirement signature: <Self where Self.[Recursive]B == Self.[Recursive]D.[Recursive]B, Self.[Recursive]C == Self.[Recursive]D.[Recursive]C, Self.[Recursive]D : Recursive>
 protocol Recursive<B, C> {

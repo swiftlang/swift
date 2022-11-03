@@ -63,7 +63,7 @@ enum class SourceKitRequest {
   Statistics,
   SyntaxTree,
   EnableCompileNotifications,
-  CollectExpresstionType,
+  CollectExpressionType,
   CollectVariableType,
   GlobalConfiguration,
   DependencyUpdated,
@@ -71,7 +71,7 @@ enum class SourceKitRequest {
   Compile,
   CompileClose,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 };
 
 struct TestOptions {

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
@@ -25,7 +25,8 @@ public struct B {
 }
 
 // CHECK: class B;
-// CHECK-NEXT: namespace _impl {
+// CHECK: class A;
+// CHECK: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_A;
 
@@ -33,8 +34,11 @@ public struct B {
 
 // CHECK: B returnsB() const;
 
-// CHECK: class A;
-// CHECK-NEXT: namespace _impl {
+// CHECK: namespace _impl {
+// CHECK-EMPTY:
+// CHECK-NEXT: class _impl_A {
+
+// CHECK: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_B;
 

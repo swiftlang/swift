@@ -19,11 +19,12 @@
 #ifndef SWIFT_SIL_SILDeclRef_H
 #define SWIFT_SIL_SILDeclRef_H
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/TypeAlignments.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -299,6 +300,11 @@ struct SILDeclRef {
   /// Retrieves the ASTContext from the underlying AST node being stored.
   ASTContext &getASTContext() const;
 
+  /// Retrieve the innermost declaration context corresponding to the underlying
+  /// node, which will either be the node itself (if it's also a declaration
+  /// context) or its parent context.
+  DeclContext *getInnermostDeclContext() const;
+
   llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
 
   SILLocation getAsRegularLocation() const;
@@ -374,7 +380,10 @@ struct SILDeclRef {
   bool isAlwaysInline() const;
   /// True if the function has the @_backDeploy attribute.
   bool isBackDeployed() const;
-  
+
+  /// Return the expected linkage for a definition of this declaration.
+  SILLinkage getDefinitionLinkage() const;
+
   /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
@@ -474,9 +483,6 @@ struct SILDeclRef {
     return result;
   }
 
-  /// True is the decl ref references any kind of thunk.
-  bool isAnyThunk() const;
-
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.
   bool isForeignToNativeThunk() const;
@@ -504,9 +510,6 @@ struct SILDeclRef {
   /// table entry.
   bool requiresNewWitnessTableEntry() const;
 
-  /// True if the decl is a method which introduces a new witness table entry.
-  static bool requiresNewWitnessTableEntry(AbstractFunctionDecl *func);
-
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
@@ -530,6 +533,9 @@ struct SILDeclRef {
   static AbstractFunctionDecl *getOverriddenWitnessTableEntry(
                                                     AbstractFunctionDecl *func);
 
+  /// Returns the availability of the decl for computing linkage.
+  Optional<AvailabilityContext> getAvailabilityForLinkage() const;
+
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
 
@@ -544,11 +550,22 @@ struct SILDeclRef {
 
   bool isImplicit() const;
 
+  /// Whether the referenced function contains user code. This is generally true
+  /// for a non-implicit decls, but may also be true for implicit decls if
+  /// explicitly written code has been spliced into the body. This is the case
+  /// for e.g a lazy variable getter.
+  bool hasUserWrittenCode() const;
+
   /// Return the scope in which the parent class of a method (i.e. class
   /// containing this declaration) can be subclassed, returning NotApplicable if
   /// this is not a method, there is no such class, or the class cannot be
   /// subclassed.
   SubclassScope getSubclassScope() const;
+
+  /// For a SILDeclRef that describes a variable initializer or backing
+  /// initializer, retrieves the expression that will be emitted for that
+  /// initialization. Otherwise, returns \c nullptr.
+  Expr *getInitializationExpr() const;
 
   bool isDynamicallyReplaceable() const;
 

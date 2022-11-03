@@ -1800,7 +1800,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
-          result.setDeclName(swiftCtx.getIdentifier(typedefType->getDecl()->getName()));
+          StringRef baseName = typedefType->getDecl()->getName();
+          SmallString<16> swiftPrivateScratch;
+          // If this declaration has the swift_private attribute, prepend "__"
+          if (shouldBeSwiftPrivate(*this, D, version,
+                                   result.info.hasAsyncInfo)) {
+            swiftPrivateScratch = "__";
+            swiftPrivateScratch += baseName;
+            baseName = swiftPrivateScratch;
+          }
+
+          result.setDeclName(swiftCtx.getIdentifier(baseName));
           result.setEffectiveContext(D->getDeclContext());
           return result;
         }
@@ -1858,6 +1868,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Minus:
     case clang::OverloadedOperatorKind::OO_Star:
     case clang::OverloadedOperatorKind::OO_Slash:
+    case clang::OverloadedOperatorKind::OO_PlusEqual:
+    case clang::OverloadedOperatorKind::OO_MinusEqual:
+    case clang::OverloadedOperatorKind::OO_StarEqual:
+    case clang::OverloadedOperatorKind::OO_SlashEqual:
     case clang::OverloadedOperatorKind::OO_Percent:
     case clang::OverloadedOperatorKind::OO_Caret:
     case clang::OverloadedOperatorKind::OO_Amp:

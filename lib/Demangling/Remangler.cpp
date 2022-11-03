@@ -1097,9 +1097,9 @@ Remangler::mangleDependentGenericLayoutRequirement(Node *node, unsigned depth) {
                    node);
   DEMANGLER_ASSERT(node->getChild(1)->getText().size() == 1, node);
   Buffer << node->getChild(1)->getText()[0];
-  if (node->getNumChildren() >=3)
+  if (node->getNumChildren() >= 3)
     RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
-  if (node->getNumChildren() >=4)
+  if (node->getNumChildren() >= 4)
     RETURN_IF_ERROR(mangleChildNode(node, 3, depth + 1));
   return ManglingError::Success;
 }
@@ -1669,6 +1669,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AccessibleFunctionRecord:
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
+      case Node::Kind::HasSymbolQuery:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3500,6 +3501,11 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
   else
     Buffer << "Xg";
 
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
+  Buffer << "TwS";
   return ManglingError::Success;
 }
 

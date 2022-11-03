@@ -66,6 +66,7 @@ namespace swift {
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class BuiltinTupleDecl;
   class ClangModuleLoader;
   class ClangNode;
   class ClangTypeConverter;
@@ -131,6 +132,7 @@ namespace swift {
   class IndexSubset;
   struct SILAutoDiffDerivativeFunctionKey;
   struct InterfaceSubContextDelegate;
+  class CompilerPlugin;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -306,6 +308,10 @@ public:
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
 
+  /// Should we globally ignore swiftmodule files adjacent to swiftinterface
+  /// files?
+  bool IgnoreAdjacentModules = false;
+
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
@@ -345,6 +351,12 @@ public:
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
+
+  /// Cache of compiler plugins keyed by their name.
+  llvm::StringMap<CompilerPlugin> LoadedPlugins;
+
+  /// Cache of loaded symbols.
+  llvm::StringMap<void *> LoadedSymbols;
 
 private:
   /// The current generation number, which reflects the number of
@@ -600,6 +612,12 @@ public:
 
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
+
+  /// Get IteratorProtocol.next().
+  FuncDecl *getIteratorNext() const;
+
+  /// Get AsyncIteratorProtocol.next().
+  FuncDecl *getAsyncIteratorNext() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
@@ -953,7 +971,7 @@ public:
   const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
   const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
   const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
-  
+
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
@@ -989,7 +1007,8 @@ public:
       bool isUnderlyingClangModule,
       ModuleDependenciesCache &cache,
       InterfaceSubContextDelegate &delegate,
-      bool cacheOnly = false);
+      bool cacheOnly = false,
+      llvm::Optional<std::pair<std::string, swift::ModuleDependenciesKind>> dependencyOf = None);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   Optional<ModuleDependencies> getSwiftModuleDependencies(
@@ -1128,9 +1147,12 @@ public:
   ///
   /// \param ModulePath The module's \c ImportPath which describes
   /// the name of the module being loaded, possibly including submodules.
-
+  /// \param AllowMemoryCached Should we allow reuse of an already loaded
+  /// module or force reloading from disk, defaults to true.
+  ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ImportPath::Module ModulePath);
+  ModuleDecl *
+  getModule(ImportPath::Module ModulePath, bool AllowMemoryCached = true);
 
   /// Attempts to load the matching overlay module for the given clang
   /// module into this ASTContext.
@@ -1157,7 +1179,10 @@ public:
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
 
-public:
+  /// Change the behavior of all loaders to ignore swiftmodules next to
+  /// swiftinterfaces.
+  void setIgnoreAdjacentModules(bool value);
+
   /// Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
   /// lookup tables.
@@ -1255,7 +1280,7 @@ public:
   /// \param type The type for which we are retrieving the conformance.
   ///
   /// \param inherited The inherited conformance.
-  InheritedProtocolConformance *
+  ProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// Get the lazy data for the given declaration.
@@ -1349,7 +1374,7 @@ public:
   /// Get a generic signature where the generic parameter τ_d_i represents
   /// the element of the pack generic parameter τ_d_i… in \p baseGenericSig.
   ///
-  /// This drops the @_typeSequence attribute from each generic parameter,
+  /// This drops the parameter pack bit from each generic parameter,
   /// and converts same-element requirements to same-type requirements.
   CanGenericSignature getOpenedElementSignature(CanGenericSignature baseGenericSig);
 
@@ -1420,6 +1445,20 @@ public:
   /// invocation decoder of the given distributed actor.
   FuncDecl *getDistributedActorArgumentDecodingMethod(NominalTypeDecl *);
 
+  /// The special Builtin.TheTupleType, which parents tuple extensions and
+  /// conformances.
+  BuiltinTupleDecl *getBuiltinTupleDecl();
+
+  /// The declared interface type of Builtin.TheTupleType.
+  BuiltinTupleType *getBuiltinTupleType();
+
+  /// Finds the loaded compiler plugin given its name.
+  CompilerPlugin *getLoadedPlugin(StringRef name);
+
+  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
+  /// search within the library.
+  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
+
 private:
   friend Decl;
 
@@ -1431,6 +1470,8 @@ private:
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
+
+  void loadCompilerPlugins();
 
   friend TypeBase;
   friend ArchetypeType;

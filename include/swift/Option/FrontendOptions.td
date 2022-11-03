@@ -579,6 +579,10 @@ def enable_experimental_associated_type_inference :
   Flag<["-"], "enable-experimental-associated-type-inference">,
   HelpText<"Enable experimental associated type inference via type witness systems">;
 
+def enable_experimental_implicit_some :
+  Flag<["-"], "enable-experimental-implicit-some">,
+  HelpText<"Enable experimental implicit some">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
@@ -881,6 +885,10 @@ def explicit_interface_module_build :
   Flag<["-"], "explicit-interface-module-build">,
   HelpText<"Use the specified command-line to build the module from interface, instead of flags specified in the interface">;
 
+def direct_clang_cc1_module_build :
+  Flag<["-"], "direct-clang-cc1-module-build">,
+  HelpText<"Use the specified -Xcc options to build a PCM by using Clang frontend directly, bypassing the Clang driver">;
+
 def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
@@ -1069,11 +1077,12 @@ def skip_import_in_public_interface:
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
 
-def clang_header_expose_public_decls:
-  Flag<["-"], "clang-header-expose-public-decls">,
-  HelpText<"Expose all public declarations in the generated clang header">,
-  Flags<[FrontendOption, HelpHidden]>;
-  
+def clang_header_expose_decls:
+  Joined<["-"], "clang-header-expose-decls=">,
+  HelpText<"Which declarations should be exposed in the generated clang header.">,
+  Flags<[FrontendOption, HelpHidden]>,
+  MetaVarName<"all-public|has-expose-attr">;
+
 def weak_link_at_target :
   Flag<["-"], "weak-link-at-target">,
   HelpText<"Weakly link symbols for declarations that were introduced at the "
@@ -1110,4 +1119,8 @@ def enable_emit_generic_class_ro_t_list :
   Flag<["-"], "enable-emit-generic-class-ro_t-list">,
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
+
+def experimental_spi_only_imports :
+  Flag<["-"], "experimental-spi-only-imports">,
+  HelpText<"Enable use of @_spiOnly imports">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

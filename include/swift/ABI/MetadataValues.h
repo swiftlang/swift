@@ -1436,6 +1436,12 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Functions accessible at runtime (i.e. distributed method accessors).
   const uint16_t AccessibleFunctionRecord = 0x438c; // = 17292
+
+  /// C type GetExtraInhabitantTag function descriminator
+  const uint16_t GetExtraInhabitantTagFunction = 0x392e; // = 14638
+
+  /// C type StoreExtraInhabitantTag function descriminator
+  const uint16_t StoreExtraInhabitantTagFunction = 0x9bf6; // = 39926
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -2247,7 +2253,9 @@ public:
     RequestedPriority_width = 8,
 
     Task_IsChildTask                              = 8,
-    // bit 9 is unused
+    // Should only be set in task-to-thread model where Task.runInline is
+    // available
+    Task_IsInlineTask                             = 9,
     Task_CopyTaskLocals                           = 10,
     Task_InheritContext                           = 11,
     Task_EnqueueJob                               = 12,
@@ -2263,6 +2271,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsInlineTask,
+                                isInlineTask,
+                                setIsInlineTask)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_CopyTaskLocals,
                                 copyTaskLocals,
                                 setCopyTaskLocals)

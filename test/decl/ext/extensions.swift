@@ -122,9 +122,9 @@ extension X3 {
   func foo() -> Int { return 0 }
 }
 
-// Make sure the test case from https://bugs.swift.org/browse/SR-3847 doesn't
-// cause problems when the later extension is incorrectly nested inside another
-// declaration.
+// Make sure the test case from https://github.com/apple/swift/issues/46432
+// doesn't cause problems when the later extension is incorrectly nested inside
+// another declaration.
 extension C1.NestedStruct {
   static let originalValue = 0
 }
@@ -135,7 +135,7 @@ struct WrapperContext {
 }
 
 // Class-constrained extension where protocol does not impose class requirement
-// SR-11298
+// https://github.com/apple/swift/issues/53699
 
 protocol DoesNotImposeClassReq_1 {}
 
@@ -352,11 +352,12 @@ extension Tree.BoughPayload.Contents {
   // expected-note@-2 {{did you mean to extend 'Nest<Int>' instead?}}
 }
 
-// SR-10466 Check 'where' clause when referencing type defined inside extension
-struct SR_10466<T> {
-  var a : A // expected-error {{'SR_10466<T>.A' (aka 'Int') requires the types 'T' and 'Never' be equivalent}}
+// https://github.com/apple/swift/issues/52866
+// Check 'where' clause when referencing type defined inside extension.
+struct S_52866<T> {
+  var a : A // expected-error {{'S_52866<T>.A' (aka 'Int') requires the types 'T' and 'Never' be equivalent}}
 }
-extension SR_10466 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
+extension S_52866 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
   typealias A = Int
 }
 

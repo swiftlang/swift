@@ -117,6 +117,7 @@ public:
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
+    UncheckedConversionKind,    // unchecked_X_cast
 
     FirstLogicalKind = GetterSetterKind,
     FirstTranslationKind = OrigToSubstKind,
@@ -224,6 +225,9 @@ public:
     ActorIso = None;
     return current;
   }
+
+  void set(SILGenFunction &SGF, SILLocation loc,
+           ArgumentSource &&value, ManagedValue base) &&;
 
   /// Determines whether this component has any actor-isolation.
   bool hasActorIsolation() const { return ActorIso.hasValue(); }

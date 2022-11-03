@@ -19,7 +19,7 @@ func test() {
 //
 // RUN: %target-swift-frontend -I %t -module-name SomeModule -emit-module-interface-path %t/SomeModule.swiftinterface -emit-module-doc-path %t/SomeModule.swiftdoc %S/Inputs/SomeModule.swift -emit-module -o /dev/null
 
-// Actual test: Check the CusorInfo results of references to symbols in that
+// Actual test: Check the CursorInfo results of references to symbols in that
 // module, including the available refactoring actions, and associated doc
 // comments (from the .swiftdoc file).
 //

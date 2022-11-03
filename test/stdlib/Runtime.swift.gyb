@@ -378,7 +378,7 @@ Runtime.test("demangleName") {
   expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
-if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+if #available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *) {
   Runtime.test("demangleTruncate") {
     // Swift.Int requires 10 bytes to be fully demangled.
     let buffer = UnsafeMutableBufferPointer<Int8>.allocate(capacity: 10)
@@ -673,7 +673,10 @@ Reflection.test("ObjectIdentifier/CustomDebugStringConvertible") {
 class C: Q1 & Codable { }
 
 Reflection.test("multiprotocolTypes") {
-  // [SR-8158]: Printing type(of: Codable & Protocol type ) EXC_BAD_ACCESS
+  // https://github.com/apple/swift/issues/50690
+  // EXC_BAD_ACCESS when calling 'type(of:)' on protocol composition with
+  // 'Codable'
+  //
   // This use of String(reflecting:) exercises a previously incorrect cast in
   // NonFixedExistentialMetatypeBox::Container::getNumWitnessTables.
   let obj: Q1 & Codable = C()
@@ -688,7 +691,7 @@ var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
 #else
   fatalError("implement")
@@ -712,7 +715,7 @@ BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
   expectTrue(_isPowerOf2(asInt(1024)))
 #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32) || arch(powerpc)
   // Not applicable to 32-bit architectures.
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x) || arch(riscv64)
   expectTrue(_isPowerOf2(asInt(0x8000_0000)))
 #else
   fatalError("implement")

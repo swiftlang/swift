@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFileSharedCore.h"
-#include "ModuleFileCoreTableInfo.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFileCoreTableInfo.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -150,6 +151,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::ResilienceStrategyLayout::readRecord(scratch, Strategy);
       extendedInfo.setResilienceStrategy(ResilienceStrategy(Strategy));
       break;
+    case options_block::IS_BUILT_FROM_INTERFACE:
+      extendedInfo.setIsBuiltFromInterface(true);
+      break;
     case options_block::IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED:
       extendedInfo.setAllowModuleWithCompilerErrorsEnabled(true);
       break;
@@ -282,9 +286,9 @@ static ValidationInfo validateControlBlock(
       }
       case 4:
         if (scratch[3] != 0) {
-          result.compatibilityVersion =
-            version::Version(blobData.substr(scratch[2]+1, scratch[3]),
-                             SourceLoc(), nullptr);
+          result.compatibilityVersion = *VersionParser::parseVersionString(
+              blobData.substr(scratch[2] + 1, scratch[3]), SourceLoc(),
+              nullptr);
         }
         LLVM_FALLTHROUGH;
       case 3:
@@ -469,7 +473,7 @@ bool serialization::isSerializedAST(StringRef data) {
 
 ValidationInfo serialization::validateSerializedAST(
     StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
-    ExtendedValidationInfo *extendedInfo,
+    bool requiresRevisionMatch, ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
   ValidationInfo result;
 
@@ -511,7 +515,7 @@ ValidationInfo serialization::validateSerializedAST(
       result = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          requiresOSSAModules, /*requiresRevisionMatch=*/true,
+          requiresOSSAModules, requiresRevisionMatch,
           requiredSDK,
           extendedInfo, localObfuscator);
       if (result.status == Status::Malformed)
@@ -580,10 +584,17 @@ void ModuleFileSharedCore::fatal(llvm::Error error) const {
 }
 
 void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
-  os << "module '" << Name << "' with full misc version '" << MiscVersion
-      << "'";
+  bool resilient = ResilienceStrategy(Bits.ResilienceStrategy) ==
+                   ResilienceStrategy::Resilient;
+  os << "module '" << Name
+     << "', builder version '" << MiscVersion
+     << "', built from "
+     << (Bits.IsBuiltFromInterface? "swiftinterface": "source")
+     << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
-    os << " (built with -experimental-allow-module-with-compiler-errors)";
+    os << ", built with -experimental-allow-module-with-compiler-errors";
+  if (ModuleInputBuffer)
+    os << ", loaded from '" << ModuleInputBuffer->getBufferIdentifier() << "'";
 }
 
 ModuleFileSharedCore::~ModuleFileSharedCore() { }
@@ -1316,6 +1327,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
+      Bits.IsBuiltFromInterface = extInfo.isBuiltFromInterface();
       Bits.IsAllowModuleWithCompilerErrorsEnabled =
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();

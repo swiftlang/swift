@@ -52,6 +52,7 @@ docs/_build
 
 # SwiftPM
 .build
+.swiftpm
 
 #==============================================================================#
 # Ignore CMake temporary files

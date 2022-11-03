@@ -158,7 +158,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 
 void printCxxNaiveException(raw_ostream &os) {
   os << "/// Naive exception class that should be thrown\n";
-  os << "class NaiveException {\n";
+  os << "class NaiveException : public swift::Error {\n";
   os << "public:\n";
   os << "  inline NaiveException(const char * _Nonnull msg) noexcept : "
      << "msg_(msg) { }\n";
@@ -214,11 +214,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
     os << "static inline const constexpr bool isUsableInGenericContext<"
        << typeInfo.name << "> = true;\n\n";
 
-    os << "template<>\ninline void * _Nonnull getTypeMetadata<";
-    os << typeInfo.name << ">() {\n";
-    os << "  return &" << cxx_synthesis::getCxxImplNamespaceName()
-       << "::" << typeMetadataVarName << ";\n";
-    os << "}\n\n";
+    os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
+       << "  static inline void * _Nonnull getTypeMetadata() {\n"
+       << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::" << typeMetadataVarName << ";\n"
+       << "  }\n};\n\n";
   }
 }
 
@@ -243,10 +243,9 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
         });
     os << "\n";
     // C++ only supports inline variables from C++17.
-    // FIXME: silence the warning instead?
-    os << "#if __cplusplus > 201402L\n";
-    printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                    /*isCForwardDefinition=*/false);
-    os << "#endif\n";
+    ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+      printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                      /*isCForwardDefinition=*/false);
+    });
   });
 }

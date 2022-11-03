@@ -165,6 +165,8 @@ void ExistentialSpecializerCloner::cloneArguments(
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       auto *NewArg =
           ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
+      NewArg->setNoImplicitCopy(ArgDesc.Arg->isNoImplicitCopy());
+      NewArg->setLifetimeAnnotation(ArgDesc.Arg->getLifetimeAnnotation());
       NewArg->setOwnershipKind(ValueOwnershipKind(
           NewF, MappedTy, ArgDesc.Arg->getArgumentConvention()));
       entryArgs.push_back(NewArg);
@@ -180,6 +182,8 @@ void ExistentialSpecializerCloner::cloneArguments(
         GenericSILType, ArgDesc.Decl,
         ValueOwnershipKind(NewF, GenericSILType,
                            ArgDesc.Arg->getArgumentConvention()));
+    NewArg->setNoImplicitCopy(ArgDesc.Arg->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(ArgDesc.Arg->getLifetimeAnnotation());
     // Determine the Conformances.
     SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
     CanType OpenedType = NewArg->getType().getASTType();
@@ -194,7 +198,7 @@ void ExistentialSpecializerCloner::cloneArguments(
       /// bb0(%0 : $*T):
       /// %3 = alloc_stack $P
       /// %4 = init_existential_addr %3 : $*P, $T
-      /// copy_addr [take] %0 to [initialization] %4 : $*T
+      /// copy_addr [take] %0 to [init] %4 : $*T
       /// %7 = open_existential_addr immutable_access %3 : $*P to
       /// $*@opened P
       auto *ASI =
@@ -311,7 +315,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
 
     /// Generate new generic parameter.
     auto *NewGenericParam =
-        GenericTypeParamType::get(/*type sequence*/ false, Depth, GPIdx++, Ctx);
+        GenericTypeParamType::get(/*isParameterPack*/ false, Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                constraint);
@@ -402,7 +406,10 @@ void ExistentialTransform::populateThunkBody() {
   auto *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
     auto argumentType = ArgDesc.Arg->getType();
-    ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
+    auto *NewArg =
+        ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
+    NewArg->setNoImplicitCopy(ArgDesc.Arg->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(ArgDesc.Arg->getLifetimeAnnotation());
   }
 
   /// Builder to add new instructions in the Thunk.

@@ -88,6 +88,10 @@ void MapOpaqueArchetypes::replace() {
     SILType mappedType = remapType(origArg->getType());
     auto *NewArg = clonedEntryBlock->createFunctionArgument(
         mappedType, origArg->getDecl(), true);
+    NewArg->setNoImplicitCopy(
+        cast<SILFunctionArgument>(origArg)->isNoImplicitCopy());
+    NewArg->setLifetimeAnnotation(
+        cast<SILFunctionArgument>(origArg)->getLifetimeAnnotation());
     entryArgs.push_back(NewArg);
   }
 
@@ -310,6 +314,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::TestSpecificationInst:
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
@@ -336,6 +341,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
@@ -418,7 +424,7 @@ class SerializeSILPass : public SILModuleTransform {
       // underlying type. Update the function's opaque archetypes.
       if (wasSerialized && F.isDefinition()) {
         updateOpaqueArchetypes(F);
-        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+        invalidateAnalysis(&F, SILAnalysis::InvalidationKind::FunctionBody);
       }
 
       // After serialization we don't need to keep @alwaysEmitIntoClient

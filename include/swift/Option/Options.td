@@ -241,6 +241,9 @@ def tools_directory : Separate<["-"], "tools-directory">,
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
+  
+def e : JoinedOrSeparate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
+  HelpText<"Executes a line of code provided on the command line">;
 
 def F : JoinedOrSeparate<["-"], "F">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
@@ -340,6 +343,10 @@ def remark_loading_module : Flag<["-"], "Rmodule-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark and file path of each loaded module">;
 
+def remark_indexing_system_module : Flag<["-"], "Rindexing-system-module">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit a remark when indexing a system module">;
+
 def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface-build">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if an explicit module interface invocation has an early exit because the expected output is up-to-date">;
@@ -411,7 +418,13 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
 
 def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
-  HelpText<"Require explicit availability on public declarations">;
+  HelpText<"Warn on public declarations without an availability attribute">;
+
+def require_explicit_availability_EQ : Joined<["-"], "require-explicit-availability=">,
+  MetaVarName<"<error,warn,ignore>">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Set diagnostic level to report public declarations without an availability attribute">;
+
 def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
@@ -618,23 +631,18 @@ def enable_experimental_concise_pound_file : Flag<["-"],
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
+
+def enable_experimental_cxx_interop_in_clang_header :
+  Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Enable experimental Swift to C++ interop code generation in generated Clang header">;
 
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   Flags<[HelpHidden]>,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
-
-def experimental_emit_module_separately:
-  Flag<["-"], "experimental-emit-module-separately">,
-  Flags<[NoInteractiveOption, HelpHidden]>,
-  HelpText<"Emit module files as a distinct job (new Driver only)">;
-
-def no_emit_module_separately:
-  Flag<["-"], "no-emit-module-separately">,
-  Flags<[NoInteractiveOption, HelpHidden]>,
-  HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
 
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
@@ -653,6 +661,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
 def no_warnings_as_errors : Flag<["-"], "no-warnings-as-errors">,
   Flags<[FrontendOption]>,
   HelpText<"Don't treat warnings as errors">;
+  
+def suppress_remarks : Flag<["-"], "suppress-remarks">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all remarks">;
 
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -1071,8 +1083,12 @@ def typecheck : Flag<["-"], "typecheck">,
 def dump_parse : Flag<["-"], "dump-parse">,
   HelpText<"Parse input file(s) and dump AST(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_parse : Flag<["-"], "emit-parse">, Alias<dump_parse>,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_ast : Flag<["-"], "emit-ast">, Alias<dump_ast>,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   HelpText<"Parse and type-check input file(s) and dump the scope map(s)">,
@@ -1357,6 +1373,11 @@ def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Pretty-print the output JSON">;
 
+def emit_extension_block_symbols: Flag<["-"], "emit-extension-block-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+        NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit 'swift.extension' symbols for extensions to external types instead of directly associating members and conformances with the extended nominal when generating symbol graphs">;
+
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
@@ -1542,5 +1563,151 @@ def use_interface_for_module: Separate<["-", "--"], "use-interface-for-module">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Prefer loading these modules via interface">,
   MetaVarName<"<name>">;
+
+// ONLY SUPPORTED IN NEW DRIVER
+
+// These flags only exist here so that the old driver doesn't fail with unknown
+// arguments when they're given. The option definitions (and ie. their flags)
+// matter since they are synced to the new swift-driver. The options themselves
+// are completely unimplemented in the old driver, however.
+
+def driver_print_graphviz:
+  Flag<["-"], "driver-print-graphviz">,
+  Flags<[HelpHidden, DoesNotAffectIncrementalBuild, NewDriverOnlyOption]>,
+  HelpText<"Write the job graph as a graphviz file">;
+
+def driver_explicit_module_build:
+  Flag<["-"], "explicit-module-build">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Prebuild module dependencies to make them explicit">;
+
+def driver_experimental_explicit_module_build:
+  Flag<["-"], "experimental-explicit-module-build">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  Alias<driver_explicit_module_build>,
+  HelpText<"Prebuild module dependencies to make them explicit">;
+
+def driver_scan_dependencies_non_lib:
+  Flag<["-"], "nonlib-dependency-scanner">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Use calls to `swift-frontend -scan-dependencies` instead of "
+           "dedicated dependency scanning library">;
+
+def driver_warn_unused_options:
+  Flag<["-"], "driver-warn-unused-options">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Emit warnings for any provided options which are unused by the "
+           "driver">;
+
+def emit_module_separately:
+  Flag<["-"], "experimental-emit-module-separately">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Emit module files as a distinct job">;
+
+def no_emit_module_separately:
+  Flag<["-"], "no-emit-module-separately">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Force using merge-module as the incremental build mode">;
+
+def emit_module_separately_WMO:
+  Flag<["-"], "emit-module-separately-wmo">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Emit module files as a distinct job in wmo builds">;
+
+def no_emit_module_separately_WMO:
+  Flag<["-"], "no-emit-module-separately-wmo">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Force emitting the swiftmodule in the same job in wmo builds">;
+
+def emit_module_serialize_diagnostics_path:
+  Separate<["-"], "emit-module-serialize-diagnostics-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a serialized diagnostics file for the emit-module task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
+def emit_module_dependencies_path:
+  Separate<["-"], "emit-module-dependencies-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a discovered dependencies file for the emit-module task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
+def use_frontend_parseable_output:
+  Flag<["-"], "use-frontend-parseable-output">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Emit parseable-output from swift-frontend jobs instead of from "
+           "the driver">;
+
+def print_explicit_dependency_graph:
+  Flag<["-"], "print-explicit-dependency-graph">,
+  Flags<[DoesNotAffectIncrementalBuild, HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Print the result of module dependency scanning after external "
+           "module resolution to output">;
+
+def explicit_dependency_graph_format:
+  Joined<["-"], "explicit-dependency-graph-format=">,
+  Flags<[DoesNotAffectIncrementalBuild, HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Specify the explicit dependency graph output format to either 'json' or 'dot'">;
+
+def print_preprocessed_explicit_dependency_graph:
+  Flag<["-"], "print-preprocessed-explicit-dependency-graph">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Print the result of module dependency scanning to output">;
+
+def emit_digester_baseline:
+  Flag<["-"], "emit-digester-baseline">,
+  Flags<[NoInteractiveOption, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a baseline file for the module using the API digester">;
+
+def emit_digester_baseline_path:
+  Separate<["-"], "emit-digester-baseline-path">,
+  Flags<[NoInteractiveOption, ArgumentIsPath, SupplementaryOutput,
+         NewDriverOnlyOption]>,
+  HelpText<"Emit a baseline file for the module to <path> using the API "
+           "digester">,
+  MetaVarName<"<path>">;
+
+def compare_to_baseline_path:
+  Separate<["-"], "compare-to-baseline-path">,
+  Flags<[NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
+  HelpText<"Compare the built module to the baseline at <path> and diagnose "
+           "breaking changes using the API digester">,
+  MetaVarName<"<path>">;
+
+def serialize_breaking_changes_path:
+  Separate<["-"], "serialize-breaking-changes-path">,
+  Flags<[NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
+  HelpText<"Serialize breaking changes found by the API digester to <path>">,
+  MetaVarName<"<path>">;
+
+def digester_breakage_allowlist_path:
+  Separate<["-"], "digester-breakage-allowlist-path">,
+  Flags<[NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
+  HelpText<"The path to a list of permitted breaking changes the API digester "
+           "should ignore">,
+  MetaVarName<"<path>">;
+
+def digester_mode:
+  Separate<["-"], "digester-mode">,
+  Flags<[NoInteractiveOption, NewDriverOnlyOption]>,
+  HelpText<"Whether the API digester should run in API or ABI mode (defaults "
+           "to API checking)">,
+  MetaVarName<"<api|abi>">;
+
+def nostartfiles:
+  Flag<["-"], "nostartfiles">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, NoInteractiveOption,
+         HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Do not link in the Swift language startup routines">;
+
+// END ONLY SUPPORTED IN NEW DRIVER
+
+def load_plugin_library:
+  Separate<["-"], "load-plugin-library">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to a dynamic library containing compiler plugins such as "
+           "macros">,
+  MetaVarName<"<path>">;
 
 include "FrontendOptions.td"

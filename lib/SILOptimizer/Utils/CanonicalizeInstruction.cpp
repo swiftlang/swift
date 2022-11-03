@@ -33,7 +33,7 @@
 
 using namespace swift;
 
-// Tracing within the implementation can also be activiated by the pass.
+// Tracing within the implementation can also be activated by the pass.
 #define DEBUG_TYPE pass.debugType
 
 llvm::cl::opt<bool> EnableLoadSplittingDebugInfo(
@@ -79,7 +79,7 @@ killInstAndIncidentalUses(SingleValueInstruction *inst,
 //===----------------------------------------------------------------------===//
 
 // If simplification is successful, return a valid iterator to the next
-// intruction that wasn't erased.
+// instruction that wasn't erased.
 static Optional<SILBasicBlock::iterator>
 simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
   // Erase the simplified instruction and any instructions that end its

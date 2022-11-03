@@ -65,12 +65,45 @@ hasLoopInvariantOperands(SILInstruction *inst, SILLoop *loop,
 static bool
 canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                               SILBasicBlock *bb,
-                              SmallVectorImpl<SILInstruction *> &moves) {
+                              SmallVectorImpl<SILInstruction *> &moves,
+                              SinkAddressProjections &sinkProj) {
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
-    OwnershipForwardingMixin *ofm = nullptr;
     auto *inst = &instRef;
+    if (!inst->isTriviallyDuplicatable()) {
+      return false;
+    }
+    // It wouldn't make sense to rotate dealloc_stack without also rotating the
+    // alloc_stack, which is covered by isTriviallyDuplicatable.
+    if (isa<DeallocStackInst>(inst)) {
+      return false;
+    }
+    OwnershipForwardingMixin *ofm = nullptr;
+    if ((ofm = OwnershipForwardingMixin::get(inst)) &&
+        ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
+      return false;
+    }
+    if (isa<FunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<DynamicFunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<PreviousDynamicFunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<IntegerLiteralInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
     if (auto *MI = dyn_cast<MethodInst>(inst)) {
       if (MI->getMember().isForeign)
         return false;
@@ -78,36 +111,21 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
         continue;
       moves.push_back(inst);
       invariants.insert(inst);
-    } else if (!inst->isTriviallyDuplicatable())
-      return false;
-    // It wouldn't make sense to rotate dealloc_stack without also rotating the
-    // alloc_stack, which is covered by isTriviallyDuplicatable.
-    else if (isa<DeallocStackInst>(inst))
-      return false;
-    else if (isa<FunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<DynamicFunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<PreviousDynamicFunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<IntegerLiteralInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if ((ofm = OwnershipForwardingMixin::get(inst)) &&
-               ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
-      return false;
-    } else if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory()
-               && !isa<TermInst>(inst) && !isa<AllocationInst>(inst)
-               && /* not marked mayhavesideffects */
-               hasLoopInvariantOperands(inst, loop, invariants)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else {
-      cost += (int)instructionInlineCost(instRef);
+      continue;
     }
+    if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory() &&
+        !isa<TermInst>(inst) &&
+        !isa<AllocationInst>(inst) && /* not marked mayhavesideeffects */
+        hasLoopInvariantOperands(inst, loop, invariants)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (!sinkProj.analyzeAddressProjections(inst)) {
+      return false;
+    }
+
+    cost += (int)instructionInlineCost(instRef);
   }
 
   return cost < LoopRotateSizeLimit;
@@ -129,9 +147,7 @@ static void mapOperands(SILInstruction *inst,
 static void updateSSAForUseOfValue(
     SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
     const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
-    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res,
-    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>>
-        &accumulatedAddressPhis) {
+    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res) {
   // Find the mapped instruction.
   assert(valueMap.count(Res) && "Expected to find value in map!");
   SILValue MappedValue = valueMap.find(Res)->second;
@@ -161,14 +177,13 @@ static void updateSSAForUseOfValue(
     if (user->getParent() == Header)
       continue;
 
-    assert(user->getParent() != EntryCheckBlock
-           && "The entry check block should dominate the header");
+    assert(user->getParent() != EntryCheckBlock &&
+           "The entry check block should dominate the header");
     updater.rewriteUse(*use);
   }
 
   // Canonicalize inserted phis to avoid extra BB Args and if we find an address
   // phi, stash it so we can handle it after we are done rewriting.
-  bool hasOwnership = Header->getParent()->hasOwnership();
   for (SILPhiArgument *arg : insertedPhis) {
     if (SILValue inst = replaceBBArgWithCast(arg)) {
       arg->replaceAllUsesWith(inst);
@@ -177,30 +192,24 @@ static void updateSSAForUseOfValue(
       // SimplifyCFG deletes the dead BB arg.
       continue;
     }
-
-    // If we didn't simplify and have an address phi, stash the value so we can
-    // fix it up.
-    if (hasOwnership && arg->getType().isAddress())
-      accumulatedAddressPhis.emplace_back(arg->getParent(), arg->getIndex());
   }
 }
 
-static void updateSSAForUseOfInst(
-    SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
-    const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
-    SILBasicBlock *header, SILBasicBlock *entryCheckBlock, SILInstruction *inst,
-    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>>
-        &accumulatedAddressPhis) {
+static void
+updateSSAForUseOfInst(SILSSAUpdater &updater,
+                      SmallVectorImpl<SILPhiArgument *> &insertedPhis,
+                      const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
+                      SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
+                      SILInstruction *inst) {
   for (auto result : inst->getResults())
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, result, accumulatedAddressPhis);
+                           entryCheckBlock, result);
 }
 
 /// Rewrite the code we just created in the preheader and update SSA form.
 static void rewriteNewLoopEntryCheckBlock(
     SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
     const llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
-  SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> accumulatedAddressPhis;
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
 
@@ -209,7 +218,7 @@ static void rewriteNewLoopEntryCheckBlock(
   for (unsigned i : range(header->getNumArguments())) {
     auto *arg = header->getArguments()[i];
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, arg, accumulatedAddressPhis);
+                           entryCheckBlock, arg);
   }
 
   auto instIter = header->begin();
@@ -218,42 +227,8 @@ static void rewriteNewLoopEntryCheckBlock(
   while (instIter != header->end()) {
     auto &inst = *instIter;
     updateSSAForUseOfInst(updater, insertedPhis, valueMap, header,
-                          entryCheckBlock, &inst, accumulatedAddressPhis);
+                          entryCheckBlock, &inst);
     ++instIter;
-  }
-
-  // Then see if any of our phis were address phis. In such a case, rewrite the
-  // address to be a smuggled through raw pointer. We do this late to
-  // conservatively not interfere with the previous code's invariants.
-  //
-  // We also translate the phis into a BasicBlock, Index form so we are careful
-  // with invalidation issues around branches/args.
-  auto rawPointerTy =
-      SILType::getRawPointerType(header->getParent()->getASTContext());
-  auto rawPointerUndef = SILUndef::get(rawPointerTy, header->getModule());
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-  while (!accumulatedAddressPhis.empty()) {
-    SILBasicBlock *block;
-    unsigned argIndex;
-    std::tie(block, argIndex) = accumulatedAddressPhis.pop_back_val();
-    auto *arg = cast<SILPhiArgument>(block->getArgument(argIndex));
-    assert(arg->getType().isAddress() && "Not an address phi?!");
-    for (auto *predBlock : block->getPredecessorBlocks()) {
-      Operand *predUse = arg->getIncomingPhiOperand(predBlock);
-      SILBuilderWithScope builder(predUse->getUser());
-      auto *newIncomingValue =
-          builder.createAddressToPointer(loc, predUse->get(), rawPointerTy);
-      predUse->set(newIncomingValue);
-    }
-    SILBuilderWithScope builder(arg->getNextInstruction());
-    SILType oldArgType = arg->getType();
-    auto *phiShim = builder.createPointerToAddress(
-        loc, rawPointerUndef, oldArgType, true /*isStrict*/,
-        false /*is invariant*/);
-    arg->replaceAllUsesWith(phiShim);
-    SILArgument *newArg = block->replacePhiArgument(
-        argIndex, rawPointerTy, OwnershipKind::None, nullptr);
-    phiShim->setOperand(newArg);
   }
 }
 
@@ -378,8 +353,9 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> moveToPreheader;
-  if (!canDuplicateOrMoveToPreheader(loop, preheader, header,
-                                     moveToPreheader)) {
+  SinkAddressProjections sinkProj;
+  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
+                                     sinkProj)) {
     LLVM_DEBUG(llvm::dbgs()
                << *loop << " instructions in header preventing rotating\n");
     return false;
@@ -425,6 +401,14 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The other instructions are just cloned to the preheader.
   TermInst *preheaderBranch = preheader->getTerminator();
+
+  // sink address projections to avoid address phis.
+  for (auto &inst : *header) {
+    bool success = sinkProj.analyzeAddressProjections(&inst);
+    assert(success);
+    sinkProj.cloneProjections();
+  }
+
   for (auto &inst : *header) {
     if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
       mapOperands(cloned, valueMap);
@@ -488,16 +472,10 @@ namespace {
 class LoopRotation : public SILFunctionTransform {
 
   void run() override {
-    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
-    assert(loopAnalysis);
-    DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
-    assert(domAnalysis);
-
     SILFunction *f = getFunction();
-    assert(f);
-
+    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
+    DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
     SILLoopInfo *loopInfo = loopAnalysis->get(f);
-    assert(loopInfo);
     DominanceInfo *domInfo = domAnalysis->get(f);
 
     if (loopInfo->empty()) {

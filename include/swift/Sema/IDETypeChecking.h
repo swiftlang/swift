@@ -231,11 +231,10 @@ namespace swift {
 
   /// Collect type information for every expression in \c SF; all types will
   /// be printed to \c OS.
-  ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
-    ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch,
-    bool CanonicalType,
-    llvm::raw_ostream &OS);
+  ArrayRef<ExpressionTypeInfo> collectExpressionType(
+      SourceFile &SF, ArrayRef<const char *> ExpectedProtocols,
+      std::vector<ExpressionTypeInfo> &scratch, bool FullyQualified,
+      bool CanonicalType, llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
@@ -265,6 +264,7 @@ namespace swift {
   /// \c VariableTypeInfos will index into the string that backs this
   /// stream.
   void collectVariableType(SourceFile &SF, SourceRange Range,
+                           bool FullyQualified,
                            std::vector<VariableTypeInfo> &VariableTypeInfos,
                            llvm::raw_ostream &OS);
 
@@ -326,6 +326,12 @@ namespace swift {
 
   /// Just a proxy to swift::contextUsesConcurrencyFeatures() from lib/IDE code.
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
+
+  /// Determine the isolation of a particular closure.
+  ClosureActorIsolation determineClosureActorIsolation(
+      AbstractClosureExpr *closure, llvm::function_ref<Type(Expr *)> getType,
+      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+          getClosureActorIsolation);
 
   /// If the capture list shadows any declarations using shorthand syntax, i.e.
   /// syntax that names both the newly declared variable and the referenced

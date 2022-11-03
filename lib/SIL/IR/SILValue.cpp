@@ -118,6 +118,16 @@ bool ValueBase::isLexical() const {
   return false;
 }
 
+bool ValueBase::hasDebugTrace() const {
+  for (auto *op : getUses()) {
+    if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
+      if (debugValue->hasTrace())
+        return true;
+    }
+  }
+  return false;
+}
+
 SILBasicBlock *SILNode::getParentBlock() const {
   if (auto *Inst = dyn_cast<SILInstruction>(this))
     return Inst->getParent();
@@ -420,8 +430,10 @@ StringRef OperandOwnership::asString() const {
     return "forwarding-consume";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
-  case OperandOwnership::ForwardingBorrow:
-    return "forwarding-borrow";
+  case OperandOwnership::GuaranteedForwarding:
+    return "guaranteed-forwarding";
+  case OperandOwnership::GuaranteedForwardingPhi:
+    return "guaranteed-forwarding-phi";
   case OperandOwnership::EndBorrow:
     return "end-borrow";
   case OperandOwnership::Reborrow:

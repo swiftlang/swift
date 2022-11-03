@@ -33,7 +33,7 @@ def _get_sdk_target_names(sdk_names):
 
 
 # -----------------------------------------------------------------------------
-# Mirgrate Swift SDKs
+# Migrate Swift SDKs
 
 class TestMigrateSwiftSDKsMeta(type):
     """Metaclass used to dynamically generate test methods.

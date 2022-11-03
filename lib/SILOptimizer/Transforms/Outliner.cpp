@@ -633,7 +633,8 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It,
         return false;
     }
     ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
-    assert(Release == &*It);
+    if (Release != &*It)
+      return false;
   }
 
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
@@ -1407,7 +1408,7 @@ public:
     }
 
     if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 };

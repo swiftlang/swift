@@ -284,8 +284,15 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
-  Opts.ExposePublicDeclsInClangHeader =
-      Args.hasArg(OPT_clang_header_expose_public_decls);
+  if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
+      Opts.ClangHeaderExposedDecls =
+          llvm::StringSwitch<llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(A->getValue())
+              .Case("all-public", FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
+              .Case("has-expose-attr", FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr)
+              .Default(llvm::None);
+  }
+  Opts.EnableExperimentalCxxInteropInClangHeader =
+      Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);

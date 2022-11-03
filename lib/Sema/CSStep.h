@@ -632,6 +632,14 @@ protected:
   bool attempt(const TypeVariableBinding &choice) override;
 
   bool shouldSkip(const TypeVariableBinding &choice) const override {
+    // Let's always attempt types inferred from "defaultable" constraints
+    // in diagnostic mode. This allows the solver to attempt i.e. `Any`
+    // for collection literals and produce better diagnostics for for-in
+    // statements like `for (x, y, z) in [] { ... }` when pattern type
+    // could not be inferred.
+    if (CS.shouldAttemptFixes())
+      return false;
+
     // If this is a defaultable binding and we have found solutions,
     // don't explore the default binding.
     return AnySolved && choice.isDefaultable();
@@ -999,9 +1007,6 @@ public:
       auto remainingTime = OuterTimeRemaining->second;
       CS.Timer.emplace(anchor, CS, remainingTime);
     }
-    
-    if (CS.isDebugMode())
-      getDebugLogger() << ")\n";
   }
 
   StepResult resume(bool prevFailed) override;

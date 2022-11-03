@@ -66,7 +66,7 @@ func load_invariant_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8load_gen{{[_0-9a-zA-Z]*}}F
 func load_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
-  // CHECK: copy_addr [[ADDR]] to [initialization] {{%.*}}
+  // CHECK: copy_addr [[ADDR]] to [init] {{%.*}}
   return Builtin.load(x)
 }
 
@@ -90,7 +90,7 @@ func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8move_gen{{[_0-9a-zA-Z]*}}F
 func move_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
-  // CHECK: copy_addr [take] [[ADDR]] to [initialization] {{%.*}}
+  // CHECK: copy_addr [take] [[ADDR]] to [init] {{%.*}}
   return Builtin.take(x)
 }
 
@@ -188,7 +188,7 @@ func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8init_gen{{[_0-9a-zA-Z]*}}F
 func init_gen<T>(_ x: T, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
-  // CHECK: copy_addr [[OTHER_LOC:%.*]] to [initialization]  [[ADDR]]
+  // CHECK: copy_addr [[OTHER_LOC:%.*]] to [init]  [[ADDR]]
   // CHECK-NOT: destroy_addr [[OTHER_LOC]]
   Builtin.initialize(x, y)
 }
@@ -326,8 +326,8 @@ func gep_raw32(_ p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins3gep{{[_0-9a-zA-Z]*}}F
 func gep<Elem>(_ p: Builtin.RawPointer, i: Builtin.Word, e: Elem.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0
-  // CHECK: [[GEP:%.*]] = index_addr [[P2A]] : $*Elem, %1 : $Builtin.Word
-  // CHECK: [[A2P:%.*]] = address_to_pointer [[GEP]]
+  // CHECK: [[GEP:%.*]] = index_addr [stack_protection] [[P2A]] : $*Elem, %1 : $Builtin.Word
+  // CHECK: [[A2P:%.*]] = address_to_pointer [stack_protection] [[GEP]]
   // CHECK: return [[A2P]]
   return Builtin.gep_Word(p, i, e)
 }
@@ -385,6 +385,40 @@ func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Typ
   // CHECK: return [[A2P]]
   return Builtin.getTailAddr_Word(start, i, ty1, ty2)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins18protectedAddressOfyBpxzlF
+func protectedAddressOf<T>(_ x: inout T) -> Builtin.RawPointer {
+  // CHECK: [[A:%.*]] = begin_access [modify] [unknown] %0
+  // CHECK: [[P:%.*]] = address_to_pointer [stack_protection] [[A]]
+  // CHECK: return [[P]]
+  return Builtin.addressof(&x)
+}
+// CHECK: } // end sil function '$s8builtins18protectedAddressOfyBpxzlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20unprotectedAddressOfyBpxzlF
+func unprotectedAddressOf<T>(_ x: inout T) -> Builtin.RawPointer {
+  // CHECK: [[A:%.*]] = begin_access [modify] [unknown] %0
+  // CHECK: [[P:%.*]] = address_to_pointer [[A]]
+  // CHECK: return [[P]]
+  return Builtin.unprotectedAddressOf(&x)
+}
+// CHECK: } // end sil function '$s8builtins20unprotectedAddressOfyBpxzlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins24protectedAddressOfBorrowyBpxlF
+func protectedAddressOfBorrow<T>(_ x: T) -> Builtin.RawPointer {
+  // CHECK: [[P:%.*]] = address_to_pointer [stack_protection] %0
+  // CHECK: return [[P]]
+  return Builtin.addressOfBorrow(x)
+}
+// CHECK: } // end sil function '$s8builtins24protectedAddressOfBorrowyBpxlF'
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins26unprotectedAddressOfBorrowyBpxlF
+func unprotectedAddressOfBorrow<T>(_ x: T) -> Builtin.RawPointer {
+  // CHECK: [[P:%.*]] = address_to_pointer %0
+  // CHECK: return [[P]]
+  return Builtin.unprotectedAddressOfBorrow(x)
+}
+// CHECK: } // end sil function '$s8builtins26unprotectedAddressOfBorrowyBpxlF'
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins25beginUnpairedModifyAccess{{[_0-9a-zA-Z]*}}F
 func beginUnpairedModifyAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
@@ -559,7 +593,7 @@ func reinterpretAddrOnly<T, U>(_ t: T) -> U {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins28reinterpretAddrOnlyToTrivial{{[_0-9a-zA-Z]*}}F
 func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
-  // CHECK: copy_addr %0 to [initialization] [[INPUT:%.*]] : $*T
+  // CHECK: copy_addr %0 to [init] [[INPUT:%.*]] : $*T
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
   // CHECK: destroy_addr [[INPUT]]
@@ -571,7 +605,7 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [trivial] [[BUF]]
   // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]] : $*Int to $*T
-  // CHECK: copy_addr [[RES1]] to [initialization]
+  // CHECK: copy_addr [[RES1]] to [init]
   return (Builtin.reinterpretCast(a) as T,
   // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
   // CHECK: load [trivial] [[RES]]

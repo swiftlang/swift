@@ -36,12 +36,20 @@ sil @indirect_argument : $@convention(thin) (@in Int) -> ()
 sil @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
 sil @direct_argument : $@convention(thin) (Int) -> ()
 sil @class_argument : $@convention(thin) (@guaranteed X) -> ()
-sil [escapes !%0] @non_escaping_class_argument : $@convention(thin) (@guaranteed X) -> ()
-sil [escapes !%0.**] @inout_class_argument : $@convention(thin) (@inout X) -> ()
+sil @non_escaping_class_argument : $@convention(thin) (@guaranteed X) -> () {
+[%0: noescape]
+}
+sil @inout_class_argument : $@convention(thin) (@inout X) -> () {
+[%0: noescape **]
+}
 sil @container_argument : $@convention(thin) (@guaranteed Container) -> ()
 sil @take_closure_as_addr : $@convention(thin) (@in @callee_guaranteed () -> ()) -> ()
-sil [escapes !%0.**] @closure_with_inout : $@convention(thin) (@inout Str) -> ()
-sil [escapes %0 => %r, %0.c*.v** => %r.c*.v**] @initX : $@convention(method) (@owned X) -> @owned X
+sil @closure_with_inout : $@convention(thin) (@inout Str) -> () {
+[%0: noescape **]
+}
+sil @initX : $@convention(method) (@owned X) -> @owned X {
+[%0: escape => %r, escape c*.v** => %r.c*.v**]
+}
 sil @modifyStr : $@convention(method) (@inout Str) -> ()
 
 // CHECK-LABEL: Address escape information for test_simple:
@@ -232,7 +240,7 @@ bb0:
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
   %3 = alloc_stack $Str
-  copy_addr %1 to [initialization] %3 : $*Str
+  copy_addr %1 to [init] %3 : $*Str
   %5 = function_ref @indirect_struct_argument : $@convention(thin) (@in Str) -> ()
   %6 = apply %5(%3) : $@convention(thin) (@in Str) -> ()
   strong_release %0 : $X

@@ -33,6 +33,7 @@
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
+  class ASTContext;
   class ASTWalker;
   class DeclContext;
   class IdentTypeRepr;
@@ -48,7 +49,7 @@ enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
 class OpaqueReturnTypeRepr;
-using CollectedOpaqueReprs = SmallVector<OpaqueReturnTypeRepr *, 2>;
+using CollectedOpaqueReprs = SmallVector<TypeRepr *, 2>;
 
 /// Representation of a type as written in source.
 class alignas(1 << TypeReprAlignInBits) TypeRepr
@@ -73,10 +74,7 @@ protected:
     Warned : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 1+32,
-    /// Whether this tuple has '...' and its position.
-    HasEllipsis : 1,
-    : NumPadBits,
+  SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 32,
     /// The number of elements contained.
     NumElements : 32
   );
@@ -120,6 +118,9 @@ public:
   TypeReprKind getKind() const {
     return static_cast<TypeReprKind>(Bits.TypeRepr.Kind);
   }
+
+  /// Is this type representation a protocol?
+  bool isProtocol(DeclContext *dc);
 
   /// Is this type representation known to be invalid?
   bool isInvalid() const { return Bits.TypeRepr.Invalid; }
@@ -167,10 +168,6 @@ public:
   /// Check recursively whether this type repr or any of its descendants are
   /// opaque return type reprs.
   bool hasOpaque();
-
-  /// Walk the type representation recursively, collecting any
-  /// `OpaqueReturnTypeRepr`s.
-  CollectedOpaqueReprs collectOpaqueReturnTypeReprs();
 
   /// Retrieve the type repr without any parentheses around it.
   ///
@@ -708,6 +705,45 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
+/// A pack expansion 'T...' with a pattern 'T'.
+///
+/// Can appear in the following positions:
+/// - The type of a parameter declaration in a function declaration
+/// - The type of a parameter in a function type
+/// - The element of a tuple
+///
+/// In the first two cases, it also spells an old-style variadic parameter
+/// desugaring to an array type. The two meanings are distinguished by the
+/// presence of at least one pack type parameter in the pack expansion
+/// pattern.
+///
+/// In the third case, tuples cannot contain an old-style variadic element,
+/// so the pack expansion must be a real variadic pack expansion.
+class PackExpansionTypeRepr final : public TypeRepr {
+  TypeRepr *Pattern;
+  SourceLoc EllipsisLoc;
+
+public:
+  PackExpansionTypeRepr(TypeRepr *Pattern, SourceLoc EllipsisLoc)
+    : TypeRepr(TypeReprKind::PackExpansion), Pattern(Pattern),
+      EllipsisLoc(EllipsisLoc) {}
+
+  TypeRepr *getPatternType() const { return Pattern; }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::PackExpansion;
+  }
+  static bool classof(const PackExpansionTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Pattern->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return EllipsisLoc; }
+  SourceLoc getLocImpl() const { return EllipsisLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// A tuple type.
 /// \code
 ///   (Foo, Bar)
@@ -715,10 +751,8 @@ struct TupleTypeReprElement {
 ///   (_ x: Foo)
 /// \endcode
 class TupleTypeRepr final : public TypeRepr,
-    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement,
-                                  Located<unsigned>> {
+    private llvm::TrailingObjects<TupleTypeRepr, TupleTypeReprElement> {
   friend TrailingObjects;
-  typedef Located<unsigned> SourceLocAndIdx;
 
   SourceRange Parens;
   
@@ -726,8 +760,7 @@ class TupleTypeRepr final : public TypeRepr,
     return Bits.TupleTypeRepr.NumElements;
   }
 
-  TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
-                SourceRange Parens, SourceLoc Ellipsis, unsigned EllipsisIdx);
+  TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements, SourceRange Parens);
 
 public:
   unsigned getNumElements() const { return Bits.TupleTypeRepr.NumElements; }
@@ -783,47 +816,15 @@ public:
 
   SourceRange getParens() const { return Parens; }
 
-  bool hasEllipsis() const {
-    return Bits.TupleTypeRepr.HasEllipsis;
-  }
-
-  SourceLoc getEllipsisLoc() const {
-    return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].Loc : SourceLoc();
-  }
-
-  unsigned getEllipsisIndex() const {
-    return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].Item :
-        Bits.TupleTypeRepr.NumElements;
-  }
-
-  void removeEllipsis() {
-    if (hasEllipsis()) {
-      Bits.TupleTypeRepr.HasEllipsis = false;
-      getTrailingObjects<SourceLocAndIdx>()[0] = {
-        getNumElements(),
-        SourceLoc()
-      };
-    }
-  }
-
   bool isParenType() const {
     return Bits.TupleTypeRepr.NumElements == 1 &&
            getElementNameLoc(0).isInvalid() &&
-           !hasEllipsis();
+           !isa<PackExpansionTypeRepr>(getElementType(0));
   }
 
   static TupleTypeRepr *create(const ASTContext &C,
                                ArrayRef<TupleTypeReprElement> Elements,
-                               SourceRange Parens,
-                               SourceLoc Ellipsis, unsigned EllipsisIdx);
-  static TupleTypeRepr *create(const ASTContext &C,
-                               ArrayRef<TupleTypeReprElement> Elements,
-                               SourceRange Parens) {
-    return create(C, Elements, Parens,
-                  SourceLoc(), Elements.size());
-  }
+                               SourceRange Parens);
   static TupleTypeRepr *createEmpty(const ASTContext &C, SourceRange Parens);
 
   static bool classof(const TypeRepr *T) {
@@ -865,6 +866,12 @@ public:
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
 
+  /// 'Any' is understood as CompositionTypeRepr by the compiler but its type array will be empty
+  ///  becasue it is a  nonspecific type
+  bool isTypeReprAny() {
+        return getTypes().size() == 0 ?  true : false;
+  }
+  
   static CompositionTypeRepr *create(const ASTContext &C,
                                      ArrayRef<TypeRepr*> Protocols,
                                      SourceLoc FirstTypeLoc,
@@ -1339,6 +1346,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::PackExpansion:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Array:

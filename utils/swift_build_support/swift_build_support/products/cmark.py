@@ -69,6 +69,10 @@ class CMark(cmake_product.CMakeProduct):
         elif platform == "linux":
             toolchain_file = self.generate_linux_toolchain_file(platform, arch)
             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+        elif platform == "openbsd":
+            toolchain_file = self.get_openbsd_toolchain_file()
+            if toolchain_file:
+                self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
 
         self.build_with_cmake(["all"], self.args.cmark_build_variant, [])
 

@@ -6,14 +6,14 @@
 // REQUIRES: OS=macosx
 
 // -- Fallback definition of genericFunc()
-// CHECK-LABEL: sil non_abi [serialized] [available 10.51] [ossa] @$s11back_deploy11genericFuncyxxlFTwB : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy11genericFuncyxxlFTwB : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK: bb0([[OUT_ARG:%.*]] : $*T, [[IN_ARG:%.*]] : $*T):
-// CHECK:   copy_addr [[IN_ARG]] to [initialization] [[OUT_ARG]] : $*T
+// CHECK:   copy_addr [[IN_ARG]] to [init] [[OUT_ARG]] : $*T
 // CHECK:   [[RESULT:%.*]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for genericFunc()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [available 10.51] [ossa] @$s11back_deploy11genericFuncyxxlFTwb : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy11genericFuncyxxlFTwb : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK: bb0([[OUT_ARG:%.*]] : $*T, [[IN_ARG:%.*]] : $*T):
 // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
@@ -37,7 +37,7 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Original definition of genericFunc()
-// CHECK-LABEL: sil [available 10.51] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+// CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy11genericFuncyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 @available(macOS 10.51, *)
 @_backDeploy(before: macOS 10.52)
 public func genericFunc<T>(_ t: T) -> T {

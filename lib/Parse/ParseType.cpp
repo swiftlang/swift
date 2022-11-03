@@ -332,15 +332,15 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 }
 
 
-/// parseType
-///   type:
+/// parseTypeScalar
+///   type-scalar:
 ///     attribute-list type-composition
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'async'? 'throws'? '->' type
+///     type-composition 'async'? 'throws'? '->' type-scalar
 ///
-ParserResult<TypeRepr> Parser::parseType(
+ParserResult<TypeRepr> Parser::parseTypeScalar(
     Diag<> MessageID, ParseTypeReason reason) {
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
@@ -409,7 +409,8 @@ ParserResult<TypeRepr> Parser::parseType(
                            throwsLoc, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
-        parseType(diag::expected_type_function_result);
+        parseTypeScalar(diag::expected_type_function_result,
+                        ParseTypeReason::Unspecified);
     status |= SecondHalf;
     if (SecondHalf.isNull()) {
       status.setIsParseError();
@@ -537,14 +538,14 @@ ParserResult<TypeRepr> Parser::parseType(
     // Forget any generic parameters we saw in the type.
     class EraseTypeParamWalker : public ASTWalker {
     public:
-      bool walkToTypeReprPre(TypeRepr *T) override {
+      PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
               ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
-        return true;
+        return Action::Continue();
       }
 
     } walker;
@@ -560,6 +561,32 @@ ParserResult<TypeRepr> Parser::parseType(
       status,
       applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc,
                            constLoc));
+}
+
+/// parseType
+///   type:
+///     type-scalar
+///     pack-expansion-type
+///
+///   pack-expansion-type:
+///     type-scalar '...'
+///
+ParserResult<TypeRepr> Parser::parseType(
+    Diag<> MessageID, ParseTypeReason reason) {
+  auto ty = parseTypeScalar(MessageID, reason);
+  if (ty.isNull())
+    return ty;
+
+  // Parse pack expansion 'T...'.
+  if (Tok.isEllipsis()) {
+    Tok.setKind(tok::ellipsis);
+    SourceLoc ellipsisLoc = consumeToken();
+    ty = makeParserResult(ty,
+        new (Context) PackExpansionTypeRepr(ty.get(), ellipsisLoc));
+    SyntaxContext->createNodeInPlace(SyntaxKind::PackExpansionType);
+  }
+
+  return ty;
 }
 
 ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
@@ -919,7 +946,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
           /*UnexpectedNodes=*/None,
           /*Type=*/std::move(*synType),
           /*UnexpectedNodes=*/None,
-          /*Ampersand=*/None, *SyntaxContext);
+          /*Ampersand=*/None, /*UnexpectedNodes=*/None, *SyntaxContext);
       SyntaxContext->addSyntax(std::move(LastNode));
     }
   }
@@ -1044,7 +1071,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ///   type-tuple:
 ///     '(' type-tuple-body? ')'
 ///   type-tuple-body:
-///     type-tuple-element (',' type-tuple-element)* '...'?
+///     type-tuple-element (',' type-tuple-element)*
 ///   type-tuple-element:
 ///     identifier? identifier ':' type
 ///     type
@@ -1057,8 +1084,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
 
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
-  SourceLoc EllipsisLoc;
-  unsigned EllipsisIdx;
   SmallVector<TupleTypeReprElement, 8> ElementsR;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
@@ -1138,20 +1163,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
       }
     }
 
-    // Parse optional '...'.
-    if (Tok.isEllipsis()) {
-      Tok.setKind(tok::ellipsis);
-      auto ElementEllipsisLoc = consumeToken();
-      if (EllipsisLoc.isInvalid()) {
-        EllipsisLoc = ElementEllipsisLoc;
-        EllipsisIdx = ElementsR.size();
-      } else {
-        diagnose(ElementEllipsisLoc, diag::multiple_ellipsis_in_tuple)
-          .highlight(EllipsisLoc)
-          .fixItRemove(ElementEllipsisLoc);
-      }
-    }
-
     // Parse '= expr' here so we can complain about it directly, rather
     // than dying when we see it.
     if (Tok.is(tok::equal)) {
@@ -1171,9 +1182,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     ElementsR.push_back(element);
     return makeParserSuccess();
   });
-
-  if (EllipsisLoc.isInvalid())
-    EllipsisIdx = ElementsR.size();
 
   bool isFunctionType =
       Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows) ||
@@ -1223,8 +1231,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
 
   return makeParserResult(Status,
                           TupleTypeRepr::create(Context, ElementsR,
-                                                SourceRange(LPLoc, RPLoc),
-                                                EllipsisLoc, EllipsisIdx));
+                                                SourceRange(LPLoc, RPLoc)));
 }
 
 
@@ -1551,7 +1558,16 @@ bool Parser::canParseType() {
   if (!consumeIf(tok::arrow))
     return false;
   
-  return canParseType();
+  if (!canParseType())
+    return false;
+
+  // Parse pack expansion 'T...'.
+  if (Tok.isEllipsis()) {
+    Tok.setKind(tok::ellipsis);
+    consumeToken();
+  }
+
+  return true;
 }
 
 bool Parser::canParseTypeIdentifierOrTypeComposition() {
@@ -1681,9 +1697,6 @@ bool Parser::canParseTypeTupleBody() {
       // Otherwise, this has to be a type.
       if (!canParseType())
         return false;
-
-      if (Tok.isEllipsis())
-        consumeToken();
 
     } while (consumeIf(tok::comma));
   }

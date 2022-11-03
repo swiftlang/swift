@@ -146,20 +146,20 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILFunction *F = AI.getFunction();
   SILBasicBlock *Entry = AI.getParent();
 
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
+
   // Iden is the basic block containing the direct call.
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
   Iden->createPhiArgument(SILType::getPrimitiveObjectType(SubType),
-                          OwnershipKind::Owned);
+                          CMI->getOperand()->getOwnershipKind());
 
   SILBasicBlock *Continue = Entry->split(It);
 
   SILBuilderWithScope Builder(Entry, AI.getInstruction());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
-
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
                                       CMI->getOperand(),

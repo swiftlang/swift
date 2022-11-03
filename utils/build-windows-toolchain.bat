@@ -219,6 +219,7 @@ cmake ^
   -D PYTHON_HOME=%PYTHON_HOME% ^
   -D PYTHON_EXECUTABLE=%PYTHON_HOME%\python.exe ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
+  -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
   -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
 
   -G Ninja ^
@@ -246,6 +247,7 @@ cmake ^
   -D LLVM_DIR=%BuildRoot%\1\lib\cmake\llvm ^
   -D SWIFT_NATIVE_SWIFT_TOOLS_PATH=%BuildRoot%\1\bin ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE=%SourceRoot%\swift-corelibs-libdispatch ^
+  -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
   -D EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR=%SourceRoot%\swift-experimental-string-processing ^
 
   -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
@@ -573,6 +575,8 @@ cmake ^
   -D SwiftDriver_DIR=%BuildRoot%\11\cmake\modules ^
   -D SwiftCrypto_DIR=%BuildRoot%\12\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
+  -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
+  -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\swiftpm || (exit /b)
@@ -604,9 +608,28 @@ cmake ^
 cmake --build %BuildRoot%\15 || (exit /b)
 cmake --build %BuildRoot%\15 --target install || (exit /b)
 
-:: Build SourceKit-LSP
+:: Build swift-syntax
 cmake ^
   -B %BuildRoot%\16 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-syntax || (exit /b)
+cmake --build %BuildRoot%\16 || (exit /b)
+cmake --build %BuildRoot%\16 --target install || (exit /b)
+
+:: Build SourceKit-LSP
+cmake ^
+  -B %BuildRoot%\17 ^
 
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
@@ -631,11 +654,12 @@ cmake ^
   -D SwiftPM_DIR=%BuildRoot%\14\cmake\modules ^
   -D IndexStoreDB_DIR=%BuildRoot%\15\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
+  -D SwiftSyntax_DIR=%BuildRoot%\16\cmake\modules ^
 
   -G Ninja ^
   -S %SourceRoot%\sourcekit-lsp || (exit /b)
-cmake --build %BuildRoot%\16 || (exit /b)
-cmake --build %BuildRoot%\16 --target install || (exit /b)
+cmake --build %BuildRoot%\17 || (exit /b)
+cmake --build %BuildRoot%\17 --target install || (exit /b)
 
 :: Create Configuration Files
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > %SDKInstallRoot%\SDKSettings.plist
@@ -651,15 +675,15 @@ FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestSwift
 
 SET SKIP_TEST=0
-FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==dispatch SET SKIP_TEST=1)
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==dispatch SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestDispatch
 
 SET SKIP_TEST=0
-FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==foundation SET SKIP_TEST=1)
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==foundation SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestFoundation
 
 SET SKIP_TEST=0
-FOR %%T IN (%SKIP_TESTS%) DO (IF /I %T==xctest SET SKIP_TEST=1)
+FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==xctest SET SKIP_TEST=1)
 IF "%SKIP_TEST%"=="0" call :TestXCTest
 
 :: Clean up the module cache

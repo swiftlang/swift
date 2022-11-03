@@ -64,7 +64,7 @@ class DiagnoseLifetimeIssues {
   static constexpr int maxCallDepth = 8;
 
   /// The liveness of the object in question, computed in visitUses.
-  PrunedLiveness liveness;
+  SSAPrunedLiveness liveness;
 
   /// All weak stores of the object, which are found in visitUses.
   llvm::SmallVector<SILInstruction *, 8> weakStores;
@@ -74,7 +74,7 @@ class DiagnoseLifetimeIssues {
   /// We could also cache this information in an Analysis, so that it persists
   /// over runs of this pass for different functions. But computing the state
   /// is very cheap and we avoid worst case scenarios with maxCallDepth. So it's
-  /// propably not worth doing it.
+  /// probably not worth doing it.
   llvm::DenseMap<SILFunctionArgument *, State> argumentStates;
 
   State visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth);
@@ -149,7 +149,7 @@ static bool isStoreObjcWeak(SILInstruction *inst, Operand *op) {
   return objcDecl->getSetterKind() == clang::ObjCPropertyDecl::Weak;
 }
 
-/// Transitively iterates over all uses of \p def and and - if \p
+/// Transitively iterates over all uses of \p def and - if \p
 /// updateLivenessAndWeakStores is true - adds them to self.liveness.
 /// If any weak stores are seen, add them to self.weakStores (also only if
 /// \p updateLivenessAndWeakStores is true).
@@ -214,7 +214,8 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         if (updateLivenessAndWeakStores)
           liveness.updateForUse(user, /*lifetimeEnding*/ false);
         break;
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
+      case OperandOwnership::GuaranteedForwardingPhi:
       case OperandOwnership::ForwardingConsume:
         // TermInst includes ReturnInst, which is generally an escape.
         // If this is called as part of getArgumentState, then it is not really
@@ -238,9 +239,11 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
           return CanEscape;
         break;
       case OperandOwnership::Borrow: {
-        if (updateLivenessAndWeakStores &&
-            !liveness.updateForBorrowingOperand(use))
+        if (updateLivenessAndWeakStores
+            && (liveness.updateForBorrowingOperand(use)
+                != InnerBorrowKind::Contained)) {
           return CanEscape;
+        }
         BorrowingOperand borrowOper(use);
         if (borrowOper.hasBorrowIntroducingUser()) {
           if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(user))
@@ -304,14 +307,14 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
   return argState;
 }
 
-/// Returns true if \p inst is outside the the pruned \p liveness.
-static bool isOutOfLifetime(SILInstruction *inst, PrunedLiveness &liveness) {
+/// Returns true if \p inst is outside the pruned \p liveness.
+static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // Check if the lifetime of the stored object ends at the store_weak.
   //
   // A more sophisticated analysis would be to check if there are no
   // (potential) loads from the store's destination address after the store,
   // but within the object's liferange. But without a good alias analysis (and
-  // we don't want to use AliasAnalysis in a mandatory pass) it's practially
+  // we don't want to use AliasAnalysis in a mandatory pass) it's practically
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
@@ -325,15 +328,15 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
   weakStores.clear();
 
   SILValue storedDef = cast<SingleValueInstruction>(allocationInst);
-  liveness.initializeDefBlock(storedDef->getParentBlock());
+  liveness.initializeDef(storedDef);
 
-  // Compute the canoncial lifetime of storedDef, like the copy-propagation pass
+  // Compute the canonical lifetime of storedDef, like the copy-propagation pass
   // would do.
   State state = visitUses(storedDef, /*updateLivenessAndWeakStores*/ true,
                           /*callDepth*/ 0);
 
   // If the allocation escapes (e.g. it is stored somewhere), we should not
-  // give a warning, becuase it can be a false alarm. The allocation could be
+  // give a warning, because it can be a false alarm. The allocation could be
   // kept alive by references we don't see.
   if (state == CanEscape)
     return;

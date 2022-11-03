@@ -94,7 +94,11 @@ enum class ClassMetadataFlags {
   /// or the field offset vector in the metadata, and the Objective-C runtime
   /// will slide offsets based on the actual superclass size, which is not
   /// known at compile time.
-  ClassHasObjCAncestry = (1 << 6)
+  ClassHasObjCAncestry = (1 << 6),
+
+  /// Is the class implemented by an \c @_objcImplementation extension? If so,
+  /// we should generate pure ObjC-compatible metadata.
+  ClassHasObjCImplementation = (1 << 7)
 };
 
 using ClassMetadataOptions = OptionSet<ClassMetadataFlags>;
@@ -210,6 +214,12 @@ public:
     unsigned index = found - AllStoredProperties.begin();
 
     return std::make_pair(AllFieldAccesses[index], AllElements[index]);
+  }
+
+  /// Returns true if the class is implemented by an \c @_objcImplementation
+  /// extension, and therefore should not have any Swift-specific metadata.
+  bool hasObjCImplementation() const {
+    return Options.contains(ClassMetadataFlags::ClassHasObjCImplementation);
   }
 };
 

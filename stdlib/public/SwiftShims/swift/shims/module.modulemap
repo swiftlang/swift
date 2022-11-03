@@ -1,0 +1,32 @@
+module SwiftShims {
+  header "AssertionReporting.h"
+  header "CoreFoundationShims.h"
+  header "FoundationShims.h"
+  header "GlobalObjects.h"
+  header "HeapObject.h"
+  header "KeyPath.h"
+  header "LibcShims.h"
+  header "MetadataSections.h"
+  header "Random.h"
+  header "RefCount.h"
+  header "Reflection.h"
+  header "RuntimeShims.h"
+  header "RuntimeStubs.h"
+  header "SwiftStdbool.h"
+  header "SwiftStddef.h"
+  header "SwiftStdint.h"
+  header "System.h"
+  header "ThreadLocalStorage.h"
+  header "UnicodeData.h"
+  header "Visibility.h"
+  export *
+}
+
+module _SwiftConcurrencyShims {
+  header "_SwiftConcurrency.h"
+}
+
+module SwiftOverlayShims {
+  header "LibcOverlayShims.h"
+  export *
+}

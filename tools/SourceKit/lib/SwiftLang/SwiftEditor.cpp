@@ -615,7 +615,7 @@ struct SwiftSemanticToken {
 #if !defined(_MSC_VER)
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
 // FIXME: MSVC doesn't pack bitfields with different underlying types.
-// Giving up to check this in MSVC for now, becasue static_assert is only for
+// Giving up to check this in MSVC for now, because static_assert is only for
 // keeping low memory usage.
 #endif
 
@@ -1541,15 +1541,15 @@ private:
     : PlaceholderLoc(PlaceholderLoc), Found(Found) {
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<EditorPlaceholderExpr>(E) && E->getStartLoc() == PlaceholderLoc) {
         Found = cast<EditorPlaceholderExpr>(E);
-        return { false, nullptr };
+        return Action::Stop();
       }
-      return { true, E };
+      return Action::Continue(E);
     }
 
-    bool walkToDeclPre(Decl *D) override {
+    PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
         // The base walker assumes the content of active IfConfigDecl clauses
         // has been injected into the parent context and will be walked there.
@@ -1560,9 +1560,9 @@ private:
             Elem.walk(*this);
           }
         }
-        return false;
+        return Action::SkipChildren();
       }
-      return true;
+      return Action::Continue();
     }
   };
 
@@ -1574,7 +1574,7 @@ private:
     explicit ClosureTypeWalker(SourceManager &SM, ClosureInfo &Info) : SM(SM),
       Info(Info) { }
 
-    bool walkToTypeReprPre(TypeRepr *T) override {
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
         for (auto &ArgElt : FTR->getArgsTypeRepr()->getElements()) {
@@ -1595,14 +1595,8 @@ private:
           Info.ReturnTypeRange = CharSourceRange(SM, RTR->getStartLoc(), SRE);
         }
       }
-      return !FoundFunctionTypeRepr;
+      return Action::StopIf(FoundFunctionTypeRepr);
     }
-
-    bool walkToTypeReprPost(TypeRepr *T) override {
-      // If we just visited the FunctionTypeRepr, end traversal.
-      return !FoundFunctionTypeRepr;
-    }
-
   };
 
   bool containClosure(Expr *E) {
@@ -2084,7 +2078,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
 
     bool SawChanges = true;
     if (Impl.Edited) {
-      // We're ansering an edit request. Report all highlighted token ranges not
+      // We're answering an edit request. Report all highlighted token ranges not
       // in the previous syntax map to the Consumer and extend the AffectedRange
       // to contain all added/removed token ranges.
       SawChanges =
@@ -2552,7 +2546,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
     }
 
-    // If client doesn't need any information, we doen't need to parse it.
+    // If client doesn't need any information, we doesn't need to parse it.
 
 
     SyntaxParsingCache *SyntaxCachePtr = nullptr;

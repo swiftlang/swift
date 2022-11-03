@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/IndexTrie.h"
@@ -32,6 +33,7 @@
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILType.h"
@@ -161,6 +163,7 @@ public:
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
+  using SILMoveOnlyDeinitListType = llvm::ArrayRef<SILMoveOnlyDeinit *>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
   using BasicBlockNameMapType =
@@ -191,6 +194,7 @@ private:
   friend SILProperty;
   friend SILUndef;
   friend SILWitnessTable;
+  friend SILMoveOnlyDeinit;
   friend Lowering::SILGenModule;
   friend Lowering::TypeConverter;
   class SerializationCallback;
@@ -271,6 +275,13 @@ private:
   /// The list of SILDifferentiabilityWitnesses in the module.
   DifferentiabilityWitnessListType differentiabilityWitnesses;
 
+  /// Lookup table for SIL vtables from class decls.
+  llvm::DenseMap<const NominalTypeDecl *, SILMoveOnlyDeinit *>
+      MoveOnlyDeinitMap;
+
+  /// The list of move only deinits in the module.
+  std::vector<SILMoveOnlyDeinit *> moveOnlyDeinits;
+
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
@@ -303,6 +314,9 @@ private:
 
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef *> UndefValues;
+
+  /// The list of decls that require query functions for #_hasSymbol conditions.
+  llvm::SetVector<ValueDecl *> hasSymbolDecls;
 
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
@@ -614,6 +628,25 @@ public:
   vtable_const_iterator vtable_begin() const { return getVTables().begin(); }
   vtable_const_iterator vtable_end() const { return getVTables().end(); }
 
+  ArrayRef<SILMoveOnlyDeinit *> getMoveOnlyDeinits() const {
+    return ArrayRef<SILMoveOnlyDeinit *>(moveOnlyDeinits);
+  }
+  using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;
+  using moveonlydeinit_const_iterator =
+      SILMoveOnlyDeinitListType::const_iterator;
+  moveonlydeinit_iterator moveonlydeinit_begin() {
+    return getMoveOnlyDeinits().begin();
+  }
+  moveonlydeinit_iterator moveonlydeinit_end() {
+    return getMoveOnlyDeinits().end();
+  }
+  moveonlydeinit_const_iterator moveonlydeinit_begin() const {
+    return getMoveOnlyDeinits().begin();
+  }
+  moveonlydeinit_const_iterator moveonlydeinit_end() const {
+    return getMoveOnlyDeinits().end();
+  }
+
   using witness_table_iterator = WitnessTableListType::iterator;
   using witness_table_const_iterator = WitnessTableListType::const_iterator;
   WitnessTableListType &getWitnessTableList() { return witnessTables; }
@@ -668,6 +701,12 @@ public:
   }
   bool isExternallyVisibleDecl(ValueDecl *decl) {
     return externallyVisible.count(decl) != 0;
+  }
+
+  void addHasSymbolDecl(ValueDecl *decl) { hasSymbolDecls.insert(decl); }
+
+  ArrayRef<ValueDecl *> getHasSymbolDecls() {
+    return hasSymbolDecls.getArrayRef();
   }
 
   using sil_global_iterator = GlobalListType::iterator;
@@ -798,6 +837,15 @@ public:
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
+
+  /// Look up the deinit mapped to the given move only nominal type decl.
+  /// Returns null on failure.
+  SILMoveOnlyDeinit *lookUpMoveOnlyDeinit(const NominalTypeDecl *nomDecl,
+                                          bool deserializeLazily = true);
+
+  /// Look up the function mapped to the given move only nominal type decl.
+  /// Returns null on failure.
+  SILFunction *lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl);
 
   /// Look up the differentiability witness with the given name.
   SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(StringRef name);

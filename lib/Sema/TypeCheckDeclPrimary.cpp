@@ -31,6 +31,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -178,7 +180,8 @@ static void checkInheritanceClause(
     // For generic parameters and associated types, the GSB checks constraints;
     // however, we still want to fire off the requests to produce diagnostics
     // in some circular validation cases.
-    if (isa<AbstractTypeParamDecl>(decl))
+    if (isa<GenericTypeParamDecl>(decl) ||
+        isa<AssociatedTypeDecl>(decl))
       continue;
 
     // Check whether we inherited from 'AnyObject' twice.
@@ -190,7 +193,7 @@ static void checkInheritanceClause(
       // for Swift >= 5.
       auto sourceRange = inherited.getSourceRange();
       bool isWrittenAsClass =
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          isa<ProtocolDecl>(decl) &&
           Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
               .is(tok::kw_class);
       if (ctx.LangOpts.isSwiftVersionAtLeast(5) && isWrittenAsClass) {
@@ -208,7 +211,7 @@ static void checkInheritanceClause(
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = getRemovalRange(knownIndex);
         if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
-            (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+            isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
           SourceLoc classLoc = knownRange.Start;
@@ -1018,7 +1021,7 @@ void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
   PlaceholderNotator().check(writtenType, inferredType);
 }
 
-/// Check the default arguments that occur within this pattern.
+/// Check the default arguments that occur within this parameter list.
 static void checkDefaultArguments(ParameterList *params) {
   // Force the default values in case they produce diagnostics.
   for (auto *param : *params) {
@@ -1037,6 +1040,39 @@ static void checkDefaultArguments(ParameterList *params) {
       TypeChecker::notePlaceholderReplacementTypes(
           ifacety, expr->getType()->mapTypeOutOfContext());
     }
+  }
+}
+
+void swift::checkVariadicParameters(ParameterList *params, DeclContext *dc) {
+  bool lastWasVariadic = false;
+
+  for (auto *param : *params) {
+    if (lastWasVariadic) {
+      if (param->getArgumentName().empty()) {
+        if (isa<AbstractClosureExpr>(dc))
+          param->diagnose(diag::closure_unlabeled_parameter_following_variadic_parameter);
+        else
+          param->diagnose(diag::unlabeled_parameter_following_variadic_parameter);
+      }
+
+      lastWasVariadic = false;
+    }
+
+    if (!param->isVariadic() &&
+        !param->getInterfaceType()->is<PackExpansionType>())
+      continue;
+
+    if (param->isDefaultArgument())
+      param->diagnose(diag::parameter_vararg_default);
+
+    // Enum elements don't allow old-style variadics.
+    if (param->isVariadic() &&
+        isa<EnumElementDecl>(dc)) {
+      param->diagnose(diag::enum_element_ellipsis);
+      continue;
+    }
+
+    lastWasVariadic = true;
   }
 }
 
@@ -1132,7 +1168,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
       TypeResolutionStage::Interface,
       [proto](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
-        case RequirementKind::SameCount:
+        case RequirementKind::SameShape:
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -1176,6 +1212,46 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
     assert(isa<SubscriptDecl>(decl));
     decl->diagnose(diag::dynamic_self_invalid_subscript);
   }
+}
+
+/// Check that, if this declaration is a member of an `@_objcImplementation`
+/// extension, it is either `final` or `@objc` (which may have been inferred by
+/// checking whether it shadows an imported declaration).
+static void checkObjCImplementationMemberAvoidsVTable(ValueDecl *VD) {
+  // We check the properties instead of their accessors.
+  if (isa<AccessorDecl>(VD))
+    return;
+
+  // Are we in an @_objcImplementation extension?
+  auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ED || !ED->isObjCImplementation())
+    return;
+
+  assert(ED->getSelfClassDecl() &&
+         !ED->getSelfClassDecl()->hasKnownSwiftImplementation() &&
+         "@_objcImplementation on non-class or Swift class?");
+
+  if (!VD->isObjCMemberImplementation())
+    return;
+
+  if (VD->isObjC()) {
+    assert(isa<DestructorDecl>(VD) || VD->isDynamic() &&
+           "@objc decls in @_objcImplementations should be dynamic!");
+    return;
+  }
+
+  auto &diags = VD->getASTContext().Diags;
+  diags.diagnose(VD, diag::member_of_objc_implementation_not_objc_or_final,
+                 VD->getDescriptiveKind(), VD, ED->getExtendedNominal());
+
+  if (canBeRepresentedInObjC(VD))
+    diags.diagnose(VD, diag::fixit_add_objc_for_objc_implementation,
+                   VD->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+
+  diags.diagnose(VD, diag::fixit_add_final_for_objc_implementation,
+                 VD->getDescriptiveKind())
+      .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
 }
 
 /// Build a default initializer string for the given pattern.
@@ -1464,6 +1540,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       return;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
+    case SourceFileKind::MacroExpansion:
       break;
     }
   }
@@ -1801,6 +1878,10 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
+      // If this is in an `@_objcImplementation` extension, check whether it's
+      // valid there.
+      checkObjCImplementationMemberAvoidsVTable(VD);
+
       // Check for actor isolation of top-level and local declarations.
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
@@ -1848,6 +1929,7 @@ public:
       auto importer = ID->getModuleContext();
       if (target &&
           !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+          !ID->getAttrs().hasAttribute<SPIOnlyAttr>() &&
           target->getLibraryLevel() == LibraryLevel::SPI) {
 
         auto &diags = ID->getASTContext().Diags;
@@ -1866,8 +1948,10 @@ public:
 #endif
 
         bool isImportOfUnderlying = importer->getName() == target->getName();
+        auto *SF = ID->getDeclContext()->getParentSourceFile();
         bool treatAsError = enableTreatAsError &&
-                            !isImportOfUnderlying;
+                            !isImportOfUnderlying &&
+                            SF->Kind != SourceFileKind::Interface;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
@@ -1891,6 +1975,10 @@ public:
 
   void visitMissingMemberDecl(MissingMemberDecl *MMD) {
     llvm_unreachable("should always be type-checked already");
+  }
+
+  void visitMacroExpansionDecl(MacroExpansionDecl *MED) {
+    llvm_unreachable("FIXME: macro expansion decl not handled in DeclChecker");
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -2099,6 +2187,7 @@ public:
             return;
           case SourceFileKind::Main:
           case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
             break;
           }
 
@@ -2119,6 +2208,7 @@ public:
           case SourceFileKind::SIL:
             return;
           case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
             break;
           }
 
@@ -2236,6 +2326,7 @@ public:
     TypeChecker::checkParameterList(SD->getIndices(), SD);
 
     checkDefaultArguments(SD->getIndices());
+    checkVariadicParameters(SD->getIndices(), SD);
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -2807,6 +2898,7 @@ public:
         return false;
       case SourceFileKind::Library:
       case SourceFileKind::Main:
+      case SourceFileKind::MacroExpansion:
         break;
       }
     }
@@ -2935,6 +3027,7 @@ public:
         checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
     checkDefaultArguments(FD->getParameters());
+    checkVariadicParameters(FD->getParameters(), FD);
 
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
@@ -3011,6 +3104,7 @@ public:
       TypeChecker::checkParameterList(PL, EED);
 
       checkDefaultArguments(PL);
+      checkVariadicParameters(PL, EED);
     }
 
     auto &DE = getASTContext().Diags;
@@ -3126,6 +3220,18 @@ public:
     checkGenericParams(ED);
 
     TypeChecker::checkDeclAttributes(ED);
+
+    // If this is an @_objcImplementation of a class, set up some aspects of the
+    // class.
+    if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
+      // Force lowering of stored properties.
+      (void) CD->getStoredProperties();
+
+      // Force creation of an implicit destructor, if any.
+      (void) CD->getDestructor();
+      
+      // FIXME: Should we duplicate any other logic from visitClassDecl()?
+    }
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
@@ -3306,9 +3412,19 @@ public:
     }
 
     checkDefaultArguments(CD->getParameters());
+    checkVariadicParameters(CD->getParameters(), CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
+    // Only check again for destructor decl outside of a class if our dstructor
+    // is not marked as invalid.
+    if (!DD->isInvalid()) {
+      auto *nom = dyn_cast<NominalTypeDecl>(DD->getDeclContext());
+      if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
+        DD->diagnose(diag::destructor_decl_outside_class);
+      }
+    }
+
     TypeChecker::checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
@@ -3319,6 +3435,10 @@ public:
     } else {
       addDelayedFunction(DD);
     }
+  }
+
+  void visitBuiltinTupleDecl(BuiltinTupleDecl *BTD) {
+    llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
 };
 } // end anonymous namespace

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
@@ -591,9 +592,16 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   for (auto LastRelease : FinalReleases) {
     SILBuilderWithScope Builder(LastRelease);
     if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
+      // If we have a mark_must_check use of our stack box, we want to destroy
+      // that.
+      SILValue valueToDestroy = StackBox;
+      if (auto *mmci = StackBox->getSingleUserOfType<MarkMustCheckInst>()) {
+        valueToDestroy = mmci;
+      }
+
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
-      Builder.emitDestroyAddrAndFold(Loc, StackBox);
+      Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
     }
     Builder.createDeallocStack(Loc, ASI);
   }
@@ -791,6 +799,10 @@ PromotedParamCloner::populateCloned() {
                                            Cloned->getModule().Types, 0);
       auto *promotedArg =
           ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
+      promotedArg->setNoImplicitCopy(
+          cast<SILFunctionArgument>(*I)->isNoImplicitCopy());
+      promotedArg->setLifetimeAnnotation(
+          cast<SILFunctionArgument>(*I)->getLifetimeAnnotation());
       OrigPromotedParameters.insert(*I);
 
       NewPromotedArgs[ArgNo] = promotedArg;
@@ -803,8 +815,13 @@ PromotedParamCloner::populateCloned() {
       entryArgs.push_back(SILValue());
     } else {
       // Create a new argument which copies the original argument.
-      entryArgs.push_back(ClonedEntryBB->createFunctionArgument(
-          (*I)->getType(), (*I)->getDecl()));
+      auto *newArg = ClonedEntryBB->createFunctionArgument((*I)->getType(),
+                                                           (*I)->getDecl());
+      newArg->setNoImplicitCopy(
+          cast<SILFunctionArgument>(*I)->isNoImplicitCopy());
+      newArg->setLifetimeAnnotation(
+          cast<SILFunctionArgument>(*I)->getLifetimeAnnotation());
+      entryArgs.push_back(newArg);
     }
     ++ArgNo;
     ++I;

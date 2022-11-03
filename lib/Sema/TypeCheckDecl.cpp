@@ -288,6 +288,7 @@ enum class ImplicitlyFinalReason : unsigned {
 }
 
 static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
+                                          FinalAttr *explicitFinalAttr,
                                           StaticSpellingKind staticSpelling) {
   // Are there any reasons to infer 'final'? Prefer 'static' over the class
   // being final for the purposes of diagnostics.
@@ -295,8 +296,8 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (staticSpelling == StaticSpellingKind::KeywordStatic) {
     reason = ImplicitlyFinalReason::Static;
 
-    if (auto finalAttr = D->getAttrs().getAttribute<FinalAttr>()) {
-      auto finalRange = finalAttr->getRange();
+    if (explicitFinalAttr) {
+      auto finalRange = explicitFinalAttr->getRange();
       if (finalRange.isValid()) {
         auto &context = D->getASTContext();
         context.Diags.diagnose(finalRange.Start, diag::static_decl_already_final)
@@ -447,7 +448,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       // (or the same file) to add vtable entries, we can re-evaluate this
       // restriction.
       if (!decl->isSynthesized() &&
-          isa<ExtensionDecl>(decl->getDeclContext()) &&
+          isa<ExtensionDecl>(decl->getDeclContext()->getImplementedObjCContext()) &&
           !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
 
         if (classDcl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
@@ -498,20 +499,20 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                                ASTContext &ctx)
         : Decl(decl), ctx(ctx) { }
 
-    bool walkToDeclPre(class Decl *D) override {
+    PreWalkAction walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      return !isa<NominalTypeDecl>(D);
+      return Action::SkipChildrenIf(isa<NominalTypeDecl>(D));
     }
     
-    std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
-        return { false, E };
+        return Action::SkipChildren(E);
       
       // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)
-        return { true, E };
+        return Action::Continue(E);
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
@@ -525,12 +526,12 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         arg = CRE->getBase();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
         if (dotExpr->getName().getBaseName() != DeclBaseName::createConstructor())
-          return { true, E };
+          return Action::Continue(E);
 
         arg = dotExpr->getBase();
       } else {
         // Not a constructor call.
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // Look for a base of 'self' or 'super'.
@@ -559,13 +560,13 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       }
       
       if (myKind == BodyInitKind::None)
-        return { true, E };
+        return Action::Continue(E);
 
       if (Kind == BodyInitKind::None) {
         Kind = myKind;
 
         InitExpr = apply;
-        return { true, E };
+        return Action::Continue(E);
       }
 
       // If the kind changed, complain.
@@ -576,13 +577,14 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
                            Kind == BodyInitKind::Chained);
       }
 
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 
   auto &ctx = decl->getASTContext();
   FindReferenceToInitializer finder(decl, ctx);
-  decl->getBody()->walk(finder);
+  if (auto *body = decl->getBody())
+    body->walk(finder);
 
   // get the kind out of the finder.
   auto Kind = finder.Kind;
@@ -801,8 +803,9 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
 
 bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  auto explicitFinalAttr = decl->getAttrs().getAttribute<FinalAttr>();
   if (isa<ClassDecl>(decl))
-    return decl->getAttrs().hasAttribute<FinalAttr>();
+    return explicitFinalAttr;
 
   auto cls = decl->getDeclContext()->getSelfClassDecl();
   if (!cls)
@@ -830,10 +833,17 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
         auto *PBD = VD->getParentPatternBinding();
-        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, cls, PBD->getStaticSpelling()))
+        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
+                                                 PBD->getStaticSpelling()))
           return true;
 
         if (VD->isLet()) {
+          // If this `let` is in an `@_objcImplementation extension`, don't
+          // infer `final` unless it is written explicitly.
+          auto ed = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+          if (!explicitFinalAttr && ed && ed->isObjCImplementation())
+            return false;
+
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
@@ -855,7 +865,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Func: {
       // Methods declared 'static' are final.
       auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
+                                        staticSpelling))
         return true;
       break;
     }
@@ -888,7 +899,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Subscript: {
       // Member subscripts.
       auto staticSpelling = cast<SubscriptDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
+                                        staticSpelling))
         return true;
       break;
     }
@@ -897,10 +909,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       break;
   }
 
-  if (decl->getAttrs().hasAttribute<FinalAttr>())
-    return true;
-
-  return false;
+  return explicitFinalAttr;
 }
 
 bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
@@ -954,6 +963,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return true;
   }
+
+  // @_objcImplementation extension member implementations are implicitly
+  // dynamic.
+  if (decl->isObjCMemberImplementation())
+    return true;
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     // Runtime-replaceable accessors are dynamic when their storage declaration
@@ -2205,52 +2219,72 @@ static Type validateParameterType(ParamDecl *decl) {
       options |= TypeResolutionFlags::Preconcurrency;
   }
 
-  // If the element is a variadic parameter, resolve the parameter type as if
-  // it were in non-parameter position, since we want functions to be
-  // @escaping in this case.
-  options.setContext(decl->isVariadic() ?
-                       TypeResolverContext::VariadicFunctionInput :
-                       TypeResolverContext::FunctionInput);
-  options |= TypeResolutionFlags::Direct;
-
   if (dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
-  const auto resolution =
-      TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get);
-  auto Ty = resolution.resolveType(decl->getTypeRepr());
+  Type Ty;
+
+  auto *nestedRepr = decl->getTypeRepr();
+  while (true) {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+      nestedRepr = attrTypeRepr->getTypeRepr();
+      continue;
+    }
+    if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      nestedRepr = specifierTypeRepr->getBase();
+      continue;
+    }
+    break;
+  }
+
+  if (auto *packExpansionRepr = dyn_cast<PackExpansionTypeRepr>(nestedRepr)) {
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    options.setContext(TypeResolverContext::VariadicFunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    // FIXME: This duplicates code found elsewhere
+    auto *patternRepr = packExpansionRepr->getPatternType();
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(patternRepr);
+
+    // Find the first type parameter pack and use that as the count type.
+    SmallVector<Type, 2> rootParameterPacks;
+    Ty->getTypeParameterPacks(rootParameterPacks);
+
+    // Handle the monovariadic/polyvariadic interface type split.
+    if (!rootParameterPacks.empty()) {
+      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
+      Ty = PackExpansionType::get(Ty, rootParameterPacks[0]);
+    } else {
+      // Monovariadic types (T...) for <T> resolve to [T].
+      Ty = VariadicSequenceType::get(Ty);
+
+      // Set the old-style variadic bit.
+      decl->setVariadic();
+      if (!ctx.getArrayDecl()) {
+        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                           diag::sugar_type_not_found, 0);
+        return ErrorType::get(ctx);
+      }
+    }
+  } else {
+    options.setContext(TypeResolverContext::FunctionInput);
+    options |= TypeResolutionFlags::Direct;
+
+    const auto resolution =
+        TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                     PlaceholderType::get);
+    Ty = resolution.resolveType(decl->getTypeRepr());
+  }
 
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
-  }
-
-  if (decl->isVariadic()) {
-    // Find the first type sequence parameter and use that as the count type.
-    SmallVector<Type, 2> rootTypeSequenceParams;
-    Ty->getTypeSequenceParameters(rootTypeSequenceParams);
-
-    // Handle the monovariadic/polyvariadic interface type split.
-    if (!rootTypeSequenceParams.empty()) {
-      // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty, rootTypeSequenceParams[0]);
-    } else {
-      // Monovariadic types (T...) for <T> resolve to [T].
-      Ty = VariadicSequenceType::get(Ty);
-    }
-    if (!ctx.getArrayDecl()) {
-      ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
-                         diag::sugar_type_not_found, 0);
-      return ErrorType::get(ctx);
-    }
-
-    // Disallow variadic parameters in enum elements.
-    if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
-      decl->diagnose(diag::enum_element_ellipsis);
-      decl->setInvalid();
-      return ErrorType::get(ctx);
-    }
   }
 
   return Ty;
@@ -2278,6 +2312,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
+  case DeclKind::BuiltinTuple:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("should not get here");
     return Type();
 
@@ -2345,6 +2381,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
+
+    if (auto clangDecl = VD->getClangDecl()) {
+      auto clangVarDecl = cast<clang::VarDecl>(clangDecl);
+
+      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(
+          clangVarDecl, VD, VD->getDeclContext());
+    }
+
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
       return ErrorType::get(Context);
@@ -2825,12 +2869,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (ext->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
   const auto resolution = TypeResolution::forStructural(
-      ext->getDeclContext(), options,
-      [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      },
+      ext->getDeclContext(), options, nullptr,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
       PlaceholderType::get);

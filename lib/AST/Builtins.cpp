@@ -234,10 +234,8 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam = GenericTypeParamDecl::create(
-      &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
-      /*type sequence*/ false, 0, index, /*opaque type=*/false, nullptr);
-  return genericParam;
+  return GenericTypeParamDecl::createImplicit(
+      &M->getMainFile(FileUnitKind::Builtin), ident, /*depth*/ 0, index);
 }
 
 /// Create a generic parameter list with multiple generic parameters.
@@ -851,11 +849,6 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
-static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
-                            _parameters(_owned(_typeparam(0))), _typeparam(0));
-}
-
 static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
                             _parameters(_typeparam(0)), _typeparam(0));
@@ -1193,15 +1186,6 @@ static ValueDecl *getCOWBufferForReading(ASTContext &C, Identifier Id) {
   builder.addParameter(T);
   builder.setResult(T);
   return builder.build(Id);
-}
-
-static ValueDecl *getIntInstrprofIncrement(ASTContext &C, Identifier Id) {
-  // (Builtin.RawPointer, Builtin.Int64, Builtin.Int32, Builtin.Int32) -> ()
-  Type Int64Ty = BuiltinIntegerType::get(64, C);
-  Type Int32Ty = BuiltinIntegerType::get(32, C);
-  return getBuiltinFunction(Id,
-                            {C.TheRawPointerType, Int64Ty, Int32Ty, Int32Ty},
-                            TupleType::getEmpty(C));
 }
 
 static ValueDecl *getTypePtrAuthDiscriminator(ASTContext &C, Identifier Id) {
@@ -2291,6 +2275,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return nullptr; // not needed for the parser library.
   #endif
 
+  // Builtin.TheTupleType resolves to the singleton instance of BuiltinTupleDecl.
+  if (Id == Context.Id_TheTupleType)
+    return Context.getBuiltinTupleDecl();
+
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
 
@@ -2537,11 +2525,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getEndUnpairedAccessOperation(Context, Id);
 
-  case BuiltinValueKind::Move:
-    if (!Types.empty())
-      return nullptr;
-    return getMoveOperation(Context, Id);
-
   case BuiltinValueKind::Copy:
     if (!Types.empty())
       return nullptr;
@@ -2710,6 +2693,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getReinterpretCastOperation(Context, Id);
       
   case BuiltinValueKind::AddressOf:
+  case BuiltinValueKind::UnprotectedAddressOf:
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
 
@@ -2717,6 +2701,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
+  case BuiltinValueKind::UnprotectedAddressOfBorrow:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
@@ -2853,9 +2838,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getBuiltinFunction(Id,
                               {},
                               TupleType::getEmpty(Context));
-
-  case BuiltinValueKind::IntInstrprofIncrement:
-    return getIntInstrprofIncrement(Context, Id);
 
   case BuiltinValueKind::TypePtrAuthDiscriminator:
     return getTypePtrAuthDiscriminator(Context, Id);

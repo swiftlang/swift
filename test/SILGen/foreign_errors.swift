@@ -22,16 +22,23 @@ func test0() throws {
   // CHECK: [[T0:%.*]] = load_borrow [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = ref_to_unmanaged [[T0]]
   // CHECK: store [[T1]] to [trivial] [[ERR_TEMP1]]
-  // CHECK: address_to_pointer [[ERR_TEMP1]]
+  // CHECK: address_to_pointer [stack_protection] [[ERR_TEMP1]]
 
   //   Call the method.
   // CHECK: [[RESULT:%.*]] = apply [[METHOD]]({{.*}}, [[SELF]])
 
   //   Writeback to the first temporary.
+  //
+  //   NOTE: We need to a mark dependence here to ensure that the destroy
+  //   associated with the assign to ERR_TEMP0 is not hoisted above the copy_value
+  //   of T1_COPY. If we were to allow that, we could introduce a lifetime gap
+  //   causing potentially use after frees.
+  //
   // CHECK: [[T0:%.*]] = load [trivial] [[ERR_TEMP1]]
   // CHECK: [[T1:%.*]] = unmanaged_to_ref [[T0]]
   // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
-  // CHECK: assign [[T1_COPY]] to [[ERR_TEMP0]]
+  // CHECK: [[T1_COPY_DEP:%.*]] = mark_dependence [[T1_COPY]] : $Optional<NSError> on [[ERR_TEMP0]]
+  // CHECK: assign [[T1_COPY_DEP]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
   // CHECK: [[BOOL_OR_INT:%.*]] = struct_extract [[RESULT]]
@@ -148,22 +155,7 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_ : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_guaranteed () -> @error any Error {
-// CHECK:      [[T0:%.*]] = function_ref @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error any Error
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [callee_guaranteed] [[T0]](%0)
-// CHECK-NEXT: return [[T1]]
-
-// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcSo10ErrorProneCmcfu_yyKcfu0_ : $@convention(thin) (@thick ErrorProne.Type) -> @error any Error {
-// CHECK:      [[TEMP:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
-// CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
-// CHECK:      [[METHOD:%.*]] = objc_method [[SELF]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
-// CHECK:      [[RESULT:%.*]] = apply [[METHOD]]({{%.*}}, [[SELF]])
-// CHECK:      cond_br
-// CHECK:      return
-// CHECK:      [[T0:%.*]] = load [take] [[TEMP]]
-// CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
-// CHECK:      "willThrow"([[T1]] : $any Error)
-// CHECK:      throw [[T1]]
+// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcfu_ : $@convention(thin) () -> @error any Error
 
 func testArgs() throws {
   try ErrorProne.consume(nil)

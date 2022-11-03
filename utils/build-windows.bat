@@ -17,7 +17,7 @@
 :: - REPO_SCHEME: Optional. The scheme name to checkout.
 
 :: REQUIRED PERMISSIONS
-:: Practically, it is easier to be in the Adminstrators group to run the
+:: Practically, it is easier to be in the Administrators group to run the
 :: script, but it should be possible to execute as a normal user.
 :: The user will need permission to write files into the Windows SDK and the
 :: VisualC++ folder.
@@ -122,7 +122,6 @@ git -C "%source_root%\swift" checkout-index --force --all
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-integration-tests"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swiftpm"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-stress-tester"
-@set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-syntax"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-tools-support-core"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository swift-xcode-playground-support"
 @set "skip_repositories_arg=%skip_repositories_arg% --skip-repository tensorflow-swift-apis"
@@ -282,6 +281,7 @@ cmake^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DSWIFT_LIT_ARGS="--time-tests"^
+    -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH=%source_root%\swift-syntax^
     -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%

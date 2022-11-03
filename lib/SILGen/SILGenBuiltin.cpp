@@ -409,12 +409,11 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   return SGF.emitManagedRetain(loc, result, destLowering);
 }
 
-/// Specialized emitter for Builtin.addressof.
-static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
+static ManagedValue emitBuiltinAddressOfBuiltins(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionMap substitutions,
                                          PreparedArguments &&preparedArgs,
-                                         SGFContext C) {
+                                         SGFContext C, bool stackProtected) {
   SILType rawPointerType = SILType::getRawPointerType(SGF.getASTContext());
 
   auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 1);
@@ -436,17 +435,36 @@ static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
                  .getLValueAddress();
   
   // Take the address argument and cast it to RawPointer.
-  SILValue result = SGF.B.createAddressToPointer(loc, addr,
-                                                 rawPointerType);
+  SILValue result = SGF.B.createAddressToPointer(loc, addr, rawPointerType,
+                                                 stackProtected);
   return ManagedValue::forUnmanaged(result);
 }
 
+/// Specialized emitter for Builtin.addressof.
+static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
+                                         SILLocation loc,
+                                         SubstitutionMap substitutions,
+                                         PreparedArguments &&preparedArgs,
+                                         SGFContext C) {
+  return emitBuiltinAddressOfBuiltins(SGF, loc, substitutions, std::move(preparedArgs), C,
+                                      /*stackProtected=*/ true);
+}
+
+static ManagedValue emitBuiltinUnprotectedAddressOf(SILGenFunction &SGF,
+                                         SILLocation loc,
+                                         SubstitutionMap substitutions,
+                                         PreparedArguments &&preparedArgs,
+                                         SGFContext C) {
+  return emitBuiltinAddressOfBuiltins(SGF, loc, substitutions, std::move(preparedArgs), C,
+                                      /*stackProtected=*/ false);
+}
+
 /// Specialized emitter for Builtin.addressOfBorrow.
-static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
+static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
                                                SILLocation loc,
                                                SubstitutionMap substitutions,
                                                PreparedArguments &&preparedArgs,
-                                               SGFContext C) {
+                                               SGFContext C, bool stackProtected) {
   SILType rawPointerType = SILType::getRawPointerType(SGF.getASTContext());
 
   auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 1);
@@ -468,9 +486,29 @@ static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
   addr = borrow.getValue();
   
   // Take the address argument and cast it to RawPointer.
-  SILValue result = SGF.B.createAddressToPointer(loc, addr,
-                                                 rawPointerType);
+  SILValue result = SGF.B.createAddressToPointer(loc, addr, rawPointerType,
+                                                 stackProtected);
   return ManagedValue::forUnmanaged(result);
+}
+
+/// Specialized emitter for Builtin.addressOfBorrow.
+static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap substitutions,
+                                               PreparedArguments &&preparedArgs,
+                                               SGFContext C) {
+  return emitBuiltinAddressOfBorrowBuiltins(SGF, loc, substitutions,
+            std::move(preparedArgs), C, /*stackProtected=*/ true);
+}
+
+/// Specialized emitter for Builtin.addressOfBorrow.
+static ManagedValue emitBuiltinUnprotectedAddressOfBorrow(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap substitutions,
+                                               PreparedArguments &&preparedArgs,
+                                               SGFContext C) {
+  return emitBuiltinAddressOfBorrowBuiltins(SGF, loc, substitutions,
+            std::move(preparedArgs), C, /*stackProtected=*/ false);
 }
 
 /// Specialized emitter for Builtin.gepRaw.
@@ -504,8 +542,10 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
                                                ElemTy.getAddressType(),
                                                /*strict*/ true,
                                                /*invariant*/ false);
-  addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue());
-  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType);
+  addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
+                               /*needsStackProtection=*/ true);
+  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
+                                      /*needsStackProtection=*/ true);
 
   return ManagedValue::forUnmanaged(addr);
 }
@@ -530,7 +570,8 @@ static ManagedValue emitBuiltinGetTailAddr(SILGenFunction &SGF,
                                                /*invariant*/ false);
   addr = SGF.B.createTailAddr(loc, addr, args[1].getUnmanagedValue(),
                               TailTy.getAddressType());
-  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType);
+  addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
+                                      /*needsStackProtection=*/ false);
 
   return ManagedValue::forUnmanaged(addr);
 }
@@ -1055,7 +1096,8 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   SILValue result = SGF.B.createRefTailAddr(
       loc, args[0].borrow(SGF, loc).getValue(), ElemType.getAddressType());
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
-  result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
+  result = SGF.B.createAddressToPointer(loc, result, rawPointerType,
+                                        /*needsStackProtection=*/ false);
   return ManagedValue::forUnmanaged(result);
 }
 
@@ -1110,7 +1152,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, unsigned arity,
     bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
-  // FIXME(SR-11853): Support throwing functions.
+  // FIXME(https://github.com/apple/swift/issues/54259): Support throwing functions.
   assert(!throws && "Throwing functions are not yet supported");
 
   auto origFnVal = args[0].getValue();
@@ -1179,7 +1221,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
 static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
     unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
-  // FIXME(SR-11853): Support throwing functions.
+  // FIXME(https://github.com/apple/swift/issues/54259): Support throwing functions.
   assert(!throws && "Throwing functions are not yet supported");
 
   auto origFnVal = args.front().getValue();
@@ -1477,7 +1519,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                        /*depth*/ 0, /*index*/ 0,
                                                        SGF.getASTContext()),
                              MetatypeRepresentation::Thick))
@@ -1503,7 +1545,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
           .build();
   auto genericSig = subs.getGenericSignature().getCanonicalSignature();
   auto genericResult =
-      GenericTypeParamType::get(/*type sequence*/ false,
+      GenericTypeParamType::get(/*isParameterPack*/ false,
                                 /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
   // <T> () async throws -> T
   CanType functionTy =
@@ -1535,7 +1577,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
                                                        /*depth*/ 0, /*index*/ 0,
                                                        SGF.getASTContext()),
                              MetatypeRepresentation::Thick))

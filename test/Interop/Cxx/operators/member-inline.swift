@@ -1,15 +1,13 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
-// TODO: Fix CxxShim for Windows.
-// XFAIL: OS=windows-msvc
 
 import MemberInline
 import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-#if !os(Windows)    // SR-13129
+#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
@@ -36,6 +34,24 @@ OperatorsTestSuite.test("LoadableIntWrapper.equal (inline)") {
   let result = lhs == rhs
 
   expectTrue(result)
+}
+
+OperatorsTestSuite.test("LoadableIntWrapper.plusEqual (inline)") {
+  var lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 42)
+
+  lhs += rhs
+
+  expectEqual(lhs.value, 84)
+}
+
+OperatorsTestSuite.test("LoadableIntWrapper.minusEqual (inline)") {
+  var lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 42)
+
+  lhs -= rhs
+
+  expectEqual(lhs.value, 0)
 }
 
 OperatorsTestSuite.test("LoadableIntWrapper.unaryMinus (inline)") {
@@ -69,7 +85,16 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
-#if !os(Windows)    // SR-13129
+OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
+  let lhs = TemplatedWithFriendOperatorSpec()
+  let rhs = TemplatedWithFriendOperatorSpec()
+
+  let result = lhs == rhs
+
+  expectTrue(result)
+}
+
+#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   var wrapper = LoadableBoolWrapper(value: true)
 
@@ -242,7 +267,7 @@ OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
   expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
 }
 
-#if !os(Windows)    // SR-13129
+#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   var arr = NonTrivialArrayByVal()
   let NonTrivialByVal = arr[0];

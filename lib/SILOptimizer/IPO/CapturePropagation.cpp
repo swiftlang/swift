@@ -197,8 +197,12 @@ void CapturePropagationCloner::cloneClosure(
 
     SILArgument *Arg = OrigEntryBB->getArgument(ArgIdx);
 
-    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+    auto *MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
+    MappedValue->setNoImplicitCopy(
+        cast<SILFunctionArgument>(Arg)->isNoImplicitCopy());
+    MappedValue->setLifetimeAnnotation(
+        cast<SILFunctionArgument>(Arg)->getLifetimeAnnotation());
     entryArgs.push_back(MappedValue);
   }
   assert(OrigEntryBB->args_size() - ArgIdx == PartialApplyArgs.size()
@@ -329,6 +333,22 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
   auto *T2TF = Builder.createThinToThickFunction(OrigPAI->getLoc(), FuncRef,
                                                  OrigPAI->getType());
   OrigPAI->replaceAllUsesWith(T2TF);
+  
+  // Bypass any mark_dependence on the captures we specialized away.
+  //
+  // TODO: If we start to specialize away key path literals with operands
+  // (subscripts etc.), then a dependence of the new partial_apply on those
+  // operands may still exist. However, we should still leave the key path
+  // itself out of the dependency chain, and introduce dependencies on those
+  // operands instead, so that the key path object itself can be made dead.
+  for (auto user : T2TF->getUsersOfType<MarkDependenceInst>()) {
+    if (auto depUser = user->getBase()->getSingleUserOfType<PartialApplyInst>()){
+      if (depUser == OrigPAI) {
+        user->replaceAllUsesWith(T2TF);
+      }
+    }
+  }
+  
   // Remove any dealloc_stack users.
   SmallVector<Operand*, 16> Uses(T2TF->getUses());
   for (auto *Use : Uses)
@@ -596,7 +616,7 @@ void CapturePropagation::run() {
     }
   }
   if (HasChanged) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
 

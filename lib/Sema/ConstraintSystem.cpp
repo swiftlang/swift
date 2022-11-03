@@ -15,13 +15,15 @@
 // inference for expressions.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
-#include "swift/AST/Initializer.h"
+#include "TypeChecker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -29,7 +31,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -444,15 +445,6 @@ ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
       break;
     }
 
-    // If the conversion is associated with a contextual type e.g.
-    // `_: Double = CGFloat(1)` then drop `ContextualType` so that
-    // it's easy to find when the underlying expression has been
-    // rewritten.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      anchor = ASTNode();
-      path.clear();
-    }
-
     // If conversion is for a tuple element, let's drop `TupleType`
     // components from the path since they carry information for
     // diagnostics that `ExprRewriter` won't be able to re-construct
@@ -666,37 +658,38 @@ static void extendDepthMap(
     // should actually do this, as it doesn't reflect the true expression depth,
     // but it's needed to preserve compatibility with the behavior from when
     // TupleExpr and ParenExpr were used to represent argument lists.
-    std::pair<bool, ArgumentList *>
+    PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *ArgList) override {
       ++Depth;
-      return {true, ArgList};
+      return Action::Continue(ArgList);
     }
-    ArgumentList *walkToArgumentListPost(ArgumentList *ArgList) override {
+    PostWalkResult<ArgumentList *>
+    walkToArgumentListPost(ArgumentList *ArgList) override {
       --Depth;
-      return ArgList;
+      return Action::Continue(ArgList);
     }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       DepthMap[E] = {Depth, Parent.getAsExpr()};
       ++Depth;
 
       if (auto CE = dyn_cast<ClosureExpr>(E))
         Closures.push_back(CE);
 
-      return { true, E };
+      return Action::Continue(E);
     }
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
         assert(Closures.back() == CE);
         Closures.pop_back();
       }
 
       --Depth;
-      return E;
+      return Action::Continue(E);
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto RS = dyn_cast<ReturnStmt>(S)) {
         // For return statements, treat the parent of the return expression
         // as the closure itself.
@@ -704,11 +697,11 @@ static void extendDepthMap(
           llvm::SaveAndRestore<ParentTy> SavedParent(Parent, Closures.back());
           auto E = RS->getResult();
           E->walk(*this);
-          return { false, S };
+          return Action::SkipChildren(S);
         }
       }
 
-      return { true, S };
+      return Action::Continue(S);
     }
   };
 
@@ -1259,7 +1252,8 @@ ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
-    ConstraintLocator *memberLocator, bool wantInterfaceType) {
+    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    bool adjustForPreconcurrency) {
   return ConstraintSystem::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
@@ -1272,22 +1266,25 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType, GetClosureType{*this},
+      memberLocator, wantInterfaceType, adjustForPreconcurrency,
+      GetClosureType{*this},
       ClosureIsolatedByPreconcurrency{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    ConstraintLocator *memberLocator,
+    bool wantInterfaceType, bool adjustForPreconcurrency,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType,
     llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
-  // Adjust the type for concurrency.
-  requestedType = adjustVarTypeForConcurrency(
-      requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
+  // Adjust the type for concurrency if requested.
+  if (adjustForPreconcurrency)
+    requestedType = adjustVarTypeForConcurrency(
+        requestedType, value, UseDC, getClosureType, isolatedByPreconcurrency);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1739,8 +1736,12 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   auto *paramLocator = getConstraintLocator(
       locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
 
-  auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
-                                                      TVO_CanBindToHole);
+  unsigned options = (TVO_PrefersSubtypeBinding |
+                      TVO_CanBindToHole);
+  if (parameter->isParameterPack())
+    options |= TVO_CanBindToPack;
+
+  auto typeVar = createTypeVariable(paramLocator, options);
   auto result = replacements.insert(std::make_pair(
       cast<GenericTypeParamType>(parameter->getCanonicalType()), typeVar));
 
@@ -1773,8 +1774,6 @@ void ConstraintSystem::openGenericRequirement(
 
   auto kind = req.getKind();
   switch (kind) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
   case RequirementKind::Conformance: {
     auto protoDecl = req.getProtocolDecl();
     // Determine whether this is the protocol 'Self' constraint we should
@@ -1788,6 +1787,7 @@ void ConstraintSystem::openGenericRequirement(
   }
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
+  case RequirementKind::SameShape:
     openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
     break;
   case RequirementKind::Layout:
@@ -2311,9 +2311,14 @@ ConstraintSystem::getTypeOfMemberReference(
       FunctionType::ExtInfo info;
       refType = FunctionType::get(indices, elementTy, info);
     } else {
+      // Delay the adjustment for preconcurrency until after we've formed
+      // the function type for this kind of reference. Otherwise we will lose
+      // track of the adjustment in the formed function's return type.
+
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            locator,
-                                           /*wantInterfaceType=*/true);
+                                           /*wantInterfaceType=*/true,
+                                           /*adjustForPreconcurrency=*/false);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -2423,8 +2428,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Adjust the opened type for concurrency.
   Type origOpenedType = openedType;
-  if ((isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) &&
-      !isRequirementOrWitness(locator)) {
+  if (isRequirementOrWitness(locator)) {
+    // Don't adjust when doing witness matching, because that can cause cycles.
+  } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     unsigned numApplies = getNumApplications(
         value, hasAppliedSelf, functionRefKind);
     openedType = adjustFunctionTypeForConcurrency(
@@ -2434,6 +2440,16 @@ ConstraintSystem::getTypeOfMemberReference(
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<AnyFunctionType>(), subscript, useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements);
+  } else if (auto var = dyn_cast<VarDecl>(value)) {
+    // Adjust the function's result type, since that's the Var's actual type.
+    auto origFnType = origOpenedType->castTo<AnyFunctionType>();
+
+    auto resultTy = adjustVarTypeForConcurrency(
+          origFnType->getResult(), var, useDC, GetClosureType{*this},
+          ClosureIsolatedByPreconcurrency{*this});
+
+    openedType = FunctionType::get(
+                  origFnType->getParams(), resultTy, origFnType->getExtInfo());
   }
 
   // Compute the type of the reference.
@@ -2454,6 +2470,29 @@ ConstraintSystem::getTypeOfMemberReference(
 
   return { origOpenedType, openedType, origType, type };
 }
+
+#if SWIFT_SWIFT_PARSER
+Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
+                                               Expr *anchor) {
+  auto req = MacroContextRequest{macroName.str(), DC->getParentModule()};
+  auto *macroCtx = evaluateOrDefault(getASTContext().evaluator, req, nullptr);
+  if (!macroCtx)
+    return Type();
+
+  auto *locator = getConstraintLocator(anchor);
+  // Dig through to __MacroEvaluationContext.SignatureType
+  auto sig = getASTContext().getIdentifier("SignatureType");
+  auto *signature = cast<TypeAliasDecl>(macroCtx->lookupDirect(sig).front());
+  auto type = signature->getUnderlyingType();
+
+  // Open any the generic types.
+  OpenedTypeMap replacements;
+  openGeneric(signature->getParent(), signature->getGenericSignature(),
+              locator, replacements);
+
+  return openType(type, replacements);
+}
+#endif
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
@@ -2760,6 +2799,13 @@ static std::pair<bool, unsigned>
 isInvalidPartialApplication(ConstraintSystem &cs,
                             const AbstractFunctionDecl *member,
                             ConstraintLocator *locator) {
+  // If this is a compiler synthesized implicit conversion, let's skip
+  // the check because the base of `UDE` is not the base of the injected
+  // initializer.
+  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
+      locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return {false, 0};
+
   auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
   if (UDE == nullptr)
     return {false,0};
@@ -2839,31 +2885,28 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
     DeclContext *DC;
     bool FoundThrow = false;
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // If we've found a 'try', record it and terminate the traversal.
       if (isa<TryExpr>(expr)) {
         FoundThrow = true;
-        return { false, nullptr };
+        return Action::Stop();
       }
 
       // Don't walk into a 'try!' or 'try?'.
       if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
-        return { false, expr };
+        return Action::SkipChildren(expr);
       }
 
       // Do not recurse into other closures.
       if (isa<ClosureExpr>(expr))
-        return { false, expr };
+        return Action::SkipChildren(expr);
 
-      return { true, expr };
+      return Action::Continue(expr);
     }
 
-    bool walkToDeclPre(Decl *decl) override {
+    PreWalkAction walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
-      if (!isa<PatternBindingDecl>(decl))
-        return false;
-
-      return true;
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(decl));
     }
 
     bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
@@ -2949,11 +2992,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       return LabelItem.isSyntacticallyExhaustive();
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
       // If we've found a 'throw', record it and terminate the traversal.
       if (isa<ThrowStmt>(stmt)) {
         FoundThrow = true;
-        return { false, nullptr };
+        return Action::Stop();
       }
 
       // Handle do/catch differently.
@@ -2962,27 +3005,27 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
         // if the catch isn't syntactically exhaustive.
         if (!isSyntacticallyExhaustive(doCatch)) {
           if (!doCatch->getBody()->walk(*this))
-            return { false, nullptr };
+            return Action::Stop();
         }
 
         // Walk into all the catch clauses.
         for (auto catchClause : doCatch->getCatches()) {
           if (!catchClause->walk(*this))
-            return { false, nullptr };
+            return Action::Stop();
         }
 
         // We've already walked all the children we care about.
-        return { false, stmt };
+        return Action::SkipChildren(stmt);
       }
 
       if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
         if (forEach->getTryLoc().isValid()) {
           FoundThrow = true;
-          return { false, nullptr };
+          return Action::Stop();
         }
       }
 
-      return { true, stmt };
+      return Action::Continue(stmt);
     }
 
   public:
@@ -3530,10 +3573,28 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   if (isDebugMode()) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
-    llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 2)
-      << "(overload set choice binding "
-      << boundType->getString(PO) << " := "
-      << adjustedRefType->getString(PO) << ")\n";
+
+    auto &log = llvm::errs();
+    log.indent(solverState ? solverState->getCurrentIndent() : 2);
+    log << "(overload set choice binding ";
+    boundType->print(log, PO);
+    log << " := ";
+    adjustedRefType->print(log, PO);
+
+    auto openedAtLoc = getOpenedTypes(locator);
+    if (!openedAtLoc.empty()) {
+      log << " [";
+      llvm::interleave(
+          openedAtLoc.begin(), openedAtLoc.end(),
+          [&](OpenedType opened) {
+            opened.second->getImpl().getGenericParameter()->print(log, PO);
+            log << " := ";
+            Type(opened.second).print(log, PO);
+          },
+          [&]() { log << ", "; });
+      log << "]";
+    }
+    log << ")\n";
   }
 
   if (auto *decl = choice.getDeclOrNull()) {
@@ -3581,11 +3642,18 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
-      if (lookupBaseType->mayHaveMembers()) {
+      if (lookupBaseType->mayHaveMembers() ||
+          lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
         if (!conformance) {
+          // FIXME: This regresses diagnostics if removed, but really the
+          // handling of a missing conformance should be the same for
+          // tuples and non-tuples.
+          if (lookupBaseType->is<TupleType>())
+            return DependentMemberType::get(lookupBaseType, assocType);
+
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
@@ -3599,9 +3667,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           return memberTy;
         }
 
-        auto subs = SubstitutionMap::getProtocolSubstitutions(
-            proto, lookupBaseType, conformance);
-        auto result = assocType->getDeclaredInterfaceType().subst(subs);
+        auto result = conformance.getAssociatedType(
+            lookupBaseType, assocType->getDeclaredInterfaceType());
         if (!result->hasError())
           return result;
       }
@@ -4048,7 +4115,9 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch ||
-                     fix->getKind() == FixKind::GenericArgumentsMismatch;
+                     fix->getKind() == FixKind::GenericArgumentsMismatch ||
+                     fix->getKind() == FixKind::InsertCall ||
+                     fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch;
             });
       });
 
@@ -4524,7 +4593,9 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
 
     auto argParamMatch = argMatching->second.parameterBindings[i];
     auto param = applyFnType->getParams()[argParamMatch.front()];
-    auto paramFnType = param.getPlainType()->castTo<FunctionType>();
+    auto paramFnType = param.getPlainType()->getAs<FunctionType>();
+    if (!paramFnType)
+      continue;
 
     if (cs.typeVarOccursInType(resultTypeVar, paramFnType->getResult()))
       closureArguments.push_back(closure);
@@ -4790,10 +4861,10 @@ static void extendPreorderIndexMap(
     explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
       : IndexMap(indexMap) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       IndexMap[E] = Index;
       ++Index;
-      return { true, E };
+      return Action::Continue(E);
     }
   };
 
@@ -5159,7 +5230,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       if (auto *condStmt = getAsStmt<LabeledConditionalStmt>(anchor)) {
         anchor = &condStmt->getCond().front();
       } else {
-        anchor = castToExpr<IfExpr>(anchor)->getCondExpr();
+        anchor = castToExpr<TernaryExpr>(anchor)->getCondExpr();
       }
 
       path = path.slice(1);
@@ -5173,7 +5244,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
         anchor =
             branch.forThen() ? ifStmt->getThenStmt() : ifStmt->getElseStmt();
       } else {
-        auto *ifExpr = castToExpr<IfExpr>(anchor);
+        auto *ifExpr = castToExpr<TernaryExpr>(anchor);
         anchor =
             branch.forThen() ? ifExpr->getThenExpr() : ifExpr->getElseExpr();
       }
@@ -5531,8 +5602,8 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
   if (isa<ExplicitCastExpr>(fnExpr))
     return false;
 
-  // No direct callee for an if expr.
-  if (isa<IfExpr>(fnExpr))
+  // No direct callee for a ternary expr.
+  if (isa<TernaryExpr>(fnExpr))
     return false;
 
   // Assume that anything else would have a direct callee.
@@ -5999,7 +6070,6 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
-  case ConversionRestrictionKind::ReifyPackToType:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.
@@ -6568,8 +6638,8 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     case RequirementKind::Superclass: {
       if (req.getFirstType()->getRootGenericParam()->getDepth() > 0 &&
@@ -6662,7 +6732,17 @@ SourceRange constraints::getSourceRange(ASTNode anchor) {
 
 static Optional<Requirement> getRequirement(ConstraintSystem &cs,
                                             ConstraintLocator *reqLocator) {
-  auto reqLoc = reqLocator->getLastElementAs<LocatorPathElt::AnyRequirement>();
+  ArrayRef<LocatorPathElt> path = reqLocator->getPath();
+
+  // If we have something like ... -> type req # -> pack element #, we're
+  // solving a requirement of the form T : P where T is a type parameter pack
+  if (!path.empty() && path.back().is<LocatorPathElt::PackElement>())
+    path = path.drop_back();
+
+  if (path.empty())
+    return None;
+
+  auto reqLoc = path.back().getAs<LocatorPathElt::AnyRequirement>();
   if (!reqLoc)
     return None;
 

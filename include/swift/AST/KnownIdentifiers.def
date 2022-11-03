@@ -60,6 +60,7 @@ IDENTIFIER(CoreFoundation)
 IDENTIFIER(count)
 IDENTIFIER(CVarArg)
 IDENTIFIER(Cxx)
+IDENTIFIER(CxxStdlib)
 IDENTIFIER(Darwin)
 IDENTIFIER(Distributed)
 IDENTIFIER(dealloc)
@@ -75,6 +76,7 @@ IDENTIFIER_WITH_NAME(PatternMatchVar, "$match")
 IDENTIFIER(dynamicallyCall)
 IDENTIFIER(dynamicMember)
 IDENTIFIER(Element)
+IDENTIFIER(Elements)
 IDENTIFIER_(enclosingInstance)
 IDENTIFIER(Encodable)
 IDENTIFIER(encode)
@@ -306,6 +308,33 @@ IDENTIFIER(whenLocal)
 IDENTIFIER(decodeNextArgument)
 IDENTIFIER(SerializationRequirement)
 IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
+
+// Type wrappers
+IDENTIFIER_WITH_NAME(TypeWrapperStorage, "$Storage")
+IDENTIFIER_WITH_NAME(TypeWrapperProperty, "$storage")
+IDENTIFIER(storageKeyPath)
+IDENTIFIER(propertyKeyPath)
+IDENTIFIER(wrappedSelf)
+IDENTIFIER(storageWrapper)
+IDENTIFIER_WITH_NAME(localStorageVar, "_storage")
+
+// Attribute options
+IDENTIFIER_(_always)
+IDENTIFIER_(assumed)
+IDENTIFIER(checked)
+IDENTIFIER(never)
+IDENTIFIER(none)
+IDENTIFIER(safe)
+IDENTIFIER(size)
+IDENTIFIER(speed)
+IDENTIFIER(unchecked)
+IDENTIFIER(unsafe)
+
+// The singleton instance of TupleTypeDecl in the Builtin module
+IDENTIFIER(TheTupleType)
+
+// Macros / compiler plugins
+IDENTIFIER_(CompilerPluginSupport)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

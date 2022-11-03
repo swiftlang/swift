@@ -194,6 +194,8 @@ protected:
     SHARED_FIELD(EndAccessInst, bool aborting);
     SHARED_FIELD(RefElementAddrInst, bool immutable);
     SHARED_FIELD(RefTailAddrInst, bool immutable);
+    SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
+    SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
     SHARED_FIELD(DestroyValueInst, bool poisonRefs);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
@@ -202,7 +204,8 @@ protected:
 
     SHARED_FIELD(DebugValueInst, uint8_t
       poisonRefs : 1,
-      operandWasMoved : 1);
+      operandWasMoved : 1,
+      trace : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
       dynamicLifetime : 1,
@@ -392,7 +395,7 @@ public:
   static bool classof(SILNodePointer node) { return true; }
 };
 
-static_assert(sizeof(SILNode) <= 4 * sizeof(void *),
+static_assert(sizeof(SILNode) <= 4 * sizeof(uint64_t),
               "SILNode must stay small");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

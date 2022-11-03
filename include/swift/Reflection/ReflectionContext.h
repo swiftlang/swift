@@ -203,8 +203,8 @@ public:
     StoredPointer FirstJob;
 
     uint8_t State;
-    bool IsDistributedRemote;
     bool IsPriorityEscalated;
+    bool IsDistributedRemote;
     uint8_t MaxPriority;
 
     bool HasThreadPort;
@@ -1737,13 +1737,12 @@ private:
 
     uint32_t Flags = ActorObj->Status.Flags[0];
     Info.State = Flags & concurrency::ActorFlagConstants::ActorStateMask;
-    Info.IsDistributedRemote =
-        Flags & concurrency::ActorFlagConstants::DistributedRemote;
     Info.IsPriorityEscalated =
         Flags & concurrency::ActorFlagConstants::IsPriorityEscalated;
     Info.MaxPriority =
         (Flags & concurrency::ActorFlagConstants::PriorityMask) >>
         concurrency::ActorFlagConstants::PriorityShift;
+    Info.IsDistributedRemote = ActorObj->IsDistributedRemote;
 
     // Don't read FirstJob when idle.
     if (Info.State != concurrency::ActorFlagConstants::Idle) {

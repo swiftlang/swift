@@ -54,6 +54,8 @@ class SwiftFormat(product.Product):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
 
+        install_destdir = self.host_install_destdir(host_target)
+
         configuration = 'release' if self.is_release() else 'debug'
 
         helper_cmd = [
@@ -68,6 +70,9 @@ class SwiftFormat(product.Product):
             # reset the dependencies to be local.
             '--update'
         ]
+        helper_cmd.extend([
+            '--prefix', install_destdir + self.args.install_prefix
+        ])
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
         helper_cmd.extend(additional_params)
@@ -87,7 +92,10 @@ class SwiftFormat(product.Product):
         self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
-        return False
+        return self.args.install_swiftformat
+
+    def install(self, host_target):
+        self.run_build_script_helper('install', host_target)
 
     @classmethod
     def get_dependencies(cls):

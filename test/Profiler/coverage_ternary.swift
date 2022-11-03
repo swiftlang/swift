@@ -4,9 +4,9 @@
 // coverage_ternary.bar.init() -> coverage_ternary.bar
 // CHECK-LABEL: sil hidden @$s16coverage_ternary3barCACycfc
 // CHECK-NOT: return
-// CHECK: builtin "int_instrprof_increment"
+// CHECK: increment_profiler_counter
 
-// rdar://problem/23256795 - Avoid crash if an if_expr has no parent
+// rdar://problem/23256795 - Avoid crash if an ternary_expr has no parent
 // CHECK: sil_coverage_map {{.*}}// variable initialization expression of coverage_ternary.bar.m1 : Swift.String
 class bar {
   var m1 = flag == 0   // CHECK: [[@LINE]]:12 -> [[@LINE+2]]:22 : 0

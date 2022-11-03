@@ -108,7 +108,7 @@ public:
   public:
     FunctionSummary(unsigned argCount) : ArgAccesses(argCount) {}
 
-    /// Returns of summary of the the function accesses that argument at the
+    /// Returns of summary of the function accesses that argument at the
     /// given index.
     ArgumentSummary &getAccessForArgument(unsigned argument) {
       return ArgAccesses[argument];
@@ -229,7 +229,7 @@ private:
   void processFunction(FunctionInfo *info, FunctionOrder &order);
 
   /// Summarize how the function uses the given argument.
-  void processArgument(FunctionInfo *info, SILFunctionArgument *argment,
+  void processArgument(FunctionInfo *info, SILFunctionArgument *argument,
                         ArgumentSummary &summary, FunctionOrder &order);
 
   /// Summarize a partial_apply instruction.

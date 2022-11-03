@@ -205,6 +205,14 @@ class AndroidPlatform(Platform):
         return config_file
 
 
+class OpenBSDPlatform(Platform):
+    def cmake_options(self, args):
+        toolchain_file = os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
+        if not toolchain_file:
+            return ''
+        return f'-DCMAKE_TOOLCHAIN_FILE="${toolchain_file}"'
+
+
 class Target(object):
     """
     Abstract representation of a target Swift can run on.
@@ -265,7 +273,7 @@ class StdlibDeploymentTarget(object):
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
-    OpenBSD = Platform("openbsd", archs=["amd64"])
+    OpenBSD = OpenBSDPlatform("openbsd", archs=["amd64"])
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
@@ -422,7 +430,7 @@ def install_prefix():
 
 def darwin_toolchain_prefix(darwin_install_prefix):
     """
-    Given the install prefix for a Darwin system, and assuming that that path
+    Given the install prefix for a Darwin system, and assuming that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory.
     """
@@ -431,7 +439,7 @@ def darwin_toolchain_prefix(darwin_install_prefix):
 
 def toolchain_path(install_destdir, install_prefix):
     """
-    Given the install prefix for a Darwin system, and assuming that that path
+    Given the install prefix for a Darwin system, and assuming that path
     is to a .xctoolchain directory, return the path to the .xctoolchain
     directory in the given install directory.
     This toolchain is being populated during the build-script invocation.

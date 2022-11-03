@@ -227,7 +227,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack [lexical] $any P, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<any P>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
+// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -389,7 +389,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack [lexical] $GenericStruct<T>, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
+// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -497,7 +497,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[T0:%.*]] = alloc_stack [lexical] $T.Element, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
-// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [initialization] [[T0]]
+// CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -603,7 +603,8 @@ func unusedArgPattern(_ xx: [Int]) {
   }
 }
 
-// Test for SR-11269. Make sure that the sil contains the needed upcast.
+// https://github.com/apple/swift/issues/53670
+// Make sure that the SIL contains the needed upcast.
 //
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach25genericFuncWithConversion4listySayxG_tAA1CCRbzlF
 // CHECK: bb2([[ITER_VAL:%.*]] : @owned $T):
@@ -614,9 +615,10 @@ func genericFuncWithConversion<T: C>(list : [T]) {
   }
 }
 
-// SR-8688: Check that branch on result of next() precedes optional injection.
-// If we branch on the converted result of next(), the loop won't terminate.
-//
+// https://github.com/apple/swift/issues/51201
+// Check that branch on result of 'next()' precedes optional injection.
+// If we branch on the converted result of 'next()', the loop won't terminate.
+
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySaySiGF
 // CHECK: [[NEXT_RESULT:%.*]] = load [trivial] {{.*}} : $*Optional<Int>
 // CHECK: switch_enum [[NEXT_RESULT]] : $Optional<Int>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
@@ -627,17 +629,14 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
   for x : Int? in xs {}
 }
 
-// SR-8688: Check that branch on result of next() precedes optional injection.
-// If we branch on the converted result of next(), the loop won't terminate.
-//
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySayxGlF
-// CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [initialization] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
+// CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [init] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
 // CHECK: switch_enum_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
 // CHECK: [[BB_SOME]]:
 // CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] $Optional<T>, let, name "x"
 // CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[ADDR]] to [initialization] [[X_ADDR]] : $*T
+// CHECK: copy_addr [take] [[ADDR]] to [init] [[X_ADDR]] : $*T
 // CHECK: inject_enum_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
 func injectForEachElementIntoOptional<T>(_ xs: [T]) {
   for x : T? in xs {}

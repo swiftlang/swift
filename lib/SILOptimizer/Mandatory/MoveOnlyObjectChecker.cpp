@@ -31,7 +31,7 @@
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -114,7 +114,7 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       auto *mmci = dyn_cast<MarkMustCheckInst>(&*ii);
       ++ii;
 
-      if (!mmci || !mmci->hasMoveCheckerKind())
+      if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isObject())
         continue;
 
       // Handle guaranteed/owned move arguments and values.
@@ -299,8 +299,13 @@ bool MoveOnlyChecker::searchForCandidateMarkMustChecks() {
       // We then RAUW the mark_must_check once we have emitted the error since
       // later passes expect that mark_must_check has been eliminated by
       // us. Since we are failing already, this is ok to do.
-      diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
-               diag::sil_moveonlychecker_not_understand_mark_move);
+      if (mmci->getType().isMoveOnlyWrapped()) {
+        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_no_implicit_copy);
+      } else {
+        diagnose(fn->getASTContext(), mmci->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_moveonly);
+      }
       mmci->replaceAllUsesWith(mmci->getOperand());
       mmci->eraseFromParent();
       changed = true;
@@ -396,8 +401,8 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
   };
 
   CanonicalizeOSSALifetime canonicalizer(
-      false /*pruneDebugMode*/, false /*poisonRefsMode*/, accessBlockAnalysis,
-      domTree, deleter, foundConsumingUseNeedingCopy,
+      false /*pruneDebugMode*/, !fn->shouldOptimize() /*maximizeLifetime*/,
+      accessBlockAnalysis, domTree, deleter, foundConsumingUseNeedingCopy,
       foundConsumingUseNotNeedingCopy);
   auto moveIntroducers = llvm::makeArrayRef(moveIntroducersToProcess.begin(),
                                             moveIntroducersToProcess.end());
@@ -413,7 +418,24 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *markedValue);
 
     // First canonicalize ownership.
-    changed |= canonicalizer.canonicalizeValueLifetime(markedValue);
+    if (!canonicalizer.canonicalizeValueLifetime(markedValue)) {
+      // If we failed to canonicalize ownership, there was something in the SIL
+      // that copy propagation did not understand. Emit a we did not understand
+      // error.
+      if (markedValue->getType().isMoveOnlyWrapped()) {
+        diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_no_implicit_copy);
+      } else {
+        diagnose(fn->getASTContext(), markedValue->getLoc().getSourceLoc(),
+                 diag::sil_moveonlychecker_not_understand_moveonly);
+      }
+      valuesWithDiagnostics.insert(markedValue);
+      continue;
+    } else {
+      // Always set changed to true if we succeeded in canonicalizing since we
+      // may have rewritten copies.
+      changed = true;
+    }
 
     // If we are asked to perform guaranteed checking, emit an error if we have
     // /any/ consuming uses.
@@ -502,6 +524,7 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
             b.createExplicitCopyValue(cvi->getLoc(), cvi->getOperand());
         cvi->replaceAllUsesWith(expCopy);
         cvi->eraseFromParent();
+        changed = true;
       }
     }
   }
@@ -525,6 +548,9 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
 
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
+
+    LLVM_DEBUG(llvm::dbgs() << "===> MoveOnly Object Checker. Visiting: "
+                            << fn->getName() << '\n');
 
     auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();

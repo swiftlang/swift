@@ -12,20 +12,21 @@
 
 #ifdef SWIFT_ENABLE_REFLECTION
 
-#include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Reflection.h"
-#include "swift/Runtime/Casting.h"
-#include "swift/Runtime/Config.h"
-#include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Enum.h"
-#include "swift/Basic/Unreachable.h"
-#include "swift/Demangling/Demangle.h"
-#include "swift/Runtime/Debug.h"
-#include "swift/Runtime/Portability.h"
+#include "ImageInspection.h"
 #include "Private.h"
 #include "WeakReference.h"
-#include "../SwiftShims/Reflection.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Basic/Unreachable.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Casting.h"
+#include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Enum.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Portability.h"
+#include "swift/Runtime/Reflection.h"
+#include "swift/shims/Reflection.h"
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
@@ -1125,5 +1126,27 @@ id swift_reflectionMirror_quickLookObject(OpaqueValue *value, const Metadata *T)
   return call(value, T, nullptr, [](ReflectionMirrorImpl *impl) { return impl->quickLookObject(); });
 }
 #endif
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_INTERNAL const char *swift_keyPath_dladdr(void *address) {
+  SymbolInfo info;
+  if (lookupSymbol(address, &info) == 0) {
+    return 0;
+  } else {
+    return info.symbolName.get();
+  }
+}
+
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_INTERNAL const
+    char *swift_keyPathSourceString(char *name) {
+  size_t length = strlen(name);
+  std::string mangledName = keyPathSourceString(name, length);
+  if (mangledName == "") {
+    return 0;
+  } else {
+    return strdup(mangledName.c_str());
+  }
+}
 
 #endif  // SWIFT_ENABLE_REFLECTION

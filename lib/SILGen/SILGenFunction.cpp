@@ -537,7 +537,6 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
-  emitProfilerIncrement(fd->getTypecheckedBody());
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
 
@@ -547,7 +546,9 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   } else {
     prepareEpilog(fd->getResultInterfaceType(),
                   fd->hasThrows(), CleanupLocation(fd));
-    
+
+    emitProfilerIncrement(fd->getTypecheckedBody());
+
     // Emit the actual function body as usual
     emitStmt(fd->getTypecheckedBody());
 
@@ -564,12 +565,12 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
-  emitProfilerIncrement(ace);
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
              SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace)));
   prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
 
+  emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
   } else {
@@ -981,6 +982,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
+  auto *const topLevelValue = value;
   auto *dc = function.getDecl()->getInnermostDeclContext();
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
@@ -1034,8 +1036,12 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
-  if (EmitProfilerIncrement)
-    emitProfilerIncrement(value);
+  if (EmitProfilerIncrement) {
+    // Emit a profiler increment for the top-level value, not looking through
+    // any function conversions. This is necessary as the counter would have
+    // been recorded for this expression, not the sub-expression.
+    emitProfilerIncrement(topLevelValue);
+  }
   prepareEpilog(interfaceType, false, CleanupLocation(Loc));
 
   {
@@ -1140,18 +1146,11 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   emitEpilog(loc);
 }
 
-static SILLocation getLocation(ASTNode Node) {
-  if (auto *E = Node.dyn_cast<Expr *>())
-    return E;
-  else if (auto *S = Node.dyn_cast<Stmt *>())
-    return S;
-  else if (auto *D = Node.dyn_cast<Decl *>())
-    return D;
-  else
-    llvm_unreachable("unsupported ASTNode");
+void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
+  emitProfilerIncrement(ProfileCounterRef::node(Node));
 }
 
-void SILGenFunction::emitProfilerIncrement(ASTNode N) {
+void SILGenFunction::emitProfilerIncrement(ProfileCounterRef Ref) {
   // Ignore functions which aren't set up for instrumentation.
   SILProfiler *SP = F.getProfiler();
   if (!SP)
@@ -1159,29 +1158,20 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
   if (!SP->hasRegionCounters() || !getModule().getOptions().UseProfile.empty())
     return;
 
-  auto &C = B.getASTContext();
   const auto &RegionCounterMap = SP->getRegionCounterMap();
-  auto CounterIt = RegionCounterMap.find(N);
+  auto CounterIt = RegionCounterMap.find(Ref);
 
   assert(CounterIt != RegionCounterMap.end() &&
          "cannot increment non-existent counter");
 
-  auto Int32Ty = getLoweredType(BuiltinIntegerType::get(32, C));
-  auto Int64Ty = getLoweredType(BuiltinIntegerType::get(64, C));
+  // If we're at an unreachable point, the increment can be elided as the
+  // counter cannot be incremented.
+  if (!B.hasValidInsertionPoint())
+    return;
 
-  SILLocation Loc = getLocation(N);
-  SILValue Args[] = {
-      // The intrinsic must refer to the function profiling name var, which is
-      // inaccessible during SILGen. Rely on irgen to rewrite the function name.
-      B.createStringLiteral(Loc, SP->getPGOFuncName(),
-                            StringLiteralInst::Encoding::UTF8),
-      B.createIntegerLiteral(Loc, Int64Ty, SP->getPGOFuncHash()),
-      B.createIntegerLiteral(Loc, Int32Ty, SP->getNumRegionCounters()),
-      B.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
-  B.createBuiltin(
-      Loc,
-      C.getIdentifier(getBuiltinName(BuiltinValueKind::IntInstrprofIncrement)),
-      SGM.Types.getEmptyTupleType(), {}, Args);
+  B.createIncrementProfilerCounter(
+      Ref.getLocation(), CounterIt->second, SP->getPGOFuncName(),
+      SP->getNumRegionCounters(), SP->getPGOFuncHash());
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {

@@ -24,6 +24,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
@@ -331,10 +332,11 @@ IRGenModule::getAddrOfObjCProtocolRecord(ProtocolDecl *proto,
 /// create ObjC protocol_t records for protocols, storing references to the
 /// record into the __objc_protolist and __objc_protorefs sections to be
 /// fixed up by the runtime.
-llvm::Constant *IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
-                                               ForDefinition_t forDefinition) {
-  return const_cast<llvm::Constant*>
-    (cast<llvm::Constant>(getObjCProtocolGlobalVars(proto).ref));
+Address IRGenModule::getAddrOfObjCProtocolRef(ProtocolDecl *proto,
+                                              ForDefinition_t forDefinition) {
+  return Address(const_cast<llvm::Constant *>(cast<llvm::Constant>(
+                     getObjCProtocolGlobalVars(proto).ref)),
+                 Int8PtrTy, getPointerAlignment());
 }
 
 IRGenModule::ObjCProtocolPair
@@ -392,6 +394,145 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   ObjCProtocols.insert({proto, pair});
   
   return pair;
+}
+
+static std::pair<uint64_t, llvm::ConstantArray *>
+getProtocolRefsList(llvm::Constant *protocol) {
+  // We expect to see a structure like this.
+  // @"_OBJC_PROTOCOL_$_MyProto" = weak hidden global %struct._protocol_t {
+  //  i8* null,
+  //  i8* getelementptr inbounds ([8 x i8],
+  //    [8 x i8]* @OBJC_CLASS_NAME_, i32 0, i32 0),
+  //  %struct._objc_protocol_list* bitcast (
+  //    { i64, [2 x %struct._protocol_t*] }*
+  //       @"_OBJC_$_PROTOCOL_REFS_MyProto" to %struct._objc_protocol_list*),
+  //  %struct.__method_list_t* null,
+  //  %struct.__method_list_t* null,
+  //  %struct.__method_list_t* null,
+  //  %struct.__method_list_t* null,
+  //  %struct._prop_list_t* null, i32 96, i32 0,
+  //  i8** getelementptr inbounds ([1 x i8*],
+  //    [1 x i8*]* @"_OBJC_$_PROTOCOL_METHOD_TYPES_MyProto", i32 0, i32 0),
+  //  i8* null, %struct._prop_list_t* null }, align 8
+  auto protocolVar = cast<llvm::GlobalVariable>(protocol);
+  auto protocolStruct =
+      cast<llvm::ConstantStruct>(protocolVar->getInitializer());
+  auto objCProtocolList = cast<llvm::Constant>(protocolStruct->getOperand(2));
+  if (objCProtocolList->isNullValue()) {
+    return std::make_pair(0, nullptr);
+  }
+  auto bitcast = cast<llvm::ConstantExpr>(objCProtocolList);
+  assert(bitcast->getOpcode() == llvm::Instruction::BitCast);
+  auto protocolRefsVar = cast<llvm::GlobalVariable>(bitcast->getOperand(0));
+  auto sizeListPair =
+      cast<llvm::ConstantStruct>(protocolRefsVar->getInitializer());
+  auto size =
+      cast<llvm::ConstantInt>(sizeListPair->getOperand(0))->getZExtValue();
+  auto protocolRefsList =
+      cast<llvm::ConstantArray>(sizeListPair->getOperand(1));
+  return std::make_pair(size, protocolRefsList);
+}
+
+// Get runtime protocol list used during emission of objective-c protocol
+// metadata taking non-runtime protocols into account.
+static std::vector<clang::ObjCProtocolDecl *>
+getRuntimeProtocolList(clang::ObjCProtocolDecl::protocol_range protocols) {
+
+  llvm::DenseSet<clang::ObjCProtocolDecl *> nonRuntimeProtocols;
+  std::vector<clang::ObjCProtocolDecl*> runtimeProtocols;
+  for (auto p: protocols) {
+    auto *proto = p->getCanonicalDecl();
+    if (proto->isNonRuntimeProtocol())
+      nonRuntimeProtocols.insert(proto);
+    else
+      runtimeProtocols.push_back(proto);
+  }
+
+  if (nonRuntimeProtocols.empty())
+    return runtimeProtocols;
+
+  // Find the non-runtime implied protocols: protocols that occur in the closest
+  // ancestry of a non-runtime protocol.
+  llvm::SetVector<clang::ObjCProtocolDecl *> nonRuntimeImpliedProtos;
+  std::vector<clang::ObjCProtocolDecl *> worklist;
+  llvm::DenseSet<clang::ObjCProtocolDecl*> seen;
+  for (auto *nonRuntimeProto : nonRuntimeProtocols) {
+    worklist.push_back(nonRuntimeProto);
+    while(!worklist.empty()) {
+       auto *item = worklist.back();
+       worklist.pop_back();
+       if (!seen.insert(item).second)
+         continue;
+
+       if (item->isNonRuntimeProtocol()) {
+         for (auto *parent : item->protocols())
+           worklist.push_back(parent);
+       } else {
+         nonRuntimeImpliedProtos.insert(item->getCanonicalDecl());
+       }
+    }
+  }
+
+  // Subtract the implied protocols of the runtime protocols and non runtime
+  // protoocls implied protocols form the non runtime implied protocols.
+  llvm::DenseSet<const clang::ObjCProtocolDecl *> impliedProtocols;
+  for (auto *p : runtimeProtocols) {
+    impliedProtocols.insert(p);
+    p->getImpliedProtocols(impliedProtocols);
+  }
+
+  for (auto *p : nonRuntimeImpliedProtos) {
+    p->getImpliedProtocols(impliedProtocols);
+  }
+
+  for (auto *p : nonRuntimeImpliedProtos) {
+    if (!impliedProtocols.contains(p)) {
+      runtimeProtocols.push_back(p);
+    }
+  }
+
+  return runtimeProtocols;
+}
+
+static void updateProtocolRefs(IRGenModule &IGM,
+                               const clang::ObjCProtocolDecl *objcProtocol,
+                               llvm::Constant *protocol) {
+
+  // Get the clang importer to map ObjCProtocolDecl to ProtocolDecl.
+  auto &astContext = IGM.getSwiftModule()->getASTContext();
+  auto *clangImporter =
+      static_cast<ClangImporter *>(astContext.getClangModuleLoader());
+  assert(clangImporter && "Must have a clang importer");
+
+  // Get the array containining the protocol refs.
+  unsigned protocolRefsSize;
+  llvm::ConstantArray *protocolRefs;
+  std::tie(protocolRefsSize, protocolRefs) = getProtocolRefsList(protocol);
+  unsigned currentIdx = 0;
+  auto inheritedObjCProtocols = getRuntimeProtocolList(objcProtocol->protocols());
+  for (auto inheritedObjCProtocol : inheritedObjCProtocols) {
+    assert(currentIdx < protocolRefsSize);
+    auto oldVar = protocolRefs->getOperand(currentIdx);
+    // Map the objc protocol to swift protocol.
+    auto optionalDecl = clangImporter->importDeclCached(inheritedObjCProtocol);
+    auto inheritedSwiftProtocol = cast<ProtocolDecl>(*optionalDecl);
+    // Get the objc protocol record we use in Swift.
+    auto record = IGM.getAddrOfObjCProtocolRecord(inheritedSwiftProtocol,
+                                                  NotForDefinition);
+    auto newOpd = llvm::ConstantExpr::getBitCast(record, oldVar->getType());
+    if (newOpd != oldVar)
+      oldVar->replaceAllUsesWith(newOpd);
+    ++currentIdx;
+  }
+  assert(currentIdx == protocolRefsSize);
+}
+
+llvm::Constant *IRGenModule::emitClangProtocolObject(
+    const clang::ObjCProtocolDecl *objcProtocol) {
+  auto clangProto =
+      clang::CodeGen::emitObjCProtocolObject(getClangCGM(), objcProtocol);
+  updateProtocolRefs(*this, objcProtocol, clangProto);
+  return clangProto;
 }
 
 void IRGenModule::emitLazyObjCProtocolDefinition(ProtocolDecl *proto) {
@@ -663,7 +804,8 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
 
   auto fn =
       FunctionPointer::forDirect(FunctionPointer::Kind::Function, messenger,
-                                 /*secondaryValue*/ nullptr, sig);
+                                 /*secondaryValue*/ nullptr, sig,
+                                 /*useSignature*/ true);
   return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
 
@@ -681,14 +823,14 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             SILType selfType) {
   // Get an appropriately-cast function pointer.
   auto fn = IGF.IGM.getObjCAllocWithZoneFn();
+  auto fnType = IGF.IGM.getObjCAllocWithZoneFnType();
 
   if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
-    auto fnTy = llvm::FunctionType::get(self->getType(), self->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+    fnType = llvm::FunctionType::get(self->getType(), self->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  
-  auto call = IGF.Builder.CreateCall(fn, self);
+
+  auto call = IGF.Builder.CreateCall(fnType, fn, self);
 
   // Cast the returned pointer to the right type.
   auto &classTI = IGF.getTypeInfo(selfType);
@@ -1500,25 +1642,26 @@ bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
 llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {
   // Get an appropriately-cast function pointer.
   auto fn = IGM.getBlockCopyFn();
+  auto fnType = IGM.getBlockCopyFnType();
+
   if (value->getType() != IGM.ObjCBlockPtrTy) {
-    auto fnTy = llvm::FunctionType::get(value->getType(), value->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+    fnType = llvm::FunctionType::get(value->getType(), value->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  
-  auto call = Builder.CreateCall(fn, value);
+
+  auto call = Builder.CreateCall(fnType, fn, value);
   return call;
 }
 
 void IRGenFunction::emitBlockRelease(llvm::Value *value) {
   // Get an appropriately-cast function pointer.
   auto fn = IGM.getBlockReleaseFn();
+  auto fnType = IGM.getBlockReleaseFnType();
   if (value->getType() != IGM.ObjCBlockPtrTy) {
-    auto fnTy = llvm::FunctionType::get(IGM.VoidTy, value->getType(),
-                                        false)->getPointerTo();
-    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+    fnType = llvm::FunctionType::get(IGM.VoidTy, value->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-  auto call = Builder.CreateCall(fn, value);
+  auto call = Builder.CreateCall(fnType, fn, value);
   call->setDoesNotThrow();
 }
 
@@ -1527,13 +1670,13 @@ void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
   auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
-  auto llvmFn = IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition);
+  auto llvmFn = cast<llvm::Function>(
+      IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
 
   auto argType =
-      cast<llvm::FunctionType>(llvmFn->getType()->getPointerElementType())
-          ->getParamType(0);
+      cast<llvm::FunctionType>(llvmFn->getFunctionType())->getParamType(0);
   value = Builder.CreateBitCast(value, argType);
 
-  auto call = Builder.CreateCall(llvmFn, value);
+  auto call = Builder.CreateCall(llvmFn->getFunctionType(), llvmFn, value);
   call->setDoesNotThrow();
 }

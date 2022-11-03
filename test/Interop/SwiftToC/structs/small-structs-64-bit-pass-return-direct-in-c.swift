@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-c-header-in-clang(%t/structs.h -Wno-unused-function)
@@ -60,64 +60,78 @@ public func printStructI8AndU32AndI16(_ x: StructI8AndU32AndI16) {
     print("StructI8AndU32AndI16.x = \(x.x), y = \(x.y), z = \(x.z)")
 }
 
-// CHECK:      struct swift_interop_stub_Structs_StructTwoI32 {
+// CHECK:      struct swift_interop_returnStub_Structs_uint64_t_0_8 {
 // CHECK-NEXT:  uint64_t _1;
 // CHECK-NEXT: };
 
-// CHECK:      static inline void swift_interop_returnDirect_Structs_StructTwoI32(char * _Nonnull result, struct swift_interop_stub_Structs_StructTwoI32 value) __attribute__((always_inline)) {
+// CHECK:      static inline void swift_interop_returnDirect_Structs_uint64_t_0_8(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8 value) __attribute__((always_inline)) {
 // CHECK-NEXT:  memcpy(result + 0, &value._1, 8);
 // CHECK-NEXT: }
 
-// CHECK:      static inline struct swift_interop_stub_Structs_StructTwoI32 swift_interop_passDirect_Structs_StructTwoI32(const char * _Nonnull value) __attribute__((always_inline)) {
-// CHECK-NEXT:  struct swift_interop_stub_Structs_StructTwoI32 result;
+// CHECK:      struct swift_interop_passStub_Structs_uint64_t_0_8 {
+// CHECK-NEXT:  uint64_t _1;
+// CHECK-NEXT: };
+
+// CHECK:      static inline struct swift_interop_passStub_Structs_uint64_t_0_8 swift_interop_passDirect_Structs_uint64_t_0_8(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK-NEXT:  struct swift_interop_passStub_Structs_uint64_t_0_8 result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 8);
 // CHECK-NEXT:  return result;
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_EXTERN struct swift_interop_stub_Structs_StructTwoI32 $s7Structs23passThroughStructTwoI32yAA0deF0Vs5Int32V_AdFtF(int32_t i, struct swift_interop_stub_Structs_StructTwoI32 x, int32_t j) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_uint64_t_0_8 $s7Structs23passThroughStructTwoI32yAA0deF0Vs5Int32V_AdFtF(int32_t i, struct swift_interop_passStub_Structs_uint64_t_0_8 x, int32_t j) SWIFT_NOEXCEPT SWIFT_CALL;
 
-// CHECK:      struct swift_interop_stub_Structs_StructI8AndU32AndI16 {
+// CHECK:      struct swift_interop_passStub_Structs_uint64_t_0_8_uint16_t_8_10 {
 // CHECK-NEXT:  uint64_t _1;
 // CHECK-NEXT:  uint16_t _2;
 // CHECK-NEXT: };
 
-// CHECK:      static inline void swift_interop_returnDirect_Structs_StructI8AndU32AndI16(char * _Nonnull result, struct swift_interop_stub_Structs_StructI8AndU32AndI16 value) __attribute__((always_inline)) {
-// CHECK-NEXT:  memcpy(result + 0, &value._1, 8);
-// CHECK-NEXT:  memcpy(result + 8, &value._2, 2);
-// CHECK-NEXT: }
-
-// CHECK:      static inline struct swift_interop_stub_Structs_StructI8AndU32AndI16 swift_interop_passDirect_Structs_StructI8AndU32AndI16(const char * _Nonnull value) __attribute__((always_inline)) {
-// CHECK-NEXT:  struct swift_interop_stub_Structs_StructI8AndU32AndI16 result;
+// CHECK:      static inline struct swift_interop_passStub_Structs_uint64_t_0_8_uint16_t_8_10 swift_interop_passDirect_Structs_uint64_t_0_8_uint16_t_8_10(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK-NEXT:  struct swift_interop_passStub_Structs_uint64_t_0_8_uint16_t_8_10 result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 8);
 // CHECK-NEXT:  memcpy(&result._2, value + 8, 2);
 // CHECK-NEXT:  return result;
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_EXTERN void $s7Structs019printStructI8AndU32E3I16yyAA0cdefeG0VF(struct swift_interop_stub_Structs_StructI8AndU32AndI16 x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK:      SWIFT_EXTERN void $s7Structs019printStructI8AndU32E3I16yyAA0cdefeG0VF(struct swift_interop_passStub_Structs_uint64_t_0_8_uint16_t_8_10 x) SWIFT_NOEXCEPT SWIFT_CALL;
 
-// CHECK:      struct swift_interop_stub_Structs_StructOneI16AndOneStruct {
+// CHECK:      struct swift_interop_passStub_Structs_uint64_t_0_8_uint32_t_8_12 {
 // CHECK-NEXT:  uint64_t _1;
 // CHECK-NEXT:  uint32_t _2;
 // CHECK-NEXT: };
 
-// CHECK:      static inline void swift_interop_returnDirect_Structs_StructOneI16AndOneStruct(char * _Nonnull result, struct swift_interop_stub_Structs_StructOneI16AndOneStruct value) __attribute__((always_inline)) {
-// CHECK-NEXT:  memcpy(result + 0, &value._1, 8);
-// CHECK-NEXT:  memcpy(result + 8, &value._2, 4);
-// CHECK-NEXT: }
-
-// CHECK:      static inline struct swift_interop_stub_Structs_StructOneI16AndOneStruct swift_interop_passDirect_Structs_StructOneI16AndOneStruct(const char * _Nonnull value) __attribute__((always_inline)) {
-// CHECK-NEXT:  struct swift_interop_stub_Structs_StructOneI16AndOneStruct result;
+// CHECK:      static inline struct swift_interop_passStub_Structs_uint64_t_0_8_uint32_t_8_12 swift_interop_passDirect_Structs_uint64_t_0_8_uint32_t_8_12(const char * _Nonnull value) __attribute__((always_inline)) {
+// CHECK-NEXT:  struct swift_interop_passStub_Structs_uint64_t_0_8_uint32_t_8_12 result;
 // CHECK-NEXT:  memcpy(&result._1, value + 0, 8);
 // CHECK-NEXT:  memcpy(&result._2, value + 8, 4);
 // CHECK-NEXT:  return result;
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_EXTERN void $s7Structs011printStructc20TwoI32_and_OneI16AndgC0yyAA0cdE0V_AA0cghigC0VtF(struct swift_interop_stub_Structs_StructTwoI32 y, struct swift_interop_stub_Structs_StructOneI16AndOneStruct x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK:      SWIFT_EXTERN void $s7Structs011printStructc20TwoI32_and_OneI16AndgC0yyAA0cdE0V_AA0cghigC0VtF(struct swift_interop_passStub_Structs_uint64_t_0_8 y, struct swift_interop_passStub_Structs_uint64_t_0_8_uint32_t_8_12 x) SWIFT_NOEXCEPT SWIFT_CALL;
 
-// CHECK:      SWIFT_EXTERN void $s7Structs17printStructTwoI32yyAA0cdE0VF(struct swift_interop_stub_Structs_StructTwoI32 x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK:      SWIFT_EXTERN void $s7Structs17printStructTwoI32yyAA0cdE0VF(struct swift_interop_passStub_Structs_uint64_t_0_8 x) SWIFT_NOEXCEPT SWIFT_CALL;
 
-// CHECK:      SWIFT_EXTERN struct swift_interop_stub_Structs_StructI8AndU32AndI16 $s7Structs023returnNewStructI8AndU32F3I16AA0defgfH0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK: struct swift_interop_returnStub_Structs_uint64_t_0_8_uint16_t_8_10 {
+// CHECK-NEXT:   uint64_t _1;
+// CHECK-NEXT:   uint16_t _2;
+// CHECK-NEXT: };
+// CHECK-EMPTY:
+// CHECK-NEXT: static inline void swift_interop_returnDirect_Structs_uint64_t_0_8_uint16_t_8_10(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8_uint16_t_8_10 value) __attribute__((always_inline)) {
+// CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
+// CHECK-NEXT:   memcpy(result + 8, &value._2, 2);
+// CHECK-NEXT: }
+// CHECK-EMPTY:
+// CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_uint64_t_0_8_uint16_t_8_10 $s7Structs023returnNewStructI8AndU32F3I16AA0defgfH0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
 
-// CHECK:      SWIFT_EXTERN struct swift_interop_stub_Structs_StructOneI16AndOneStruct $s7Structs024returnNewStructOneI16AndeD0AA0defgeD0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK: struct swift_interop_returnStub_Structs_uint64_t_0_8_uint32_t_8_12 {
+// CHECK-NEXT:   uint64_t _1;
+// CHECK-NEXT:   uint32_t _2;
+// CHECK-NEXT: };
 
-// CHECK:      SWIFT_EXTERN struct swift_interop_stub_Structs_StructTwoI32 $s7Structs21returnNewStructTwoI32yAA0deF0Vs5Int32VF(int32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK: static inline void swift_interop_returnDirect_Structs_uint64_t_0_8_uint32_t_8_12(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8_uint32_t_8_12 value) __attribute__((always_inline)) {
+// CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
+// CHECK-NEXT:   memcpy(result + 8, &value._2, 4);
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_uint64_t_0_8_uint32_t_8_12 $s7Structs024returnNewStructOneI16AndeD0AA0defgeD0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
+
+// CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_uint64_t_0_8 $s7Structs21returnNewStructTwoI32yAA0deF0Vs5Int32VF(int32_t x) SWIFT_NOEXCEPT SWIFT_CALL;

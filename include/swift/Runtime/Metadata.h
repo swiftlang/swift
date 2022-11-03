@@ -20,7 +20,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/Reflection/Records.h"
 #include "swift/Runtime/Once.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 namespace swift {
 
@@ -142,7 +142,13 @@ SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable
   VALUE_WITNESS_SYM(FUNCTION_MANGLING);     // () -> ()
 
-// The @escaping () -> () table can be used for arbitrary escaping function types.
+// The @differentiable(reverse) () -> () table can be used for differentiable
+// function types.
+SWIFT_RUNTIME_EXPORT
+const ValueWitnessTable
+  VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING); // @differentiable(reverse) () -> ()
+
+// The @noescape () -> () table can be used for arbitrary noescaping function types.
 SWIFT_RUNTIME_EXPORT
 const ValueWitnessTable
   VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);     // @noescape () -> ()

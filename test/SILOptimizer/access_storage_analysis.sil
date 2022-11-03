@@ -271,9 +271,9 @@ bb0:
 // A sil_global such as this without a corresponding Swift declaration must be
 // defined in another module. Such a global can only be identified when accessed
 // via global_addr instruction (as happens with C imports). Any access via an
-// addessor (as with Swift imports) will be Unidentified. For the purpose of
-// access analysis, a global is considered "external" based on the availabitiy
-// of a Swift declaraion. We only consider an global to be a disjoint access
+// accessor (as with Swift imports) will be Unidentified. For the purpose of
+// access analysis, a global is considered "external" based on the availability
+// of a Swift declaration. We only consider an global to be a disjoint access
 // location if its declaration is available.
 sil_global @external_global : $Int64
 
@@ -439,7 +439,7 @@ bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
   %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
   %leftAddr = tuple_element_addr %boxAccess : $*(left: TreeB<T>, right: TreeB<T>), 0
-  copy_addr %leftAddr to [initialization] %0 : $*TreeB<T>
+  copy_addr %leftAddr to [init] %0 : $*TreeB<T>
   end_access %boxAccess : $*(left: TreeB<T>, right: TreeB<T>)
   %v = tuple ()
   return %v : $()
@@ -649,41 +649,6 @@ bb2(%7 : ${ var Int }):
 
 bb3(%result : $Int):
   return %result : $Int
-}
-
-// Make sure identifyFormalAccess returns a valid storage object for an address-phi
-// that feeds ref_element_addr instructions. The ref_element_addr's need to have the
-// same base object and same field id.
-// <rdar://problem/46114512> SIL verification failed: Unknown formal access pattern: storage
-class BaseClass {
-  var f: Float = 0.0
-}
-
-class SubClass : BaseClass {}
-
-// CHECK-LABEL: @testElementAddressPhiAccess
-// CHECK: [read] [no_nested_conflict] Class %{{.*}} = argument of bb0 : $SubClass
-// CHECK: Field: @_hasInitialValue var f: Float
-sil @testElementAddressPhiAccess : $@convention(thin) (@guaranteed SubClass) -> () {
-bb0(%0 : $SubClass):
-  %base = upcast %0 : $SubClass to $BaseClass
-  cond_br undef, bb1, bb2
-
-bb1:
-  %ref1 = ref_element_addr %base : $BaseClass, #BaseClass.f
-  br bb3(%ref1 : $*Float)
-
-bb2:
-  %ref2 = ref_element_addr %base : $BaseClass, #BaseClass.f
-  br bb3(%ref2 : $*Float)
-
-bb3(%phi : $*Float):
-  %access = begin_access [read] [dynamic] [no_nested_conflict] %phi : $*Float
-  %addr = struct_element_addr %access : $*Float, #Float._value
-  %val = load %addr : $*Builtin.FPIEEE32
-  end_access %access : $*Float
-  %v = tuple ()
-  return %v : $()
 }
 
 // Test an inlined global variable addressor after simplify-cfg has

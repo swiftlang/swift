@@ -13,21 +13,20 @@
 #ifndef SWIFT_IDE_UTILS_H
 #define SWIFT_IDE_UTILS_H
 
-#include "llvm/ADT/PointerIntPair.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ASTPrinter.h"
-#include "swift/Frontend/FrontendOptions.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <functional>
 #include <memory>
 #include <string>
-#include <functional>
 #include <vector>
 
 namespace llvm {
@@ -41,10 +40,8 @@ namespace clang {
 }
 
 namespace swift {
-  class ModuleDecl;
   class ValueDecl;
   class ASTContext;
-  class CompilerInvocation;
   class SourceFile;
   class TypeDecl;
   class SourceLoc;
@@ -83,20 +80,6 @@ struct SourceCompleteResult {
 SourceCompleteResult
 isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
 SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
-
-bool initCompilerInvocation(
-    CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
-    StringRef UnresolvedPrimaryFile,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    const std::string &swiftExecutablePath,
-    const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
-    std::string &Error);
-
-bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
-                                    CompilerInvocation &Invok,
-                                    std::string &Error);
 
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.
@@ -284,18 +267,15 @@ class NameMatcher: public ASTWalker {
   bool handleCustomAttrs(Decl *D);
   ArgumentList *getApplicableArgsFor(Expr* E);
 
-  std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
-  Expr* walkToExprPost(Expr *E) override;
-  bool walkToDeclPre(Decl *D) override;
-  bool walkToDeclPost(Decl *D) override;
-  std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override;
-  Stmt* walkToStmtPost(Stmt *S) override;
-  bool walkToTypeReprPre(TypeRepr *T) override;
-  bool walkToTypeReprPost(TypeRepr *T) override;
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
+  PreWalkAction walkToDeclPre(Decl *D) override;
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 
-  std::pair<bool, ArgumentList *>
+  PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *ArgList) override;
 
   // FIXME: Remove this

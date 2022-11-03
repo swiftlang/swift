@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
+  APIGen.cpp
   ClassLayout.cpp
   DebugTypeInfo.cpp
   EnumPayload.cpp
@@ -49,6 +50,7 @@ add_swift_host_library(swiftIRGen STATIC
   IRGenSILPasses.cpp
   IRGenRequests.cpp
   IRGenSIL.cpp
+  IRSymbolVisitor.cpp
   Linking.cpp
   LoadableByAddress.cpp
   LocalTypeData.cpp
@@ -57,6 +59,8 @@ add_swift_host_library(swiftIRGen STATIC
   Outlining.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
+  TBDGen.cpp
+  TBDGenRequests.cpp
   TypeLayout.cpp
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
@@ -73,7 +77,6 @@ target_link_libraries(swiftIRGen PRIVATE
   swiftLLVMPasses
   swiftSIL
   swiftSILGen
-  swiftSILOptimizer
-  swiftTBDGen)
+  swiftSILOptimizer)
 
 set_swift_llvm_is_available(swiftIRGen)

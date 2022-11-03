@@ -54,6 +54,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::InOut:
   case TypeKind::DynamicSelf:
   case TypeKind::PackExpansion:
+  case TypeKind::BuiltinTuple:
     llvm_unreachable("these types do not have metadata");
 
   // All the builtin types are leaves.
@@ -68,7 +69,8 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::SequenceArchetype:
+  case TypeKind::PackArchetype:
+  case TypeKind::ElementArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return true;

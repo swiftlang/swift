@@ -27,6 +27,12 @@ public protocol Value : AnyObject, CustomStringConvertible {
   ///
   /// It's not legal to get the definingBlock of an `Undef` value.
   var definingBlock: BasicBlock { get }
+
+  /// True if the value has a trivial type.
+  var hasTrivialType: Bool { get }
+
+  /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
+  var hasTrivialNonPointerType: Bool { get }
 }
 
 public enum Ownership {
@@ -93,6 +99,12 @@ extension Value {
 
   public var type: Type { SILValue_getType(bridged).type }
 
+  /// True if the value has a trivial type.
+  public var hasTrivialType: Bool { type.isTrivial(in: function) }
+
+  /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
+  public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: function) }
+
   public var ownership: Ownership { SILValue_getOwnership(bridged).ownership }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
@@ -118,6 +130,30 @@ public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
   return !(lhs === rhs)
 }
 
+/// A projected value, which is defined by the original value and a projection path.
+///
+/// For example, if the `value` is of type `struct S { var x: Int }` and `path` is `s0`,
+/// then the projected value represents field `x` of the original value.
+/// An empty path means represents the "whole" original value.
+///
+public struct ProjectedValue {
+  public let value: Value
+  public let path: SmallProjectionPath
+}
+
+extension Value {
+  /// Returns a projected value, defined by this value and `path`.
+  public func at(_ path: SmallProjectionPath) -> ProjectedValue {
+    ProjectedValue(value: self, path: path)
+  }
+
+  /// Returns a projected value, defined by this value and path containig a single field of `kind` and `index`.
+  public func at(_ kind: SmallProjectionPath.FieldKind, index: Int = 0) -> ProjectedValue {
+    ProjectedValue(value: self, path: SmallProjectionPath(kind, index: index))
+  }
+}
+
+
 extension BridgedValue {
   public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
 
@@ -141,9 +177,18 @@ extension BridgedValue {
 
 final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
+
   public var definingBlock: BasicBlock {
     fatalError("undef has no defining block")
   }
+
+  /// Undef has not parent function, therefore the default `hasTrivialType` does not work.
+  /// Return the conservative default in this case.
+  public var hasTrivialType: Bool { false }
+
+  /// Undef has not parent function, therefore the default `hasTrivialNonPointerType` does not work.
+  /// Return the conservative default in this case.
+  public var hasTrivialNonPointerType: Bool { false }
 }
 
 final class PlaceholderValue : Value {

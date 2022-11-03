@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/generic-function-in-cxx.swift -typecheck -module-name Functions -clang-header-expose-public-decls -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/generic-function-in-cxx.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -c %s -I %t -o %t/swift-functions-execution.o
 // RUN: %target-interop-build-swift %S/generic-function-in-cxx.swift -o %t/swift-functions-execution -Xlinker %t/swift-functions-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -206,5 +206,23 @@ int main() {
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 4294902062)
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 65233)
+  {
+    auto x = createTestSmallStruct(42);
+    int passThru = x.genericMethodPassThrough((int)555);
+    assert(passThru == 555);
+    auto xprime = x.genericMethodPassThrough(x);
+    genericPrintFunction(xprime);
+    x.genericMethodMutTake((uint32_t)16);
+    genericPrintFunction(xprime);
+    genericPrintFunction(x);
+    x.genericMethodMutTake(xprime);
+    genericPrintFunction(xprime);
+    genericPrintFunction(x);
+  }
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 42)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 42)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 58)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 42)
+// CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 57)
   return 0;
 }

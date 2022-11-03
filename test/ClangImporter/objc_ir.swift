@@ -129,7 +129,6 @@ class Impl: FooProto, AnotherProto {
 
 // CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir27protocolCompositionMetatype1pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC* %0) {{.*}} {
 func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
-  // CHECK: = getelementptr inbounds %T7objc_ir4ImplC, %T7objc_ir4ImplC* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
@@ -142,7 +141,6 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
 
 // CHECK-LABEL: define hidden swiftcc %swift.type* @"$s7objc_ir28protocolCompositionMetatype21pSo12AnotherProto_So03FooG0pXpAA4ImplC_tF"(%T7objc_ir4ImplC* %0) {{.*}} {
 func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
-  // CHECK: = getelementptr inbounds %T7objc_ir4ImplC, %T7objc_ir4ImplC* %0, i32 0, i32 0, i32 0
   // CHECK-NOT: {{retain|release}}
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType2(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
@@ -357,7 +355,7 @@ func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
 // CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
 // CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
-// CHECK: attributes [[NOUNWIND]] = { nounwind }
+// CHECK: attributes [[NOUNWIND]] = { nounwind readonly }
 
 // CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[LET_SWIFT_NAME_ALIAS_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])

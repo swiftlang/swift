@@ -33,9 +33,11 @@ add_swift_host_library(swiftAST STATIC
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
+  CASTBridging.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
+  CompilerPlugin.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
@@ -70,6 +72,8 @@ add_swift_host_library(swiftAST STATIC
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
   PackConformance.cpp
+  PackExpansionMatcher.cpp
+  ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
   PlatformKind.cpp
@@ -137,6 +141,7 @@ if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
     clangFormat
     clangToolingCore
     clangFrontendTool
+    clangDependencyScanning
     clangFrontend
     clangDriver
     clangSerialization
@@ -150,6 +155,13 @@ if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
     clangLex
     clangAPINotes
     clangBasic)
+endif()
+
+if(SWIFT_SWIFT_PARSER)
+  target_compile_definitions(swiftAST
+    PRIVATE
+    SWIFT_SWIFT_PARSER
+  )
 endif()
 
 target_link_libraries(swiftAST
@@ -175,6 +187,7 @@ endif()
 # where intrinsics and attributes are declared. swiftAST depends on these
 # headers.
 # For more information see the comment at the top of lib/CMakeLists.txt.
-add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
+add_dependencies(swift-ast-generated-headers intrinsics_gen clang-tablegen-targets)
+add_dependencies(swiftAST swift-ast-generated-headers)
 
 set_swift_llvm_is_available(swiftAST)

@@ -144,10 +144,10 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
          locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
-bool TypeVariableType::Implementation::isTypeSequence() const {
+bool TypeVariableType::Implementation::isParameterPack() const {
   return locator
       && locator->isForGenericParameter()
-      && locator->getGenericParameter()->isTypeSequence();
+      && locator->getGenericParameter()->isParameterPack();
 }
 
 bool TypeVariableType::Implementation::isCodeCompletionToken() const {
@@ -159,18 +159,21 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
-                                      ArrayRef<TupleTypeElt> toTuple,
+bool constraints::computeTupleShuffle(TupleType *fromTuple,
+                                      TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
   const unsigned unassigned = -1;
   
-  SmallVector<bool, 4> consumed(fromTuple.size(), false);
+  auto fromElts = fromTuple->getElements();
+  auto toElts = toTuple->getElements();
+
+  SmallVector<bool, 4> consumed(fromElts.size(), false);
   sources.clear();
-  sources.assign(toTuple.size(), unassigned);
+  sources.assign(toElts.size(), unassigned);
 
   // Match up any named elements.
-  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
-    const auto &toElt = toTuple[i];
+  for (unsigned i = 0, n = toElts.size(); i != n; ++i) {
+    const auto &toElt = toElts[i];
 
     // Skip unnamed elements.
     if (!toElt.hasName())
@@ -180,7 +183,7 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     int matched = -1;
     {
       int index = 0;
-      for (auto field : fromTuple) {
+      for (auto field : fromElts) {
         if (field.getName() == toElt.getName() && !consumed[index]) {
           matched = index;
           break;
@@ -197,14 +200,14 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
   }  
 
   // Resolve any unmatched elements.
-  unsigned fromNext = 0, fromLast = fromTuple.size();
+  unsigned fromNext = 0, fromLast = fromElts.size();
   auto skipToNextAvailableInput = [&] {
     while (fromNext != fromLast && consumed[fromNext])
       ++fromNext;
   };
   skipToNextAvailableInput();
 
-  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
+  for (unsigned i = 0, n = toElts.size(); i != n; ++i) {
     // Check whether we already found a value for this element.
     if (sources[i] != unassigned)
       continue;
@@ -215,11 +218,11 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     }
 
     // Otherwise, assign this input to the next output element.
-    const auto &elt2 = toTuple[i];
+    const auto &elt2 = toElts[i];
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
-    if (fromTuple[fromNext].hasName() && elt2.hasName())
+    if (fromElts[fromNext].hasName() && elt2.hasName())
       return true;
 
     sources[i] = fromNext;
@@ -271,20 +274,20 @@ class FunctionSyntacticDiagnosticWalker : public ASTWalker {
 public:
   FunctionSyntacticDiagnosticWalker(DeclContext *dc) { dcStack.push_back(dc); }
 
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     performSyntacticExprDiagnostics(expr, dcStack.back(), /*isExprStmt=*/false);
 
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
         dcStack.push_back(closure);
-        return {true, expr};
+        return Action::Continue(expr);
       }
     }
 
-    return {false, expr};
+    return Action::SkipChildren(expr);
   }
 
-  Expr *walkToExprPost(Expr *expr) override {
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
     if (auto closure = dyn_cast<ClosureExpr>(expr)) {
       if (closure->isSeparatelyTypeChecked()) {
         assert(dcStack.back() == closure);
@@ -292,20 +295,23 @@ public:
       }
     }
 
-    return expr;
+    return Action::Continue(expr);
   }
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override {
     performStmtDiagnostics(stmt, dcStack.back());
-    return {true, stmt};
+    return Action::Continue(stmt);
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
-    return {false, pattern};
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
+    return Action::SkipChildren(pattern);
   }
-
-  bool walkToTypeReprPre(TypeRepr *typeRepr) override { return false; }
-  bool walkToParameterListPre(ParameterList *params) override { return false; }
+  PreWalkAction walkToTypeReprPre(TypeRepr *typeRepr) override {
+    return Action::SkipChildren();
+  }
+  PreWalkAction walkToParameterListPre(ParameterList *params) override {
+    return Action::SkipChildren();
+  }
 };
 } // end anonymous namespace
 
@@ -545,6 +551,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     assert(!type->is<UnboundGenericType>());
 
     if (auto *GP = type->getAs<GenericTypeParamType>()) {
+      auto openedVar = genericParameters.find(getCanonicalGenericParamTy(GP));
+      if (openedVar != genericParameters.end()) {
+        return openedVar->second;
+      }
       return cs.openGenericParameter(DC->getParent(), GP, genericParameters,
                                      locator);
     }
@@ -642,8 +652,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       auto &requirement = requirements[reqIdx];
 
       switch (requirement.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
 
       case RequirementKind::SameType: {
         auto lhsTy = requirement.getFirstType();
@@ -1108,27 +1118,27 @@ TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
     LoadAdder(ASTContext &ctx, GetTypeFn getType, SetTypeFn setType)
         : Ctx(ctx), getType(getType), setType(setType) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<ParenExpr>(E) || isa<ForceValueExpr>(E))
-        return { true, E };
+        return Action::Continue(E);
 
       // Since load expression is created by walker,
       // it's safe to stop as soon as it encounters first one
       // because it would be the one it just created.
       if (isa<LoadExpr>(E))
-        return { false, nullptr };
+        return Action::Stop();
 
-      return { false, createLoadExpr(E) };
+      return Action::SkipChildren(createLoadExpr(E));
     }
 
-    Expr *walkToExprPost(Expr *E) override {
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto *FVE = dyn_cast<ForceValueExpr>(E))
         setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
 
       if (auto *PE = dyn_cast<ParenExpr>(E))
         setType(E, ParenType::get(Ctx, getType(PE->getSubExpr())));
 
-      return E;
+      return Action::Continue(E);
     }
 
   private:
@@ -1299,9 +1309,9 @@ void Solution::dump(raw_ostream &out) const {
   if (!overloadChoices.empty()) {
     out << "\nOverload choices:";
     for (auto ovl : overloadChoices) {
-      out.indent(2);
       if (ovl.first) {
         out << "\n";
+        out.indent(2);
         ovl.first->dump(sm, out);
       }
 
@@ -1466,16 +1476,17 @@ void ConstraintSystem::print(raw_ostream &out) const {
              });
   for (auto tv : typeVariables) {
     out.indent(2);
-    tv->getImpl().print(out);
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
+        tv->getImpl().print(out);
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
         const_cast<ConstraintSystem *>(this)->getBindingsFor(tv).dump(out, 1);
       }
     } else {
+      tv->getImpl().print(out);
       out << " equivalent to ";
       Type(rep).print(out, PO);
     }
@@ -1728,7 +1739,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     case CheckedCastKind::Unresolved:
       // Even though we know the elements cannot be downcast, we cannot return
       // Unresolved here as it's possible for an empty Array, Set or Dictionary
-      // to be cast to any element type at runtime (SR-6192). The one exception
+      // to be cast to any element type at runtime
+      // (https://github.com/apple/swift/issues/48744). The one exception
       // to this is when we're checking whether we can treat a coercion as a
       // checked cast because we don't want to tell the user to use as!, as it's
       // probably the wrong suggestion.
@@ -2249,19 +2261,27 @@ void ConstraintSystem::forEachExpr(
                 llvm::function_ref<Expr *(Expr *)> callback)
         : CS(CS), callback(callback) {}
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      auto *NewE = callback(E);
+      if (!NewE)
+        return Action::Stop();
+
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
         if (!CS.participatesInInference(closure))
-          return { false, callback(E) };
+          return Action::SkipChildren(NewE);
       }
-      return { true, callback(E) };
+      return Action::Continue(NewE);
     }
 
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      return Action::SkipChildren(P);
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipChildren();
+    }
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      return Action::SkipChildren();
+    }
   };
 
   expr->walk(ChildWalker(*this, callback));

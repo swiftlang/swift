@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-// rdar://problem/38461036 , https://bugs.swift.org/browse/SR-7192 and highlights the real problem in https://bugs.swift.org/browse/SR-6941
+// rdar://problem/38461036
+// https://github.com/apple/swift/issues/49740 and highlights the real problem
+// in https://github.com/apple/swift/issues/49489
 
 protocol SameType {}
 protocol Conforms {}

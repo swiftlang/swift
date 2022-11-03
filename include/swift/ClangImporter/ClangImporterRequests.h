@@ -178,6 +178,128 @@ private:
   evaluate(Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const;
 };
 
+/// The input type for a clang category lookup request.
+struct ClangCategoryLookupDescriptor final {
+  const ClassDecl *classDecl;
+  Identifier categoryName;
+
+  ClangCategoryLookupDescriptor(const ClassDecl *classDecl,
+                                Identifier categoryName)
+      : classDecl(classDecl), categoryName(categoryName) {}
+
+  friend llvm::hash_code hash_value(const ClangCategoryLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.classDecl, desc.categoryName);
+  }
+
+  friend bool operator==(const ClangCategoryLookupDescriptor &lhs,
+                         const ClangCategoryLookupDescriptor &rhs) {
+    return lhs.classDecl == rhs.classDecl
+               && lhs.categoryName == rhs.categoryName;
+  }
+
+  friend bool operator!=(const ClangCategoryLookupDescriptor &lhs,
+                         const ClangCategoryLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ClangCategoryLookupDescriptor &desc);
+SourceLoc extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc);
+
+/// Given a Swift class, find the imported Swift decl representing the
+/// \c \@interface with the given category name. That is, this will return an
+/// \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl, or a
+/// \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, or \c nullptr
+/// if the class is not imported from Clang or it does not have a category by
+/// that name.
+///
+/// An empty/invalid \c categoryName requests the main interface for the class.
+class ClangCategoryLookupRequest
+    : public SimpleRequest<ClangCategoryLookupRequest,
+                           IterableDeclContext *(ClangCategoryLookupDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  IterableDeclContext *evaluate(Evaluator &evaluator,
+                                ClangCategoryLookupDescriptor desc) const;
+};
+
+/// Links an imported Clang decl to the native Swift decl(s) that implement it
+/// using \c \@_objcImplementation.
+struct ObjCInterfaceAndImplementation final {
+  Decl *interfaceDecl;
+  Decl *implementationDecl;
+
+  ObjCInterfaceAndImplementation(Decl *interfaceDecl,
+                                 Decl *implementationDecl)
+      : interfaceDecl(interfaceDecl), implementationDecl(implementationDecl)
+  {
+    assert(interfaceDecl && implementationDecl &&
+           "interface and implementation are both non-null");
+  }
+
+  ObjCInterfaceAndImplementation()
+      : interfaceDecl(nullptr), implementationDecl(nullptr) {}
+
+  operator bool() const {
+    return interfaceDecl;
+  }
+
+  friend llvm::hash_code
+  hash_value(const ObjCInterfaceAndImplementation &pair) {
+    return llvm::hash_combine(pair.interfaceDecl, pair.implementationDecl);
+  }
+
+  friend bool operator==(const ObjCInterfaceAndImplementation &lhs,
+                         const ObjCInterfaceAndImplementation &rhs) {
+    return lhs.interfaceDecl == rhs.interfaceDecl
+               && lhs.implementationDecl == rhs.implementationDecl;
+  }
+
+  friend bool operator!=(const ObjCInterfaceAndImplementation &lhs,
+                         const ObjCInterfaceAndImplementation &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ObjCInterfaceAndImplementation &desc);
+SourceLoc extractNearestSourceLoc(const ObjCInterfaceAndImplementation &desc);
+
+/// Given a \c Decl whose declaration is imported from ObjC but whose
+/// implementation is provided by a Swift \c \@_objcImplementation
+/// \c extension , return both decls, with the imported interface first.
+/// Otherwise return \c {nullptr,nullptr} .
+///
+/// We retrieve both in a single request because we want to cache the
+/// relationship on both sides to avoid duplicating work.
+class ObjCInterfaceAndImplementationRequest
+    : public SimpleRequest<ObjCInterfaceAndImplementationRequest,
+                           ObjCInterfaceAndImplementation(Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ObjCInterfaceAndImplementation
+  evaluate(Evaluator &evaluator, Decl *decl) const;
+
+ public:
+   // Separate caching.
+   bool isCached() const { return true; }
+   Optional<ObjCInterfaceAndImplementation> getCachedResult() const;
+   void cacheResult(ObjCInterfaceAndImplementation value) const;
+};
+
 enum class CxxRecordSemanticsKind {
   Trivial,
   Owned,
@@ -193,10 +315,10 @@ enum class CxxRecordSemanticsKind {
 };
 
 struct CxxRecordSemanticsDescriptor final {
-  const clang::CXXRecordDecl *decl;
+  const clang::RecordDecl *decl;
   ASTContext &ctx;
 
-  CxxRecordSemanticsDescriptor(const clang::CXXRecordDecl *decl,
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
                                ASTContext &ctx)
       : decl(decl), ctx(ctx) {}
 
@@ -223,12 +345,9 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 class CxxRecordSemantics
     : public SimpleRequest<CxxRecordSemantics,
                            CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  // Caching
-  bool isCached() const { return true; }
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };

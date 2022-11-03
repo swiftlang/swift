@@ -13,13 +13,13 @@
 import SILBridging
 
 public struct SubstitutionMap {
-  public let bridged: BridgedSubstitutionMap
+  public let bridged: swift.SubstitutionMap
 
-  public init(_ bridged: BridgedSubstitutionMap) {
+  public init(_ bridged: swift.SubstitutionMap) {
     self.bridged = bridged
   }
   
   public init() {
-    self.bridged = SubstitutionMap_getEmpty();
+    self.bridged = swift.SubstitutionMap()
   }
 }

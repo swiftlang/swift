@@ -13,3 +13,8 @@ module SubTypes {
 module TypeAliases {
   header "type-aliases.h"
 }
+
+module VirtualMethods {
+  header "virtual-methods.h"
+  requires cplusplus
+}

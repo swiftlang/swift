@@ -5,8 +5,6 @@ add_swift_host_library(swiftAPIDigester STATIC
   ModuleDiagsConsumer.cpp)
 
 target_link_libraries(swiftAPIDigester PRIVATE
-  swiftFrontend
-  swiftSIL
   swiftIDE)
 
 set_swift_llvm_is_available(swiftAPIDigester)

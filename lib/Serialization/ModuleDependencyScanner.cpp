@@ -136,6 +136,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
     auto sourceFile = new (Ctx) SourceFile(
         *moduleDecl, SourceFileKind::Interface, bufferID);
+    moduleDecl->addAuxiliaryFile(*sourceFile);
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;
@@ -199,7 +200,7 @@ Optional<ModuleDependencies> SerializedModuleLoaderBase::getModuleDependencies(
   assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
          "Expected PlaceholderSwiftModuleScanner as the first dependency scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, llvm::VersionTuple(), false)) {
+    if (scanner->canImportModule(modulePath, nullptr)) {
       // Record the dependencies.
       cache.recordDependencies(moduleName, *(scanner->dependencies));
       return std::move(scanner->dependencies);

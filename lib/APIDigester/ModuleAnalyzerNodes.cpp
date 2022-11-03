@@ -2,7 +2,6 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SIL/SILDeclRef.h"
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -1491,7 +1490,7 @@ static bool isProtocolRequirement(ValueDecl *VD) {
 
 static bool requireWitnessTableEntry(ValueDecl *VD) {
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return SILDeclRef::requiresNewWitnessTableEntry(FD);
+    return FD->requiresNewWitnessTableEntry();
   }
   return false;
 }
@@ -2387,16 +2386,17 @@ class ConstExtractor: public ASTWalker {
     }
     return false;
   }
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (E->isSemanticallyConstExpr()) {
       record(E, E);
-      return { false, E };
+      return Action::SkipChildren(E);
     }
     if (handleSimpleReference(E)) {
-      return { false, E };
+      return Action::SkipChildren(E);
     }
-    return { true, E };
+    return Action::Continue(E);
   }
+
 public:
   ConstExtractor(SDKContext &SCtx, ASTContext &Ctx): SCtx(SCtx),
     SM(Ctx.SourceMgr) {}

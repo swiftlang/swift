@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
@@ -26,6 +26,11 @@ public struct FirstSmallStruct {
 #endif
     }
 }
+
+// CHECK: class FirstSmallStruct;
+
+// CHECK: template<>
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
 
 // CHECK: class FirstSmallStruct final {
 // CHECK-NEXT: public:
@@ -71,11 +76,11 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
-// CHECK-NEXT: template<>
-// CHECK-NEXT: inline void * _Nonnull getTypeMetadata<Structs::FirstSmallStruct>() {
+// CHECK-NEXT: struct TypeMetadataTrait<Structs::FirstSmallStruct> {
+// CHECK-NEXT: inline void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:   return Structs::_impl::$s7Structs16FirstSmallStructVMa(0)._0;
 // CHECK-NEXT: }
+// CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
 // CHECK-NEXT: static inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;
@@ -192,13 +197,13 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 }
 
 // CHECK:      inline LargeStruct createLargeStruct(swift::Int x) noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s7Structs17createLargeStructyAA0cD0VSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      inline StructWithRefCountStoredProp createStructWithRefCountStoredProp() noexcept SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT:   return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:     _impl::$s7Structs34createStructWithRefCountStoredPropAA0cdefgH0VyF(result);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
@@ -228,7 +233,7 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 // CHECK-NEXT: return _impl::$s7Structs11LargeStructV2x1Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: inline FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](void * _Nonnull result) {
+// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) {
 // CHECK-NEXT:   _impl::$s7Structs11LargeStructV010firstSmallC0AA05FirsteC0Vvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }

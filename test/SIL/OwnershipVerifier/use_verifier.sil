@@ -866,8 +866,7 @@ bb2:
 
 bb3:
   %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0 : $Builtin.NativeObject
-  %2a = begin_borrow %2 : $ThreeDifferingPayloadEnum
-  br bb5(%2a : $ThreeDifferingPayloadEnum)
+  br bb5(%2 : $ThreeDifferingPayloadEnum)
 
 bb4:
   %3 = integer_literal $Builtin.Int32, 0
@@ -876,7 +875,6 @@ bb4:
 
 bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
   %6 = copy_value %5 : $ThreeDifferingPayloadEnum
-  end_borrow %5 : $ThreeDifferingPayloadEnum
   return %6 : $ThreeDifferingPayloadEnum
 }
 
@@ -894,18 +892,15 @@ bb2:
 
 bb3:
   %3 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %1 : $Builtin.NativeObject
-  %3a = begin_borrow %3 : $ThreeDifferingPayloadEnum
-  br bb5(%3a : $ThreeDifferingPayloadEnum)
+  br bb5(%3 : $ThreeDifferingPayloadEnum)
 
 bb4:
   %4 = integer_literal $Builtin.Int32, 0
   %5 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %4 : $Builtin.Int32
-  %5a = begin_borrow %5 : $ThreeDifferingPayloadEnum
-  br bb5(%5a : $ThreeDifferingPayloadEnum)
+  br bb5(%5 : $ThreeDifferingPayloadEnum)
 
 bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
   %7 = copy_value %6 : $ThreeDifferingPayloadEnum
-  end_borrow %6 : $ThreeDifferingPayloadEnum
   end_borrow %1 : $Builtin.NativeObject
   br bb6(%7 : $ThreeDifferingPayloadEnum)
 
@@ -1211,8 +1206,7 @@ bb1:
 
 bb2:
   %5 = struct_extract %1 : $NonTrivialStructWithTrivialField, #NonTrivialStructWithTrivialField.owner
-  %6 = begin_borrow %5 : $Builtin.NativeObject
-  br bb3(%6 : $Builtin.NativeObject)
+  br bb3(%5 : $Builtin.NativeObject)
 
 bb3(%7 : @guaranteed $Builtin.NativeObject):
   end_borrow %7 : $Builtin.NativeObject

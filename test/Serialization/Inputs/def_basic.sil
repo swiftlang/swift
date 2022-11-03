@@ -249,12 +249,12 @@ bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Bendable & Runcible)>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>, 0
-  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*any Bendable & Runcible
-  copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
+  // CHECK: copy_addr [take] {{.*}} to [init] {{.*}} : $*any Bendable & Runcible
+  copy_addr [take] %1 to [init] %2a : $*Bendable & Runcible
   // CHECK: alloc_stack
   %4 = alloc_stack $Bendable & Runcible
-  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*any Bendable & Runcible
-  copy_addr %2a to [initialization] %4 : $*Bendable & Runcible
+  // CHECK: copy_addr {{.*}} to [init] {{.*}} : $*any Bendable & Runcible
+  copy_addr %2a to [init] %4 : $*Bendable & Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
   destroy_addr %4 : $*Bendable & Runcible
@@ -372,7 +372,7 @@ sil [transparent] [serialized] @test_union_addr_data_case : $@convention(thin) (
 bb0(%0 : $*Gimel, %1 : $*Q):
   // CHECK: {{%.*}} = init_enum_data_addr {{%.*}} : $*Gimel, #Gimel.DataCase!enumelt
   %p = init_enum_data_addr %0 : $*Gimel, #Gimel.DataCase!enumelt
-  copy_addr [take] %1 to [initialization] %p : $*Q
+  copy_addr [take] %1 to [init] %p : $*Q
   inject_enum_addr %0 : $*Gimel, #Gimel.DataCase!enumelt
   %t = tuple ()
   return %t : $()
@@ -560,12 +560,12 @@ sil [transparent] [serialized] @test_existential_metatype : $@convention(thin) (
 bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeProtocol>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <SomeProtocol>, 0
-  // CHECK: copy_addr [take] %0 to [initialization] %{{.*}} : $*any SomeProtocol
-  copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
+  // CHECK: copy_addr [take] %0 to [init] %{{.*}} : $*any SomeProtocol
+  copy_addr [take] %0 to [init] %1a : $*SomeProtocol
   // CHECK: alloc_stack
   %4 = alloc_stack $SomeProtocol
-  // CHECK: copy_addr %{{.*}} to [initialization] %{{.*}} : $*any SomeProtocol
-  copy_addr %1a to [initialization] %4 : $*SomeProtocol
+  // CHECK: copy_addr %{{.*}} to [init] %{{.*}} : $*any SomeProtocol
+  copy_addr %1a to [init] %4 : $*SomeProtocol
   // CHECK: existential_metatype $@thick any SomeProtocol.Type, {{%.*}} : $*any SomeProtocol
   %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
   destroy_addr %4 : $*SomeProtocol
@@ -683,6 +683,24 @@ bb0:
   %2 = tuple ()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil public_external [transparent] @test_stack_protection_flags
+sil [transparent] [serialized] @test_stack_protection_flags : $@convention(thin) (@inout Builtin.Word) -> () {
+bb0(%0 : $*Builtin.Word):
+  // CHECK: address_to_pointer [stack_protection] %0
+  %1 = address_to_pointer [stack_protection] %0 : $*Builtin.Word to $Builtin.RawPointer
+  // CHECK: address_to_pointer %0
+  %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = integer_literal $Builtin.Word, 0
+  // CHECK: index_addr [stack_protection] %0
+  %4 = index_addr [stack_protection] %0 : $*Builtin.Word, %3 : $Builtin.Word
+  // CHECK: index_addr %0
+  %5 = index_addr %0 : $*Builtin.Word, %3 : $Builtin.Word
+
+  %6 = tuple ()
+  return %6 : $()
+}
+
 
 // CHECK-LABEL: sil public_external [transparent] @test_tail_elems
 sil [transparent] [serialized] @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
@@ -1311,7 +1329,7 @@ bb0(%0 : $A):
   %1 = alloc_stack $Any
   %2 = ref_element_addr %0 : $A, #A.property
   %3 = begin_access [dynamic] [read] %2 : $*Any
-  copy_addr %3 to [initialization] %1 : $*Any
+  copy_addr %3 to [init] %1 : $*Any
   end_access %3 : $*Any
   %6 = begin_access [dynamic] [read] [no_nested_conflict] %2 : $*Any
   copy_addr %6 to %1 : $*Any
@@ -1519,6 +1537,7 @@ bb0:
   %84 = function_ref @test_dealloc_partial_ref : $@convention(thin) () -> ()
   %85 = function_ref @test_dealloc_box : $@convention(thin) () -> ()
   %86 = function_ref @test_stack_flag : $@convention(thin) () -> ()
+  %86b = function_ref @test_stack_protection_flags : $@convention(thin) (@inout Builtin.Word) -> ()
   %87 = function_ref @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> ()
   %88 = function_ref @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> ()
   %89 = function_ref @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1

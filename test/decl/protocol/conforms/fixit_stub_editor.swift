@@ -102,7 +102,8 @@ class Class4 {}
 extension Class4: PropertyMutabilityProto { // expected-error{{type 'Class4' does not conform to protocol 'PropertyMutabilityProto'}} expected-note{{do you want to add protocol stubs?}} {{44-44=\n    var computed: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    var stored: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
-// https://bugs.swift.org/browse/SR-9868
+// https://github.com/apple/swift/issues/52274
+
 protocol FooProto {
  typealias CompletionType = (Int) -> Void
  func doSomething(then completion: @escaping CompletionType)

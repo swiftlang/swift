@@ -276,7 +276,7 @@ nay:
 // CHECK:   [[V2:%.*]] = icmp ne %T5casts1AC* [[V1]], null
 // CHECK:   br i1 [[V2]], label %[[LBL:.*]], label
 // CHECK:    [[LBL]]:
-// CHECK:   [[V4:%.*]] = getelementptr inbounds %T5casts1AC, %T5casts1AC* [[V1]]
+// CHECK:   [[V4:%.*]] = bitcast %T5casts1AC* [[V1]] to %swift.type**
 // CHECK:    load %swift.type*, %swift.type** [[V4]]
 sil @checked_downcast_optional_class_to_ex : $@convention(thin) (@guaranteed Optional<A>) -> @owned Optional<CP> {
 bb0(%0 : $Optional<A>):
@@ -299,7 +299,7 @@ bb3(%9 : $Optional<CP>):
 sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type) -> () {
 entry(%e : $@thick Any.Type):
   %a = metatype $@thick NotClass.Type
-  // CHECK: call i1 @swift_dynamicCast({{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast({{.*}})
   checked_cast_br %a : $@thick NotClass.Type to AnyObject, a_yea, a_nay
 a_yea(%1 : $AnyObject):
   %b = metatype $@thick A.Type

@@ -21,10 +21,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
-#include "swift/DependencyScan/ScanDependencies.h"
 #include "Dependencies.h"
 #include "TBD.h"
-#include "swift/Subsystems.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,7 +33,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
@@ -47,30 +45,31 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
-#include "swift/Basic/TargetInfo.h"
 #include "swift/ConstExtract/ConstExtract.h"
-#include "swift/Option/Options.h"
-#include "swift/Frontend/Frontend.h"
+#include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
-#include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
-#include "swift/Option/Options.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "swift/Migrator/Migrator.h"
+#include "swift/Option/Options.h"
 #include "swift/PrintAsClang/PrintAsClang.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/TBDGen/TBDGen.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringMap.h"
@@ -181,15 +180,15 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
 /// \see swift::printAsClangHeader
 static bool printAsClangHeaderIfNeeded(StringRef outputPath, ModuleDecl *M,
                                        StringRef bridgingHeader,
-                                       bool ExposePublicDeclsInClangHeader,
+                                       const FrontendOptions &frontendOpts,
                                        const IRGenOptions &irGenOpts) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(
-      M->getDiags(), outputPath, [&](raw_ostream &out) -> bool {
-        return printAsClangHeader(out, M, bridgingHeader,
-                                  ExposePublicDeclsInClangHeader, irGenOpts);
-      });
+  return withOutputFile(M->getDiags(), outputPath,
+                        [&](raw_ostream &out) -> bool {
+                          return printAsClangHeader(out, M, bridgingHeader,
+                                                    frontendOpts, irGenOpts);
+                        });
 }
 
 /// Prints the stable module interface for \p M to \p outputPath.
@@ -423,6 +422,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
                           .SupplementaryOutputs.ABIDescriptorOutputPath;
+  bool IgnoreAdjacentModules = Instance.hasASTContext() &&
+                               Instance.getASTContext().IgnoreAdjacentModules;
 
   // If an explicit interface build was requested, bypass the creation of a new
   // sub-instance from the interface which will build it in a separate thread,
@@ -444,7 +445,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getOutputFilename(), ABIPath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
-      RequireOSSAModules_t(Invocation.getSILOptions()));
+      RequireOSSAModules_t(Invocation.getSILOptions()),
+      IgnoreAdjacentModules);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -936,8 +938,8 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     }
     hadAnyError |= printAsClangHeaderIfNeeded(
         Invocation.getClangHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), BridgingHeaderPathForPrint,
-        opts.ExposePublicDeclsInClangHeader, Invocation.getIRGenOptions());
+        Instance.getMainModule(), BridgingHeaderPathForPrint, opts,
+        Invocation.getIRGenOptions());
   }
 
   // Only want the header if there's been any errors, ie. there's not much
@@ -2276,8 +2278,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
   // arguments are generated by the driver, not directly by a user. The driver
-  // is responsible for emitting diagnostics for its own errors. See SR-2683
-  // for details.
+  // is responsible for emitting diagnostics for its own errors.
+  // See https://github.com/apple/swift/issues/45288 for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
         Invocation.getFrontendOptions().InputsAndOutputs);

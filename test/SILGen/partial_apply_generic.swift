@@ -14,21 +14,21 @@ protocol Foo {
 
 // CHECK-LABEL: sil hidden [ossa] @$s21partial_apply_generic14getStaticFunc1{{[_0-9a-zA-Z]*}}F
 func getStaticFunc1<T: Foo>(t: T.Type) -> () -> () {
-// CHECK: function_ref @$s21partial_apply_generic14getStaticFunc11tyycxm_tAA3FooRzlFyycxmcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@thick τ_0_0.Type) -> @owned @callee_guaranteed () -> ()
+// CHECK: function_ref @$s21partial_apply_generic14getStaticFunc11tyycxm_tAA3FooRzlFyycfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@thick τ_0_0.Type) -> ()
   return t.staticFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic14getStaticFunc11tyycxm_tAA3FooRzlFyycxmcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
+// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic14getStaticFunc11tyycxm_tAA3FooRzlFyycfu_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
 // CHECK: witness_method $T, #Foo.staticFunc :
 
 
 // CHECK-LABEL: sil hidden [ossa] @$s21partial_apply_generic14getStaticFunc2{{[_0-9a-zA-Z]*}}F
 func getStaticFunc2<T: Foo>(t: T) -> () -> () {
-// CHECK: function_ref @$s21partial_apply_generic14getStaticFunc21tyycx_tAA3FooRzlFyycxmcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@thick τ_0_0.Type) -> @owned @callee_guaranteed () -> ()
+// CHECK: function_ref @$s21partial_apply_generic14getStaticFunc21tyycx_tAA3FooRzlFyycfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@thick τ_0_0.Type) -> ()
   return T.staticFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic14getStaticFunc21tyycx_tAA3FooRzlFyycxmcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
+// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic14getStaticFunc21tyycx_tAA3FooRzlFyycfu_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
 // CHECK: witness_method $T, #Foo.staticFunc :
 
 

@@ -162,12 +162,8 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   // If an SDK path was explicitly passed to Swift, make sure to pass it to
   // Clang driver as well. It affects the resulting include paths.
   auto sdkPath = ctx.SearchPathOpts.getSDKPath();
-  if (!sdkPath.empty()) {
-    unsigned argIndex = clangDriverArgs.MakeIndex("--sysroot", sdkPath);
-    clangDriverArgs.append(new llvm::opt::Arg(
-        clangDriver.getOpts().getOption(clang::driver::options::OPT__sysroot),
-        sdkPath, argIndex));
-  }
+  if (!sdkPath.empty())
+    clangDriver.SysRoot = sdkPath.str();
   return clangDriverArgs;
 }
 
@@ -210,13 +206,6 @@ getGlibcFileMapping(ASTContext &ctx) {
     actualModuleMapPath = path.getValue();
   else
     // FIXME: Emit a warning of some kind.
-    return {};
-
-  // Only inject the module map if it actually exists. It may not, for example
-  // if `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
-  // a Swift compiler not built for Linux targets.
-  if (!llvm::sys::fs::exists(actualModuleMapPath))
-    // FIXME: emit a warning of some kind.
     return {};
 
   // TODO: remove the SwiftGlibc.h header and reference all Glibc headers

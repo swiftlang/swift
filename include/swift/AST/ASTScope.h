@@ -128,6 +128,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class GenericTypeOrExtensionWherePortion;
   friend class IterableTypeBodyPortion;
   friend class ScopeCreator;
+  friend class ASTSourceFileScope;
 
 #pragma mark - tree state
 protected:
@@ -203,7 +204,7 @@ private:
 
 #pragma mark common queries
 public:
-  virtual NullablePtr<ClosureExpr> getClosureIfClosureScope() const;
+  virtual NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const;
   virtual ASTContext &getASTContext() const;
   virtual NullablePtr<Decl> getDeclIfAny() const { return nullptr; };
   virtual NullablePtr<Stmt> getStmtIfAny() const { return nullptr; };
@@ -1032,9 +1033,9 @@ public:
 /// For a closure with named parameters, this scope does the local bindings.
 class ClosureParametersScope final : public ASTScopeImpl {
 public:
-  ClosureExpr *const closureExpr;
+  AbstractClosureExpr *const closureExpr;
 
-  ClosureParametersScope(ClosureExpr *closureExpr)
+  ClosureParametersScope(AbstractClosureExpr *closureExpr)
       : closureExpr(closureExpr) {}
   virtual ~ClosureParametersScope() {}
 
@@ -1042,7 +1043,7 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
-  NullablePtr<ClosureExpr> getClosureIfClosureScope() const override {
+  NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const override {
     return closureExpr;
   }
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
@@ -1541,7 +1542,7 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
-  NullablePtr<ClosureExpr> parentClosureIfAny() const; // public??
+  NullablePtr<AbstractClosureExpr> parentClosureIfAny() const; // public??
   Stmt *getStmt() const override { return stmt; }
 
 protected:

@@ -91,13 +91,14 @@ void SILFunctionBuilder::addFunctionAttributes(
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind,
-          targetFunction, spiGroupIdent,
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, targetFunction, spiGroupIdent,
           attributedFuncDecl->getModuleContext(), availability));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
+          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          SA->isExported(), kind, nullptr, spiGroupIdent,
+          attributedFuncDecl->getModuleContext(), availability));
     }
   }
 
@@ -139,8 +140,8 @@ void SILFunctionBuilder::addFunctionAttributes(
       }
     }
     for (const EffectsAttr *effectsAttr : llvm::reverse(customEffects)) {
-      auto error = F->parseEffects(effectsAttr->getCustomString(),
-                            /*fromSIL*/ false, /*isDerived*/ false, paramNames);
+      auto error = F->parseArgumentEffectsFromSource(
+                                effectsAttr->getCustomString(), paramNames);
       if (error.first) {
         SourceLoc loc = effectsAttr->getCustomStringLocation();
         if (loc.isValid())
@@ -308,10 +309,13 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
-    if (constant.isForeign && decl->hasClangNode())
+    if (constant.isForeign && decl->hasClangNode() &&
+        !decl->getObjCImplementationDecl())
       F->setClangNodeOwner(decl);
 
-    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    if (auto availability = constant.getAvailabilityForLinkage())
+      F->setAvailabilityForLinkage(*availability);
+
     F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {

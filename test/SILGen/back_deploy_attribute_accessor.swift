@@ -8,12 +8,12 @@
 @available(macOS 10.50, *)
 public struct TopLevelStruct {
   // -- Fallback definition for TopLevelStruct.property.getter
-  // CHECK-LABEL: sil non_abi [serialized] [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvgTwB : $@convention(method) (TopLevelStruct) -> TopLevelStruct
+  // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvgTwB : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   // CHECK: bb0([[SELF:%.*]] : $TopLevelStruct):
   // CHECK:   return [[SELF]] : $TopLevelStruct
 
   // -- Back deployment thunk for TopLevelStruct.property.getter
-  // CHECK-LABEL: sil non_abi [serialized] [thunk] [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvgTwb : $@convention(method) (TopLevelStruct) -> TopLevelStruct
+  // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvgTwb : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   // CHECK: bb0([[BB0_ARG:%.*]] : $TopLevelStruct):
   // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
   // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
@@ -36,7 +36,7 @@ public struct TopLevelStruct {
   // CHECK:   return [[RETURN_BB_ARG]] : $TopLevelStruct
 
   // -- Original definition of TopLevelStruct.property.getter
-  // CHECK-LABEL: sil [available 10.51] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
+  // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvg : $@convention(method) (TopLevelStruct) -> TopLevelStruct
   @available(macOS 10.51, *)
   @_backDeploy(before: macOS 10.52)
   public var property: TopLevelStruct { self }

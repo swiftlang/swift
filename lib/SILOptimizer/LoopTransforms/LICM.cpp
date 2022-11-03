@@ -197,7 +197,7 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
 }
 
 /// Returns true if \p sideEffectInst cannot be reordered with a call to a
-/// global initialier.
+/// global initializer.
 static bool mayConflictWithGlobalInit(AliasAnalysis *AA,
                     SILInstruction *sideEffectInst, ApplyInst *globalInitCall) {
   if (auto *SI = dyn_cast<StoreInst>(sideEffectInst)) {
@@ -210,7 +210,7 @@ static bool mayConflictWithGlobalInit(AliasAnalysis *AA,
 }
 
 /// Returns true if any of the instructions in \p sideEffectInsts which are
-/// post-dominated by a call to a global initialier cannot be reordered with
+/// post-dominated by a call to a global initializer cannot be reordered with
 /// the call.
 static bool mayConflictWithGlobalInit(AliasAnalysis *AA,
                        InstSet &sideEffectInsts,
@@ -234,7 +234,7 @@ static bool mayConflictWithGlobalInit(AliasAnalysis *AA,
 }
 
 /// Returns true if any of the instructions in \p sideEffectInsts cannot be
-/// reordered with a call to a global initialier (which is in the same basic
+/// reordered with a call to a global initializer (which is in the same basic
 /// block).
 static bool mayConflictWithGlobalInit(AliasAnalysis *AA,
                        ArrayRef<SILInstruction *> sideEffectInsts,
@@ -1324,7 +1324,7 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
 
       // If a store just stores the loaded value, bail. The operand (= the load)
       // will be removed later, so it cannot be used as available value.
-      // This corner case is suprisingly hard to handle, so we just give up.
+      // This corner case is surprisingly hard to handle, so we just give up.
       if (isLoadWithinAccess(dyn_cast<LoadInst>(SI->getSrc()), accessPath))
         return;
 

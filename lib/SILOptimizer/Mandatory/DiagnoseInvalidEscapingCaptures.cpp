@@ -148,6 +148,10 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 }
 
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
+  // Look through mark must check.
+  if (auto *mmci = dyn_cast<MarkMustCheckInst>(value))
+    value = mmci->getOperand();
+
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *decl = dyn_cast_or_null<ParamDecl>(arg->getDecl()))
       return decl;
@@ -262,6 +266,13 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
 
     if (isIncidentalUse(user) || onlyAffectsRefCount(user))
       continue;
+
+    // Look through mark must check inst.
+    if (auto *mmci = dyn_cast<MarkMustCheckInst>(user)) {
+      for (auto *use : mmci->getUses())
+        uselistInsert(use);
+      continue;
+    }
 
     // Look through copies, borrows, and conversions.
     if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {

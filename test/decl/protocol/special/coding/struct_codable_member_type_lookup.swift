@@ -653,7 +653,8 @@ struct GenericCodableStruct<T : Codable> : Codable {}
 
 func foo(_: GenericCodableStruct<Int>.CodingKeys) // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
-struct sr6886 {
+// https://github.com/apple/swift/issues/49435
+struct S_49435 {
   struct Nested : Codable {}
   let Nested: Nested // Don't crash with a coding key that is the same as a nested type name
 }

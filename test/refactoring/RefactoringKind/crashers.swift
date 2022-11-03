@@ -39,7 +39,7 @@ func test_42098130<T>(e1: T, e2: E_42098130) {
 // RUN: %refactor -source-filename %s -pos=32:3 | %FileCheck %s -check-prefix=CHECK3
 // CHECK3: Action begins
 
-// SR-13000
+// https://github.com/apple/swift/issues/55445
 enum Foo {}
 typealias Bar = (Any, Any) -> Foo
 extension /*invoke here:*/Bar {}

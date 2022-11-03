@@ -33,7 +33,7 @@ umask 0022
 # The --skip-build parameter, with no product name, does not affect the
 # configuration (CMake parameters). You can turn this option on and
 # off in different invocations of the script for the same build
-# directory without affecting configutation.
+# directory without affecting configuration.
 #
 # skip-build-* and build-* parameters affect the CMake configuration
 # (enable/disable those components).
@@ -62,6 +62,7 @@ KNOWN_SETTINGS=(
     build-args                                    ""                "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                                     ""                "out-of-tree build directory; default is in-tree. **This argument is required**"
     build-jobs                                    ""                "The number of parallel build jobs to use"
+    lit-jobs                                      ""                "The number of workers to use when testing with lit"
     build-runtime-with-host-compiler              ""                "use the host c++ compiler to build everything"
     build-stdlib-deployment-targets               "all"             "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
     build-toolchain-only                          ""                "If set, only build the necessary tools to build an external toolchain"
@@ -203,6 +204,7 @@ KNOWN_SETTINGS=(
     swift-implicit-concurrency-import             "1"               "whether to implicitly import the Swift concurrency module"
     swift-stdlib-support-back-deployment          "1"               "whether to support back-deployment of built binaries to older OS versions"
     swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
+    swift-stdlib-reflection-metadata              "enabled"         "whether to build stdlib with runtime metadata (valid options are 'enabled', 'disabled' and 'debugger-only')"
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
     swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
@@ -229,6 +231,7 @@ KNOWN_SETTINGS=(
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
     swift-enable-experimental-string-processing   "1"               "whether to build experimental string processing feature"
+    swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -735,7 +738,6 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
-                -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
                 -DCMAKE_OSX_ARCHITECTURES="${architecture}"
             )
@@ -830,10 +832,10 @@ function set_build_options_for_host() {
     )
 
     llvm_cmake_options+=(
-        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
     swift_cmake_options+=(
-        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${LIT_JOBS}"
     )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
@@ -850,6 +852,16 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
+
+    if [[ "$(true_false ${SWIFT_EARLYSWIFTSYNTAX})" == "TRUE" ]]; then
+        early_swiftsyntax_build_dir="$(build_directory ${host} earlyswiftsyntax)"
+        swift_cmake_options+=(
+            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
+        )
+        lldb_cmake_options+=(
+            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
+        )
+    fi
 }
 
 function configure_default_options() {
@@ -1082,7 +1094,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv5 | linux-armv6 | linux-armv7 | android-* | openbsd-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1233,7 +1245,8 @@ LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR="${WORKSPACE}/swift-experimental-string-processing"
-LIBXML2_SOURCE_DIR="${WORKSPACE}/libxml2"
+SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
+SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
 # We cannot currently apply the normal rules of skipping here for LLVM. Even if
 # we are skipping building LLVM, we still need to at least build a few tools
@@ -1605,6 +1618,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 -DCMAKE_BUILD_WITH_INSTALL_RPATH="1"
             )
         fi
+
+        if [[ "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
+            llvm_cmake_options=(
+                "${llvm_cmake_options[@]}"
+                -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
+            )
+        fi
     fi
 
     llvm_cmake_options=(
@@ -1811,6 +1831,15 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 cmake_options+=(
                     -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
+                    # In the near future we are aiming to build compiler-rt with
+                    # LLVM_ENABLE_RUNTIMES
+                    # Until that happens, we need to unset this variable from
+                    # LLVM CMakeCache.txt for two reasons
+                    # * prevent PRs testing this variable to affect other runs landing
+                    #   unrelated features
+                    # * avoid fallouts should we land such change and then have to revert
+                    #   it to account for unforeseen regressions
+                    -ULLVM_ENABLE_RUNTIMES
                 )
 
                 # NOTE: This is not a dead option! It is relied upon for certain
@@ -1884,6 +1913,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
                         -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
+                    )
+                fi
+
+                if [[ $(is_cross_tools_host ${host}) && "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_TOOLCHAIN_FILE="${OPENBSD_USE_TOOLCHAIN_FILE}"
                     )
                 fi
 
@@ -1988,6 +2024,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_TRAP_FUNCTION:STRING="${SWIFT_STDLIB_TRAP_FUNCTION}"
                     -DSWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK}")
                     -DSWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES:BOOL=$(true_false "${SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES}")
+                    -DSWIFT_STDLIB_REFLECTION_METADATA:STRING="${SWIFT_STDLIB_REFLECTION_METADATA}"
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -2008,6 +2045,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
                     "${swift_cmake_options[@]}"
                 )
 
@@ -2934,7 +2972,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : int($2/2) }')"
+                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${LIT_JOBS} '{ print (N < $2) ? N : int($2/2) }')"
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"
@@ -3426,10 +3464,10 @@ for host in "${ALL_HOSTS[@]}"; do
         # The usage for this script says that lipo happens before
         # dsym extraction but that's not really what happens.  At this point,
         # we're processing an individual host (eg macosx-x86_64) but targeting
-        # the (shared) SYMROOT which can cause mutliple hosts to stomp on each
+        # the (shared) SYMROOT which can cause multiple hosts to stomp on each
         # other.  As a hack, I'm segregating the hosts in the symroot but it
         # would probably be better to make the script behave as the usage
-        # descibes
+        # describes
         host_symroot="${INSTALL_SYMROOT}/${host}"
 
         set -x

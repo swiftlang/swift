@@ -187,19 +187,19 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
 
       AsyncClosureChecker(const ClosureExpr *Target) : Target(Target) {}
 
-      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (E == Target)
-          return {false, E};
+          return Action::SkipChildren(E);
 
         if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
           if (conversionExpr->getSubExpr() == Target) {
             if (conversionExpr->getType()->is<AnyFunctionType>() &&
                 conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
               Result = true;
-            return {false, E};
+            return Action::SkipChildren(E);
           }
         }
-        return {true, E};
+        return Action::Continue(E);
       }
     } checker(closure);
     closure->getParent()->walkContext(checker);
@@ -755,8 +755,18 @@ void CompletionLookup::analyzeActorIsolation(
     }
     LLVM_FALLTHROUGH;
   case ActorIsolation::GlobalActor: {
-    auto contextIsolation =
-        getActorIsolationOfContext(const_cast<DeclContext *>(CurrDeclContext));
+    auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
+      // Prefer solution-specific actor-isolations and fall back to the one
+      // recorded in the AST.
+      auto isolation = ClosureActorIsolations.find(CE);
+      if (isolation != ClosureActorIsolations.end()) {
+        return isolation->second;
+      } else {
+        return CE->getActorIsolation();
+      }
+    };
+    auto contextIsolation = getActorIsolationOfContext(
+        const_cast<DeclContext *>(CurrDeclContext), getClosureActorIsolation);
     if (contextIsolation != isolation) {
       implicitlyAsync = true;
     }
@@ -1871,6 +1881,20 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   return true;
 }
 
+void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
+                                                  DeclVisibilityKind Reason) {
+
+  // Remember the decl name to
+  SmallString<32> buffer;
+  llvm::raw_svector_ostream OS(buffer);
+  PrintOptions PS = PrintOptions::printDocInterface();
+  PS.FullyQualifiedTypes = true;
+  NTD->getDeclaredType()->print(OS, PS);
+  NullTerminatedStringRef qualifiedName(
+      buffer, *CompletionContext->getResultSink().Allocator);
+  CompletionContext->LookedupNominalTypeNames.push_back(qualifiedName);
+}
+
 void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                                  DynamicLookupInfo dynamicLookupInfo) {
   assert(Reason !=
@@ -2081,9 +2105,7 @@ bool CompletionLookup::handleEnumElement(ValueDecl *D,
                       /*HasTypeContext=*/true);
     return true;
   } else if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    llvm::DenseSet<EnumElementDecl *> Elements;
-    ED->getAllElements(Elements);
-    for (auto *Ele : Elements) {
+    for (auto *Ele : ED->getAllElements()) {
       addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
     }
@@ -3170,9 +3192,9 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
     LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
         : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return {false, S};
+        return Action::SkipChildren(S);
 
       if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
         if (LS->getLabelInfo()) {
@@ -3184,15 +3206,17 @@ void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
         }
       }
 
-      return {true, S};
+      return Action::Continue(S);
     }
 
-    Stmt *walkToStmtPost(Stmt *S) override { return nullptr; }
+    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+      return Action::Stop();
+    }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return {false, E};
-      return {true, E};
+        return Action::SkipChildren(E);
+      return Action::Continue(E);
     }
   } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
   const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);

@@ -182,7 +182,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for structs.
-  if (T->is<StructType>()) {
+  if (auto *SD = T->getStructOrBoundGenericStruct()) {
     diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
         .highlight(TypeRange)
         .limitBehavior(behavior);
@@ -291,9 +291,16 @@ static void diagnoseFunctionParamNotRepresentable(
           .limitBehavior(behavior));
   }
   SourceRange SR;
-  if (auto typeRepr = P->getTypeRepr())
-    SR = typeRepr->getSourceRange();
-  diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR, behavior);
+
+  if (P->hasAttachedPropertyWrapper()) {
+    auto wrapperTy = P->getPropertyWrapperBackingPropertyType();
+    SR = P->getOutermostAttachedPropertyWrapper()->getRange();
+    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior);
+  } else {
+    if (auto typeRepr = P->getTypeRepr())
+      SR = typeRepr->getSourceRange();
+    diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR, behavior);
+  }
   Reason.describe(AFD);
 }
 
@@ -335,11 +342,17 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
 
     if (param->getType()->hasError())
       return false;
-    
-    if (param->getType()->isRepresentableIn(
+
+    if (param->hasAttachedPropertyWrapper()) {
+      if (param->getPropertyWrapperBackingPropertyType()->isRepresentableIn(
           ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD)))
+        continue;
+    } else if (param->getType()->isRepresentableIn(
+          ForeignLanguage::ObjectiveC,
+          const_cast<AbstractFunctionDecl *>(AFD))) {
       continue;
+    }
 
     // Permit '()' when this method overrides a method with a
     // foreign error convention that replaces NSErrorPointer with ()
@@ -2448,11 +2461,26 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   auto methods = conflict.typeDecl->lookupDirect(conflict.selector,
                                                  conflict.isInstanceMethod);
 
+  // Find async alternatives for each.
+  llvm::SmallDenseMap<AbstractFunctionDecl *, AbstractFunctionDecl *>
+    asyncAlternatives;
+  for (auto method : methods) {
+    if (isa<ProtocolDecl>(method->getDeclContext())) {
+      if (auto alt = method->getAsyncAlternative())
+        asyncAlternatives[method] = alt;
+    }
+  }
+
   // Erase any invalid or stub declarations. We don't want to complain about
   // them, because we might already have complained about redeclarations
   // based on Swift matching.
-  llvm::erase_if(methods, [](AbstractFunctionDecl *afd) -> bool {
+  llvm::erase_if(methods,
+                 [&asyncAlternatives](AbstractFunctionDecl *afd) -> bool {
     if (afd->isInvalid())
+      return true;
+
+    // If there is an async alternative, remove this entry.
+    if (asyncAlternatives.count(afd))
       return true;
 
     if (auto ad = dyn_cast<AccessorDecl>(afd))
@@ -2462,6 +2490,7 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
       if (ctor->hasStubImplementation())
         return true;
     }
+
     return false;
   });
 
