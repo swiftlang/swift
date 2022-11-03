@@ -256,6 +256,11 @@ public:
                                     : funcTy->getNumResults();
   }
 
+  /// Like getNumDirectSILResults but @out tuples, which are not flattened in
+  /// the return type, are recursively flattened in the count.
+  template <bool _ = false>
+  unsigned getNumExpandedDirectSILResults(TypeExpansionContext context) const;
+
   struct DirectSILResultFilter {
     bool loweredAddresses;
     DirectSILResultFilter(bool loweredAddresses)
@@ -427,6 +432,34 @@ SILFunctionConventions::getDirectSILResultTypes(
     TypeExpansionContext context) const {
   return llvm::map_range(getDirectSILResults(),
                          SILResultTypeFunc(*this, context));
+}
+
+template <bool _>
+unsigned SILFunctionConventions::getNumExpandedDirectSILResults(
+    TypeExpansionContext context) const {
+  if (silConv.loweredAddresses)
+    return funcTy->getNumDirectFormalResults();
+  unsigned retval = 0;
+  // Worklist of elements to flatten or count.
+  SmallVector<SILType, 4> flattenedElements;
+  // Seed the worklist with the direct results.
+  for (auto result : getDirectSILResultTypes(context)) {
+    flattenedElements.push_back(result);
+  }
+  // Pop elements from the worklist and either increment the count or, if the
+  // type is a tuple, add its elements to the worklist.
+  while (!flattenedElements.empty()) {
+    auto ty = flattenedElements.pop_back_val();
+    if (auto tupleType = ty.getASTType()->getAs<TupleType>()) {
+      for (auto index :
+           llvm::reverse(indices(tupleType->getElementTypes()))) {
+        flattenedElements.push_back(ty.getTupleElementType(index));
+      }
+    } else {
+      retval += 1;
+    }
+  }
+  return retval;
 }
 
 struct SILFunctionConventions::SILParameterTypeFunc {

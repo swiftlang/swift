@@ -1714,13 +1714,13 @@ namespace {
 /// object arguments with address-type arguments.
 class CallArgRewriter {
   AddressLoweringState &pass;
-  FullApplySite apply;
+  ApplySite apply;
   SILLocation callLoc;
   SILBuilder argBuilder;
   AddressMaterialization addrMat;
 
 public:
-  CallArgRewriter(FullApplySite apply, AddressLoweringState &pass)
+  CallArgRewriter(ApplySite apply, AddressLoweringState &pass)
       : pass(pass), apply(apply), callLoc(apply.getLoc()),
         argBuilder(pass.getBuilder(apply.getInstruction()->getIterator())),
         addrMat(pass, argBuilder) {}
@@ -2599,6 +2599,10 @@ protected:
     CallArgRewriter(applyInst, pass).rewriteIndirectArgument(use);
   }
 
+  void visitPartialApplyInst(PartialApplyInst *pai) {
+    CallArgRewriter(pai, pass).rewriteIndirectArgument(use);
+  }
+
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteIndirectArgument(use);
   }
@@ -2611,6 +2615,19 @@ protected:
   void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
     SILValue opAddr = addrMat.materializeAddress(use->get());
     vmi->setOperand(opAddr);
+  }
+
+  void visitBuiltinInst(BuiltinInst *bi) {
+    switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
+    case BuiltinValueKind::Copy: {
+      SILValue opAddr = addrMat.materializeAddress(use->get());
+      bi->setOperand(0, opAddr);
+      break;
+    }
+    default:
+      bi->dump();
+      llvm::report_fatal_error("^^^ Unimplemented builtin opaque value use.");
+    }
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
@@ -3106,6 +3123,22 @@ protected:
   void visitBeginApplyInst(BeginApplyInst *bai) {
     CallArgRewriter(bai, pass).rewriteArguments();
     ApplyRewriter(bai, pass).convertBeginApplyWithOpaqueYield();
+  }
+
+  void visitBuiltinInst(BuiltinInst *bi) {
+    switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
+    case BuiltinValueKind::Copy: {
+      SILValue addr = addrMat.materializeAddress(bi);
+      builder.createBuiltin(
+          bi->getLoc(), bi->getName(),
+          SILType::getEmptyTupleType(bi->getType().getASTContext()),
+          bi->getSubstitutions(), {addr, bi->getOperand(0)});
+      break;
+    }
+    default:
+      bi->dump();
+      llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
+    }
   }
 
   // Rewrite the apply for an indirect result.

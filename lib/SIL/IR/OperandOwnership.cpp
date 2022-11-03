@@ -821,7 +821,14 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
-BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
+OperandOwnership OperandOwnershipBuiltinClassifier::visitCopy(BuiltinInst *bi,
+                                                              StringRef) {
+  if (bi->getFunction()->getConventions().useLoweredAddresses()) {
+    return OperandOwnership::UnownedInstantaneousUse;
+  } else {
+    return OperandOwnership::DestroyingConsume;
+  }
+}
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLetWithLocalBuffer)
