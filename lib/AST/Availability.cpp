@@ -579,10 +579,10 @@ AvailabilityContext ASTContext::getSwiftFutureAvailability() {
         VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isiOS()) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(99, 0, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else if (target.isWatchOS()) {
     return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(9, 99, 0)));
+        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
   } else {
     return AvailabilityContext::alwaysAvailable();
   }
