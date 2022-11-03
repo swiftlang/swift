@@ -1714,13 +1714,13 @@ namespace {
 /// object arguments with address-type arguments.
 class CallArgRewriter {
   AddressLoweringState &pass;
-  FullApplySite apply;
+  ApplySite apply;
   SILLocation callLoc;
   SILBuilder argBuilder;
   AddressMaterialization addrMat;
 
 public:
-  CallArgRewriter(FullApplySite apply, AddressLoweringState &pass)
+  CallArgRewriter(ApplySite apply, AddressLoweringState &pass)
       : pass(pass), apply(apply), callLoc(apply.getLoc()),
         argBuilder(pass.getBuilder(apply.getInstruction()->getIterator())),
         addrMat(pass, argBuilder) {}
@@ -2597,6 +2597,10 @@ protected:
   // Opaque call argument.
   void visitApplyInst(ApplyInst *applyInst) {
     CallArgRewriter(applyInst, pass).rewriteIndirectArgument(use);
+  }
+
+  void visitPartialApplyInst(PartialApplyInst *pai) {
+    CallArgRewriter(pai, pass).rewriteIndirectArgument(use);
   }
 
   void visitBeginApplyInst(BeginApplyInst *bai) {
