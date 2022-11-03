@@ -4,6 +4,7 @@
 
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))
 

@@ -4,6 +4,7 @@
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: asserts
 
 @propertyWrapper
 struct Wrapper<Value> {

@@ -6,6 +6,7 @@
 
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 print(#customStringify(3 + 2 - 1))
 
