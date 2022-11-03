@@ -467,6 +467,15 @@ InOutConversionScope::~InOutConversionScope() {
 void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 
+void PhysicalPathComponent::set(SILGenFunction &SGF, SILLocation loc,
+                                ArgumentSource &&value, ManagedValue base) && {
+  auto finalDestAddr = std::move(*this).project(SGF, loc, base);
+  assert(finalDestAddr.getType().isAddress());
+
+  auto srcRValue = std::move(value).getAsRValue(SGF).ensurePlusOne(SGF, loc);
+  std::move(srcRValue).assignInto(SGF, loc, finalDestAddr.getValue());
+}
+
 void PathComponent::dump() const {
   dump(llvm::errs());
 }
@@ -4899,12 +4908,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   
   // Write to the tail component.
   if (component.isPhysical()) {
-    auto finalDestAddr =
-      std::move(component).project(*this, loc, destAddr);
-    assert(finalDestAddr.getType().isAddress());
-
-    auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
-    std::move(value).assignInto(*this, loc, finalDestAddr.getValue());
+    std::move(component.asPhysical()).set(*this, loc, std::move(src), destAddr);
   } else {
     std::move(component.asLogical()).set(*this, loc, std::move(src), destAddr);
   }

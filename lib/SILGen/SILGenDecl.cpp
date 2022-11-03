@@ -30,6 +30,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -1601,21 +1602,57 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
     case StmtConditionElement::CK_HasSymbol: {
       auto info = elt.getHasSymbolInfo();
-      assert(!info->isInvalid());
+      if (info->isInvalid()) {
+        // This condition may have referenced a decl that isn't valid in some
+        // way but for developer convenience wasn't treated as an error. Just
+        // emit a 'true' condition value.
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        booleanTestValue = B.createIntegerLiteral(loc, i1, 1);
+        break;
+      }
+
       auto expr = info->getSymbolExpr();
       auto declRef = info->getReferencedDecl();
       assert(declRef);
 
-      auto queryFunc = declRef.getDecl()->getHasSymbolQueryDecl();
+      auto decl = declRef.getDecl();
+      getModule().addHasSymbolDecl(decl);
+
       SILFunction *silFn = SGM.getFunction(
-          SILDeclRef(queryFunc, SILDeclRef::Kind::Func), NotForDefinition);
+          SILDeclRef(decl->getHasSymbolQueryDecl(), SILDeclRef::Kind::Func),
+          NotForDefinition);
       SILValue fnRef = B.createFunctionRefFor(loc, silFn);
       booleanTestValue = B.createApply(loc, fnRef, {}, {});
       booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
 
-      // FIXME: Add decl to list of decls that need a has symbol query
-      //        function to be emitted during IRGen.
+      // Ensure that function declarations for each function associated with
+      // the decl are emitted so that they can be referenced during IRGen.
+      class SymbolVisitor : public SILSymbolVisitor {
+        SILGenModule &SGM;
+
+      public:
+        SymbolVisitor(SILGenModule &SGM) : SGM{SGM} {};
+
+        void addFunction(SILDeclRef declRef) override {
+          (void)SGM.getFunction(declRef, NotForDefinition);
+        }
+
+        virtual void addFunction(StringRef name, SILDeclRef declRef) override {
+          // The kinds of functions which go through this callback (e.g.
+          // differentiability witnesses) can't be forward declared with a
+          // SILDeclRef alone. For now, just ignore them.
+          //
+          // Ideally, this callback will be removed entirely in favor of
+          // SILDeclRef being able to represent all function variants.
+        }
+      };
+
+      SILSymbolVisitorOptions opts;
+      opts.VisitMembers = false;
+      auto visitorCtx =
+          SILSymbolVisitorContext(getModule().getSwiftModule(), opts);
+      SymbolVisitor(SGM).visitDecl(decl, visitorCtx);
       break;
     }
     }

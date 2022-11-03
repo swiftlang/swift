@@ -139,7 +139,7 @@ public:
 
   // --- IRSymbolVisitor ---
 
-  void willVisitDecl(Decl *D) override;
+  bool willVisitDecl(Decl *D) override;
   void didVisitDecl(Decl *D) override;
 
   void addFunction(SILDeclRef declRef) override;

@@ -634,6 +634,11 @@ def enable_experimental_cxx_interop :
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
+def experimental_c_foreign_reference_types :
+  Flag<["-"], "experimental-c-foreign-reference-types">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  HelpText<"Enable experimental C foreign references types (with reference coutning).">;
+
 def enable_experimental_cxx_interop_in_clang_header :
   Flag<["-"], "enable-experimental-cxx-interop-in-clang-header">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
