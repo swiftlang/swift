@@ -362,7 +362,8 @@ public:
       : Visitor{Visitor}, Ctx{Ctx} {}
 
   void visit(Decl *D) {
-    Visitor.willVisitDecl(D);
+    if (!Visitor.willVisitDecl(D))
+      return;
     ASTVisitor::visit(D);
     Visitor.didVisitDecl(D);
   }
@@ -408,12 +409,6 @@ public:
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
-    // A @_silgen_name("...") function without a body only exists to
-    // forward-declare a symbol from another library.
-    if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>()) {
-      return;
-    }
-
     // Add exported prespecialized symbols.
     for (auto *attr : AFD->getAttrs().getAttributes<SpecializeAttr>()) {
       if (!attr->isExported())

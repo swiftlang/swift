@@ -85,13 +85,6 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
-/// A helper for creating pointer-to-struct types.
-static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
-                                                  StringRef name,
-                                  std::initializer_list<llvm::Type*> types) {
-  return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
-}
-
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
