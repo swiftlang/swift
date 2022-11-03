@@ -345,12 +345,9 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 class CxxRecordSemantics
     : public SimpleRequest<CxxRecordSemantics,
                            CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  // Caching
-  bool isCached() const { return true; }
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };
