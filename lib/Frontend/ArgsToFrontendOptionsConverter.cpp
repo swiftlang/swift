@@ -293,6 +293,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   Opts.EnableExperimentalCxxInteropInClangHeader =
       Args.hasArg(OPT_enable_experimental_cxx_interop_in_clang_header);
+  
+  Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
+                                                 OPT_no_strict_implicit_module_context,
+                                                 false);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
