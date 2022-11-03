@@ -1800,7 +1800,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // If the typedef is available in Swift, the user will get ambiguity.
         // It also means they may not have intended this API to be imported like this.
         if (importer::isUnavailableInSwift(typedefType->getDecl(), nullptr, true)) {
-          result.setDeclName(swiftCtx.getIdentifier(typedefType->getDecl()->getName()));
+          StringRef baseName = typedefType->getDecl()->getName();
+          SmallString<16> swiftPrivateScratch;
+          // If this declaration has the swift_private attribute, prepend "__"
+          if (shouldBeSwiftPrivate(*this, D, version,
+                                   result.info.hasAsyncInfo)) {
+            swiftPrivateScratch = "__";
+            swiftPrivateScratch += baseName;
+            baseName = swiftPrivateScratch;
+          }
+
+          result.setDeclName(swiftCtx.getIdentifier(baseName));
           result.setEffectiveContext(D->getDeclContext());
           return result;
         }

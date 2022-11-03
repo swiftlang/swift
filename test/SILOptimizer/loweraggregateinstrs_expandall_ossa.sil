@@ -149,7 +149,7 @@ bb0(%0 : $*E):
 // CHECK: } // end sil function 'expand_copy_addr_takeinit'
 sil [ossa] @expand_copy_addr_takeinit : $@convention(thin) (@in S) -> @out S {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr [take] %1 to [initialization] %0 : $*S
+  copy_addr [take] %1 to [init] %0 : $*S
   %2 = tuple()
   return %2 : $()
 }
@@ -161,7 +161,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK: } // end sil function 'expand_copy_addr_init'
 sil [ossa] @expand_copy_addr_init : $@convention(thin) (@in_guaranteed S) -> @out S {
 bb0(%0 : $*S, %1 : $*S):
-  copy_addr %1 to [initialization] %0 : $*S
+  copy_addr %1 to [init] %0 : $*S
   %2 = tuple()
   return %2 : $()
 }

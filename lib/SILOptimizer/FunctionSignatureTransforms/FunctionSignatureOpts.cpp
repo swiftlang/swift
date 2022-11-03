@@ -61,7 +61,7 @@ using SILParameterInfoList = llvm::SmallVector<SILParameterInfo, 8>;
 using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 
 //===----------------------------------------------------------------------===//
-//                           Optimization Hueristic
+//                           Optimization Heuristic
 //===----------------------------------------------------------------------===//
 
 /// Set to true to enable the support for partial specialization.
@@ -818,7 +818,7 @@ public:
 
     // Never repeat the same function signature optimization on the same
     // function. Multiple function signature optimizations are composed by
-    // successively optmizing the newly created functions. Each optimization
+    // successively optimizing the newly created functions. Each optimization
     // creates a new level of thunk which are all ultimately inlined away.
     //
     // This happens, for example, when a reference to the original function is
@@ -881,7 +881,7 @@ public:
     // The old function must be a thunk now.
     assert(F->isThunk() && "Old function should have been turned into a thunk");
 
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.

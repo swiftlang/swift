@@ -668,7 +668,7 @@ bb0(%0 : @owned $SmallCodesizeStruct):
   return %3 : $Klass
 }
 
-// SILMem2Reg is disabled when there is a load [take] with struct_elemenet_addr/tuple_element_addr
+// SILMem2Reg is disabled when there is a load [take] with struct_element_addr/tuple_element_addr
 // CHECK-LABEL: sil [ossa] @mem2reg_struct_addr_load_take :
 // CHECK: alloc_stack
 // CHECK-LABEL: } // end sil function 'mem2reg_struct_addr_load_take'

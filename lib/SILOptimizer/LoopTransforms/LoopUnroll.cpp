@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
@@ -213,14 +214,14 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
-      if (!Loop->canDuplicate(&Inst))
+      if (!canDuplicateLoopInstruction(Loop, &Inst))
         return false;
       if (instructionInlineCost(Inst) != InlineCost::Free)
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
         if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
-          // If callee is rather big and potentialy inlinable, it may be better
+          // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
         }

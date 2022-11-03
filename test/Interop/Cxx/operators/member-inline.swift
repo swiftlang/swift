@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
-// TODO: Fix CxxShim for Windows.
-// XFAIL: OS=windows-msvc
 
 import MemberInline
 import StdlibUnittest
@@ -42,20 +40,18 @@ OperatorsTestSuite.test("LoadableIntWrapper.plusEqual (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 42)
 
-  let result = lhs += rhs
+  lhs += rhs
 
   expectEqual(lhs.value, 84)
-  expectEqual(result.value, 84)
 }
 
 OperatorsTestSuite.test("LoadableIntWrapper.minusEqual (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 42)
 
-  let result = lhs -= rhs
+  lhs -= rhs
 
   expectEqual(lhs.value, 0)
-  expectEqual(result.value, 0)
 }
 
 OperatorsTestSuite.test("LoadableIntWrapper.unaryMinus (inline)") {
@@ -87,6 +83,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(44, result2.value)
   expectEqual(43, result1.value)
   expectEqual(42, wrapper.value)
+}
+
+OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
+  let lhs = TemplatedWithFriendOperatorSpec()
+  let rhs = TemplatedWithFriendOperatorSpec()
+
+  let result = lhs == rhs
+
+  expectTrue(result)
 }
 
 #if !os(Windows)    // https://github.com/apple/swift/issues/55575

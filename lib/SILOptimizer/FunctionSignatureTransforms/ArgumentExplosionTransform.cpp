@@ -272,7 +272,7 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
   // it is predicted that a leaf will be dead after the owned-to-guaranteed
   // transformation, then the leaf count is decreased.
   //
-  // The owned-to-guaranteed will only be applied to the argumehnt if its
+  // The owned-to-guaranteed will only be applied to the argument if its
   // convention is Direct_Owned.  Additionally, it only applies to non-trivial
   // leaves, which it may kill, so if it is already known that there are no live
   // non-trivial leaves, owned-to-guaranteed will not eliminate anything.

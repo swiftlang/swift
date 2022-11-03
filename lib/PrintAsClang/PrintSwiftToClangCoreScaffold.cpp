@@ -243,10 +243,9 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
         });
     os << "\n";
     // C++ only supports inline variables from C++17.
-    // FIXME: silence the warning instead?
-    os << "#if __cplusplus > 201402L\n";
-    printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                    /*isCForwardDefinition=*/false);
-    os << "#endif\n";
+    ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+      printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                      /*isCForwardDefinition=*/false);
+    });
   });
 }

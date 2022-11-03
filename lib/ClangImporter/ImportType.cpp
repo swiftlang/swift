@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
@@ -1071,29 +1072,13 @@ namespace {
               importedTypeArgs.push_back(importedTypeArg);
             }
           } else {
+            auto *genericEnv = imported->getGenericEnvironment();
+
             for (auto typeParam : imported->getGenericParams()->getParams()) {
-              if (typeParam->getSuperclass() &&
-                  typeParam->getConformingProtocols().empty()) {
-                importedTypeArgs.push_back(typeParam->getSuperclass());
-                continue;
-              }
-
-              SmallVector<Type, 4> memberTypes;
-
-              if (auto superclassType = typeParam->getSuperclass())
-                memberTypes.push_back(superclassType);
-
-              for (auto protocolDecl : typeParam->getConformingProtocols())
-                memberTypes.push_back(protocolDecl->getDeclaredInterfaceType());
-
-              bool hasExplicitAnyObject = false;
-              if (memberTypes.empty())
-                hasExplicitAnyObject = true;
-
-              Type importedTypeArg = ExistentialType::get(
-                  ProtocolCompositionType::get(
-                      Impl.SwiftContext, memberTypes,
-                      hasExplicitAnyObject));
+              Type importedTypeArg = genericEnv->mapTypeIntoContext(
+                  typeParam->getDeclaredInterfaceType())
+                  ->castTo<ArchetypeType>()
+                  ->getExistentialType();
               importedTypeArgs.push_back(importedTypeArg);
             }
           }
@@ -2083,6 +2068,15 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     (clangDecl->hasAttr<clang::CFAuditedTransferAttr>() ||
      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>());
+
+  // C++ operators +=, -=, *=, /= may return a reference to self. This is not
+  // idiomatic in Swift, let's drop these return values.
+  clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
+  if (op == clang::OverloadedOperatorKind::OO_PlusEqual ||
+      op == clang::OverloadedOperatorKind::OO_MinusEqual ||
+      op == clang::OverloadedOperatorKind::OO_StarEqual ||
+      op == clang::OverloadedOperatorKind::OO_SlashEqual)
+    return {SwiftContext.getVoidType(), false};
 
   // Fix up optionality.
   OptionalTypeKind OptionalityOfReturn;

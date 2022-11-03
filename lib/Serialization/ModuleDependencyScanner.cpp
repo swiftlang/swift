@@ -136,6 +136,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
     auto sourceFile = new (Ctx) SourceFile(
         *moduleDecl, SourceFileKind::Interface, bufferID);
+    moduleDecl->addAuxiliaryFile(*sourceFile);
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;

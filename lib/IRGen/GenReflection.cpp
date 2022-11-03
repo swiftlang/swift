@@ -264,10 +264,10 @@ getTypeRefByFunction(IRGenModule &IGM,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
-        bindFromGenericRequirementsBuffer(IGF, requirements,
-            Address(bindingsBufPtr, IGM.getPointerAlignment()),
-            MetadataState::Complete,
-            [&](CanType t) {
+        bindFromGenericRequirementsBuffer(
+            IGF, requirements,
+            Address(bindingsBufPtr, IGM.Int8Ty, IGM.getPointerAlignment()),
+            MetadataState::Complete, [&](CanType t) {
               return genericEnv
                 ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
                 : t;
@@ -421,10 +421,10 @@ IRGenModule::emitWitnessTableRefString(CanType type,
           if (type->hasTypeParameter()) {
             auto bindingsBufPtr = IGF.collectParameters().claimNext();
 
-            bindFromGenericRequirementsBuffer(IGF, requirements,
-                Address(bindingsBufPtr, getPointerAlignment()),
-                MetadataState::Complete,
-                [&](CanType t) {
+            bindFromGenericRequirementsBuffer(
+                IGF, requirements,
+                Address(bindingsBufPtr, Int8Ty, getPointerAlignment()),
+                MetadataState::Complete, [&](CanType t) {
                   return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
                 });
 
@@ -513,8 +513,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Set the low bit.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(
-    addr->getType()->getPointerElementType(), addr, bitConstant);
+  addr = llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
 
   // Update the entry.
   entry = {var, addr};
@@ -1557,6 +1556,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   if (auto *SD = dyn_cast<StructDecl>(D)) {
     if (SD->hasClangNode())
       needsOpaqueDescriptor = true;
+  }
+
+  if (auto *CD = dyn_cast<ClassDecl>(D)) {
+    if (CD->getObjCImplementationDecl())
+      needsFieldDescriptor = false;
   }
 
   // If the type has custom @_alignment, emit a fixed record with the

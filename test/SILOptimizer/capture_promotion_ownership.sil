@@ -272,10 +272,10 @@ sil [ossa] @captureWithinGeneric : $@convention(thin) <T> (@inout Int, @inout In
 bb0(%0 : $*Int, %1 : $*Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  copy_addr %0 to [initialization] %2a : $*Int
+  copy_addr %0 to [init] %2a : $*Int
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  copy_addr %1 to [initialization] %4a : $*Int
+  copy_addr %1 to [init] %4a : $*Int
   %6 = function_ref @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
   // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
   %7 = function_ref @closureWithGenericSignature : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> ()

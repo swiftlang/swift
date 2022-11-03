@@ -1701,11 +1701,24 @@ NominalTypeDecl::lookupDirect(ObjCSelector selector, bool isInstance) {
   return stored.Methods;
 }
 
+static bool inObjCImplExtension(AbstractFunctionDecl *newDecl) {
+  if (auto ext = dyn_cast<ExtensionDecl>(newDecl->getDeclContext()))
+    return ext->isObjCImplementation();
+  return false;
+}
+
 /// If there is an apparent conflict between \p newDecl and one of the methods
 /// in \p vec, should we diagnose it?
 static bool
 shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &vec) {
+  // Conflicts between member implementations and their interfaces, or
+  // inherited inits and their overrides in @_objcImpl extensions, are spurious.
+  if (newDecl->isObjCMemberImplementation()
+      || (isa<ConstructorDecl>(newDecl) && inObjCImplExtension(newDecl)
+          && newDecl->getAttrs().hasAttribute<OverrideAttr>()))
+    return false;
+
   // Are all conflicting methods imported from ObjC and in our ObjC half or a
   // bridging header? Some code bases implement ObjC methods in Swift even
   // though it's not exactly supported.
@@ -2287,7 +2300,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
     }
 
     // Make sure we didn't miss some interesting kind of type declaration.
-    assert(isa<AbstractTypeParamDecl>(typeDecl));
+    assert(isa<GenericTypeParamDecl>(typeDecl) ||
+           isa<AssociatedTypeDecl>(typeDecl));
   }
 
   return nominalDecls;
@@ -2870,11 +2884,9 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     for (auto repr : typeReprs) {
    
       // Allocate a new generic parameter to represent this opaque type.
-      auto gp = GenericTypeParamDecl::create(
-          dc, Identifier(), SourceLoc(), /*isTypeSequence=*/false,
-          GenericTypeParamDecl::InvalidDepth, index++, /*isOpaqueType=*/true,
-          repr);
-      gp->setImplicit();
+      auto *gp = GenericTypeParamDecl::createImplicit(
+          dc, Identifier(), GenericTypeParamDecl::InvalidDepth, index++,
+          /*isParameterPack*/ false, /*isOpaqueType*/ true, repr);
 
       // Use the underlying constraint as the constraint on the generic parameter.
       //  The underlying constraint is only present for OpaqueReturnTypeReprs
@@ -2902,10 +2914,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto &ctx = value->getASTContext();
 
     // Builtin.TheTupleType has a single pack generic parameter: <Elements...>
-    auto *genericParam = GenericTypeParamDecl::create(
-        tupleDecl->getDeclContext(), ctx.Id_Elements, SourceLoc(),
-        /*isTypeSequence=*/true, /*depth=*/0, /*depth=*/0,
-        /*isOpaqueType=*/false, /*opaqueTypeRepr=*/nullptr);
+    auto *genericParam = GenericTypeParamDecl::createImplicit(
+        tupleDecl->getDeclContext(), ctx.Id_Elements, /*depth*/ 0, /*index*/ 0,
+        /*isParameterPack*/ true);
 
     return GenericParamList::create(ctx, SourceLoc(), genericParam,
                                     SourceLoc());
@@ -2945,10 +2956,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = GenericTypeParamDecl::create(
-        proto, selfId, SourceLoc(), /*type sequence=*/false,
-        /*depth=*/0, /*index=*/0, /*opaque type=*/false,
-        /*opaque type repr=*/nullptr);
+    auto selfDecl = GenericTypeParamDecl::createImplicit(
+        proto, selfId, /*depth*/ 0, /*index*/ 0);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };
@@ -2959,6 +2968,20 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                            SourceLoc());
     return result;
+  }
+
+  // AccessorDecl generic parameter list is the same of its storage
+  // context.
+  if (auto *AD = dyn_cast<AccessorDecl>(value)) {
+    auto *GC = AD->getStorage()->getAsGenericContext();
+    if (!GC)
+      return nullptr;
+
+    auto *GP = GC->getGenericParams();
+    if (!GP)
+      return nullptr;
+
+    return GP->clone(AD->getDeclContext());
   }
 
   auto parsedGenericParams = value->getParsedGenericParams();

@@ -83,6 +83,15 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
   return false;
 }
 
+bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
+    const NominalTypeDecl *typeDecl) {
+  if (!typeDecl->isGeneric())
+    return true;
+  printGenericSignatureInnerStaticAsserts(
+      typeDecl->getGenericSignature().getCanonicalSignature());
+  return false;
+}
+
 void ClangSyntaxPrinter::printNominalClangTypeReference(
     const clang::Decl *typeDecl) {
   auto &clangCtx = typeDecl->getASTContext();
@@ -284,6 +293,7 @@ void ClangSyntaxPrinter::printGenericSignature(
                           printGenericTypeParamTypeName(genericParamType);
                         });
   os << ">\n";
+  os << "#ifdef __cpp_concepts\n";
   os << "requires ";
   llvm::interleave(
       signature.getInnermostGenericParams(), os,
@@ -293,7 +303,21 @@ void ClangSyntaxPrinter::printGenericSignature(
         os << ">";
       },
       " && ");
-  os << "\n";
+  os << "\n#endif // __cpp_concepts\n";
+}
+
+void ClangSyntaxPrinter::printGenericSignatureInnerStaticAsserts(
+    const CanGenericSignature &signature) {
+  os << "#ifndef __cpp_concepts\n";
+  llvm::interleave(
+      signature.getInnermostGenericParams(), os,
+      [&](const GenericTypeParamType *genericParamType) {
+        os << "static_assert(swift::isUsableInGenericContext<";
+        printGenericTypeParamTypeName(genericParamType);
+        os << ">, \"type cannot be used in a Swift generic context\");";
+      },
+      "\n");
+  os << "\n#endif // __cpp_concepts\n";
 }
 
 void ClangSyntaxPrinter::printGenericSignatureParams(
@@ -353,4 +377,21 @@ void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
   os << "#elif __has_include(<swiftToCxx/" << headerName << ">)\n";
   os << "#include <swiftToCxx/" << headerName << ">\n";
   os << "#endif\n";
+}
+
+void ClangSyntaxPrinter::printDefine(StringRef macroName) {
+  os << "#define " << macroName << "\n";
+}
+
+void ClangSyntaxPrinter::printIgnoredDiagnosticBlock(
+    StringRef diagName, llvm::function_ref<void()> bodyPrinter) {
+  os << "#pragma clang diagnostic push\n";
+  os << "#pragma clang diagnostic ignored \"-W" << diagName << "\"\n";
+  bodyPrinter();
+  os << "#pragma clang diagnostic pop\n";
+}
+
+void ClangSyntaxPrinter::printIgnoredCxx17ExtensionDiagnosticBlock(
+    llvm::function_ref<void()> bodyPrinter) {
+  printIgnoredDiagnosticBlock("c++17-extensions", bodyPrinter);
 }

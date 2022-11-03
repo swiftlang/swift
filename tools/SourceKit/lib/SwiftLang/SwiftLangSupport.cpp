@@ -26,9 +26,9 @@
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDETool/CompletionInstance.h"
 
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -62,7 +62,7 @@ using swift::index::SymbolRoleSet;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 static UIdent Attr_IBAction("source.decl.attribute.ibaction");
 static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
@@ -377,7 +377,7 @@ UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
   case ide::RefactoringKind::None: llvm_unreachable("cannot end up here.");
 #define REFACTORING(KIND, NAME, ID)                                            \
   case ide::RefactoringKind::KIND: return KindRefactoring##KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
   }
 }
 

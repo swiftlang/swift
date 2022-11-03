@@ -902,8 +902,6 @@ private:
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false,
                                      const SubscriptDecl *SD = nullptr) {
-    printDocumentationComment(AFD);
-
     Optional<ForeignAsyncConvention> asyncConvention =
         AFD->getForeignAsyncConvention();
     Optional<ForeignErrorConvention> errorConvention =
@@ -930,6 +928,7 @@ private:
         return;
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
+      printDocumentationComment(AFD);
       DeclAndTypeClangFunctionPrinter declPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
@@ -978,6 +977,7 @@ private:
       // FIXME: availability
       return;
     }
+    printDocumentationComment(AFD);
 
     if (isClassMethod)
       os << "+ (";
@@ -1379,8 +1379,8 @@ private:
     os << " {\n";
     funcPrinter.printCxxThunkBody(
         FD, funcABI.getSignature(), funcABI.getSymbolName(),
-        FD->getModuleContext(), resultTy, FD->getParameters(),
-        funcTy->isThrowing(), funcTy);
+        /*typeDeclContext=*/nullptr, FD->getModuleContext(), resultTy,
+        FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
   }
 
@@ -2609,7 +2609,8 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   return !VD->isInvalid() && (!requiresExposedAttribute || hasExposeAttr(VD)) &&
          (outputLang == OutputLanguageMode::Cxx
-              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess)
+              ? cxx_translation::isVisibleToCxx(VD, minRequiredAccess) &&
+                    cxx_translation::isExposableToCxx(VD)
               : isVisibleToObjC(VD, minRequiredAccess)) &&
          !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
          !isAsyncAlternativeOfOtherDecl(VD);

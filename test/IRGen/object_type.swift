@@ -36,7 +36,7 @@ func work() {
 // CHECK-IR: call {{.*}} @swift_getObjectType({{.*}}) #[[M:[0-9]+]]
 // CHECK-IR: declare {{.*}} @swift_getObjectType{{.*}} local_unnamed_addr #[[N:[0-9]+]]
 // CHECK-IR: attributes #[[N]] = { mustprogress nofree nounwind readonly willreturn }
-// CHECK-IR: attributes #[[M]] = { nounwind readonly }
+// CHECK-IR: attributes #[[M]] = { nounwind readonly willreturn }
 
 // CHECK: okay
 work()

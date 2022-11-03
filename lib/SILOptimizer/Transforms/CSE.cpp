@@ -1416,7 +1416,7 @@ class SILCSE : public SILFunctionTransform {
     if (C.processLazyPropertyGetters()) {
       // Cleanup the dead blocks from the inlined lazy property getters.
       removeUnreachableBlocks(*Fn);
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     } else if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }

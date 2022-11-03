@@ -97,6 +97,13 @@ public:
         return Action::Continue(expr);
 
       if (auto *wrappedVar = var->getOriginalWrappedProperty()) {
+        // If there is no type it means that the body of the
+        // closure hasn't been resolved yet, so we can
+        // just skip it and wait for \c applyPropertyWrapperToParameter
+        // to assign types.
+        if (wrappedVar->hasImplicitPropertyWrapper())
+          return Action::Continue(expr);
+
         auto outermostWrapperAttr =
             wrappedVar->getOutermostAttachedPropertyWrapper();
 

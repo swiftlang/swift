@@ -297,16 +297,13 @@ namespace {
           auto metadataBytes =
             IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
           auto fieldOffsetPtr = IGF.Builder.CreateInBoundsGEP(
-              metadataBytes->getType()
-                  ->getScalarType()
-                  ->getPointerElementType(),
-              metadataBytes,
+              IGF.IGM.Int8Ty, metadataBytes,
               IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
           fieldOffsetPtr =
             IGF.Builder.CreateBitCast(fieldOffsetPtr,
                                       IGF.IGM.Int32Ty->getPointerTo());
-          llvm::Value *fieldOffset =
-            IGF.Builder.CreateLoad(fieldOffsetPtr, Alignment(4));
+          llvm::Value *fieldOffset = IGF.Builder.CreateLoad(
+              Address(fieldOffsetPtr, IGF.IGM.Int32Ty, Alignment(4)));
           fieldOffset = IGF.Builder.CreateZExtOrBitCast(fieldOffset,
                                                         IGF.IGM.SizeTy);
 
@@ -326,10 +323,9 @@ namespace {
   };
 
   /// A type implementation for loadable record types imported from Clang.
-  class LoadableClangRecordTypeInfo final :
-    public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
-                              ClangFieldInfo> {
-    IRGenModule &IGM;
+  class LoadableClangRecordTypeInfo final
+      : public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
+                                  ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
     template <class Fn>
@@ -356,14 +352,14 @@ namespace {
 
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
-                                unsigned explosionSize, IRGenModule &IGM,
-                                llvm::Type *storageType, Size size,
-                                SpareBitVector &&spareBits, Alignment align,
+                                unsigned explosionSize, llvm::Type *storageType,
+                                Size size, SpareBitVector &&spareBits,
+                                Alignment align,
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, storageType, size,
                              std::move(spareBits), align, IsPOD, IsFixedSize),
-          IGM(IGM), ClangDecl(clangDecl) {}
+          ClangDecl(clangDecl) {}
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
@@ -484,11 +480,13 @@ namespace {
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
-      dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
-                             IGF.IGM.DataLayout);
-      src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
-                            IGF.IGM.DataLayout);
-      IGF.Builder.CreateCall(callee, {dest, src});
+      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
+        dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
+                               IGF.IGM.DataLayout);
+        src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
+                              IGF.IGM.DataLayout);
+      }
+      IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
     }
 
   public:
@@ -536,9 +534,11 @@ namespace {
               destructorGlobalDecl, NotForDefinition));
 
       SmallVector<llvm::Value *, 2> args;
-      auto *thisArg = IGF.coerceValue(address.getAddress(),
-                                      destructorFnAddr->getArg(0)->getType(),
-                                      IGF.IGM.DataLayout);
+      auto *thisArg = address.getAddress();
+      if (IGF.IGM.getLLVMContext().supportsTypedPointers())
+        thisArg = IGF.coerceValue(address.getAddress(),
+                                  destructorFnAddr->getArg(0)->getType(),
+                                  IGF.IGM.DataLayout);
       args.push_back(thisArg);
       llvm::Value *implicitParam =
           clang::CodeGen::getCXXDestructorImplicitParam(
@@ -1049,7 +1049,7 @@ public:
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
-        FieldInfos, NextExplosionIndex, IGM, llvmType, TotalStride,
+        FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment, ClangDecl);
   }
 
@@ -1368,7 +1368,7 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
-  llvm::Type *storageType = IGM.OpaquePtrTy->getPointerElementType();
+  llvm::Type *storageType = IGM.OpaqueTy;
   return new ResilientStructTypeInfo(storageType, abiAccessible);
 }
 

@@ -12,12 +12,12 @@ public class Sub: Base {
   public override func disappearingMethod() {}
 }
 
-// CHECK-CRASH: error: fatal error encountered while reading from module 'Lib'; please submit a bug report (https://swift.org/contributing/#reporting-bugs) and include the project
+// CHECK-CRASH: error: fatal error encountered while reading from module 'Lib'; please submit a bug report (https://swift.org/contributing/#reporting-bugs){{$}}
 // CHECK-CRASH-4: Compiling with effective version 4.1.50
 // CHECK-CRASH-4_2: Compiling with effective version 4.2
 // CHECK-CRASH: While loading members for 'Sub' (in module 'Lib')
 // CHECK-CRASH-LABEL: *** DESERIALIZATION FAILURE ***
 // CHECK-CRASH-LABEL: *** If any module named here was modified in the SDK, please delete the ***
 // CHECK-CRASH-LABEL: *** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***
-// CHECK-CRASH: module 'Lib' with full misc version {{.*}}4.1.50
+// CHECK-CRASH: module 'Lib', builder version {{.*}}4.1.50
 // CHECK-CRASH: could not find 'disappearingMethod()' in parent class

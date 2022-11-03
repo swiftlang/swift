@@ -47,7 +47,7 @@ class Devirtualizer : public SILFunctionTransform {
     ChangedCFG = false;
     devirtualizeAppliesInFunction(F, CHA);
     if (ChangedCFG)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     else if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }

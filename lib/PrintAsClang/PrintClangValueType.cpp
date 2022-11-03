@@ -140,6 +140,10 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
             "passDirect_Swift_String(_getOpaquePointer())));\n";
       os << "  }\n";
     });
+  } else if (typeDecl == typeDecl->getASTContext().getOptionalDecl()) {
+    // Add additional methods for the `Optional` declaration.
+    printer.printDefine("SWIFT_CXX_INTEROP_OPTIONAL_MIXIN");
+    printer.printIncludeForShimHeader("_SwiftStdlibCxxOverlay.h");
   }
 }
 
@@ -237,6 +241,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
   ClangSyntaxPrinter(os).printBaseName(typeDecl);
   os << " final {\n";
   os << "public:\n";
+  if (genericSignature)
+    ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
+        *genericSignature);
 
   // Print out the destructor.
   os << "  inline ~";
@@ -369,6 +376,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
         printCxxImplClassName(os, typeDecl);
         os << " {\n";
         os << "public:\n";
+        if (genericSignature)
+          ClangSyntaxPrinter(os).printGenericSignatureInnerStaticAsserts(
+              *genericSignature);
 
         os << "  static inline char * _Nonnull getOpaquePointer(";
         printCxxTypeName(os, typeDecl, moduleContext);

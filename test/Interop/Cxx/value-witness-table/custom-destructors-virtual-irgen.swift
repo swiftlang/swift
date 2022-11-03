@@ -3,9 +3,6 @@
 // FIXME: Once we can link with libc++ we can start using RTTI.
 //
 // RUN: %target-swift-frontend -enable-experimental-cxx-interop -I %S/Inputs %s -emit-ir -Xcc -fno-rtti | %FileCheck %s
-//
-// Windows doesn't support -fno-rtti.
-// UNSUPPORTED: OS=windows-msvc
 
 import CustomDestructor
 

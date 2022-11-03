@@ -162,7 +162,8 @@ set(SWIFT_BENCH_MODULES
     single-source/RomanNumbers
     single-source/SIMDRandomMask
     single-source/SIMDReduceInteger
-    single-source/SimpleArraySpecialization
+    # Disabled while layout prespecializations are experimental
+    #single-source/SimpleArraySpecialization
     single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
@@ -198,6 +199,7 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
+    cxx-source/CxxVectorSum
     cxx-source/ReadAccessor
 )
 
@@ -216,7 +218,8 @@ endif()
 
 set(BENCH_LIBRARY_MODULES
     utils/TestsUtils
-    utils/SimpleArray
+    # Disabled while layout prespecializations are experimental
+    #utils/SimpleArray
 )
 
 set(BENCH_DRIVER_LIBRARY_MODULES

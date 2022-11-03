@@ -423,7 +423,7 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
   auto Replacements2 = Subs2.getReplacementTypes();
   assert(Replacements1.size() == Replacements2.size());
   TypeComparator TypeCmp;
-  // Perform component-wise comparisions for substitutions.
+  // Perform component-wise comparisons for substitutions.
   for (unsigned idx : indices(Replacements1)) {
     auto Type1 = Replacements1[idx]->getCanonicalType();
     auto Type2 = Replacements2[idx]->getCanonicalType();
@@ -446,7 +446,7 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
     // They are not comparable in this sense.
   }
 
-  // The substitition list is not growing.
+  // The substitution list is not growing.
   return false;
 }
 
@@ -1119,7 +1119,7 @@ static bool hasNonSelfContainedRequirements(ArchetypeType *Archetype,
       // FIXME: Second type of a superclass requirement may contain
       // generic parameters.
       continue;
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1171,7 +1171,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
           CurrentGP)
         CollectedReqs.push_back(Req);
       continue;
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::SameType: {
       // Check if this requirement contains more than one generic param.
       // If this is the case, then these archetypes are interdependent and
@@ -1270,8 +1270,8 @@ shouldBePartiallySpecialized(Type Replacement,
         UsedArchetypes.insert(Primary);
       }
 
-      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
-        UsedArchetypes.insert(Seq);
+      if (auto Pack = dyn_cast<PackArchetypeType>(Archetype)) {
+        UsedArchetypes.insert(Pack);
       }
     }
   });
@@ -1474,7 +1474,7 @@ public:
 
 GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
-  auto GP = GenericTypeParamType::get(/*type sequence*/ false, 0, GPIdx++, Ctx);
+  auto GP = GenericTypeParamType::get(/*isParameterPack*/ false, 0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
   return GP;
 }
@@ -1500,8 +1500,8 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
           UsedCallerArchetypes.insert(Primary);
         }
 
-        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype)) {
-          UsedCallerArchetypes.insert(Seq);
+        if (auto Pack = dyn_cast<PackArchetypeType>(Archetype)) {
+          UsedCallerArchetypes.insert(Pack);
         }
       }
     });

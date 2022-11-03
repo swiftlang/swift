@@ -27,7 +27,7 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
 
 bb1:
   %2 = alloc_stack [moved] $T, let, name "x"
-  copy_addr [take] %0 to [initialization] %2 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   br bb3
@@ -53,7 +53,7 @@ bb3:
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
-// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK-NEXT:   copy_addr [[ARG]] to [init] [[STACK]]
 // CHECK-NEXT:   destroy_addr [[STACK]]
 // CHECK-NEXT:   destroy_addr [[ARG]]
 // CHECK-NEXT:   br bb5
@@ -76,11 +76,11 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
 
 bb1:
   %2 = alloc_stack [moved] $T, let, name "x"
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   %3 = alloc_stack [moved] $T, let, name "y"
-  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %3 : $*T
   destroy_addr %0 : $*T
@@ -112,11 +112,11 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
 
 bb1:
   %2 = alloc_stack $T, let, name "x"
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   %3 = alloc_stack $T, let, name "y"
-  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %3 : $*T
   destroy_addr %0 : $*T
@@ -152,7 +152,7 @@ bb4:
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
-// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK-NEXT:   copy_addr [[ARG]] to [init] [[STACK]]
 // CHECK-NEXT:   destroy_addr [[STACK]]
 // CHECK-NEXT:   destroy_addr [[ARG]]
 // CHECK-NEXT:   br bb5
@@ -175,11 +175,11 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
 
 bb1:
   %2 = alloc_stack $T, let, name "x"
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   %3 = alloc_stack [moved] $T, let, name "y"
-  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %3 : $*T
   destroy_addr %0 : $*T
@@ -211,7 +211,7 @@ bb4:
 // CHECK-NEXT:   br bb3
 //
 // CHECK: bb3:
-// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[STACK]]
+// CHECK-NEXT:   copy_addr [[ARG]] to [init] [[STACK]]
 // CHECK-NEXT:   destroy_addr [[STACK]]
 // CHECK-NEXT:   destroy_addr [[ARG]]
 // CHECK-NEXT:   br bb5
@@ -234,11 +234,11 @@ bb0(%0 : $*T, %1: $Builtin.Int1):
 
 bb1:
   %2 = alloc_stack [moved] $T, let, name "x"
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   %3 = alloc_stack $T, let, name "y"
-  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [init] %3 : $*T
   destroy_addr %3 : $*T
   dealloc_stack %3 : $*T
   destroy_addr %0 : $*T

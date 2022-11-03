@@ -72,6 +72,7 @@ const ProtocolDecl *Rule::isAnyConformanceRule() const {
     case Symbol::Kind::Name:
     case Symbol::Kind::AssociatedType:
     case Symbol::Kind::GenericParam:
+    case Symbol::Kind::Shape:
       break;
     }
 

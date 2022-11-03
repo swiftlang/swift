@@ -18,24 +18,26 @@ public struct TestOptions: OptionSet {
 // CHECK:   %initval = struct $TestOptions ([[INT]] : $Int)
 let globalTestOptions: TestOptions = [.first, .second, .third, .fourth]
 
-// CHECK-LABEL: sil @{{.*}}returnTestOptions{{.*}}
-// CHECK-NEXT: bb0:
+// CHECK-LABEL: sil @$s4test17returnTestOptionsAA0cD0VyF
+// CHECK:      bb0:
 // CHECK-NEXT:   builtin
 // CHECK-NEXT:   integer_literal {{.*}}, 15
 // CHECK-NEXT:   struct $Int
 // CHECK:        struct $TestOptions
 // CHECK-NEXT:   return
+// CHECK:      } // end sil function '$s4test17returnTestOptionsAA0cD0VyF'
 public func returnTestOptions() -> TestOptions {
     return [.first, .second, .third, .fourth]
 }
 
-// CHECK-LABEL: sil @{{.*}}returnEmptyTestOptions{{.*}}
-// CHECK-NEXT: bb0:
+// CHECK-LABEL: sil @$s4test22returnEmptyTestOptionsAA0dE0VyF
+// CHECK:      bb0:
 // CHECK-NEXT:   integer_literal {{.*}}, 0
 // CHECK-NEXT:   struct $Int
 // CHECK:        builtin "onFastPath"() : $()
 // CHECK-NEXT:   struct $TestOptions
 // CHECK-NEXT:   return
+// CHECK:      } // end sil function '$s4test22returnEmptyTestOptionsAA0dE0VyF'
 public func returnEmptyTestOptions() -> TestOptions {
     return []
 }

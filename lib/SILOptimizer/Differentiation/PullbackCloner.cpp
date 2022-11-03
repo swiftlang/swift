@@ -356,7 +356,7 @@ private:
       builder.emitZeroIntoBuffer(loc, destAddress, IsInitialization);
       break;
     /// If adjoint value is a symbolic aggregate (tuple or struct), recursively
-    /// materialize materialize the symbolic tuple or struct, filling the
+    /// materialize the symbolic tuple or struct, filling the
     /// buffer.
     case AdjointValueKind::Aggregate: {
       if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
@@ -1495,7 +1495,7 @@ public:
   }
   void visitStoreBorrowInst(StoreBorrowInst *sbi) {
     visitStoreOperation(sbi->getParent(), sbi->getLoc(), sbi->getSrc(),
-                        sbi->getDest());
+                        sbi);
   }
 
   /// Handle `copy_addr` instruction.
@@ -2044,7 +2044,7 @@ bool PullbackCloner::Implementation::run() {
       return true;
   }
   // Otherwise, perform standard pullback generation.
-  // Visit original blocks blocks in post-order and perform differentiation
+  // Visit original blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
     for (auto *bb : originalBlocks) {
@@ -2289,7 +2289,7 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
     //                                 #Optional.some!enumelt
     auto *enumAddr = builder.createInitEnumDataAddr(
         pbLoc, optArgBuf, someEltDecl, wrappedTanType.getAddressType());
-    // copy_addr %wrappedAdjoint to [initialization] %enumAddr
+    // copy_addr %wrappedAdjoint to [init] %enumAddr
     builder.createCopyAddr(pbLoc, wrappedAdjoint, enumAddr, IsNotTake,
                            IsInitialization);
     // inject_enum_addr %optArgBuf : $*Optional<T.TangentVector>,

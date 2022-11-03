@@ -26,7 +26,7 @@ func testLocalWrapper() {
   // CHECK-NEXT: [[C:%.*]] = copy_value [[W]] : ${ var Wrapper<Int> }
   // CHECK-NOT: mark_function_escape
   // CHECK-NEXT: [[SPA:%.*]] = partial_apply [callee_guaranteed] [[S]]([[C]]) : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NEXT: assign_by_wrapper {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@callee_guaranteed (Int) -> ()
+  // CHECK-NEXT: assign_by_wrapper origin property_wrapper, {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@callee_guaranteed (Int) -> ()
 
   _ = value
   // CHECK: mark_function_escape [[P]] : $*Wrapper<Int>
@@ -45,7 +45,7 @@ func testLocalWrapper() {
   // CHECK: [[OP:%.*]] = function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: apply [[OP]]({{%.*}}) : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: [[RESULT:%.*]] = load [trivial] [[TMP]] : $*Int
-  // CHECK: assign_by_wrapper [[RESULT]] : $Int to [[P]]
+  // CHECK: assign_by_wrapper origin property_wrapper, [[RESULT]] : $Int to [[P]]
 
   // Check local property wrapper backing initializer and accessors
 

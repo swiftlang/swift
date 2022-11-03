@@ -92,8 +92,7 @@ void DependencyScannerDiagnosticCollectingConsumer::addDiagnostic(SourceManager 
 
   std::string ResultingMessage;
   llvm::raw_string_ostream Stream(ResultingMessage);
-  const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
-  
+
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
   llvm::raw_svector_ostream Out(Text);

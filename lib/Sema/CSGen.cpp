@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
-#include "TypeCheckType.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckRegex.h"
+#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -1188,6 +1189,30 @@ namespace {
     }
 
     Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+#ifdef SWIFT_SWIFT_PARSER
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::BuiltinMacros)) {
+        auto kind = MagicIdentifierLiteralExpr::getKindString(expr->getKind())
+                        .drop_front();
+
+        auto protocol =
+            TypeChecker::getLiteralProtocol(CS.getASTContext(), expr);
+        if (!protocol)
+          return Type();
+
+        auto openedType = CS.getTypeOfMacroReference(kind, expr);
+        if (!openedType)
+          return Type();
+
+        CS.addConstraint(ConstraintKind::LiteralConformsTo, openedType,
+                         protocol->getDeclaredInterfaceType(),
+                         CS.getConstraintLocator(expr));
+
+        return openedType;
+      }
+      // Fall through to use old implementation.
+#endif
+
       switch (expr->getKind()) {
       // Magic pointer identifiers are of type UnsafeMutableRawPointer.
 #define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
@@ -1641,7 +1666,7 @@ namespace {
                         bgt->getDecl()->getName(), typeVars.size(),
                         specializations.size(),
                         /*too many arguments*/ false,
-                        /*type sequence?*/ false)
+                        /*isParameterPack?*/ false)
                 .highlight(
                     SourceRange(expr->getLAngleLoc(), expr->getRAngleLoc()));
             de.diagnose(bgt->getDecl(), diag::kind_declname_declared_here,
@@ -1770,6 +1795,13 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
+      // If the ParenExpr contains a pack expansion, generate a tuple
+      // type containing the pack expansion type.
+      if (CS.getType(expr->getSubExpr())->getAs<PackExpansionType>()) {
+        return TupleType::get({CS.getType(expr->getSubExpr())},
+                              CS.getASTContext());
+      }
+
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
@@ -1787,18 +1819,6 @@ namespace {
       }
 
       return TupleType::get(elements, CS.getASTContext());
-    }
-
-    Type visitPackExpr(PackExpr *expr) {
-      // The type of a pack expression is simply a pack of the types of
-      // its subexpressions.
-      SmallVector<Type, 4> elements;
-      elements.reserve(expr->getNumElements());
-      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
-        elements.emplace_back(CS.getType(expr->getElement(i)));
-      }
-
-      return PackType::get(CS.getASTContext(), elements);
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
@@ -2885,6 +2905,35 @@ namespace {
       return variadicSeq;
     }
 
+    Type visitPackExpansionExpr(PackExpansionExpr *expr) {
+      for (auto *binding : expr->getBindings()) {
+        auto type = visit(binding);
+        CS.setType(binding, type);
+      }
+
+      auto elementResultType = CS.getType(expr->getPatternExpr());
+      auto patternTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                             TVO_CanBindToPack |
+                                             TVO_CanBindToHole);
+      CS.addConstraint(ConstraintKind::PackElementOf, elementResultType,
+                       patternTy, CS.getConstraintLocator(expr));
+
+      // FIXME: Use a ShapeOf constraint here.
+      Type shapeType;
+      auto *binding = expr->getBindings().front();
+      auto type = CS.simplifyType(CS.getType(binding));
+      type.visit([&](Type type) {
+        if (shapeType)
+          return;
+
+        if (auto archetype = type->getAs<PackArchetypeType>()) {
+          shapeType = archetype->getShape();
+        }
+      });
+
+      return PackExpansionType::get(patternTy, shapeType);
+    }
+
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToNoEscape);
@@ -2895,7 +2944,6 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type checked");
       return expr->getType();
     }
 
@@ -3580,6 +3628,46 @@ namespace {
       return resultTy;
     }
 
+    Type visitMacroExpansionExpr(MacroExpansionExpr *expr) {
+#if SWIFT_SWIFT_PARSER
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.hasFeature(Feature::Macros)) {
+        auto macroIdent = expr->getMacroName().getBaseIdentifier();
+        auto refType = CS.getTypeOfMacroReference(macroIdent.str(), expr);
+        if (!refType) {
+          ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
+                             macroIdent)
+              .highlight(expr->getMacroNameLoc().getSourceRange());
+          return Type();
+        }
+        if (expr->getArgs()) {
+          CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
+          // FIXME: Do we have object-like vs. function-like macros?
+          if (auto fnType = dyn_cast<FunctionType>(refType.getPointer())) {
+            SmallVector<AnyFunctionType::Param, 8> params;
+            getMatchingParams(expr->getArgs(), params);
+
+            Type resultType = CS.createTypeVariable(
+                CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+                TVO_CanBindToNoEscape);
+
+            CS.addConstraint(
+                ConstraintKind::ApplicableFunction,
+                FunctionType::get(params, resultType),
+                fnType,
+                CS.getConstraintLocator(
+                  expr, ConstraintLocator::ApplyFunction));
+
+            return resultType;
+          }
+        }
+
+        return refType;
+      }
+#endif
+      return Type();
+    }
+
     static bool isTriggerFallbackDiagnosticBuiltin(UnresolvedDotExpr *UDE,
                                                    ASTContext &Context) {
       auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase());
@@ -4043,10 +4131,10 @@ generateForEachStmtConstraints(
   // `.next()`. `next()` is called on each iteration of the loop.
   {
     auto *nextRef = UnresolvedDotExpr::createImplicit(
-      ctx,
-      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(),
-                            /*Implicit=*/true),
-      ctx.Id_next, /*labels=*/ArrayRef<Identifier>());
+        ctx,
+        new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
+                              /*Implicit=*/true),
+        ctx.Id_next, /*labels=*/ArrayRef<Identifier>());
     nextRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     Expr *nextCall = CallExpr::createImplicitEmpty(ctx, nextRef);
@@ -4382,17 +4470,13 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
 
     case StmtConditionElement::CK_Boolean: {
       Expr *condExpr = condElement.getBoolean();
-      setContextualType(condExpr, TypeLoc::withoutLoc(boolTy), CTP_Condition);
+      auto target = SolutionApplicationTarget(condExpr, dc, CTP_Condition,
+                                              boolTy, /*isDiscarded=*/false);
 
-      condExpr = generateConstraints(condExpr, dc);
-      if (!condExpr) {
+      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
         return true;
-      }
 
-      addConstraint(
-          ConstraintKind::Conversion, getType(condExpr), boolTy,
-          getConstraintLocator(condExpr,
-                               LocatorPathElt::ContextualType(CTP_Condition)));
+      setSolutionApplicationTarget(&condElement, target);
       continue;
     }
 
@@ -4516,6 +4600,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
       auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
       addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
                     getConstraintLocator(param));
+      setType(param->getPropertyWrapperProjectionVar(), projectionType);
     }
 
     initKind = PropertyWrapperInitKind::ProjectedValue;
@@ -4523,6 +4608,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, wrappedValueType, locator);
     initKind = PropertyWrapperInitKind::WrappedValue;
+    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
   }
 
   appliedPropertyWrappers[anchor].push_back({ wrapperType, initKind });

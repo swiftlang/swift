@@ -2317,7 +2317,7 @@ bb0(%0 : $Builtin.NativeObject):
   return %10 : $()
 }
 
-// Make sure that we elimiante the inner retain/release pair on the
+// Make sure that we eliminate the inner retain/release pair on the
 // partial_apply by treating it as an entrance.
 // CHECK-LABEL: sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
 // CHECK: partial_apply

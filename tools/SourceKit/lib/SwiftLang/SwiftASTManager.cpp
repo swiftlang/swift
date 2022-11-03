@@ -24,9 +24,10 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDETool/CompilerInvocation.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 // This is included only for createLazyResolver(). Move to different header ?
 #include "swift/Sema/IDETypeChecking.h"
 

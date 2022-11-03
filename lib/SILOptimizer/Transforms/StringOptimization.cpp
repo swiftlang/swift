@@ -44,7 +44,7 @@ namespace {
 /// This pass must run on high-level SIL, where semantic calls are still in
 /// place.
 ///
-/// The optimization is implemented in a simple way. Therfore it cannot handle
+/// The optimization is implemented in a simple way. Therefore it cannot handle
 /// complicated patterns, e.g. the dataflow analysis for the String.append self
 /// argument is only done within a single block.
 /// But this is totally sufficient to be able to constant propagate strings in
@@ -78,9 +78,9 @@ class StringOptimization {
   SILFunction *makeUTF8Func = nullptr;
   
   /// Caches the analysis result for an alloc_stack or an inout function
-  /// argument, whether it is an "identifyable" object.
+  /// argument, whether it is an "identifiable" object.
   /// See mayWriteToIdentifyableObject().
-  llvm::DenseMap<SILValue, bool> identifyableObjectsCache;
+  llvm::DenseMap<SILValue, bool> identifiableObjectsCache;
 
 public:
   bool run(SILFunction *F);
@@ -129,7 +129,7 @@ bool StringOptimization::run(SILFunction *F) {
 bool StringOptimization::optimizeBlock(SILBasicBlock &block) {
   bool changed = false;
   
-  /// Maps identifyable objects (alloc_stack, inout parameters) to string values
+  /// Maps identifiable objects (alloc_stack, inout parameters) to string values
   /// which are stored in those objects.
   llvm::DenseMap<SILValue, SILValue> storedStrings;
   
@@ -166,7 +166,7 @@ bool StringOptimization::optimizeBlock(SILBasicBlock &block) {
       }
     }
     // Remove items from storedStrings if inst overwrites (or potentially
-    // overwrites) a stored String in an identifyable object.
+    // overwrites) a stored String in an identifiable object.
     invalidateModifiedObjects(inst, storedStrings);
   }
   return changed;
@@ -188,7 +188,7 @@ bool StringOptimization::optimizeStringAppend(ApplyInst *appendCall,
   StringInfo lhsString = getStringInfo(storedStrings[lhsAddr]);
 
   // The following two optimizations are a trade-off: Performance-wise it may be
-  // benefitial to initialize an empty string with reserved capacity and then
+  // beneficial to initialize an empty string with reserved capacity and then
   // append multiple other string components.
   // Removing the empty string (with the reserved capacity) might result in more
   // allocations.
@@ -398,20 +398,20 @@ ApplyInst *StringOptimization::isSemanticCall(SILInstruction *inst,
 }
 
 /// Returns true for all instructions which we can safely analyze as a potential
-/// write to an identifyable objects.
+/// write to an identifiable objects.
 ///
 /// If we see any other kind of object user, which may write to an object, or
 /// let the object address escape in some unexpected way (like address
 /// projections), we'll just ignore that object and will not treat it as
-/// "identifyable" object.
+/// "identifiable" object.
 static bool mayWriteToIdentifyableObject(SILInstruction *inst) {
   // For simplicity, only handle store and apply. This is sufficient for most
   // case, especially for string interpolation.
   return isa<StoreInst>(inst) || isa<ApplyInst>(inst);
 }
 
-/// Returns the store intstruction if \p inst is a store of a String to an
-/// identifyable object.
+/// Returns the store instruction if \p inst is a store of a String to an
+/// identifiable object.
 StoreInst *StringOptimization::
 isStringStoreToIdentifyableObject(SILInstruction *inst) {
   auto *store = dyn_cast<StoreInst>(inst);
@@ -426,11 +426,11 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
   if (!isa<AllocStackInst>(destAddr) && !isExclusiveArgument(destAddr))
     return nullptr;
 
-  if (identifyableObjectsCache.count(destAddr) != 0) {
-    return identifyableObjectsCache[destAddr] ? store : nullptr;
+  if (identifiableObjectsCache.count(destAddr) != 0) {
+    return identifiableObjectsCache[destAddr] ? store : nullptr;
   }
 
-  // Check if it's an "identifyable" object. This is the case if it only has
+  // Check if it's an "identifiable" object. This is the case if it only has
   // users which we are able to track in a simple way: stores and applies.
   for (Operand *use : destAddr->getUses()) {
     SILInstruction *user = use->getUser();
@@ -448,13 +448,13 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
         if (!mayWriteToIdentifyableObject(user)) {
           // We don't handle user. It is some instruction which may write to
           // destAddr or let destAddr "escape" (like an address projection).
-          identifyableObjectsCache[destAddr] = false;
+          identifiableObjectsCache[destAddr] = false;
           return nullptr;
         }
         break;
     }
   }
-  identifyableObjectsCache[destAddr] = true;
+  identifiableObjectsCache[destAddr] = true;
   return store;
 }
 
@@ -463,7 +463,7 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
 void StringOptimization::invalidateModifiedObjects(SILInstruction *inst,
                             llvm::DenseMap<SILValue, SILValue> &storedStrings) {
   // Ignore non-writing instructions, like "load", "dealloc_stack".
-  // Note that identifyable objects (= keys in storedStrings) can only have
+  // Note that identifiable objects (= keys in storedStrings) can only have
   // certain kind of instructions as users: all instruction which we handle in
   // isStringStoreToIdentifyableObject().
   if (!mayWriteToIdentifyableObject(inst))

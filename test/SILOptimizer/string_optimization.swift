@@ -5,6 +5,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
+// REQUIRES: swift_in_compiler
 
 // Test needs to be updated for 32bit.
 // rdar://74810823
@@ -125,39 +126,39 @@ public func testObjcClassName(qualified: Bool) -> String {
 
 
 @inline(never)
-func printEmbeeded(_ s: String) {
+func printEmbedded(_ s: String) {
   print("<\(s)>")
 }
 
 // CHECK-OUTPUT: <-Inner+>
-printEmbeeded(testTypeNameInterpolation())
+printEmbedded(testTypeNameInterpolation())
 
 // CHECK-OUTPUT: <-Array<Int> is cool+>
-printEmbeeded(testFoldCompleteInterpolation())
+printEmbedded(testFoldCompleteInterpolation())
 
 // CHECK-OUTPUT: <-static+>
-printEmbeeded(testFoldStaticLet())
+printEmbedded(testFoldStaticLet())
 
 // CHECK-OUTPUT: <abc>
-printEmbeeded(testFoldConcat())
+printEmbedded(testFoldConcat())
 
 // CHECK-OUTPUT: <Inner>
-printEmbeeded(testUnqualifiedTypeName())
+printEmbedded(testUnqualifiedTypeName())
 
 // CHECK-OUTPUT: <test.Outer.Inner>
-printEmbeeded(testQualifiedTypeName())
+printEmbedded(testQualifiedTypeName())
 
 // CHECK-OUTPUT: <LocalStruct>
-printEmbeeded(testUnqualifiedLocalType())
+printEmbedded(testUnqualifiedLocalType())
 
 // CHECK-OUTPUT: <test.(unknown context at {{.*}}).LocalStruct>
-printEmbeeded(testQualifiedLocalType())
+printEmbedded(testQualifiedLocalType())
 
 // CHECK-OUTPUT: <test.Outer.InnerClass>
-printEmbeeded(testInnerClass())
+printEmbedded(testInnerClass())
 
 // CHECK-OUTPUT: <C>
-printEmbeeded(C().f())
+printEmbedded(C().f())
 
 #if _runtime(_ObjC)
 

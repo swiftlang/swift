@@ -41,7 +41,7 @@ static void forAllRequirementTypes(
   std::move(source).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
+    case RequirementKind::SameShape:
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
@@ -477,6 +477,7 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(MacroExpansion, "does not have access control")
 
   UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
 
@@ -1101,6 +1102,7 @@ public:
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(MissingMember, "does not have access control")
+  UNREACHABLE(MacroExpansion, "does not have access control")
   UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
 #undef UNREACHABLE
 
@@ -1709,6 +1711,7 @@ public:
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")
   UNREACHABLE(MissingMember, "handled by the enclosing declaration")
+  UNREACHABLE(MacroExpansion, "handled by the enclosing declaration")
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \

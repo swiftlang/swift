@@ -288,6 +288,7 @@ enum class ImplicitlyFinalReason : unsigned {
 }
 
 static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
+                                          FinalAttr *explicitFinalAttr,
                                           StaticSpellingKind staticSpelling) {
   // Are there any reasons to infer 'final'? Prefer 'static' over the class
   // being final for the purposes of diagnostics.
@@ -295,8 +296,8 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (staticSpelling == StaticSpellingKind::KeywordStatic) {
     reason = ImplicitlyFinalReason::Static;
 
-    if (auto finalAttr = D->getAttrs().getAttribute<FinalAttr>()) {
-      auto finalRange = finalAttr->getRange();
+    if (explicitFinalAttr) {
+      auto finalRange = explicitFinalAttr->getRange();
       if (finalRange.isValid()) {
         auto &context = D->getASTContext();
         context.Diags.diagnose(finalRange.Start, diag::static_decl_already_final)
@@ -447,7 +448,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       // (or the same file) to add vtable entries, we can re-evaluate this
       // restriction.
       if (!decl->isSynthesized() &&
-          isa<ExtensionDecl>(decl->getDeclContext()) &&
+          isa<ExtensionDecl>(decl->getDeclContext()->getImplementedObjCContext()) &&
           !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
 
         if (classDcl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
@@ -802,8 +803,9 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
 
 bool
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  auto explicitFinalAttr = decl->getAttrs().getAttribute<FinalAttr>();
   if (isa<ClassDecl>(decl))
-    return decl->getAttrs().hasAttribute<FinalAttr>();
+    return explicitFinalAttr;
 
   auto cls = decl->getDeclContext()->getSelfClassDecl();
   if (!cls)
@@ -831,10 +833,17 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
         auto *PBD = VD->getParentPatternBinding();
-        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, cls, PBD->getStaticSpelling()))
+        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
+                                                 PBD->getStaticSpelling()))
           return true;
 
         if (VD->isLet()) {
+          // If this `let` is in an `@_objcImplementation extension`, don't
+          // infer `final` unless it is written explicitly.
+          auto ed = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+          if (!explicitFinalAttr && ed && ed->isObjCImplementation())
+            return false;
+
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
@@ -856,7 +865,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Func: {
       // Methods declared 'static' are final.
       auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
+                                        staticSpelling))
         return true;
       break;
     }
@@ -889,7 +899,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Subscript: {
       // Member subscripts.
       auto staticSpelling = cast<SubscriptDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, explicitFinalAttr,
+                                        staticSpelling))
         return true;
       break;
     }
@@ -898,10 +909,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       break;
   }
 
-  if (decl->getAttrs().hasAttribute<FinalAttr>())
-    return true;
-
-  return false;
+  return explicitFinalAttr;
 }
 
 bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
@@ -955,6 +963,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return true;
   }
+
+  // @_objcImplementation extension member implementations are implicitly
+  // dynamic.
+  if (decl->isObjCMemberImplementation())
+    return true;
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     // Runtime-replaceable accessors are dynamic when their storage declaration
@@ -2239,14 +2252,14 @@ static Type validateParameterType(ParamDecl *decl) {
                                      PlaceholderType::get);
     Ty = resolution.resolveType(patternRepr);
 
-    // Find the first type sequence parameter and use that as the count type.
-    SmallVector<Type, 2> rootTypeSequenceParams;
-    Ty->getTypeSequenceParameters(rootTypeSequenceParams);
+    // Find the first type parameter pack and use that as the count type.
+    SmallVector<Type, 2> rootParameterPacks;
+    Ty->getTypeParameterPacks(rootParameterPacks);
 
     // Handle the monovariadic/polyvariadic interface type split.
-    if (!rootTypeSequenceParams.empty()) {
+    if (!rootParameterPacks.empty()) {
       // Polyvariadic types (T...) for <T...> resolve to pack expansions.
-      Ty = PackExpansionType::get(Ty, rootTypeSequenceParams[0]);
+      Ty = PackExpansionType::get(Ty, rootParameterPacks[0]);
     } else {
       // Monovariadic types (T...) for <T> resolve to [T].
       Ty = VariadicSequenceType::get(Ty);
@@ -2300,6 +2313,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
   case DeclKind::BuiltinTuple:
+  case DeclKind::MacroExpansion:
     llvm_unreachable("should not get here");
     return Type();
 

@@ -101,7 +101,8 @@ namespace irgen {
 
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
-  void expandPolymorphicSignature(
+  /// Returns the number of type metadata pointers added to `types`.
+  unsigned expandPolymorphicSignature(
       IRGenModule &IGM, CanSILFunctionType type,
       SmallVectorImpl<llvm::Type *> &types,
       SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs =

@@ -15,13 +15,15 @@
 // inference for expressions.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
-#include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
-#include "swift/AST/Initializer.h"
+#include "TypeChecker.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -29,7 +31,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
-#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -1735,8 +1736,12 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   auto *paramLocator = getConstraintLocator(
       locator.withPathElement(LocatorPathElt::GenericParameter(parameter)));
 
-  auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding |
-                                                      TVO_CanBindToHole);
+  unsigned options = (TVO_PrefersSubtypeBinding |
+                      TVO_CanBindToHole);
+  if (parameter->isParameterPack())
+    options |= TVO_CanBindToPack;
+
+  auto typeVar = createTypeVariable(paramLocator, options);
   auto result = replacements.insert(std::make_pair(
       cast<GenericTypeParamType>(parameter->getCanonicalType()), typeVar));
 
@@ -1769,8 +1774,6 @@ void ConstraintSystem::openGenericRequirement(
 
   auto kind = req.getKind();
   switch (kind) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
   case RequirementKind::Conformance: {
     auto protoDecl = req.getProtocolDecl();
     // Determine whether this is the protocol 'Self' constraint we should
@@ -1784,6 +1787,7 @@ void ConstraintSystem::openGenericRequirement(
   }
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
+  case RequirementKind::SameShape:
     openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
     break;
   case RequirementKind::Layout:
@@ -2424,8 +2428,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Adjust the opened type for concurrency.
   Type origOpenedType = openedType;
-  if ((isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) &&
-      !isRequirementOrWitness(locator)) {
+  if (isRequirementOrWitness(locator)) {
+    // Don't adjust when doing witness matching, because that can cause cycles.
+  } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     unsigned numApplies = getNumApplications(
         value, hasAppliedSelf, functionRefKind);
     openedType = adjustFunctionTypeForConcurrency(
@@ -2465,6 +2470,29 @@ ConstraintSystem::getTypeOfMemberReference(
 
   return { origOpenedType, openedType, origType, type };
 }
+
+#if SWIFT_SWIFT_PARSER
+Type ConstraintSystem::getTypeOfMacroReference(StringRef macroName,
+                                               Expr *anchor) {
+  auto req = MacroContextRequest{macroName.str(), DC->getParentModule()};
+  auto *macroCtx = evaluateOrDefault(getASTContext().evaluator, req, nullptr);
+  if (!macroCtx)
+    return Type();
+
+  auto *locator = getConstraintLocator(anchor);
+  // Dig through to __MacroEvaluationContext.SignatureType
+  auto sig = getASTContext().getIdentifier("SignatureType");
+  auto *signature = cast<TypeAliasDecl>(macroCtx->lookupDirect(sig).front());
+  auto type = signature->getUnderlyingType();
+
+  // Open any the generic types.
+  OpenedTypeMap replacements;
+  openGeneric(signature->getParent(), signature->getGenericSignature(),
+              locator, replacements);
+
+  return openType(type, replacements);
+}
+#endif
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                                                 const OverloadChoice &overload,
@@ -3614,7 +3642,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
-      if (lookupBaseType->mayHaveMembers()) {
+      if (lookupBaseType->mayHaveMembers() ||
+          lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
         auto conformance = DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
@@ -3638,9 +3667,8 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           return memberTy;
         }
 
-        auto subs = SubstitutionMap::getProtocolSubstitutions(
-            proto, lookupBaseType, conformance);
-        auto result = assocType->getDeclaredInterfaceType().subst(subs);
+        auto result = conformance.getAssociatedType(
+            lookupBaseType, assocType->getDeclaredInterfaceType());
         if (!result->hasError())
           return result;
       }
@@ -6042,7 +6070,6 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
-  case ConversionRestrictionKind::ReifyPackToType:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.
@@ -6513,7 +6540,7 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   // First check whether this declaration is universally unavailable.
-  if (AvailableAttr::isUnavailable(D))
+  if (D->getAttrs().isUnavailable(getASTContext()))
     return true;
 
   return TypeChecker::isDeclarationUnavailable(D, DC, [&] {
@@ -6611,8 +6638,8 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
 
   for (const auto &req : sig.getRequirements()) {
     switch (req.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
 
     case RequirementKind::Superclass: {
       if (req.getFirstType()->getRootGenericParam()->getDepth() > 0 &&
@@ -6705,7 +6732,17 @@ SourceRange constraints::getSourceRange(ASTNode anchor) {
 
 static Optional<Requirement> getRequirement(ConstraintSystem &cs,
                                             ConstraintLocator *reqLocator) {
-  auto reqLoc = reqLocator->getLastElementAs<LocatorPathElt::AnyRequirement>();
+  ArrayRef<LocatorPathElt> path = reqLocator->getPath();
+
+  // If we have something like ... -> type req # -> pack element #, we're
+  // solving a requirement of the form T : P where T is a type parameter pack
+  if (!path.empty() && path.back().is<LocatorPathElt::PackElement>())
+    path = path.drop_back();
+
+  if (path.empty())
+    return None;
+
+  auto reqLoc = path.back().getAs<LocatorPathElt::AnyRequirement>();
   if (!reqLoc)
     return None;
 

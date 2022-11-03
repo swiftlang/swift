@@ -314,8 +314,10 @@ public:
       return;
     } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
       forwardDeclare(ED);
-    } else if (isa<AbstractTypeParamDecl>(TD)) {
-      llvm_unreachable("should not see type params here");
+    } else if (isa<GenericTypeParamDecl>(TD)) {
+      llvm_unreachable("should not see generic parameters here");
+    } else if (isa<AssociatedTypeDecl>(TD)) {
+      llvm_unreachable("should not see associated types here");
     } else if (isa<StructDecl>(TD) &&
                TD->getModuleContext()->isStdlibModule()) {
       // stdlib has some @_cdecl functions with structs.
@@ -561,7 +563,8 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (ED->lookupConformance(errorTypeProto, conformances)) {
+    if (outputLangMode != OutputLanguageMode::Cxx
+        && ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {
@@ -773,7 +776,10 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   // FIXME: refactor.
   if (!prologueOS.str().empty()) {
-    os << "#endif\n";
+    // FIXME: This is a workaround for prologue being emitted outside of
+    // __cplusplus.
+    if (!M.isStdlibModule())
+      os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
     M.ValueDecl::getName().print(os);
@@ -784,7 +790,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
     os << prologueOS.str();
 
-    os << "\n#ifdef __cplusplus\n";
+    if (!M.isStdlibModule())
+      os << "\n#ifdef __cplusplus\n";
     os << "}\n";
     os << "}\n";
     os << "}\n";

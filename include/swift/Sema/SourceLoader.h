@@ -73,7 +73,8 @@ public:
   /// returns NULL.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ImportPath::Module path) override;
+             ImportPath::Module path,
+             bool AllowMemoryCache) override;
 
   /// Load extensions to the given nominal type.
   ///

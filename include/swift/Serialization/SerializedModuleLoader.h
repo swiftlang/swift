@@ -185,7 +185,8 @@ public:
   /// emits a diagnostic and returns a FailedImportModule object.
   virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ImportPath::Module path) override;
+             ImportPath::Module path,
+             bool AllowMemoryCache) override;
 
 
   virtual void loadExtensions(NominalTypeDecl *nominal,
@@ -294,7 +295,8 @@ public:
 
   ModuleDecl *
   loadModule(SourceLoc importLoc,
-             ImportPath::Module path) override;
+             ImportPath::Module path,
+             bool AllowMemoryCache = true) override;
 
   /// Register a memory buffer that contains the serialized module for the given
   /// access path. This API is intended to be used by LLDB to add swiftmodules

@@ -34,6 +34,7 @@ namespace swift {
 
 class DominanceInfo;
 class DeadEndBlocks;
+class BasicCalleeAnalysis;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)

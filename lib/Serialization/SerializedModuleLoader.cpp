@@ -203,7 +203,8 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       });
       return None;
     }
-    case ModuleSearchPathKind::RuntimeLibrary: {
+    case ModuleSearchPathKind::RuntimeLibrary:
+    case ModuleSearchPathKind::CompilerPlugin: {
       // Look for:
       // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
       // (Other OS)  $PATH/{name}.{extension}
@@ -444,7 +445,8 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
 
-  if (LoadMode == ModuleLoadingMode::OnlyInterface)
+  if (LoadMode == ModuleLoadingMode::OnlyInterface ||
+      Ctx.IgnoreAdjacentModules)
     return std::make_error_code(std::errc::not_supported);
 
   auto ModuleErr = openModuleFile(ModuleID, BaseName, ModuleBuffer);
@@ -613,7 +615,8 @@ SerializedModuleLoaderBase::findModule(ImportPath::Element moduleID,
 
     switch (searchPath->getKind()) {
     case ModuleSearchPathKind::Import:
-    case ModuleSearchPathKind::RuntimeLibrary: {
+    case ModuleSearchPathKind::RuntimeLibrary:
+    case ModuleSearchPathKind::CompilerPlugin: {
       isFramework = false;
 
       // On Apple platforms, we can assume that the runtime libraries use
@@ -770,6 +773,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setImplicitDynamicEnabled();
     if (loadedModuleFile->hasIncrementalInfo())
       M.setHasIncrementalInfo();
+    if (loadedModuleFile->isBuiltFromInterface())
+      M.setIsBuiltFromInterface();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
@@ -1173,7 +1178,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   if (swiftInterfaceVersion.empty() && *unusedModuleBuffer) {
     auto metaData = serialization::validateSerializedAST(
         (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
-        Ctx.LangOpts.SDKName);
+        Ctx.LangOpts.SDKName, !Ctx.LangOpts.DebuggerSupport);
     versionInfo->setVersion(metaData.userModuleVersion,
                             ModuleVersionSourceKind::SwiftBinaryModule);
   } else {
@@ -1205,7 +1210,8 @@ bool MemoryBufferSerializedModuleLoader::canImportModule(
 
 ModuleDecl *
 SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
-                                       ImportPath::Module path) {
+                                       ImportPath::Module path,
+                                       bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -1230,7 +1236,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.Item, Ctx);
   M->setIsSystemModule(isSystemModule);
-  Ctx.addLoadedModule(M);
+  if (AllowMemoryCache)
+    Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   llvm::sys::path::native(moduleInterfacePath);
@@ -1261,7 +1268,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
 ModuleDecl *
 MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
-                                               ImportPath::Module path) {
+                                               ImportPath::Module path,
+                                               bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -1297,7 +1305,8 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   if (BypassResilience)
     M->setBypassResilience();
   M->addFile(*file);
-  Ctx.addLoadedModule(M);
+  if (AllowMemoryCache)
+    Ctx.addLoadedModule(M);
   return M;
 }
 

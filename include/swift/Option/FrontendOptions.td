@@ -317,10 +317,6 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_experimental_async_top_level :
   Flag<["-"], "enable-experimental-async-top-level">,
   HelpText<"Enable experimental concurrency in top-level code">;
-
-def enable_experimental_layout_prespecialization :
-  Flag<["-"], "enable-experimental-layout-prespecialization">,
-  HelpText<"Enable experimental support for layout based pre-specializations">;
 }
 
 // HIDDEN FLAGS

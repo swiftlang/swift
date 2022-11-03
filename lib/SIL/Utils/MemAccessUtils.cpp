@@ -16,6 +16,8 @@
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILBridging.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -400,12 +402,7 @@ bool swift::isLetAddress(SILValue address) {
 //                      MARK: Deinitialization barriers.
 //===----------------------------------------------------------------------===//
 
-static bool isBarrierApply(FullApplySite) {
-  // TODO: check side effect analysis
-  return true;
-}
-
-static bool mayAccessPointer(SILInstruction *instruction) {
+bool swift::mayAccessPointer(SILInstruction *instruction) {
   if (!instruction->mayReadOrWriteMemory())
     return false;
   bool isUnidentified = false;
@@ -417,22 +414,43 @@ static bool mayAccessPointer(SILInstruction *instruction) {
   return isUnidentified;
 }
 
-static bool mayLoadWeakOrUnowned(SILInstruction *instruction) {
-  // TODO: It is possible to do better here by looking at the address that is
-  //       being loaded.
-  return isa<LoadWeakInst>(instruction) || isa<LoadUnownedInst>(instruction)
-    || isa<StrongCopyUnownedValueInst>(instruction)
-    || isa<StrongCopyUnmanagedValueInst>(instruction);
+bool swift_mayAccessPointer(BridgedInstruction inst) {
+  return mayAccessPointer(castToInst(inst));
 }
 
-bool swift::isDeinitBarrier(SILInstruction *instruction) {
-  if (instruction->maySynchronize()) {
-    if (auto apply = FullApplySite::isa(instruction)) {
-      return isBarrierApply(apply);
-    }
-    return true;
-  }
-  return mayLoadWeakOrUnowned(instruction) || mayAccessPointer(instruction);
+bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
+  return isa<LoadWeakInst>(instruction) 
+      || isa<LoadUnownedInst>(instruction) 
+      || isa<StrongCopyUnownedValueInst>(instruction)
+      || isa<StrongCopyUnmanagedValueInst>(instruction);
+}
+
+bool swift_mayLoadWeakOrUnowned(BridgedInstruction inst) {
+  return mayLoadWeakOrUnowned(castToInst(inst));
+}
+
+/// Conservatively, whether this instruction could involve a synchronization
+/// point like a memory barrier, lock or syscall.
+bool swift::maySynchronizeNotConsideringSideEffects(SILInstruction *instruction) {
+  return FullApplySite::isa(instruction) 
+      || isa<EndApplyInst>(instruction)
+      || isa<AbortApplyInst>(instruction);
+}
+
+bool swift_maySynchronizeNotConsideringSideEffects(BridgedInstruction inst) {
+  return maySynchronizeNotConsideringSideEffects(castToInst(inst));
+}
+
+bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
+  bool retval = mayAccessPointer(instruction)
+             || mayLoadWeakOrUnowned(instruction)
+             || maySynchronizeNotConsideringSideEffects(instruction);
+  assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
+  return retval;
+}
+
+bool swift_mayBeDeinitBarrierNotConsideringSideEffects(BridgedInstruction inst) {
+  return mayBeDeinitBarrierNotConsideringSideEffects(castToInst(inst));
 }
 
 //===----------------------------------------------------------------------===//

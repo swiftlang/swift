@@ -98,9 +98,13 @@ namespace {
         return Action::SkipChildren(E);
       } 
 
-      // Capture lists need to be reparented to enclosing autoclosures.
       if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
-        if (isa<AutoClosureExpr>(ParentDC)) {
+        // Capture lists need to be reparented to enclosing autoclosures
+        // and/or initializers of property wrapper backing properties
+        // (because they subsume initializers associated with wrapped
+        // properties).
+        if (isa<AutoClosureExpr>(ParentDC) ||
+            isPropertyWrapperBackingPropertyInitContext(ParentDC)) {
           for (auto &Cap : CapE->getCaptureList()) {
             Cap.PBD->setDeclContext(ParentDC);
             Cap.getVar()->setDeclContext(ParentDC);
@@ -135,6 +139,21 @@ namespace {
       // But we do want to walk into the initializers of local
       // variables.
       return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+    }
+
+  private:
+    static bool isPropertyWrapperBackingPropertyInitContext(DeclContext *DC) {
+      auto *init = dyn_cast<PatternBindingInitializer>(DC);
+      if (!init)
+        return false;
+
+      if (auto *PB = init->getBinding()) {
+        auto *var = PB->getSingleVar();
+        return var && var->getOriginalWrappedProperty(
+                          PropertyWrapperSynthesizedPropertyKind::Backing);
+      }
+
+      return false;
     }
   };
 
@@ -471,24 +490,6 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   // Typecheck a #available or #unavailable condition.
   if (elt.getKind() == StmtConditionElement::CK_Availability) {
     isFalsable = true;
-
-    // Reject inlinable code using availability macros.
-    PoundAvailableInfo *info = elt.getAvailability();
-    if (auto *decl = dc->getAsDecl()) {
-      auto fragileKind = dc->getFragileFunctionKind();
-      if (fragileKind.kind != FragileFunctionKind::None)
-        for (auto queries : info->getQueries())
-          if (auto availSpec =
-                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
-            if (availSpec->getMacroLoc().isValid()) {
-              Context.Diags.diagnose(
-                  availSpec->getMacroLoc(),
-                  swift::diag::availability_macro_in_inlinable,
-                  fragileKind.getSelector());
-              break;
-            }
-    }
-
     return false;
   }
 
@@ -2120,19 +2121,35 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
       // what the type of the expression is.  Take the inserted return back out.
       body->setLastElement(func->getSingleExpressionBody());
     }
-  } else if (isa<ConstructorDecl>(AFD) &&
-             (body->empty() ||
-                !isKnownEndOfConstructor(body->getLastElement()))) {
-    // For constructors, we make sure that the body ends with a "return" stmt,
-    // which we either implicitly synthesize, or the user can write.  This
-    // simplifies SILGen.
-    SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
-                                 body->getElements().end());
-    Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
-                                        /*value*/nullptr,
-                                        /*implicit*/true));
-    body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
-                             body->getRBraceLoc(), body->isImplicit());
+  } else if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
+    // If this is user-defined constructor that requires `_storage`
+    // variable injection, do so now so now.
+    if (auto *storageVar = ctor->getLocalTypeWrapperStorageVar()) {
+      SmallVector<ASTNode, 8> Elts;
+
+      Elts.push_back(storageVar->getParentPatternBinding());
+      Elts.push_back(storageVar);
+
+      Elts.append(body->getElements().begin(),
+                  body->getElements().end());
+
+      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
+                               body->getRBraceLoc(), body->isImplicit());
+    }
+
+    if (body->empty() ||
+        !isKnownEndOfConstructor(body->getLastElement())) {
+      // For constructors, we make sure that the body ends with a "return" stmt,
+      // which we either implicitly synthesize, or the user can write.  This
+      // simplifies SILGen.
+      SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
+                                   body->getElements().end());
+      Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
+                                          /*value*/nullptr,
+                                          /*implicit*/true));
+      body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
+                               body->getRBraceLoc(), body->isImplicit());
+    }
   }
 
   // Typechecking, in particular ApplySolution is going to replace closures

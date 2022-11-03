@@ -586,7 +586,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
 
 void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   auto dd = cast<DestructorDecl>(dtor.getDecl());
-  auto cd = cast<ClassDecl>(dd->getDeclContext());
+  auto cd = cast<ClassDecl>(dd->getDeclContext()->getImplementedObjCContext());
   MagicFunctionName = DeclName(SGM.M.getASTContext().getIdentifier("deinit"));
 
   RegularLocation loc(dd);

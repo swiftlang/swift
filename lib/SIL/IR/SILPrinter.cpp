@@ -1687,12 +1687,26 @@ public:
   }
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
+    {
+      *this << "origin ";
+
+      switch (AI->getOriginator()) {
+      case AssignByWrapperInst::Originator::TypeWrapper:
+        *this << "type_wrapper";
+        break;
+      case AssignByWrapperInst::Originator::PropertyWrapper:
+        *this << "property_wrapper";
+      }
+
+      *this << ", ";
+    }
+
     *this << getIDAndType(AI->getSrc()) << " to ";
     switch (AI->getMode()) {
     case AssignByWrapperInst::Unknown:
       break;
     case AssignByWrapperInst::Initialization:
-      *this << "[initialization] ";
+      *this << "[init] ";
       break;
     case AssignByWrapperInst::Assign:
       *this << "[assign] ";
@@ -1701,9 +1715,13 @@ public:
       *this << "[assign_wrapped_value] ";
       break;
     }
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
+
+    *this << getIDAndType(AI->getDest());
+
+    if (AI->getOriginator() == AssignByWrapperInst::Originator::PropertyWrapper)
+      *this << ", init " << getIDAndType(AI->getInitializer());
+
+    *this << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
@@ -1753,7 +1771,7 @@ public:
   void visitStore##Name##Inst(Store##Name##Inst *SI) { \
     *this << Ctx.getID(SI->getSrc()) << " to "; \
     if (SI->isInitializationOfDest()) \
-      *this << "[initialization] "; \
+      *this << "[init] "; \
     *this << getIDAndType(SI->getDest()); \
   }
 #include "swift/AST/ReferenceStorage.def"
@@ -1763,7 +1781,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -1772,7 +1790,7 @@ public:
       *this << "[take] ";
     *this << Ctx.getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      *this << "[initialization] ";
+      *this << "[init] ";
     *this << getIDAndType(CI->getDest());
   }
 
@@ -2392,7 +2410,11 @@ public:
   void visitReturnInst(ReturnInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
-  
+
+  void visitTestSpecificationInst(TestSpecificationInst *TSI) {
+    *this << QuotedString(TSI->getArgumentsSpecification());
+  }
+
   void visitThrowInst(ThrowInst *TI) {
     *this << getIDAndType(TI->getOperand());
   }

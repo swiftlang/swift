@@ -305,8 +305,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
       return addr;
 
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(
-      addr->getType()->getPointerElementType(), addr, bitConstant);
+    return llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
   };
 
   // Check whether we already have an entry with this name.
@@ -484,8 +483,8 @@ llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
   classPtr = IGF.Builder.CreateBitCast(classPtr, IGF.IGM.ObjCClassPtrTy);
   
   // Fetch the metadata for that class.
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassMetadataFn(),
-                                     classPtr);
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetObjCClassMetadataFunctionPointer(), classPtr);
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return call;
@@ -624,7 +623,8 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
     SmallString<64> scratch;
     auto className =
         IGF.IGM.getAddrOfGlobalString(theClass->getObjCRuntimeName(scratch));
-    return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFn(), className);
+    return IGF.Builder.CreateCall(IGF.IGM.getLookUpClassFunctionPointer(),
+                                  className);
   }
 
   assert(!theClass->isForeign());
@@ -660,14 +660,13 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
     auto cacheVariable =
         IGF.IGM.getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(theType);
     auto call = IGF.Builder.CreateCall(
-        IGF.IGM.getGetCanonicalSpecializedMetadataFn(),
+        IGF.IGM.getGetCanonicalSpecializedMetadataFunctionPointer(),
         {request.get(IGF),
          IGF.IGM.getAddrOfTypeMetadata(theType,
                                        TypeMetadataCanonicality::Noncanonical),
          cacheVariable});
     call->setDoesNotThrow();
     call->setCallingConv(IGF.IGM.SwiftCC);
-    call->addFnAttr(llvm::Attribute::ReadNone);
     return MetadataResponse::handle(IGF, request, call);
   }
   }
@@ -1172,8 +1171,7 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
     llvm::ConstantInt::get(IGM.Int32Ty, 1)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-        fullMetadata->getType()->getPointerElementType(), fullMetadata,
-        indices);
+      IGM.FullTypeMetadataStructTy, fullMetadata, indices);
 }
 
 using GetElementMetadataFn =
@@ -1214,8 +1212,8 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
     };
 
-    auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata2Fn(),
-                                       args);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getGetTupleMetadata2FunctionPointer(), args);
     call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
@@ -1234,8 +1232,8 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
     };
 
-    auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata3Fn(),
-                                       args);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getGetTupleMetadata3FunctionPointer(), args);
     call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
@@ -1277,8 +1275,8 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
     };
 
-    auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(),
-                                       args);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getGetTupleMetadataFunctionPointer(), args);
     call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
@@ -1304,8 +1302,7 @@ static Address createGenericArgumentsArray(IRGenFunction &IGF,
   for (unsigned i : indices(args)) {
     Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
                                               IGF.IGM.getPointerSize() * i);
-    auto *arg =
-      IGF.Builder.CreateBitCast(args[i], elt.getType()->getPointerElementType());
+    auto *arg = IGF.Builder.CreateBitCast(args[i], IGF.IGM.Int8PtrTy);
     IGF.Builder.CreateStore(arg, elt);
   }
 
@@ -1577,7 +1574,7 @@ namespace {
 
       auto constructSimpleCall =
           [&](llvm::SmallVectorImpl<llvm::Value *> &arguments)
-          -> llvm::Constant * {
+          -> FunctionPointer {
         arguments.push_back(flagsVal);
 
         collectParameters([&](unsigned i, llvm::Value *typeRef,
@@ -1592,16 +1589,16 @@ namespace {
 
         switch (params.size()) {
         case 0:
-          return IGF.IGM.getGetFunctionMetadata0Fn();
+          return IGF.IGM.getGetFunctionMetadata0FunctionPointer();
 
         case 1:
-          return IGF.IGM.getGetFunctionMetadata1Fn();
+          return IGF.IGM.getGetFunctionMetadata1FunctionPointer();
 
         case 2:
-          return IGF.IGM.getGetFunctionMetadata2Fn();
+          return IGF.IGM.getGetFunctionMetadata2FunctionPointer();
 
         case 3:
-          return IGF.IGM.getGetFunctionMetadata3Fn();
+          return IGF.IGM.getGetFunctionMetadata3FunctionPointer();
 
         default:
           llvm_unreachable("supports only 1/2/3 parameter functions");
@@ -1616,7 +1613,7 @@ namespace {
         if (!hasParameterFlags && !type->isDifferentiable() &&
             !type->getGlobalActor()) {
           llvm::SmallVector<llvm::Value *, 8> arguments;
-          auto *metadataFn = constructSimpleCall(arguments);
+          auto metadataFn = constructSimpleCall(arguments);
           auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
           call->setDoesNotThrow();
           return setLocal(CanType(type), MetadataResponse::forComplete(call));
@@ -1690,13 +1687,16 @@ namespace {
               IGF.emitAbstractTypeMetadataRef(globalActor->getCanonicalType()));
         }
 
-        auto *getMetadataFn = type->getGlobalActor()
-            ? (IGF.IGM.isConcurrencyAvailable()
-               ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
-               : IGF.IGM.getGetFunctionMetadataGlobalActorBackDeployFn())
+        auto getMetadataFn =
+            type->getGlobalActor()
+                ? (IGF.IGM.isConcurrencyAvailable()
+                       ? IGF.IGM
+                             .getGetFunctionMetadataGlobalActorFunctionPointer()
+                       : IGF.IGM
+                             .getGetFunctionMetadataGlobalActorBackDeployFunctionPointer())
             : type->isDifferentiable()
-              ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
-              : IGF.IGM.getGetFunctionMetadataFn();
+                ? IGF.IGM.getGetFunctionMetadataDifferentiableFunctionPointer()
+                : IGF.IGM.getGetFunctionMetadataFunctionPointer();
 
         auto call = IGF.Builder.CreateCall(getMetadataFn, arguments);
         call->setDoesNotThrow();
@@ -1725,7 +1725,7 @@ namespace {
       auto instMetadata =
         IGF.emitAbstractTypeMetadataRef(type.getInstanceType());
 
-      auto fn = IGF.IGM.getGetMetatypeMetadataFn();
+      auto fn = IGF.IGM.getGetMetatypeMetadataFunctionPointer();
       auto call = IGF.Builder.CreateCall(fn, instMetadata);
       call->setDoesNotThrow();
 
@@ -1750,7 +1750,7 @@ namespace {
       auto instMetadata =
         IGF.emitAbstractTypeMetadataRef(type.getExistentialInstanceType());
 
-      auto fn = IGF.IGM.getGetExistentialMetatypeMetadataFn();
+      auto fn = IGF.IGM.getGetExistentialMetatypeMetadataFunctionPointer();
       auto call = IGF.Builder.CreateCall(fn, instMetadata);
       call->setDoesNotThrow();
 
@@ -1797,9 +1797,8 @@ namespace {
         llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
       };
       return MetadataResponse::forComplete(
-        llvm::ConstantExpr::getInBoundsGetElementPtr(
-          singletonMetadata->getType()->getPointerElementType(),
-          singletonMetadata, indices));
+          llvm::ConstantExpr::getInBoundsGetElementPtr(
+              IGF.IGM.FullTypeMetadataStructTy, singletonMetadata, indices));
     }
 
     llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {
@@ -1824,9 +1823,9 @@ namespace {
                                                  "protocols");
       IGF.Builder.CreateLifetimeStart(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
-      descriptorArray = IGF.Builder.CreateBitCast(descriptorArray,
-                               IGF.IGM.ProtocolDescriptorRefTy->getPointerTo());
-      
+      descriptorArray = IGF.Builder.CreateElementBitCast(
+          descriptorArray, IGF.IGM.ProtocolDescriptorRefTy);
+
       unsigned index = 0;
       for (auto *protoDecl : protocols) {
         llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
@@ -1848,11 +1847,11 @@ namespace {
           CanType(superclass));
       }
 
-      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
-                                         {classConstraint,
-                                          superclassConstraint,
-                                          IGF.IGM.getSize(Size(protocols.size())),
-                                          descriptorArray.getAddress()});
+      auto call = IGF.Builder.CreateCall(
+          IGF.IGM.getGetExistentialMetadataFunctionPointer(),
+          {classConstraint, superclassConstraint,
+           IGF.IGM.getSize(Size(protocols.size())),
+           descriptorArray.getAddress()});
       call->setDoesNotThrow();
       IGF.Builder.CreateLifetimeEnd(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
@@ -1892,10 +1891,12 @@ namespace {
       }
 
       // Call the metadata access function in the runtime.
-      auto call = IGF.Builder.CreateCall(shapeIsUnique
-                    ? IGF.IGM.getGetExtendedExistentialTypeMetadataUniqueFn()
-                    : IGF.IGM.getGetExtendedExistentialTypeMetadataFn(),
-                    {shape, argsPointer});
+      auto call = IGF.Builder.CreateCall(
+          shapeIsUnique
+              ? IGF.IGM
+                    .getGetExtendedExistentialTypeMetadataUniqueFunctionPointer()
+              : IGF.IGM.getGetExtendedExistentialTypeMetadataFunctionPointer(),
+          {shape, argsPointer});
       call->setDoesNotThrow();
 
       // Destroy the generalization arguments array, if we made one.
@@ -2039,12 +2040,11 @@ static bool isLoadFrom(llvm::Value *value, Address address) {
 /// If cacheVariable is null, we perform the direct access every time.
 /// This is used for metadata accessors that come about due to resilience,
 /// where the direct access is completely trivial.
-void irgen::emitCacheAccessFunction(IRGenModule &IGM,
-                                    llvm::Function *accessor,
+void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
                                     llvm::Constant *cacheVariable,
+                                    llvm::Type *cacheTy,
                                     CacheStrategy cacheStrategy,
-                                    CacheEmitter getValue,
-                                    bool isReadNone) {
+                                    CacheEmitter getValue, bool isReadNone) {
   assert((cacheStrategy == CacheStrategy::None) == (cacheVariable == nullptr));
   accessor->setDoesNotThrow();
   // Don't inline cache functions, since doing so has little impact on
@@ -2096,11 +2096,9 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   }
 
   llvm::Constant *null =
-    llvm::ConstantPointerNull::get(
-      cast<llvm::PointerType>(
-        cacheVariable->getType()->getPointerElementType()));
+      llvm::ConstantPointerNull::get(cast<llvm::PointerType>(cacheTy));
 
-  Address cache(cacheVariable, IGM.getPointerAlignment());
+  Address cache(cacheVariable, cacheTy, IGM.getPointerAlignment());
 
   // Okay, first thing, check the cache variable.
   //
@@ -2250,7 +2248,8 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
     callArgs.append(args.begin(), args.end());
   }
 
-  auto call = Builder.CreateCall(accessFunction, callArgs);
+  auto call = Builder.CreateCall(accessFunction->getFunctionType(),
+                                 accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
   call->addFnAttr(allocatedArgsBuffer
@@ -2293,7 +2292,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     // swift_getGenericMetadata's calling convention is already cleverly
     // laid out to minimize the assembly language size of the thunk.
     // The caller passed us an appropriate buffer with the arguments.
-    auto argsBuffer = Address(params.claimNext(), IGM.getPointerAlignment());
+    auto argsBuffer =
+        Address(params.claimNext(), IGM.Int8PtrTy, IGM.getPointerAlignment());
     llvm::Value *arguments =
       IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrTy);
 
@@ -2301,12 +2301,12 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     llvm::CallInst *call;
     if (checkPrespecialized) {
       call = IGF.Builder.CreateCall(
-          IGM.getGetCanonicalPrespecializedGenericMetadataFn(),
+          IGM.getGetCanonicalPrespecializedGenericMetadataFunctionPointer(),
           {request, arguments, descriptor,
            IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
                nominal)});
     } else {
-      call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+      call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFunctionPointer(),
                                     {request, arguments, descriptor});
     }
     call->setDoesNotThrow();
@@ -2325,6 +2325,8 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       subIGF.CurFn->setOnlyReadsMemory();
       subIGF.CurFn->setWillReturn();
       subIGF.CurFn->setCallingConv(IGM.SwiftCC);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->emitArtificialFunction(subIGF, subIGF.CurFn);
       IGM.setHasNoFramePointer(subIGF.CurFn);
 
       auto params = subIGF.collectParameters();
@@ -2365,17 +2367,18 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
       llvm::Value *result;
       if (checkPrespecialized) {
         result = subIGF.Builder.CreateCall(
-            IGM.getGetCanonicalPrespecializedGenericMetadataFn(),
+            IGM.getGetCanonicalPrespecializedGenericMetadataFunctionPointer(),
             {request, argsAddr, descriptor, token});
       } else {
-        result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
-                                           {request, argsAddr, descriptor});
+        result = subIGF.Builder.CreateCall(
+            IGM.getGetGenericMetadataFunctionPointer(),
+            {request, argsAddr, descriptor});
       }
       subIGF.Builder.CreateRet(result);
     };
-    llvm::Constant *thunkFn;
+    llvm::Function *thunkFn;
     if (checkPrespecialized) {
-      thunkFn = IGM.getOrCreateHelperFunction(
+      thunkFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
           "__swift_instantiateCanonicalPrespecializedGenericMetadata",
           IGM.TypeMetadataResponseTy,
           {
@@ -2387,9 +2390,9 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
               IGM.OnceTy->getPointerTo()      // token pointer
           },
           generateThunkFn,
-          /*noinline*/ true);
+          /*noinline*/ true));
     } else {
-      thunkFn = IGM.getOrCreateHelperFunction(
+      thunkFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
           "__swift_instantiateGenericMetadata", IGM.TypeMetadataResponseTy,
           {
               IGM.SizeTy,                    // request
@@ -2399,7 +2402,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
               IGM.TypeContextDescriptorPtrTy // type context descriptor
           },
           generateThunkFn,
-          /*noinline*/ true);
+          /*noinline*/ true));
     }
 
     // Call out to the helper.
@@ -2419,9 +2422,10 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
           IGM.getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
               nominal);
       call = IGF.Builder.CreateCall(
-          thunkFn, {request, arg0, arg1, arg2, descriptor, token});
+          thunkFn->getFunctionType(), thunkFn,
+          {request, arg0, arg1, arg2, descriptor, token});
     } else {
-      call = IGF.Builder.CreateCall(thunkFn,
+      call = IGF.Builder.CreateCall(thunkFn->getFunctionType(), thunkFn,
                                     {request, arg0, arg1, arg2, descriptor});
     }
     call->setDoesNotAccessMemory();
@@ -2602,6 +2606,7 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
 
   // Okay, define the accessor.
   llvm::Constant *cacheVariable = nullptr;
+  llvm::Type *cacheTy = nullptr;
 
   // If our preferred access method is to go via an accessor, it means
   // there is some non-trivial computation that needs to be cached.
@@ -2616,12 +2621,14 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
     // For lazy initialization, the cache variable is just a pointer.
     case CacheStrategy::Lazy:
       cacheVariable = IGM.getAddrOfTypeMetadataLazyCacheVariable(type);
+      cacheTy = IGM.TypeMetadataPtrTy;
       break;
 
     // For in-place initialization, drill down to the first element.
     case CacheStrategy::SingletonInitialization:
       cacheVariable = IGM.getAddrOfTypeMetadataSingletonInitializationCache(
                                           type->getAnyNominal(), ForDefinition);
+      cacheTy = IGM.TypeMetadataPtrTy;
       break;
     }
 
@@ -2629,11 +2636,12 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
       accessor->addFnAttr(llvm::Attribute::NoInline);
   }
 
-  emitCacheAccessFunction(IGM, accessor, cacheVariable, cacheStrategy,
+  emitCacheAccessFunction(IGM, accessor, cacheVariable, cacheTy, cacheStrategy,
                           [&](IRGenFunction &IGF, Explosion &params) {
-    auto request = DynamicMetadataRequest(params.claimNext());
-    return generator(IGF, request, cacheVariable);
-  });
+                            auto request =
+                                DynamicMetadataRequest(params.claimNext());
+                            return generator(IGF, request, cacheVariable);
+                          });
 
   return accessor;
 }
@@ -2907,6 +2915,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     subIGF.CurFn->setOnlyReadsMemory();
     subIGF.CurFn->setWillReturn();
     IGM.setHasNoFramePointer(subIGF.CurFn);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->emitArtificialFunction(subIGF, subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
     auto cache = params.claimNext();
@@ -2932,7 +2942,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     // in the current LLVM ARM backend.
     auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache,
                                                  IGM.Int64Ty->getPointerTo());
-    auto load = subIGF.Builder.CreateLoad(cacheWordAddr, Alignment(8));
+    auto load = subIGF.Builder.CreateLoad(
+        Address(cacheWordAddr, IGM.Int64Ty, Alignment(8)));
     // Make this barrier explicit when building for TSan to avoid false positives.
     if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
       load->setOrdering(llvm::AtomicOrdering::Acquire);
@@ -2993,7 +3004,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     llvm::CallInst *call;
     if (request.isStaticallyAbstract()) {
       call = subIGF.Builder.CreateCall(
-          IGM.getGetTypeByMangledNameInContextInMetadataStateFn(),
+          IGM.getGetTypeByMangledNameInContextInMetadataStateFunctionPointer(),
           {llvm::ConstantInt::get(IGM.SizeTy, (size_t)MetadataState::Abstract),
            stringAddr, size,
            // TODO: Use mangled name lookup in generic
@@ -3002,7 +3013,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
            llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
     } else {
       call = subIGF.Builder.CreateCall(
-          IGM.getGetTypeByMangledNameInContextFn(),
+          IGM.getGetTypeByMangledNameInContextFunctionPointer(),
           {stringAddr, size,
            // TODO: Use mangled name lookup in generic
            // contexts?
@@ -3036,14 +3047,13 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                                IGM.TypeMetadataPtrTy);
     subIGF.Builder.CreateRet(resultAddr);
   };
-  auto instantiationFn =
-    IGM.getOrCreateHelperFunction(instantiationFnName,
-                                  IGF.IGM.TypeMetadataPtrTy,
-                                  cache->getType(),
-                                  generateInstantiationFn,
-                                  /*noinline*/true);
-  
-  auto call = IGF.Builder.CreateCall(instantiationFn, cache);
+  auto instantiationFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+      instantiationFnName, IGF.IGM.TypeMetadataPtrTy, cache->getType(),
+      generateInstantiationFn,
+      /*noinline*/ true));
+
+  auto call = IGF.Builder.CreateCall(instantiationFn->getFunctionType(),
+                                     instantiationFn, cache);
   call->setDoesNotThrow();
   call->setOnlyReadsMemory();
   
@@ -3072,9 +3082,9 @@ emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF, CanType type,
     return emitMetadataAccessByMangledName(IGF, type, request);
   }
 
-  llvm::Constant *accessor =
-    getOrCreateTypeMetadataAccessFunction(IGF.IGM, type);
-  llvm::CallInst *call = IGF.Builder.CreateCall(accessor, { request.get(IGF) });
+  auto *accessor = getOrCreateTypeMetadataAccessFunction(IGF.IGM, type);
+  llvm::CallInst *call = IGF.Builder.CreateCall(accessor->getFunctionType(),
+                                                accessor, {request.get(IGF)});
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotAccessMemory();
   call->setDoesNotThrow();
@@ -3543,8 +3553,9 @@ namespace {
         auto elt1 = visit(type.getElementType(1), request);
 
         // Ignore the offset.
-        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayout2Fn(),
-                                           {resultPtr, elt0, elt1});
+        auto call =
+            IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayout2FunctionPointer(),
+                                   {resultPtr, elt0, elt1});
         call->setDoesNotThrow();
 
         break;
@@ -3556,8 +3567,9 @@ namespace {
         auto elt2 = visit(type.getElementType(2), request);
 
         // Ignore the offsets.
-        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayout3Fn(),
-                                           {resultPtr, elt0, elt1, elt2});
+        auto call =
+            IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayout3FunctionPointer(),
+                                   {resultPtr, elt0, elt1, elt2});
         call->setDoesNotThrow();
 
         break;
@@ -3592,9 +3604,9 @@ namespace {
         auto flagsValue = IGF.IGM.getSize(Size(flags.getIntValue()));
 
         // Compute the layout.
-        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleLayoutFn(),
-                                           {resultPtr, offsetsPtr, flagsValue,
-                                            eltLayoutsArray.getAddress()});
+        auto call = IGF.Builder.CreateCall(
+            IGF.IGM.getGetTupleLayoutFunctionPointer(),
+            {resultPtr, offsetsPtr, flagsValue, eltLayoutsArray.getAddress()});
         call->setDoesNotThrow();
 
         // We're done with the buffer.
@@ -3636,8 +3648,8 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
   metatype = IGF.Builder.CreateBitCast(metatype, IGF.IGM.TypeMetadataPtrTy);
   
   // Fetch the metadata for that class.
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassFromMetadataFn(),
-                                     metatype);
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetObjCClassFromMetadataFunctionPointer(), metatype);
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   return call;
@@ -3758,8 +3770,9 @@ MetadataResponse
 irgen::emitGetTypeMetadataDynamicState(IRGenFunction &IGF,
                                        DynamicMetadataRequest request,
                                        llvm::Value *metadata) {
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getCheckMetadataStateFn(),
-                                     { request.get(IGF), metadata });
+  auto call =
+      IGF.Builder.CreateCall(IGF.IGM.getCheckMetadataStateFunctionPointer(),
+                             {request.get(IGF), metadata});
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   return MetadataResponse::handle(IGF, request, call);

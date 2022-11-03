@@ -41,6 +41,10 @@ using namespace ast_scope;
 void ASTScope::unqualifiedLookup(
     SourceFile *SF, SourceLoc loc,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
+  if (loc.isValid()) {
+    SF = SF->getParentModule()->getSourceFileContainingLocation(loc);
+  }
+
   if (auto *s = SF->getASTContext().Stats)
     ++s->getFrontendCounters().NumASTScopeLookups;
   ASTScopeImpl::unqualifiedLookup(SF, loc, consumer);

@@ -31,6 +31,9 @@ public:
   CodeCompletionCache &Cache;
   CompletionKind CodeCompletionKind = CompletionKind::None;
 
+  /// Module qualified nominal type decl names
+  SmallVector<NullTerminatedStringRef, 2> LookedupNominalTypeNames;
+
   enum class TypeContextKind {
     /// There is no known contextual type. All types are equally good.
     None,

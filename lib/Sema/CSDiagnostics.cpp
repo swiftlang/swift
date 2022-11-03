@@ -794,6 +794,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
+    case ConstraintLocator::TernaryBranch:
+      diagnostic = diag::ternary_expr_cases_mismatch;
+      break;
+
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
       assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
@@ -7174,7 +7178,6 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
-  case ConversionRestrictionKind::ReifyPackToType:
     llvm_unreachable("Expected an ephemeral conversion!");
   }
 }

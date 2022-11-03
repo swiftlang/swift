@@ -86,16 +86,34 @@ bool ScopedAddressValue::visitScopeEndingUses(
   }
 }
 
-bool ScopedAddressValue::computeLiveness(PrunedLiveness &liveness) const {
+// Note: This is used to fixup an incomplete address scope, so cannot assume the
+// scope's lifetime is already complete. Therefore, it needs to transitively
+// process all address uses.
+//
+// FIXME: users of this should use the standard recursive lifetime completion
+// utility. Otherwise dealing with nested incomplete lifetimes becomes
+// expensive and complex. e.g.
+//
+//   %storeBorrow = store_borrow %_ to %adr
+//   %loadBorrow  = load_borrow %storeBorrow
+//   apply %f(%loadBorrow) : $@convention(thin) (...) -> Never
+//   unreachable
+//
+AddressUseKind ScopedAddressValue::computeTransitiveLiveness(
+    SSAPrunedLiveness &liveness) const {
+  liveness.initializeDef(value);
+  return updateTransitiveLiveness(liveness);
+}
+
+AddressUseKind
+ScopedAddressValue::updateTransitiveLiveness(PrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
-  if (addressKind != AddressUseKind::NonEscaping) {
-    return false;
-  }
-
-  liveness.initializeDefBlock(value->getParentBlock());
   for (auto *use : uses) {
+    if (isScopeEndingUse(use))
+      continue;
+
     // Update all collected uses as non-lifetime ending.
     liveness.updateForUse(use->getUser(), /* lifetimeEnding */ false);
   }
@@ -103,7 +121,7 @@ bool ScopedAddressValue::computeLiveness(PrunedLiveness &liveness) const {
     liveness.updateForUse(endOp->getUser(), /* isLifetimeEnding */ true);
     return true;
   });
-  return true;
+  return addressKind;
 }
 
 void ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
@@ -123,7 +141,7 @@ void ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
 }
 
 void ScopedAddressValue::endScopeAtLivenessBoundary(
-    PrunedLiveness *liveness) const {
+    SSAPrunedLiveness *liveness) const {
   // If no users exist, create scope ending instruction immediately after the
   // scoped address value.
   if (liveness->empty()) {
@@ -133,7 +151,7 @@ void ScopedAddressValue::endScopeAtLivenessBoundary(
   }
 
   PrunedLivenessBoundary scopedAddressBoundary;
-  scopedAddressBoundary.compute(*liveness);
+  liveness->computeBoundary(scopedAddressBoundary);
   // Go over the boundary and create scope ending instructions.
   scopedAddressBoundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
@@ -142,7 +160,7 @@ void ScopedAddressValue::endScopeAtLivenessBoundary(
 }
 
 bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
-                                           PrunedLiveness *liveness,
+                                           SSAPrunedLiveness *liveness,
                                            DeadEndBlocks *deadEndBlocks) {
   SmallVector<StoreBorrowInst *, 4> otherStoreBorrows;
   // Collect all other store_borrows to the destination of \p storeBorrow
@@ -157,73 +175,11 @@ bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
 
   for (auto *otherStoreBorrow : otherStoreBorrows) {
     // Return true, if otherStoreBorrow was in \p storeBorrow's scope
-    if (liveness->isWithinBoundaryOfDef(otherStoreBorrow, storeBorrow)) {
+    if (liveness->isWithinBoundary(otherStoreBorrow)) {
       return true;
     }
   }
   return false;
-}
-
-bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
-                              SmallVectorImpl<Operand *> &newUses,
-                              DeadEndBlocks *deadEndBlocks,
-                              InstModCallbacks callbacks) {
-  ScopedAddressValue scopedAddress(sbi);
-
-  SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  PrunedLiveness storeBorrowLiveness(&discoveredBlocks);
-  bool success = scopedAddress.computeLiveness(storeBorrowLiveness);
-
-  // If all new uses are within store_borrow boundary, no need for extension.
-  if (storeBorrowLiveness.areUsesWithinBoundary(newUses, deadEndBlocks)) {
-    return true;
-  }
-
-  if (!success) {
-    return false;
-  }
-
-  // store_borrow extension is possible only when there are no other
-  // store_borrows to the same destination within the store_borrow's lifetime
-  // built from newUsers.
-  if (hasOtherStoreBorrowsInLifetime(sbi, &storeBorrowLiveness,
-                                     deadEndBlocks)) {
-    return false;
-  }
-
-  InstModCallbacks tempCallbacks = callbacks;
-  InstructionDeleter deleter(std::move(tempCallbacks));
-  GuaranteedOwnershipExtension borrowExtension(deleter, *deadEndBlocks);
-  auto status = borrowExtension.checkBorrowExtension(
-      BorrowedValue(sbi->getSrc()), newUses);
-  if (status == GuaranteedOwnershipExtension::Invalid) {
-    return false;
-  }
-
-  borrowExtension.transform(status);
-
-  SmallVector<Operand *, 4> endBorrowUses;
-  // Collect old scope-ending instructions.
-  scopedAddress.visitScopeEndingUses([&](Operand *op) {
-    endBorrowUses.push_back(op);
-    return true;
-  });
-
-  for (auto *use : newUses) {
-    // Update newUsers as non-lifetime ending.
-    storeBorrowLiveness.updateForUse(use->getUser(),
-                                     /* lifetimeEnding */ false);
-  }
-
-  // Add new scope-ending instructions.
-  scopedAddress.endScopeAtLivenessBoundary(&storeBorrowLiveness);
-
-  // Remove old scope-ending instructions.
-  for (auto *endBorrowUse : endBorrowUses) {
-    callbacks.deleteInst(endBorrowUse->getUser());
-  }
-
-  return true;
 }
 
 void ScopedAddressValue::print(llvm::raw_ostream &os) const {

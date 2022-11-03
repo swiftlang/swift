@@ -629,16 +629,13 @@ bb0(%0 : @guaranteed $RecurStruct):
 
 bb1:
   %3 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
-  %borrow3 = begin_borrow %3 : $Klass
-  br bb3(%borrow3 : $Klass)
+  br bb3(%3 : $Klass)
 
 bb2:
   %4 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
-  %borrow4 = begin_borrow %4 : $Klass
-  br bb3(%borrow4 : $Klass)
+  br bb3(%4 : $Klass)
 
 bb3(%borrow : @guaranteed $Klass):
-  end_borrow %borrow : $Klass
   %copy = copy_value %1 : $NonTrivialStruct
   return %copy : $NonTrivialStruct
 }

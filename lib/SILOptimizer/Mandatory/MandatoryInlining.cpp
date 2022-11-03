@@ -166,7 +166,7 @@ static  bool fixupReferenceCounts(
           });
 
       // Since our applySite is in a different loop than our partial apply means
-      // thatour leak code will have lifetime extended the value over the
+      // that our leak code will have lifetime extended the value over the
       // loop. So we should /not/ insert a destroy after the apply site. In
       // contrast, if we do not have a loop, we must have been compensating for
       // uses in the top of a diamond and need to insert a destroy after the
@@ -1008,7 +1008,7 @@ class MandatoryInlining : public SILModuleTransform {
     if (getOptions().DebugSerialization)
       return;
     for (auto *F : changedFunctions) {
-      invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 

@@ -66,7 +66,7 @@ func load_invariant_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8load_gen{{[_0-9a-zA-Z]*}}F
 func load_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
-  // CHECK: copy_addr [[ADDR]] to [initialization] {{%.*}}
+  // CHECK: copy_addr [[ADDR]] to [init] {{%.*}}
   return Builtin.load(x)
 }
 
@@ -90,7 +90,7 @@ func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8move_gen{{[_0-9a-zA-Z]*}}F
 func move_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
-  // CHECK: copy_addr [take] [[ADDR]] to [initialization] {{%.*}}
+  // CHECK: copy_addr [take] [[ADDR]] to [init] {{%.*}}
   return Builtin.take(x)
 }
 
@@ -188,7 +188,7 @@ func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8init_gen{{[_0-9a-zA-Z]*}}F
 func init_gen<T>(_ x: T, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
-  // CHECK: copy_addr [[OTHER_LOC:%.*]] to [initialization]  [[ADDR]]
+  // CHECK: copy_addr [[OTHER_LOC:%.*]] to [init]  [[ADDR]]
   // CHECK-NOT: destroy_addr [[OTHER_LOC]]
   Builtin.initialize(x, y)
 }
@@ -593,7 +593,7 @@ func reinterpretAddrOnly<T, U>(_ t: T) -> U {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins28reinterpretAddrOnlyToTrivial{{[_0-9a-zA-Z]*}}F
 func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
-  // CHECK: copy_addr %0 to [initialization] [[INPUT:%.*]] : $*T
+  // CHECK: copy_addr %0 to [init] [[INPUT:%.*]] : $*T
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
   // CHECK: destroy_addr [[INPUT]]
@@ -605,7 +605,7 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [trivial] [[BUF]]
   // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]] : $*Int to $*T
-  // CHECK: copy_addr [[RES1]] to [initialization]
+  // CHECK: copy_addr [[RES1]] to [init]
   return (Builtin.reinterpretCast(a) as T,
   // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
   // CHECK: load [trivial] [[RES]]

@@ -677,7 +677,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
 
   // The returned partial_apply of a thunk is most likely being optimized away
   // if inlined. Because some thunks cannot be specialized (e.g. if an opened
-  // existential is in the subsitution list), we inline such thunks also in case
+  // existential is in the substitution list), we inline such thunks also in case
   // they are generic.
   if (Callee->isThunk() && returnsClosure(Callee))
     return true;

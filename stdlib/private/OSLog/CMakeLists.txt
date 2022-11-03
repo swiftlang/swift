@@ -1,7 +1,10 @@
 set(swift_oslog_darwin_dependencies "")
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     list(APPEND swift_oslog_darwin_dependencies "_Concurrency")
-endif ()
+endif()
+if (SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+  list(APPEND swift_oslog_darwin_dependencies "_StringProcessing")
+endif()
 
 add_swift_target_library(swiftOSLogTestHelper
   IS_SDK_OVERLAY

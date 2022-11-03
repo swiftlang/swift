@@ -502,6 +502,9 @@ class GlobalModuleDependenciesCache {
     ModuleDependenciesKindMap ModuleDependenciesMap;
   };
 
+  /// The 'persistent' Clang dependency scanner service
+  clang::tooling::dependencies::DependencyScanningService clangScanningService;
+
   /// All cached Swift source module dependencies, in the order in which they were encountered
   std::vector<ModuleDependencyID> AllSourceModules;
 
@@ -616,9 +619,6 @@ private:
   StringRef mainScanModuleName;
   /// Set containing all of the Clang modules that have already been seen.
   llvm::StringSet<> alreadySeenClangModules;
-  /// The 'persistent' Clang dependency scanner service
-  /// TODO: Share this service among common scanner invocations
-  clang::tooling::dependencies::DependencyScanningService clangScanningService;
   /// The Clang dependency scanner tool
   clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
 

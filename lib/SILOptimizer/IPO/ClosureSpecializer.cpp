@@ -1003,7 +1003,7 @@ void SILClosureSpecializerTransform::run() {
 
   // Invalidate everything since we delete calls as well as add new
   // calls and branches.
-  invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+  invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
 }
 
 static void markReabstractionPartialApplyAsUsed(
@@ -1287,7 +1287,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
 
-        // We currently only support copying intermediate reabastraction
+        // We currently only support copying intermediate reabstraction
         // closures if the closure is ultimately passed trivially.
         bool IsClosurePassedTrivially = ClosureParamInfo.getInterfaceType()
                                             ->castTo<SILFunctionType>()

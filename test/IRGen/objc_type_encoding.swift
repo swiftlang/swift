@@ -220,5 +220,6 @@ class C: P {
   func stuff() {}
 }
 
-// CHECK-macosx: [[ENC5:@.*]] = private unnamed_addr constant [9 x i8] c"Vv16@0:8\00"
-// CHECK-macosx: @_PROTOCOL_INSTANCE_METHODS_P = {{.*}}@"\01L_selector_data(stuff)"{{.*}}[[ENC5]]{{.*}}
+// CHECK-macosx: @OBJC_METH_VAR_NAME_ = private unnamed_addr constant [6 x i8] c"stuff\00"
+// CHECK-macosx: @OBJC_METH_VAR_TYPE_ = private unnamed_addr constant [9 x i8] c"Vv16@0:8\00"
+// CHECK-macosx: @"_OBJC_$_PROTOCOL_INSTANCE_METHODS_P" = {{.*}}@OBJC_METH_VAR_NAME_{{.*}}@OBJC_METH_VAR_TYPE_{{.*}}

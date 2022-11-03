@@ -217,7 +217,7 @@ bb0(%0 : $*Int32, %1 : $*Int32):
   return %4 : $Int32
 }
 
-// CHECK-LABEL:  @esacping_allocstack_and_copyaddr
+// CHECK-LABEL:  @escaping_allocstack_and_copyaddr
 // CHECK:        PAIR #3.
 // CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
@@ -230,7 +230,7 @@ bb0(%0 : $*Int32, %1 : $*Int32):
 // CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:       %3 = address_to_pointer %1 : $*Int32 to $Builtin.RawPointer
 // CHECK-NEXT:     r=1,w=1
-sil @esacping_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
+sil @escaping_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
@@ -789,20 +789,20 @@ bb0(%0 : $*Int64Wrapper):
 
 // CHECK-LABEL: @test_copy_addr_initialize
 // CHECK:      PAIR #0.
-// CHECK-NEXT:   copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   copy_addr %1 to [init] %0 : $*C
 // CHECK-NEXT:   %0 = argument of bb0 : $*C
 // CHECK-NEXT:   r=0,w=1
 // CHECK:      PAIR #1.
-// CHECK-NEXT:    copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:    copy_addr %1 to [init] %0 : $*C
 // CHECK-NEXT:    %1 = argument of bb0 : $*C
 // CHECK-NEXT:    r=1,w=0
 // CHECK:      PAIR #2.
-// CHECK-NEXT:   copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   copy_addr %1 to [init] %0 : $*C
 // CHECK-NEXT:   %2 = argument of bb0 : $*C
 // CHECK-NEXT:   r=0,w=0
 sil @test_copy_addr_initialize : $@convention(thin) (@inout C, @inout C) -> @out C {
 bb0(%0 : $*C, %1 : $*C, %2: $*C):
-  copy_addr %1 to [initialization] %0 : $*C
+  copy_addr %1 to [init] %0 : $*C
   %6 = tuple ()
   return %6 : $()
 }
@@ -829,20 +829,20 @@ bb0(%0 : $*C, %1 : $*C, %2: $*C):
 
 // CHECK-LABEL: @test_copy_addr_take
 // CHECK:      PAIR #0.
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0 : $*C
 // CHECK-NEXT:   %0 = argument of bb0 : $*C
 // CHECK-NEXT:   r=0,w=1
 // CHECK:      PAIR #1.
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0 : $*C
 // CHECK-NEXT:   %1 = argument of bb0 : $*C
 // CHECK-NEXT:   r=1,w=1
 // CHECK:      PAIR #2.
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   copy_addr [take] %1 to [init] %0 : $*C
 // CHECK-NEXT:   %2 = argument of bb0 : $*C
 // CHECK-NEXT:   r=0,w=0
 sil @test_copy_addr_take : $@convention(thin) (@in C, @inout C) -> @out C {
 bb0(%0 : $*C, %1 : $*C, %2: $*C):
-  copy_addr [take] %1 to [initialization] %0 : $*C
+  copy_addr [take] %1 to [init] %0 : $*C
   %6 = tuple ()
   return %6 : $()
 }

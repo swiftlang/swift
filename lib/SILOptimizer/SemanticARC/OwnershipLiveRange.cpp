@@ -102,7 +102,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     tmpForwardingConsumingUses.push_back(op);
 
     // If we have a non-terminator, just visit its users recursively to see if
-    // the the users force the live range to be alive.
+    // the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
         if (v->getOwnershipKind() != OwnershipKind::Owned)
@@ -310,14 +310,7 @@ void OwnershipLiveRange::convertJoinedLiveRangePhiToGuaranteed(
     InstModCallbacks callbacks) && {
 
   // First convert the phi value itself to be guaranteed.
-  SILValue phiValue = convertIntroducerToGuaranteed(introducer);
-
-  // Then insert end_borrows at each of our destroys if we are consuming. We
-  // have to convert the phi to guaranteed first since otherwise, the ownership
-  // check when we create the end_borrows will trigger.
-  if (introducer.hasConsumingGuaranteedOperands()) {
-    insertEndBorrowsAtDestroys(phiValue, deadEndBlocks, scratch);
-  }
+  convertIntroducerToGuaranteed(introducer);
 
   // Then eliminate all of the destroys...
   while (!destroyingUses.empty()) {

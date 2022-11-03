@@ -13,6 +13,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 
 using namespace swift;
@@ -74,7 +75,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   // temporaries.
   SmallVector<Operand *, 16> paiUses;
 
-  // Of course we must inlude all apply instructions which we want to optimize.
+  // Of course we must include all apply instructions which we want to optimize.
   for (FullApplySite ai : applies) {
     paiUses.push_back(ai.getCalleeOperand());
   }

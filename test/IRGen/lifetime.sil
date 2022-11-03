@@ -10,7 +10,7 @@ import Builtin
 sil @generic : $@convention(thin) <T> (@in T) -> () {
 bb0(%x : $*T):
   %y = alloc_stack $T
-  copy_addr %x to [initialization] %y : $*T
+  copy_addr %x to [init] %y : $*T
   destroy_addr %y : $*T
   dealloc_stack %y : $*T
   destroy_addr %x : $*T
@@ -52,9 +52,9 @@ bb0(%x : $*T):
 sil @generic_with_reuse : $@convention(thin) <T> (@in T) -> () {
 bb0(%x : $*T):
   %y = alloc_stack $T
-  copy_addr %x to [initialization] %y : $*T
+  copy_addr %x to [init] %y : $*T
   destroy_addr %y : $*T
-  copy_addr [take] %x to [initialization] %y : $*T
+  copy_addr [take] %x to [init] %y : $*T
   destroy_addr %y : $*T
   dealloc_stack %y : $*T
   %0 = tuple ()
@@ -102,7 +102,7 @@ bb0(%x : $*T):
 sil @fixed_size : $@convention(thin) (@in Builtin.Int64) -> () {
 bb0(%x : $*Builtin.Int64):
   %y = alloc_stack $Builtin.Int64
-  copy_addr %x to [initialization] %y : $*Builtin.Int64
+  copy_addr %x to [init] %y : $*Builtin.Int64
   destroy_addr %y : $*Builtin.Int64
   dealloc_stack %y : $*Builtin.Int64
   destroy_addr %x : $*Builtin.Int64

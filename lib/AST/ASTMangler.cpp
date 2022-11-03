@@ -294,7 +294,17 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      appendType(sub->mapTypeOutOfContext()->getCanonicalType(), signature);
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> Optional<Type> {
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return None;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
     }
   }
   appendOperator("TK");
@@ -318,7 +328,17 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      appendType(sub->mapTypeOutOfContext()->getCanonicalType(), signature);
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> Optional<Type> {
+        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return None;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
     }
   }
   appendOperator("Tk");
@@ -861,6 +881,28 @@ std::string ASTMangler::mangleGenericSignature(const GenericSignature sig) {
   return finalize();
 }
 
+std::string ASTMangler::mangleHasSymbolQuery(const ValueDecl *Decl) {
+  beginMangling();
+
+  if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
+    appendConstructorEntity(Ctor, /*isAllocating=*/false);
+  } else if (auto Dtor = dyn_cast<DestructorDecl>(Decl)) {
+    appendDestructorEntity(Dtor, /*isDeallocating=*/false);
+  } else if (auto GTD = dyn_cast<GenericTypeDecl>(Decl)) {
+    appendAnyGenericType(GTD);
+  } else if (isa<AssociatedTypeDecl>(Decl)) {
+    appendContextOf(Decl);
+    appendDeclName(Decl);
+    appendOperator("Qa");
+  } else {
+    appendEntity(Decl);
+  }
+
+  appendSymbolKind(ASTMangler::SymbolKind::HasSymbolQuery);
+
+  return finalize();
+}
+
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
@@ -872,6 +914,7 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::AccessibleFunctionRecord: return appendOperator("HF");
     case SymbolKind::BackDeploymentThunk: return appendOperator("Twb");
     case SymbolKind::BackDeploymentFallback: return appendOperator("TwB");
+    case SymbolKind::HasSymbolQuery: return appendOperator("TwS");
   }
 }
 
@@ -1367,15 +1410,10 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
-    case TypeKind::SequenceArchetype:
+    case TypeKind::PackArchetype:
+    case TypeKind::ElementArchetype:
+    case TypeKind::OpenedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
-
-    case TypeKind::OpenedArchetype: {
-      // Opened archetypes have always been mangled via their interface type,
-      // although those manglings aren't used in any stable manner.
-      auto openedType = cast<OpenedArchetypeType>(tybase);
-      return appendType(openedType->getInterfaceType(), sig, forDecl);
-    }
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
@@ -2868,8 +2906,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   Type FirstTy = reqt.getFirstType()->getCanonicalType();
 
   switch (reqt.getKind()) {
-  case RequirementKind::SameCount:
-    llvm_unreachable("Same-count requirement not supported here");
+  case RequirementKind::SameShape:
+    llvm_unreachable("Same-shape requirement not supported here");
   case RequirementKind::Layout:
     break;
   case RequirementKind::Conformance: {
@@ -2891,8 +2929,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   if (auto *DT = FirstTy->getAs<DependentMemberType>()) {
     if (tryMangleTypeSubstitution(DT, sig)) {
       switch (reqt.getKind()) {
-        case RequirementKind::SameCount:
-          llvm_unreachable("Same-count requirement not supported here");
+        case RequirementKind::SameShape:
+          llvm_unreachable("Same-shape requirement not supported here");
         case RequirementKind::Conformance:
           return appendOperator("RQ");
         case RequirementKind::Layout:
@@ -2912,8 +2950,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
     addTypeSubstitution(DT, sig);
     assert(gpBase);
     switch (reqt.getKind()) {
-      case RequirementKind::SameCount:
-        llvm_unreachable("Same-count requirement not supported here");
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
       case RequirementKind::Conformance:
         return appendOpWithGenericParamIndex(isAssocTypeAtDepth ? "RP" : "Rp",
                                              gpBase, lhsBaseIsProtocolSelf);
@@ -2933,8 +2971,8 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   }
   GenericTypeParamType *gpBase = FirstTy->castTo<GenericTypeParamType>();
   switch (reqt.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Conformance:
       return appendOpWithGenericParamIndex("R", gpBase);
     case RequirementKind::Layout:
@@ -3494,8 +3532,8 @@ void ASTMangler::appendConcreteProtocolConformance(
   bool firstRequirement = true;
   for (const auto &conditionalReq : conformance->getConditionalRequirements()) {
     switch (conditionalReq.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Layout:
     case RequirementKind::SameType:
     case RequirementKind::Superclass:
@@ -3645,8 +3683,8 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
   bool firstRequirement = true;
   for (const auto &reqt : requirements) {
     switch (reqt.getKind()) {
-    case RequirementKind::SameCount:
-      llvm_unreachable("Same-count requirement not supported here");
+    case RequirementKind::SameShape:
+      llvm_unreachable("Same-shape requirement not supported here");
     case RequirementKind::Layout:
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:

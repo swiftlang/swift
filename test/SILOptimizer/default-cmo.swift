@@ -5,7 +5,7 @@
 // RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-module -emit-module-path=%t/Module.swiftmodule -module-name=Module -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/module.o
 // RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-tbd -emit-tbd-path %t/ModuleTBD.tbd -emit-module -emit-module-path=%t/ModuleTBD.swiftmodule -module-name=ModuleTBD -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/moduletbd.o
 
-// RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -emit-sil | %FileCheck %s
+// RUN: %target-build-swift -O -wmo -module-name=Main -I%t -I%S/Inputs/cross-module %s -emit-sil | %FileCheck %s
 
 
 import Module
@@ -22,6 +22,20 @@ public func callPublicFunctionPointer(_ x: Int) -> Int {
 
 public func callPrivateFunctionPointer(_ x: Int) -> Int {
   return Module.ModuleStruct.privateFunctionPointer(x)
+}
+
+// CHECK-LABEL: sil @$s4Main24callPrivateCFuncInModuleSiyF : $@convention(thin) () -> Int {
+// CHECK:         function_ref @$s6Module16callPrivateCFuncSiyF
+// CHECK:       } // end sil function '$s4Main24callPrivateCFuncInModuleSiyF'
+public func callPrivateCFuncInModule() -> Int {
+  return Module.callPrivateCFunc()
+}
+
+// CHECK-LABEL: sil @$s4Main22usePrivateCVarInModuleSiyF : $@convention(thin) () -> Int {
+// CHECK:         function_ref @$s6Module14usePrivateCVarSiyF
+// CHECK:       } // end sil function '$s4Main22usePrivateCVarInModuleSiyF'
+public func usePrivateCVarInModule() -> Int {
+  return Module.usePrivateCVar()
 }
 
 // CHECK-LABEL: sil @$s4Main11doIncrementyS2iF

@@ -54,6 +54,7 @@ TEST(ConditionVariableTest, CriticalSectionThreaded) {
   criticalSectionThreaded(cond);
 }
 
+#if !SWIFT_THREADING_NONE
 // Check that timeouts work
 TEST(ConditionVariableTest, Timeout) {
   using namespace std::chrono_literals;
@@ -95,7 +96,6 @@ TEST(ConditionVariableTest, Timeout) {
   ASSERT_GE(duration.count(), 0.5);
 }
 
-#if !SWIFT_THREADING_NONE
 // Check that signal() wakes exactly one waiter
 TEST(ConditionVariableTest, Signal) {
   ConditionVariable cond;

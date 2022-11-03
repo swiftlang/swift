@@ -181,12 +181,12 @@ SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
     return SourceRange(charRange.getStart(), charRange.getEnd());
   }
 
-  if (SF->getTopLevelDecls().empty())
+  if (SF->getTopLevelItems().empty())
     return SourceRange();
 
   // Use the source ranges of the declarations in the file.
-  return SourceRange(SF->getTopLevelDecls().front()->getStartLoc(),
-                     SF->getTopLevelDecls().back()->getEndLoc());
+  return SourceRange(SF->getTopLevelItems().front().getStartLoc(),
+                     SF->getTopLevelItems().back().getEndLoc());
 }
 
 SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(

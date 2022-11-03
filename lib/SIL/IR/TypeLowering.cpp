@@ -1459,6 +1459,110 @@ namespace {
     }
   };
 
+  /// A lowering for loadable but non-trivial struct types.
+  class MoveOnlyLoadableStructTypeLowering final
+      : public LoadableAggTypeLowering<MoveOnlyLoadableStructTypeLowering,
+                                       VarDecl *> {
+    using Super =
+        LoadableAggTypeLowering<MoveOnlyLoadableStructTypeLowering, VarDecl *>;
+
+  public:
+    MoveOnlyLoadableStructTypeLowering(CanType type,
+                                       RecursiveProperties properties,
+                                       TypeExpansionContext forExpansion)
+        : LoadableAggTypeLowering(type, properties, forExpansion) {}
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue structValue, VarDecl *field,
+                               const TypeLowering &fieldLowering) const {
+      return B.createStructExtract(loc, structValue, field,
+                                   fieldLowering.getLoweredType());
+    }
+
+    void destructureAggregate(
+        SILBuilder &B, SILLocation loc, SILValue aggValue, bool skipTrivial,
+        function_ref<void(unsigned childIndex, SILValue childValue,
+                          const TypeLowering &childLowering)>
+            visitor) const {
+      if (!B.hasOwnership())
+        return Super::destructureAggregate(B, loc, aggValue, skipTrivial,
+                                           visitor);
+
+      auto *dsi = B.createDestructureStruct(loc, aggValue);
+      for (auto pair : llvm::enumerate(dsi->getResults())) {
+        SILValue childValue = pair.value();
+        auto &childLowering =
+            B.getFunction().getTypeLowering(childValue->getType());
+        if (skipTrivial && childLowering.isTrivial())
+          continue;
+        visitor(pair.index(), childValue, childLowering);
+      }
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      return B.createStruct(loc, getLoweredType(), values);
+    }
+
+  private:
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto silTy = getLoweredType();
+      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      assert(structDecl);
+
+      for (auto prop : structDecl->getStoredProperties()) {
+        SILType propTy = silTy.getFieldType(prop, TC, getExpansionContext());
+        auto &propTL = TC.getTypeLowering(propTy, getExpansionContext());
+        children.push_back(Child{prop, propTL});
+      }
+    }
+  };
+
+  /// A lowering for loadable but non-trivial enum types.
+  class MoveOnlyLoadableEnumTypeLowering final
+      : public NonTrivialLoadableTypeLowering {
+  public:
+    MoveOnlyLoadableEnumTypeLowering(CanType type,
+                                     RecursiveProperties properties,
+                                     TypeExpansionContext forExpansion)
+        : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
+                                         properties, IsNotReferenceCounted,
+                                         forExpansion) {}
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  TypeExpansionKind style) const override {
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.createReleaseValue(loc, value, B.getDefaultAtomicity());
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 TypeExpansionKind style) const override {
+      // Enums, we never want to expand.
+      return emitDestroyValue(B, loc, value);
+    }
+  };
+
   /// A type lowering for `@differentiable(_linear)` function types.
   class LinearDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
@@ -2146,7 +2250,8 @@ namespace {
         properties.setNonTrivial();
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(structType, properties);
-        return handleMoveOnlyReference(structType, properties);
+        return new (TC) MoveOnlyLoadableStructTypeLowering(
+            structType, properties, Expansion);
       }
 
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -2223,7 +2328,8 @@ namespace {
         properties.setNonTrivial();
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(enumType, properties);
-        return handleMoveOnlyReference(enumType, properties);
+        return new (TC)
+            MoveOnlyLoadableEnumTypeLowering(enumType, properties, Expansion);
       }
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,

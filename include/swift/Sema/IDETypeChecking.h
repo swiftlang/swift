@@ -231,11 +231,10 @@ namespace swift {
 
   /// Collect type information for every expression in \c SF; all types will
   /// be printed to \c OS.
-  ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
-    ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch,
-    bool CanonicalType,
-    llvm::raw_ostream &OS);
+  ArrayRef<ExpressionTypeInfo> collectExpressionType(
+      SourceFile &SF, ArrayRef<const char *> ExpectedProtocols,
+      std::vector<ExpressionTypeInfo> &scratch, bool FullyQualified,
+      bool CanonicalType, llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
@@ -265,6 +264,7 @@ namespace swift {
   /// \c VariableTypeInfos will index into the string that backs this
   /// stream.
   void collectVariableType(SourceFile &SF, SourceRange Range,
+                           bool FullyQualified,
                            std::vector<VariableTypeInfo> &VariableTypeInfos,
                            llvm::raw_ostream &OS);
 

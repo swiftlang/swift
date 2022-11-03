@@ -25,6 +25,8 @@
 
 namespace swift {
 
+struct ASTNode;
+
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
 template<typename Request>
@@ -85,13 +87,13 @@ public:
 };
 
 struct SourceFileParsingResult {
-  ArrayRef<Decl *> TopLevelDecls;
+  ArrayRef<ASTNode> TopLevelItems;
   Optional<ArrayRef<Token>> CollectedTokens;
   Optional<StableHasher> InterfaceHasher;
   Optional<syntax::SourceFileSyntax> SyntaxRoot;
 };
 
-/// Parse the top-level decls of a SourceFile.
+/// Parse the top-level items of a SourceFile.
 class ParseSourceFileRequest
     : public SimpleRequest<
           ParseSourceFileRequest, SourceFileParsingResult(SourceFile *),
@@ -114,6 +116,25 @@ public:
 public:
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
+};
+
+/// Parse the top-level items of a SourceFile.
+class ParseTopLevelDeclsRequest
+    : public SimpleRequest<
+          ParseTopLevelDeclsRequest, ArrayRef<Decl *>(SourceFile *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 void simple_display(llvm::raw_ostream &out,

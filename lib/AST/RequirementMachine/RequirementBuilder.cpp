@@ -43,6 +43,7 @@ struct ConnectedComponent {
   Type ConcreteType;
 
   void buildRequirements(Type subjectType,
+                         RequirementKind kind,
                          std::vector<Requirement> &reqs,
                          std::vector<ProtocolTypeAlias> &aliases);
 };
@@ -68,6 +69,7 @@ struct ConnectedComponent {
 ///
 ///   A == X, B == X, C == X, D == X
 void ConnectedComponent::buildRequirements(Type subjectType,
+                                           RequirementKind kind,
                                            std::vector<Requirement> &reqs,
                                            std::vector<ProtocolTypeAlias> &aliases) {
   std::sort(Members.begin(), Members.end(),
@@ -81,12 +83,14 @@ void ConnectedComponent::buildRequirements(Type subjectType,
     }
 
     for (auto constraintType : Members) {
-      reqs.emplace_back(RequirementKind::SameType,
-                        subjectType, constraintType);
+      reqs.emplace_back(kind, subjectType, constraintType);
       subjectType = constraintType;
     }
 
   } else {
+    // Shape requirements cannot be concrete.
+    assert(kind == RequirementKind::SameType);
+
     // If there are multiple protocol typealiases in the connected component,
     // lower them all to a series of identical concrete-type aliases.
     for (auto name : Aliases) {
@@ -135,7 +139,7 @@ class RequirementBuilder {
 
   // Temporary state populated by addRequirementRules() and
   // addTypeAliasRules().
-  llvm::SmallDenseMap<TypeBase *, ConnectedComponent> Components;
+  llvm::SmallDenseMap<Term, ConnectedComponent> Components;
 
 public:
   // Results.
@@ -229,7 +233,7 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
         if (ReconstituteSugar)
           concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
 
-        auto &component = Components[subjectType.getPointer()];
+        auto &component = Components[rule.getRHS()];
         assert(!component.ConcreteType);
         component.ConcreteType = concreteType;
         return;
@@ -243,6 +247,7 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
       case Symbol::Kind::Name:
       case Symbol::Kind::AssociatedType:
       case Symbol::Kind::GenericParam:
+      case Symbol::Kind::Shape:
         break;
       }
 
@@ -250,10 +255,17 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
     }
 
     assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
-    auto constraintType = Map.getTypeForTerm(rule.getLHS(), GenericParams);
-    auto subjectType = Map.getTypeForTerm(rule.getRHS(), GenericParams);
 
-    Components[subjectType.getPointer()].Members.push_back(constraintType);
+    MutableTerm constraintTerm(rule.getLHS());
+    if (constraintTerm.back().getKind() == Symbol::Kind::Shape) {
+      assert(rule.getRHS().back().getKind() == Symbol::Kind::Shape);
+      // Strip off the shape symbol from the constraint term.
+      constraintTerm = MutableTerm(constraintTerm.begin(),
+                                   constraintTerm.end() - 1);
+    }
+
+    auto constraintType = Map.getTypeForTerm(constraintTerm, GenericParams);
+    Components[rule.getRHS()].Members.push_back(constraintType);
   };
 
   if (Debug) {
@@ -277,9 +289,6 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
   for (unsigned ruleID : rules) {
     const auto &rule = System.getRule(ruleID);
     auto name = *rule.isProtocolTypeAliasRule();
-    Type underlyingType;
-
-    auto subjectType = Map.getTypeForTerm(rule.getRHS(), GenericParams);
 
     if (auto prop = rule.isPropertyRule()) {
       assert(prop->getKind() == Symbol::Kind::ConcreteType);
@@ -301,11 +310,11 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
       if (ReconstituteSugar)
         concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
 
-      auto &component = Components[subjectType.getPointer()];
+      auto &component = Components[rule.getRHS()];
       assert(!component.ConcreteType);
-      Components[subjectType.getPointer()].ConcreteType = concreteType;
+      Components[rule.getRHS()].ConcreteType = concreteType;
     } else {
-      Components[subjectType.getPointer()].Aliases.push_back(name);
+      Components[rule.getRHS()].Aliases.push_back(name);
     }
   }
 }
@@ -314,7 +323,18 @@ void RequirementBuilder::processConnectedComponents() {
   // Now, convert each connected component into a series of same-type
   // requirements.
   for (auto &pair : Components) {
-    pair.second.buildRequirements(pair.first, Reqs, Aliases);
+    MutableTerm subjectTerm(pair.first);
+    RequirementKind kind;
+    if (subjectTerm.back().getKind() == Symbol::Kind::Shape) {
+      kind = RequirementKind::SameShape;
+      // Strip off the shape symbol from the subject term.
+      subjectTerm = MutableTerm(subjectTerm.begin(), subjectTerm.end() - 1);
+    } else {
+      kind = RequirementKind::SameType;
+    }
+
+    auto subjectType = Map.getTypeForTerm(subjectTerm, GenericParams);
+    pair.second.buildRequirements(subjectType, kind, Reqs, Aliases);
   }
 }
 

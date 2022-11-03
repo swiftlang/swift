@@ -15,7 +15,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc %T17dynamic_self_cast9SelfCastsC* @"$s17dynamic_self_cast9SelfCastsC09genericToD0yACXDxlFZ"(%swift.opaque* noalias nocapture %0, %swift.type* %T, %swift.type* swiftself %1)
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %T, %swift.type* %1, {{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %T, %swift.type* %1, {{.*}})
   // CHECK: ret
   public static func genericToSelf<T>(_ s: T) -> Self {
     return s as! Self
@@ -31,7 +31,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s17dynamic_self_cast9SelfCastsC011genericFromD0xylFZ"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.type* %T, %swift.type* swiftself %1)
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %1, %swift.type* %T, {{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %1, %swift.type* %T, {{.*}})
   // CHECK: ret
   public static func genericFromSelf<T>() -> T {
     let s = Self()
@@ -39,7 +39,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc %swift.refcounted* @"$s17dynamic_self_cast9SelfCastsC016classGenericFromD0xyRlzClFZ"(%swift.type* %T, %swift.type* swiftself %0)
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %0, %swift.type* %T, {{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %0, %swift.type* %T, {{.*}})
   // CHECK: ret
   public static func classGenericFromSelf<T : AnyObject>() -> T {
     let s = Self()
@@ -56,7 +56,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC09genericToD11ConditionalyACXDSgxlFZ"(%swift.opaque* noalias nocapture %0, %swift.type* %T, %swift.type* swiftself %1)
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %T, %swift.type* %1, {{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %T, %swift.type* %1, {{.*}})
   // CHECK: ret
   public static func genericToSelfConditional<T>(_ s: T) -> Self? {
     return s as? Self
@@ -72,7 +72,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s17dynamic_self_cast9SelfCastsC011genericFromD11ConditionalxSgylFZ"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.type* %T, %swift.type* swiftself %1)
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %1, %swift.type* %T, {{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %1, %swift.type* %T, {{.*}})
   // CHECK: ret
   public static func genericFromSelfConditional<T>() -> T? {
     let s = Self()
@@ -80,7 +80,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc {{i32|i64}} @"$s17dynamic_self_cast9SelfCastsC016classGenericFromD11ConditionalxSgyRlzClFZ"(%swift.type* %T, %swift.type* swiftself %0)
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %0, %swift.type* %T, {{.*}})
+  // CHECK: call zeroext i1 @swift_dynamicCast(%swift.opaque* {{%.*}}, %swift.opaque* {{%.*}}, %swift.type* %0, %swift.type* %T, {{.*}})
   // CHECK: ret
   public static func classGenericFromSelfConditional<T : AnyObject>() -> T? {
     let s = Self()

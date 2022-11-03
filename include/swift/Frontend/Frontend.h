@@ -33,6 +33,7 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/IRGen/TBDGen.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
@@ -40,14 +41,13 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
-#include "swift/TBDGen/TBDGen.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -190,6 +190,14 @@ public:
 
   ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.getFrameworkSearchPaths();
+  }
+
+  void setCompilerPluginLibraryPaths(const std::vector<std::string> &Paths) {
+    SearchPathOpts.setCompilerPluginLibraryPaths(Paths);
+  }
+
+  ArrayRef<std::string> getCompilerPluginLibraryPaths() {
+    return SearchPathOpts.getCompilerPluginLibraryPaths();
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {

@@ -767,7 +767,7 @@ bb0(%0 : $Int8):
 //  This cond_fail formula should be registered!
 //  cond_fail %cmp_result : $Builtin.Int1
 //  At this point we know that x >= y
-//  %usub_result = builtin "usub_with_overflow_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64, %check_overfow : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+//  %usub_result = builtin "usub_with_overflow_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64, %check_overflow : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
 //  %usub_val = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
 //  We can figure out that x - y will not underflow because of x >= y
 //  %usub_underverflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1

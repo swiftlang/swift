@@ -194,7 +194,8 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
 }
 
 RewriteContext::RewriteContext(ASTContext &ctx)
-    : Context(ctx),
+    : TheShapeSymbol(nullptr),
+      Context(ctx),
       Stats(ctx.Stats),
       SymbolHistogram(Symbol::NumKinds),
       TermHistogram(4, /*Start=*/1),

@@ -57,7 +57,7 @@ tupleWithDefaults(x: (x,x))
 // CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
-// CHECK: copy_addr [[READ]] to [initialization] [[ADDR]]
+// CHECK: copy_addr [[READ]] to [init] [[ADDR]]
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Int>([[ARRAY]])
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @$s20scalar_to_tuple_args13variadicFirstyySid_tF

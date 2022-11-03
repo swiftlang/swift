@@ -77,6 +77,8 @@ class CFPointeeInfo {
 public:
   static CFPointeeInfo classifyTypedef(const clang::TypedefNameDecl *decl);
 
+  static bool isKnownCFTypeName(llvm::StringRef name);
+
   bool isValid() const { return IsValid; }
   explicit operator bool() const { return isValid(); }
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/swift-functions-errors.swift -typecheck -module-name Functions -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-errors-execution.o
 // RUN: %target-interop-build-swift %S/swift-functions-errors.swift -o %t/swift-functions-errors-execution -Xlinker %t/swift-functions-errors-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -9,6 +9,7 @@
 // RUN: %target-run %t/swift-functions-errors-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=windows-msvc
 
 #include <cassert>
 #include <cstdio>
@@ -27,7 +28,9 @@ int main() {
   try {
     Functions::throwFunction();
   } catch (swift::Error& e) {
-     printf("Exception\n");
+      auto errorVal = e.as<Functions::NaiveErrors>();
+      assert(errorVal == Functions::NaiveErrors::throwError);
+      errorVal.getMessage();
   }
   try {
     Functions::throwFunctionWithReturn();
@@ -43,7 +46,7 @@ int main() {
 
 // CHECK: passEmptyThrowFunction
 // CHECK-NEXT: passThrowFunction
-// CHECK-NEXT: Exception
+// CHECK-NEXT: throwError
 // CHECK-NEXT: passThrowFunctionWithReturn
 // CHECK-NEXT: Exception
 // CHECK-NEXT: Test destroyed

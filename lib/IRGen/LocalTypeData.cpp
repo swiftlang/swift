@@ -338,7 +338,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
     return;
   if (!type->isRoot())
     return;
-  if (!isa<PrimaryArchetypeType>(type) && !isa<SequenceArchetypeType>(type))
+  if (!isa<PrimaryArchetypeType>(type) && !isa<PackArchetypeType>(type))
     return;
 
   auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();

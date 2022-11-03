@@ -6,8 +6,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fno-rtti -O)
 //
 // REQUIRES: executable_test
-// Windows doesn't support -fno-rtti.
-// UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=windows-msvc
 
 import CustomDestructor
 import StdlibUnittest

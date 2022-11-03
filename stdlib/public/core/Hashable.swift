@@ -120,7 +120,7 @@ public protocol Hashable: Equatable {
   /// in your type's `==` operator implementation. Call `hasher.combine(_:)`
   /// with each of these components.
   ///
-  /// - Important: In your implemention of `hash(into:)`,
+  /// - Important: In your implementation of `hash(into:)`,
   ///   don't call `finalize()` on the `hasher` instance provided,
   ///   or replace it with a different instance.
   ///   Doing so may become a compile-time error in the future.
