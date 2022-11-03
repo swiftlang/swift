@@ -87,10 +87,14 @@ void *SwiftSequenceExpr_create(void *ctx, BridgedArrayRef exprs) {
 }
 
 void *SwiftTupleExpr_create(void *ctx, void *lparen, BridgedArrayRef subs,
+                            BridgedArrayRef names,
+                            BridgedArrayRef nameLocs,
                             void *rparen) {
+  auto &Context = *static_cast<ASTContext *>(ctx);
   return TupleExpr::create(
-      *static_cast<ASTContext *>(ctx), getSourceLocFromPointer(lparen),
-      getArrayRef<Expr *>(subs), {}, {}, getSourceLocFromPointer(rparen),
+      Context, getSourceLocFromPointer(lparen),
+      getArrayRef<Expr *>(subs), getArrayRef<Identifier>(names),
+      getArrayRef<SourceLoc>(nameLocs), getSourceLocFromPointer(rparen),
       /*Implicit*/ false);
 }
 

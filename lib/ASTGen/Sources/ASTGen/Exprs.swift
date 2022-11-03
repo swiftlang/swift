@@ -24,7 +24,6 @@ extension ASTGenVisitor {
     }
 
     let args = visit(node.argumentList).rawValue
-    // TODO: hack
     let callee = visit(node.calledExpression).rawValue
 
     return .expr(SwiftFunctionCallExpr_create(self.ctx, callee, args))
@@ -65,13 +64,28 @@ extension ASTGenVisitor {
 
   public func visit(_ node: TupleExprElementListSyntax) -> ASTNode {
     let elements = node.map { self.visit($0).rawValue }
+    let labels: [BridgedIdentifier] = node.enumerated().map { (idx, e) in
+      var name = e.label?.text ?? "\(idx)"
+      return name.withUTF8 { buf in
+        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      }
+    }
+    let labelLocs: [UnsafeMutableRawPointer] = node.map {
+      let pos = $0.label?.position ?? $0.position
+      return base.advanced(by: pos.utf8Offset).raw
+    }
 
     let lParenLoc = self.base.advanced(by: node.position.utf8Offset).raw
     let rParenLoc = self.base.advanced(by: node.endPosition.utf8Offset).raw
 
     return .expr(
       elements.withBridgedArrayRef { elementsRef in
-        SwiftTupleExpr_create(self.ctx, lParenLoc, elementsRef, rParenLoc)
+        labels.withBridgedArrayRef { labelsRef in
+          labelLocs.withBridgedArrayRef { labelLocRef in
+            SwiftTupleExpr_create(self.ctx, lParenLoc, elementsRef, labelsRef,
+                                  labelLocRef, rParenLoc)
+          }
+        }
       })
   }
 }
