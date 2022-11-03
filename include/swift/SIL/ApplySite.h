@@ -485,17 +485,21 @@ public:
   ///
   /// NOTE: We pass std::next() for begin_apply. If one wishes to insert code
   /// /after/ the end_apply/abort_apply, please use instead
-  /// insertAfterFullEvaluation.
+  /// insertAfterApplication.
   void insertAfterInvocation(function_ref<void(SILBuilder &)> func) const;
 
   /// Pass a builder with insertion points that are guaranteed to be immediately
-  /// after this full apply site has completely finished executing.
+  /// after this apply site has been applied.
+  ///
+  /// For apply and try_apply, that means after the apply.  For partial_apply,
+  /// that means after the partial_apply.  For begin_apply, that means after its
+  /// end_apply and abort_apply instructions.
   ///
   /// This is just like insertAfterInvocation except that if the full apply site
   /// is a begin_apply, we pass the insertion points after the end_apply,
   /// abort_apply rather than an insertion point right after the
   /// begin_apply. For such functionality, please invoke insertAfterInvocation.
-  void insertAfterFullEvaluation(function_ref<void(SILBuilder &)> func) const;
+  void insertAfterApplication(function_ref<void(SILBuilder &)> func) const;
 
   /// Return whether the given apply is of a formally-throwing function
   /// which is statically known not to throw.

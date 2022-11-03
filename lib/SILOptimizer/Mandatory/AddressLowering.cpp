@@ -1778,7 +1778,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   if (apply.getArgumentConvention(*operand).isOwnedConvention()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
-    apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+    apply.insertAfterApplication([&](SILBuilder &callBuilder) {
       callBuilder.createDeallocStack(callLoc, allocInst);
     });
     operand->set(allocInst);
@@ -1787,7 +1787,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
     auto *store =
         argBuilder.emitStoreBorrowOperation(callLoc, borrow, allocInst);
     auto *storeBorrow = dyn_cast<StoreBorrowInst>(store);
-    apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+    apply.insertAfterApplication([&](SILBuilder &callBuilder) {
       if (storeBorrow) {
         callBuilder.emitEndBorrowOperation(callLoc, storeBorrow);
       }
@@ -2072,7 +2072,7 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
 
   // Instead of using resultBuilder, insert dealloc immediately after the call
   // for stack discipline across loadable indirect results.
-  apply.insertAfterFullEvaluation([&](SILBuilder &callBuilder) {
+  apply.insertAfterApplication([&](SILBuilder &callBuilder) {
     callBuilder.createDeallocStack(callLoc, allocInst);
   });
 
