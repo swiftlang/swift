@@ -5533,7 +5533,7 @@ ProtocolDecl::getAssociatedTypeMembers() const {
     contextData->loader->loadAssociatedTypes(
         this, contextData->associatedTypesData, result);
   } else {
-    for (auto member : getMembers()) {
+    for (auto member : getABIMembers()) {
       if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
         result.push_back(ATD);
       }

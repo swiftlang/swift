@@ -1817,7 +1817,7 @@ void MultiConformanceChecker::checkAllConformances() {
       return *checker;
     };
 
-    for (auto member : proto->getMembers()) {
+    for (auto member : proto->getABIMembers()) {
       auto req = dyn_cast<ValueDecl>(member);
       if (!req || !req->isProtocolRequirement()) continue;
 
@@ -5124,7 +5124,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
 }
 
 void ConformanceChecker::resolveValueWitnesses() {
-  for (auto member : Proto->getMembers()) {
+  for (auto member : Proto->getABIMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
     if (!requirement)
       continue;
@@ -7129,7 +7129,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     return {defaultType, defaultedAssocType};
   };
 
-  for (auto *requirement : proto->getMembers()) {
+  for (auto *requirement : proto->getABIMembers()) {
     if (requirement->isInvalid())
       continue;
 
