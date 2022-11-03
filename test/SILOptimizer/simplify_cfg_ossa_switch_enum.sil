@@ -211,7 +211,7 @@ bb2:
   br bb3(%4 : $FakeOptional<Klass>)
 
 bb3(%6 :@owned  $FakeOptional<Klass>):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[7]"
+  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[5]"
   switch_enum %6 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb5
 
 bb4(%8 : @owned $Klass):
@@ -222,6 +222,157 @@ bb5:
   br bb6
 
 bb6:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable1 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable1'
+sil [ossa] @test_simplify_switch_enum_unreachable1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  unreachable
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  unreachable
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable2 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable2'
+sil [ossa] @test_simplify_switch_enum_unreachable2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  unreachable
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+
+// This case does not get optimized because the some block has instructions other than unreachable
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable3 :
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable3'
+sil [ossa] @test_simplify_switch_enum_unreachable3 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  unreachable
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable4 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable4'
+sil [ossa] @test_simplify_switch_enum_unreachable4 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  unreachable 
+
+bb1(%3 : @guaranteed $Klass):
+  unreachable
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable5 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable5'
+sil [ossa] @test_simplify_switch_enum_unreachable5 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[2]"
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  unreachable
+
+bb1(%3 : @guaranteed $Klass):
+  unreachable
+
+bb3:
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable6 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable6'
+sil [ossa] @test_simplify_switch_enum_unreachable6 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  unreachable 
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_unreachable7 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable7'
+sil [ossa] @test_simplify_switch_enum_unreachable7 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[2]"
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  unreachable
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
   %t = tuple ()
   return %t : $()
 }
