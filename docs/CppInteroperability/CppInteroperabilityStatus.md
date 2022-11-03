@@ -218,4 +218,4 @@ This status table describes which of the following Swift standard library APIs h
 |--------------------------------|----------------------------------------------------------|
 | `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++. Conversion between `std.string` is not yet supported   |
 | `Array<T>`   | Can be used as a type in C++. Ranged for loops are supported. Limited set of APIs in some extensions are exposed to C++. |
-| `Optional<T>`   | Can be used as a type in C++. `get` extracts the optional value and it's also implicitly castable to `bool`. Can't be constructed from C++ yet.  |
+| `Optional<T>`   | Can be used as a type in C++. Can be constructed. `get` extracts the optional value and it's also implicitly castable to `bool`.  |

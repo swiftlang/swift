@@ -128,6 +128,11 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:  none
 // CHECK-NEXT: };
 
+// CHECK: inline GenericOpt<T_0_0> operator()(const T_0_0& val) const;
+// CHECK-NEXT: } some;
+// CHECK: inline GenericOpt<T_0_0> operator()() const;
+// CHECK-NEXT: } none;
+
 // CHECK: inline operator cases() const {
 // CHECK-NEXT:   switch (_getEnumTag()) {
 // CHECK-NEXT:     case 0: return cases::some;
@@ -203,6 +208,28 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif // __cpp_concepts
+// CHECK-NEXT:   inline GenericOpt<T_0_0> GenericOpt<T_0_0>::_impl_some::operator()(const T_0_0& val) const {
+// CHECK-NEXT:     auto result = GenericOpt<T_0_0>::_make();
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
+// CHECK-NEXT:     void *ptr = ::swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
+// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &ptr, sizeof(ptr));
+// CHECK-NEXT: } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
+// CHECK-NEXT:     alignas(T_0_0) unsigned char buffer[sizeof(T_0_0)];
+// CHECK-NEXT:     auto *valCopy = new(buffer) T_0_0(val);
+// CHECK-NEXT:     swift::_impl::implClassFor<T_0_0>::type::initializeWithTake(result._getOpaquePointer(), swift::_impl::implClassFor<T_0_0>::type::getOpaquePointer(*valCopy));
+// CHECK-NEXT: } else {
+// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT: }
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT:     result._destructiveInjectEnumTag(0);
+// CHECK-NEXT:     return result;
+// CHECK-NEXT:   }
+// CHECK-NEXT: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   inline bool GenericOpt<T_0_0>::isSome() const {
 // CHECK-NEXT:     return *this == GenericOpt<T_0_0>::some;
@@ -234,6 +261,15 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT:     return returnValue;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     #pragma clang diagnostic pop
+// CHECK-NEXT:   }
+// CHECK-NEXT: template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif // __cpp_concepts
+// CHECK-NEXT:   inline GenericOpt<T_0_0> GenericOpt<T_0_0>::_impl_none::operator()() const {
+// CHECK-NEXT:     auto result = GenericOpt<T_0_0>::_make();
+// CHECK-NEXT:     result._destructiveInjectEnumTag(1);
+// CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
 // CHECK-NEXT: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
