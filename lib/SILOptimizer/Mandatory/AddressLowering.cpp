@@ -2776,7 +2776,26 @@ protected:
         uncheckedCastInst->getLoc(), srcAddr,
         uncheckedCastInst->getType().getAddressType());
 
-    markRewritten(uncheckedCastInst, destAddr);
+    if (uncheckedCastInst->getType().isAddressOnly(*pass.function)) {
+      markRewritten(uncheckedCastInst, destAddr);
+      return;
+    }
+
+    // For loadable cast destination type, replace copies with load copies.
+    if (Operand *use = uncheckedCastInst->getSingleUse()) {
+      if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+        auto *load = builder.createLoad(cvi->getLoc(), destAddr,
+                                        LoadOwnershipQualifier::Copy);
+        cvi->replaceAllUsesWith(load);
+        pass.deleter.forceDelete(cvi);
+        return;
+      }
+    }
+    SILValue load =
+        builder.emitLoadBorrowOperation(uncheckedCastInst->getLoc(), destAddr);
+    uncheckedCastInst->replaceAllUsesWith(load);
+    pass.deleter.forceDelete(uncheckedCastInst);
+    emitEndBorrows(load);
   }
 
   void visitUnconditionalCheckedCastInst(

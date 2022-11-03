@@ -50,3 +50,23 @@ func getRawPointer<T>(to value: T) -> Builtin.RawPointer {
 func getUnprotectedRawPointer<T>(to value: T) -> Builtin.RawPointer {
   return Builtin.unprotectedAddressOfBorrow(value)
 }
+
+// CHECK-LABEL: sil hidden @getBridgeObject : {{.*}} {
+// CHECK:         [[OBJECT_ADDR:%[^,]+]] = unchecked_addr_cast {{%[^,]+}} : $*T to $*Builtin.BridgeObject
+// CHECK:         [[OBJECT:%[^,]+]] = load [[OBJECT_ADDR]]
+// CHECK:         return [[OBJECT]]
+// CHECK-LABEL: } // end sil function 'getBridgeObject'
+@_silgen_name("getBridgeObject")
+func toObject<T>(_ object: inout T) -> Builtin.BridgeObject {
+  Builtin.reinterpretCast(object)
+}
+
+// CHECK-LABEL: sil hidden @getAnotherType : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[RETADDR:%[^,]+]] : $*U, {{%[^,]+}} : $*T, {{%[^,]+}} : $@thick U.Type):
+// CHECK:         [[OTHER_TY_ADDR:%[^,]+]] = unchecked_addr_cast {{%[^,]+}} : $*T to $*U
+// CHECK:         copy_addr [[OTHER_TY_ADDR]] to [init] [[RETADDR]] : $*U
+// CHECK-LABEL: } // end sil function 'getAnotherType'
+@_silgen_name("getAnotherType")
+func getAnotherType<T, U>(_ object: inout T, to ty: U.Type) -> U {
+  Builtin.reinterpretCast(object)
+}
