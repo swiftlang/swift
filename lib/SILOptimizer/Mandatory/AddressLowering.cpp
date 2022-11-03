@@ -2618,6 +2618,11 @@ protected:
     vmi->setOperand(opAddr);
   }
 
+  void visitExistentialMetatypeInst(ExistentialMetatypeInst *emi) {
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    emi->setOperand(opAddr);
+  }
+
   void visitAddressOfBorrowBuiltinInst(BuiltinInst *bi, bool stackProtected) {
     SILValue value = bi->getOperand(0);
     SILValue addr = pass.valueStorageMap.getStorage(value).storageAddress;
