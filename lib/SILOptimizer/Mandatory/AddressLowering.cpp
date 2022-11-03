@@ -1183,7 +1183,8 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   storage.storageAddress = nullptr;
 
   // It's only use should be dealloc_stacks.
-  for (Operand *use : allocInst->getUses()) {
+  SmallVector<Operand *, 4> uses(allocInst->getUses());
+  for (Operand *use : uses) {
     pass.deleter.forceDelete(cast<DeallocStackInst>(use->getUser()));
   }
   pass.deleter.forceDelete(allocInst);
