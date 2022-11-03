@@ -4733,23 +4733,16 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     // of 'Never' if it is declared in a context that does not satisfy the
     // requirements of the conformance context.
     //
-    // FIXME: If SwiftUI redeclares the typealias under the correct constraints,
-    // this can be removed.
+    // FIXME: Remove this eventually.
     bool skipRequirementCheck = false;
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (typeAliasDecl->getUnderlyingType()->isNever()) {
-        if (typeAliasDecl->getParentModule()->getName().is("SwiftUI")) {
+      if (typeAliasDecl->getParentModule()->getName().is("SwiftUI") &&
+          typeAliasDecl->getParentSourceFile() &&
+          typeAliasDecl->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+        if (typeAliasDecl->getUnderlyingType()->isNever()) {
           if (typeAliasDecl->getDeclContext()->getSelfNominalTypeDecl() ==
               DC->getSelfNominalTypeDecl()) {
-            const auto reqs =
-                typeAliasDecl->getGenericSignature().requirementsNotSatisfiedBy(
-                    DC->getGenericSignatureOfContext());
-            if (!reqs.empty()) {
-              SwiftUIInvalidTyWitness = {assocType, typeAliasDecl,
-                                         reqs.front()};
-
-              skipRequirementCheck = true;
-            }
+            skipRequirementCheck = true;
           }
         }
       }
@@ -5422,32 +5415,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   if (Conformance->isInvalid()) {
     return;
-  }
-
-  // As a narrow fix for a source compatibility issue with SwiftUI's
-  // swiftinterface, but only if the conformance succeeds, warn about an
-  // actually malformed conformance if we recorded a 'typealias' type witness
-  // with an underlying type of 'Never', which resides in a context that does
-  // not satisfy the requirements of the conformance context.
-  //
-  // FIXME: If SwiftUI redeclares the typealias under the correct constraints,
-  // this can be removed.
-  if (SwiftUIInvalidTyWitness) {
-    const auto &info = SwiftUIInvalidTyWitness.getValue();
-    const auto &failedReq = info.FailedReq;
-
-    auto &diags = getASTContext().Diags;
-    diags.diagnose(Loc, diag::type_does_not_conform_swiftui_warning, Adoptee,
-                   Proto->getDeclaredInterfaceType());
-    diags.diagnose(info.AssocTypeDecl, diag::no_witnesses_type,
-                   info.AssocTypeDecl->getName());
-
-    if (failedReq.getKind() != RequirementKind::Layout) {
-      diags.diagnose(info.TypeWitnessDecl,
-                     diag::protocol_type_witness_missing_requirement,
-                     failedReq.getFirstType(), failedReq.getSecondType(),
-                     (unsigned)failedReq.getKind());
-    }
   }
 }
 
