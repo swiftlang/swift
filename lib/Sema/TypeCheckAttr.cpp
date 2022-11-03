@@ -1957,6 +1957,10 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   if (repr.isUnsupported()) {
     using namespace cxx_translation;
     switch (*repr.error) {
+    case UnrepresentableAsync:
+      diagnose(attr->getLocation(), diag::expose_unsupported_async_decl_to_cxx,
+               VD->getDescriptiveKind(), VD);
+      break;
     case UnrepresentableIsolatedInActor:
       diagnose(attr->getLocation(),
                diag::expose_unsupported_actor_isolated_to_cxx,
