@@ -163,3 +163,20 @@ func duplicate_with_int3<Value>(value: Value) -> (Int, (Value, (Value, (Value, I
     (42, (value, (value, (value, 43), value)), 44)
   }
 }
+
+// CHECK-LABEL: sil hidden @get_a_generic_tuple : {{.*}} {
+// CHECK:         [[TUPLE_ADDR:%[^,]+]] = alloc_stack [lexical] $(This, This)
+// CHECK:         [[GIVE_A_GENERIC_TUPLE:%[^,]+]] = function_ref @give_a_generic_tuple
+// CHECK:         [[TUPLE_0_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(This, This), 0
+// CHECK:         [[TUPLE_1_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(This, This), 1
+// CHECK:         apply [[GIVE_A_GENERIC_TUPLE]]<This>([[TUPLE_0_ADDR]], [[TUPLE_1_ADDR]], {{%[^,]+}})
+// CHECK:         destroy_addr [[TUPLE_ADDR]]
+// CHECK:         dealloc_stack [[TUPLE_ADDR]]
+// CHECK-LABEL: } // end sil function 'get_a_generic_tuple'
+struct This {}
+@_silgen_name("give_a_generic_tuple")
+func give_a_generic_tuple<This>(of ty: This.Type) -> (This, This)
+@_silgen_name("get_a_generic_tuple")
+func get_a_generic_tuple<This>(ty: This.Type) {
+  let p = give_a_generic_tuple(of: ty)
+}
