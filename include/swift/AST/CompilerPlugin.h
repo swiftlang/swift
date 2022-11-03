@@ -17,7 +17,6 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
-#include "llvm/Support/DynamicLibrary.h"
 
 #ifndef SWIFT_AST_COMPILER_PLUGIN_H
 #define SWIFT_AST_COMPILER_PLUGIN_H
@@ -49,12 +48,16 @@ private:
     Kind = 2,
     // static func _rewrite(...) -> (UnsafePointer<UInt8>?, count: Int)
     Rewrite = 3,
+    // static func _genericSignature(...) -> (UnsafePointer<UInt8>?, count: Int)
+    GenericSignature = 4,
+    // static func _typeSignature(...) -> (UnsafePointer<UInt8>, count: Int)
+    TypeSignature = 5,
   };
 
   /// The plugin type metadata.
   const void *metadata;
   /// The parent dynamic library containing the plugin.
-  llvm::sys::DynamicLibrary parentLibrary;
+  void *parentLibrary;
   /// The witness table proving that the plugin conforms to `_CompilerPlugin`.
   const void *witnessTable;
   /// The plugin name, aka. result of the `_name()` method.
@@ -68,8 +71,7 @@ private:
   }
 
 protected:
-  CompilerPlugin(const void *metadata, llvm::sys::DynamicLibrary parentLibrary,
-                 ASTContext &ctx);
+  CompilerPlugin(const void *metadata, void *parentLibrary, ASTContext &ctx);
 
 private:
   /// Invoke the `_name` method. The caller assumes ownership of the result
@@ -80,11 +82,23 @@ private:
   Kind invokeKind() const;
 
 public:
-  /// Invoke the `_rewrite` method. Invoke the `_name` method. The caller
-  /// assumes ownership of the result string buffer.
+  ~CompilerPlugin();
+  CompilerPlugin(const CompilerPlugin &) = delete;
+  CompilerPlugin(CompilerPlugin &&) = default;
+
+  /// Invoke the `_rewrite` method. The caller assumes ownership of the result
+  /// string buffer.
   Optional<NullTerminatedStringRef> invokeRewrite(
       StringRef targetModuleName, StringRef filePath, StringRef sourceFileText,
       CharSourceRange range,  ASTContext &ctx) const;
+
+  /// Invoke the `_genericSignature` method. The caller assumes ownership of the
+  /// result string buffer.
+  Optional<StringRef> invokeGenericSignature() const;
+
+  /// Invoke the `_typeSignature` method. The caller assumes ownership of the
+  /// result string buffer.
+  StringRef invokeTypeSignature() const;
 
   StringRef getName() const {
     return name;

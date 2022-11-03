@@ -44,7 +44,6 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
-#include "llvm/Support/DynamicLibrary.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -1456,10 +1455,9 @@ public:
   /// Finds the loaded compiler plugin given its name.
   CompilerPlugin *getLoadedPlugin(StringRef name);
 
-  /// Finds the address of the given symbol. If `libraryHint` is non-null,
+  /// Finds the address of the given symbol. If `libraryHandleHint` is non-null,
   /// search within the library.
-  void *getAddressOfSymbol(StringRef name,
-                           llvm::sys::DynamicLibrary *libraryHint = nullptr);
+  void *getAddressOfSymbol(const char *name, void *libraryHandleHint = nullptr);
 
 private:
   friend Decl;

@@ -7,5 +7,8 @@
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
 
-let (result, code) = #customStringify(3 + 2 - 1)
-print(result, code)
+print(#customStringify(3 + 2 - 1))
+
+print(#customStringify(1.0.truncatingRemainder(dividingBy: 1.0) + 3.0))
+
+print(#customStringify(["a", "b", "c"] + ["d", "e", "f"]))

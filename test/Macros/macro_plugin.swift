@@ -13,3 +13,21 @@ let _ = #customStringify(1.byteSwapped + 2.advanced(by: 10))
 // CHECK:   (tuple_expr type='(Int, String)'
 // CHECK:     (binary_expr type='Int'
 // CHECK:     (string_literal_expr type='String'
+
+let _ = #customStringify(1.0.truncatingRemainder(dividingBy: 1.0) + 3.0)
+
+// CHECK: (macro_expansion_expr type='(Double, String)' {{.*}} name=customStringify
+// CHECK:   (argument_list
+// EXPANSION BEGINS
+// CHECK:   (tuple_expr type='(Double, String)'
+// CHECK:     (binary_expr type='Double'
+// CHECK:     (string_literal_expr type='String'
+
+let _ = #customStringify(["a", "b", "c"] + ["d", "e", "f"])
+
+// CHECK: (macro_expansion_expr type='([String], String)' {{.*}} name=customStringify
+// CHECK:   (argument_list
+// EXPANSION BEGINS
+// CHECK:   (tuple_expr type='([String], String)'
+// CHECK:     (binary_expr type='[String]'
+// CHECK:     (string_literal_expr type='String'

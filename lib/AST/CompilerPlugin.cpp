@@ -24,8 +24,11 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
-#include "llvm/Support/DynamicLibrary.h"
 #include <cstdlib>
+
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
 
 using namespace swift;
 
@@ -56,8 +59,7 @@ void swift_ASTGen_getMacroTypes(const void *getter,
 #endif
 
 static const void *
-getMacroRegistrationPropertyGetter(llvm::sys::DynamicLibrary library,
-                                   StringRef moduleName,
+getMacroRegistrationPropertyGetter(void *library, StringRef moduleName,
                                    ASTContext &ctx) {
   assert(!moduleName.empty());
   // TODO: Consider using runtime lookup to get all types that conform to the
@@ -147,23 +149,28 @@ getMacroRegistrationPropertyGetter(llvm::sys::DynamicLibrary library,
     assert(mangleResult.isSuccess());
     name = mangleResult.result();
   }
-  return ctx.getAddressOfSymbol(name, &library);
+  return ctx.getAddressOfSymbol(name.c_str(), library);
 }
 
 void ASTContext::loadCompilerPlugins() {
-  for (StringRef path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
-    std::string errorMsg;
-    auto lib = llvm::sys::DynamicLibrary::getPermanentLibrary(
-        path.data(), &errorMsg);
-    if (!lib.isValid()) {
+  for (auto &path : SearchPathOpts.getCompilerPluginLibraryPaths()) {
+    void *lib = nullptr;
+#if !defined(_WIN32)
+    lib = dlopen(path.c_str(), RTLD_LAZY|RTLD_LOCAL);
+#endif
+    if (!lib) {
+      const char *errorMsg = "Unsupported platform";
+#if !defined(_WIN32)
+      errorMsg = dlerror();
+#endif
       Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded, path,
                      errorMsg);
       continue;
     }
     auto moduleName = llvm::sys::path::filename(path);
-    #if !defined(_WIN32)
+#if !defined(_WIN32)
     moduleName.consume_front("lib");
-    #endif
+#endif
     moduleName.consume_back(LTDL_SHLIB_EXT);
     auto *getter = getMacroRegistrationPropertyGetter(lib, moduleName, *this);
     if (!getter) {
@@ -175,7 +182,7 @@ void ASTContext::loadCompilerPlugins() {
     // Note: We don't currently have a way to poke at the contents of a Swift
     // array `[Any.Type]` from C++. But this should not be an issue for release
     // toolchains where user-defined macros will be used.
-    #if SWIFT_SWIFT_PARSER
+#if SWIFT_SWIFT_PARSER
     const void *const *metatypesAddress;
     ptrdiff_t metatypeCount;
     swift_ASTGen_getMacroTypes(getter, &metatypesAddress, &metatypeCount);
@@ -186,7 +193,7 @@ void ASTContext::loadCompilerPlugins() {
       LoadedPlugins.try_emplace(name, std::move(plugin));
     }
     free(const_cast<void *>((const void *)metatypes.data()));
-    #endif
+#endif // SWIFT_SWIFT_PARSER
   }
 }
 
@@ -197,8 +204,7 @@ using WitnessTableLookupFn = const void *(const void *type,
 extern "C" WitnessTableLookupFn swift_conformsToProtocol;
 #endif
 
-CompilerPlugin::CompilerPlugin(const void *metadata,
-                               llvm::sys::DynamicLibrary parentLibrary,
+CompilerPlugin::CompilerPlugin(const void *metadata, void *parentLibrary,
                                ASTContext &ctx)
    : metadata(metadata), parentLibrary(parentLibrary)
 {
@@ -208,12 +214,20 @@ CompilerPlugin::CompilerPlugin(const void *metadata,
 #endif
   void *protocolDescriptor =
       ctx.getAddressOfSymbol(COMPILER_PLUGIN_PROTOCOL_DESCRIPTOR);
+  assert(swift_conformsToProtocol);
+  assert(protocolDescriptor);
   witnessTable = swift_conformsToProtocol(metadata, protocolDescriptor);
   assert(witnessTable && "Type does not conform to _CompilerPlugin");
   auto returnedName = invokeName();
   name = ctx.getIdentifier(returnedName).str();
   free(const_cast<void *>((const void *)returnedName.data()));
   kind = invokeKind();
+}
+
+CompilerPlugin::~CompilerPlugin() {
+#if !defined(_WIN32)
+  dlclose(parentLibrary);
+#endif
 }
 
 namespace {
@@ -276,6 +290,31 @@ CompilerPlugin::invokeRewrite(StringRef targetModuleName,
   if (!result.data)
     return None;
   return result.cstr();
+#else
+  llvm_unreachable("Incompatible host compiler");
+#endif
+}
+
+Optional<StringRef>
+CompilerPlugin::invokeGenericSignature() const {
+#if __clang__
+  using Method = SWIFT_CC CharBuffer(
+      SWIFT_CONTEXT const void *, const void *, const void *);
+  auto method = getWitnessMethodUnsafe<Method>(
+      WitnessTableEntry::GenericSignature);
+  return method(metadata, metadata, witnessTable).str();
+#else
+  llvm_unreachable("Incompatible host compiler");
+#endif
+}
+
+StringRef CompilerPlugin::invokeTypeSignature() const {
+#if __clang__
+  using Method = SWIFT_CC CharBuffer(
+      SWIFT_CONTEXT const void *, const void *, const void *);
+  auto method = getWitnessMethodUnsafe<Method>(
+      WitnessTableEntry::TypeSignature);
+  return method(metadata, metadata, witnessTable).str();
 #else
   llvm_unreachable("Incompatible host compiler");
 #endif

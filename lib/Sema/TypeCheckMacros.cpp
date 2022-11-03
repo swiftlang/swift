@@ -42,22 +42,44 @@ extern "C" ptrdiff_t swift_ASTGen_evaluateMacro(
     const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
 
 extern "C" void
-swift_ASTGen_getMacroTypeSignature(void *macro, const char **genericSignature,
-                                   ptrdiff_t *genericSignatureLength);
+swift_ASTGen_getMacroTypeSignature(void *macro,
+                                   const char **evaluationContextPtr,
+                                   ptrdiff_t *evaluationContextLengthPtr);
+
+static NullTerminatedStringRef
+getPluginMacroTypeSignature(CompilerPlugin *plugin, ASTContext &ctx) {
+  auto genSig = plugin->invokeGenericSignature();
+  auto typeSig = plugin->invokeTypeSignature();
+  std::string source;
+  llvm::raw_string_ostream out(source);
+  out << "struct __MacroEvaluationContext" << (genSig ? *genSig : "") << " {\n"
+      << "  typealias SignatureType = " << typeSig << "\n"
+      << "}";
+  auto len = source.length();
+  auto *buffer = (char *)malloc(len + 1);
+  memcpy(buffer, source.data(), len + 1);
+  return {buffer, len};
+}
 
 StructDecl *MacroContextRequest::evaluate(Evaluator &evaluator,
                                           std::string macroName,
                                           ModuleDecl *mod) const {
 #if SWIFT_SWIFT_PARSER
   auto &ctx = mod->getASTContext();
-  auto *macro = swift_ASTGen_lookupMacro(macroName.c_str());
-  if (!macro)
+  auto *builtinMacro = swift_ASTGen_lookupMacro(macroName.c_str());
+  NullTerminatedStringRef evaluatedSource;
+  if (builtinMacro) {
+    const char *evaluatedSourcePtr;
+    ptrdiff_t evaluatedSourceLength;
+    swift_ASTGen_getMacroTypeSignature(builtinMacro, &evaluatedSourcePtr,
+                                       &evaluatedSourceLength);
+    evaluatedSource = NullTerminatedStringRef(
+        evaluatedSourcePtr, (size_t)evaluatedSourceLength);
+  } else if (auto *plugin = ctx.getLoadedPlugin(macroName)) {
+    evaluatedSource = getPluginMacroTypeSignature(plugin, ctx);
+  } else {
     return nullptr;
-
-  const char *evaluatedSource;
-  ptrdiff_t evaluatedSourceLength;
-  swift_ASTGen_getMacroTypeSignature(macro, &evaluatedSource,
-                                     &evaluatedSourceLength);
+  }
 
   // Create a new source buffer with the contents of the macro's
   // signature.
@@ -68,7 +90,7 @@ StructDecl *MacroContextRequest::evaluate(Evaluator &evaluator,
     out << "Macro signature of #" << macroName;
   }
   auto macroBuffer = llvm::MemoryBuffer::getMemBuffer(
-      StringRef(evaluatedSource, evaluatedSourceLength), bufferName);
+      evaluatedSource, bufferName);
   unsigned macroBufferID =
       sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
   auto macroSourceFile = new (ctx) SourceFile(
@@ -80,13 +102,23 @@ StructDecl *MacroContextRequest::evaluate(Evaluator &evaluator,
 
   auto *start = sourceMgr.getLocForBufferStart(macroBufferID)
                     .getOpaquePointerValue();
-  void *context = nullptr;
-  swift_ASTGen_getMacroEvaluationContext(
-      (const void *)start, (void *)(DeclContext *)macroSourceFile,
-      (void *)&ctx, macro, &context);
-
-  ctx.addCleanup([macro]() { swift_ASTGen_destroyMacro(macro); });
-  return dyn_cast<StructDecl>((Decl *)context);
+  if (builtinMacro) {
+    void *context = nullptr;
+    swift_ASTGen_getMacroEvaluationContext(
+        (const void *)start, (void *)(DeclContext *)macroSourceFile,
+        (void *)&ctx, builtinMacro, &context);
+    ctx.addCleanup([builtinMacro]() { swift_ASTGen_destroyMacro(builtinMacro); });
+    return dyn_cast<StructDecl>((Decl *)context);
+  } else {
+    Parser parser(macroBufferID, *macroSourceFile, &ctx.Diags, nullptr,
+                  nullptr);
+    parser.consumeTokenWithoutFeedingReceiver();
+    DeclAttributes attrs;
+    auto parsedResult = parser.parseDeclStruct(Parser::PD_Default, attrs);
+    if (parsedResult.isParseError() || parsedResult.isNull())
+      return nullptr; // TODO: Diagnose this properly.
+    return parsedResult.get();
+  }
 #else
   return nullptr;
 #endif // SWIFT_SWIFT_PARSER
@@ -132,12 +164,7 @@ Expr *swift::expandMacroExpr(
   else {
     auto mee = cast<MacroExpansionExpr>(expr);
     auto *plugin = ctx.getLoadedPlugin(macroName);
-    if (!plugin) {
-      ctx.Diags.diagnose(
-          mee->getLoc(), diag::macro_undefined, macroName)
-      .highlight(mee->getMacroNameLoc().getSourceRange());
-      return nullptr;
-    }
+    assert(plugin && "Should have been checked during earlier type checking");
     auto bufferID = sourceFile->getBufferID();
     auto sourceFileText = sourceMgr.getEntireTextForBuffer(*bufferID);
     auto evaluated = plugin->invokeRewrite(

@@ -11,6 +11,24 @@ struct DummyMacro: _CompilerPlugin {
     }
   }
 
+  static func _genericSignature() -> (UnsafePointer<UInt8>?, count: Int) {
+    var genSig = "<T>"
+    return genSig.withUTF8 { buffer in
+      let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
+      result.initialize(from: buffer.baseAddress!, count: buffer.count)
+      return (UnsafePointer(result), count: buffer.count)
+    }
+  }
+
+  static func _typeSignature() -> (UnsafePointer<UInt8>, count: Int) {
+    var typeSig = "(T) -> (T, String)"
+    return typeSig.withUTF8 { buffer in
+      let result = UnsafeMutablePointer<UInt8>.allocate(capacity: buffer.count)
+      result.initialize(from: buffer.baseAddress!, count: buffer.count)
+      return (UnsafePointer(result), count: buffer.count)
+    }
+  }
+
   static func _kind() -> _CompilerPluginKind {
     .expressionMacro
   }
