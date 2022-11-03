@@ -193,6 +193,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
       return true;
     }
   }
