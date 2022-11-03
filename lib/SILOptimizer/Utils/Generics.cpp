@@ -2337,7 +2337,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     SILBasicBlock *resultBlock = tai->getNormalBB();
     assert(resultBlock->getSinglePredecessorBlock() == tai->getParent());
     // First insert the cleanups for our arguments int he appropriate spot.
-    FullApplySite(tai).insertAfterFullEvaluation(
+    FullApplySite(tai).insertAfterApplication(
         [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
@@ -2363,7 +2363,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   }
   case ApplySiteKind::ApplyInst: {
     auto *ai = cast<ApplyInst>(applySite);
-    FullApplySite(ai).insertAfterFullEvaluation(
+    FullApplySite(ai).insertAfterApplication(
         [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
@@ -2400,7 +2400,7 @@ replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   case ApplySiteKind::BeginApplyInst: {
     auto *bai = cast<BeginApplyInst>(applySite);
     assert(!resultOut);
-    FullApplySite(bai).insertAfterFullEvaluation(
+    FullApplySite(bai).insertAfterApplication(
         [&](SILBuilder &argBuilder) {
           cleanupCallArguments(argBuilder, loc, arguments,
                                argsNeedingEndBorrow);
@@ -2582,7 +2582,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
 
   // Now that we have finished constructing our CFG (note the return above),
   // insert any compensating end borrows that we need.
-  ApplySite.insertAfterFullEvaluation([&](SILBuilder &argBuilder) {
+  ApplySite.insertAfterApplication([&](SILBuilder &argBuilder) {
     cleanupCallArguments(argBuilder, Loc, Arguments, ArgsThatNeedEndBorrow);
   });
 
