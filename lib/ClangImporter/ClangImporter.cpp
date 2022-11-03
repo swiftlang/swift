@@ -6275,7 +6275,7 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
        !copyConstructorIsDefaulted(decl)) ||
       (decl->hasUserDeclaredCopyAssignment() &&
        !copyAssignOperatorIsDefaulted(decl)) ||
-      (decl->hasUserDeclaredDestructor() &&
+      (decl->hasUserDeclaredDestructor() && decl->getDestructor() &&
        !decl->getDestructor()->isDefaulted()))
     return false;
 
