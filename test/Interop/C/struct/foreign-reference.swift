@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -validate-tbd-against-ir=none)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -validate-tbd-against-ir=none -Xfrontend -experimental-c-foreign-reference-types)
 //
 // REQUIRES: executable_test
 // TODO: This should work without ObjC interop in the future rdar://97497120

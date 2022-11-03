@@ -1945,6 +1945,10 @@ namespace {
     }
 
     bool recordHasReferenceSemantics(const clang::RecordDecl *decl) {
+      if (!isa<clang::CXXRecordDecl>(decl) &&
+          !Impl.SwiftContext.LangOpts.CForeignReferenceTypes)
+        return false;
+
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxRecordSemantics({decl, Impl.SwiftContext}), {});
