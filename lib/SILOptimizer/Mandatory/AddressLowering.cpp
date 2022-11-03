@@ -2751,6 +2751,21 @@ protected:
 
   void emitExtract(SingleValueInstruction *extractInst);
 
+  void visitSelectEnumInst(SelectEnumInst *sei) {
+    SmallVector<std::pair<EnumElementDecl *, SILValue>> caseValues;
+    for (unsigned index = 0, count = sei->getNumCases(); index < count;
+         ++index) {
+      caseValues.push_back(sei->getCase(index));
+    }
+
+    SILValue opAddr = addrMat.materializeAddress(use->get());
+    SILValue addr =
+        builder.createSelectEnumAddr(sei->getLoc(), opAddr, sei->getType(),
+                                     sei->getDefaultResult(), caseValues);
+    sei->replaceAllUsesWith(addr);
+    pass.deleter.forceDelete(sei);
+  }
+
   // Extract from an opaque struct.
   void visitStructExtractInst(StructExtractInst *extractInst);
 

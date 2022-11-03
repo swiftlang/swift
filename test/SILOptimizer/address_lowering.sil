@@ -1340,6 +1340,23 @@ exit_error(%47 : @owned $any Error):
   throw %47 : $any Error
 }
 
+// CHECK-LABEL: sil [ossa] @selecteroo : $@convention(thin) <T> () -> () {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         apply undef<T>([[ADDR]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+// CHECK:         select_enum_addr [[ADDR]] : $*Optional<T>, case #Optional.some!enumelt: {{%[^,]+}}, default {{%[^,]+}} : $Builtin.Int1
+// CHECK:         dealloc_stack [[ADDR]] : $*Optional<T>
+// CHECK-LABEL: } // end sil function 'selecteroo'
+sil [ossa] @selecteroo : $@convention(thin) <T> () -> () {
+bb0:
+  %11 = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = integer_literal $Builtin.Int1, 0
+  %14 = select_enum %11 : $Optional<T>, case #Optional.some!enumelt: %12, default %13 : $Builtin.Int1
+  destroy_value %11 : $Optional<T>
+  %retval = tuple ()
+  return %retval : $()
+} // end sil function '$ss17FixedWidthIntegerPsEyxSgSScfC'
+
 sil hidden [ossa] @testBeginApplyDeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
   %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
