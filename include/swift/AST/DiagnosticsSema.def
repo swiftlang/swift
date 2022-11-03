@@ -2024,10 +2024,6 @@ ERROR(synthesized_nominal_extension,none,
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
 
-// FIXME: SwiftUI source compatibility hack; see usage for details.
-WARNING(type_does_not_conform_swiftui_warning,none,
-        "type %0 does not conform to protocol %1", (Type, Type))
-
 ERROR(non_final_class_cannot_conform_to_self_same_type,none,
       "non-final class %0 cannot safely conform to protocol %1, "
       "which requires that %2 %select{is exactly equal to|inherit from}3 %4",
