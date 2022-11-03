@@ -1231,7 +1231,8 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
-  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+  if ((superclassDecl->hasClangNode() ||
+       superclassDecl->getModuleContext() != decl->getParentModule()) &&
       superclassDecl->hasMissingDesignatedInitializers())
     return false;
 

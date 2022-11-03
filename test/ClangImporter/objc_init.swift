@@ -210,3 +210,14 @@ extension SuperclassWithDesignatedInitInCategory {
 func testConvenienceInitInheritance() {
   _ = SubclassWithSwiftPrivateDesignatedInit(y: 5)
 }
+
+// ...unless the superclass has been marked with
+// @_hasMissingDesignatedInitializers to disable this behavior.
+extension NoConvenienceInitInheritanceBase {
+  convenience init(y: Int) { self.init() }
+}
+
+func testNoConvenienceInitInheritance() {
+  _ = NoConvenienceInitInheritanceBase(y: 42)
+  _ = NoConvenienceInitInheritance(y: 42) // expected-error {{argument passed to call that takes no arguments}}
+}
