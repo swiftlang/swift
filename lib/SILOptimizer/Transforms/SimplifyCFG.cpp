@@ -2535,15 +2535,6 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
     return false;
   }
   TermInst *Term = BB->getTerminator();
-  // TODO: OSSA; cleanup nontrivial terminator operands (if this ever actually
-  // happens)
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    if (llvm::any_of(Term->getOperandValues(), [this](SILValue op) {
-          return !op->getType().isTrivial(Fn);
-        })) {
-      return false;
-    }
-  }
   LLVM_DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
   SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest.destBB,
                                          commonDest.newSourceBranchArgs);
