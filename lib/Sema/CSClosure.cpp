@@ -1920,7 +1920,7 @@ private:
   /// compiles today will continue to compile. Once result builder types
   /// have had the chance to adopt buildLimitedAvailability(), we'll upgrade
   /// this warning to an error.
-  LLVM_NODISCARD
+  [[nodiscard]]
   bool diagnoseMissingBuildWithAvailability(IfStmt *ifStmt) {
     auto findAvailabilityCondition =
         [](StmtCondition stmtCond) -> const StmtConditionElement * {

@@ -383,7 +383,7 @@ int swift::RunImmediately(CompilerInstance &CI,
 
   MainFnTy JITMain = nullptr;
   if (auto MainFnOrErr = JIT->lookup("main"))
-    JITMain = llvm::jitTargetAddressToFunction<MainFnTy>(MainFnOrErr->getAddress());
+    JITMain = llvm::jitTargetAddressToFunction<MainFnTy>(MainFnOrErr->getValue());
   else {
     logAllUnhandledErrors(MainFnOrErr.takeError(), llvm::errs(), "");
     return -1;

@@ -151,11 +151,11 @@ public:
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
-  LLVM_NODISCARD bool collectFrom();
+  [[nodiscard]] bool collectFrom();
 
 private:
-  LLVM_NODISCARD bool collectUses(SILValue Pointer);
-  LLVM_NODISCARD bool collectContainerUses(SILValue boxValue);
+  [[nodiscard]] bool collectUses(SILValue Pointer);
+  [[nodiscard]] bool collectContainerUses(SILValue boxValue);
 };
 } // end anonymous namespace
 

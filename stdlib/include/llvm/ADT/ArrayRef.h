@@ -41,7 +41,7 @@ namespace llvm {
   /// This is intended to be trivially copyable, so it should be passed by
   /// value.
   template<typename T>
-  class LLVM_GSL_POINTER LLVM_NODISCARD ArrayRef {
+  class LLVM_GSL_POINTER [[nodiscard]] ArrayRef {
   public:
     using value_type = T;
     using pointer = value_type *;
@@ -305,7 +305,7 @@ namespace llvm {
   /// This is intended to be trivially copyable, so it should be passed by
   /// value.
   template<typename T>
-  class LLVM_NODISCARD MutableArrayRef : public ArrayRef<T> {
+  class [[nodiscard]] MutableArrayRef : public ArrayRef<T> {
   public:
     using value_type = T;
     using pointer = value_type *;
