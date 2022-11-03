@@ -4617,4 +4617,7 @@ void SILGenFunction::emitProtocolWitness(
   formalEvalScope.pop();
   scope.pop();
   B.createReturn(loc, reqtResultValue);
+
+  // Now that we have finished emitting the function, verify it!
+  F.verify();
 }
