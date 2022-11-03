@@ -64,8 +64,10 @@ extension ASTGenVisitor {
 
   public func visit(_ node: TupleExprElementListSyntax) -> ASTNode {
     let elements = node.map { self.visit($0).rawValue }
-    let labels: [BridgedIdentifier] = node.enumerated().map { (idx, e) in
-      var name = e.label?.text ?? "\(idx)"
+    let labels: [BridgedIdentifier?] = node.map {
+      guard var name = $0.label?.text else {
+        return nil
+      }
       return name.withUTF8 { buf in
         SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
       }
