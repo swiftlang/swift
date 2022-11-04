@@ -957,8 +957,8 @@ function(add_swift_fuzzer_host_tool executable)
 endfunction()
 
 macro(add_swift_tool_symlink name dest component)
-  add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
-  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+  llvm_add_tool_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE)
+  llvm_install_symlink(SWIFT ${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
 endmacro()
 
 # Declare that files in this library are built with LLVM's support

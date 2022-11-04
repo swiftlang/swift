@@ -81,11 +81,6 @@ static llvm::cl::list<const llvm::PassInfo *, bool, llvm::PassNameParser>
     PassList(llvm::cl::desc("Optimizations available:"));
 
 static llvm::cl::opt<bool>
-    UseLegacyPassManager("legacy-pass-manager",
-                         llvm::cl::desc("Use the legacy llvm pass manager"),
-                         llvm::cl::init(true));
-
-static llvm::cl::opt<bool>
     Optimized("O", llvm::cl::desc("Optimization level O. Similar to swift -O"));
 
 // TODO: I wanted to call this 'verify', but some other pass is using this
@@ -314,16 +309,15 @@ int main(int argc, char **argv) {
   if (Optimized) {
     IRGenOptions Opts;
     Opts.OptMode = OptimizationMode::ForSpeed;
-    Opts.LegacyPassManager = UseLegacyPassManager;
+    Opts.OutputKind = IRGenOutputKind::LLVMAssemblyAfterOptimization;
 
     // Then perform the optimizations.
-    performLLVMOptimizations(Opts, M.get(), TM.get());
+    performLLVMOptimizations(Opts, M.get(), TM.get(), &Out->os());
   } else {
     runSpecificPasses(argv[0], M.get(), TM.get(), ModuleTriple);
+    // Finally dump the output.
+    dumpOutput(*M, Out->os());
   }
-
-  // Finally dump the output.
-  dumpOutput(*M, Out->os());
 
   return 0;
 }

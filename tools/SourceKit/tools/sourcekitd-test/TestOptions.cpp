@@ -55,7 +55,7 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 // Create OptTable class for parsing actual command line arguments
 class TestOptTable : public llvm::opt::OptTable {
 public:
-  TestOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)){}
+  TestOptTable() : OptTable(InfoTable, std::size(InfoTable)){}
 };
 
 } // end anonymous namespace

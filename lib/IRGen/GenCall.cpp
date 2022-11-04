@@ -3423,7 +3423,7 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
   Alignment coercionTyAlignment =
       Alignment(coercionTyLayout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
-  if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
+  if (alloca->getAlign() < coercionTyAlignment.getValue()) {
     alloca->setAlignment(
         llvm::MaybeAlign(coercionTyAlignment.getValue()).valueOrOne());
     temporary = Address(temporary.getAddress(), temporary.getElementType(),
@@ -4548,7 +4548,7 @@ static void adjustAllocaAlignment(const llvm::DataLayout &DL,
   auto layout = DL.getStructLayout(type);
   Alignment layoutAlignment = Alignment(layout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(allocaAddr.getAddress());
-  if (alloca->getAlignment() < layoutAlignment.getValue()) {
+  if (alloca->getAlign() < layoutAlignment.getValue()) {
     alloca->setAlignment(
         llvm::MaybeAlign(layoutAlignment.getValue()).valueOrOne());
     allocaAddr = Address(allocaAddr.getAddress(), allocaAddr.getElementType(),

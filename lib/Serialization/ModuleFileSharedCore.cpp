@@ -467,7 +467,7 @@ static bool validateInputBlock(
 
 bool serialization::isSerializedAST(StringRef data) {
   StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
-                         llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
+                         std::size(SWIFTMODULE_SIGNATURE));
   return data.startswith(signatureStr);
 }
 

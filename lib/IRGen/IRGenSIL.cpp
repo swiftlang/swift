@@ -704,7 +704,7 @@ public:
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     ZeroInitBuilder.CreateMemSet(
         AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, llvm::MaybeAlign(AI->getAlignment()));
+        Size, llvm::MaybeAlign(AI->getAlign()));
   }
 
   /// Try to emit an inline assembly gadget which extends the lifetime of
