@@ -1183,7 +1183,8 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   storage.storageAddress = nullptr;
 
   // It's only use should be dealloc_stacks.
-  for (Operand *use : allocInst->getUses()) {
+  SmallVector<Operand *, 4> uses(allocInst->getUses());
+  for (Operand *use : uses) {
     pass.deleter.forceDelete(cast<DeallocStackInst>(use->getUser()));
   }
   pass.deleter.forceDelete(allocInst);
@@ -2649,6 +2650,13 @@ protected:
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
+
+  void visitFixLifetimeInst(FixLifetimeInst *fli) {
+    SILValue value = fli->getOperand();
+    SILValue address = pass.valueStorageMap.getStorage(value).storageAddress;
+    builder.createFixLifetime(fli->getLoc(), address);
+    pass.deleter.forceDelete(fli);
+  }
 
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
