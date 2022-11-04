@@ -503,7 +503,7 @@ class LogParser(object):
         Returns a list of `PerformanceTestResult`s.
         """
         match_json = re.compile(r"\s*({.*)")
-        match_header = re.compile(r"( *#[, \t]+TEST[, \t]+SAMPLES[, \t].*)")
+        match_header = re.compile(r"( *#[, \t]+TEST.*)")
         match_legacy = re.compile(r" *(\d+[, \t].*)")
         header = ""
         for line in lines:
