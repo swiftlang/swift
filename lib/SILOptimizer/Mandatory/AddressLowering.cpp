@@ -2617,6 +2617,16 @@ protected:
     vmi->setOperand(opAddr);
   }
 
+  void visitAddressOfBorrowBuiltinInst(BuiltinInst *bi, bool stackProtected) {
+    SILValue value = bi->getOperand(0);
+    SILValue addr = pass.valueStorageMap.getStorage(value).storageAddress;
+    auto &astCtx = pass.getModule()->getASTContext();
+    SILType rawPointerType = SILType::getRawPointerType(astCtx);
+    SILValue result = builder.createAddressToPointer(
+        bi->getLoc(), addr, rawPointerType, stackProtected);
+    bi->replaceAllUsesWith(result);
+  }
+
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().getValueOr(BuiltinValueKind::None)) {
     case BuiltinValueKind::Copy: {
@@ -2624,6 +2634,12 @@ protected:
       bi->setOperand(0, opAddr);
       break;
     }
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+      visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/true);
+      break;
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+      visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/false);
+      break;
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value use.");
