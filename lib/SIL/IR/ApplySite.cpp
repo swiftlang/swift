@@ -20,7 +20,7 @@ void ApplySite::insertAfterInvocation(function_ref<void(SILBuilder &)> func) con
   SILBuilderWithScope::insertAfter(getInstruction(), func);
 }
 
-void ApplySite::insertAfterFullEvaluation(
+void ApplySite::insertAfterApplication(
     function_ref<void(SILBuilder &)> func) const {
   switch (getKind()) {
   case ApplySiteKind::ApplyInst:

@@ -431,7 +431,7 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
   }
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
-  fas.insertAfterFullEvaluation(insertAtNonUnreachable);
+  fas.insertAfterApplication(insertAtNonUnreachable);
 }
 
 static SILValue skipConvert(SILValue v) {
