@@ -202,23 +202,24 @@ public:
 
   /// Default
   constexpr Expected() { has_val = false; }
-  constexpr Expected(T buf) : buffer(buf) { has_val = true; }
-  constexpr Expected(swift::Error * _Nonnull error_val)  : err(error_val) { has_val = false; }
+  constexpr Expected(const swift::Error& error_val) : err(error_val) { has_val = false; }
+  constexpr Expected(T buf) {
+    new (&buffer) T(buf);
+    has_val = true;
+  }
 
   /// Copy
   constexpr Expected(Expected const& other) noexcept {
-    if (other.has_value()) {
-      buffer = other.buffer;
-      has_val = true;
-    }
+    if (other.has_value())
+      new (&buffer) T(other.value());
+    else
+      new (&err) Error(other.error());
+
+    has_val = other.has_value();
   }
   /// Move
-  constexpr Expected(Expected&& other) noexcept {
-    if (other.has_value()) {
-      buffer = other.buffer;
-      has_val = true;
-    }
-  }
+  // FIXME: Implement move semantics when move Swift values is possible
+  constexpr Expected(Expected&&) noexcept { abort(); }
 
   ~Expected() noexcept { }
 
@@ -273,7 +274,7 @@ public:
   constexpr bool has_value() const noexcept { return has_val; }
 
 private:
-  T buffer;
+  alignas(alignof(T)) char buffer[sizeof(T)];
   swift::Error err;
   bool has_val;
 };
