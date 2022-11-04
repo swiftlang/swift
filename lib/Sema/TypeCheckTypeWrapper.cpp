@@ -173,25 +173,36 @@ NominalTypeDecl::getTypeWrappedTypeMemberwiseInitializer() const {
       SynthesizeTypeWrappedTypeMemberwiseInitializer{mutableSelf}, nullptr);
 }
 
-NominalTypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
+TypeDecl *NominalTypeDecl::getTypeWrapperStorageDecl() const {
   auto *mutableSelf = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            GetTypeWrapperStorage{mutableSelf}, nullptr);
 }
 
-NominalTypeDecl *
-GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
-                                NominalTypeDecl *parent) const {
+TypeDecl *GetTypeWrapperStorage::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *parent) const {
   if (!parent->hasTypeWrapper())
     return nullptr;
 
   auto &ctx = parent->getASTContext();
 
-  auto *storage =
-      new (ctx) StructDecl(/*StructLoc=*/SourceLoc(), ctx.Id_TypeWrapperStorage,
-                           /*NameLoc=*/SourceLoc(),
-                           /*Inheritted=*/{},
-                           /*GenericParams=*/nullptr, parent);
+  TypeDecl *storage = nullptr;
+  if (isa<ProtocolDecl>(parent)) {
+    // If type wrapper is associated with a protocol, we need to
+    // inject a new associated type - $Storage.
+    storage = new (ctx)
+        AssociatedTypeDecl(parent, /*keywordLoc=*/SourceLoc(),
+                           ctx.Id_TypeWrapperStorage, /*nameLoc=*/SourceLoc(),
+                           /*defaultDefinition=*/nullptr,
+                           /*trailingWhere=*/nullptr);
+  } else {
+    // For classes and structs we inject a new member struct - $Storage.
+    storage = new (ctx)
+        StructDecl(/*StructLoc=*/SourceLoc(), ctx.Id_TypeWrapperStorage,
+                   /*NameLoc=*/SourceLoc(),
+                   /*Inheritted=*/{},
+                   /*GenericParams=*/nullptr, parent);
+  }
 
   storage->setImplicit();
   storage->setSynthesized();
@@ -223,7 +234,7 @@ GetTypeWrapperProperty::evaluate(Evaluator &evaluator,
   auto propertyTy = BoundGenericType::get(
       typeWrapper, /*Parent=*/typeWrapperType->getParent(),
       /*genericArgs=*/
-      {parent->getDeclaredInterfaceType(),
+      {parent->getSelfInterfaceType(),
        storage->getDeclaredInterfaceType()});
 
   return injectProperty(parent, ctx.Id_TypeWrapperProperty, propertyTy,
@@ -240,7 +251,10 @@ VarDecl *GetTypeWrapperStorageForProperty::evaluate(Evaluator &evaluator,
   if (!property->isAccessedViaTypeWrapper())
     return nullptr;
 
-  auto *storage = wrappedType->getTypeWrapperStorageDecl();
+  assert(!isa<ProtocolDecl>(wrappedType));
+
+  auto *storage =
+      cast<NominalTypeDecl>(wrappedType->getTypeWrapperStorageDecl());
   assert(storage);
 
   // Type wrapper variables are never initialized directly,
@@ -456,7 +470,11 @@ VarDecl *SynthesizeLocalVariableForTypeWrapperStorage::evaluate(
   if (!(DC && DC->hasTypeWrapper()))
     return nullptr;
 
-  auto *storageDecl = DC->getTypeWrapperStorageDecl();
+  // Default protocol initializers do not get transformed.
+  if (isa<ProtocolDecl>(DC))
+    return nullptr;
+
+  auto *storageDecl = cast<NominalTypeDecl>(DC->getTypeWrapperStorageDecl());
   assert(storageDecl);
 
   SmallVector<TupleTypeElt, 4> members;

@@ -3552,8 +3552,7 @@ public:
 /// Inject or get `$Storage` type which has all of the stored properties
 /// of the given type with a type wrapper.
 class GetTypeWrapperStorage
-    : public SimpleRequest<GetTypeWrapperStorage,
-                           NominalTypeDecl *(NominalTypeDecl *),
+    : public SimpleRequest<GetTypeWrapperStorage, TypeDecl *(NominalTypeDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3561,7 +3560,7 @@ public:
 private:
   friend SimpleRequest;
 
-  NominalTypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
+  TypeDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *) const;
 
 public:
   bool isCached() const { return true; }
