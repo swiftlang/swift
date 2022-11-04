@@ -6473,6 +6473,13 @@ public:
       if (auto existential = constraint->getAs<ExistentialType>())
         constraint = existential->getConstraintType();
 
+      // Opaque archetype substitutions are always canonical, so re-sugar the
+      // constraint type using the owning declaration's generic parameter names.
+      auto genericSig = T->getDecl()->getNamingDecl()->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+      if (genericSig)
+        constraint = genericSig->getSugaredType(constraint);
+
       visit(constraint);
       return;
     }
