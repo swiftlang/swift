@@ -131,6 +131,11 @@ public:
   static inline void *_Nonnull &getOpaquePointerRef(RefCountedClass &object) {
     return object._opaquePointer;
   }
+  static inline void *_Nonnull copyOpaquePointer(
+      const RefCountedClass &object) {
+    swift_retain(object._opaquePointer);
+    return object._opaquePointer;
+  }
 };
 
 } // namespace _impl
