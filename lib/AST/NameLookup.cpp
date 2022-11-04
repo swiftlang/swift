@@ -2718,6 +2718,20 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(result);
 }
 
+ArrayRef<ValueDecl *>
+ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  SmallVector<ValueDecl *, 4> requirements;
+
+  for (auto *member : PD->getABIMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (VD && VD->isProtocolRequirement())
+      requirements.push_back(VD);
+  }
+
+  return PD->getASTContext().AllocateCopy(requirements);
+}
+
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
