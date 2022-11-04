@@ -37,6 +37,160 @@ Expr *getVoidExpr(ASTContext &ctx, SourceLoc contextLoc = SourceLoc()) {
   return voidExpr;
 }
 
+/// Pre-check all the expressions in the body.
+/// ANGELA
+class PreCheckBody : public ASTWalker {
+
+  // AnyFunctionRef Fn;
+  BraceStmt *Body;
+  ConstraintSystem &CS;
+
+  bool SkipPrecheck = false;
+  bool SuppressDiagnostics = false;
+  std::vector<ReturnStmt *> ReturnStmts;
+  bool HasError = false;
+
+  bool hasReturnStmt() const { return !ReturnStmts.empty(); }
+
+public:
+  PreCheckBody(ConstraintSystem &cs, BraceStmt *closurebody, bool skipPrecheck,
+               bool suppressDiagnostics)
+      : Body(closurebody), CS(cs), SkipPrecheck(skipPrecheck),
+        SuppressDiagnostics(suppressDiagnostics) {}
+
+  const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
+
+  ResultBuilderBodyPreCheck run() {
+    // Stmt *oldBody = Fn.getBody();
+
+    // Stmt *newBody = oldBody->walk(*this);
+    Stmt *newBody = Body->walk(*this);
+
+    // If the walk was aborted, it was because we had a problem of some kind.
+    assert((newBody == nullptr) == HasError &&
+           "unexpected short-circuit while walking body");
+    if (HasError)
+      return ResultBuilderBodyPreCheck::Error;
+
+    // assert(oldBody == newBody && "pre-check walk wasn't in-place?");
+
+    if (hasReturnStmt())
+      return ResultBuilderBodyPreCheck::HasReturnStmt;
+
+    return ResultBuilderBodyPreCheck::Okay;
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (SkipPrecheck)
+      return Action::SkipChildren(E);
+
+    // Pre-check the target.  If this fails, abort the walk immediately.
+    // Otherwise, replace the expression with the result of pre-checking.
+    // In either case, don't recurse into the expression.
+    {
+      auto &log = llvm::errs();
+
+      auto &ctx = CS.getASTContext();
+      auto &diagEngine = ctx.Diags;
+
+      bool isDiscarded =
+          !ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport;
+
+      SolutionApplicationTarget target(E, CS.DC, ContextualTypeInfo().purpose,
+                                       ContextualTypeInfo().getType(),
+                                       isDiscarded);
+
+      if (CS.isDebugMode()) {
+        log.indent(CS.solverState->getCurrentIndent())
+            << "(Precheck conjunction element syntactic element)";
+        log << " \n";
+        E->dump(log, CS.solverState->getCurrentIndent());
+        log << " \n";
+      }
+
+      // bool hadErrors = false;
+
+      // Even if precheck fails, we will still simplify the Constraint
+      HasError |= ConstraintSystem::preCheckTarget(target, true, true);
+
+      if (CS.isDebugMode()) {
+        log.indent(CS.solverState->getCurrentIndent()) << "(AFTER Precheck)";
+        log << " \n";
+        E->dump(log, CS.solverState->getCurrentIndent());
+        log << " \n";
+
+        if (HasError) {
+          log.indent(CS.solverState->getCurrentIndent())
+              << "(!!!Precheck had errors!!!)";
+          log << "\n";
+        }
+      }
+      // auto *DC = Fn.getAsDeclContext();
+      // auto &diagEngine = DC->getASTContext().Diags;
+
+      // Suppress any diagnostics which could be produced by this expression.
+      DiagnosticTransaction transaction(diagEngine);
+
+      //      HasError |= ConstraintSystem::preCheckExpression(
+      //          E, DC, /*replaceInvalidRefsWithErrors=*/true,
+      //          /*leaveClosureBodiesUnchecked=*/false);
+
+      HasError |= transaction.hasErrors();
+
+      if (!HasError)
+        HasError |= containsErrorExpr(E);
+
+      if (SuppressDiagnostics)
+        transaction.abort();
+
+      if (HasError)
+        return Action::Stop();
+
+      return Action::SkipChildren(E);
+    }
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    // If we see a return statement, note it..
+    if (auto returnStmt = dyn_cast<ReturnStmt>(S)) {
+      if (!returnStmt->isImplicit()) {
+        ReturnStmts.push_back(returnStmt);
+        return Action::SkipChildren(S);
+      }
+    }
+
+    // Otherwise, recurse into the statement normally.
+    return Action::Continue(S);
+  }
+
+  /// Check whether given expression (including single-statement
+  /// closures) contains `ErrorExpr` as one of its sub-expressions.
+  bool containsErrorExpr(Expr *expr) {
+    bool hasError = false;
+
+    expr->forEachChildExpr([&](Expr *expr) -> Expr * {
+      hasError |= isa<ErrorExpr>(expr);
+      if (hasError)
+        return nullptr;
+
+      if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+        if (closure->hasSingleExpressionBody()) {
+          hasError |= containsErrorExpr(closure->getSingleExpressionBody());
+          return hasError ? nullptr : expr;
+        }
+      }
+      return expr;
+    });
+
+    return hasError;
+  }
+
+  /// Ignore patterns.
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *pat) override {
+    return Action::SkipChildren(pat);
+  }
+};
+
 /// Find any type variable references inside of an AST node.
 class TypeVariableRefFinder : public ASTWalker {
   /// A stack of all closures the walker encountered so far.
@@ -880,7 +1034,6 @@ private:
                           locator, LocatorPathElt::SyntacticElement(element)),
                       /*contextualInfo=*/{}, isDiscarded));
     }
-
     createConjunction(cs, elements, locator);
   }
 
@@ -1071,8 +1224,10 @@ bool ConstraintSystem::generateConstraints(AnyFunctionRef fn, BraceStmt *body) {
       SyntacticElementConstraintGenerator generator(
           *this, closure, getConstraintLocator(closure));
 
-      // Incrementally pre-check each target, validating any types that occur in
-      // the expression and folding sequence expressions.
+      // ANGELA : Call precheck here
+      PreCheckBody precheck(*this, closure->getBody(), /*skipPrecheck=*/false,
+                            true);
+      closure->getBody()->walk(precheck);
 
       generator.visit(closure->getBody());
 
@@ -1167,7 +1322,6 @@ ConstraintSystem::simplifySyntacticElementConstraint(
   if (auto *expr = element.dyn_cast<Expr *>()) {
     SolutionApplicationTarget target(expr, context, contextInfo.purpose,
                                      contextInfo.getType(), isDiscarded);
-
     if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
       return SolutionKind::Error;
 

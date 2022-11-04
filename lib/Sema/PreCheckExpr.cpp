@@ -1549,7 +1549,8 @@ namespace {
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
-  // We want to skip checking the body for multi-statement closures
+
+  // We always want to skip checking the body for multi-statement closures
   if (!closure->hasSingleExpressionBody())
     return false;
 
@@ -2206,6 +2207,14 @@ bool ConstraintSystem::preCheckTarget(SolutionApplicationTarget &target,
     // Even if the pre-check fails, expression still has to be re-set.
     target.setExpr(expr);
   }
+
+  //  if (auto *closure = target.getAsClosureExpr()) {
+  //    Expr* expr = cast<Expr>(closure);
+  //    hadErrors |= preCheckExpression(expr, DC, replaceInvalidRefsWithErrors,
+  //                                    leaveClosureBodiesUnchecked);
+  //    // Even if the pre-check fails, expression still has to be re-set.
+  //    target.setClosureExpr(closure);
+  //  }
 
   if (target.isForEachStmt()) {
     auto *stmt = target.getAsForEachStmt();

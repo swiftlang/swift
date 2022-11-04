@@ -2206,6 +2206,23 @@ public:
     llvm_unreachable("invalid expression type");
   }
 
+  ClosureExpr *getAsClosureExpr() const {
+    switch (kind) {
+    case Kind::closure:
+      return closure.closure;
+
+    case Kind::expression:
+    case Kind::function:
+    case Kind::stmtCondition:
+    case Kind::caseLabelItem:
+    case Kind::patternBinding:
+    case Kind::uninitializedVar:
+    case Kind::forEachStmt:
+      return nullptr;
+    }
+    llvm_unreachable("invalid expression type");
+  }
+
   DeclContext *getDeclContext() const {
     switch (kind) {
     case Kind::expression:
@@ -2422,6 +2439,11 @@ public:
   void setExpr(Expr *expr) {
     assert(kind == Kind::expression);
     expression.expression = expr;
+  }
+
+  void setClosureExpr(ClosureExpr *closure) {
+    assert(kind == Kind::closure);
+    this->closure.closure = closure;
   }
 
   void setPattern(Pattern *pattern) {
