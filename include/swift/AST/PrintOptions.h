@@ -466,6 +466,10 @@ struct PrintOptions {
   /// of the alias.
   bool PrintTypeAliasUnderlyingType = false;
 
+  /// Use aliases when printing references to modules to avoid ambiguities
+  /// with types sharing a name with a module.
+  bool AliasModuleNames = false;
+
   /// When printing an Optional<T>, rather than printing 'T?', print
   /// 'T!'. Used as a modifier only when we know we're printing
   /// something that was declared as an implicitly unwrapped optional
@@ -601,7 +605,7 @@ struct PrintOptions {
     return result;
   }
 
-  /// Retrieve the set of options suitable for interface generation.
+  /// Retrieve the set of options suitable for IDE interface generation.
   static PrintOptions printInterface(bool printFullConvention) {
     PrintOptions result =
         printForDiagnostics(AccessLevel::Public, printFullConvention);
@@ -636,7 +640,8 @@ struct PrintOptions {
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
-                                              bool printSPIs);
+                                              bool printSPIs,
+                                              bool aliasModuleNames);
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which
   /// are a prettified representation of the public API of a module, to be

@@ -131,7 +131,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   bool printSPIs) {
+                                                   bool printSPIs,
+                                                   bool aliasModuleNames) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -152,6 +153,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
+  result.AliasModuleNames = aliasModuleNames;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -367,6 +369,9 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
 
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name,
                                 const PrintOptions &Options) {
+  if (Options.AliasModuleNames)
+    printTextImpl(MODULE_DISAMBIGUATING_PREFIX);
+
   printName(Name);
 }
 
