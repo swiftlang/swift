@@ -1673,3 +1673,31 @@ bb0(%0 : @guaranteed $T):
   return %6 : $U
 }
 
+// CHECK-LABEL: sil [ossa] @yield_two : {{.*}} {
+// CHECK:         tuple_element_addr
+// CHECK:         tuple_element_addr
+// CHECK:         [[KEY:%[^,]+]] = tuple_element_addr {{%[^,]+}} : $*(key: Key, value: Value), 0
+// CHECK:         [[VALUE:%[^,]+]] = tuple_element_addr {{%[^,]+}} : $*(key: Key, value: Value), 1
+// CHECK:         yield ([[KEY]] : $*Key, [[VALUE]] : $*Value)
+// CHECK-LABEL: } // end sil function 'yield_two'
+sil [ossa] @yield_two : $@yield_once @convention(method) <Key, Value> (@in_guaranteed Key, @in_guaranteed Value) -> (@yields @in_guaranteed Key, @yields @in_guaranteed Value) {
+bb0(%0 : @guaranteed $Key, %1 : @guaranteed $Value):
+  %7 = copy_value %0 : $Key
+  %8 = copy_value %1 : $Value
+  %9 = tuple $(key: Key, value: Value) (%7, %8)
+  %10 = begin_borrow %9 : $(key: Key, value: Value)
+  %11 = tuple_extract %10 : $(key: Key, value: Value), 0
+  %12 = tuple_extract %10 : $(key: Key, value: Value), 1
+  yield (%11 : $Key, %12 : $Value), resume bb1, unwind bb2
+
+bb1:
+  end_borrow %10 : $(key: Key, value: Value)
+  destroy_value %9 : $(key: Key, value: Value)
+  %17 = tuple ()
+  return %17 : $()
+
+bb2:
+  end_borrow %10 : $(key: Key, value: Value)
+  destroy_value %9 : $(key: Key, value: Value)
+  unwind
+}
