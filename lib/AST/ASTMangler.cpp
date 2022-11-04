@@ -816,9 +816,6 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return std::string(); // not needed for the parser library.
-#endif
   return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
@@ -864,10 +861,6 @@ std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {
 }
 
 std::string ASTMangler::mangleOpaqueTypeDecl(const ValueDecl *decl) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return std::string(); // not needed for the parser library.
-#endif
-
   OptimizeProtocolNames = false;
 
   beginMangling();
@@ -2100,10 +2093,6 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
 Optional<ASTMangler::SpecialContext>
 ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
                                       bool useObjCProtocolNames) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return None; // not needed for the parser library.
-  #endif
-
   // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'So'
   //
