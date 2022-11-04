@@ -9,6 +9,13 @@
 // RUN:   -g -I %S/Inputs -Xcc -DFOO="foo" -Xcc -UBAR \
 // RUN:   -debug-prefix-map %t.mcp=PREFIX \
 // RUN:   -o - | %FileCheck %s --check-prefix=REMAP
+//
+// RUN: %empty-directory(%t.mcp)
+// RUN: cd %S && %target-swift-frontend -module-cache-path %t.mcp -emit-ir %s \
+// RUN:   -g -I %S/Inputs -Xcc -DFOO="foo" -Xcc -UBAR \
+// RUN:   -debug-prefix-map %S=. \
+// RUN:   -Xcc -Xclang -Xcc -fmodule-file-home-is-cwd \
+// RUN:   -o - | %FileCheck %s --check-prefix=CWD
 
 import ClangModule.SubModule
 import OtherClangModule.SubModule
@@ -42,3 +49,5 @@ let _ = someFunc(0)
 // REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}clang
 // REMAP-SAME:           PREFIX{{/|\\\\}}{{.*}}{{/|\\\\}}ClangModule
 // REMAP-SAME:           dwoId:
+
+// CWD: !DIFile(filename: "ClangModule", directory: ".{{/|\\\\}}Inputs")

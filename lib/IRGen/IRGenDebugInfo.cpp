@@ -47,6 +47,8 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/HeaderSearchOptions.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
@@ -732,6 +734,15 @@ private:
       bool CreateSkeletonCU = !ASTFile.empty();
       bool IsRootModule = !Parent;
       if (CreateSkeletonCU && IsRootModule) {
+        auto &HSI = CI.getClangPreprocessor()
+                        .getHeaderSearchInfo()
+                        .getHeaderSearchOpts();
+        if (HSI.ModuleFileHomeIsCwd) {
+          llvm::SmallString<256> cwd;
+          llvm::sys::fs::current_path(cwd);
+          RemappedIncludePath = DebugPrefixMap.remapPath(cwd.str());
+        }
+
         llvm::DIBuilder DIB(M);
         DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
                                               : llvm::dwarf::DW_LANG_C99,
