@@ -1159,7 +1159,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   coalescedPhi.coalesce(phi, pass.valueStorageMap);
 
   SmallVector<SILValue, 4> coalescedValues;
-  coalescedValues.resize(coalescedPhi.getCoalescedOperands().size());
+  coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
   for (SILValue value : coalescedPhi.getCoalescedValues())
     coalescedValues.push_back(value);
 
