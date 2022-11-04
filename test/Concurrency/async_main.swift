@@ -20,10 +20,10 @@ func asyncFunc() async {
 
 @main struct MyProgram {
   static func main() async throws {
-    print(foo)
+    print("\(foo)")
     foo += 1
     await asyncFunc()
-    print(foo)
+    print("\(foo)")
   }
 }
 

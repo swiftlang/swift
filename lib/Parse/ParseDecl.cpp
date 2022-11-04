@@ -167,7 +167,7 @@ extern "C" void parseTopLevelSwift(const char *buffer,
                                    void (*)(void *, void *));
 
 static void appendToVector(void *declPtr, void *vecPtr) {
-  auto vec = static_cast<SmallVectorImpl<Decl *> *>(vecPtr);
+  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
   auto decl = static_cast<Decl *>(declPtr);
 
   vec->push_back(decl);

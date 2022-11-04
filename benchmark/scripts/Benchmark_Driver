@@ -408,8 +408,9 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            if isinstance(msg, str) and getattr(stream, "encoding", None):
-                stream.write(msg.encode(stream.encoding))
+            if isinstance(msg, str) and (getattr(stream, "encoding", None) and
+               getattr(stream, "buffer", None)):
+                stream.buffer.write(msg.encode(stream.encoding))
             else:
                 stream.write(msg)
         except UnicodeError:

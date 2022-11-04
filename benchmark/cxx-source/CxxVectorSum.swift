@@ -15,24 +15,16 @@
 
 import TestsUtils
 
-public let benchmarks: [BenchmarkInfo] = []
-#if FIX_61472
+#if SWIFT_PACKAGE
+// FIXME: Needs fix for https://github.com/apple/swift/issues/61547.
 
-import std
+public let benchmarks = [BenchmarkInfo]()
 
-// FIXME: remove workaround for: https://github.com/apple/swift/issues/61472
-public func __workaround_std_import() {
-    let s = std.string()
-    blackHole(s.size())
-}
+#else
 
 import CxxStdlibPerformance
 import Cxx
 
-// FIXME: Linux needs fix for https://github.com/apple/swift/issues/61547.
-#if os(Linux)
-public let benchmarks: [BenchmarkInfo] = []
-#else
 public let benchmarks = [
   BenchmarkInfo(
       name: "CxxVecU32.sum.Cxx.rangedForLoop",
@@ -138,5 +130,4 @@ public func run_CxxVectorOfU32_Sum_Swift_Reduce(_ n: Int) {
 extension VectorOfU32.const_iterator : Equatable, UnsafeCxxInputIterator { }
 
 extension VectorOfU32: CxxSequence {}
-#endif
 #endif
