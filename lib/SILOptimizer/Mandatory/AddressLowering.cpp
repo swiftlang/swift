@@ -3362,8 +3362,21 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (valueDef->getType().isAddress())
       continue;
 
+    SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
-    for (Operand *oper : uses) {
+    for (auto *oper : uses) {
+      originalUses.insert(oper);
+      UseRewriter::rewriteUse(oper, pass);
+    }
+    // Rewrite every new uses that was added.
+    uses.clear();
+    for (auto *use : valueDef->getUses()) {
+      if (originalUses.contains(use))
+        continue;
+      uses.push_back(use);
+    }
+    for (auto *oper : uses) {
+      assert(isa<DebugValueInst>(oper->getUser()));
       UseRewriter::rewriteUse(oper, pass);
     }
   }

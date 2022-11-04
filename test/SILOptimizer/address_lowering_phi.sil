@@ -470,3 +470,33 @@ bb2:
 bb3(%phi : @owned $T):
   return %phi : $T
 }
+
+// Check that the debug_value instruction that is created when deleting a load
+// gets rewritten and doesn't obstruct the deletion of the phi.
+// CHECK-LABEL: sil [ossa] @f100_store_phi : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $*Value):
+// CHECK:         [[TEMP:%[^,]+]] = alloc_stack $Value
+// CHECK:         [[VAR:%[^,]+]] = alloc_stack [lexical] $Value, var, name "value"
+// CHECK:         cond_br undef, bb2, bb1
+// CHECK:       bb3:
+// CHECK:         copy_addr [take] [[TEMP]] to [init] [[VAR]]
+// CHECK:         debug_value [[TEMP]] : $*Value, var, name "value"
+// CHECK-LABEL: } // end sil function 'f100_store_phi'
+sil [ossa] @f100_store_phi : $@convention(thin) <Value> (@in Value) -> () {
+entry(%instance : @owned $Value):
+  %14 = alloc_stack [lexical] $Value, var, name "value"
+  cond_br undef, left, right
+
+left:
+  br merge(%instance : $Value)
+
+right:
+  br merge(%instance : $Value)
+
+merge(%34 : @owned $Value):
+  store %34 to [init] %14 : $*Value
+  destroy_addr %14 : $*Value
+  dealloc_stack %14 : $*Value
+  %43 = tuple ()
+  return %43 : $()
+}
