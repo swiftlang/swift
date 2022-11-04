@@ -162,7 +162,8 @@ public:
       PrintNameContext NameContext = PrintNameContext::Normal);
 
   /// Called when printing the referenced name of a module.
-  virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
+  virtual void printModuleRef(ModuleEntity Mod, Identifier Name,
+                              const PrintOptions &Options);
 
   /// Called before printing a synthesized extension.
   virtual void printSynthesizedExtensionPre(const ExtensionDecl *ED,
