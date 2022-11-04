@@ -2610,7 +2610,7 @@ protected:
 
   void visitYieldInst(YieldInst *yield) {
     SILValue addr = addrMat.materializeAddress(use->get());
-    yield->setOperand(0, addr);
+    yield->setOperand(use->getOperandNumber(), addr);
   }
 
   void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
