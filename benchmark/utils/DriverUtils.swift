@@ -624,7 +624,7 @@ final class TestRunner {
     if justify == .right {
       printSpaces(pad)
     }
-    print(s)
+    print(s, terminator: "")
     if justify == .left {
       printSpaces(pad)
     }
@@ -648,9 +648,11 @@ final class TestRunner {
 
   func printText(index: Int, info: BenchmarkInfo, results: BenchResults?) {
     printToWidth(index.description, width: 4, justify: .right)
+    printSpaces(1)
     printToWidth(info.name, width: c.testNameLength)
 
     if let results = results {
+      printToWidth(String(describing:results.samples.count), width: 10, justify: .right)
       if results.samples.count > 0 {
 	let min = results.samples.sorted().first!
 	printDoubleToWidth(min, width: 10)
@@ -662,8 +664,10 @@ final class TestRunner {
 
   func printTextHeading() {
     printToWidth("#", width: 4, justify: .right)
-    printToWidth("Name", width: c.testNameLength, justify: .left)
-    printToWidth("Minimum", width: 10, justify: .right)
+    printSpaces(1)
+    printToWidth("TEST", width: c.testNameLength, justify: .left)
+    printToWidth("SAMPLES", width: 10, justify: .right)
+    printToWidth("MIN", width: 10, justify: .right)
     print()
   }
 
