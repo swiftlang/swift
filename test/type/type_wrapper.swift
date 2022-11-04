@@ -172,8 +172,8 @@ class GenericA<K: Hashable, V> {
   var data: [K: V]
 }
 
-@NoopWrapper // expected-error {{type wrapper attribute 'NoopWrapper' can only be applied to a class, struct}}
-protocol P {
+@NoopWrapper
+protocol P { // Ok
 }
 
 @NoopWrapper // expected-error {{type wrapper attribute 'NoopWrapper' can only be applied to a class, struct}}

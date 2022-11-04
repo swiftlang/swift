@@ -6605,7 +6605,7 @@ ERROR(type_wrappers_are_experimental,none,
       "type wrappers are an experimental feature", ())
 
 ERROR(type_wrapper_attribute_not_allowed_here,none,
-      "type wrapper attribute %0 can only be applied to a class, struct",
+      "type wrapper attribute %0 can only be applied to a class, struct, or protocol",
       (Identifier))
 
 ERROR(type_wrapper_requires_two_generic_params,none,

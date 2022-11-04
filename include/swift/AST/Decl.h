@@ -3909,8 +3909,9 @@ public:
 
   /// If this declaration has a type wrapper, return `$Storage`
   /// declaration that contains all the stored properties managed
-  /// by the wrapper.
-  NominalTypeDecl *getTypeWrapperStorageDecl() const;
+  /// by the wrapper. Note that if this type is a protocol them
+  /// this method returns an associated type for $Storage.
+  TypeDecl *getTypeWrapperStorageDecl() const;
 
   /// If this declaration is a type wrapper, retrieve
   /// its required initializer - `init(storageWrapper:)`.

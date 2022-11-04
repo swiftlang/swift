@@ -3597,7 +3597,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   }
 
   if (nominal->getAttrs().hasAttribute<TypeWrapperAttr>()) {
-    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D))) {
+    if (!(isa<ClassDecl>(D) || isa<StructDecl>(D) || isa<ProtocolDecl>(D))) {
       diagnose(attr->getLocation(),
                diag::type_wrapper_attribute_not_allowed_here,
                nominal->getName());
