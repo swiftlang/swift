@@ -598,6 +598,8 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
 Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
   assert(type->isTypeParameter());
 
+  bool hasExplicitAnyObject = requiresClass(type);
+
   llvm::SmallVector<Type, 2> types;
   if (Type superclass = getSuperclassBound(type)) {
     // If the class contains a type parameter, try looking for a non-dependent
@@ -606,24 +608,28 @@ Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
       superclass = superclass->getSuperclass();
     }
 
-    if (superclass)
+    if (superclass) {
       types.push_back(superclass);
+      hasExplicitAnyObject = false;
+    }
   }
-  for (const auto &elt : getRequiredProtocols(type)) {
-    types.push_back(elt->getDeclaredInterfaceType());
+  for (auto *proto : getRequiredProtocols(type)) {
+    if (proto->requiresClass())
+      hasExplicitAnyObject = false;
+
+    types.push_back(proto->getDeclaredInterfaceType());
   }
 
-  const auto layout = getLayoutConstraint(type);
-  const auto boundsTy = ProtocolCompositionType::get(
+  auto constraint = ProtocolCompositionType::get(
       getASTContext(), types,
-      /*HasExplicitAnyObject=*/layout &&
-          layout->getKind() == LayoutConstraintKind::Class);
+      hasExplicitAnyObject);
 
-  if (boundsTy->isExistentialType()) {
-    return ExistentialType::get(boundsTy);
+  if (!constraint->isConstraintType()) {
+    assert(constraint->getClassOrBoundGenericClass());
+    return constraint;
   }
 
-  return boundsTy;
+  return ExistentialType::get(constraint);
 }
 
 Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
