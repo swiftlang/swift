@@ -368,6 +368,10 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 
   Opts.PreserveTypesAsWritten |=
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
+  Opts.AliasModuleNames |=
+    Args.hasFlag(OPT_alias_module_names_in_module_interface,
+                 OPT_disable_alias_module_names_in_module_interface,
+                 false);
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
   Opts.ExperimentalSPIImports |=
