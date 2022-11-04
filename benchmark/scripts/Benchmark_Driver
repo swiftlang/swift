@@ -136,7 +136,8 @@ class BenchmarkDriver(object):
 
     @property
     def _cmd_list_benchmarks(self):
-        return [self.test_harness, "--list", "--json"] + (
+        # TODO: Switch to JSON format: add "--json" here
+        return [self.test_harness, "--list"] + (
             ["--skip-tags="] if (self.args.benchmarks or self.args.filters) else []
         )
 
@@ -145,8 +146,19 @@ class BenchmarkDriver(object):
         lines = self._invoke(self._cmd_list_benchmarks).split("\n")
         json_tests = []
         for line in lines:
-            if line.strip() != "":
-                json_tests.append(json.loads(line))
+            columns = re.split(r'[ ,]+', line.strip())
+            try:
+                number = int(columns[0])
+                name = columns[1]
+                json = {"number": number, "name": name}
+                json_tests.append(json)
+            except Exception as e:
+                continue
+            # TODO: Replace the above with the following to
+            # use the JSON output from the benchmark driver
+            # directly
+            #if line.strip() != "":
+            #    json_tests.append(json.loads(line))
         self.all_tests = [json["name"] for json in json_tests]
         test_numbers = [json["number"] for json in json_tests]
         self.test_number = dict([(json["name"], json["number"]) for json in json_tests])
