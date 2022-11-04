@@ -3503,15 +3503,21 @@ Type ArchetypeType::getExistentialType() const {
   // Otherwise, compute it from scratch.
   SmallVector<Type, 4> constraintTypes;
   
+  bool hasExplicitAnyObject = requiresClass();
+
   if (auto super = getSuperclass()) {
+    hasExplicitAnyObject = false;
     constraintTypes.push_back(super);
   }
   for (auto proto : getConformsTo()) {
+    if (proto->requiresClass())
+      hasExplicitAnyObject = false;
     constraintTypes.push_back(proto->getDeclaredInterfaceType());
   }
+
   auto &ctx = const_cast<ArchetypeType*>(this)->getASTContext();
   auto constraint = ProtocolCompositionType::get(
-     ctx, constraintTypes, requiresClass());
+     ctx, constraintTypes, hasExplicitAnyObject);
 
   // If the archetype is only constrained to a class type,
   // return the class type directly.
