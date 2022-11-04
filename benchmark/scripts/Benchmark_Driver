@@ -206,7 +206,10 @@ class BenchmarkDriver(object):
         )
         output = self._invoke(cmd)
         results = self.parser.results_from_string(output)
-        return list(results.items())[0][1] if test else results
+        if test:
+            return list(results.items())[0][1]
+        else:
+            return results
 
     def _cmd_run(
         self,
@@ -232,7 +235,8 @@ class BenchmarkDriver(object):
             cmd.append("--verbose")
         if measure_memory:
             cmd.append("--memory")
-        cmd.append("--json")
+# TODO: Uncomment this as soon as the new Benchmark Swift logic is available everywhere
+#        cmd.append("--json")
         return cmd
 
     def run_independent_samples(self, test):
