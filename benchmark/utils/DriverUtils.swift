@@ -617,19 +617,23 @@ final class TestRunner {
     }
   }
   func printToWidth(_ s: String, width: Int, justify: Justification = .left) {
-    let pad = width - 1 - s.count
+    var pad = width - 1 - s.count
+    if pad <= 0 {
+      pad = 1
+    }
     if justify == .right {
       printSpaces(pad)
     }
-    print(s, terminator: " ")
+    print(s)
     if justify == .left {
       printSpaces(pad)
     }
   }
   func printDoubleToWidth(_ d: Double, fractionDigits: Int = 3, width: Int) {
     let digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-    // 10 ** fractionDigits -- This suffices for up to 8 digits
-    let scale = (0..<fractionDigits).reduce(1, {i,_ in i * 10})
+    // Handle up to 8 fraction digits
+    let scales = [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000]
+    let scale = scales[fractionDigits]
     let i = Int(d * Double(scale) + 0.5)
     let intPart = i / scale
     let fraction = i % scale
