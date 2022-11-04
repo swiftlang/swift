@@ -1377,7 +1377,7 @@ public func run_KeyPathNestedStructs(n: Int) {
 public func run_KeyPathClassStructs(n: Int) {
   var sum = 0
   var index = 0
-  let iterationMultipier = 2000
+  let iterationMultipier = 500
 
   let singleHopKeyPath0: WritableKeyPath<D1, D2> = \D1.b
   let singleHopKeyPath1: WritableKeyPath<D2, D3> = \D2.c
