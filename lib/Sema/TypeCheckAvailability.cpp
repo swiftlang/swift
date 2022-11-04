@@ -3262,6 +3262,12 @@ public:
         // as well as the initializer that is implicitly called.
         diagnoseDeclRefAvailability(Context.getRegexDecl(), Range);
       }
+
+      // Check availability of the type produced by implicit literal
+      // initializer.
+      if (auto *nominalDecl = LE->getType()->getAnyNominal()) {
+        diagnoseDeclAvailability(nominalDecl, Range, /*call=*/nullptr, Where);
+      }
       diagnoseDeclRefAvailability(LE->getInitializer(), Range);
     }
 
