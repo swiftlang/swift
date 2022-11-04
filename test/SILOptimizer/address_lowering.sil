@@ -1228,6 +1228,18 @@ bb2(%9 : $Error):
   throw %9 : $Error
 }
 
+// CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
+// CHECK:         fix_lifetime [[ADDR]]
+// CHECK-LABEL: } // end sil function 'fixeeLifetime'
+sil [ossa] @fixeeLifetime : $@convention(thin) <T> (@in T) -> () {
+bb0(%instance : @owned $T):
+  fix_lifetime %instance : $T
+  destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @lexical_borrow_struct_extract {{.*}} {
 // CHECK:         [[PAIR_ADDR:%[^,]+]] = alloc_stack [lexical]
 // CHECK:         [[X_ADDR:%[^,]+]] = struct_element_addr [[PAIR_ADDR]]
@@ -1271,6 +1283,61 @@ entry(%instance : @owned $Pair<T>):
   destroy_value %instance : $Pair<T>
   %retval = tuple ()
   return %retval : $()
+}
+
+/// Verify that alloc_stacks for which there is already a dealloc stack can be
+/// deleted.
+// CHECK-LABEL: sil [ossa] @partition : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INDEX_OUT:%[^,]+]] : $*Self.Index, [[SELF:%[^,]+]] : $*Self):
+// CHECK:         [[MAYBE_INDEX_ADDR:%[^,]+]] = alloc_stack $Optional<Builtin.Int64>
+// CHECK:         try_apply {{%[^,]+}}<Self, Builtin.Int64>([[MAYBE_INDEX_ADDR]], [[SELF]]) : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection><τ_1_0> (@inout τ_0_0) -> (@out Optional<τ_1_0>, @error any Error), normal [[YES_BLOCK:bb[0-9]+]], error [[NO_BLOCK:bb[0-9]+]]
+// CHECK:       [[NO_BLOCK]]([[REGISTER_16:%[^,]+]] : @owned $any Error):
+// CHECK:         dealloc_stack [[MAYBE_INDEX_ADDR]]
+// CHECK:         br [[EXIT_ERROR:bb[0-9]+]]([[REGISTER_16]] : $any Error)
+// CHECK:       [[EXIT_ERROR]]([[ERROR_TO_THROW:%[^,]+]] : @owned $any Error):
+// CHECK:         throw [[ERROR_TO_THROW]]
+// CHECK:       [[YES_BLOCK]]
+// CHECK:         [[MAYBE_INDEX:%[^,]+]] = load [trivial] [[MAYBE_INDEX_ADDR]]
+// CHECK:         dealloc_stack [[MAYBE_INDEX_ADDR]]
+// CHECK:         switch_enum [[MAYBE_INDEX]] : $Optional<Builtin.Int64>, case #Optional.some!enumelt: [[SOME_BLOCK:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BLOCK:bb[0-9]+]]
+// CHECK:       [[NONE_BLOCK]]:
+// CHECK:         apply {{%[^,]+}}<Self>([[INDEX_OUT]], [[SELF]])
+// CHECK:       [[SOME_BLOCK]]([[SOME_INDEX:%[^,]+]] : $Builtin.Int64):
+// CHECK:         apply {{%[^,]+}}<Self>([[INDEX_OUT]], [[SOME_INDEX]])
+// CHECK-LABEL: } // end sil function 'partition'
+protocol MyCollection {
+    associatedtype Index
+}
+sil [ossa] @impl : $@convention(method) <τ_0_0 where τ_0_0 : MyCollection> (@inout τ_0_0) -> @out τ_0_0.Index
+sil [ossa] @one : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection><τ_1_0> (@inout τ_0_0) -> (@out Optional<τ_1_0>, @error any Error)
+sil [ossa] @startIndex : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection> (@in_guaranteed τ_0_0) -> @out τ_0_0.Index
+sil [ossa] @index : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection> (Int) -> @out τ_0_0.Index
+sil [ossa] @partition : $@convention(method) <Self where Self : MyCollection> (@inout Self) -> (@out Self.Index, @error any Error) {
+bb0(%1 : $*Self):
+  %11 = function_ref @one : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection><τ_1_0> (@inout τ_0_0) -> (@out Optional<τ_1_0>, @error any Error)
+  try_apply %11<Self, Int>(%1) : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection><τ_1_0> (@inout τ_0_0) -> (@out Optional<τ_1_0>, @error any Error), normal bb1, error bb6
+
+bb1(%13 : $Optional<Int>):
+  switch_enum %13 : $Optional<Int>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
+
+bb2(%17 : $Int):
+  %28 = function_ref @index : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection> (Int) -> @out τ_0_0.Index
+  %29 = apply %28<Self>(%17) : $@convention(thin) <τ_0_0 where τ_0_0 : MyCollection> (Int) -> @out τ_0_0.Index
+  br exit_normal(%29 : $Self.Index)
+
+bb3:
+  %34 = function_ref @impl : $@convention(method) <τ_0_0 where τ_0_0 : MyCollection> (@inout τ_0_0) -> @out τ_0_0.Index
+  %36 = apply %34<Self>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : MyCollection> (@inout τ_0_0) -> @out τ_0_0.Index
+  br exit_normal(%36 : $Self.Index)
+
+bb6(%41 : @owned $any Error):
+  br exit_error(%41 : $any Error)
+
+exit_normal(%39 : @owned $Self.Index):
+  return %39 : $Self.Index
+
+exit_error(%47 : @owned $any Error):
+  throw %47 : $any Error
 }
 
 sil hidden [ossa] @testBeginApplyDeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
@@ -1541,3 +1608,4 @@ bb0(%0 : @guaranteed $T):
   destroy_value %3 : $U
   return %6 : $U
 }
+
