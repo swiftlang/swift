@@ -35,8 +35,6 @@ internal func _abstract(
 /// type.
 @_objcRuntimeName(_TtCs11_AnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
-  internal var _isPureStructKeyPath: Bool?
-  internal var _pureStructValueOffset: Int = 0
   /// The root type for this key path.
   @inlinable
   public static var rootType: Any.Type {
@@ -220,15 +218,15 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ) -> Self {
     _internalInvariant(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
-    let keypath = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
+    let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
-    keypath._kvcKeyPathStringPtr = nil
-    let base = UnsafeMutableRawPointer(Builtin.projectTailElems(keypath,
+    result._kvcKeyPathStringPtr = nil
+    let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))
     body(UnsafeMutableRawBufferPointer(start: base, count: bytes))
-    keypath._computeOffsetForPureStructKeypath()
-    return keypath
+    return result
   }
+  
   final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
@@ -241,90 +239,26 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return withBuffer {
       var buffer = $0
 
-  internal func isClass(_ item: Any.Type) -> Bool {
-    // Displays "warning: 'is' test is always true" at compile time, but that's not actually the case.
-    return (item is AnyObject)
-  }
+      // The identity key path is effectively a stored keypath of type Self
+      // at offset zero
+      if buffer.data.isEmpty { return 0 }
 
-  // TODO: Find a quicker way to see if this is a tuple.
-  internal func isTuple(_ item: Any) -> Bool {
-    // Unwraps type information if possible.
-    // Otherwise, everything the Mirror handling "item" sees would be "Optional<Any.Type>".
-    func unwrapType<T>(_ any: T) -> Any {
-      let mirror = Mirror(reflecting: any)
-      guard mirror.displayStyle == .optional, let first = mirror.children.first else {
-        return any
-      }
-      return first.value
-    }
+      var offset = 0
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        switch rawComponent.header.kind {
+        case .struct:
+          offset += rawComponent._structOrClassOffset
 
-    let mirror = Mirror(reflecting: unwrapType(item))
-    let description = mirror.description
-    let offsetOfFirstBracketForMirrorDescriptionOfTuple = 11
-    let idx = description.index(description.startIndex, offsetBy: offsetOfFirstBracketForMirrorDescriptionOfTuple)
-    if description[idx] == "(" {
-      return true
-    }
-    return false
-  }
-    
-    // If this keypath traverses structs only, it'll have a predictable memory layout.
-    // We can then jump to the value directly in _projectReadOnly().
-    internal func _computeOffsets() -> (offset: Int, isPureStruct: Bool, isTuple: Bool) {
-      _pureStructValueOffset = 0
-      var isPureStruct = true
-      var _isTuple = false
-      defer {
-        _isPureStructKeyPath = isPureStruct
-      }
-      withBuffer {
-        var buffer = $0
-        if buffer.data.isEmpty {
-          if isClass(Self._rootAndValueType.root) {
-            isPureStruct = false
-          }
-        } else {
-          while true {
-            let (rawComponent, optNextType) = buffer.next()
-            if isTuple(optNextType as Any) {
-              isPureStruct = false
-              _isTuple = true
-            }
-            switch rawComponent.header.kind {
-            case .struct:
-              _pureStructValueOffset += rawComponent._structOrClassOffset
-            case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
-              isPureStruct = false
-            }
-            if optNextType == nil {
-              break
-            }
-          }
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+          return .none
         }
-      }
-      return (_pureStructValueOffset, isPureStruct, _isTuple)
-    }
 
-    internal func _computeOffsetForPureStructKeypath() {
-      _ = _computeOffsets()
-    }
-
-    // This function was refactored since _computeOffsets() was performing
-    // essentially the same computation.
-    @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
-    internal var _storedInlineOffset: Int? {
-      // TODO: Cache this value in a similar manner to _pureStructValueOffset.
-      // The current design assumes keypath read and write operations will be called
-      // much more often than MemoryLayout<Root>.offset(of:).
-      let offsetInformation = _computeOffsets()
-      if offsetInformation.isPureStruct || offsetInformation.isTuple {
-        return .some(offsetInformation.offset)
-      } else {
-        return .none
+        if optNextType == nil { return .some(offset) }
       }
     }
   }
-
+}
 
 /// A partially type-erased key path, from a concrete root type to any
 /// resulting value type.
@@ -446,6 +380,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   @usableFromInline
   internal func _projectMutableAddress(from base: UnsafePointer<Root>)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
+   
     // One performance improvement is to skip right to Value
     // if this keypath traverses through structs only.
           
@@ -2452,13 +2387,7 @@ internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
     }
     return _openExistential(rootValue, do: open2)
   }
-  var returnValue:AnyKeyPath = _openExistential(rootRoot, do: open)
-  _processAppendingKeyPathType(root: &returnValue, leaf: leaf)
-  if let returnValue = returnValue as? Result
-  {
-      return returnValue
-  }
-  return nil
+  return _openExistential(rootRoot, do: open)
 }
 
 @usableFromInline
