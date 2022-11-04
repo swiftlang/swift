@@ -15,6 +15,8 @@ enum Optional<T> {
   case some(T)
 }
 
+struct S {}
+
 struct SRef<T> {
   @_hasStorage var object: AnyObject { get set }
   @_hasStorage var element: T { get set }
@@ -514,6 +516,23 @@ sil [ossa] @f105_phi_into_tuple : $@convention(thin) <Self> () -> () {
 exit(%self_2 : @owned $Self):
   %tuple = tuple (%self_2 : $Self, undef : $Bool)
   destroy_value %tuple : $(Self, Bool)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Check deleting the first of multiple block arguments.
+// CHECK-LABEL: sil [ossa] @f110_nonfinal_argument : {{.*}} {
+// CHECK:       bb3({{%[^,]+}} : $S):
+// CHECK-LABEL: } // end sil function 'f110_nonfinal_argument'
+sil [ossa] @f110_nonfinal_argument : $@convention(thin) <T> (@in T, S) -> () {
+entry(%instance : @owned $T, %s : $S):
+  cond_br undef, left, right
+left:
+  br exit(%instance : $T, %s : $S)
+right:
+  br exit(%instance : $T, %s : $S)
+exit(%instance_2 : @owned $T, %s_2 : $S):
+  destroy_value %instance_2 : $T
   %retval = tuple ()
   return %retval : $()
 }
