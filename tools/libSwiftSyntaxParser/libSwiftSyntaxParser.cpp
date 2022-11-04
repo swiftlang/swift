@@ -61,7 +61,7 @@ class SynParser {
   swiftparse_node_lookup_t NodeLookup = nullptr;
   swiftparse_diagnostic_handler_t DiagHandler = nullptr;
   /// The language version that should be used to parse the Swift source file.
-  /// If \c None this is the default langauge version specified in LangOptions.h
+  /// If \c None this is the default language version specified in LangOptions.h
   Optional<version::Version> EffectiveLanguageVersion;
 
   /// Whether bare slash regex literals are enabled.
