@@ -3493,40 +3493,22 @@ bool ArchetypeType::isRoot() const {
 }
 
 Type ArchetypeType::getExistentialType() const {
+  auto *genericEnv = getGenericEnvironment();
+
   // Opened types hold this directly.
   if (auto *opened = dyn_cast<OpenedArchetypeType>(this)) {
     if (opened->isRoot()) {
-      return getGenericEnvironment()->getOpenedExistentialType();
+      return genericEnv->getOpenedExistentialType();
     }
   }
 
-  // Otherwise, compute it from scratch.
-  SmallVector<Type, 4> constraintTypes;
-  
-  bool hasExplicitAnyObject = requiresClass();
+  // Otherwise we compute it via a generic signature query.
+  auto interfaceType = getInterfaceType();
+  auto genericSig = genericEnv->getGenericSignature();
 
-  if (auto super = getSuperclass()) {
-    hasExplicitAnyObject = false;
-    constraintTypes.push_back(super);
-  }
-  for (auto proto : getConformsTo()) {
-    if (proto->requiresClass())
-      hasExplicitAnyObject = false;
-    constraintTypes.push_back(proto->getDeclaredInterfaceType());
-  }
+  auto upperBound = genericSig->getDependentUpperBounds(interfaceType);
 
-  auto &ctx = const_cast<ArchetypeType*>(this)->getASTContext();
-  auto constraint = ProtocolCompositionType::get(
-     ctx, constraintTypes, hasExplicitAnyObject);
-
-  // If the archetype is only constrained to a class type,
-  // return the class type directly.
-  if (!constraint->isConstraintType()) {
-    assert(constraint->getClassOrBoundGenericClass());
-    return constraint;
-  }
-
-  return ExistentialType::get(constraint);
+  return genericEnv->mapTypeIntoContext(upperBound);
 }
 
 bool ArchetypeType::requiresClass() const {
