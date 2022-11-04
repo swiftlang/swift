@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 
+// REQUIRES: concurrency
+
 // REQUIRES: executable_test
 
 func runIn10ms(_ closure: @escaping @Sendable () -> Void) {
