@@ -128,10 +128,6 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr) {
 
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return nullptr;
-#endif
-
   auto resultClangTy = convert(resultTy);
   if (resultClangTy.isNull())
     return nullptr;
@@ -174,10 +170,6 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
     SILFunctionType::Representation repr) {
-
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return nullptr;
-#endif
 
   // Using the interface type is sufficient as type parameters get mapped to
   // `id`, since ObjC lightweight generics use type erasure. (See also: SE-0057)

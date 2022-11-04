@@ -960,10 +960,6 @@ public:
   }
 
   bool visit(Decl *D) {
-    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-      return false; // not needed for the parser library.
-    #endif
-
     bool Synthesize =
         Options.TransformContext &&
         Options.TransformContext->isPrintingSynthesizedExtension() &&
@@ -1847,11 +1843,7 @@ bool isNonSendableExtension(const Decl *D) {
 
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
-  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    return false; // not needed for the parser library.
-  #endif
-
-  if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
   }
@@ -2292,8 +2284,6 @@ static void addNamespaceMembers(Decl *decl,
       if (!name)
         continue;
 
-      // If we're building libSyntaxParser, #if out the clang importer request
-      // because libSyntaxParser doesn't know about the clang importer.
       CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
       for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
         if (addedMembers.insert(found).second)
@@ -5476,10 +5466,6 @@ public:
   }
 
   void visit(Type T) {
-    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-      return; // not needed for the parser library.
-    #endif
-
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 

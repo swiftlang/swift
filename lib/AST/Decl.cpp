@@ -123,10 +123,6 @@ const clang::Module *ClangNode::getClangModule() const {
 }
 
 void ClangNode::dump() const {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return; // not needed for the parser library.
-#endif
-
   if (auto D = getAsDecl())
     D->dump();
   else if (auto M = getAsMacro())

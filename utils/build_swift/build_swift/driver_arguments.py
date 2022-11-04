@@ -750,9 +750,6 @@ def create_argument_parser():
     option('--build-ninja', toggle_true,
            help='build the Ninja tool')
 
-    option(['--build-libparser-only'], toggle_true('build_libparser_only'),
-           help='build only libParser for SwiftSyntax')
-
     option(['--build-lld'], toggle_true('build_lld'),
            help='build lld as part of llvm')
 
