@@ -110,6 +110,8 @@ void *ReturnStmt_create(void *ctx, void *loc, void *_Nullable expr);
 void *SwiftSequenceExpr_create(void *ctx, BridgedArrayRef exprs);
 
 void *SwiftTupleExpr_create(void *ctx, void *lparen, BridgedArrayRef subs,
+                            BridgedArrayRef names,
+                            BridgedArrayRef nameLocs,
                             void *rparen);
 
 void *SwiftFunctionCallExpr_create(void *ctx, void *fn, void *args);

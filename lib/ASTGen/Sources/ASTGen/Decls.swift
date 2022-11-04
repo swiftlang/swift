@@ -91,7 +91,9 @@ extension ASTGenVisitor {
     let secondName: UnsafeMutableRawPointer?
     let type: UnsafeMutableRawPointer?
 
-    if let nodeFirstName = node.firstName {
+    if let nodeFirstName = node.firstName,
+       // Swift AST represnts "_" as nil.
+       nodeFirstName.text != "_" {
       var text = nodeFirstName.text
       firstName = text.withUTF8 { buf in
         SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
