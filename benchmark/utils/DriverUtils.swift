@@ -654,8 +654,13 @@ final class TestRunner {
     if let results = results {
       printToWidth(String(describing:results.samples.count), width: 10, justify: .right)
       if results.samples.count > 0 {
-	let min = results.samples.sorted().first!
+	let sorted = results.samples.sorted()
+	let min = sorted.first!
+	let max = sorted.last!
+	let median = sorted[sorted.count / 2]
 	printDoubleToWidth(min, width: 10)
+	printDoubleToWidth(median, width: 10)
+	printDoubleToWidth(max, width: 10)
       }
     }
     print()
@@ -668,6 +673,8 @@ final class TestRunner {
     printToWidth("TEST", width: c.testNameLength, justify: .left)
     printToWidth("SAMPLES", width: 10, justify: .right)
     printToWidth("MIN", width: 10, justify: .right)
+    printToWidth("MEDIAN", width: 10, justify: .right)
+    printToWidth("MAX", width: 10, justify: .right)
     print()
   }
 
