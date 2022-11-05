@@ -10,16 +10,15 @@
 public struct BufferView<T> {
     var ptr: UnsafeBufferPointer<T>
 
-    deinit {}
-}
-
-extension BufferView : Sequence {
-    public typealias Iterator = UnsafeBufferPointer<T>.Iterator
-    public typealias Element = UnsafeBufferPointer<T>.Element
-
-    public func makeIterator() -> Self.Iterator {
-        return ptr.makeIterator()
+    var count: Int {
+        return ptr.count
     }
+
+    subscript(_ x: Int) -> T {
+        return ptr[x]
+    }
+
+    deinit {}
 }
 
 extension Array {
@@ -36,8 +35,8 @@ func testBufferView(_ x: __owned [Int]) {
     // CHECK: 2
     // CHECK: 3
     y.withBufferView {
-        for x in $0 {
-            print(x)
+        for i in 0..<$0.count {
+            print($0[i])
         }
     }
 }
@@ -52,8 +51,8 @@ func testConditionalBufferView(_ x: __owned [Int]) {
         // CHECK: 5
         // CHECK: 6
         if getBool() {
-            for z in y {
-                print(z)
+            for i in 0..<y.count {
+                print(y[i])
             }
         }
     }
