@@ -4986,17 +4986,13 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  if (concreteType->isAny() || concreteType->isAnyObject() ||
-      concreteType->isVoid() || concreteType->is<TupleType>()) {
+  if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
     defaultVarTy = FullExistentialTypeMetadataStructTy;
     adjustmentIndex = 1;
   } else if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     if (concreteType->getClassOrBoundGenericClass() && !foreign) {
       adjustmentIndex = MetadataAdjustmentIndex::Class;
-    } else if (foreign) {
-      defaultVarTy = FullForeignTypeMetadataStructTy;
-      adjustmentIndex = MetadataAdjustmentIndex::Foreign;
     } else {
       adjustmentIndex = MetadataAdjustmentIndex::ValueType;
     }

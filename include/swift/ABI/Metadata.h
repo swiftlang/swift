@@ -465,7 +465,7 @@ protected:
 /// The common structure of opaque metadata.  Adds nothing.
 template <typename Runtime>
 struct TargetOpaqueMetadata {
-  typedef TargetTypeMetadataHeader<Runtime> HeaderType;
+  typedef TargetTypeMetadataHeaderBase<Runtime> HeaderType;
 
   // We have to represent this as a member so we can list-initialize it.
   TargetMetadata<Runtime> base;
