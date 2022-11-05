@@ -828,6 +828,11 @@ void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     diagnoseAndRemoveAttr(attr, isError.getValue(),
                                  /*array=*/isArray, type);
 
+  // Skip remaining diagnostics if the property has an
+  // attached wrapper.
+  if (VD->hasAttachedPropertyWrapper())
+    return;
+
   // If the type wasn't optional, an array, or unowned, complain.
   if (!wasOptional && !isArray) {
     diagnose(attr->getLocation(), diag::iboutlet_non_optional, type);
