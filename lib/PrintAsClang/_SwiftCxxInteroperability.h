@@ -229,21 +229,19 @@ public:
 
   /// For accessing T's members
   // precondition: has_value() == true
-  constexpr T const* _Nonnull operator->() const noexcept { return &buffer; }
+  constexpr T const *_Nonnull operator->() const noexcept { return reinterpret_cast<const T *>(buffer); }
 
   // precondition: has_value() == true
-  constexpr T* _Nonnull operator->() noexcept { return &buffer; }
+  constexpr T *_Nonnull operator->() noexcept { return reinterpret_cast<T *>(buffer); }
 
   /// Getting reference to T
   // precondition: has_value() == true
-  constexpr T const& operator*() const& noexcept { return buffer; }
+  constexpr T const &operator*() const & noexcept { return reinterpret_cast<const T &>(buffer); }
 
   // precondition: has_value() == true
-  constexpr T& operator*() & noexcept { return buffer; }
+  constexpr T &operator*() & noexcept { return reinterpret_cast<T &>(buffer); }
 
-  constexpr explicit operator bool() const noexcept {
-    return has_value();
-  }
+  constexpr explicit operator bool() const noexcept { return has_value(); }
 
   // Get value, if not exists abort
   // FIXME: throw exception instead of abort?
