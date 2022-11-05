@@ -204,12 +204,12 @@ def test_opt_levels(args):
     return 0
 
 
-def measure(driver, tests, i):
+def measure(driver, tests, i, min_num_samples):
     """Log and measure samples of the tests with the given driver.
 
     Collect increasing number of samples, depending on the iteration.
     """
-    num_samples = min(i + 3, 10)
+    num_samples = max(min(i + 3, 10), min_num_samples)
     msg = "    Iteration {0} for {1}: num samples = {2}, ".format(
         i, driver.args.tests, num_samples
     )
@@ -246,7 +246,7 @@ def test_performance(
                                    optimization=opt_level))
         for dir in [old_dir, new_dir]
     ]
-    results = [measure(driver, driver.tests, i) for driver in [old, new]]
+    results = [measure(driver, driver.tests, i, num_samples) for driver in [old, new]]
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased
 
@@ -255,7 +255,7 @@ def test_performance(
         if VERBOSE:
             log("        test again: " + str([test.name for test in changed]))
         results = [
-            merge(the_results, measure(driver, [test.name for test in changed], i))
+            merge(the_results, measure(driver, [test.name for test in changed], i, num_samples))
             for the_results, driver in zip(results, [old, new])
         ]
         tests = TestComparator(results[0], results[1], threshold)
