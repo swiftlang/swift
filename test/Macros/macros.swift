@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Macros -dump-ast %s -module-name MacrosTest 2>&1 | %FileCheck %s
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
 
 func test(a: Int, b: Int) {
   let s = #stringify(a + b)
