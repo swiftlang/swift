@@ -132,7 +132,7 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
 
   auto fnConv = SGF.F.getConventions();
   if (!fnConv.useLoweredAddresses()) {
-    // In opaque-values code, nested @out enums are not flattened.  Reconstruct
+    // In opaque-values code, nested @out tuples are not flattened.  Reconstruct
     // nested tuples.
     auto resultType = SGF.F.getLoweredType(SGF.F.mapTypeIntoContext(
         fnConv.getSILResultType(SGF.getTypeExpansionContext())));

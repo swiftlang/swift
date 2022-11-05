@@ -1340,6 +1340,23 @@ exit_error(%47 : @owned $any Error):
   throw %47 : $any Error
 }
 
+// CHECK-LABEL: sil [ossa] @selecteroo : $@convention(thin) <T> () -> () {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         apply undef<T>([[ADDR]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+// CHECK:         select_enum_addr [[ADDR]] : $*Optional<T>, case #Optional.some!enumelt: {{%[^,]+}}, default {{%[^,]+}} : $Builtin.Int1
+// CHECK:         dealloc_stack [[ADDR]] : $*Optional<T>
+// CHECK-LABEL: } // end sil function 'selecteroo'
+sil [ossa] @selecteroo : $@convention(thin) <T> () -> () {
+bb0:
+  %11 = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = integer_literal $Builtin.Int1, 0
+  %14 = select_enum %11 : $Optional<T>, case #Optional.some!enumelt: %12, default %13 : $Builtin.Int1
+  destroy_value %11 : $Optional<T>
+  %retval = tuple ()
+  return %retval : $()
+} // end sil function '$ss17FixedWidthIntegerPsEyxSgSScfC'
+
 sil hidden [ossa] @testBeginApplyDeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
   %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> () -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
@@ -1554,6 +1571,53 @@ bb0(%0 : @guaranteed $T, %1 : $@thick U.Type):
   return %6 : $U
 }
 
+// There's only one use and it's a copy, just rewrite it as a load [copy].
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable :
+// CHECK:       {{bb[0-9]+}}([[ADDR_IN:%[^,]+]] : $*T):
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr [[ADDR_IN]] to [init] [[STACK]]
+// CHECK:         [[STACK_AS_CLASS:%[^,]+]] = unchecked_addr_cast [[STACK]] : $*T to $*Klass
+// CHECK:         [[KLASS:%[^,]+]] = load [copy] [[STACK_AS_CLASS]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK:         return [[KLASS]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_bitwise_cast_to_loadable'
+sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable : $@convention(thin) <T> (@in_guaranteed T) -> @owned Klass {
+bb0(%instance : @guaranteed $T):
+  %copy = copy_value %instance : $T
+  %unowned_klass = unchecked_bitwise_cast %copy : $T to $Klass
+  %klass = copy_value %unowned_klass : $Klass
+  destroy_value %copy : $T
+  return %klass : $Klass
+}
+
+// There is more than one use of the unchecked_addr_cast.  The value should be
+// load_borrow'd and uses of the original should be uses of that load.
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable_multiuse : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : $*T):
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr [[INSTANCE]] to [init] [[STACK]]
+// CHECK:         [[STACK_AS_CLASS:%[^,]+]] = unchecked_addr_cast [[STACK]] : $*T to $*Klass
+// CHECK:         [[BORROWED_KLASS:%[^,]+]] = load_borrow [[STACK_AS_CLASS]]
+// CHECK:         [[KLASS_TO_RETURN:%[^,]+]] = copy_value [[BORROWED_KLASS]]
+// CHECK:         [[KLASS_TO_DESTROY:%[^,]+]] = copy_value [[BORROWED_KLASS]]
+// CHECK:         end_borrow [[BORROWED_KLASS]]
+// CHECK:         destroy_value [[KLASS_TO_DESTROY]]
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK:         return [[KLASS_TO_RETURN]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_bitwise_cast_to_loadable_multiuse'
+sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable_multiuse : $@convention(thin) <T> (@in_guaranteed T) -> @owned Klass {
+bb0(%instance : @guaranteed $T):
+  %copy = copy_value %instance : $T
+  %unowned_klass = unchecked_bitwise_cast %copy : $T to $Klass
+  %klass = copy_value %unowned_klass : $Klass
+  %klass2 = copy_value %unowned_klass : $Klass
+  destroy_value %klass2 : $Klass
+  destroy_value %copy : $T
+  return %klass : $Klass
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Builtin.Int64) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $Builtin.Int64):
 // CHECK:   [[INT:%.*]] = alloc_stack $Builtin.Int64
@@ -1609,3 +1673,31 @@ bb0(%0 : @guaranteed $T):
   return %6 : $U
 }
 
+// CHECK-LABEL: sil [ossa] @yield_two : {{.*}} {
+// CHECK:         tuple_element_addr
+// CHECK:         tuple_element_addr
+// CHECK:         [[KEY:%[^,]+]] = tuple_element_addr {{%[^,]+}} : $*(key: Key, value: Value), 0
+// CHECK:         [[VALUE:%[^,]+]] = tuple_element_addr {{%[^,]+}} : $*(key: Key, value: Value), 1
+// CHECK:         yield ([[KEY]] : $*Key, [[VALUE]] : $*Value)
+// CHECK-LABEL: } // end sil function 'yield_two'
+sil [ossa] @yield_two : $@yield_once @convention(method) <Key, Value> (@in_guaranteed Key, @in_guaranteed Value) -> (@yields @in_guaranteed Key, @yields @in_guaranteed Value) {
+bb0(%0 : @guaranteed $Key, %1 : @guaranteed $Value):
+  %7 = copy_value %0 : $Key
+  %8 = copy_value %1 : $Value
+  %9 = tuple $(key: Key, value: Value) (%7, %8)
+  %10 = begin_borrow %9 : $(key: Key, value: Value)
+  %11 = tuple_extract %10 : $(key: Key, value: Value), 0
+  %12 = tuple_extract %10 : $(key: Key, value: Value), 1
+  yield (%11 : $Key, %12 : $Value), resume bb1, unwind bb2
+
+bb1:
+  end_borrow %10 : $(key: Key, value: Value)
+  destroy_value %9 : $(key: Key, value: Value)
+  %17 = tuple ()
+  return %17 : $()
+
+bb2:
+  end_borrow %10 : $(key: Key, value: Value)
+  destroy_value %9 : $(key: Key, value: Value)
+  unwind
+}
