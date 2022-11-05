@@ -6705,5 +6705,22 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "macro %0 is undefined; use `-load-plugin-library` to specify dynamic "
       "libraries that contain this macro", (Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: Move Only Errors
+//------------------------------------------------------------------------------
+
+ERROR(moveonly_copyable_type_that_contains_moveonly_type, none,
+      "%0 %1 cannot contain a move-only type without also being move-only",
+      (DescriptiveDeclKind, DeclName))
+NOTE(moveonly_copyable_type_that_contains_moveonly_type_location, none,
+     "contained move-only %0 '%1.%2'",
+     (DescriptiveDeclKind, StringRef, StringRef))
+ERROR(moveonly_cannot_conform_to_protocol, none,
+     "move-only %0 %1 cannot conform yet to any protocols",
+     (DescriptiveDeclKind, DeclName))
+ERROR(moveonly_cannot_conform_to_protocol_with_name, none,
+     "move-only %0 %1 cannot conform to protocol %2",
+     (DescriptiveDeclKind, DeclName, DeclName))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
+
