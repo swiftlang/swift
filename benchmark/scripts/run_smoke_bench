@@ -28,7 +28,7 @@ import subprocess
 import sys
 from imp import load_source
 
-from compare_perf_tests import LogParser, TestComparator, create_report
+from compare_perf_tests import PerformanceTestResult, TestComparator, create_report
 
 # import Benchmark_Driver  # doesn't work because it misses '.py' extension
 Benchmark_Driver = load_source(
@@ -283,8 +283,8 @@ def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output
         )
 
     idx = 1
-    old_lines = ""
-    new_lines = ""
+    old_results = {}
+    new_results = {}
     for oldfile in files:
         new_dir = os.path.join(new_dir, '')
         newfile = oldfile.replace(old_dir, new_dir, 1)
@@ -292,17 +292,11 @@ def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output
             oldsize = get_codesize(oldfile)
             newsize = get_codesize(newfile)
             bname = os.path.basename(oldfile)
-
-            def result_line(value):
-                v = "," + str(value)
-                return str(idx) + "," + bname + ",1" + (v * 3) + ",0" + v + "\n"
-
-            old_lines += result_line(oldsize)
-            new_lines += result_line(newsize)
+            old_json = {"number":idx, "name":bname, "samples":[oldsize]}
+            new_json = {"number":idx, "name":bname, "samples":[newsize]}
+            old_results[bname] = PerformanceTestResult(old_json)
+            new_results[bname] = PerformanceTestResult(new_json)
             idx += 1
-
-    old_results = LogParser.results_from_string(old_lines)
-    new_results = LogParser.results_from_string(new_lines)
     return report_results(
         "Code size: -" + opt_level, 0.01, output_file, old_results, new_results
     )
