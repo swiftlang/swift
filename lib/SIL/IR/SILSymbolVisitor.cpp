@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SynthesizedFileUnit.h"
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
@@ -63,6 +64,7 @@ static Optional<DynamicKind> getDynamicKind(ValueDecl *VD) {
 class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
   SILSymbolVisitor &Visitor;
   const SILSymbolVisitorContext &Ctx;
+  llvm::SmallVector<Decl *, 4> DeclStack;
 
   /// A set of original function and derivative configuration pairs for which
   /// derivative symbols have been emitted.
@@ -356,12 +358,33 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     return true;
   }
 
+  void addMethodIfNecessary(FuncDecl *FD) {
+    auto CD = dyn_cast<ClassDecl>(FD->getDeclContext());
+    if (!CD)
+      return;
+
+    // If we're already visiting the parent ClassDecl then this was handled by
+    // its vtable visitor.
+    if (llvm::find(DeclStack, CD) != DeclStack.end())
+      return;
+
+    SILDeclRef method = SILDeclRef(FD);
+    if (Ctx.getOpts().VirtualFunctionElimination ||
+        CD->hasResilientMetadata()) {
+      Visitor.addDispatchThunk(method);
+    }
+    Visitor.addMethodDescriptor(method);
+  }
+
 public:
   SILSymbolVisitorImpl(SILSymbolVisitor &Visitor,
                        const SILSymbolVisitorContext &Ctx)
       : Visitor{Visitor}, Ctx{Ctx} {}
 
   void visit(Decl *D) {
+    DeclStack.push_back(D);
+    SWIFT_DEFER { DeclStack.pop_back(); };
+
     if (!Visitor.willVisitDecl(D))
       return;
     ASTVisitor::visit(D);
@@ -478,6 +501,7 @@ public:
     // If there's an opaque return type, its descriptor is exported.
     addOpaqueResultIfNecessary(FD);
     visitAbstractFunctionDecl(FD);
+    addMethodIfNecessary(FD);
   }
 
   void visitAccessorDecl(AccessorDecl *AD) {
