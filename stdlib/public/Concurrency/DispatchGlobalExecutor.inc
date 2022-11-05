@@ -84,12 +84,18 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
                                           dispatch_qos_class_t qos) {
   dispatchEnqueueFuncType func = nullptr;
 
-  // Always fall back to plain dispatch_async_f on Windows for now, and
-  // also for back-deployed concurrency.
-#if !defined(_WIN32) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+  // Always fall back to plain dispatch_async_f for back-deployed concurrency.
+#if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
   if (runtime::environment::concurrencyEnableJobDispatchIntegration())
+#if defined(_WIN32)
+    func = reinterpret_cast<dispatchEnqueueFuncType>(
+        GetProcAddress(LoadLibraryW(L"dispatch.dll"),
+        "dispatch_async_swift_job"));
+#else
     func = reinterpret_cast<dispatchEnqueueFuncType>(
         dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
+
+#endif
 #endif
 
   if (!func)
