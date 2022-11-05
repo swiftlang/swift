@@ -33,6 +33,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -2491,6 +2492,9 @@ public:
       }
     }
 
+    diagnoseCopyableTypeContainingMoveOnlyType(ED);
+    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(ED);
+
     checkExplicitAvailability(ED);
 
     TypeChecker::checkDeclCircularity(ED);
@@ -2513,8 +2517,9 @@ public:
 
     TypeChecker::checkDeclAttributes(SD);
 
-    for (Decl *Member : SD->getMembers())
+    for (Decl *Member : SD->getMembers()) {
       visit(Member);
+    }
 
     TypeChecker::checkPatternBindingCaptures(SD);
 
@@ -2528,6 +2533,12 @@ public:
     TypeChecker::checkDeclCircularity(SD);
 
     TypeChecker::checkConformancesInContext(SD);
+
+    // If this struct is not move only, check that all vardecls of nominal type
+    // are not move only.
+    diagnoseCopyableTypeContainingMoveOnlyType(SD);
+
+    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2629,6 +2640,17 @@ public:
     }
   }
 
+  void diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(
+      NominalTypeDecl *nomDecl) {
+    if (!nomDecl->isMoveOnly())
+      return;
+
+    for (auto *prot : nomDecl->getAllProtocols()) {
+      nomDecl->diagnose(diag::moveonly_cannot_conform_to_protocol_with_name,
+                        nomDecl->getDescriptiveKind(),
+                        nomDecl->getBaseName(), prot->getBaseName());
+    }
+  }
 
   void visitClassDecl(ClassDecl *CD) {
     checkUnsupportedNestedType(CD);
@@ -2792,6 +2814,8 @@ public:
     TypeChecker::checkConformancesInContext(CD);
 
     maybeDiagnoseClassWithoutInitializers(CD);
+
+    diagnoseMoveOnlyNominalDeclDoesntConformToProtocols(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -3246,6 +3270,12 @@ public:
 
     if (nominal->isDistributedActor())
       TypeChecker::checkDistributedActor(SF, nominal);
+
+    // If we have a move only type and allow it to extend any protocol, error.
+    if (nominal->isMoveOnly() && ED->getInherited().size()) {
+      ED->diagnose(diag::moveonly_cannot_conform_to_protocol,
+                   nominal->getDescriptiveKind(), nominal->getBaseName());
+    }
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
