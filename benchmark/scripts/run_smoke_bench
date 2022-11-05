@@ -209,7 +209,7 @@ def measure(driver, tests, i, min_num_samples):
 
     Collect increasing number of samples, depending on the iteration.
     """
-    num_samples = max(min(i + 3, 10), min_num_samples)
+    num_samples = min(i + min_num_samples, 4 * min_num_samples)
     msg = "    Iteration {0} for {1}: num samples = {2}, ".format(
         i, driver.args.tests, num_samples
     )
