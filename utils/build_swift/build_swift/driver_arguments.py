@@ -122,6 +122,10 @@ def _apply_default_arguments(args):
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
+    elif args.cmake_generator == 'Xcode':
+        # Building with Xcode is deprecated.
+        args.skip_build = True
+        args.build_early_swift_driver = False
 
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
