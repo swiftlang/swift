@@ -64,7 +64,7 @@ func testClassConstrainedProto(arg: some BaseClassConstrainedP) {
   arg.#^TestBaseClassConstrainedP^#
 // TestBaseClassConstrainedP: LookedupTypeNames: ['Mod.BaseClassConstrainedP', 'Mod.BaseClass']
 }
-func testClassConstriainedProto2(arg: some DerivedClassConstrainedP) {
+func testClassConstrainedProto2(arg: some DerivedClassConstrainedP) {
   arg.#^TestDerivedClassConstrainedP^#
 // TestDerivedClassConstrainedP: LookedupTypeNames: ['Mod.DerivedClassConstrainedP', 'Mod.DerivedClass', 'Mod.BaseClass']
 }
