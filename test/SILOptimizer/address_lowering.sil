@@ -1130,6 +1130,24 @@ bb4:
   return %31 : $()
 }
 
+// Verify the handling of non-unique default case blocks when there is more
+// than one case handled by default.
+// CHECK-LABEL: sil [ossa] @f221_testSwitchDefault : $@convention(thin) <T> (@in Optional<T>) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : $*Optional<T>):
+// CHECK:         switch_enum_addr [[INSTANCE]] : $*Optional<T>, default [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[INSTANCE]] : $*Optional<T>
+// CHECK-LABEL: } // end sil function 'f221_testSwitchDefault'
+sil [ossa] @f221_testSwitchDefault : $@convention(thin) <T> (@in Optional<T>) -> () {
+entry(%instance : @owned $Optional<T>):
+  switch_enum %instance : $Optional<T>, default exit
+
+exit(%instance_2 : @owned $Optional<T>):
+  destroy_value %instance_2 : $Optional<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @f230_testTryApply : $@convention(thin) <T> (@in T) -> (@out T, @error any Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   [[F:%.*]] = function_ref @throwsError : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error any Error)
