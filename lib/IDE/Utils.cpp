@@ -890,7 +890,7 @@ bool swift::ide::isDeclOverridable(ValueDecl *D) {
   if (!NTD)
     return false;
 
-  // Only classes and protocols support overridding by subtypes.
+  // Only classes and protocols support overriding by subtypes.
   if (!(isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)))
     return false;
 
