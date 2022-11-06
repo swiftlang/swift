@@ -296,7 +296,7 @@ bool ContextFreeCodeCompletionResult::getDeclIsSystem(const Decl *D) {
 // MARK: - CodeCompletionResult
 
 static ContextualNotRecommendedReason
-getNotRecommenedReason(const ContextFreeCodeCompletionResult &ContextFree,
+getNotRecommendedReason(const ContextFreeCodeCompletionResult &ContextFree,
                        bool CanCurrDeclContextHandleAsync,
                        ContextualNotRecommendedReason ExplicitReason) {
   if (ExplicitReason != ContextualNotRecommendedReason::None) {
@@ -321,7 +321,7 @@ CodeCompletionResult::CodeCompletionResult(
     ContextualNotRecommendedReason NotRecommended)
     : ContextFree(ContextFree), SemanticContext(SemanticContext),
       Flair(Flair.toRaw()),
-      NotRecommended(getNotRecommenedReason(
+      NotRecommended(getNotRecommendedReason(
           ContextFree, CanCurrDeclContextHandleAsync, NotRecommended)),
       NumBytesToErase(NumBytesToErase),
       TypeDistance(ContextFree.getResultType().calculateTypeRelation(
