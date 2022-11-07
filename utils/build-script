@@ -57,6 +57,18 @@ def print_note(message, stream=sys.stdout):
     stream.flush()
 
 
+def print_warning(message, stream=sys.stdout):
+    """Writes a warning to the given stream. By default this function outputs
+    to stdout.
+    """
+
+    warning = "[{}] WARNING: {}\n".format(sys.argv[0], message)
+    magenta_warning = "\033[35m" + warning + "\033[0m"
+
+    stream.write(magenta_warning)
+    stream.flush()
+
+
 def clean_delay():
     """Provide a short delay so accidentally invoked clean builds can be
     canceled.
@@ -745,6 +757,17 @@ def main_normal():
         with shell.pushd(args.install_symroot):
             tar(source=prefix.lstrip('/'),
                 destination=args.symbols_package)
+
+    if args.cmake_generator == "Xcode":
+        print_warning(
+            "The Xcode projects generated with '--xcode' can be used for "
+            "navigation or editing purposes, but are not a recommended means "
+            "to building, running or debugging. For a full-fledged Xcode "
+            "workflow using these generated projects, see "
+            "https://github.com/apple/swift/blob/main/docs/HowToGuides/"
+            "GettingStarted.md#using-ninja-with-xcode"
+        )
+        print()
 
     return 0
 
