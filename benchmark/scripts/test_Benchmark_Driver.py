@@ -222,9 +222,9 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
 
     def test_gets_list_of_precommit_benchmarks(self):
         self.subprocess_mock.expect(
-            "/benchmarks/Benchmark_O-* --list --json".split(" "),
-            """{"number":1,"name":"Benchmark1","tags":["t1","t2"]}\n"""
-            + """{"number":2,"name":"Benchmark2","tags":["t3"]}\n""",
+            "/benchmarks/Benchmark_O-* --list".split(" "),
+            """1 Benchmark1 ["t1" "t2"]\n"""
+            + """2 Benchmark2 ["t3"]\n""",
         )
         driver = BenchmarkDriver(self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
@@ -234,10 +234,10 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.assertEqual(driver.test_number["Benchmark2"], 2)
 
     list_all_tests = (
-        "/benchmarks/Benchmark_O-* --list --json --skip-tags=".split(" "),
-        """{"number":1, "name": "Benchmark1", "tags":["t1","t2"]}\n"""
-        + """{"number":2, "name": "Benchmark2", "tags":["t3"]}\n"""
-        + """{"number":3, "name": "Benchmark3", "tags":["t3","t4"]}\n""",
+        "/benchmarks/Benchmark_O-* --list --skip-tags=".split(" "),
+        """1 Benchmark1 ["t1","t2"]\n"""
+        + """2 Benchmark2 ["t3"]\n"""
+        + """3 Benchmark3 ["t3","t4"]\n""",
     )
 
     def test_gets_list_of_all_benchmarks_when_benchmarks_args_exist(self):
@@ -319,8 +319,8 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.parser_stub = LogParserStub()
         self.subprocess_mock = SubprocessMock()
         self.subprocess_mock.expect(
-            "/benchmarks/Benchmark_O-* --list --json".split(" "),
-            """{"number":1, "name":"b1", "tags":["tag"]}""",
+            "/benchmarks/Benchmark_O-* --list".split(" "),
+            """1 b1 ["tag"]""",
         )
         self.driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock, parser=self.parser_stub
@@ -329,29 +329,29 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_run_benchmark_with_multiple_samples(self):
         self.driver.run("b1")
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b1", "--json")
+            ("/benchmarks/Benchmark_O-*", "b1")
         )
         self.driver.run("b2", num_samples=5)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b2", "--num-samples=5", "--json")
+            ("/benchmarks/Benchmark_O-*", "b2", "--num-samples=5")
         )
 
     def test_run_benchmark_with_specified_number_of_iterations(self):
         self.driver.run("b", num_iters=1)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--num-iters=1", "--json")
+            ("/benchmarks/Benchmark_O-*", "b", "--num-iters=1")
         )
 
     def test_run_benchmark_for_specified_time(self):
         self.driver.run("b", sample_time=0.5)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--sample-time=0.5", "--json")
+            ("/benchmarks/Benchmark_O-*", "b", "--sample-time=0.5")
         )
 
     def test_run_benchmark_in_verbose_mode(self):
         self.driver.run("b", verbose=True)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--verbose", "--json")
+            ("/benchmarks/Benchmark_O-*", "b", "--verbose")
         )
 
     def test_run_batch(self):
@@ -363,7 +363,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.driver.tests = ["b1", "bx"]
         self.driver.run()
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "1", "bx", "--json")
+            ("/benchmarks/Benchmark_O-*", "1", "bx")
         )
 
     def test_parse_results_from_running_benchmarks(self):
@@ -382,7 +382,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_measure_memory(self):
         self.driver.run("b", measure_memory=True)
         self.subprocess_mock.assert_called_with(
-            ("/benchmarks/Benchmark_O-*", "b", "--memory", "--json")
+            ("/benchmarks/Benchmark_O-*", "b", "--memory")
         )
 
     def test_run_benchmark_independent_samples(self):
@@ -396,7 +396,6 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
                     "b1",
                     "--num-iters=1",
                     "--memory",
-                    "--json",
                 )
             ),
             3,
