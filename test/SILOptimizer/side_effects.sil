@@ -1113,3 +1113,22 @@ bb0(%0 : $@callee_guaranteed () -> ()):
   return %1 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @test_enum_and_p2a
+// CHECK-NEXT:  [%0: write v**.c*.v**]
+// CHECK-NEXT:  [global: write,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_enum_and_p2a : $@convention(thin) (Optional<UnsafeMutablePointer<Int>>, Int) -> () {
+bb0(%0 : $Optional<UnsafeMutablePointer<Int>>, %1 : $Int):
+  switch_enum %0 : $Optional<UnsafeMutablePointer<Int>>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%2 : $UnsafeMutablePointer<Int>):
+  %3 = struct_extract %2 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int
+  store %1 to %4 : $*Int
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple()
+  return %r : $()
+}
+

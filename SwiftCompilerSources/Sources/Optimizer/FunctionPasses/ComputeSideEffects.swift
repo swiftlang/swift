@@ -380,7 +380,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
   mutating func hasUnknownUses(argument: FunctionArgument) -> Bool {
     if argument.type.isAddress {
       return walkDownUses(ofAddress: argument, path: UnusedWalkingPath()) == .abortWalk
-    } else if argument.hasTrivialType {
+    } else if argument.hasTrivialNonPointerType {
       return false
     } else {
       return walkDownUses(ofValue: argument, path: UnusedWalkingPath()) == .abortWalk
