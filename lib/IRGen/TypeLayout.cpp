@@ -2302,6 +2302,10 @@ bool EnumTypeLayoutEntry::isMultiPayloadEnum() const {
   return cases.size() > 1;
 }
 
+bool EnumTypeLayoutEntry::isSingleton() const {
+  return cases.size() + numEmptyCases == 1;
+}
+
 llvm::Value *
 EnumTypeLayoutEntry::getEnumTagMultipayload(IRGenFunction &IGF,
                                             Address enumAddr) const {
@@ -2376,7 +2380,10 @@ llvm::Value *EnumTypeLayoutEntry::getEnumTag(IRGenFunction &IGF,
                                              Address enumAddr) const {
   assert(!cases.empty());
 
-  if (cases.size() == 1) {
+  if (isSingleton()) {
+    // Singleton tag is always `0`
+    return IGF.IGM.getInt32(0);
+  } else if (cases.size() == 1) {
     // Single payload enum.
     auto &IGM = IGF.IGM;
     auto payload = cases[0];
@@ -2480,7 +2487,10 @@ void EnumTypeLayoutEntry::storeEnumTagMultipayload(IRGenFunction &IGF,
 void EnumTypeLayoutEntry::destructiveInjectEnumTag(IRGenFunction &IGF,
                                                    llvm::Value *tag,
                                                    Address enumAddr) const {
-  if (cases.size() == 1) {
+  if (isSingleton()) {
+    // No tag, nothing to do
+    return;
+  } if (cases.size() == 1) {
     auto payload = cases[0];
     auto emptyCases = IGF.IGM.getInt32(numEmptyCases);
     payload->storeEnumTagSinglePayload(IGF, tag, emptyCases, enumAddr);
