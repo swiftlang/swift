@@ -1538,6 +1538,8 @@ ERROR(expose_inside_unexposed_decl,none,
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in an @_expose attribute; "
       "exposed initializer name must start with 'init'", (StringRef))
+ERROR(expose_unsupported_async_decl_to_cxx,none,
+      "async %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 ERROR(expose_unsupported_actor_isolated_to_cxx,none,
       "actor-isolated %0 %1 can not be exposed to C++", (DescriptiveDeclKind, ValueDecl *))
 
@@ -6611,7 +6613,8 @@ ERROR(type_wrapper_requires_two_generic_params,none,
       "wrapped and storage types", ())
 
 ERROR(cannot_use_multiple_type_wrappers,none,
-      "type %0 cannot use more than one type wrapper", ())
+      "%0 %1 cannot use more than one type wrapper",
+      (DescriptiveDeclKind, DeclName))
 
 ERROR(type_wrapper_requires_memberwise_init,none,
       "type wrapper type %0 does not contain a required initializer"

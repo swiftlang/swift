@@ -169,6 +169,10 @@ swift::cxx_translation::DeclRepresentation
 swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (AFD->hasAsync())
+      return {Unsupported, UnrepresentableAsync};
+  }
   return {Representable, llvm::None};
 }
 

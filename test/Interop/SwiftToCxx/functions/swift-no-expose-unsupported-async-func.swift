@@ -9,8 +9,6 @@
 // CHECK:       namespace Functions {
 // CHECK-EMPTY:
 // CHECK-EMPTY:
-// CHECK-EMPTY:
-// CHECK-EMPTY:
 // CHECK-NEXT:  } // namespace Functions
 
 // CHECK-NOT: inline double asyncFunc(double x) noexcept SWIFT_WARN_UNUSED_RESULT {
