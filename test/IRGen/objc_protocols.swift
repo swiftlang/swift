@@ -222,3 +222,9 @@ func triggerDoubleInheritedFunging() -> AnyObject {
 class TestNonRuntimeProto : RuntimeP { }
 
 class TestNonRuntime2Proto : Runtime2P {}
+
+public class SomeImpl : DeclarationOnlyUser {
+    public func printIt() {
+        print("hello")
+    }
+}

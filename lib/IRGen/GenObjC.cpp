@@ -515,6 +515,12 @@ static void updateProtocolRefs(IRGenModule &IGM,
     auto oldVar = protocolRefs->getOperand(currentIdx);
     // Map the objc protocol to swift protocol.
     auto optionalDecl = clangImporter->importDeclCached(inheritedObjCProtocol);
+    // This should not happen but the compiler currently silently accepts
+    // protocol forward declarations without definitions (102058759).
+    if (!optionalDecl || *optionalDecl == nullptr) {
+      ++currentIdx;
+      continue;
+    }
     auto inheritedSwiftProtocol = cast<ProtocolDecl>(*optionalDecl);
     // Get the objc protocol record we use in Swift.
     auto record = IGM.getAddrOfObjCProtocolRecord(inheritedSwiftProtocol,
