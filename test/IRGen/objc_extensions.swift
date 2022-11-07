@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -g | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 // REQUIRES: objc_interop
 
 import Foundation
