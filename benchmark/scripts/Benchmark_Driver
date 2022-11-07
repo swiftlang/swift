@@ -28,7 +28,6 @@ class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
 import argparse
 import functools
 import glob
-import json
 import logging
 import math
 import os
@@ -150,14 +149,14 @@ class BenchmarkDriver(object):
             try:
                 number = int(columns[0])
                 name = columns[1]
-                json = {"number": number, "name": name}
-                json_tests.append(json)
-            except Exception as e:
+                json_descr = {"number": number, "name": name}
+                json_tests.append(json_descr)
+            except Exception:
                 continue
             # TODO: Replace the above with the following to
             # use the JSON output from the benchmark driver
             # directly
-            #if line.strip() != "":
+            # if line.strip() != "":
             #    json_tests.append(json.loads(line))
         self.all_tests = [json["name"] for json in json_tests]
         test_numbers = [json["number"] for json in json_tests]
