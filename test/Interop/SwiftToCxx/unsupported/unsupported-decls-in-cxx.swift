@@ -31,11 +31,19 @@ public actor ActorClass {
 
     @_expose(Cxx) // ok
     nonisolated public var prop2: Int { 42 }
+
+    @_expose(Cxx) // expected-error {{async instance method 'methodAsync()' can not be exposed to C++}}
+    public nonisolated func methodAsync() async {
+    }
 }
 
 @_expose(Cxx)
 public distributed actor DistributedActorClass {
     public typealias ActorSystem = LocalTestingDistributedActorSystem
+
+    public init(actorSystem: LocalTestingDistributedActorSystem) {
+        self.actorSystem = actorSystem
+    }
 
     @_expose(Cxx) // expected-error {{actor-isolated instance method 'unsupported()' can not be exposed to C++}}
     public func unsupported() {}
