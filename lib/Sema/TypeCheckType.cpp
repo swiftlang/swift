@@ -647,8 +647,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   llvm_unreachable("invalid requirement check type");
 }
 
-static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
-
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -756,7 +754,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // Build ParameterizedProtocolType if the protocol has a primary associated
     // type and we're in a supported context (for now just generic requirements,
     // inheritance clause, extension binding).
-    if (resolution.getOptions().isConstraintImplicitExistential() && !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
+    if (resolution.getOptions().isConstraintImplicitExistential() &&
+        !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
                      protoDecl->getDeclaredExistentialType(),
@@ -1700,7 +1699,7 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   auto DC = resolution.getDeclContext();
   auto &ctx = DC->getASTContext();
   auto &diags = ctx.Diags;
-  auto isExtenstionBinding = options.is(TypeResolverContext::ExtensionBinding);
+  auto isExtensionBinding = options.is(TypeResolverContext::ExtensionBinding);
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
@@ -1715,13 +1714,13 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
       if (TypeChecker::isUnsupportedMemberTypeAccess(
-              parentTy, member, hasUnboundOpener, isExtenstionBinding) !=
+              parentTy, member, hasUnboundOpener, isExtensionBinding) !=
           TypeChecker::UnsupportedMemberTypeAccessKind::None)
         return ErrorType::get(ctx);
     }
 
     switch (TypeChecker::isUnsupportedMemberTypeAccess(
-        parentTy, member, hasUnboundOpener, isExtenstionBinding)) {
+        parentTy, member, hasUnboundOpener, isExtensionBinding)) {
     case TypeChecker::UnsupportedMemberTypeAccessKind::None:
       break;
 
@@ -1910,7 +1909,9 @@ static Type applyNonEscapingIfNecessary(Type ty,
 
     // We lost the sugar to flip the isNoEscape bit.
     //
-    // FIXME(https://github.com/apple/swift/issues/45125): It would be better to add a new AttributedType sugared type, which would wrap the TypeAliasType or ParenType, and apply the isNoEscape bit when de-sugaring.
+    // FIXME(https://github.com/apple/swift/issues/45125): It would be better
+    // to add a new AttributedType sugared type, which would wrap the
+    // TypeAliasType and apply the isNoEscape bit when de-sugaring.
     return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
   }
 
@@ -2340,10 +2341,11 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
         return ty;
       };
 
-      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)){
+      if(getASTContext().LangOpts.hasFeature(Feature::ImplicitSome)) {
         if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(DC)) {
           if (auto ordinal = opaqueDecl->getAnonymousOpaqueParamOrdinal(repr))
-            return diagnoseDisallowedExistential(getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
+            return diagnoseDisallowedExistential(
+                getIdentityOpaqueTypeArchetypeType(opaqueDecl, *ordinal));
         }
       }
 
