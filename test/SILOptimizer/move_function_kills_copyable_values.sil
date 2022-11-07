@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -o - -sil-move-kills-copyable-values-checker -verify %s
+// RUN: %target-sil-opt -enable-experimental-move-only -enable-sil-verify-all -o - -sil-move-kills-copyable-values-checker -verify %s
 
 // This file is meant for specific SIL patterns that may be hard to produce with
 // the current swift frontend but have reproduced before and we want to make
