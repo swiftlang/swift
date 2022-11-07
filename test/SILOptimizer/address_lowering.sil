@@ -1247,6 +1247,25 @@ bb2(%9 : $Error):
   throw %9 : $Error
 }
 
+// CHECK-LABEL: sil [ossa] @f261_testTryApplyIntoEnum : $@convention(thin) <T> () -> (@out Optional<T>, @error any Error) {
+// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*Optional<T>):
+// CHECK:         [[SOME_ADDR:%[^,]+]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:         try_apply undef<T>([[SOME_ADDR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]], error {{bb[0-9]+}}
+// CHECK:       [[NORMAL]]
+// CHECK:         inject_enum_addr [[OUT_ADDR]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-LABEL: } // end sil function 'f261_testTryApplyIntoEnum'
+sil [ossa] @f261_testTryApplyIntoEnum : $@convention(thin) <T> () -> (@out Optional<T>, @error any Error) {
+entry:
+  try_apply undef<T>() : $@convention(thin) <T> () -> (@out T, @error any Error), normal okay, error nopers
+
+okay(%instance : @owned $T):
+  %some = enum $Optional<T>, #Optional.some!enumelt, %instance : $T
+  return %some : $Optional<T>
+
+nopers(%error : @owned $any Error):
+  throw %error : $any Error
+}
+
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
 // CHECK:         fix_lifetime [[ADDR]]
