@@ -1272,7 +1272,7 @@ struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtoco
 // PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T, U> where T : QuxProtocol, U : QuxProtocol, T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
 
 //===---
-//===--- Tupe sugar for library types.
+//===--- Type sugar for library types.
 //===---
 
 struct d2900_TypeSugar1 {
