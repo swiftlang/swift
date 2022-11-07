@@ -270,6 +270,30 @@ struct ShrinkBorrowScopeTest : UnitTest {
   }
 };
 
+struct SimplifyCFGSimplifyArgument : UnitTest {
+  SimplifyCFGSimplifyArgument(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifyArgument(arguments.takeBlock(), arguments.takeUInt());
+  }
+};
+
+struct SimplifyCFGSimplifyBlockArgs : UnitTest {
+  SimplifyCFGSimplifyBlockArgs(UnitTestRunner *pass) : UnitTest(pass) {}
+  void invoke(Arguments &arguments) override {
+    auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
+    passToRun->injectPassManager(getPass()->getPassManager());
+    passToRun->injectFunction(getFunction());
+    SimplifyCFG(*getFunction(), *passToRun, /*VerifyAll=*/false,
+                /*EnableJumpThread=*/false)
+        .simplifyBlockArgs();
+  }
+};
+
 struct SimplifyCFGCanonicalizeSwitchEnum : UnitTest {
   SimplifyCFGCanonicalizeSwitchEnum(UnitTestRunner *pass) : UnitTest(pass) {}
   void invoke(Arguments &arguments) override {
@@ -478,6 +502,10 @@ void UnitTestRunner::withTest(StringRef name, Doit doit) {
     ADD_UNIT_TEST_SUBCLASS("shrink-borrow-scope", ShrinkBorrowScopeTest)
 
     // SimplifyCFG unit tests
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-argument",
+                           SimplifyCFGSimplifyArgument)
+    ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-block-args",
+                           SimplifyCFGSimplifyBlockArgs)
     ADD_UNIT_TEST_SUBCLASS("simplify-cfg-canonicalize-switch-enum",
                            SimplifyCFGCanonicalizeSwitchEnum)
     ADD_UNIT_TEST_SUBCLASS("simplify-cfg-simplify-switch-enum-block",

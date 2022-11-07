@@ -3811,16 +3811,21 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
   A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
-  auto *NewArg =
-      BB->replacePhiArgument(i, proj->getType(), OwnershipKind::Owned);
+  auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
+                                        BB->getArgument(i)->getOwnershipKind());
   proj->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.
   for (auto *Pred : BB->getPredecessorBlocks()) {
     if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
+      auto *BranchOpValue = cast<SingleValueInstruction>(Branch->getOperand(i));
       auto V = getInsertedValue(cast<SingleValueInstruction>(Branch->getArg(i)),
                                 proj);
       Branch->setOperand(i, V);
+      if (isInstructionTriviallyDead(BranchOpValue)) {
+        BranchOpValue->replaceAllUsesWithUndef();
+        BranchOpValue->eraseFromParent();
+      }
       addToWorklist(Pred);
     }
   }
@@ -3865,15 +3870,6 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   // Ignore the entry block.
   if (BB->pred_empty())
     return false;
-
-  if (!EnableOSSARewriteTerminator && Fn.hasOwnership()) {
-    // TODO: OSSA phi support
-    if (llvm::any_of(BB->getArguments(), [this](SILArgument *arg) {
-          return !arg->getType().isTrivial(Fn);
-        })) {
-      return false;
-    }
-  }
 
   // Ignore blocks that are successors of terminators with mandatory args.
   for (SILBasicBlock *pred : BB->getPredecessorBlocks()) {
