@@ -131,7 +131,8 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   bool printSPIs) {
+                                                   bool printSPIs,
+                                                   bool aliasModuleNames) {
   PrintOptions result;
   result.IsForSwiftInterface = true;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -152,6 +153,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
   result.PreferTypeRepr = preferTypeRepr;
+  result.AliasModuleNames = aliasModuleNames;
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
@@ -365,7 +367,11 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
   printName(Name, Context);
 }
 
-void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
+void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name,
+                                const PrintOptions &Options) {
+  if (Options.AliasModuleNames)
+    printTextImpl(MODULE_DISAMBIGUATING_PREFIX);
+
   printName(Name);
 }
 
@@ -2493,7 +2499,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                              Name = Declaring->getRealName();
                          }
                        }
-                       Printer.printModuleRef(Mods.front(), Name);
+                       Printer.printModuleRef(Mods.front(), Name, Options);
                        Mods = Mods.slice(1);
                      } else {
                        Printer << Elem.Item.str();
@@ -5381,7 +5387,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       }
     }
 
-    Printer.printModuleRef(Mod, Name);
+    Printer.printModuleRef(Mod, Name, Options);
     Printer << ".";
   }
 
@@ -5728,7 +5734,8 @@ public:
     Printer << "module<";
     // Should print the module real name in case module aliasing is
     // used (see -module-alias), since that's the actual binary name.
-    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName(),
+                           Options);
     Printer << ">";
   }
 

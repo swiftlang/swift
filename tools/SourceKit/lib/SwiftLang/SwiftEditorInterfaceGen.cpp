@@ -185,10 +185,11 @@ public:
     StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 
-  void printModuleRef(ModuleEntity Mod, Identifier Name) override {
+  void printModuleRef(ModuleEntity Mod, Identifier Name,
+                      const PrintOptions &Options) override {
     unsigned StartOffset = OS.tell();
     Info.References.emplace_back(Mod, StartOffset, Name.str().size());
-    StreamPrinter::printModuleRef(Mod, Name);
+    StreamPrinter::printModuleRef(Mod, Name, Options);
   }
 };
 
