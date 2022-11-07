@@ -107,7 +107,9 @@ StructDecl *MacroContextRequest::evaluate(Evaluator &evaluator,
     swift_ASTGen_getMacroEvaluationContext(
         (const void *)start, (void *)(DeclContext *)macroSourceFile,
         (void *)&ctx, builtinMacro, &context);
-    ctx.addCleanup([builtinMacro]() { swift_ASTGen_destroyMacro(builtinMacro); });
+    ctx.addCleanup([builtinMacro]() {
+      swift_ASTGen_destroyMacro(builtinMacro);
+    });
     return dyn_cast<StructDecl>((Decl *)context);
   } else {
     Parser parser(macroBufferID, *macroSourceFile, &ctx.Diags, nullptr,
@@ -145,7 +147,7 @@ Expr *swift::expandMacroExpr(
 
   // Built-in macros go through `MacroSystem` in Swift Syntax linked to this
   // compiler.
-  if (swift_ASTGen_lookupMacro(macroName.str().c_str())) {
+  if (auto *macro = swift_ASTGen_lookupMacro(macroName.str().c_str())) {
     auto astGenSourceFile = sourceFile->exportedSourceFile;
     if (!astGenSourceFile)
       return nullptr;
@@ -159,6 +161,7 @@ Expr *swift::expandMacroExpr(
       return nullptr;
     evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
                                               (size_t)evaluatedSourceLength);
+    swift_ASTGen_destroyMacro(macro);
   }
   // Other macros go through a compiler plugin.
   else {
