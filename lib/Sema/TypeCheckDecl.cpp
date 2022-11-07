@@ -1709,6 +1709,20 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   AvailabilityContext infoForConformingDecl =
       overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);
 
+  // Relax the requirements for @_spi witnesses by treating the requirement as
+  // if it were introduced at the deployment target. This is not strictly sound
+  // since clients of SPI do not necessarily have the same deployment target as
+  // the module declaring the requirement. However, now that the public
+  // declarations in API libraries are checked according to the minimum possible
+  // deployment target of their clients this relaxation is needed for source
+  // compatibility with some existing code and is reasonably safe for the
+  // majority of cases.
+  if (witness->isSPI()) {
+    AvailabilityContext deploymentTarget =
+        AvailabilityContext::forDeploymentTarget(Context);
+    requirementInfo.constrainWith(deploymentTarget);
+  }
+
   // Constrain over-approximates intersection of version ranges.
   witnessInfo.constrainWith(infoForConformingDecl);
   requirementInfo.constrainWith(infoForConformingDecl);
