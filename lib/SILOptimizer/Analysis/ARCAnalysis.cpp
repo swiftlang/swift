@@ -110,9 +110,9 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
           return true;
         }
       }
+      return false;
     }
-
-    return false;
+    return true;
   }
 
   auto &BI = BInst->getBuiltinInfo();
