@@ -759,7 +759,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     if (resolution.getOptions().isConstraintImplicitExistential() && !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any,
                      protoDecl->getDeclaredInterfaceType(),
-                     protoDecl->getExistentialType(),
+                     protoDecl->getDeclaredExistentialType(),
                      /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
 
       return ErrorType::get(ctx);
@@ -4790,7 +4790,7 @@ public:
         Ctx.Diags.diagnose(comp->getNameLoc(),
                            diag::existential_requires_any,
                            proto->getDeclaredInterfaceType(),
-                           proto->getExistentialType(),
+                           proto->getDeclaredExistentialType(),
                            /*isAlias=*/false)
             .fixItReplace(replaceRepr->getSourceRange(), fix);
       }
