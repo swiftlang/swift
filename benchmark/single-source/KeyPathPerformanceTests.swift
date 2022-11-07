@@ -66,6 +66,12 @@ public let benchmarks = [
     tags: [.validation, .api],
     setUpFunction: setupKeyPathNestedStructs
   ),
+  BenchmarkInfo(
+    name: "KeyPathClassStructs",
+    runFunction: run_KeyPathClassStructs,
+    tags: [.validation, .api],
+    setUpFunction: setupKeyPathNestedStructs
+  ),
 ]
 
 /**
@@ -97,6 +103,7 @@ class FixedSizeArrayHolder {
   var fixedSizeArray100: FixedSizeArray100<ElementType>
   var fixedSizeArray10: FixedSizeArray10<ElementType>
   var mainArrayForNestedStructs: [A]
+  var mainArrayForClassStructs: [D1]
   var arrayForMutatingGetset: [MutatingGetsetNested1]
   var arrayForGet: [GetNested1]
   var arrayForOptionals: [Optional1]
@@ -107,6 +114,7 @@ class FixedSizeArrayHolder {
   var keypathForOptional: KeyPath<Optional1, Int?>
   var keypathForNestedClasses: KeyPath<C1, Int>
   var keypathForNonMutatingGetset: WritableKeyPath<M, Int>
+  var keypathForClassStructs: WritableKeyPath<D1, Int>
 
   // Same order as in KeyPathWritePerformance
   var kp46: WritableKeyPath<FixedSizeArray100<ElementType>, ElementType>
@@ -176,6 +184,7 @@ class FixedSizeArrayHolder {
     fixedSizeArray100 = initializeFixedSizeArray100()
     fixedSizeArray10 = initializeFixedSizeArray10()
     mainArrayForNestedStructs = [A]()
+    mainArrayForClassStructs = [D1]()
     arrayForMutatingGetset = [MutatingGetsetNested1]()
     arrayForGet = [GetNested1]()
     arrayForOptionals = [Optional1]()
@@ -252,6 +261,7 @@ class FixedSizeArrayHolder {
       ._nestedItemStorage?!._nestedItemStorage?!._storage)
     keypathForNestedClasses = identity(\C1.r.r.r.r.a)
     keypathForNonMutatingGetset = identity(\M.n.o.p.q.q)
+    keypathForClassStructs = identity(\D1.b.c.d.e.e)
   }
 }
 
@@ -262,6 +272,10 @@ public func setupKeyPathNestedStructs() {
     let instance = A(a: 0, b: B(b: 0, c: C(c: 0, d: D(d: 0, e: E(e: expectedIntForNestedItems)))))
     holder.mainArrayForNestedStructs.append(instance)
 
+    let classStructInstance = D1(b: D2(b: 0, c: D3(c: 0, d: D4(d: 0,
+      e: D5(e: expectedIntForNestedItems)))))
+    holder.mainArrayForClassStructs.append(classStructInstance)
+      
     var mutatingGetsetInstance = MutatingGetsetNested1()
     mutatingGetsetInstance.nestedItem.nestedItem.nestedItem.nestedItem
       .storage = expectedIntForNestedItems
@@ -330,6 +344,36 @@ struct D {
 }
 
 struct E {
+  var e: Int
+}
+
+// Used for run_KeyPathClassStruct().
+class D1 {
+  var a: Int
+  var b: D2
+  init(b: D2)
+  {
+    a = 0
+    self.b = b
+  }
+}
+
+struct D2 {
+  var b: Int
+  var c: D3
+}
+
+struct D3 {
+  var c: Int
+  var d: D4
+}
+
+struct D4 {
+  var d: Int
+  var e: D5
+}
+
+struct D5 {
   var e: Int
 }
 
@@ -1325,6 +1369,36 @@ public func run_KeyPathNestedStructs(n: Int) {
   }
   check(sum == iterationMultipier * n * expectedIntForNestedItems)
 }
+
+// This measures the performance of keypath reads where a block of
+// trivially-typed memory is preceded by something else (optionals, reference
+// types, etc.)
+@inline(never)
+public func run_KeyPathClassStructs(n: Int) {
+  var sum = 0
+  var index = 0
+  let iterationMultipier = 500
+
+  let singleHopKeyPath0: WritableKeyPath<D1, D2> = \D1.b
+  let singleHopKeyPath1: WritableKeyPath<D2, D3> = \D2.c
+  let singleHopKeyPath2: WritableKeyPath<D3, D4> = \D3.d
+  let singleHopKeyPath3: WritableKeyPath<D4, D5> = \D4.e
+  let singleHopKeyPath4: WritableKeyPath<D5, Int> = \D5.e
+
+  let appendedKeyPath = identity(singleHopKeyPath0.appending(path: singleHopKeyPath1)
+    .appending(path: singleHopKeyPath2).appending(path: singleHopKeyPath3)
+    .appending(path: singleHopKeyPath4))
+
+  let elementCount = FixedSizeArrayHolder.shared.mainArrayForClassStructs.count
+  for _ in 1 ... iterationMultipier * n {
+    let element = FixedSizeArrayHolder.shared.mainArrayForClassStructs[index]
+    sum += element[keyPath: appendedKeyPath]
+    index = (index + 1) % elementCount
+  }
+  check(sum == iterationMultipier * n * expectedIntForNestedItems)
+}
+
+
 
 // This is meant as a baseline, from a timing perspective,
 // for run_testKeyPathReadPerformance() and run_testKeyPathWritePerformance().
