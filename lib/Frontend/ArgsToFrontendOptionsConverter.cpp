@@ -755,14 +755,11 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       if (!allowModuleName) {
         if (value == options.ModuleName ||
             value == options.ModuleABIName ||
-            value == options.ModuleLinkName) {
+            value == options.ModuleLinkName ||
+            value == STDLIB_NAME) {
           diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
           return false;
         }
-      }
-      if (value == STDLIB_NAME) {
-        diags.diagnose(SourceLoc(), diag::error_module_alias_forbidden_name, value);
-        return false;
       }
       if (!Lexer::isIdentifier(value)) {
         diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);

@@ -1027,9 +1027,10 @@ class ModuleInterfaceLoaderImpl {
       }
       // Set up a builder if we need to build the module. It'll also set up
       // the genericSubInvocation we'll need to use to compute the cache paths.
+      Identifier realName = ctx.getRealModuleName(ctx.getIdentifier(moduleName));
       ImplicitModuleInterfaceBuilder builder(
         ctx.SourceMgr, diagsToUse,
-        astDelegate, interfacePath, moduleName, cacheDir,
+        astDelegate, interfacePath, realName.str(), cacheDir,
         prebuiltCacheDir, backupInterfaceDir, StringRef(),
         Opts.disableInterfaceLock,
         ctx.IgnoreAdjacentModules, diagnosticLoc,
