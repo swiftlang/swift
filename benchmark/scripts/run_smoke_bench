@@ -254,11 +254,11 @@ def test_performance(
         i += 1
         if VERBOSE:
             log("        test again: " + str([test.name for test in changed]))
-        results = [
-            merge(the_results, measure(driver, [test.name for test in changed], i, num_samples))
-            for the_results, driver in zip(results, [old, new])
-        ]
-        tests = TestComparator(results[0], results[1], threshold)
+        old_measurement = measure(old, [test.name for test in changed], i, num_samples)
+        old_results = merge(results[0], old_measurement)
+        new_measurement = measure(new, [test.name for test in changed], i, num_samples)
+        new_results = merge(results[1], new_measurement)
+        tests = TestComparator(old_results, new_results, threshold)
         changed = tests.decreased + tests.increased
 
         if len(old.tests) == len(changed):
@@ -269,7 +269,7 @@ def test_performance(
     log("")
     report_title = "Performance ({}): -{}".format(arch, opt_level)
     return report_results(
-        report_title, threshold * 1.4, output_file, *results
+        report_title, threshold * 1.4, output_file, old_results, new_results
     )
 
 
@@ -292,8 +292,8 @@ def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output
             oldsize = get_codesize(oldfile)
             newsize = get_codesize(newfile)
             bname = os.path.basename(oldfile)
-            old_json = {"number":idx, "name":bname, "samples":[oldsize]}
-            new_json = {"number":idx, "name":bname, "samples":[newsize]}
+            old_json = {"number": idx, "name": bname, "samples": [oldsize]}
+            new_json = {"number": idx, "name": bname, "samples": [newsize]}
             old_results[bname] = PerformanceTestResult(old_json)
             new_results[bname] = PerformanceTestResult(new_json)
             idx += 1
