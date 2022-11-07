@@ -641,3 +641,15 @@ do {
   // expected-error@-1 {{missing arguments for parameters 'a', 'b' in call}}
   // expected-error@-2 {{extra argument 'storageWrapper' in call}}
 }
+
+func test_multiple_wrapper_attributes() {
+  @Parent.Wrapper @NoopWrapper
+  // expected-note@-1 {{'Wrapper' declared here}}
+  // expected-note@-2 {{'NoopWrapper' declared here}}
+  struct Test1 {} // expected-error {{struct 'Test1' cannot use more than one type wrapper}}
+
+  @Parent.Wrapper @NoopWrapper
+  // expected-note@-1 {{'Wrapper' declared here}}
+  // expected-note@-2 {{'NoopWrapper' declared here}}
+  class Test2 {} // expected-error {{class 'Test2' cannot use more than one type wrapper}}
+}

@@ -116,7 +116,14 @@ NominalTypeDecl *GetTypeWrapper::evaluate(Evaluator &evaluator,
     return nullptr;
 
   if (typeWrappers.size() != 1) {
-    ctx.Diags.diagnose(decl, diag::cannot_use_multiple_type_wrappers);
+    ctx.Diags.diagnose(decl, diag::cannot_use_multiple_type_wrappers,
+                       decl->getDescriptiveKind(), decl->getName());
+
+    for (const auto &attr : typeWrappers) {
+      ctx.Diags.diagnose(attr.first->getLocation(), diag::decl_declared_here,
+                         attr.second->getName());
+    }
+
     return nullptr;
   }
 
