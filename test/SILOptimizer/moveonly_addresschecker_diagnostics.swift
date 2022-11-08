@@ -2061,3 +2061,15 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout Klass) {
     }
     f()
 }
+
+/////////////////////////////
+// Tests For Move Operator //
+/////////////////////////////
+
+func moveOperatorTest(_ k: __owned Klass) {
+    var k2 = k // expected-error {{'k2' consumed more than once}}
+    k2 = Klass()
+    let k3 = _move k2 // expected-note {{consuming use}}
+    let _ = _move k2 // expected-note {{consuming use}}
+    let _ = k3
+}

@@ -2326,3 +2326,14 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume2(_ x2: __owned 
     f()
     print(x2) // expected-note {{consuming use}}
 }
+
+/////////////////////////////
+// Tests For Move Operator //
+/////////////////////////////
+
+func moveOperatorTest(_ k: __owned Klass) {
+    let k2 = k // expected-error {{'k2' consumed more than once}}
+    let k3 = _move k2 // expected-note {{consuming use}}
+    let _ = _move k2 // expected-note {{consuming use}}
+    let _ = k3
+}
