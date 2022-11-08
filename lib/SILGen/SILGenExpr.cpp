@@ -41,6 +41,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -5934,7 +5935,11 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
   }
 
   // If we aren't loadable, then create a temporary initialization and
-  // mark_unresolved_move into that.
+  // mark_unresolved_move into that if we have a copyable type if we have a move
+  // only, just add a copy_addr init.
+  //
+  // The reason why we do this is that we only use mark_unresolved_move_addr and
+  // the move operator checker for copyable values.
   std::unique_ptr<TemporaryInitialization> optTemp;
   optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
   SILValue toAddr = optTemp->getAddressForInPlaceInitialization(SGF, E);
@@ -5945,7 +5950,12 @@ RValue RValueEmitter::visitMoveExpr(MoveExpr *E, SGFContext C) {
       SGF.emitRValue(subExpr, SGFContext(SGFContext::AllowImmediatePlusZero))
           .getAsSingleValue(SGF, subExpr);
   assert(mv.getType().isAddress());
-  SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
+  if (mv.getType().isMoveOnly()) {
+    SGF.B.createCopyAddr(subExpr, mv.getValue(), toAddr, IsNotTake,
+                         IsInitialization);
+  } else {
+    SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
+  }
   optTemp->finishInitialization(SGF);
   return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
 }
