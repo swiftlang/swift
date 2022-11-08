@@ -54,7 +54,7 @@ public final class E : C {
 
 // CHECK-LABEL: sil {{.*}}@$s22devirt_value_metatypes5testEySiAA1ECF
 // CHECK-NOT: value_metatype $@thick E.Type
-// CHECK_NOT: checked_cast_br
+// CHECK-NOT: checked_cast_br
 // CHECK: function_ref
 // CHECK: apply
 // CHECK: return
