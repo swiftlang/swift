@@ -1457,6 +1457,8 @@ EnumTypeLayoutEntry::CopyDestroyStrategy
 EnumTypeLayoutEntry::copyDestroyKind(IRGenFunction &IGF) const {
   if (isPOD()) {
     return POD;
+  } else if (isSingleton()) {
+    return ForwardToPayload;
   } else if (cases.size() == 1 && numEmptyCases <= 1 &&
              cases[0]->isSingleRetainablePointer()) {
     return NullableRefcounted;
@@ -2490,7 +2492,7 @@ void EnumTypeLayoutEntry::destructiveInjectEnumTag(IRGenFunction &IGF,
   if (isSingleton()) {
     // No tag, nothing to do
     return;
-  } if (cases.size() == 1) {
+  } else if (cases.size() == 1) {
     auto payload = cases[0];
     auto emptyCases = IGF.IGM.getInt32(numEmptyCases);
     payload->storeEnumTagSinglePayload(IGF, tag, emptyCases, enumAddr);
