@@ -109,6 +109,12 @@
 #define SWIFT_WEAK_IMPORT
 #endif
 
+#if __has_attribute(musttail)
+#define SWIFT_MUSTTAIL [[clang::musttail]]
+#else
+#define SWIFT_MUSTTAIL
+#endif
+
 // Define the appropriate attributes for sharing symbols across
 // image (executable / shared-library) boundaries.
 //

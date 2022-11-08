@@ -941,6 +941,7 @@ bb0(%0 : @owned $P):
 // CHECK: bb0(%0 : $*any P):
 // CHECK:   [[ALLOCP:%.*]] = alloc_stack $any P, var, name "q"
 // CHECK:   copy_addr %0 to [init] [[ALLOCP]] : $*any P
+// CHECK:   debug_value %0 : $*any P, var, name "q"
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
 // CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
@@ -948,8 +949,8 @@ bb0(%0 : @owned $P):
 // CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   %10 = apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr %9 : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
+// CHECK:   apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr [[DATA:%[^,]+]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   destroy_addr [[ALLOCP]] : $*any P
 // CHECK:   destroy_addr %0 : $*any P
 // CHECK:   dealloc_stack [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
