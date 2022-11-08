@@ -1478,7 +1478,9 @@ llvm::Value *EnumTypeLayoutEntry::size(IRGenFunction &IGF) const {
   auto &ctx = IGM.getLLVMContext();
 
   auto emptyCaseCount = IGM.getInt32(numEmptyCases);
-  if (cases.size() == 1) {
+  if (cases.size() == 1 && numEmptyCases == 0) {
+    return cases[0]->size(IGF);
+  } else if (cases.size() == 1) {
     // Single payload enum.
     // // If there are enough extra inhabitants for all of the cases, then the
     // // size of the enum is the same as its payload.
@@ -1572,7 +1574,10 @@ llvm::Optional<Size> EnumTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
   if (_fixedSize)
     return *_fixedSize;
   assert(!cases.empty());
-  if (cases.size() == 1) {
+
+  if (cases.size() == 1 && numEmptyCases == 0) {
+    return cases[0]->fixedSize(IGM);
+  } else if (cases.size() == 1) {
     // Single payload enum.
     //
     // If there are enough extra inhabitants for all of the cases, then the
@@ -1634,7 +1639,9 @@ EnumTypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
     return *_fixedXICount;
   assert(!cases.empty());
 
-  if (cases.size() == 1) {
+  if (cases.size() == 1 && numEmptyCases == 0) {
+    return cases[0]->fixedXICount(IGM);
+  } else if (cases.size() == 1) {
     // Single payload enum.
     // unsigned unusedExtraInhabitants =
     //   payloadNumExtraInhabitants >= emptyCases ?
@@ -1679,7 +1686,9 @@ llvm::Value *EnumTypeLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-  if (cases.size() == 1) {
+  if (cases.size() == 1 && numEmptyCases == 0) {
+    return cases[0]->extraInhabitantCount(IGF);
+  } else if (cases.size() == 1) {
     // Single payload enum.
     // unsigned unusedExtraInhabitants =
     //   payloadNumExtraInhabitants >= emptyCases ?
@@ -2213,7 +2222,9 @@ llvm::Value *EnumTypeLayoutEntry::getEnumTagSinglePayloadForSinglePayloadEnum(
 llvm::Value *EnumTypeLayoutEntry::getEnumTagSinglePayload(
     IRGenFunction &IGF, llvm::Value *emptyCases, Address addr) const {
   assert(!cases.empty());
-  if (cases.size() == 1) {
+  if (cases.size() == 1 && numEmptyCases == 0) {
+    return cases[0]->getEnumTagSinglePayload(IGF, emptyCases, addr);
+  } else if (cases.size() == 1) {
     return getEnumTagSinglePayloadForSinglePayloadEnum(IGF, addr, emptyCases);
   }
   return getEnumTagSinglePayloadForMultiPayloadEnum(IGF, addr, emptyCases);
@@ -2292,7 +2303,9 @@ void EnumTypeLayoutEntry::storeEnumTagSinglePayload(IRGenFunction &IGF,
                                                     llvm::Value *emptyCases,
                                                     Address addr) const {
   assert(!cases.empty());
-  if (cases.size() == 1) {
+  if (cases.size() == 1 && numEmptyCases == 0) {
+    return cases[0]->storeEnumTagSinglePayload(IGF, tag, emptyCases, addr);
+  } else if (cases.size() == 1) {
     storeEnumTagSinglePayloadForSinglePayloadEnum(IGF, tag, emptyCases, addr);
     return;
   }

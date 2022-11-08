@@ -31,6 +31,11 @@ public enum SingletonEnum {
 // CHECK-OPT:   ret %swift.opaque* [[R2]]
 // CHECK: }
 
+// CHECK: define internal i32 @"$s14enum_singleton13SingletonEnumOwet"
+// CHECK-OPT:   [[R2:%.*]] = tail call i32 @"{{.*}}OwetTm"
+// CHECK-OPT:   ret i32 [[R2]]
+// CHECK: }
+
 // CHECK: define internal void @"$s14enum_singleton13SingletonEnumOwst"
 // CHECK-OPT:   tail call void @"{{.*}}OwstTm"
 // CHECK-OPT:   ret void
