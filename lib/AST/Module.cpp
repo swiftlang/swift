@@ -2852,8 +2852,7 @@ void SourceFile::lookupImportedSPIGroups(
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
         importedModule == import.module.importedModule) {
-      auto importedSpis = import.spiGroups;
-      spiGroups.insert(importedSpis.begin(), importedSpis.end());
+      spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
 }
