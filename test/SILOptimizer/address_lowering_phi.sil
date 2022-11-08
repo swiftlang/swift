@@ -15,6 +15,8 @@ enum Optional<T> {
   case some(T)
 }
 
+struct S {}
+
 struct SRef<T> {
   @_hasStorage var object: AnyObject { get set }
   @_hasStorage var element: T { get set }
@@ -469,4 +471,68 @@ bb2:
   br bb3(%1 : $T)
 bb3(%phi : @owned $T):
   return %phi : $T
+}
+
+// Check that the debug_value instruction that is created when deleting a load
+// gets rewritten and doesn't obstruct the deletion of the phi.
+// CHECK-LABEL: sil [ossa] @f100_store_phi : {{.*}} {
+// CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $*Value):
+// CHECK:         [[TEMP:%[^,]+]] = alloc_stack $Value
+// CHECK:         [[VAR:%[^,]+]] = alloc_stack [lexical] $Value, var, name "value"
+// CHECK:         cond_br undef, bb2, bb1
+// CHECK:       bb3:
+// CHECK:         copy_addr [take] [[TEMP]] to [init] [[VAR]]
+// CHECK:         debug_value [[TEMP]] : $*Value, var, name "value"
+// CHECK-LABEL: } // end sil function 'f100_store_phi'
+sil [ossa] @f100_store_phi : $@convention(thin) <Value> (@in Value) -> () {
+entry(%instance : @owned $Value):
+  %14 = alloc_stack [lexical] $Value, var, name "value"
+  cond_br undef, left, right
+
+left:
+  br merge(%instance : $Value)
+
+right:
+  br merge(%instance : $Value)
+
+merge(%34 : @owned $Value):
+  store %34 to [init] %14 : $*Value
+  destroy_addr %14 : $*Value
+  dealloc_stack %14 : $*Value
+  %43 = tuple ()
+  return %43 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f105_phi_into_tuple : {{.*}} {
+// CHECK:         [[STORAGE:%[^,]+]] = alloc_stack $(Self, Builtin.Int1)          
+// CHECK:         [[SELF_ADDR:%[^,]+]] = tuple_element_addr [[STORAGE]]
+// CHECK:         apply {{%[^,]+}}<Self>([[SELF_ADDR]])
+// CHECK-LABEL: } // end sil function 'f105_phi_into_tuple'
+sil [ossa] @f105_phi_into_tuple : $@convention(thin) <Self> () -> () {
+  %getOut = function_ref @getOut : $@convention(thin) <T> () -> @out T
+  %self = apply %getOut<Self>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  br exit(%self : $Self)
+
+exit(%self_2 : @owned $Self):
+  %tuple = tuple (%self_2 : $Self, undef : $Bool)
+  destroy_value %tuple : $(Self, Bool)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Check deleting the first of multiple block arguments.
+// CHECK-LABEL: sil [ossa] @f110_nonfinal_argument : {{.*}} {
+// CHECK:       bb3({{%[^,]+}} : $S):
+// CHECK-LABEL: } // end sil function 'f110_nonfinal_argument'
+sil [ossa] @f110_nonfinal_argument : $@convention(thin) <T> (@in T, S) -> () {
+entry(%instance : @owned $T, %s : $S):
+  cond_br undef, left, right
+left:
+  br exit(%instance : $T, %s : $S)
+right:
+  br exit(%instance : $T, %s : $S)
+exit(%instance_2 : @owned $T, %s_2 : $S):
+  destroy_value %instance_2 : $T
+  %retval = tuple ()
+  return %retval : $()
 }

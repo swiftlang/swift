@@ -1159,7 +1159,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   coalescedPhi.coalesce(phi, pass.valueStorageMap);
 
   SmallVector<SILValue, 4> coalescedValues;
-  coalescedValues.resize(coalescedPhi.getCoalescedOperands().size());
+  coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
   for (SILValue value : coalescedPhi.getCoalescedValues())
     coalescedValues.push_back(value);
 
@@ -3362,8 +3362,21 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (valueDef->getType().isAddress())
       continue;
 
+    SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
-    for (Operand *oper : uses) {
+    for (auto *oper : uses) {
+      originalUses.insert(oper);
+      UseRewriter::rewriteUse(oper, pass);
+    }
+    // Rewrite every new uses that was added.
+    uses.clear();
+    for (auto *use : valueDef->getUses()) {
+      if (originalUses.contains(use))
+        continue;
+      uses.push_back(use);
+    }
+    for (auto *oper : uses) {
+      assert(isa<DebugValueInst>(oper->getUser()));
       UseRewriter::rewriteUse(oper, pass);
     }
   }
@@ -3396,7 +3409,7 @@ static void filterDeadArgs(OperandValueArrayRef origArgs,
                            SmallVectorImpl<SILValue> &newArgs) {
   auto nextDeadArgI = deadArgIndices.begin();
   for (unsigned i : indices(origArgs)) {
-    if (i == *nextDeadArgI) {
+    if (i == *nextDeadArgI && nextDeadArgI != deadArgIndices.end()) {
       ++nextDeadArgI;
       continue;
     }
