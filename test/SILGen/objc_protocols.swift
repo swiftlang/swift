@@ -290,8 +290,9 @@ public protocol DangerousEscaper {
 // CHECK:  [[OE:%.*]] = open_existential_ref [[SELF]]
 // CHECK:  [[CLOSURE_COPY1:%.*]]  = copy_value [[CLOSURE_ARG]]
 // CHECK:  [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_COPY1]]
-// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NOESCAPE]])
+// CHECK:  [[NOESCAPEC:%.*]] = copy_value [[NOESCAPE]]
+// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NOESCAPEC]])
 // CHECK:  [[WITHOUT_ESCAPING:%.*]] = mark_dependence [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL]] : $@callee_guaranteed () -> () on [[NOESCAPE]]
 // CHECK:  [[WITHOUT_ESCAPING_COPY:%.*]] = copy_value [[WITHOUT_ESCAPING]] : $@callee_guaranteed () -> ()
 // CHECK:  [[BLOCK:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()

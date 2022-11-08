@@ -122,6 +122,7 @@ public:
     unsigned getArgumentCount() const { return ArgAccesses.size(); }
 
     void print(raw_ostream &os, SILFunction *fn) const;
+    void dump(SILFunction *fn) const;
   };
 
   class FunctionInfo;

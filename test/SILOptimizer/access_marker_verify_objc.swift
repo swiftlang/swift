@@ -41,8 +41,9 @@ class HasBlockImpl: HasBlock {
 // CHECK:   [[THUNK:%.*]] = function_ref @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CP]]) : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int
 // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (Int) -> Int to $@noescape @callee_guaranteed (Int) -> Int
-// CHECK:   [[F:%.*]] = function_ref @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEF : $@convention(method) (@noescape @callee_guaranteed (Int) -> Int, @guaranteed HasBlockImpl) -> ()
-// CHECK:   %{{.*}} = apply [[F]]([[CVT]], %{{.*}}) : $@convention(method) (@noescape @callee_guaranteed (Int) -> Int, @guaranteed HasBlockImpl) -> ()
+// CHECK:   [[CVTB:%.*]] = begin_borrow [[CVT]]
+// CHECK:   [[F:%.*]] = function_ref @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEF : $@convention(method) (@guaranteed @noescape @callee_guaranteed (Int) -> Int, @guaranteed HasBlockImpl) -> ()
+// CHECK:   %{{.*}} = apply [[F]]([[CVTB]], %{{.*}}) : $@convention(method) (@guaranteed @noescape @callee_guaranteed (Int) -> Int, @guaranteed HasBlockImpl) -> ()
 // CHECK:   return %{{.*}} : $()                                
 // CHECK-LABEL: } // end sil function '$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo'
 

@@ -537,6 +537,12 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::Yield:
     os << "Yield";
     return;
+  case Kind::PartialApplyStack:
+    os << "PartialApply [stack]";
+    return;
+  case Kind::BeginAsyncLet:
+    os << "BeginAsyncLet";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -565,7 +571,9 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
   case BorrowingOperandKind::BeginBorrow:
-  case BorrowingOperandKind::BeginApply: {
+  case BorrowingOperandKind::BeginApply:
+  case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::PartialApplyStack: {
     return op->getUser()->hasUsesOfAnyResult();
   }
   case BorrowingOperandKind::Branch: {
@@ -611,6 +619,31 @@ bool BorrowingOperand::visitScopeEndingUses(
     }
     return !deadApply;
   }
+  case BorrowingOperandKind::PartialApplyStack: {
+    auto user = cast<PartialApplyInst>(op->getUser());
+    assert(user->isOnStack() && "escaping closures can't borrow");
+    // The closure's borrow lifetimes end when the closure itself ends its
+    // lifetime. That may happen transitively through conversions that forward
+    // ownership of the closure.
+    return user->visitOnStackLifetimeEnds(func);
+  }
+  case BorrowingOperandKind::BeginAsyncLet: {
+    auto user = cast<BuiltinInst>(op->getUser());
+    // The async let ends its borrow when the task is ended.
+    bool dead = true;
+    for (auto *use : user->getUses()) {
+      dead = false;
+      auto builtinUser = dyn_cast<BuiltinInst>(use->getUser());
+      if (!builtinUser
+          || builtinUser->getBuiltinKind() != BuiltinValueKind::EndAsyncLetLifetime)
+        continue;
+
+      if (!func(use)) {
+        return false;
+      }
+    }
+    return !dead;
+  }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
   case BorrowingOperandKind::Apply:
@@ -654,6 +687,8 @@ bool BorrowingOperand::visitBorrowIntroducingUserResults(
   case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::Yield:
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::BeginAsyncLet:
     llvm_unreachable("Never has borrow introducer results!");
   case BorrowingOperandKind::BeginBorrow: {
     auto value = BorrowedValue(cast<BeginBorrowInst>(op->getUser()));
@@ -678,6 +713,8 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
   case BorrowingOperandKind::TryApply:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::Yield:
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::BeginAsyncLet:
     return BorrowedValue();
 
   case BorrowingOperandKind::BeginBorrow:

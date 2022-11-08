@@ -1035,8 +1035,9 @@ bb0:
   %18 = mark_dependence %15 : $@noescape @callee_guaranteed () -> () on %17 : $@callee_guaranteed () -> ()
   br bb1(%18 : $@noescape @callee_guaranteed () -> (), %17 : $@callee_guaranteed () -> (), %14 : $@callee_guaranteed () -> ())
 
-bb1(%21 : $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@callee_guaranteed () -> (), %23 : @owned $@callee_guaranteed () -> ()):
+bb1(%21 : @owned $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@callee_guaranteed () -> (), %23 : @owned $@callee_guaranteed () -> ()):
   %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %21 : $@noescape @callee_guaranteed () -> ()
   end_borrow %22 : $@callee_guaranteed () -> ()
   destroy_value %23 : $@callee_guaranteed () -> ()
   %28 = tuple ()
