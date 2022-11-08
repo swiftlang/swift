@@ -39,7 +39,7 @@ public struct LaterGeneric<T> {
 // CHECK: class ComesFirstEnum final {
 // CHECK: LaterGeneric<ComesFirstEnum> returnsLaterOpt() const;
 
-// CHECK: namespace Generics {
+// CHECK: namespace Generics __attribute__((swift_private)) {
 // CHECK-EMPTY:
 // CHECK-NEXT:  namespace _impl {
 // CHECK-EMPTY:

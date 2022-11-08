@@ -4,10 +4,10 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
-// CHECK: namespace Structs {
+// CHECK: namespace Structs __attribute__((swift_private)) {
 // CHECK: namespace _impl {
 
-// CHECK: namespace Structs {
+// CHECK: namespace Structs __attribute__((swift_private)) {
 
 // CHECK: class StructWithIntField;
 // CHECK-NEXT: } // end namespace
@@ -20,7 +20,7 @@
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
-// CHECK: namespace Structs {
+// CHECK: namespace Structs __attribute__((swift_private)) {
 
 // CHECK:      namespace _impl {
 // CHECK-EMPTY:
@@ -95,7 +95,7 @@
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
-// CHECK-NEXT: namespace Structs {
+// CHECK-NEXT: namespace Structs __attribute__((swift_private)) {
 
 public struct StructWithIntField {
   let field: Int64

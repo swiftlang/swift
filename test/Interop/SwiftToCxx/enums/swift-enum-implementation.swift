@@ -166,7 +166,7 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 // CHECK-NEXT:   }
-// CHECK:      namespace Enums {
+// CHECK:      namespace Enums __attribute__((swift_private)) {
 // CHECK:        inline E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));

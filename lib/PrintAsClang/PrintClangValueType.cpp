@@ -496,9 +496,8 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   }
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(moduleContext);
-  os << " {\n";
+  os << "\n";
+  printer.printModuleNamespaceStart(*moduleContext);
 }
 
 void ClangValueTypePrinter::printTypeGenericTraits(
@@ -592,7 +591,6 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
-  os << "\nnamespace ";
-  printer.printBaseName(moduleContext);
-  os << " {\n";
+  os << "\n";
+  printer.printModuleNamespaceStart(*moduleContext);
 }
