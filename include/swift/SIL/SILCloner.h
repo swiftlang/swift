@@ -1835,6 +1835,13 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   if (!getBuilder().hasOwnership()) {
+    // Noescape closures become trivial after OSSA.
+    if (auto fnTy = Inst->getType().getAs<SILFunctionType>()) {
+      if (fnTy->isTrivialNoEscape()) {
+        return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
+      }
+    }
+  
     SILValue newValue = getBuilder().emitCopyValueOperation(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()));
     return recordFoldedValue(Inst, newValue);
@@ -1950,6 +1957,32 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   if (!getBuilder().hasOwnership()) {
+    // Noescape closures become trivial after OSSA.
+    if (auto fnTy = Inst->getOperand()->getType().getAs<SILFunctionType>()) {
+      if (fnTy->isTrivialNoEscape()) {
+        // Destroying the partial_apply [stack] becomes the stack deallocation
+        // of the context.
+        // Look through mark_dependence and other wrapper instructions.
+        SILValue deallocOperand = Inst->getOperand();
+        while (true) {
+          if (auto mdi = dyn_cast<MarkDependenceInst>(deallocOperand)) {
+            deallocOperand = mdi->getValue();
+          } else if (auto conv = dyn_cast<ConversionInst>(deallocOperand)) {
+            deallocOperand = conv->getConverted();
+          } else {
+            break;
+          }
+        }
+        if (isa<PartialApplyInst>(deallocOperand)) {
+          recordClonedInstruction(Inst,
+            getBuilder().createDeallocStack(getOpLocation(Inst->getLoc()),
+                                            getOpValue(deallocOperand)));
+        }
+        
+        return;
+      }
+    }
+  
     return recordClonedInstruction(
         Inst, getBuilder().createReleaseValue(
                   getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),

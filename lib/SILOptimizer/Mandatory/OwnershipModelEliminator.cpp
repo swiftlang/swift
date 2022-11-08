@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -62,7 +63,7 @@ struct OwnershipModelEliminatorVisitor
     : SILInstructionVisitor<OwnershipModelEliminatorVisitor, bool> {
   SmallVector<SILInstruction *, 8> trackingList;
   SmallBlotSetVector<SILInstruction *, 8> instructionsToSimplify;
-
+  
   /// Points at either a user passed in SILBuilderContext or points at
   /// builderCtxStorage.
   SILBuilderContext builderCtx;
@@ -174,6 +175,8 @@ struct OwnershipModelEliminatorVisitor
       return true;
     });
   }
+  
+  bool visitPartialApplyInst(PartialApplyInst *pai);
 
   void splitDestructure(SILInstruction *destructure,
                         SILValue destructureOperand);
@@ -288,7 +291,26 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   if (cvi->getType().isAddressOnly(*cvi->getFunction()))
     return false;
 
-  // Now that we have set the unqualified ownership flag, destroy value
+  // Nonescaping closures are represented ultimately as trivial pointers to
+  // their context, but we use ownership to do borrow checking of their captures
+  // in OSSA. Now that we're eliminating ownership, fold away copies.
+  if (auto cvFnTy = cvi->getType().getAs<SILFunctionType>()) {
+    if (cvFnTy->isTrivialNoEscape()) {
+      // Erase any `destroy_value`s of this copy, so we don't mistake them for
+      // the end of the original value's lifetime after we RAUW.
+      SmallVector<DestroyValueInst *, 2> destroys;
+      for (auto user : cvi->getUsersOfType<DestroyValueInst>()) {
+        destroys.push_back(user);
+      }
+      for (auto destroy : destroys) {
+        eraseInstruction(destroy);
+      }
+      eraseInstructionAndRAUW(cvi, cvi->getOperand());
+      return true;
+    }
+  }
+
+  // Now that we have set the unqualified ownership flag, emitCopyValueOperation
   // operation will delegate to the appropriate strong_release, etc.
   withBuilder<void>(cvi, [&](SILBuilder &b, SILLocation loc) {
     b.emitCopyValueOperation(loc, cvi->getOperand());
@@ -387,18 +409,109 @@ static void injectDebugPoison(DestroyValueInst *destroy) {
   }
 }
 
+bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
+    PartialApplyInst *inst) {
+  // Escaping closures don't need attention beyond what we already perform.
+  if (!inst->isOnStack())
+    return false;
+  
+  // A nonescaping closure borrows its captures, but now that we've lowered
+  // those borrows away, we need to make those dependence relationships explicit
+  // so that the optimizer continues respecting them.
+  MarkDependenceInst *firstNewMDI = nullptr;
+  auto newValue = withBuilder<SILValue>(inst->getNextInstruction(),
+                                        [&](SILBuilder &b, SILLocation loc) {
+    SILValue newValue = inst;
+    for (auto op : inst->getArguments()) {
+      // Trivial types have infinite lifetimes already.
+      if (op->getType().isTrivial(*inst->getFunction())) {
+        break;
+      }
+      // Address operands should already have their dependence marked, since
+      // borrowing doesn't model values in memory.
+      if (op->getType().isAddress()) {
+        break;
+      }
+      
+      // If this is a nontrivial value argument, insert the mark_dependence.
+      auto mdi = b.createMarkDependence(loc, newValue, op);
+      if (!firstNewMDI)
+        firstNewMDI = mdi;
+      newValue = mdi;
+    }
+    return newValue;
+  });
+  
+  // Rewrite all uses other than the root of the new dependence chain, and a
+  // `dealloc_stack` of the partial_apply instruction we may have already
+  // created, to go through the dependence chain, if there is one.
+  if (firstNewMDI) {
+    while (!inst->use_empty()) {
+      auto opI = inst->use_begin();
+      while ((*opI)->getUser() == firstNewMDI
+             || isa<DeallocStackInst>((*opI)->getUser())) {
+        ++opI;
+        if (opI == inst->use_end()) {
+          goto done_rewriting;
+        }
+      }
+      (*opI)->set(newValue);
+    }
+done_rewriting:
+    return true;
+  }
+  
+  return false;
+}
+
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
     DestroyValueInst *dvi) {
+  // Nonescaping closures are represented ultimately as trivial pointers to
+  // their context, but we use ownership to do borrow checking of their captures
+  // in OSSA. Now that we're eliminating ownership, fold away destroys, unless
+  // we're destroying the original partial_apply, in which case this is where
+  // we dealloc_stack the context.
+  auto operand = dvi->getOperand();
+  auto operandTy = operand->getType();
+  if (auto operandFnTy = operandTy.getAs<SILFunctionType>()) {
+    if (operandFnTy->isTrivialNoEscape()) {
+      // Look through mark_dependence and other wrapper instructions.
+      SILValue deallocOperand = operand;
+      while (true) {
+        if (auto mdi = dyn_cast<MarkDependenceInst>(deallocOperand)) {
+          deallocOperand = mdi->getValue();
+        } else if (isa<ConvertEscapeToNoEscapeInst>(deallocOperand)) {
+          // If there's a surviving convert_escape_to_noescape that wasn't
+          // turned into a stack closure, then stop here and just delete the
+          // destroy_value, since the original escaping closure's lifetime
+          // will persist.
+          break;
+        } else if (auto conv = dyn_cast<ConversionInst>(deallocOperand)) {
+          deallocOperand = conv->getConverted();
+        } else {
+          break;
+        }
+      }
+      if (isa<PartialApplyInst>(deallocOperand)) {
+        withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
+          b.createDeallocStack(loc, deallocOperand);
+        });
+      }
+      eraseInstruction(dvi);
+      return true;
+    }
+  }
+    
   // A destroy_value of an address-only type cannot be replaced.
   //
   // TODO: When LowerAddresses runs before this, we can remove this case.
-  if (dvi->getOperand()->getType().isAddressOnly(*dvi->getFunction()))
+  if (operandTy.isAddressOnly(*dvi->getFunction()))
     return false;
 
-  // Now that we have set the unqualified ownership flag, destroy value
-  // operation will delegate to the appropriate strong_release, etc.
+  // Now that we have set the unqualified ownership flag,
+  // emitDestroyValueOperation will insert the appropriate instruction.
   withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
-    b.emitDestroyValueOperation(loc, dvi->getOperand());
+    b.emitDestroyValueOperation(loc, operand);
   });
   if (dvi->poisonRefs()) {
     injectDebugPoison(dvi);
@@ -559,7 +672,11 @@ static bool stripOwnership(SILFunction &func) {
     simplifyAndReplaceAllSimplifiedUsesAndErase(*value, callbacks);
     madeChange |= callbacks.hadCallbackInvocation();
   }
-
+  
+  if (madeChange) {
+    StackNesting::fixNesting(&func);
+  }
+  
   return madeChange;
 }
 

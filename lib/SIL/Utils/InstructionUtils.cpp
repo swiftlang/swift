@@ -356,6 +356,11 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
            SILFunctionType::Representation::Thick))
     return SILValue();
 
+  // Look through copies.
+  if (auto copy = dyn_cast<CopyValueInst>(Arg)) {
+    Arg = copy->getOperand();
+  }
+
   return Arg;
 }
 

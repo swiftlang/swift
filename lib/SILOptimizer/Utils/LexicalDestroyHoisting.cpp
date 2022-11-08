@@ -91,7 +91,8 @@ bool findUsage(Context const &context, Usage &usage) {
     // Add the destroy_values to the collection of ends so we can seed the data
     // flow and determine whether any were reused.  They aren't uses over which
     // we can't hoist though.
-    if (isa<DestroyValueInst>(use->getUser())) {
+    auto dv = dyn_cast<DestroyValueInst>(use->getUser());
+    if (dv && dv->getOperand() == context.value) {
       usage.ends.insert(use->getUser());
     } else {
       usage.users.insert(use->getUser());

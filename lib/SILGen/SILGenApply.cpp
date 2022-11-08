@@ -4644,11 +4644,17 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   // Then add all arguments to our array, copying them if they are not at +1
   // yet.
   for (auto arg : uncurriedArgs) {
-    // Named builtins are by default assumed to take all arguments at +1 i.e.,
-    // as Owned or Trivial. Named builtins that don't follow this convention
-    // must use a specialized emitter.
-    auto maybePlusOne = arg.ensurePlusOne(SGF, loc);
-    rawArgs.push_back(maybePlusOne.forward(SGF));
+    // Nonescaping closures can't be forwarded so we pass them +0.
+    auto argFnTy = arg.getType().getAs<SILFunctionType>();
+    if (argFnTy && argFnTy->isTrivialNoEscape()) {
+      rawArgs.push_back(arg.getValue());
+    } else {
+      // Named builtins are by default assumed to take other arguments at +1,
+      // as Owned or Trivial. Named builtins that don't follow this convention
+      // must use a specialized emitter.
+      auto maybePlusOne = arg.ensurePlusOne(SGF, loc);
+      rawArgs.push_back(maybePlusOne.forward(SGF));
+    }
   }
 
   SILValue rawResult = SGF.B.createBuiltin(
@@ -6348,7 +6354,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       loc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StartAsyncLetWithLocalBuffer)),
       getLoweredType(ctx.TheRawPointerType), subs,
-      {taskOptions, taskFunction.forward(*this), resultBuf});
+      {taskOptions, taskFunction.getValue(), resultBuf});
 
   return ManagedValue::forUnmanaged(apply);
 }
