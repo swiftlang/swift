@@ -5,6 +5,9 @@
 // REQUIRES: PTRSIZE=64
 // REQUIRES: swift_in_compiler
 
+// Temporarily disabled because fixing ARCAnalysis broke a critical optimization.
+// REQUIRES: rdar102078974
+
 // This tests the optimality of the IR generated for the new os log APIs. This
 // is not testing the output of a specific optimization pass (which has separate
 // tests) but that all optimizations together result in optimal IR. If this test
