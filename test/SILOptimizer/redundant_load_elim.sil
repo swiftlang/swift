@@ -894,12 +894,15 @@ bb9:                                              // Preds: bb7 bb8
 // in bb9 and bb10.
 //
 // CHECK-LABEL: reuse_silargument_multiple_bb_forwarding
-// CHECK: bb8([[ARG:%.*]] : $Int)
-// CHECK: bb9
+// CHECK: bb7:
+// CHECK:   br bb10(%3 : $Int)
+// CHECK: bb8:
+// CHECK:   cond_br undef, bb9, bb10(%3 : $Int)
 // CHECK-NOT: = load
-// CHECK: bb10
+// CHECK: bb10([[A:%[0-9]+]] : $Int):
 // CHECK-NOT: = load
-// CHECK: return
+// CHECK: return [[A]]
+// CHECK: } // end sil function 'reuse_silargument_multiple_bb_forwarding'
 sil hidden @reuse_silargument_multiple_bb_forwarding : $@convention(thin) (Bool) -> Int {
 bb0(%0 : $Bool):
   %1 = alloc_stack $TwoField, var, name "x"       // users: %7, %10, %13, %16, %21, %26, %28
