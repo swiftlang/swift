@@ -3377,6 +3377,9 @@ static void rewriteFunction(AddressLoweringState &pass) {
       DefRewriter::rewriteValue(valueDef, pass);
       valueAndStorage.storage.markRewritten();
     }
+    // The def of interest may have been changed by rewriteValue.  Get that
+    // redefinition back out of the ValueStoragePair.
+    valueDef = valueAndStorage.value;
     // Rewrite a use of any non-address value mapped to storage (does not
     // include the already rewritten uses of indirect arguments).
     if (valueDef->getType().isAddress())

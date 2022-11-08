@@ -1266,6 +1266,28 @@ nopers(%error : @owned $any Error):
   throw %error : $any Error
 }
 
+// CHECK-LABEL: sil [ossa] @f262_testTryApplyIntoPhi : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         try_apply undef<R>([[ADDR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]]
+// CHECK:       [[NORMAL]](%2 : $()):                                    
+// CHECK:         br [[EXIT:bb[0-9]+]]                                          
+// CHECK:       [[EXIT]]:                                              
+// CHECK:         return {{%[^,]+}} : $()                                 
+// CHECK-LABEL: } // end sil function 'f262_testTryApplyIntoPhi'
+sil [ossa] @f262_testTryApplyIntoPhi : $@convention(thin) <R> () -> (@out R, @error any Error) {
+entry:
+  try_apply undef<R>() : $@convention(thin) <U> () -> (@out U, @error any Error), normal good, error bad
+
+good(%instance : @owned $R):
+  br exit(%instance : $R)
+
+exit(%instance_2 : @owned $R):
+  return %instance_2 : $R
+
+bad(%41 : @owned $any Error):
+  throw %41 : $any Error
+}
+
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
 // CHECK:         fix_lifetime [[ADDR]]
