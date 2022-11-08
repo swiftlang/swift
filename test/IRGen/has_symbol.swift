@@ -28,8 +28,17 @@ public func testGlobalFunctions() {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper19forwardDeclaredFuncyyFTwS"()
   if #_hasSymbol(forwardDeclaredFunc) {}
 
-  // FIXME: Test `dynamic` functions
-  // FIXME: Test `dynamic` functions with opaque return types
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper11dynamicFuncyyFTwS"()
+  if #_hasSymbol(dynamicFunc) {}
+
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper15replacementFuncyyFTwS"()
+  if #_hasSymbol(replacementFunc) {}
+
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTwS"()
+  if #_hasSymbol(dynamicFuncOpaqueResult) {}
+
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFTwS"()
+  if #_hasSymbol(replacementFuncOpaqueResult) {}
 }
 
 // --- function(with:) ---
@@ -55,6 +64,22 @@ public func testGlobalFunctions() {
 // --- forwardDeclaredFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper19forwardDeclaredFuncyyFTwS"()
 // CHECK:   ret i1 icmp ne (void ()* @forward_declared_func, void ()* null)
+
+// --- dynamicFunc() ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper11dynamicFuncyyFTwS"()
+// CHECK:   ret i1 and (i1 and (i1 icmp ne (void ()* @"$s17has_symbol_helper11dynamicFuncyyF", void ()* null), i1 icmp ne (%swift.dyn_repl_link_entry* @"$s17has_symbol_helper11dynamicFuncyyFTX", %swift.dyn_repl_link_entry* null)), i1 icmp ne (%swift.dyn_repl_key* @"$s17has_symbol_helper11dynamicFuncyyFTx", %swift.dyn_repl_key* null))
+
+// --- replacementFunc() ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper15replacementFuncyyFTwS"()
+// CHECK:   ret i1 and (i1 icmp ne (void ()* @"$s17has_symbol_helper15replacementFuncyyF", void ()* null), i1 icmp ne (%swift.dyn_repl_link_entry* @"$s17has_symbol_helper15replacementFuncyyFTX", %swift.dyn_repl_link_entry* null))
+
+// --- dynamicFuncOpaqueResult() ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTwS"()
+// CHECK:   ret i1 and (i1 and (i1 and (i1 and (i1 and (i1 and (i1 and (i1 icmp ne (%swift.type_descriptor* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMQ", %swift.type_descriptor* null), i1 icmp ne (%swift.type_descriptor* ()* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", %swift.type_descriptor* ()* null)), i1 icmp ne (%swift.type_descriptor* ()* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMh", %swift.type_descriptor* ()* null)), i1 icmp ne (%swift.type_descriptor* ()* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", %swift.type_descriptor* ()* null)), i1 icmp ne (%swift.type_descriptor* ()* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFQOMg", %swift.type_descriptor* ()* null)), i1 icmp ne (void (%swift.opaque*)* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryF", void (%swift.opaque*)* null)), i1 icmp ne (%swift.dyn_repl_link_entry* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTX", %swift.dyn_repl_link_entry* null)), i1 icmp ne (%swift.dyn_repl_key* @"$s17has_symbol_helper23dynamicFuncOpaqueResultQryFTx", %swift.dyn_repl_key* null))
+
+// --- replacementFuncOpaqueResult() ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFTwS"()
+// CHECK:   ret i1 and (i1 and (i1 and (i1 and (i1 icmp ne (%swift.type_descriptor* @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMQ", %swift.type_descriptor* null), i1 icmp ne (%swift.type_descriptor* ()* @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMg", %swift.type_descriptor* ()* null)), i1 icmp ne (%swift.type_descriptor* ()* @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFQOMg", %swift.type_descriptor* ()* null)), i1 icmp ne (void (%swift.opaque*)* @"$s17has_symbol_helper27replacementFuncOpaqueResultQryF", void (%swift.opaque*)* null)), i1 icmp ne (%swift.dyn_repl_link_entry* @"$s17has_symbol_helper27replacementFuncOpaqueResultQryFTX", %swift.dyn_repl_link_entry* null))
 
 public func testVars() {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper6globalSivpTwS"()

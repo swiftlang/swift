@@ -1065,9 +1065,11 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::MethodDescriptorDerivative:
     return IGM.MethodDescriptorStructTy;
   case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::OpaqueTypeDescriptorAccessorKey:
     return IGM.DynamicReplacementKeyTy;
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::OpaqueTypeDescriptorAccessorVar:
     return IGM.DynamicReplacementLinkEntryTy;
   case Kind::ObjCMetadataUpdateFunction:
@@ -1158,7 +1160,9 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::SwiftMetaclassStub:
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::ObjCResilientClassStub:
