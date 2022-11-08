@@ -217,6 +217,7 @@
 #define SWIFT_EXTERN_C
 #endif
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_FROM(swiftCore)
+#define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
 #if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
 #define SWIFT_FALLTHROUGH [[fallthrough]]
