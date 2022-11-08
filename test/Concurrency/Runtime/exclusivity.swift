@@ -479,8 +479,8 @@ struct Runner {
         // CHECK-NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): (0x0, 0x0)
         // CHECK-NEXT: Access. Pointer: [[ACCESS]]. PC:
         // CHECK: Exiting Thread Local Context. After Swizzle. Task: [[TASK]]
-        // CHECK_NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[LLNODE]], [[LLNODE]])
-        // CHECK_NEXT: No Accesses.
+        // CHECK-NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[LLNODE]], [[LLNODE]])
+        // CHECK-NEXT: No Accesses.
         //
         // CHECK-NOT: Removing access:
         // CHECK: ==> End Inner Task Handle

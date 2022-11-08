@@ -36,7 +36,7 @@ open class d {
 // CHECK-DAG: define dllexport swiftcc %swift.refcounted* @"$s9dllexport1cCfd"(%T9dllexport1cC*{{.*}})
 // CHECK-DAG-NO-OPT: define dllexport swiftcc %T9dllexport1cC* @"$s9dllexport1cCACycfc"(%T9dllexport1cC* %0)
 // CHECK-DAG-NO-OPT: define dllexport swiftcc %T9dllexport1cC* @"$s9dllexport1cCACycfC"(%swift.type* %0)
-// CHECK-DAG: define dllexport swiftcc i8* @"$s9dllexport2ciAA1cCvau"()
+// CHECK-DAG: define dllexport swiftcc {{(nonnull )?}}i8* @"$s9dllexport2ciAA1cCvau"()
 // CHECK-DAG-NO-OPT: define dllexport swiftcc void @"$s9dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLyyF"(%T9dllexport1dC* %0)
 // CHECK-DAG-NO-OPT: define dllexport swiftcc void @"$s9dllexport1dCfD"(%T9dllexport1dC* %0)
 // CHECK-DAG: define dllexport swiftcc %swift.refcounted* @"$s9dllexport1dCfd"(%T9dllexport1dC*{{.*}})
