@@ -400,7 +400,8 @@ bool MoveKillsCopyableValuesChecker::check() {
   SmallSetVector<SILValue, 32> valuesToCheck;
 
   for (auto *arg : fn->getEntryBlock()->getSILFunctionArguments()) {
-    if (arg->getOwnershipKind() == OwnershipKind::Owned) {
+    if (arg->getOwnershipKind() == OwnershipKind::Owned &&
+        !arg->getType().isMoveOnly()) {
       LLVM_DEBUG(llvm::dbgs() << "Found owned arg to check: " << *arg);
       valuesToCheck.insert(arg);
     }
@@ -409,7 +410,7 @@ bool MoveKillsCopyableValuesChecker::check() {
   for (auto &block : *fn) {
     for (auto &ii : block) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(&ii)) {
-        if (bbi->isLexical()) {
+        if (bbi->isLexical() && !bbi->getType().isMoveOnly()) {
           LLVM_DEBUG(llvm::dbgs()
                      << "Found lexical lifetime to check: " << *bbi);
           valuesToCheck.insert(bbi);
@@ -551,19 +552,28 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
           SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
 
-    // Now search through our function one last time and any move_value
-    // [allows_diagnostics] that remain are ones that we did not know how to
-    // check so emit a diagnostic so the user doesn't assume that they have
-    // guarantees.
+    // Now search through our function one last time and:
+    //
+    // 1. Given any move_value on a move only type, just unset the allows
+    //    diagnostics flag. The move checker will have emitted any errors caused
+    //    by our move [allows_diagnostic] earlier in the compilation pipeline.
+    //
+    // 2. Any move_value [allows_diagnostics] that remain that are not on a move
+    //    only type are ones that we did not know how to check so emit a
+    //    diagnostic so the user doesn't assume that they have guarantees.
     //
     // TODO: Emit specific diagnostics here (e.x.: _move of global).
-    if (DisableUnhandledMoveDiagnostic)
-      return;
     for (auto &block : *fn) {
       for (auto &inst : block) {
         if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
           if (mvi->getAllowDiagnostics()) {
-            emitUnsupportedUseCaseError(mvi);
+            if (mvi->getType().isMoveOnly()) {
+              mvi->setAllowsDiagnostics(false);
+              continue;
+            }
+
+            if (!DisableUnhandledMoveDiagnostic)
+              emitUnsupportedUseCaseError(mvi);
           }
         }
       }

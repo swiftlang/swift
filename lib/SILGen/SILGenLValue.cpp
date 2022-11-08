@@ -30,6 +30,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -3914,11 +3915,21 @@ LValue SILGenLValue::visitMoveExpr(MoveExpr *e, SGFAccessKind accessKind,
 
   ManagedValue addr = SGF.emitAddressOfLValue(e, std::move(baseLV));
 
-  // Now create the temporary and
+  // Now create the temporary and move our value into there.
   auto temp =
       SGF.emitFormalAccessTemporary(e, SGF.F.getTypeLowering(addr.getType()));
   auto toAddr = temp->getAddressForInPlaceInitialization(SGF, e);
-  SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+
+  // If we have a move only type, we use a copy_addr that will be handled by the
+  // address move only checker. If we have a copyable type, we need to use a
+  // mark_unresolved_move_addr to ensure that the move operator checker performs
+  // the relevant checking.
+  if (addr.getType().isMoveOnly()) {
+    SGF.B.createCopyAddr(e, addr.getValue(), toAddr, IsNotTake,
+                         IsInitialization);
+  } else {
+    SGF.B.createMarkUnresolvedMoveAddr(e, addr.getValue(), toAddr);
+  }
   temp->finishInitialization(SGF);
 
   // Now return the temporary in a value component.
