@@ -6,7 +6,7 @@
 
 // FIXME: remove need for -Wno-shadow
 
-// CHECK: namespace Swift {
+// CHECK: namespace Swift __attribute__((swift_private)) {
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts

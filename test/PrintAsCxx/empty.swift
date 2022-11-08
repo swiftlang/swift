@@ -103,7 +103,7 @@
 // CHECK:       } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
-// CHECK:       namespace empty {
+// CHECK:       namespace empty __attribute__((swift_private)) {
 // CHECK:       } // namespace empty
 // CHECK:       #endif
 

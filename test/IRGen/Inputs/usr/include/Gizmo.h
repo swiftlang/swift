@@ -200,3 +200,10 @@ __attribute__((objc_non_runtime_protocol))
 
 @protocol Runtime2P<NonRuntimeP, OtherNonRuntimeP, P3>
 @end
+
+
+@protocol DeclarationOnly;
+
+@protocol DeclarationOnlyUser<DeclarationOnly>
+- (void) printIt;
+@end
