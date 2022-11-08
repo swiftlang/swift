@@ -653,3 +653,37 @@ func test_multiple_wrapper_attributes() {
   // expected-note@-2 {{'NoopWrapper' declared here}}
   class Test2 {} // expected-error {{class 'Test2' cannot use more than one type wrapper}}
 }
+
+@NoopWrapper
+protocol WrappedProto {
+}
+
+do {
+  // @NoopWrapper is inferred from `WrappedProto`
+  struct InferenceFromProto : WrappedProto { // Ok
+    var x: Int
+
+    func test() {
+      _ = $storage // Ok (to make sure that NoopWrapper is indeed inferred)
+    }
+  }
+
+  @Parent.Wrapper // expected-note {{'Wrapper' declared here}}
+  struct ClashBetweenDirectAndInferred : WrappedProto {
+    // expected-error@-1 {{struct 'ClashBetweenDirectAndInferred' cannot use more than one type wrapper}}
+    // expected-note@-2 {{type wrapper 'NoopWrapper' inferred from protocol 'WrappedProto'}}
+    // expected-error@-3 {{type 'ClashBetweenDirectAndInferred' does not conform to protocol 'WrappedProto'}}
+  }
+
+  @NoopWrapper
+  final class NoClashDueToSameWrapper : WrappedProto { // Ok
+    var v: [Int?]
+
+    func test() {
+      let storage: NoopWrapper<NoClashDueToSameWrapper, $Storage> = $storage
+      _ = storage[propertyKeyPath: \.v, storageKeyPath: \$Storage.v]
+    }
+  }
+
+
+}
