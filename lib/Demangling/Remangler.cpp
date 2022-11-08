@@ -2243,6 +2243,18 @@ ManglingError Remangler::mangleTuple(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::manglePack(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleTypeList(node, depth + 1));
+  Buffer << "QP";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "Qp";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleNumber(Node *node, unsigned depth) {
   mangleIndex(node->getIndex());
   return ManglingError::Success;

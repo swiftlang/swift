@@ -1860,6 +1860,14 @@ ManglingError Remangler::mangleTupleElementName(Node *node, unsigned depth) {
   return mangleIdentifier(node->getText(), OperatorKind::NotOperator);
 }
 
+ManglingError Remangler::manglePack(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::manglePackExpansion(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleDependentGenericType(Node *node,
                                                     unsigned depth) {
   Buffer << 'u';
