@@ -6621,6 +6621,10 @@ ERROR(cannot_use_multiple_type_wrappers,none,
       "%0 %1 cannot use more than one type wrapper",
       (DescriptiveDeclKind, DeclName))
 
+NOTE(type_wrapper_inferred_from,none,
+     "type wrapper %0 inferred from %1 %2",
+     (DeclName, DescriptiveDeclKind, DeclName))
+
 ERROR(type_wrapper_requires_memberwise_init,none,
       "type wrapper type %0 does not contain a required initializer"
       " - init(for:storage:)",

@@ -394,3 +394,10 @@ public class TypeWithSomeDefaultedLetProperties<T> {
     print(self.c)
   }
 }
+
+@Wrapper
+public protocol WrappedProtocol {
+  associatedtype T : RangeReplaceableCollection
+
+  var v: T { get set }
+}
