@@ -50,10 +50,10 @@ public:
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
-  void printIdentifier(StringRef name);
+  void printIdentifier(StringRef name) const;
 
   /// Print the base name of the given declaration.
-  void printBaseName(const ValueDecl *decl);
+  void printBaseName(const ValueDecl *decl) const;
 
   /// Print the C-style prefix for the given module name, that's used for
   /// C type names inside the module.
@@ -118,14 +118,18 @@ public:
   void printNominalTypeQualifier(const NominalTypeDecl *typeDecl,
                                  const ModuleDecl *moduleContext);
 
-  /// Print a C++ namespace declaration with the give name and body.
-  void
-  printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
-                 llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+  enum class NamespaceTrivia { None, AttributeSwiftPrivate };
 
-  void
-  printNamespace(StringRef name,
-                 llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
+  void printModuleNamespaceStart(const ModuleDecl &moduleContext) const;
+
+  /// Print a C++ namespace declaration with the give name and body.
+  void printNamespace(llvm::function_ref<void(raw_ostream &OS)> namePrinter,
+                      llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+                      NamespaceTrivia trivia = NamespaceTrivia::None) const;
+
+  void printNamespace(StringRef name,
+                      llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+                      NamespaceTrivia trivia = NamespaceTrivia::None) const;
 
   /// Print an extern C block with given body.
   void

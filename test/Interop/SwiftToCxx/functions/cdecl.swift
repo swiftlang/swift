@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
 
-// CHECK-LABEL: namespace CdeclFunctions {
+// CHECK-LABEL: namespace CdeclFunctions __attribute__((swift_private)) {
 
 // CHECK: namespace _impl {
 // CHECK: SWIFT_EXTERN int cfuncPassTwo(int x, int y) SWIFT_NOEXCEPT;

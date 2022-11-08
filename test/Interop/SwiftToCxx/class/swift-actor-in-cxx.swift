@@ -30,7 +30,7 @@ public final actor ActorWithField {
   }
 }
 
-// CHECK: namespace Actor {
+// CHECK: namespace Actor __attribute__((swift_private)) {
 // CHECK: SWIFT_EXTERN void * _Nonnull $s5Actor0A9WithFieldCACycfC(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // init()
 // CHECK: SWIFT_EXTERN void $s5Actor0A9WithFieldC6methodyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // method()
 
