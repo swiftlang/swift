@@ -127,7 +127,7 @@ public func run_CxxVectorOfU32_Sum_Swift_Reduce(_ n: Int) {
     blackHole(sum)
 }
 
-extension VectorOfU32.const_iterator : Equatable, UnsafeCxxInputIterator { }
+extension VectorOfU32.const_iterator : Equatable, UnsafeCxxRandomAccessIterator { }
 
-extension VectorOfU32: CxxSequence {}
+extension VectorOfU32: CxxRandomAccessCollection {}
 #endif
