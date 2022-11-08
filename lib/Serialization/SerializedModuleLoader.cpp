@@ -1488,11 +1488,13 @@ void SerializedASTFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   auto M = getParentModule();
+  auto &imports = M->getASTContext().getImportCache();
   for (auto &dep : File.Dependencies) {
     if (!dep.Import.hasValue())
       continue;
 
-    if (dep.Import->importedModule == importedModule) {
+    if (dep.Import->importedModule == importedModule ||
+        imports.isImportedBy(importedModule, dep.Import->importedModule)) {
       spiGroups.insert(dep.spiGroups.begin(), dep.spiGroups.end());
     }
   }

@@ -2849,9 +2849,11 @@ canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
+  auto &imports = getASTContext().getImportCache();
   for (auto &import : *Imports) {
     if (import.options.contains(ImportFlags::SPIAccessControl) &&
-        importedModule == import.module.importedModule) {
+        (importedModule == import.module.importedModule ||
+         imports.isImportedBy(importedModule, import.module.importedModule))) {
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
