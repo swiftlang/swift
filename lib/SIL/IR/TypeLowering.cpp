@@ -287,6 +287,26 @@ namespace {
 
 #undef IMPL
 
+    RetTy visitPackType(CanPackType type,
+                        AbstractionPattern origType,
+                        IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
+    RetTy visitPackExpansionType(CanPackExpansionType type,
+                                 AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAddressOnly(type, {IsNotTrivial, IsFixedABI,
+                                               IsAddressOnly, IsNotResilient,
+                                               isSensitive,
+                                               DoesNotHaveRawPointer,
+                                               IsLexical});
+    }
+
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
                                      AbstractionPattern orig,
                                      IsTypeExpansionSensitive_t isSensitive) {
@@ -669,16 +689,6 @@ namespace {
                                       IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyStructType(type, origType, type->getDecl(),
                                          isSensitive);
-    }
-
-    RetTy visitPackType(CanPackType type, AbstractionPattern origType,
-                        IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
-    }
-
-    RetTy visitPackExpansionType(CanPackExpansionType type, AbstractionPattern origType,
-                                 IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
     }
 
     RetTy visitBuiltinTupleType(CanBuiltinTupleType type, AbstractionPattern origType,
@@ -2126,13 +2136,21 @@ namespace {
     TypeLowering *visitPackType(CanPackType packType,
                                 AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
+      RecursiveProperties properties;
+      properties.setAddressOnly();
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      return handleAddressOnly(packType, properties);
     }
 
-    TypeLowering *visitPackExpansionType(CanPackExpansionType packType,
+    TypeLowering *visitPackExpansionType(CanPackExpansionType packExpansionType,
                                          AbstractionPattern origType,
                                          IsTypeExpansionSensitive_t isSensitive) {
-      llvm_unreachable("");
+      RecursiveProperties properties;
+      properties.setAddressOnly();
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      return handleAddressOnly(packExpansionType, properties);
     }
 
     TypeLowering *visitBuiltinTupleType(CanBuiltinTupleType type,
@@ -2447,9 +2465,37 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
 
   if (!changed) return substType;
 
-  // The cast should succeed, because if we end up with a one-element
-  // tuple type here, it must have a label.
-  return cast<TupleType>(CanType(TupleType::get(loweredElts, tc.Context)));
+  return CanTupleType(TupleType::get(loweredElts, tc.Context));
+}
+
+/// Lower each of the elements of the substituted type according to
+/// the abstraction pattern of the given original type.
+static CanPackType computeLoweredPackType(TypeConverter &tc,
+                                          TypeExpansionContext context,
+                                          AbstractionPattern origType,
+                                          CanPackType substType) {
+  assert(origType.matchesPack(substType));
+
+  // Does the lowered tuple type differ from the substituted type in
+  // any interesting way?
+  bool changed = false;
+  SmallVector<Type, 4> loweredElts;
+  loweredElts.reserve(substType->getNumElements());
+
+  for (auto i : indices(substType->getElementTypes())) {
+    auto origEltType = origType.getPackElementType(i);
+    auto substEltType = substType.getElementType(i);
+
+    CanType loweredTy =
+        tc.getLoweredRValueType(context, origEltType, substEltType);
+    changed = (changed || substEltType != loweredTy);
+
+    loweredElts.push_back(loweredTy);
+  }
+
+  if (!changed) return substType;
+
+  return CanPackType(PackType::get(tc.Context, loweredElts));
 }
 
 static CanType computeLoweredOptionalType(TypeConverter &tc,
@@ -2907,13 +2953,34 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
           TC.Context, substPPT->getBaseType(), loweredSubstArgs);
     }
 
+    // Lower pack element types.
     CanType visitPackType(CanPackType substPackType) {
-      llvm_unreachable("");
+      return computeLoweredPackType(TC, forExpansion, origType,
+                                    substPackType);
     }
 
+    CanType visitPackExpansionType(CanPackExpansionType substPackExpansionType) {
+      bool changed = false;
 
-    CanType visitPackExpansionType(CanPackExpansionType substPackType) {
-      llvm_unreachable("");
+      CanType substPatternType = substPackExpansionType.getPatternType();
+      CanType loweredSubstPatternType = TC.getLoweredRValueType(
+          forExpansion,
+          origType.getPackExpansionPatternType(),
+          substPatternType);
+      changed |= (loweredSubstPatternType != substPatternType);
+
+      CanType substCountType = substPackExpansionType.getCountType();
+      CanType loweredSubstCountType = TC.getLoweredRValueType(
+          forExpansion,
+          origType.getPackExpansionCountType(),
+          substCountType);
+      changed |= (loweredSubstCountType != substCountType);
+
+      if (!changed)
+        return substPackExpansionType;
+
+      return CanType(PackExpansionType::get(loweredSubstPatternType,
+                                            loweredSubstCountType));
     }
 
     CanType visitBuiltinTupleType(CanBuiltinTupleType type) {
