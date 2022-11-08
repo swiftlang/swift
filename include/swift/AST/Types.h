@@ -6689,17 +6689,6 @@ inline bool TypeBase::isOpenedExistential() const {
   return isa<OpenedArchetypeType>(T);
 }
 
-inline bool TypeBase::isOpenedExistentialWithError() {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
-    return archetype->getExistentialType()->isExistentialWithError();
-  }
-  return false;
-}
-
 inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
   CanType T = getCanonicalType();
   auto isArchetypeOrExistential = isa<ArchetypeType>(T) ||

@@ -8118,7 +8118,7 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
   if (!nilLiteral)
     return false;
 
-  return toType->isEqual(nilLiteral->getExistentialType()) &&
+  return toType->isEqual(nilLiteral->getDeclaredExistentialType()) &&
          fromType->getOptionalObjectType();
 }
 

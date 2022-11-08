@@ -598,6 +598,8 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
 Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
   assert(type->isTypeParameter());
 
+  bool hasExplicitAnyObject = requiresClass(type);
+
   llvm::SmallVector<Type, 2> types;
   if (Type superclass = getSuperclassBound(type)) {
     // If the class contains a type parameter, try looking for a non-dependent
@@ -606,24 +608,119 @@ Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
       superclass = superclass->getSuperclass();
     }
 
-    if (superclass)
+    if (superclass) {
       types.push_back(superclass);
+      hasExplicitAnyObject = false;
+    }
   }
-  for (const auto &elt : getRequiredProtocols(type)) {
-    types.push_back(elt->getDeclaredInterfaceType());
+  for (auto *proto : getRequiredProtocols(type)) {
+    if (proto->requiresClass())
+      hasExplicitAnyObject = false;
+
+    types.push_back(proto->getDeclaredInterfaceType());
   }
 
-  const auto layout = getLayoutConstraint(type);
-  const auto boundsTy = ProtocolCompositionType::get(
+  auto constraint = ProtocolCompositionType::get(
       getASTContext(), types,
-      /*HasExplicitAnyObject=*/layout &&
-          layout->getKind() == LayoutConstraintKind::Class);
+      hasExplicitAnyObject);
 
-  if (boundsTy->isExistentialType()) {
-    return ExistentialType::get(boundsTy);
+  if (!constraint->isConstraintType()) {
+    assert(constraint->getClassOrBoundGenericClass());
+    return constraint;
   }
 
-  return boundsTy;
+  return ExistentialType::get(constraint);
+}
+
+Type GenericSignatureImpl::getDependentUpperBounds(Type type) const {
+  assert(type->isTypeParameter());
+
+  llvm::SmallVector<Type, 2> types;
+
+  auto &ctx = type->getASTContext();
+
+  bool hasExplicitAnyObject = requiresClass(type);
+
+  // FIXME: If the superclass bound is implied by one of our protocols, we
+  // shouldn't add it to the constraint type.
+  if (Type superclass = getSuperclassBound(type)) {
+    types.push_back(superclass);
+    hasExplicitAnyObject = false;
+  }
+
+  for (auto proto : getRequiredProtocols(type)) {
+    if (proto->requiresClass())
+      hasExplicitAnyObject = false;
+
+    auto *baseType = proto->getDeclaredInterfaceType()->castTo<ProtocolType>();
+
+    auto primaryAssocTypes = proto->getPrimaryAssociatedTypes();
+    if (!primaryAssocTypes.empty()) {
+      SmallVector<Type, 2> argTypes;
+
+      // Attempt to recover same-type requirements on primary associated types.
+      for (auto *assocType : primaryAssocTypes) {
+        // For each primary associated type A of P, compute the reduced type
+        // of T.[P]A.
+        auto *memberType = DependentMemberType::get(type, assocType);
+        auto reducedType = getReducedType(memberType);
+
+        // If the reduced type is at a lower depth than the root generic
+        // parameter of T, then it's constrained.
+        bool hasOuterGenericParam = false;
+        bool hasInnerGenericParam = false;
+        reducedType.visit([&](Type t) {
+          if (auto *paramTy = t->getAs<GenericTypeParamType>()) {
+            unsigned rootDepth = type->getRootGenericParam()->getDepth();
+            if (paramTy->getDepth() == rootDepth)
+              hasInnerGenericParam = true;
+            else {
+              assert(paramTy->getDepth() < rootDepth);
+              hasOuterGenericParam = true;
+            }
+          }
+        });
+
+        if (hasInnerGenericParam && hasOuterGenericParam) {
+          llvm::errs() << "Weird same-type requirements?\n";
+          llvm::errs() << "Interface type: " << type << "\n";
+          llvm::errs() << "Member type: " << memberType << "\n";
+          llvm::errs() << "Reduced member type: " << reducedType << "\n";
+          llvm::errs() << GenericSignature(this) << "\n";
+          abort();
+        }
+
+        if (!hasInnerGenericParam)
+          argTypes.push_back(reducedType);
+      }
+
+      // We should have either constrained all primary associated types,
+      // or none of them.
+      if (!argTypes.empty()) {
+        if (argTypes.size() != primaryAssocTypes.size()) {
+          llvm::errs() << "Not all primary associated types constrained?\n";
+          llvm::errs() << "Interface type: " << type << "\n";
+          llvm::errs() << GenericSignature(this) << "\n";
+          abort();
+        }
+
+        types.push_back(ParameterizedProtocolType::get(ctx, baseType, argTypes));
+        continue;
+      }
+    }
+
+    types.push_back(baseType);
+  }
+
+  auto constraint = ProtocolCompositionType::get(
+     ctx, types, hasExplicitAnyObject);
+
+  if (!constraint->isConstraintType()) {
+    assert(constraint->getClassOrBoundGenericClass());
+    return constraint;
+  }
+
+  return ExistentialType::get(constraint);
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
