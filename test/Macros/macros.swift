@@ -7,4 +7,9 @@ func test(a: Int, b: Int) {
   // CHECK: macro_expansion_expr type='(Int, String)'{{.*}}name=stringify
   // CHECK-NEXT: argument_list
   // CHECK: tuple_expr type='(Int, String)' location=Macro expansion of #stringify
+
+  let (b, s2) = #stringify({ () -> Bool in return true })
+  // CHECK: macro_expansion_expr type='(() -> Bool, String)'{{.*}}name=stringify
+  // CHECK-NEXT: argument_list
+  // CHECK: tuple_expr type='(() -> Bool, String)' location=Macro expansion of #stringify
 }
