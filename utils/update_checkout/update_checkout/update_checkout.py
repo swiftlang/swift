@@ -653,14 +653,14 @@ repositories.
     if os.path.exists(swift_repo_path):
         with shell.pushd(swift_repo_path, dry_run=False, echo=True):
             # Check if `swift` repo itself needs to switch to a cross-repo branch.
-            branch_name, cross_repo = get_branch_for_repo(config, 'swift', 
+            branch_name, cross_repo = get_branch_for_repo(config, 'swift',
                                                           scheme_name,
                                                           scheme_map,
                                                           cross_repos_pr)
 
             if cross_repo:
                 shell.run(['git', 'checkout', branch_name], echo=True,
-                        prefix="[swift] ")
+                          prefix="[swift] ")
 
                 # Re-read the config after checkout.
                 with open(args.config) as f:
