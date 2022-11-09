@@ -1947,6 +1947,12 @@ Remangler::mangleDependentGenericSameTypeRequirement(Node *node,
 }
 
 ManglingError
+Remangler::mangleDependentGenericSameShapeRequirement(Node *node,
+                                                      unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError
 Remangler::mangleDependentGenericLayoutRequirement(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleConstrainedType(node->getChild(0), depth + 1));
   Buffer << 'l';
