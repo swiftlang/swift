@@ -4,6 +4,9 @@
 
 // RUN: %check-interop-c-header-in-clang(%t/structs.h -Wno-unused-function)
 
+// 32-bit disabled because of rdar://102147255
+// REQUIRES: PTRSIZE=64
+
 public struct StructOneI64 {
     let x: Int64
 }
