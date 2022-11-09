@@ -7,6 +7,14 @@ assignees: ''
 
 ---
 
+<!--
+This repository tracks issues related to the implementation of the Swift
+compiler, standard library, runtime, and tools that provide IDE support for
+Swift (e.g. code completion). If the bug relates to the implementation of a
+proprietary (closed-source) Apple framework such as UIKit, SwiftUI, Combine,
+etc., please report it to https://feedbackassistant.apple.com instead.
+-->
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
