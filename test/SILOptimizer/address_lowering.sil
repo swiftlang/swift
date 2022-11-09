@@ -1613,6 +1613,36 @@ bb3:
   return %31 : $()
 }
 
+// Test the result being stored into an @out enum.
+// CHECK-LABEL: sil [ossa] @test_checked_cast_br4 : $@convention(method) <Element><T> (@owned TestGeneric<Element>) -> @out Optional<T> {
+// CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*Optional<T>, [[INSTANCE:%[^,]+]] : @owned $TestGeneric<Element>):
+// CHECK:         [[TEMP:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         [[CAST_DEST_ADDR:%[^,]+]] = init_enum_data_addr [[TEMP]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK:         [[CAST_SOURCE_ADDR:%[^,]+]] = alloc_stack $TestGeneric<Element>
+// CHECK:         store [[INSTANCE]] to [init] [[CAST_SOURCE_ADDR]]
+// CHECK:         checked_cast_addr_br take_on_success TestGeneric<Element> in [[CAST_SOURCE_ADDR]] : $*TestGeneric<Element> to T in [[CAST_DEST_ADDR]] : $*T, [[SUCCESS:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
+// CHECK:         dealloc_stack [[CAST_SOURCE_ADDR]]
+// CHECK:         inject_enum_addr [[TEMP]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK:         copy_addr [take] [[TEMP]] to [init] [[OUT_ADDR]]
+// CHECK-LABEL: } // end sil function 'test_checked_cast_br4'
+sil [ossa] @test_checked_cast_br4 : $@convention(method) <Element><T> (@owned TestGeneric<Element>) -> @out Optional<T> {
+bb0(%3 : @owned $TestGeneric<Element>):
+  checked_cast_br %3 : $TestGeneric<Element> to T, bb1, bb2
+
+bb1(%5 : @owned $T):
+  %6 = enum $Optional<T>, #Optional.some!enumelt, %5 : $T
+  br bb3(%6 : $Optional<T>)
+
+bb2(%8 : @owned $TestGeneric<Element>):
+  destroy_value %8 : $TestGeneric<Element>
+  %10 = enum $Optional<T>, #Optional.none!enumelt
+  br bb3(%10 : $Optional<T>)
+
+bb3(%12 : @owned $Optional<T>):
+  return %12 : $Optional<T>
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast :
 // CHECK: bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
 // CHECK:   [[STK:%.*]] = alloc_stack $T

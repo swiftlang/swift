@@ -419,11 +419,6 @@ struct AddressLoweringState {
   // parameters are rewritten.
   SmallBlotSetVector<FullApplySite, 16> indirectApplies;
 
-  // checked_cast_br instructions with loadable source type and opaque target
-  // type need to be rewritten in a post-pass, once all the uses of the opaque
-  // target value are rewritten to their address forms.
-  SmallVector<CheckedCastBranchInst *, 8> opaqueResultCCBs;
-
   // All function-exiting terminators (return or throw instructions).
   SmallVector<TermInst *, 8> exitingInsts;
 
@@ -610,15 +605,6 @@ void OpaqueValueVisitor::mapValueStorage() {
     for (auto &inst : *block) {
       if (auto apply = FullApplySite::isa(&inst))
         checkForIndirectApply(apply);
-
-      // Collect all checked_cast_br instructions that have a loadable source
-      // type and opaque target type
-      if (auto *ccb = dyn_cast<CheckedCastBranchInst>(&inst)) {
-        if (!ccb->getSourceLoweredType().isAddressOnly(*ccb->getFunction()) &&
-            ccb->getTargetLoweredType().isAddressOnly(*ccb->getFunction())) {
-          pass.opaqueResultCCBs.push_back(ccb);
-        }
-      }
 
       for (auto result : inst.getResults()) {
         if (isPseudoCallResult(result) || isPseudoReturnValue(result))
@@ -3177,6 +3163,10 @@ protected:
       CallArgRewriter(tai, pass).rewriteArguments();
       ApplyRewriter(tai, pass).convertApplyWithIndirectResults();
       return;
+    } else if (auto *ccbi = dyn_cast_or_null<CheckedCastBranchInst>(
+                   arg->getTerminatorForResult())) {
+      CheckedCastBrRewriter(ccbi, pass).rewrite();
+      return;
     }
     LLVM_DEBUG(llvm::dbgs() << "REWRITE ARG "; arg->dump());
     if (storage.storageAddress)
@@ -3410,12 +3400,6 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (optionalApply) {
       rewriteIndirectApply(optionalApply.getValue(), pass);
     }
-  }
-
-  // Rewrite all checked_cast_br instructions with loadable source type and
-  // opaque target type now
-  for (auto *ccb : pass.opaqueResultCCBs) {
-    CheckedCastBrRewriter(ccb, pass).rewrite();
   }
 
   // Rewrite this function's return value now that all opaque values within the
